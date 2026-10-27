@@ -32,8 +32,6 @@ void main() {
 
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(BackButton));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.myGroups));
     await tester.pumpAndSettle();
 

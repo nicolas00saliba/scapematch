@@ -10,11 +10,13 @@ import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'package:scapematch/features/news/data/fake_news_repository.dart';
 import 'package:scapematch/features/news/data/news_repository.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
+import 'package:scapematch/features/news/domain/news_query.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 import 'support/pump_app.dart';
@@ -287,6 +289,102 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('changing the news chip or city does not flash the spinner', (
+    tester,
+  ) async {
+    final repository = _PausableNewsRepository(buildSampleNews(sampleNow));
+    await pumpScapeMatch(
+      tester,
+      overrides: [
+        newsRepositoryProvider.overrideWithValue(repository),
+        clockProvider.overrideWithValue(FixedClock(sampleNow)),
+      ],
+    );
+    await _selectCity(tester, SampleIds.curitiba);
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+      findsOneWidget,
+    );
+
+    repository.pause = Completer<void>();
+    await tester.tap(
+      find.byKey(AppKeys.newsCategory(NewsCategory.promotion.name)),
+    );
+    await tester.pump();
+
+    expect(find.text('Carregando novidades...'), findsNothing);
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+      findsOneWidget,
+    );
+
+    repository.pause!.complete();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+      findsNothing,
+    );
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbCombo)),
+      findsOneWidget,
+    );
+
+    repository.pause = Completer<void>();
+    await tester.tap(find.byKey(AppKeys.citySelector));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.cityOption(SampleIds.saoPaulo)));
+    await tester.pump();
+
+    expect(find.text('Carregando novidades...'), findsNothing);
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbCombo)),
+      findsOneWidget,
+    );
+
+    repository.pause!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spPromo)), findsOneWidget);
+    expect(find.byKey(AppKeys.newsCard(SampleNewsIds.cwbCombo)), findsNothing);
+  });
+
+  testWidgets('recreating Home clears the group search', (tester) async {
+    await pumpScapeMatch(tester);
+    await _selectCity(tester, SampleIds.saoPaulo);
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Metrô');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
+      findsNothing,
+    );
+
+    GoRouter.of(tester.element(find.byType(HomeScreen))).go('/groups/new');
+    await tester.pumpAndSettle();
+
+    GoRouter.of(tester.element(find.byType(CreateGroupScreen))).go('/');
+    await tester.pumpAndSettle();
+    // A lista da cidade espera o repositório. Sem animação, pumpAndSettle
+    // pode encerrar antes.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(AppKeys.groupSearch))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
+      findsOneWidget,
+    );
+  });
 }
 
 Future<void> _selectCity(WidgetTester tester, String cityId) async {
@@ -294,6 +392,35 @@ Future<void> _selectCity(WidgetTester tester, String cityId) async {
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(AppKeys.cityOption(cityId)));
   await tester.pumpAndSettle();
+}
+
+class _PausableNewsRepository implements NewsRepository {
+  _PausableNewsRepository(this.items);
+
+  final List<NewsItem> items;
+  Completer<void>? pause;
+
+  @override
+  Future<NewsItem?> getById(String id) async {
+    for (final item in items) {
+      if (item.id == id) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<NewsItem>> list({
+    required String? cityId,
+    NewsCategory? category,
+  }) async {
+    final pause = this.pause;
+    if (pause != null) {
+      await pause.future;
+    }
+    return filterNews(items, cityId: cityId, category: category);
+  }
 }
 
 class _HangingNewsRepository implements NewsRepository {

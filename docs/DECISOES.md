@@ -162,6 +162,14 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Onde está no código:** `groupSearchQueryProvider` e `filteredGroupsProvider` em `find_groups_view_model.dart`.
 - **Como trocar depois:** se a busca precisar sobreviver mesmo com a Home fora da árvore, os dois providers deixam de ser autoDispose e o campo passa a ler o texto guardado ao abrir.
 
+## Criar grupo abre o detalhe no lugar do formulário
+
+- **Data:** 2026-10-27
+- **Decisão:** depois que o grupo nasce, o detalhe substitui o formulário. O voltar vai para a Home. O formulário preenchido não fica na pilha.
+- **Motivo:** voltar para o formulário deixava o mesmo envio disponível, e a pessoa criava um grupo duplicado sem querer.
+- **Onde está no código:** `CreateGroupScreen._submit`, com `pushReplacement`.
+- **Como trocar depois:** se o formulário precisar continuar atrás do detalhe, a chamada volta a ser `push`.
+
 ## Criar grupo também atualiza Meus grupos
 
 - **Data:** 2026-10-27
