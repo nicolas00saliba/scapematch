@@ -37,7 +37,7 @@ cd build/web && python3 -m http.server 8080
 
 ## O que dá para fazer agora
 
-1. O app abre na **Home**. A barra de baixo tem **Meus grupos** à esquerda e **Home** à direita. A cidade começa vazia: o app não assume Curitiba. A cidade é o filtro dos grupos e das notícias.
+1. O app abre na **Home**. A barra de baixo tem **Home** à esquerda e **Meus grupos** à direita. A cidade começa vazia: o app não assume Curitiba. A cidade é o filtro dos grupos e das notícias.
 2. **Encontrar grupo**, no topo da Home: busca por sala ou casa, filtro **Quase cheios** (ainda dá para entrar e faltam 1 ou 2 vagas) e o atalho **Criar grupo**. Os cartões da lista são curtos. O detalhe continua com preço, presença e o resto da logística.
 3. **Novidades**, logo abaixo, no mesmo scroll. Chips: Todas, Novas salas, Horários, Promoções e Eventos. O feed é fictício e fica atrás de um `NewsRepository`. Tocar numa notícia abre o detalhe. O link de origem, quando existe, só é mostrado.
 4. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém. Não entra quem já está em outro grupo no mesmo horário, nem em sessão que já começou.
@@ -46,7 +46,7 @@ cd build/web && python3 -m http.server 8080
 7. **Sair do grupo**, se você não é o criador. Com 2 horas ou mais de antecedência o pagamento simulado é reembolsado. Com menos de 2 horas, a tela avisa antes de confirmar que não há reembolso. A vaga volta a ficar livre. Exatamente 2 horas ainda reembolsa. Sair é definitivo naquele grupo.
 8. **Excluir grupo**, só para quem criou. Isso cancela o evento para todo mundo e reembolsa integralmente, mesmo em cima da hora. Quem não criou não vê o botão. O criador não sai: ele exclui.
 9. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
-10. **Meus grupos**, na aba da esquerda, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
+10. **Meus grupos**, na aba da direita, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
 
 Não existe conta. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo continua “Você”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois.
 

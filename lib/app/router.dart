@@ -9,10 +9,11 @@ import 'package:scapematch/features/news/presentation/news_detail_screen.dart';
 
 /// Rotas do app.
 ///
-/// A barra tem dois ramos: `/groups/mine` (Meus grupos, à esquerda) e `/`
-/// (Home). Criar grupo, o detalhe do grupo e o detalhe da notícia abrem por
-/// cima da barra. `new` continua antes de `:groupId` para a palavra não virar
-/// um id. `/groups` sem sufixo volta para a Home, que agora é a busca.
+/// A barra tem dois ramos: `/` (Home, à esquerda) e `/groups/mine`
+/// (Meus grupos, à direita). O app abre na Home. Criar grupo, o detalhe do
+/// grupo e o detalhe da notícia abrem por cima da barra. `new` continua
+/// antes de `:groupId` para a palavra não virar um id. `/groups` sem sufixo
+/// volta para a Home, que agora é a busca.
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/',
@@ -31,18 +32,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/groups/mine',
-                name: 'my-groups',
-                builder: (context, state) => const MyGroupsScreen(),
+                path: '/',
+                name: 'home',
+                builder: (context, state) => const HomeScreen(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/',
-                name: 'home',
-                builder: (context, state) => const HomeScreen(),
+                path: '/groups/mine',
+                name: 'my-groups',
+                builder: (context, state) => const MyGroupsScreen(),
               ),
             ],
           ),

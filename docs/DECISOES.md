@@ -93,9 +93,9 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Meus grupos
 
 - **Data:** 2026-10-27
-- **Decisão:** Meus grupos é a aba da esquerda na barra inferior, não um cartão da Home. Dentro dela ficam três abas: Próximos, Passados e Cancelados. Entram grupos criados e grupos em que a pessoa entrou. Próximos são cadeiras ainda ativas cuja sessão não terminou, inclusive a que já começou. Passados são sessões que já terminaram e não foram canceladas, com a pessoa ainda na cadeira. Cancelados são grupo excluído, saída voluntária ou remoção pelo organizador, mesmo que a sessão também já tenha acabado. Cada aba tem a própria lista e o próprio texto de vazio.
+- **Decisão:** Meus grupos é a aba da direita na barra inferior, não um cartão da Home. Dentro dela ficam três abas: Próximos, Passados e Cancelados. Entram grupos criados e grupos em que a pessoa entrou. Próximos são cadeiras ainda ativas cuja sessão não terminou, inclusive a que já começou. Passados são sessões que já terminaram e não foram canceladas, com a pessoa ainda na cadeira. Cancelados são grupo excluído, saída voluntária ou remoção pelo organizador, mesmo que a sessão também já tenha acabado. Cada aba tem a própria lista e o próprio texto de vazio.
 - **Motivo:** a busca é para achar vaga. O histórico da pessoa, inclusive o reembolso, não pode sumir quando o grupo sai da lista da cidade. Misturar sessão encerrada com cancelamento na mesma aba escondia o motivo de cada linha.
-- **Onde está no código:** rota `/groups/mine`, primeiro ramo do `StatefulShellRoute`, `MyGroupsScreen`, `splitMyGroups` e `GroupRules.bucketForMember`. A separação das três listas não mudou.
+- **Onde está no código:** rota `/groups/mine`, segundo ramo do `StatefulShellRoute`, `MyGroupsScreen`, `splitMyGroups` e `GroupRules.bucketForMember`. A separação das três listas não mudou.
 - **Como trocar depois:** uma aba “Em andamento” usaria `hasStarted` sem `hasEnded` e sairia de Próximos. Voltar a juntar Passados e Cancelados é desfazer `bucketForMember` num único “não é próximo”.
 
 ## Editar o grupo
@@ -130,12 +130,12 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Onde está no código:** `HomeScreen`, `FindGroupsSection`, `NewsSection`. O texto da busca filtra em memória (`filterGroupsByText`); não cria outro método no `GroupRepository`. O cartão da lista não mostra mais preço, presenças confirmadas nem a barra de progresso. Isso continua no detalhe e em Meus grupos.
 - **Como trocar depois:** se a busca voltar a ser uma tela só dela, a seção sai da Home e a rota `/groups` deixa de redirecionar. Se o preço precisar aparecer no cartão, ele volta para `GroupCard`. O atalho Criar grupo pode sair se a barra ganhar um botão de criar.
 
-## Barra inferior: Meus grupos à esquerda da Home
+## Barra inferior: Home à esquerda, Meus grupos à direita
 
 - **Data:** 2026-10-27
-- **Decisão:** a barra tem só dois destinos, nesta ordem: Meus grupos, Home. O app abre na Home. Cada aba guarda o próprio scroll. Criar grupo, o detalhe do grupo e o detalhe da notícia abrem por cima da barra, com voltar. Não há terceira aba nesta versão. O rótulo da aba é “Home”, a palavra que o dono usou.
-- **Motivo:** Meus grupos precisava de um lugar fixo, à esquerda da Home, sem misturar o histórico com a busca. Duas abas bastam para o que existe hoje.
-- **Onde está no código:** `StatefulShellRoute.indexedStack` em `lib/app/router.dart` e `AppShell`. O ramo 0 é `/groups/mine`. O ramo 1 é `/`.
+- **Decisão:** a barra tem só dois destinos, nesta ordem: Home, Meus grupos. A ordem final é Home à esquerda e Meus grupos à direita. O dono mudou de ideia no mesmo dia: a primeira versão desta decisão punha Meus grupos à esquerda. O app continua abrindo na Home. Cada aba guarda o próprio scroll. Criar grupo, o detalhe do grupo e o detalhe da notícia abrem por cima da barra, com voltar. Não há terceira aba nesta versão. O rótulo da aba é “Home”, a palavra que o dono usou.
+- **Motivo:** Meus grupos precisava de um lugar fixo, sem misturar o histórico com a busca. Duas abas bastam para o que existe hoje. A posição à direita foi o pedido final do dono.
+- **Onde está no código:** `StatefulShellRoute.indexedStack` em `lib/app/router.dart` e `AppShell`. O ramo 0 é `/` (Home). O ramo 1 é `/groups/mine`.
 - **Como trocar depois:** uma aba nova entra como outro `StatefulShellBranch`, na posição em que deve aparecer. Se o nome da aba passar a ser “Início”, muda o `label` da `NavigationDestination`.
 
 ## Feed de notícias fictícias

@@ -9,7 +9,7 @@ import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('the app opens on Home, with Meus grupos to its left', (
+  testWidgets('the app opens on Home, with Meus grupos to its right', (
     tester,
   ) async {
     await pumpScapeMatch(tester);
@@ -21,15 +21,15 @@ void main() {
     expect(find.byKey(AppKeys.newsFeed), findsOneWidget);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      1,
+      0,
     );
 
     final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect((bar.destinations[0] as NavigationDestination).label, 'Meus grupos');
-    expect((bar.destinations[1] as NavigationDestination).label, 'Home');
+    expect((bar.destinations[0] as NavigationDestination).label, 'Home');
+    expect((bar.destinations[1] as NavigationDestination).label, 'Meus grupos');
     expect(
-      tester.getCenter(find.byKey(AppKeys.myGroups)).dx,
-      lessThan(tester.getCenter(find.byKey(AppKeys.homeTab)).dx),
+      tester.getCenter(find.byKey(AppKeys.homeTab)).dx,
+      lessThan(tester.getCenter(find.byKey(AppKeys.myGroups)).dx),
     );
 
     await tester.tap(find.byKey(AppKeys.myGroups));
@@ -46,7 +46,7 @@ void main() {
     expect(find.text('Cancelados'), findsOneWidget);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      0,
+      1,
     );
 
     await tester.tap(find.byKey(AppKeys.homeTab));

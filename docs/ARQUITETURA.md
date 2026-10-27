@@ -28,7 +28,7 @@ Tela  ->  view model  ->  repositório (interface)  ->  fonte de dados
 
 ## Como a Home funciona
 
-1. O app abre em `/`, a Home. A barra inferior tem Meus grupos à esquerda e a Home à direita. As duas abas são ramos de um `StatefulShellRoute`, então cada uma guarda o próprio scroll.
+1. O app abre em `/`, a Home. A barra inferior tem a Home à esquerda e Meus grupos à direita. As duas abas são ramos de um `StatefulShellRoute`, então cada uma guarda o próprio scroll.
 2. A pessoa escolhe a cidade no `CitySelector`. Isso grava o id em `selectedCityIdProvider`. Nada fica fixo em Curitiba; o valor inicial é vazio. A mesma cidade filtra os grupos e o feed.
 3. Em cima, `FindGroupsSection` observa `filteredGroupsProvider`. O `FindGroupsViewModel` lê a cidade e o filtro “Quase cheios” e chama `GroupRepository.listByCity`. O texto “Buscar sala ou casa” filtra essa lista em memória, sem outra ida ao repositório. O atalho Criar grupo abre `/groups/new` por cima da barra.
 4. O `FakeGroupRepository` filtra `FakeDatabase.groups`. Esses grupos foram montados em `sample_data.dart`.
@@ -67,7 +67,7 @@ Usamos Riverpod 3, sem gerador de código, para o arquivo continuar legível.
 - `AsyncNotifier` guarda algo que vem de um `Future` (a lista, o detalhe). O widget usa `when` para carregando, erro e dado.
 - O retry automático do Riverpod 3 está desligado em `lib/app/retry.dart`. Quem tenta de novo é a pessoa, no botão.
 
-A navegação é o `go_router` em `lib/app/router.dart`. A barra é um `StatefulShellRoute.indexedStack`: o primeiro ramo é `/groups/mine` (Meus grupos) e o segundo é `/` (Home). Por cima da barra ficam `/groups/new`, `/groups/:groupId` e `/news/:newsId`. A palavra `new` continua registrada antes de `:groupId`. `/groups/mine` é a tela Meus grupos, com as abas Próximos, Passados e Cancelados. `/groups` sem sufixo volta para a Home.
+A navegação é o `go_router` em `lib/app/router.dart`. A barra é um `StatefulShellRoute.indexedStack`: o primeiro ramo é `/` (Home) e o segundo é `/groups/mine` (Meus grupos). Por cima da barra ficam `/groups/new`, `/groups/:groupId` e `/news/:newsId`. A palavra `new` continua registrada antes de `:groupId`. `/groups/mine` é a tela Meus grupos, com as abas Próximos, Passados e Cancelados. `/groups` sem sufixo volta para a Home.
 
 ## O que é fictício, no código
 
