@@ -1,10 +1,12 @@
+import 'package:scapematch/features/groups/domain/attendance.dart';
+
 /// Product rules that do not depend on Flutter or on where data is stored.
 ///
 /// Screens and repositories both call these functions. When the fake data
 /// source is replaced, the rules stay here and do not need to be rewritten.
 ///
 /// Provisional product choices (free join, the almost-full limit, one group
-/// per room and time) are recorded in `docs/DECISOES.md`.
+/// per room and time, the refund window) are recorded in `docs/DECISOES.md`.
 class GroupRules {
   const GroupRules._();
 
@@ -16,6 +18,18 @@ class GroupRules {
   /// The creator is already seated, so the form must ask for at least one
   /// more person. A group of one is not a group.
   static const minExtraSpots = 1;
+
+  /// Creator plus at least one other person.
+  static const minGroupSize = minExtraSpots + 1;
+
+  /// Leaving at least this long before the start refunds the simulated
+  /// payment. Exactly this duration still refunds. Less than this does not.
+  /// The organizer cancelling or removing someone always refunds, and that
+  /// path does not read this constant.
+  static const refundDeadline = Duration(hours: 2);
+
+  /// Creator note stored on the group. Longer text is rejected.
+  static const maxNoteLength = 280;
 
   static int openSeats({required int filledSpots, required int totalSpots}) {
     return totalSpots - filledSpots;
@@ -91,6 +105,115 @@ class GroupRules {
     }
     return false;
   }
+
+  /// True once [now] is the start instant or later.
+  static bool hasStarted({required DateTime startsAt, required DateTime now}) {
+    return !now.isBefore(startsAt);
+  }
+
+  /// True once [now] is the end instant or later.
+  static bool hasEnded({required DateTime endsAt, required DateTime now}) {
+    return !now.isBefore(endsAt);
+  }
+
+  /// Volunteer cancellation refunds when the session is at least
+  /// [refundDeadline] away. Exactly [refundDeadline] refunds. A session
+  /// that starts in less than that, or that already started, does not.
+  static bool refundsOnParticipantCancel({
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    return startsAt.difference(now) >= refundDeadline;
+  }
+
+  static RefundOutcome refundForParticipantCancel({
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    if (refundsOnParticipantCancel(startsAt: startsAt, now: now)) {
+      return const RefundOutcome(
+        status: RefundStatus.refunded,
+        reason: RefundReason.cancelledInTime,
+      );
+    }
+    return const RefundOutcome(
+      status: RefundStatus.denied,
+      reason: RefundReason.cancelledTooLate,
+    );
+  }
+
+  /// The organizer cancelled the event or removed the person. The simulated
+  /// payment is returned in full even inside [refundDeadline].
+  static RefundOutcome refundForOrganizer(RefundReason reason) {
+    return RefundOutcome(status: RefundStatus.refunded, reason: reason);
+  }
+
+  /// Half-open intervals: a session that ends at the next session's start
+  /// does not overlap it.
+  static bool sessionsOverlap({
+    required DateTime startA,
+    required Duration durationA,
+    required DateTime startB,
+    required Duration durationB,
+  }) {
+    final endA = startA.add(durationA);
+    final endB = startB.add(durationB);
+    return startA.isBefore(endB) && startB.isBefore(endA);
+  }
+
+  /// Smallest group size the creator may save.
+  ///
+  /// It cannot drop below the people already seated, and it cannot drop
+  /// below [minGroupSize] while the creator is still looking for someone.
+  static int minimumTotalSpots({required int occupiedSpots}) {
+    if (occupiedSpots < minGroupSize) {
+      return minGroupSize;
+    }
+    return occupiedSpots;
+  }
+
+  static TotalSpotsValidation validateTotalSpots({
+    required int totalSpots,
+    required int occupiedSpots,
+    required int roomCapacity,
+  }) {
+    if (totalSpots > roomCapacity) {
+      return TotalSpotsValidation.exceedsRoomCapacity;
+    }
+    if (totalSpots < occupiedSpots) {
+      return TotalSpotsValidation.belowOccupancy;
+    }
+    if (totalSpots < minGroupSize) {
+      return TotalSpotsValidation.belowMinimum;
+    }
+    return TotalSpotsValidation.valid;
+  }
+
+  static String normalizeNote(String value) => value.trim();
+
+  static bool noteTooLong(String value) =>
+      normalizeNote(value).length > maxNoteLength;
+
+  /// Upcoming membership: the group is still on, the person still has a
+  /// seat, and the session has not ended.
+  static bool isUpcomingForMember({
+    required bool groupCancelled,
+    required bool memberActive,
+    required DateTime endsAt,
+    required DateTime now,
+  }) {
+    if (groupCancelled || !memberActive) {
+      return false;
+    }
+    return !hasEnded(endsAt: endsAt, now: now);
+  }
 }
 
 enum GroupSizeValidation { valid, belowMinimum, exceedsRoomCapacity }
+
+enum TotalSpotsValidation {
+  valid,
+  belowMinimum,
+  belowOccupancy,
+  exceedsRoomCapacity,
+}

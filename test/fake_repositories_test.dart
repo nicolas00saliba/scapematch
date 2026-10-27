@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/fake_database.dart';
-import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
@@ -9,6 +8,8 @@ import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 
+import 'support/sample_clock.dart';
+
 void main() {
   late FakeDatabase database;
   late FakeGroupRepository groups;
@@ -16,8 +17,12 @@ void main() {
   late FakeCityRepository cities;
 
   setUp(() {
-    database = buildSampleDatabase();
-    groups = FakeGroupRepository(database, latency: Duration.zero);
+    database = loadSampleDatabase();
+    groups = FakeGroupRepository(
+      database,
+      clock: loadSampleClock(),
+      latency: Duration.zero,
+    );
     catalog = FakeCatalogRepository(database, latency: Duration.zero);
     cities = FakeCityRepository(database, latency: Duration.zero);
   });
@@ -143,8 +148,12 @@ void main() {
               .map((group) => group.startsAt)
               .toSet();
           final free = slots.where((slot) => !taken.contains(slot.startsAt));
+          final futureFree = free.where(
+            (slot) => slot.startsAt.isAfter(sampleNow),
+          );
           expect(slots.length, greaterThanOrEqualTo(4), reason: room.name);
           expect(free.length, greaterThanOrEqualTo(3), reason: room.name);
+          expect(futureFree.length, greaterThanOrEqualTo(3), reason: room.name);
         }
       }
     }

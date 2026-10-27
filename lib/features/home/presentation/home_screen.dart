@@ -49,6 +49,14 @@ class HomeScreen extends StatelessWidget {
             subtitle: 'Escolha a sala, o horário e quantas vagas faltam.',
             onTap: () => context.push('/groups/new'),
           ),
+          const SizedBox(height: 12),
+          _EntryCard(
+            buttonKey: AppKeys.myGroups,
+            icon: Icons.event_available_outlined,
+            title: 'Meus grupos',
+            subtitle: 'Próximos, passados e o reembolso simulado.',
+            onTap: () => context.push('/groups/mine'),
+          ),
           const SizedBox(height: 20),
           const ExampleDataBanner(),
         ],
@@ -79,6 +87,8 @@ class _EntryCard extends StatelessWidget {
       button: true,
       identifier: buttonKey == AppKeys.findGroup
           ? 'find-group'
+          : buttonKey == AppKeys.myGroups
+          ? 'my-groups'
           : 'create-group',
       label: '$title. $subtitle',
       excludeSemantics: true,

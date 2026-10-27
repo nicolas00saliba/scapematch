@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 
 void main() {
@@ -123,5 +124,210 @@ void main() {
         isFalse,
       );
     });
+  });
+
+  group('refund window', () {
+    final now = DateTime(2026, 10, 27, 12);
+
+    test('refunds exactly two hours before the start', () {
+      expect(GroupRules.refundDeadline, const Duration(hours: 2));
+      final startsAt = now.add(GroupRules.refundDeadline);
+      expect(
+        GroupRules.refundsOnParticipantCancel(startsAt: startsAt, now: now),
+        isTrue,
+      );
+      final outcome = GroupRules.refundForParticipantCancel(
+        startsAt: startsAt,
+        now: now,
+      );
+      expect(outcome.status, RefundStatus.refunded);
+      expect(outcome.reason, RefundReason.cancelledInTime);
+    });
+
+    test(
+      'refunds one minute outside the window and refuses one minute inside',
+      () {
+        final outside = now
+            .add(GroupRules.refundDeadline)
+            .add(const Duration(minutes: 1));
+        final inside = now
+            .add(GroupRules.refundDeadline)
+            .subtract(const Duration(minutes: 1));
+        expect(
+          GroupRules.refundsOnParticipantCancel(startsAt: outside, now: now),
+          isTrue,
+        );
+        expect(
+          GroupRules.refundsOnParticipantCancel(startsAt: inside, now: now),
+          isFalse,
+        );
+        expect(
+          GroupRules.refundForParticipantCancel(
+            startsAt: inside,
+            now: now,
+          ).reason,
+          RefundReason.cancelledTooLate,
+        );
+      },
+    );
+
+    test('a session that starts in under two hours does not refund', () {
+      final startsAt = now.add(const Duration(minutes: 90));
+      expect(
+        GroupRules.refundsOnParticipantCancel(startsAt: startsAt, now: now),
+        isFalse,
+      );
+    });
+
+    test('the organizer refunds even inside the window', () {
+      final startsAt = now.add(const Duration(minutes: 30));
+      expect(
+        GroupRules.refundsOnParticipantCancel(startsAt: startsAt, now: now),
+        isFalse,
+      );
+      final outcome = GroupRules.refundForOrganizer(
+        RefundReason.organizerCancelledEvent,
+      );
+      expect(outcome.status, RefundStatus.refunded);
+      expect(outcome.reason, RefundReason.organizerCancelledEvent);
+    });
+  });
+
+  group('schedule conflicts', () {
+    final start = DateTime(2026, 10, 27, 16);
+
+    test('overlapping sessions block each other', () {
+      expect(
+        GroupRules.sessionsOverlap(
+          startA: start,
+          durationA: const Duration(minutes: 75),
+          startB: start.add(const Duration(minutes: 30)),
+          durationB: const Duration(minutes: 60),
+        ),
+        isTrue,
+      );
+    });
+
+    test('a session that starts when the other ends does not overlap', () {
+      expect(
+        GroupRules.sessionsOverlap(
+          startA: start,
+          durationA: const Duration(hours: 1),
+          startB: start.add(const Duration(hours: 1)),
+          durationB: const Duration(hours: 1),
+        ),
+        isFalse,
+      );
+    });
+
+    test('a session has started at the exact start instant', () {
+      expect(GroupRules.hasStarted(startsAt: start, now: start), isTrue);
+      expect(
+        GroupRules.hasStarted(
+          startsAt: start,
+          now: start.subtract(const Duration(minutes: 1)),
+        ),
+        isFalse,
+      );
+    });
+
+    test('a session has ended at the exact end instant', () {
+      final endsAt = start.add(const Duration(minutes: 60));
+      expect(GroupRules.hasEnded(endsAt: endsAt, now: endsAt), isTrue);
+      expect(
+        GroupRules.hasEnded(
+          endsAt: endsAt,
+          now: endsAt.subtract(const Duration(minutes: 1)),
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('editing the group size', () {
+    test('rejects a size below who already joined', () {
+      expect(
+        GroupRules.validateTotalSpots(
+          totalSpots: 4,
+          occupiedSpots: 5,
+          roomCapacity: 6,
+        ),
+        TotalSpotsValidation.belowOccupancy,
+      );
+    });
+
+    test('rejects a size above the room and a group of one', () {
+      expect(
+        GroupRules.validateTotalSpots(
+          totalSpots: 7,
+          occupiedSpots: 2,
+          roomCapacity: 6,
+        ),
+        TotalSpotsValidation.exceedsRoomCapacity,
+      );
+      expect(
+        GroupRules.validateTotalSpots(
+          totalSpots: 1,
+          occupiedSpots: 1,
+          roomCapacity: 6,
+        ),
+        TotalSpotsValidation.belowMinimum,
+      );
+    });
+
+    test('the floor is who already joined once that passes two', () {
+      expect(GroupRules.minimumTotalSpots(occupiedSpots: 1), 2);
+      expect(GroupRules.minimumTotalSpots(occupiedSpots: 5), 5);
+    });
+  });
+
+  group('my groups buckets', () {
+    final now = DateTime(2026, 10, 27, 12);
+    final endsAt = now.add(const Duration(hours: 3));
+
+    test('an active future seat stays upcoming', () {
+      expect(
+        GroupRules.isUpcomingForMember(
+          groupCancelled: false,
+          memberActive: true,
+          endsAt: endsAt,
+          now: now,
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+      'a cancelled group, a left seat, or a finished session is history',
+      () {
+        expect(
+          GroupRules.isUpcomingForMember(
+            groupCancelled: true,
+            memberActive: true,
+            endsAt: endsAt,
+            now: now,
+          ),
+          isFalse,
+        );
+        expect(
+          GroupRules.isUpcomingForMember(
+            groupCancelled: false,
+            memberActive: false,
+            endsAt: endsAt,
+            now: now,
+          ),
+          isFalse,
+        );
+        expect(
+          GroupRules.isUpcomingForMember(
+            groupCancelled: false,
+            memberActive: true,
+            endsAt: now,
+            now: now,
+          ),
+          isFalse,
+        );
+      },
+    );
   });
 }

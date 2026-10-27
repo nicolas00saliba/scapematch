@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/data/sample_data.dart';
+import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/features/catalog/data/asset_experience_source.dart';
 import 'package:scapematch/features/catalog/data/catalog_repository.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
@@ -10,12 +11,19 @@ import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
 
+/// Wall clock for rules that compare a session with "now".
+///
+/// Tests override this with a [FixedClock]. Sample groups are built from
+/// the same instant, so a session that starts in 90 minutes stays inside
+/// the refund window for the whole session.
+final clockProvider = Provider<Clock>((ref) => const SystemClock());
+
 /// One in-memory database for the whole session.
 ///
 /// The three repositories below share it, so a group created on one screen
 /// shows up on the others. Tests can override any of these providers.
 final fakeDatabaseProvider = Provider<FakeDatabase>((ref) {
-  return buildSampleDatabase();
+  return buildSampleDatabase(now: ref.watch(clockProvider).now());
 });
 
 final cityRepositoryProvider = Provider<CityRepository>((ref) {
@@ -27,7 +35,10 @@ final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
 });
 
 final groupRepositoryProvider = Provider<GroupRepository>((ref) {
-  return FakeGroupRepository(ref.watch(fakeDatabaseProvider));
+  return FakeGroupRepository(
+    ref.watch(fakeDatabaseProvider),
+    clock: ref.watch(clockProvider),
+  );
 });
 
 /// Example house feed. The screens do not read this yet.

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 import 'support/pump_app.dart';
+import 'support/sample_clock.dart';
 
 void main() {
   testWidgets('finds a group in the chosen city, filters, and joins', (
@@ -97,7 +98,7 @@ void main() {
   testWidgets('a filled group shows Grupo cheio and blocks entry', (
     tester,
   ) async {
-    final database = buildSampleDatabase();
+    final database = loadSampleDatabase();
     final index = database.groups.indexWhere(
       (group) => group.id == SampleIds.groupSpMetroAlmost,
     );
@@ -106,7 +107,10 @@ void main() {
 
     await pumpScapeMatch(
       tester,
-      overrides: [fakeDatabaseProvider.overrideWithValue(database)],
+      overrides: [
+        clockProvider.overrideWithValue(FixedClock(sampleNow)),
+        fakeDatabaseProvider.overrideWithValue(database),
+      ],
     );
 
     await _selectCity(tester, SampleIds.saoPaulo);
@@ -233,12 +237,18 @@ void main() {
   testWidgets('shows an error with retry when the group list fails', (
     tester,
   ) async {
-    final database = buildSampleDatabase();
+    final database = loadSampleDatabase();
     await pumpScapeMatch(
       tester,
       overrides: [
+        clockProvider.overrideWithValue(FixedClock(sampleNow)),
         groupRepositoryProvider.overrideWithValue(
-          FakeGroupRepository(database, latency: Duration.zero, failList: true),
+          FakeGroupRepository(
+            database,
+            clock: FixedClock(sampleNow),
+            latency: Duration.zero,
+            failList: true,
+          ),
         ),
       ],
     );

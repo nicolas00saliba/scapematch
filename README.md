@@ -39,8 +39,13 @@ cd build/web && python3 -m http.server 8080
 
 1. Na home, escolher uma cidade. O app não assume Curitiba: a cidade começa vazia e é o filtro principal, no mesmo espírito do campo de origem de um app de passagem.
 2. **Encontrar grupo**: lista os grupos da cidade, com o filtro **Quase cheios** (ainda dá para entrar e faltam 1 ou 2 vagas).
-3. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém.
-4. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. O horário é uma das opções da sala, não uma data livre. Não nascem dois grupos na mesma sala no mesmo horário.
+3. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém. Não entra quem já está em outro grupo no mesmo horário, nem em sessão que já começou.
+4. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. O horário é uma das opções da sala, não uma data livre. Não nascem dois grupos na mesma sala no mesmo horário. Um horário que já passou é recusado.
+5. **Confirmar presença** na lista de quem já está. O criador confirma a própria. O cartão e o detalhe mostram quantas presenças estão confirmadas.
+6. **Sair do grupo**, se você não é o criador. Com 2 horas ou mais de antecedência o pagamento simulado é reembolsado. Com menos de 2 horas, a tela avisa antes de confirmar que não há reembolso. A vaga volta a ficar livre. Exatamente 2 horas ainda reembolsa. Sair é definitivo naquele grupo.
+7. **Excluir grupo**, só para quem criou. Isso cancela o evento para todo mundo e reembolsa integralmente, mesmo em cima da hora. Quem não criou não vê o botão. O criador não sai: ele exclui.
+8. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
+9. **Meus grupos**, na home, com as abas Próximos e Passados/Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
 
 Não existe conta. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo continua “Você”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois.
 
@@ -56,7 +61,7 @@ lib/
   features/
     cities/                 # cidade escolhida e o seletor
     catalog/                # casas, salas e horários
-    groups/                 # achar, ver e criar grupo
+    groups/                 # achar, ver, criar e acompanhar grupo
     home/
   providers/                # liga as interfaces aos dados fictícios
 test/                       # regras, repositório e fluxos de tela
@@ -76,7 +81,7 @@ Cada feature segue o mesmo desenho:
 
 - **Flutter + Riverpod + go_router.** Sem Firebase e sem Supabase nesta fase.
 - **MVVM leve.** A tela observa um view model. O view model chama um repositório. A tela não conhece a lista fictícia.
-- **Regras puras** em `GroupRules`: não entrar em grupo cheio, o que é “quase cheio”, e o limite de vagas na criação. Dá para testar sem subir a interface.
+- **Regras puras** em `GroupRules`: não entrar em grupo cheio, o que é “quase cheio”, o limite de vagas, a janela de reembolso de 2 horas, a sobreposição de horários e o grupo que já começou. O relógio entra por um `Clock`. Dá para testar sem subir a interface.
 - **Um `Group` já vem com os nomes da casa e da sala.** A tela não junta tabelas. Quando o repositório for o Supabase, ele faz essa junção e devolve o mesmo objeto.
 - As mudanças de “entrar” e “criar” duram enquanto o app está aberto. Fechar o app volta aos dados de exemplo.
 
@@ -84,11 +89,11 @@ O mapa completo, com o caminho de uma tela, está em [docs/ARQUITETURA.md](docs/
 
 ## O que é fictício
 
-Tudo que aparece sobre casas e grupos. Os nomes (Escape Augusta, O Cofre do Café, e os outros) foram inventados. Não vêm de site de casa nenhuma. As datas de exemplo estão em novembro de 2026 para a demonstração não depender do dia de hoje.
+Tudo que aparece sobre casas e grupos. Os nomes (Escape Augusta, O Cofre do Café, e os outros) foram inventados. Não vêm de site de casa nenhuma. Os preços também são fictícios. O pagamento marcado como pago, e o reembolso, não movimentam dinheiro.
 
-As cidades de exemplo são Curitiba, São Paulo, Rio de Janeiro, Belo Horizonte e Porto Alegre, cada uma com casas e salas diferentes. Cada cidade começa com dois grupos: um quase cheio (falta 1 ou 2 vagas) e outro com mais vagas abertas, ambos dentro da capacidade da sala. O resto dos horários fica livre para criar grupos novos.
+As cidades de exemplo são Curitiba, São Paulo, Rio de Janeiro, Belo Horizonte e Porto Alegre, cada uma com casas e salas diferentes. Cada cidade começa com dois grupos: um quase cheio (falta 1 ou 2 vagas) que começa daqui a cerca de 90 minutos, e outro com mais vagas abertas que começa daqui a 3 dias. O de 90 minutos serve para testar a saída sem reembolso. O de 3 dias serve para testar a saída com reembolso. Em Curitiba, o de 90 minutos é O Cofre do Café e o de 3 dias é Enigma no Ópera. Os dois não se sobrepõem e ficam em salas diferentes. O resto dos horários futuros fica livre.
 
-A tela de criar grupo não abre um calendário. Ela lista os horários cadastrados da sala, em novembro de 2026. Cada sala tem pelo menos quatro horários, então dá para criar vários grupos na mesma sala sem repetir o começo.
+A tela de criar grupo não abre um calendário. Ela lista os horários cadastrados da sala, calculados a partir do relógio do app. Cada sala tem pelo menos quatro horários futuros e um horário que já passou.
 
 ## Próximos passos
 

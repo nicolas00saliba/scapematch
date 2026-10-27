@@ -12,9 +12,11 @@ import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
-import 'package:scapematch/features/groups/domain/group_outcomes.dart';
+import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/create_group_view_model.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
   const CreateGroupScreen({super.key});
@@ -38,8 +40,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(createGroupViewModelProvider);
+    final now = ref.watch(clockProvider).now();
     final theme = Theme.of(context);
     final capacityMessage = _capacityMessage(state);
+    final started = state.slotHasStarted(now);
 
     return AppScaffold(
       appBar: AppBar(title: const Text('Criar grupo')),
@@ -164,10 +168,22 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
             ),
           ],
+          if (started) ...[
+            const SizedBox(height: 8),
+            Text(
+              GroupMessages.alreadyStartedHint,
+              key: AppKeys.createFailure,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
           if (state.failure != null) ...[
             const SizedBox(height: 8),
             Text(
-              _failureMessage(state.failure!),
+              GroupMessages.createFailure(state.failure!),
               key: AppKeys.createFailure,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.error,
@@ -180,7 +196,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       ),
       bottomBar: FilledButton(
         key: AppKeys.createSubmit,
-        onPressed: state.canSubmit ? _submit : null,
+        onPressed: state.canSubmitAt(now) ? _submit : null,
         child: state.submitting
             ? const SizedBox(
                 width: 22,
@@ -199,19 +215,6 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         'Informe pelo menos 1 vaga além de você.',
       GroupSizeValidation.exceedsRoomCapacity =>
         'Você + ${state.extraSpots} vagas ultrapassa a capacidade da sala (${state.room!.capacity}).',
-    };
-  }
-
-  String _failureMessage(CreateGroupFailureReason reason) {
-    return switch (reason) {
-      CreateGroupFailureReason.exceedsRoomCapacity =>
-        'O grupo ficou maior do que a sala permite.',
-      CreateGroupFailureReason.belowMinimum =>
-        'O grupo precisa de mais gente além de você.',
-      CreateGroupFailureReason.unknownSelection =>
-        'Confira cidade, casa, sala e horário.',
-      CreateGroupFailureReason.duplicateSession =>
-        'Já existe um grupo nessa sala nesse horário. Escolha outro horário.',
     };
   }
 
@@ -239,7 +242,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       idOf: (room) => room.id,
       labelOf: (room) => room.name,
       subtitleOf: (room) =>
-          'Até ${room.capacity} pessoas · ${room.durationMinutes} min · ${room.difficulty.labelPt}',
+          'Até ${room.capacity} pessoas · ${room.durationMinutes} min · ${room.difficulty.labelPt} · ${formatPrice(room.priceCents)}',
     );
     if (room == null || !mounted) {
       return;

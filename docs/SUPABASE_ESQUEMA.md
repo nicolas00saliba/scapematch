@@ -37,7 +37,8 @@ create table public.rooms (
   theme text not null,
   capacity integer not null check (capacity > 0),
   duration_minutes integer not null check (duration_minutes > 0),
-  difficulty text not null check (difficulty in ('easy', 'medium', 'hard'))
+  difficulty text not null check (difficulty in ('easy', 'medium', 'hard')),
+  price_cents integer not null check (price_cents >= 0)
 );
 
 create table public.room_sessions (
@@ -61,13 +62,18 @@ create table public.groups (
   session_id uuid references public.room_sessions (id),
   starts_at timestamptz not null,
   total_spots integer not null check (total_spots >= 2),
+  price_cents integer not null check (price_cents >= 0),
+  note text not null default '' check (char_length(note) <= 280),
   created_by uuid not null references auth.users (id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  cancelled_at timestamptz
 );
 
--- Uma sala não hospeda dois grupos no mesmo instante.
+-- Uma sala não hospeda dois grupos ativos no mesmo instante.
+-- Grupo cancelado libera o horário.
 create unique index groups_one_per_room_and_time
-  on public.groups (room_id, starts_at);
+  on public.groups (room_id, starts_at)
+  where cancelled_at is null;
 
 create table public.group_members (
   id uuid primary key default gen_random_uuid(),
@@ -75,6 +81,22 @@ create table public.group_members (
   user_id uuid not null references auth.users (id),
   display_name text not null check (char_length(display_name) between 1 and 80),
   is_creator boolean not null default false,
+  attendance text not null default 'joined' check (
+    attendance in ('joined', 'confirmed', 'cancelled')
+  ),
+  payment_status text not null default 'paid' check (payment_status in ('paid')),
+  refund_status text not null default 'none' check (
+    refund_status in ('none', 'refunded', 'denied')
+  ),
+  refund_reason text not null default 'none' check (
+    refund_reason in (
+      'none',
+      'cancelled_in_time',
+      'cancelled_too_late',
+      'organizer_cancelled_event',
+      'organizer_removed_member'
+    )
+  ),
   joined_at timestamptz not null default now(),
   unique (group_id, user_id)
 );
@@ -93,7 +115,14 @@ select
     select count(*)::integer
     from public.group_members m
     where m.group_id = g.id
-  ) as filled_spots
+      and m.attendance <> 'cancelled'
+  ) as filled_spots,
+  (
+    select count(*)::integer
+    from public.group_members m
+    where m.group_id = g.id
+      and m.attendance = 'confirmed'
+  ) as confirmed_count
 from public.groups g;
 ```
 
@@ -267,6 +296,24 @@ $$;
 revoke all on function public.create_group(uuid, timestamptz, integer) from public;
 grant execute on function public.create_group(uuid, timestamptz, integer) to authenticated;
 ```
+
+## Presença, saída, exclusão e reembolso
+
+Nada disso está ligado ao app. O desenho acompanha [DECISOES.md](DECISOES.md).
+
+- `attendance`: `joined`, `confirmed` ou `cancelled`. Cadeira cancelada não entra em `filled_spots`.
+- `payment_status`: só `paid`. É o pagamento simulado de quem entrou. Não há provedor.
+- `refund_status` / `refund_reason`: preenchidos quando a pessoa sai, é removida ou o organizador exclui o grupo.
+- `groups.cancelled_at`: exclusão do organizador. A busca esconde a linha. Meus grupos continua lendo.
+- `groups.note` e `groups.price_cents`: observação do criador e o preço fictício copiado da sala.
+- O índice único de sala e horário ignora grupo cancelado, para o horário voltar a ficar livre.
+- Sair com `starts_at - now() >= interval '2 hours'` grava `refunded` / `cancelled_in_time`. Menos que isso grava `denied` / `cancelled_too_late`. Exatamente 2 horas reembolsa. O criador não sai: a função recusa.
+- `delete_group` e `remove_member` gravam `refunded` com `organizer_cancelled_event` ou `organizer_removed_member`, mesmo dentro das 2 horas. Quem já tinha saído fica com o reembolso da própria saída.
+- `join_group` também recusa sessão já iniciada (`starts_at <= now()`), grupo cancelado, conta que já saiu daquele grupo, e conta com outra cadeira ativa cujo intervalo cruza `[starts_at, starts_at + duration)`.
+- `confirm_attendance` só muda `joined` para `confirmed` enquanto a sessão não terminou.
+- `edit_group` muda `total_spots` e `note`. O total não fica abaixo de quem ainda ocupa cadeira, nem abaixo de 2, nem acima da capacidade.
+
+As funções `confirm_attendance`, `leave_group`, `delete_group`, `remove_member` e `edit_group` seguem o mesmo desenho de `join_group`: `security definer`, `search_path = public`, `auth.uid()`, e `for update` na linha do grupo. O app não ganha `update` direto em `groups` nem em `group_members`. O corpo delas fica para a migração de verdade e tem de cumprir o contrato desta seção.
 
 ## O que este rascunho não faz
 

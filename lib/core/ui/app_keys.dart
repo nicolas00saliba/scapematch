@@ -15,6 +15,29 @@ abstract final class AppKeys {
   static const capacityError = Key('capacity-error');
   static const createFailure = Key('create-failure');
   static const retry = Key('retry');
+  static const myGroups = Key('my-groups');
+  static const confirmAttendance = Key('confirm-attendance');
+  static const leaveGroup = Key('leave-group');
+  static const deleteGroup = Key('delete-group');
+  static const editGroup = Key('edit-group');
+  static const shareGroup = Key('share-group');
+  static const refundWarning = Key('refund-warning');
+  static const dialogConfirm = Key('dialog-confirm');
+  static const confirmedCount = Key('confirmed-count');
+  static const countdown = Key('countdown');
+  static const priceLabel = Key('price-label');
+  static const refundStatus = Key('refund-status');
+  static const editSpotsIncrement = Key('edit-spots-increment');
+  static const editSpotsDecrement = Key('edit-spots-decrement');
+  static const editSpotsValue = Key('edit-spots-value');
+  static const editNote = Key('edit-note');
+  static const editSave = Key('edit-save');
+  static const editError = Key('edit-error');
+  static const myGroupsUpcoming = Key('my-groups-upcoming');
+  static const myGroupsHistory = Key('my-groups-history');
+  static const groupNote = Key('group-note');
+
+  static Key removeMember(String id) => Key('remove-member-$id');
 
   static Key cityOption(String id) => Key('city-option-$id');
   static Key groupCard(String id) => Key('group-card-$id');

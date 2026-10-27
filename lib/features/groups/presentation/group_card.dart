@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
+import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 class GroupCard extends StatelessWidget {
   const GroupCard({super.key, required this.group, required this.onTap});
@@ -69,6 +71,21 @@ class GroupCard extends StatelessWidget {
                   spots,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  GroupMessages.confirmedCount(group.confirmedCount),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.teal,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${formatPrice(group.priceCents)} por pessoa',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.muted,
                   ),
                 ),
                 const SizedBox(height: 6),

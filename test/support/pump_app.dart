@@ -9,7 +9,7 @@ Future<void> pumpScapeMatch(
   WidgetTester tester, {
   List<Override> overrides = const [],
 }) async {
-  tester.view.physicalSize = const Size(400, 900);
+  tester.view.physicalSize = const Size(400, 1800);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);

@@ -1,5 +1,7 @@
 import 'package:scapematch/core/data/fake_database.dart';
+import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
@@ -9,15 +11,17 @@ import 'package:scapematch/features/groups/domain/participant.dart';
 /// Sample implementation of [GroupRepository].
 ///
 /// [failList] exists so the error screen can be tested. The real app leaves
-/// it false. Changes live only inside [FakeDatabase].
+/// it false. Changes live only inside [FakeDatabase]. Time comes from [clock].
 class FakeGroupRepository implements GroupRepository {
   FakeGroupRepository(
     this._database, {
+    this.clock = const SystemClock(),
     this.latency = const Duration(milliseconds: 280),
     this.failList = false,
   });
 
   final FakeDatabase _database;
+  final Clock clock;
   final Duration latency;
   final bool failList;
 
@@ -30,8 +34,9 @@ class FakeGroupRepository implements GroupRepository {
     if (failList) {
       throw Exception('sample list failed');
     }
+    final now = clock.now();
     final groups = _database.groups.where((group) {
-      if (group.cityId != cityId) {
+      if (group.cityId != cityId || !_listed(group, now)) {
         return false;
       }
       if (almostFullOnly && !group.isAlmostFull) {
@@ -43,14 +48,20 @@ class FakeGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<List<Group>> listForUser(String userId) async {
+    await _pause();
+    final groups =
+        _database.groups
+            .where((group) => group.participantForUser(userId) != null)
+            .toList()
+          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    return List.unmodifiable(groups);
+  }
+
+  @override
   Future<Group?> getById(String id) async {
     await _pause();
-    for (final group in _database.groups) {
-      if (group.id == id) {
-        return group;
-      }
-    }
-    return null;
+    return _find(id);
   }
 
   @override
@@ -58,20 +69,38 @@ class FakeGroupRepository implements GroupRepository {
     String groupId, {
     required String participantUserId,
     required String participantName,
+    bool markAsLocalUser = true,
   }) async {
     await _pause();
-    final index = _database.groups.indexWhere((group) => group.id == groupId);
+    final index = _indexOf(groupId);
     if (index < 0) {
       return const JoinFailure(JoinFailureReason.notFound);
     }
     final current = _database.groups[index];
-    // Already inside wins over "full", so a second tap explains itself.
-    // Entry is immediate: the organizer does not have to approve.
-    final alreadyInside = current.participants.any(
-      (person) => person.userId == participantUserId || person.isLocalUser,
-    );
-    if (alreadyInside) {
+    final now = clock.now();
+    if (current.isCancelled) {
+      return const JoinFailure(JoinFailureReason.groupCancelled);
+    }
+    if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
+      return const JoinFailure(JoinFailureReason.sessionEnded);
+    }
+    final mine = current.participantForUser(participantUserId);
+    if (mine != null && mine.occupiesSeat) {
       return const JoinFailure(JoinFailureReason.alreadyJoined);
+    }
+    if (mine != null) {
+      return const JoinFailure(JoinFailureReason.membershipClosed);
+    }
+    if (GroupRules.hasStarted(startsAt: current.startsAt, now: now)) {
+      return const JoinFailure(JoinFailureReason.alreadyStarted);
+    }
+    if (_overlaps(
+      userId: participantUserId,
+      startsAt: current.startsAt,
+      durationMinutes: current.durationMinutes,
+      ignoringGroupId: current.id,
+    )) {
+      return const JoinFailure(JoinFailureReason.overlapsAnotherGroup);
     }
     if (!GroupRules.canJoin(
       filledSpots: current.filledSpots,
@@ -88,7 +117,7 @@ class FakeGroupRepository implements GroupRepository {
           userId: participantUserId,
           displayName: participantName,
           isCreator: false,
-          isLocalUser: true,
+          isLocalUser: markAsLocalUser,
         ),
       ],
     );
@@ -130,17 +159,33 @@ class FakeGroupRepository implements GroupRepository {
         break;
     }
 
+    final now = clock.now();
+    if (GroupRules.hasStarted(startsAt: slot.startsAt, now: now)) {
+      return const CreateGroupFailure(CreateGroupFailureReason.alreadyStarted);
+    }
+
     final taken = GroupRules.roomAndTimeTaken(
       roomId: room.id,
       startsAt: slot.startsAt,
       existing: [
         for (final group in _database.groups)
-          (roomId: group.roomId, startsAt: group.startsAt),
+          if (!group.isCancelled)
+            (roomId: group.roomId, startsAt: group.startsAt),
       ],
     );
     if (taken) {
       return const CreateGroupFailure(
         CreateGroupFailureReason.duplicateSession,
+      );
+    }
+
+    if (_overlaps(
+      userId: request.creatorUserId,
+      startsAt: slot.startsAt,
+      durationMinutes: room.durationMinutes,
+    )) {
+      return const CreateGroupFailure(
+        CreateGroupFailureReason.overlapsAnotherGroup,
       );
     }
 
@@ -162,6 +207,7 @@ class FakeGroupRepository implements GroupRepository {
       startsAt: slot.startsAt,
       filledSpots: 1,
       totalSpots: 1 + request.extraSpots,
+      priceCents: room.priceCents,
       participants: [
         Participant(
           id: _database.nextParticipantId(),
@@ -176,10 +222,347 @@ class FakeGroupRepository implements GroupRepository {
     return CreateGroupSuccess(group);
   }
 
+  @override
+  Future<ConfirmAttendanceResult> confirmAttendance(
+    String groupId, {
+    required String userId,
+  }) async {
+    await _pause();
+    final located = _lookupSeat(groupId, userId);
+    if (located is _SeatProblem) {
+      return ConfirmAttendanceFailure(_confirmProblem(located.kind));
+    }
+    final found = located as _SeatFound;
+    final updated = _replaceMember(
+      found.group,
+      found.member.copyWith(attendance: AttendanceStatus.confirmed),
+    );
+    _database.groups[found.index] = updated;
+    return ConfirmAttendanceSuccess(updated);
+  }
+
+  @override
+  Future<LeaveGroupResult> leave(
+    String groupId, {
+    required String userId,
+  }) async {
+    await _pause();
+    final located = _lookupSeat(groupId, userId);
+    if (located is _SeatProblem) {
+      return LeaveGroupFailure(_leaveProblem(located.kind));
+    }
+    final found = located as _SeatFound;
+    final current = found.group;
+    final member = found.member;
+    if (member.isCreator) {
+      return const LeaveGroupFailure(LeaveGroupFailureReason.creatorMustDelete);
+    }
+    final outcome = GroupRules.refundForParticipantCancel(
+      startsAt: current.startsAt,
+      now: clock.now(),
+    );
+    final updatedPeople = [
+      for (final person in current.participants)
+        if (person.id == member.id)
+          person.copyWith(
+            attendance: AttendanceStatus.cancelled,
+            refund: outcome.status,
+            refundReason: outcome.reason,
+          )
+        else
+          person,
+    ];
+    final updated = current.copyWith(
+      participants: updatedPeople,
+      filledSpots: _occupied(updatedPeople),
+    );
+    _database.groups[found.index] = updated;
+    return LeaveGroupSuccess(updated);
+  }
+
+  @override
+  Future<DeleteGroupResult> deleteGroup(
+    String groupId, {
+    required String userId,
+  }) async {
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return const DeleteGroupFailure(DeleteGroupFailureReason.notFound);
+    }
+    final current = _database.groups[index];
+    if (!current.createdBy(userId)) {
+      return const DeleteGroupFailure(DeleteGroupFailureReason.notCreator);
+    }
+    if (current.isCancelled) {
+      return const DeleteGroupFailure(
+        DeleteGroupFailureReason.alreadyCancelled,
+      );
+    }
+    final now = clock.now();
+    if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
+      return const DeleteGroupFailure(DeleteGroupFailureReason.sessionEnded);
+    }
+    final outcome = GroupRules.refundForOrganizer(
+      RefundReason.organizerCancelledEvent,
+    );
+    final updated = current.copyWith(
+      cancelledAt: now,
+      filledSpots: 0,
+      participants: [
+        for (final person in current.participants)
+          if (person.occupiesSeat)
+            person.copyWith(
+              attendance: AttendanceStatus.cancelled,
+              refund: outcome.status,
+              refundReason: outcome.reason,
+            )
+          else
+            person,
+      ],
+    );
+    _database.groups[index] = updated;
+    return DeleteGroupSuccess(updated);
+  }
+
+  @override
+  Future<RemoveMemberResult> removeMember(
+    String groupId, {
+    required String actorUserId,
+    required String memberId,
+  }) async {
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return const RemoveMemberFailure(RemoveMemberFailureReason.notFound);
+    }
+    final current = _database.groups[index];
+    final now = clock.now();
+    if (!current.createdBy(actorUserId)) {
+      return const RemoveMemberFailure(RemoveMemberFailureReason.notCreator);
+    }
+    if (current.isCancelled) {
+      return const RemoveMemberFailure(
+        RemoveMemberFailureReason.groupCancelled,
+      );
+    }
+    if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
+      return const RemoveMemberFailure(RemoveMemberFailureReason.sessionEnded);
+    }
+    Participant? target;
+    for (final person in current.participants) {
+      if (person.id == memberId) {
+        target = person;
+        break;
+      }
+    }
+    if (target == null || !target.occupiesSeat) {
+      return const RemoveMemberFailure(
+        RemoveMemberFailureReason.memberNotFound,
+      );
+    }
+    if (target.isCreator) {
+      return const RemoveMemberFailure(
+        RemoveMemberFailureReason.cannotRemoveCreator,
+      );
+    }
+    final outcome = GroupRules.refundForOrganizer(
+      RefundReason.organizerRemovedMember,
+    );
+    final updatedPeople = [
+      for (final person in current.participants)
+        if (person.id == target.id)
+          person.copyWith(
+            attendance: AttendanceStatus.cancelled,
+            refund: outcome.status,
+            refundReason: outcome.reason,
+          )
+        else
+          person,
+    ];
+    final updated = current.copyWith(
+      participants: updatedPeople,
+      filledSpots: _occupied(updatedPeople),
+    );
+    _database.groups[index] = updated;
+    return RemoveMemberSuccess(updated);
+  }
+
+  @override
+  Future<EditGroupResult> edit(
+    String groupId, {
+    required String actorUserId,
+    required int totalSpots,
+    required String note,
+  }) async {
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return const EditGroupFailure(EditGroupFailureReason.notFound);
+    }
+    final current = _database.groups[index];
+    final now = clock.now();
+    if (!current.createdBy(actorUserId)) {
+      return const EditGroupFailure(EditGroupFailureReason.notCreator);
+    }
+    if (current.isCancelled) {
+      return const EditGroupFailure(EditGroupFailureReason.groupCancelled);
+    }
+    if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
+      return const EditGroupFailure(EditGroupFailureReason.sessionEnded);
+    }
+    if (GroupRules.noteTooLong(note)) {
+      return const EditGroupFailure(EditGroupFailureReason.noteTooLong);
+    }
+    final occupied = current.filledSpots > _occupied(current.participants)
+        ? current.filledSpots
+        : _occupied(current.participants);
+    final validation = GroupRules.validateTotalSpots(
+      totalSpots: totalSpots,
+      occupiedSpots: occupied,
+      roomCapacity: current.roomCapacity,
+    );
+    switch (validation) {
+      case TotalSpotsValidation.belowMinimum:
+        return const EditGroupFailure(EditGroupFailureReason.belowMinimum);
+      case TotalSpotsValidation.belowOccupancy:
+        return const EditGroupFailure(EditGroupFailureReason.belowOccupancy);
+      case TotalSpotsValidation.exceedsRoomCapacity:
+        return const EditGroupFailure(
+          EditGroupFailureReason.exceedsRoomCapacity,
+        );
+      case TotalSpotsValidation.valid:
+        break;
+    }
+    final updated = current.copyWith(
+      totalSpots: totalSpots,
+      note: GroupRules.normalizeNote(note),
+    );
+    _database.groups[index] = updated;
+    return EditGroupSuccess(updated);
+  }
+
+  bool _listed(Group group, DateTime now) {
+    if (group.isCancelled) {
+      return false;
+    }
+    return !GroupRules.hasEnded(endsAt: group.endsAt, now: now);
+  }
+
+  bool _overlaps({
+    required String userId,
+    required DateTime startsAt,
+    required int durationMinutes,
+    String? ignoringGroupId,
+  }) {
+    final now = clock.now();
+    final window = Duration(minutes: durationMinutes);
+    for (final group in _database.groups) {
+      if (group.id == ignoringGroupId || group.isCancelled) {
+        continue;
+      }
+      if (GroupRules.hasEnded(endsAt: group.endsAt, now: now)) {
+        continue;
+      }
+      final member = group.participantForUser(userId);
+      if (member == null || !member.occupiesSeat) {
+        continue;
+      }
+      if (GroupRules.sessionsOverlap(
+        startA: group.startsAt,
+        durationA: Duration(minutes: group.durationMinutes),
+        startB: startsAt,
+        durationB: window,
+      )) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Object _lookupSeat(String groupId, String userId) {
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return const _SeatProblem(_SeatKind.notFound);
+    }
+    final current = _database.groups[index];
+    final now = clock.now();
+    if (current.isCancelled) {
+      return const _SeatProblem(_SeatKind.cancelled);
+    }
+    if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
+      return const _SeatProblem(_SeatKind.ended);
+    }
+    final member = current.participantForUser(userId);
+    if (member == null || !member.occupiesSeat) {
+      return const _SeatProblem(_SeatKind.notMember);
+    }
+    return _SeatFound(index, current, member);
+  }
+
+  ConfirmAttendanceFailureReason _confirmProblem(_SeatKind kind) {
+    return switch (kind) {
+      _SeatKind.notFound => ConfirmAttendanceFailureReason.notFound,
+      _SeatKind.cancelled => ConfirmAttendanceFailureReason.groupCancelled,
+      _SeatKind.ended => ConfirmAttendanceFailureReason.sessionEnded,
+      _SeatKind.notMember => ConfirmAttendanceFailureReason.notMember,
+    };
+  }
+
+  LeaveGroupFailureReason _leaveProblem(_SeatKind kind) {
+    return switch (kind) {
+      _SeatKind.notFound => LeaveGroupFailureReason.notFound,
+      _SeatKind.cancelled => LeaveGroupFailureReason.groupCancelled,
+      _SeatKind.ended => LeaveGroupFailureReason.sessionEnded,
+      _SeatKind.notMember => LeaveGroupFailureReason.notMember,
+    };
+  }
+
+  Group _replaceMember(Group group, Participant member) {
+    return group.copyWith(
+      participants: [
+        for (final person in group.participants)
+          if (person.id == member.id) member else person,
+      ],
+    );
+  }
+
+  int _occupied(List<Participant> people) {
+    return people.where((person) => person.occupiesSeat).length;
+  }
+
+  Group? _find(String id) {
+    final index = _indexOf(id);
+    if (index < 0) {
+      return null;
+    }
+    return _database.groups[index];
+  }
+
+  int _indexOf(String id) {
+    return _database.groups.indexWhere((group) => group.id == id);
+  }
+
   Future<void> _pause() {
     if (latency == Duration.zero) {
       return Future<void>.value();
     }
     return Future<void>.delayed(latency);
   }
+}
+
+enum _SeatKind { notFound, cancelled, ended, notMember }
+
+class _SeatProblem {
+  const _SeatProblem(this.kind);
+
+  final _SeatKind kind;
+}
+
+class _SeatFound {
+  const _SeatFound(this.index, this.group, this.member);
+
+  final int index;
+  final Group group;
+  final Participant member;
 }

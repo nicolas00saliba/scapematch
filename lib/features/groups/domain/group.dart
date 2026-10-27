@@ -26,6 +26,9 @@ class Group {
     required this.filledSpots,
     required this.totalSpots,
     required this.participants,
+    required this.priceCents,
+    this.note = '',
+    this.cancelledAt,
   });
 
   final String id;
@@ -44,11 +47,21 @@ class Group {
   final DateTime startsAt;
 
   /// People already in the group, including the creator.
+  /// Cancelled seats are not included.
   final int filledSpots;
 
   /// How many people the group wants. This can be lower than [roomCapacity].
   final int totalSpots;
   final List<Participant> participants;
+
+  /// Fictional price per person, in cents, copied from the room.
+  final int priceCents;
+
+  /// Optional note the creator can edit. Empty when they wrote nothing.
+  final String note;
+
+  /// Set when the creator deletes the group. Null while the group is active.
+  final DateTime? cancelledAt;
 
   int get openSeats =>
       GroupRules.openSeats(filledSpots: filledSpots, totalSpots: totalSpots);
@@ -59,9 +72,40 @@ class Group {
   bool get isAlmostFull =>
       GroupRules.isAlmostFull(filledSpots: filledSpots, totalSpots: totalSpots);
 
-  bool get joinedByMe => participants.any((person) => person.isLocalUser);
+  bool get isCancelled => cancelledAt != null;
 
-  Group copyWith({int? filledSpots, List<Participant>? participants}) {
+  DateTime get endsAt => startsAt.add(Duration(minutes: durationMinutes));
+
+  int get confirmedCount =>
+      participants.where((person) => person.isConfirmed).length;
+
+  bool get joinedByMe =>
+      participants.any((person) => person.isLocalUser && person.occupiesSeat);
+
+  Participant? participantForUser(String userId) {
+    for (final person in participants) {
+      if (person.userId == userId) {
+        return person;
+      }
+    }
+    return null;
+  }
+
+  bool createdBy(String userId) {
+    return participants.any(
+      (person) => person.isCreator && person.userId == userId,
+    );
+  }
+
+  Group copyWith({
+    int? filledSpots,
+    int? totalSpots,
+    List<Participant>? participants,
+    String? note,
+    DateTime? startsAt,
+    DateTime? cancelledAt,
+    bool clearCancelled = false,
+  }) {
     return Group(
       id: id,
       cityId: cityId,
@@ -76,10 +120,13 @@ class Group {
       durationMinutes: durationMinutes,
       difficulty: difficulty,
       slotId: slotId,
-      startsAt: startsAt,
+      startsAt: startsAt ?? this.startsAt,
       filledSpots: filledSpots ?? this.filledSpots,
-      totalSpots: totalSpots,
+      totalSpots: totalSpots ?? this.totalSpots,
       participants: participants ?? this.participants,
+      priceCents: priceCents,
+      note: note ?? this.note,
+      cancelledAt: clearCancelled ? null : (cancelledAt ?? this.cancelledAt),
     );
   }
 }

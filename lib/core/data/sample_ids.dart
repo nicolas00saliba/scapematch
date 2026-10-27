@@ -14,6 +14,8 @@ abstract final class SampleIds {
   static const slotPoaEstufaTaken = 'slot-poa-estufa-fri';
 
   static const houseSpAugusta = 'sp-augusta';
+  static const houseSpLiberdade = 'sp-liberdade';
+  static const roomSpIzakaya = 'room-sp-izakaya';
   static const roomSpCobertura = 'room-sp-cobertura';
   static const slotSpMetroSun = 'slot-sp-metro-sun';
   static const slotSpCoberturaFri = 'slot-sp-cobertura-fri';
@@ -23,6 +25,15 @@ abstract final class SampleIds {
 
   static const groupSpMetroAlmost = 'grp-sp-metro-almost';
   static const groupSpCoberturaOpen = 'grp-sp-cobertura-open';
+  static const groupCwbCofreAlmost = 'grp-cwb-cofre-almost';
+
+  /// Starts about 100 minutes after the sample clock, inside the Metrô
+  /// Perdido session, so joining that group and then booking this slot
+  /// overlaps.
+  static const slotSpIzakayaOverlap = 'slot-sp-izakaya-overlap';
+
+  /// A start time that is already in the past for the sample clock.
+  static const slotSpMetroPast = 'room-sp-metro-past';
 
   static const cities = [
     curitiba,

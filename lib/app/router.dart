@@ -3,10 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_screen.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
+import 'package:scapematch/features/groups/presentation/my_groups_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
 
-/// App routes. `new` is registered before `:groupId` so the word "new"
-/// is not treated as a group id.
+/// App routes. `new` and `mine` are registered before `:groupId` so those
+/// words are not treated as a group id.
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/',
@@ -25,6 +26,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'new',
             name: 'create-group',
             builder: (context, state) => const CreateGroupScreen(),
+          ),
+          GoRoute(
+            path: 'mine',
+            name: 'my-groups',
+            builder: (context, state) => const MyGroupsScreen(),
           ),
           GoRoute(
             path: ':groupId',

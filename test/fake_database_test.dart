@@ -1,12 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
+import 'support/sample_clock.dart';
+
 void main() {
   test('participant ids advance even when no group is created', () {
-    final database = buildSampleDatabase();
+    final database = loadSampleDatabase();
     final ids = List.generate(4, (_) => database.nextParticipantId());
 
     expect(ids.toSet(), hasLength(4));
@@ -15,7 +16,7 @@ void main() {
   });
 
   test('participant ids skip values already stored on a group', () {
-    final database = buildSampleDatabase();
+    final database = loadSampleDatabase();
     final index = database.groups.indexWhere(
       (group) => group.id == SampleIds.groupSpCoberturaOpen,
     );
@@ -36,7 +37,7 @@ void main() {
   });
 
   test('group ids skip values already stored', () {
-    final database = buildSampleDatabase();
+    final database = loadSampleDatabase();
     database.groups.add(_clone(database.groups.first, id: 'grp-local-1'));
 
     expect(database.nextGroupId(), 'grp-local-2');
@@ -61,6 +62,9 @@ Group _clone(Group group, {required String id}) {
     startsAt: group.startsAt,
     filledSpots: group.filledSpots,
     totalSpots: group.totalSpots,
+    priceCents: group.priceCents,
+    note: group.note,
+    cancelledAt: group.cancelledAt,
     participants: group.participants,
   );
 }

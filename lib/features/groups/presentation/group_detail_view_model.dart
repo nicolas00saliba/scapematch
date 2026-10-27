@@ -3,14 +3,13 @@ import 'package:scapematch/features/account/presentation/current_user_provider.d
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
+import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// View model of one group.
 ///
-/// [join] asks the repository to add the current user and then updates
-/// this screen. The name comes from [currentUserProvider], not from a
-/// literal. A full group is refused by the repository even if the button
-/// was enabled by mistake. Joining does not wait for the organizer.
+/// Mutations ask the repository, then update this screen and the lists that
+/// show the same group. The name comes from [currentUserProvider].
 class GroupDetailViewModel extends AsyncNotifier<Group> {
   GroupDetailViewModel(this.groupId);
 
@@ -40,12 +39,110 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
     }
     switch (result) {
       case JoinSuccess(:final group):
-        state = AsyncData(group);
-        ref.invalidate(findGroupsViewModelProvider);
+        _publish(group);
         return null;
       case JoinFailure(:final reason):
         return reason;
     }
+  }
+
+  Future<ConfirmAttendanceFailureReason?> confirmAttendance() async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .confirmAttendance(groupId, userId: user.id);
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case ConfirmAttendanceSuccess(:final group):
+        _publish(group);
+        return null;
+      case ConfirmAttendanceFailure(:final reason):
+        return reason;
+    }
+  }
+
+  Future<LeaveGroupResult?> leave() async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .leave(groupId, userId: user.id);
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case LeaveGroupSuccess(:final group):
+        _publish(group);
+        return result;
+      case LeaveGroupFailure():
+        return result;
+    }
+  }
+
+  Future<DeleteGroupFailureReason?> deleteGroup() async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .deleteGroup(groupId, userId: user.id);
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case DeleteGroupSuccess(:final group):
+        _publish(group);
+        return null;
+      case DeleteGroupFailure(:final reason):
+        return reason;
+    }
+  }
+
+  Future<RemoveMemberFailureReason?> removeMember(String memberId) async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .removeMember(groupId, actorUserId: user.id, memberId: memberId);
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case RemoveMemberSuccess(:final group):
+        _publish(group);
+        return null;
+      case RemoveMemberFailure(:final reason):
+        return reason;
+    }
+  }
+
+  Future<EditGroupFailureReason?> edit({
+    required int totalSpots,
+    required String note,
+  }) async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .edit(
+          groupId,
+          actorUserId: user.id,
+          totalSpots: totalSpots,
+          note: note,
+        );
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case EditGroupSuccess(:final group):
+        _publish(group);
+        return null;
+      case EditGroupFailure(:final reason):
+        return reason;
+    }
+  }
+
+  void _publish(Group group) {
+    state = AsyncData(group);
+    ref.invalidate(findGroupsViewModelProvider);
+    ref.invalidate(myGroupsViewModelProvider);
   }
 }
 

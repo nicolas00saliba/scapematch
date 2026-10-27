@@ -7,12 +7,11 @@
 # release that ships Dart 3.13.7.
 #
 # Triggers: manual run, and pushes to the preview branches that publish
-# the site. cursor/two-sample-groups-per-city-7ef7 is included so that
-# branch deploys this sample-data change.
-# The github-pages environment often allows deploys from the default
-# branch only. This workflow tries Actions deployment first and, if that
-# is rejected, pushes the built site to the gh-pages branch. It never
-# pushes to main.
+# the site. The Pages site is already served from the gh-pages branch
+# (root). Deploying with actions/deploy-pages fails when the environment
+# only accepts the default branch, and that failed job turns the whole
+# run red. This workflow only pushes the built site to gh-pages. It
+# never pushes to main.
 name: Deploy web
 
 on:
@@ -22,12 +21,10 @@ on:
       - gh-pages-preview
       - cursor/gh-pages-preview-23b9
       - cursor/two-sample-groups-per-city-7ef7
+      - cursor/group-logistics-5b63
 
 permissions:
-  actions: write
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: scapematch-pages
@@ -79,52 +76,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      pages: write
-      id-token: write
-    steps:
-      - name: Enable Pages and allow this branch to deploy
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set +e
-          echo "Pages site before this run:"
-          gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '{html_url,build_type,source}'
-          if [ "$?" -ne 0 ]; then
-            echo "Pages is not enabled. Requesting an Actions publishing source."
-            echo "This only changes the Pages setting. It does not push to main."
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
-              -f build_type=workflow \
-              -f 'source[branch]=main' \
-              -f 'source[path]=/'
-          fi
-          echo "Deployment branch policy before the update:"
-          gh api "repos/${GITHUB_REPOSITORY}/environments/github-pages" \
-            --jq '{name,deployment_branch_policy}'
-          echo "Allowing every branch to deploy to github-pages."
-          gh api --method PUT "repos/${GITHUB_REPOSITORY}/environments/github-pages" \
-            --input - <<< '{"deployment_branch_policy":null}'
-          exit 0
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v5
-
   publish-gh-pages:
     name: Push gh-pages branch
-    needs: deploy
-    if: always() && needs.deploy.result == 'failure'
+    needs: build
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: write
     steps:
       - name: Checkout
@@ -149,8 +105,7 @@ jobs:
 
   check:
     name: Check public URL
-    needs: [deploy, publish-gh-pages]
-    if: always() && (needs.deploy.result == 'success' || needs.publish-gh-pages.result == 'success')
+    needs: publish-gh-pages
     runs-on: ubuntu-latest
     steps:
       - name: Request the project site
@@ -162,8 +117,8 @@ jobs:
           for attempt in $(seq 1 30); do
             code="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$url" || true)"
             echo "attempt ${attempt}: HTTP ${code}"
-            if [ "$code" = "200" ] && grep -q 'base href="/scapematch/"' /tmp/scapematch.html; then
-              echo "Public site returned the Flutter shell."
+            if [ "$code" = "200" ] && grep -q 'base href="/scapematch/"' /tmp/scapematch.html && grep -q 'name="scapematch-release" content="group-logistics"' /tmp/scapematch.html; then
+              echo "Public site returned the logistics build."
               exit 0
             fi
             sleep 20

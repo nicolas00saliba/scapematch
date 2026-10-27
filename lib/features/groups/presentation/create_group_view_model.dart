@@ -63,11 +63,25 @@ class CreateGroupState {
   bool get hasRequiredSelections =>
       cityId != null && houseId != null && roomId != null && slotId != null;
 
-  bool get canSubmit =>
-      hasRequiredSelections &&
-      sizeValidation == GroupSizeValidation.valid &&
-      !submitting &&
-      !loadingOptions;
+  bool canSubmitAt(DateTime now) {
+    final selected = slot;
+    final started =
+        selected != null &&
+        GroupRules.hasStarted(startsAt: selected.startsAt, now: now);
+    return hasRequiredSelections &&
+        sizeValidation == GroupSizeValidation.valid &&
+        !started &&
+        !submitting &&
+        !loadingOptions;
+  }
+
+  bool slotHasStarted(DateTime now) {
+    final selected = slot;
+    if (selected == null) {
+      return false;
+    }
+    return GroupRules.hasStarted(startsAt: selected.startsAt, now: now);
+  }
 
   bool get canDecrementExtraSpots => extraSpots > GroupRules.minExtraSpots;
 
@@ -202,7 +216,8 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
 
   /// Returns the created group, or null when the form is not valid.
   Future<Group?> submit() async {
-    if (!state.canSubmit) {
+    final now = ref.read(clockProvider).now();
+    if (!state.canSubmitAt(now)) {
       return null;
     }
     state = state.copyWith(submitting: true, clearFailure: true);

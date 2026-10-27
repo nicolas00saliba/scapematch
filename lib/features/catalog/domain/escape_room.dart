@@ -10,6 +10,7 @@ class EscapeRoom {
     required this.capacity,
     required this.durationMinutes,
     required this.difficulty,
+    required this.priceCents,
   });
 
   final String id;
@@ -21,4 +22,7 @@ class EscapeRoom {
   final int capacity;
   final int durationMinutes;
   final Difficulty difficulty;
+
+  /// Fictional price per person, in cents. Nothing is charged.
+  final int priceCents;
 }

@@ -44,7 +44,12 @@ Entrar num grupo é o mesmo desenho, com um passo a mais: `GroupDetailViewModel.
 
 `lib/features/groups/domain/group_rules.dart` não conhece widget nem banco.
 
-- **Entrar:** só se `preenchidas < total`.
+- **Entrar:** só se `preenchidas < total`, o grupo não foi cancelado, a sessão não começou e a pessoa não está em outro grupo no mesmo intervalo. Sair do mesmo grupo é definitivo.
+- **Presença:** entrou, presença confirmada ou cancelou. Confirmar não trava o jogo. O criador confirma a própria cadeira.
+- **Reembolso simulado:** sair com `GroupRules.refundDeadline` (2 horas) ou mais de antecedência devolve o valor. Menos que isso não devolve. Exatamente 2 horas devolve. O organizador excluir o grupo, ou remover uma pessoa, devolve sempre, mesmo dentro das 2 horas. O “agora” é o `Clock` de `clockProvider`.
+- **Excluir:** só o criador. Cancela para todo mundo, reembolsa quem ainda está, tira o grupo da busca e libera a sala naquele horário. O criador não tem botão de sair.
+- **Editar:** o criador muda o tamanho desejado (sem ficar abaixo de quem já entrou, sem ficar abaixo de 2, sem passar da sala) e uma observação de até 280 caracteres.
+- **Listas:** `listByCity` esconde grupo cancelado e sessão já encerrada. `listForUser` devolve o histórico para Meus grupos.
 - **Quase cheios:** ainda há vaga, e as vagas abertas cabem em `GroupRules.almostFullMaxOpenSeats` (hoje 2, ou seja, faltam 1 ou 2). Grupo cheio fica de fora. Mudar o filtro é mudar essa constante. O texto da tela lê o mesmo número.
 - **Criar:** `1 (quem cria) + vagas pedidas <= capacidade da sala`. A capacidade da sala e o tamanho do grupo são números diferentes. Um grupo pode querer 4 pessoas numa sala que comporta 6. O formulário não trava mais num teto fixo de 12: o mínimo e o máximo vêm de `GroupRules` (`minExtraSpots` e `maxExtraSpots`). Sem sala escolhida, não há teto.
 - **Uma sala, um horário:** não nascem dois grupos na mesma sala com o mesmo horário de início. A comparação é o relógio, não o id do slot. A tela diz: “Já existe um grupo nessa sala nesse horário. Escolha outro horário.”
@@ -60,13 +65,15 @@ Usamos Riverpod 3, sem gerador de código, para o arquivo continuar legível.
 - `AsyncNotifier` guarda algo que vem de um `Future` (a lista, o detalhe). O widget usa `when` para carregando, erro e dado.
 - O retry automático do Riverpod 3 está desligado em `lib/app/retry.dart`. Quem tenta de novo é a pessoa, no botão.
 
-A navegação é o `go_router` em `lib/app/router.dart`: `/`, `/groups`, `/groups/new`, `/groups/:groupId`. A rota `new` vem antes de `:groupId` para a palavra “new” não virar um id.
+A navegação é o `go_router` em `lib/app/router.dart`: `/`, `/groups`, `/groups/new`, `/groups/mine`, `/groups/:groupId`. As rotas `new` e `mine` vêm antes de `:groupId` para essas palavras não virarem um id. `/groups/mine` é a tela Meus grupos, com as abas Próximos e Passados/Cancelados.
 
 ## O que é fictício, no código
 
 `buildSampleDatabase()` em `lib/core/data/sample_data.dart` cria tudo. `FakeDatabase` segura as listas. Casas, salas e horários não mudam. A lista de grupos muda quando alguém entra ou cria um grupo, e só até o app fechar.
 
-Cada cidade nasce com dois grupos: um quase cheio e outro com mais vagas abertas, os dois dentro da capacidade da sala e em salas diferentes. Os outros horários ficam livres. A tela de criar grupo não pede data e hora soltas: o seletor mostra os horários da sala. Há pelo menos quatro por sala, para caber vários grupos sem colidir no mesmo começo.
+Cada cidade nasce com dois grupos: um quase cheio e outro com mais vagas abertas, os dois dentro da capacidade da sala e em salas diferentes. O quase cheio começa 90 minutos depois do relógio do app. O outro começa 3 dias e 6 horas depois. Eles não se sobrepõem. Os outros horários futuros ficam livres, e cada sala também tem um horário que já passou. A tela de criar grupo não pede data e hora soltas: o seletor mostra os horários da sala. Há pelo menos quatro horários futuros por sala.
+
+O preço por pessoa é fictício e fica na sala, em centavos. O grupo copia esse número quando nasce. O pagamento marcado como pago, e o reembolso, também são simulados.
 
 O banner laranja nas telas repete o aviso para quem está usando, não só para quem lê o código.
 
@@ -91,7 +98,7 @@ O rascunho das tabelas, das políticas e da função está em [SUPABASE_ESQUEMA.
 ## Como trocar por dados reais depois
 
 1. Criar tabelas (cidade, casa, sala, horário, grupo, participante). O rascunho está em [SUPABASE_ESQUEMA.md](SUPABASE_ESQUEMA.md). A entrada no grupo usa a função atômica, não um insert do cliente.
-2. Escrever `SupabaseGroupRepository implements GroupRepository` com os mesmos métodos: `listByCity`, `getById`, `join`, `create`. O `join` chama a RPC.
+2. Escrever `SupabaseGroupRepository implements GroupRepository` com os mesmos métodos: `listByCity`, `listForUser`, `getById`, `join`, `create`, `confirmAttendance`, `leave`, `deleteGroup`, `removeMember`, `edit`. O `join`, a saída, a exclusão e a remoção chamam RPC. O repositório recebe o mesmo `Clock` para as regras que comparam com agora, ou usa o `now()` do banco dentro da função.
 3. Apontar `groupRepositoryProvider` para essa classe.
 4. Repetir a ideia para cidades e para o catálogo. O catálogo é separado de propósito. Cada casa entra por um `ExperienceSource` (salas e sessões, com o tipo de disponibilidade). O exemplo que existe hoje só lê um JSON local. Como uma integração futura entra, e quando um site não pode ser coletado, está em [DADOS_REAIS.md](DADOS_REAIS.md).
 
