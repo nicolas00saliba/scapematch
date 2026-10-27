@@ -45,7 +45,11 @@ void main() {
     await tester.tap(find.byKey(AppKeys.findGroup));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('1 de 3 vagas'), 300);
+    await tester.scrollUntilVisible(
+      find.text('1 de 3 vagas'),
+      300,
+      scrollable: verticalScrollable,
+    );
     expect(find.text('1 de 3 vagas'), findsOneWidget);
     expect(find.text('A Estufa'), findsWidgets);
   });

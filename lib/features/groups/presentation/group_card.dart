@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
-import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
-import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 class GroupCard extends StatelessWidget {
   const GroupCard({super.key, required this.group, required this.onTap});
@@ -16,9 +14,6 @@ class GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final spots = '${group.filledSpots} de ${group.totalSpots} vagas';
-    final progress = group.totalSpots == 0
-        ? 0.0
-        : (group.filledSpots / group.totalSpots).clamp(0, 1).toDouble();
 
     return Semantics(
       button: true,
@@ -32,7 +27,7 @@ class GroupCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -51,51 +46,26 @@ class GroupCard extends StatelessWidget {
                     _StatusPill(group: group),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   '${group.houseName} · ${group.neighborhood}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppColors.muted,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.schedule, size: 18, color: AppColors.teal),
+                    const Icon(Icons.schedule, size: 16, color: AppColors.teal),
                     const SizedBox(width: 6),
                     Expanded(child: Text(formatSession(group.startsAt))),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
                 Text(
                   spots,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  GroupMessages.confirmedCount(group.confirmedCount),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.teal,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${formatPrice(group.priceCents)} por pessoa',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: AppColors.tealSoft,
-                    color: group.isFull ? AppColors.muted : AppColors.teal,
                   ),
                 ),
               ],

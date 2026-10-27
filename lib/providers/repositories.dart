@@ -10,6 +10,9 @@ import 'package:scapematch/features/cities/data/city_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
+import 'package:scapematch/features/news/data/fake_news_repository.dart';
+import 'package:scapematch/features/news/data/news_repository.dart';
+import 'package:scapematch/features/news/data/sample_news.dart';
 
 /// Wall clock for rules that compare a session with "now".
 ///
@@ -39,6 +42,13 @@ final groupRepositoryProvider = Provider<GroupRepository>((ref) {
     ref.watch(fakeDatabaseProvider),
     clock: ref.watch(clockProvider),
   );
+});
+
+/// Feed fictício. A Home lê [newsRepositoryProvider], não a lista de exemplo.
+/// Trocar pela fonte real é apontar este provider para outra classe.
+final newsRepositoryProvider = Provider<NewsRepository>((ref) {
+  final now = ref.watch(clockProvider).now();
+  return FakeNewsRepository(items: buildSampleNews(now));
 });
 
 /// Example house feed. The screens do not read this yet.

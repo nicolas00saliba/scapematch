@@ -24,19 +24,21 @@ Tela  ->  view model  ->  repositório (interface)  ->  fonte de dados
 
 `asset_experience_source.dart` é o único arquivo de `data/` que importa o Flutter, e só para ler um JSON que já vem no app (`rootBundle`). O parse em si fica em `json_experience_source.dart`, sem Flutter.
 
-`lib/providers/repositories.dart` é a única costura entre “o app quer um `GroupRepository`” e “hoje isso é o `FakeGroupRepository`”. Quando o Supabase entrar, a mudança principal é esse arquivo, mais uma classe nova em `data/`.
+`lib/providers/repositories.dart` é a única costura entre “o app quer um `GroupRepository`” e “hoje isso é o `FakeGroupRepository`”. O feed usa a mesma costura: `newsRepositoryProvider` aponta para o `FakeNewsRepository`. Quando o Supabase entrar, a mudança principal é esse arquivo, mais uma classe nova em `data/`.
 
-## Como a tela “Encontrar grupo” funciona
+## Como a Home funciona
 
-1. A pessoa escolhe a cidade no `CitySelector`. Isso grava o id em `selectedCityIdProvider`. Nada fica fixo em Curitiba; o valor inicial é vazio.
-2. A rota `/groups` abre `FindGroupsScreen`.
-3. A tela observa `findGroupsViewModelProvider`.
-4. O `FindGroupsViewModel` lê a cidade e o filtro “Quase cheios” e chama `GroupRepository.listByCity`.
-5. O `FakeGroupRepository` filtra `FakeDatabase.groups`. Esses grupos foram montados em `sample_data.dart`.
-6. A tela desenha um dos três estados:
+1. O app abre em `/`, a Home. A barra inferior tem Meus grupos à esquerda e a Home à direita. As duas abas são ramos de um `StatefulShellRoute`, então cada uma guarda o próprio scroll.
+2. A pessoa escolhe a cidade no `CitySelector`. Isso grava o id em `selectedCityIdProvider`. Nada fica fixo em Curitiba; o valor inicial é vazio. A mesma cidade filtra os grupos e o feed.
+3. Em cima, `FindGroupsSection` observa `filteredGroupsProvider`. O `FindGroupsViewModel` lê a cidade e o filtro “Quase cheios” e chama `GroupRepository.listByCity`. O texto “Buscar sala ou casa” filtra essa lista em memória, sem outra ida ao repositório. O atalho Criar grupo abre `/groups/new` por cima da barra.
+4. O `FakeGroupRepository` filtra `FakeDatabase.groups`. Esses grupos foram montados em `sample_data.dart`.
+5. A seção desenha um dos três estados, num bloco curto (a Home inteira é um scroll só):
    - carregando
    - erro, com “Tentar de novo”
    - lista, ou o vazio se a cidade não tem grupo naquele filtro
+6. Logo abaixo, `NewsSection` observa `newsFeedViewModelProvider`. O view model chama `NewsRepository.list` com a cidade e a categoria do chip. O `FakeNewsRepository` aplica `filterNews` na lista de `sample_news.dart`. Os estados são os mesmos: carregando, erro, vazio ou os cartões. Tocar num cartão abre `/news/:id`.
+
+A rota antiga `/groups` redireciona para `/`. Meus grupos continua em `/groups/mine`.
 
 Entrar num grupo é o mesmo desenho, com um passo a mais: `GroupDetailViewModel.join` chama `GroupRepository.join`. O repositório devolve sucesso ou um motivo (`cheio`, `já entrou`, `não achou`). Não usa exceção para um grupo cheio, porque isso é uma resposta normal. A lista é atualizada na memória e a tela de baixo é invalidada para recarregar.
 
@@ -65,7 +67,7 @@ Usamos Riverpod 3, sem gerador de código, para o arquivo continuar legível.
 - `AsyncNotifier` guarda algo que vem de um `Future` (a lista, o detalhe). O widget usa `when` para carregando, erro e dado.
 - O retry automático do Riverpod 3 está desligado em `lib/app/retry.dart`. Quem tenta de novo é a pessoa, no botão.
 
-A navegação é o `go_router` em `lib/app/router.dart`: `/`, `/groups`, `/groups/new`, `/groups/mine`, `/groups/:groupId`. As rotas `new` e `mine` vêm antes de `:groupId` para essas palavras não virarem um id. `/groups/mine` é a tela Meus grupos, com as abas Próximos, Passados e Cancelados.
+A navegação é o `go_router` em `lib/app/router.dart`. A barra é um `StatefulShellRoute.indexedStack`: o primeiro ramo é `/groups/mine` (Meus grupos) e o segundo é `/` (Home). Por cima da barra ficam `/groups/new`, `/groups/:groupId` e `/news/:newsId`. A palavra `new` continua registrada antes de `:groupId`. `/groups/mine` é a tela Meus grupos, com as abas Próximos, Passados e Cancelados. `/groups` sem sufixo volta para a Home.
 
 ## O que é fictício, no código
 
@@ -75,7 +77,7 @@ Cada cidade nasce com dois grupos: um quase cheio e outro com mais vagas abertas
 
 O preço por pessoa é fictício e fica na sala, em centavos. O grupo copia esse número quando nasce. O pagamento marcado como pago, e o reembolso, também são simulados.
 
-O banner laranja nas telas repete o aviso para quem está usando, não só para quem lê o código.
+O feed de exemplo nasce em `buildSampleNews`, com a mesma hora do `clockProvider`. São dez notícias em Curitiba e mais algumas nas outras cidades. Texto, link e ilustração são inventados. Uma notícia não tem arquivo de imagem e o app desenha um degradê. O banner laranja nas telas repete o aviso para quem está usando, não só para quem lê o código. Ele também cita as notícias.
 
 Quem usa o app não está escrito como o texto “Você” dentro do repositório. O nome vem de `currentUserProvider` (`lib/features/account/`). Hoje esse provider devolve um usuário fictício, ainda chamado Você. Quando houver login, a troca é a implementação desse provider.
 
@@ -100,6 +102,6 @@ O rascunho das tabelas, das políticas e da função está em [SUPABASE_ESQUEMA.
 1. Criar tabelas (cidade, casa, sala, horário, grupo, participante). O rascunho está em [SUPABASE_ESQUEMA.md](SUPABASE_ESQUEMA.md). A entrada no grupo usa a função atômica, não um insert do cliente.
 2. Escrever `SupabaseGroupRepository implements GroupRepository` com os mesmos métodos: `listByCity`, `listForUser`, `getById`, `join`, `create`, `confirmAttendance`, `leave`, `deleteGroup`, `removeMember`, `edit`. O `join`, a saída, a exclusão e a remoção chamam RPC. O repositório recebe o mesmo `Clock` para as regras que comparam com agora, ou usa o `now()` do banco dentro da função.
 3. Apontar `groupRepositoryProvider` para essa classe.
-4. Repetir a ideia para cidades e para o catálogo. O catálogo é separado de propósito. Cada casa entra por um `ExperienceSource` (salas e sessões, com o tipo de disponibilidade). O exemplo que existe hoje só lê um JSON local. Como uma integração futura entra, e quando um site não pode ser coletado, está em [DADOS_REAIS.md](DADOS_REAIS.md).
+4. Repetir a ideia para cidades, para o catálogo e para o feed. O feed troca `newsRepositoryProvider` por uma classe que implementa `NewsRepository` (`list` e `getById`). A Home não ganha HTTP por causa disso. O catálogo é separado de propósito, e o feed também: notícia não é horário de jogo. Cada casa entra no catálogo por um `ExperienceSource` (salas e sessões, com o tipo de disponibilidade). O exemplo que existe hoje só lê um JSON local. Como uma integração futura entra, inclusive a notícia vinda de site ou de Instagram, e quando um site não pode ser coletado, está em [DADOS_REAIS.md](DADOS_REAIS.md).
 
 As telas não devem ganhar `http` nem SQL. Se a tela precisar de um campo novo, ele entra no modelo `Group` e o repositório passa a preenchê-lo.

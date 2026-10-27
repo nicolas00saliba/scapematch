@@ -33,6 +33,11 @@ abstract final class AppKeys {
   static const editNote = Key('edit-note');
   static const editSave = Key('edit-save');
   static const editError = Key('edit-error');
+  static const homeTab = Key('home-tab');
+  static const groupSearch = Key('group-search');
+  static const newsFeed = Key('news-feed');
+  static const newsCategoryAll = Key('news-category-all');
+  static const newsRetry = Key('news-retry');
   static const myGroupsUpcoming = Key('my-groups-upcoming');
   static const myGroupsPast = Key('my-groups-past');
   static const myGroupsCancelled = Key('my-groups-cancelled');
@@ -43,6 +48,8 @@ abstract final class AppKeys {
 
   static Key cityOption(String id) => Key('city-option-$id');
   static Key groupCard(String id) => Key('group-card-$id');
+  static Key newsCard(String id) => Key('news-card-$id');
+  static Key newsCategory(String id) => Key('news-category-$id');
   static Key option(String id) => Key('option-$id');
   static Key selectionField(String name) => Key('selection-$name');
 }

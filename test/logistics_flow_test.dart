@@ -337,7 +337,11 @@ Future<void> _openGroup(
   await _selectCity(tester, cityId);
   await tester.tap(find.byKey(AppKeys.findGroup));
   await tester.pumpAndSettle();
-  await tester.scrollUntilVisible(find.byKey(AppKeys.groupCard(groupId)), 300);
+  await tester.scrollUntilVisible(
+    find.byKey(AppKeys.groupCard(groupId)),
+    300,
+    scrollable: verticalScrollable,
+  );
   await tester.tap(find.byKey(AppKeys.groupCard(groupId)));
   await tester.pumpAndSettle();
 }

@@ -93,9 +93,9 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Meus grupos
 
 - **Data:** 2026-10-27
-- **Decisão:** a home tem “Meus grupos”, com três abas: Próximos, Passados e Cancelados. Entram grupos criados e grupos em que a pessoa entrou. Próximos são cadeiras ainda ativas cuja sessão não terminou, inclusive a que já começou. Passados são sessões que já terminaram e não foram canceladas, com a pessoa ainda na cadeira. Cancelados são grupo excluído, saída voluntária ou remoção pelo organizador, mesmo que a sessão também já tenha acabado. Cada aba tem a própria lista e o próprio texto de vazio.
+- **Decisão:** Meus grupos é a aba da esquerda na barra inferior, não um cartão da Home. Dentro dela ficam três abas: Próximos, Passados e Cancelados. Entram grupos criados e grupos em que a pessoa entrou. Próximos são cadeiras ainda ativas cuja sessão não terminou, inclusive a que já começou. Passados são sessões que já terminaram e não foram canceladas, com a pessoa ainda na cadeira. Cancelados são grupo excluído, saída voluntária ou remoção pelo organizador, mesmo que a sessão também já tenha acabado. Cada aba tem a própria lista e o próprio texto de vazio.
 - **Motivo:** a busca é para achar vaga. O histórico da pessoa, inclusive o reembolso, não pode sumir quando o grupo sai da lista da cidade. Misturar sessão encerrada com cancelamento na mesma aba escondia o motivo de cada linha.
-- **Onde está no código:** rota `/groups/mine`, `MyGroupsScreen`, `splitMyGroups` e `GroupRules.bucketForMember`.
+- **Onde está no código:** rota `/groups/mine`, primeiro ramo do `StatefulShellRoute`, `MyGroupsScreen`, `splitMyGroups` e `GroupRules.bucketForMember`. A separação das três listas não mudou.
 - **Como trocar depois:** uma aba “Em andamento” usaria `hasStarted` sem `hasEnded` e sairia de Próximos. Voltar a juntar Passados e Cancelados é desfazer `bucketForMember` num único “não é próximo”.
 
 ## Editar o grupo
@@ -121,3 +121,35 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Motivo:** uma data fixa em novembro fica o tempo todo fora da janela de 2 horas, e o dono não consegue ver o aviso de sem reembolso. Voltar a ocupar todos os horários impediria criar grupo.
 - **Onde está no código:** `buildSampleDatabase({required DateTime now})`, chamado com `clockProvider` em `fakeDatabaseProvider`.
 - **Como trocar depois:** quando o catálogo for real, esta função sai. O `Clock` fica, porque a regra de 2 horas continua.
+
+## A Home é a busca, com o feed embaixo
+
+- **Data:** 2026-10-27
+- **Decisão:** a tela inicial deixa de ser três cartões grandes. Em cima fica a busca de grupo, mais curta: cidade bem visível, campo “Buscar sala ou casa”, filtro Quase cheios, atalho Criar grupo e cartões de grupo com menos linhas. Logo abaixo, o feed de novidades. Os dois seguem a mesma cidade. Sem cidade, nenhum dos dois lista o Brasil inteiro. A rota antiga `/groups` volta para `/`.
+- **Motivo:** o dono pediu a busca na própria Home, comprimida, e o feed no mesmo scroll. Um destino separado para “encontrar grupo” repetiria a tela.
+- **Onde está no código:** `HomeScreen`, `FindGroupsSection`, `NewsSection`. O texto da busca filtra em memória (`filterGroupsByText`); não cria outro método no `GroupRepository`. O cartão da lista não mostra mais preço, presenças confirmadas nem a barra de progresso. Isso continua no detalhe e em Meus grupos.
+- **Como trocar depois:** se a busca voltar a ser uma tela só dela, a seção sai da Home e a rota `/groups` deixa de redirecionar. Se o preço precisar aparecer no cartão, ele volta para `GroupCard`. O atalho Criar grupo pode sair se a barra ganhar um botão de criar.
+
+## Barra inferior: Meus grupos à esquerda da Home
+
+- **Data:** 2026-10-27
+- **Decisão:** a barra tem só dois destinos, nesta ordem: Meus grupos, Home. O app abre na Home. Cada aba guarda o próprio scroll. Criar grupo, o detalhe do grupo e o detalhe da notícia abrem por cima da barra, com voltar. Não há terceira aba nesta versão. O rótulo da aba é “Home”, a palavra que o dono usou.
+- **Motivo:** Meus grupos precisava de um lugar fixo, à esquerda da Home, sem misturar o histórico com a busca. Duas abas bastam para o que existe hoje.
+- **Onde está no código:** `StatefulShellRoute.indexedStack` em `lib/app/router.dart` e `AppShell`. O ramo 0 é `/groups/mine`. O ramo 1 é `/`.
+- **Como trocar depois:** uma aba nova entra como outro `StatefulShellBranch`, na posição em que deve aparecer. Se o nome da aba passar a ser “Início”, muda o `label` da `NavigationDestination`.
+
+## Feed de notícias fictícias
+
+- **Data:** 2026-10-27
+- **Decisão:** o feed lê `NewsRepository`. Hoje isso é o `FakeNewsRepository`, com notícias inventadas e datas relativas ao `clockProvider`. O modelo é `NewsItem`: id, título, resumo, categoria, casa, cidade, imagem, data, link de origem opcional e tipo de fonte (site, Instagram ou curadoria). Há dez notícias em Curitiba e mais algumas em São Paulo, Rio de Janeiro, Belo Horizonte e Porto Alegre. O chip “Todas” começa selecionado. Os outros chips são Novas salas, Horários, Promoções e Eventos. Tocar de novo num chip de categoria não tira o filtro; “Todas” tira. A ordem é a mais recente primeiro. Ranking, nesta versão, entra como Evento, porque não há um quinto chip. Tocar no cartão abre um detalhe simples. O link de origem aparece como texto e o app não abre o navegador. Uma notícia de Curitiba não tem foto: o app desenha um degradê e escreve “Ilustração fictícia”.
+- **Motivo:** o dono pediu o feed agora, com dados caprichados, e a troca por uma fonte real sem mexer na tela. Abrir um link fictício levaria a um endereço que não existe. Um quinto chip de ranking esperaria uma categoria que ele não listou.
+- **Onde está no código:** `lib/features/news/`. A lista passa por `filterNews`. As imagens ficam em `assets/images/news/`. O provider é `newsRepositoryProvider`.
+- **Como trocar depois:** apontar `newsRepositoryProvider` para uma classe que implementa `NewsRepository`. A imagem pode ser um asset ou uma URL `http(s)`; o widget `NewsArtwork` já trata os dois, e o vazio continua no degradê. Se o link passar a abrir, a troca é no detalhe, não no modelo. Um chip de ranking seria um valor novo em `NewsCategory`.
+
+## A imagem da notícia não prende a tela ao asset
+
+- **Data:** 2026-10-27
+- **Decisão:** o campo `image` é um texto opcional. Caminho `assets/...` desenha um asset. URL `http` ou `https` desenha a rede. Qualquer outro valor, ou vazio, vira a ilustração gerada. Os exemplos usam só assets e um vazio. Nenhum exemplo chama a rede.
+- **Motivo:** uma fonte real vai mandar URL. Se o campo se chamasse só “asset”, a tela teria de mudar no dia da troca.
+- **Onde está no código:** `NewsItem.image` e `NewsArtwork`.
+- **Como trocar depois:** o repositório real preenche `image` com a URL pública que a casa autorizou. Foto de marketing continua sujeita à seção de termos em [DADOS_REAIS.md](DADOS_REAIS.md).
