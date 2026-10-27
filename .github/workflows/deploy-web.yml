@@ -1,0 +1,170 @@
+# Publishes the Flutter web release on GitHub Pages.
+#
+# Public project URL: https://nicolas00saliba.github.io/scapematch/
+# --base-href must stay /scapematch/ (leading and trailing slash).
+#
+# Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
+# release that ships Dart 3.13.7.
+#
+# Triggers: manual run, and pushes to gh-pages-preview (or this preview
+# branch, which is the equivalent while the site is being set up).
+# The github-pages environment often allows deploys from the default
+# branch only. This workflow tries Actions deployment first and, if that
+# is rejected, pushes the built site to the gh-pages branch. It never
+# pushes to main.
+name: Deploy web
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gh-pages-preview
+      - cursor/gh-pages-preview-23b9
+
+permissions:
+  actions: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: scapematch-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web
+        run: flutter build web --release --base-href /scapematch/
+
+      - name: Check base href
+        run: grep -F 'base href="/scapematch/"' build/web/index.html
+
+      # Pages serves 404.html for paths the static host does not know.
+      # Copying the shell lets go_router open /groups and the other routes.
+      - name: Add SPA fallback and disable Jekyll
+        run: |
+          cp build/web/index.html build/web/404.html
+          touch build/web/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/web
+          include-hidden-files: "true"
+
+      - name: Upload web site for the gh-pages fallback
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-site
+          path: build/web
+          include-hidden-files: "true"
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Enable Pages and allow this branch to deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          echo "Pages site before this run:"
+          gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '{html_url,build_type,source}'
+          if [ "$?" -ne 0 ]; then
+            echo "Pages is not enabled. Requesting an Actions publishing source."
+            echo "This only changes the Pages setting. It does not push to main."
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
+              -f build_type=workflow \
+              -f 'source[branch]=main' \
+              -f 'source[path]=/'
+          fi
+          echo "Deployment branch policy before the update:"
+          gh api "repos/${GITHUB_REPOSITORY}/environments/github-pages" \
+            --jq '{name,deployment_branch_policy}'
+          echo "Allowing every branch to deploy to github-pages."
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/environments/github-pages" \
+            --input - <<< '{"deployment_branch_policy":null}'
+          exit 0
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  publish-gh-pages:
+    name: Push gh-pages branch
+    needs: deploy
+    if: always() && needs.deploy.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download site
+        uses: actions/download-artifact@v8
+        with:
+          name: web-site
+          path: _site
+
+      - name: Publish the site on gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish ScapeMatch web preview
+
+  check:
+    name: Check public URL
+    needs: [deploy, publish-gh-pages]
+    if: always() && (needs.deploy.result == 'success' || needs.publish-gh-pages.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request the project site
+        run: |
+          url="https://nicolas00saliba.github.io/scapematch/"
+          echo "### ScapeMatch web" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            code="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$url" || true)"
+            echo "attempt ${attempt}: HTTP ${code}"
+            if [ "$code" = "200" ] && grep -q 'base href="/scapematch/"' /tmp/scapematch.html; then
+              echo "Public site returned the Flutter shell."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "The public URL did not return the Flutter shell."
+          echo "An admin may still need to enable Pages. See the workflow log from the deploy job."
+          exit 1

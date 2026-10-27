@@ -1,0 +1,100 @@
+# Builds installable Android APKs and uploads them as run artifacts.
+#
+# Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
+# release that ships Dart 3.13.7. Release is signed with the debug key
+# already configured in android/app/build.gradle.kts, so a private
+# keystore is not required for this test build.
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gh-pages-preview
+      - cursor/gh-pages-preview-23b9
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: scapematch-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build ${{ matrix.mode }} APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [debug, release]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Flutter 3.47 defaults to compileSdk 36 and NDK 28.2.13676358.
+      # Install those packages explicitly so the build does not stop on a
+      # license prompt or a missing SDK component.
+      - name: Install Android SDK packages
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK" ]; then
+            echo "Android SDK is not installed on this runner."
+            exit 1
+          fi
+          echo "Android SDK: $SDK"
+          manager="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$manager" ]; then
+            found="$(find "$SDK" -type f -path '*/bin/sdkmanager' -print -quit || true)"
+            if [ -n "$found" ]; then
+              manager="$found"
+            fi
+          fi
+          if [ ! -x "$manager" ]; then
+            echo "Installing Android command-line tools."
+            tmp="$(mktemp -d)"
+            curl -fL --retry 3 -o "$tmp/cmdtools.zip" \
+              https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+            unzip -q "$tmp/cmdtools.zip" -d "$tmp"
+            mkdir -p "$SDK/cmdline-tools"
+            rm -rf "$SDK/cmdline-tools/latest"
+            mv "$tmp/cmdline-tools" "$SDK/cmdline-tools/latest"
+            manager="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          yes | "$manager" --sdk_root="$SDK" --licenses >/dev/null || true
+          "$manager" --sdk_root="$SDK" --install \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "platform-tools"
+          flutter doctor -v || true
+
+      - name: Build APK
+        run: flutter build apk --${{ matrix.mode }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: scapematch-apk-${{ matrix.mode }}
+          path: build/app/outputs/flutter-apk/app-${{ matrix.mode }}.apk
+          if-no-files-found: error
+          retention-days: 14
