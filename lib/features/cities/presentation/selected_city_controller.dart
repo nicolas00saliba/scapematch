@@ -1,19 +1,34 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 
-/// The city currently chosen in the big selector.
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/features/cities/data/selected_city_store.dart';
+
+/// Store da cidade. O `main` carrega o valor salvo antes do primeiro frame
+/// e coloca a instância aqui. Sem override, não há cidade salva e a tela
+/// usa Curitiba.
+final selectedCityStoreProvider = Provider<SelectedCityStore>(
+  (ref) => SelectedCityStore(),
+);
+
+/// Cidade atual do seletor.
 ///
-/// It starts empty on purpose. The app must not assume Curitiba, or any
-/// other city, until the person picks one.
-class SelectedCityController extends Notifier<String?> {
+/// Nunca começa vazia. Sem escolha salva, o valor é Curitiba. Uma escolha
+/// gravada prevalece, porque o store já foi carregado antes do `runApp`.
+class SelectedCityController extends Notifier<String> {
   @override
-  String? build() => null;
+  String build() => ref.watch(selectedCityStoreProvider).resolve();
 
   void select(String cityId) {
+    if (state == cityId) {
+      return;
+    }
     state = cityId;
+    final store = ref.read(selectedCityStoreProvider);
+    store.remember(cityId);
+    unawaited(store.persist(cityId));
   }
 }
 
-final selectedCityIdProvider =
-    NotifierProvider<SelectedCityController, String?>(
-      SelectedCityController.new,
-    );
+final selectedCityIdProvider = NotifierProvider<SelectedCityController, String>(
+  SelectedCityController.new,
+);

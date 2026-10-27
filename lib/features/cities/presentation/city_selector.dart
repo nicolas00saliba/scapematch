@@ -53,7 +53,7 @@ class CitySelector extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     List<City> cities,
-    String? selectedId,
+    String selectedId,
   ) async {
     final picked = await showModalBottomSheet<City>(
       context: context,

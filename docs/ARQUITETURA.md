@@ -29,7 +29,7 @@ Tela  ->  view model  ->  repositório (interface)  ->  fonte de dados
 ## Como a Home funciona
 
 1. O app abre em `/`, a Home. A barra inferior tem a Home à esquerda e Meus grupos à direita. As duas abas são ramos de um `StatefulShellRoute`, então cada uma guarda o próprio scroll.
-2. A pessoa escolhe a cidade no `CitySelector`. Isso grava o id em `selectedCityIdProvider`. Nada fica fixo em Curitiba; o valor inicial é vazio. A mesma cidade filtra os grupos e o feed.
+2. A cidade começa em Curitiba quando não há escolha salva. O `main` lê `SelectedCityStore` (shared_preferences; na web, localStorage) antes do primeiro frame e o seletor já mostra essa cidade. Trocar grava o id. A escolha salva prevalece. A mesma cidade filtra os grupos e o feed.
 3. Em cima, `FindGroupsSection` observa `filteredGroupsProvider`. O `FindGroupsViewModel` lê a cidade e o filtro “Quase cheios” e chama `GroupRepository.listByCity`. O texto “Buscar sala ou casa” filtra essa lista em memória, sem outra ida ao repositório. O atalho Criar grupo abre `/groups/new` por cima da barra.
 4. O `FakeGroupRepository` filtra `FakeDatabase.groups`. Esses grupos foram montados em `sample_data.dart`.
 5. A seção desenha um dos três estados, num bloco curto (a Home inteira é um scroll só):

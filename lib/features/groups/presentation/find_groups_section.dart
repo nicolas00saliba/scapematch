@@ -98,13 +98,9 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
                 key: AppKeys.almostFullFilter,
                 label: const Text('Quase cheios'),
                 selected: almostFull,
-                onSelected: cityId == null
-                    ? null
-                    : (value) {
-                        ref
-                            .read(almostFullOnlyProvider.notifier)
-                            .setEnabled(value);
-                      },
+                onSelected: (value) {
+                  ref.read(almostFullOnlyProvider.notifier).setEnabled(value);
+                },
               ),
             ),
             FilledButton.tonalIcon(
@@ -125,15 +121,12 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
           style: theme.textTheme.bodySmall?.copyWith(color: AppColors.muted),
         ),
         const SizedBox(height: 8),
-        _list(context, ref, cityId, cityName, almostFull, query, groups),
+        _list(context, ref, cityName, almostFull, query, groups),
       ],
     );
   }
 
-  String? _cityName(WidgetRef ref, String? cityId) {
-    if (cityId == null) {
-      return null;
-    }
+  String? _cityName(WidgetRef ref, String cityId) {
     final cities = ref.watch(citiesProvider).value;
     if (cities == null) {
       return null;
@@ -149,18 +142,11 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
   Widget _list(
     BuildContext context,
     WidgetRef ref,
-    String? cityId,
     String? cityName,
     bool almostFull,
     String query,
     AsyncValue<List<Group>> groups,
   ) {
-    if (cityId == null) {
-      return const InlineNotice(
-        message: 'Escolha a cidade acima para ver os grupos.',
-      );
-    }
-
     return groups.when(
       skipLoadingOnReload: true,
       loading: () =>

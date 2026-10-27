@@ -68,15 +68,12 @@ class NewsSection extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 12),
-        _body(context, ref, cityId, cityName, category, news, now),
+        _body(context, ref, cityName, category, news, now),
       ],
     );
   }
 
-  String? _cityName(WidgetRef ref, String? cityId) {
-    if (cityId == null) {
-      return null;
-    }
+  String? _cityName(WidgetRef ref, String cityId) {
     final cities = ref.watch(citiesProvider).value;
     if (cities == null) {
       return null;
@@ -92,18 +89,11 @@ class NewsSection extends ConsumerWidget {
   Widget _body(
     BuildContext context,
     WidgetRef ref,
-    String? cityId,
     String? cityName,
     NewsCategory? category,
     AsyncValue<List<NewsItem>> news,
     DateTime now,
   ) {
-    if (cityId == null) {
-      return const InlineNotice(
-        message: 'Escolha a cidade acima para ver as novidades.',
-      );
-    }
-
     // Cidade ou chip novo mantém os cartões. O spinner só aparece na
     // primeira carga, para a lista não piscar.
     return news.when(

@@ -2,9 +2,11 @@ import 'package:scapematch/features/news/domain/news_item.dart';
 
 /// Filtra o feed pela cidade e, se houver, pela categoria.
 ///
-/// Sem cidade a lista fica vazia: o app não assume Curitiba. A ordem é a
-/// mais recente primeiro. Empate de horário desempata pelo id, para o teste
-/// não depender da ordem em que a lista foi montada.
+/// Sem cidade (nulo ou vazio) a lista fica vazia, para ninguém listar o
+/// país inteiro por engano. A Home não usa esse caminho: sem escolha salva
+/// a cidade é Curitiba. A ordem é a mais recente primeiro. Empate de
+/// horário desempata pelo id, para o teste não depender da ordem em que a
+/// lista foi montada.
 List<NewsItem> filterNews(
   List<NewsItem> items, {
   required String? cityId,

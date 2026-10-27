@@ -125,7 +125,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## A Home é a busca, com o feed embaixo
 
 - **Data:** 2026-10-27
-- **Decisão:** a tela inicial deixa de ser três cartões grandes. Em cima fica a busca de grupo, mais curta: cidade bem visível, campo “Buscar sala ou casa”, filtro Quase cheios, atalho Criar grupo e cartões de grupo com menos linhas. Logo abaixo, o feed de novidades. Os dois seguem a mesma cidade. Sem cidade, nenhum dos dois lista o Brasil inteiro. A rota antiga `/groups` volta para `/`.
+- **Decisão:** a tela inicial deixa de ser três cartões grandes. Em cima fica a busca de grupo, mais curta: cidade bem visível, campo “Buscar sala ou casa”, filtro Quase cheios, atalho Criar grupo e cartões de grupo com menos linhas. Logo abaixo, o feed de novidades. Os dois seguem a mesma cidade. A cidade inicial, quando não há escolha salva, é Curitiba — ver “Sem cidade salva, a Home abre em Curitiba”. A lista nunca junta o Brasil inteiro. A rota antiga `/groups` volta para `/`.
 - **Motivo:** o dono pediu a busca na própria Home, comprimida, e o feed no mesmo scroll. Um destino separado para “encontrar grupo” repetiria a tela.
 - **Onde está no código:** `HomeScreen`, `FindGroupsSection`, `NewsSection`. O texto da busca filtra em memória (`filterGroupsByText`); não cria outro método no `GroupRepository`. O cartão da lista não mostra mais preço, presenças confirmadas nem a barra de progresso. Isso continua no detalhe e em Meus grupos.
 - **Como trocar depois:** se a busca voltar a ser uma tela só dela, a seção sai da Home e a rota `/groups` deixa de redirecionar. Se o preço precisar aparecer no cartão, ele volta para `GroupCard`. O atalho Criar grupo pode sair se a barra ganhar um botão de criar.
@@ -185,3 +185,11 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Motivo:** sem pilha o AppBar não desenha voltar, e a notícia ficava sem saída.
 - **Onde está no código:** `NewsDetailScreen`, botão `AppKeys.newsBackHome`.
 - **Como trocar depois:** se o detalhe passar a abrir dentro do shell, o botão sai e a barra inferior volta a ser o caminho.
+
+## Sem cidade salva, a Home abre em Curitiba
+
+- **Data:** 2026-10-27
+- **Decisão:** quando não há cidade salva, a cidade padrão é Curitiba, a primeira cidade do produto. Ela já entra selecionada na primeira abertura. O seletor continua visível para trocar. Uma escolha salva prevalece sobre Curitiba. A escolha é gravada com `shared_preferences` (na web, o localStorage do navegador), na chave `selected_city_id`. A ausência da chave, ou um valor vazio, significa Curitiba. O padrão não é gravado sozinho: só a troca feita pela pessoa. O valor é lido antes do primeiro frame, para a Home não piscar o aviso de escolher cidade.
+- **Motivo:** no site publicado, abrir o app no celular sem cidade escolhida mostrava só “Escolha a cidade acima para ver os grupos / as novidades”. O feed não aparecia. O dono esperava ver Curitiba, como nos prints.
+- **Onde está no código:** `SelectedCityStore` e `SelectedCityController`. O `main` chama `load` e coloca o store no `selectedCityStoreProvider` antes do `runApp`. `FindGroupsSection` e `NewsSection` leem essa cidade e não têm mais o aviso de cidade vazia.
+- **Como trocar depois:** outra cidade padrão é a constante usada em `SelectedCityStore.resolve` (`SampleIds.curitiba`). Se a escolha passar a viver na conta, o store lê o perfil em vez do `shared_preferences`. A chave antiga pode ser ignorada.
