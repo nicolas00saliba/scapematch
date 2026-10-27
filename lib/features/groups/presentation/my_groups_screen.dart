@@ -35,7 +35,7 @@ class MyGroupsScreen extends ConsumerWidget {
         data: (items) {
           final split = splitMyGroups(groups: items, userId: userId, now: now);
           return DefaultTabController(
-            length: 2,
+            length: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -44,10 +44,8 @@ class MyGroupsScreen extends ConsumerWidget {
                   tabAlignment: TabAlignment.start,
                   tabs: [
                     Tab(key: AppKeys.myGroupsUpcoming, text: 'Próximos'),
-                    Tab(
-                      key: AppKeys.myGroupsHistory,
-                      text: 'Passados/Cancelados',
-                    ),
+                    Tab(key: AppKeys.myGroupsPast, text: 'Passados'),
+                    Tab(key: AppKeys.myGroupsCancelled, text: 'Cancelados'),
                   ],
                 ),
                 Expanded(
@@ -60,10 +58,16 @@ class MyGroupsScreen extends ConsumerWidget {
                         emptyMessage: 'Você ainda não tem grupos marcados. Encontre um ou crie o seu.',
                       ),
                       _GroupList(
-                        groups: split.history,
+                        groups: split.past,
                         userId: userId,
-                        emptyTitle: 'Nada por aqui',
-                        emptyMessage: 'Nenhum grupo passado ou cancelado.',
+                        emptyTitle: 'Nenhuma sessão passada',
+                        emptyMessage: 'Quando uma sessão terminar sem ser cancelada, ela aparece aqui.',
+                      ),
+                      _GroupList(
+                        groups: split.cancelled,
+                        userId: userId,
+                        emptyTitle: 'Nenhum cancelamento',
+                        emptyMessage: 'Grupos excluídos e saídas aparecem aqui, com o reembolso simulado.',
                       ),
                     ],
                   ),

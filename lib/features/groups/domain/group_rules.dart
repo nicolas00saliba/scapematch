@@ -99,7 +99,10 @@ class GroupRules {
     required Iterable<({String roomId, DateTime startsAt})> existing,
   }) {
     for (final session in existing) {
-      if (session.roomId == roomId && session.startsAt == startsAt) {
+      // == also compares isUtc, so the same instant stored as UTC and as
+      // local would look free. The room is taken when the moments match.
+      if (session.roomId == roomId &&
+          session.startsAt.isAtSameMomentAs(startsAt)) {
         return true;
       }
     }
@@ -194,6 +197,29 @@ class GroupRules {
   static bool noteTooLong(String value) =>
       normalizeNote(value).length > maxNoteLength;
 
+  /// Where one membership appears in Meus grupos.
+  ///
+  /// Upcoming: the person still has a seat, the group is not cancelled,
+  /// and the session has not ended (a session in progress stays here).
+  /// Past: the session ended and the group was not cancelled.
+  /// Cancelled: the organizer deleted the group, or the person left or
+  /// was removed. A cancelled group stays here even if the session later
+  /// ends.
+  static GroupListBucket bucketForMember({
+    required bool groupCancelled,
+    required bool memberActive,
+    required DateTime endsAt,
+    required DateTime now,
+  }) {
+    if (groupCancelled || !memberActive) {
+      return GroupListBucket.cancelled;
+    }
+    if (hasEnded(endsAt: endsAt, now: now)) {
+      return GroupListBucket.past;
+    }
+    return GroupListBucket.upcoming;
+  }
+
   /// Upcoming membership: the group is still on, the person still has a
   /// seat, and the session has not ended.
   static bool isUpcomingForMember({
@@ -202,12 +228,17 @@ class GroupRules {
     required DateTime endsAt,
     required DateTime now,
   }) {
-    if (groupCancelled || !memberActive) {
-      return false;
-    }
-    return !hasEnded(endsAt: endsAt, now: now);
+    return bucketForMember(
+          groupCancelled: groupCancelled,
+          memberActive: memberActive,
+          endsAt: endsAt,
+          now: now,
+        ) ==
+        GroupListBucket.upcoming;
   }
 }
+
+enum GroupListBucket { upcoming, past, cancelled }
 
 enum GroupSizeValidation { valid, belowMinimum, exceedsRoomCapacity }
 

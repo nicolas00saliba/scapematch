@@ -54,7 +54,7 @@ class HomeScreen extends StatelessWidget {
             buttonKey: AppKeys.myGroups,
             icon: Icons.event_available_outlined,
             title: 'Meus grupos',
-            subtitle: 'Próximos, passados e o reembolso simulado.',
+            subtitle: 'Próximos, passados, cancelados e o reembolso simulado.',
             onTap: () => context.push('/groups/mine'),
           ),
           const SizedBox(height: 20),

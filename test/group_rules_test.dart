@@ -124,6 +124,23 @@ void main() {
         isFalse,
       );
     });
+
+    test('treats the same instant in UTC and local as the same start', () {
+      final utc = DateTime.utc(2026, 11, 8, 19);
+      final local = utc.toLocal();
+      expect(utc.isUtc, isTrue);
+      expect(local.isUtc, isFalse);
+      expect(utc == local, isFalse);
+      expect(utc.isAtSameMomentAs(local), isTrue);
+      expect(
+        GroupRules.roomAndTimeTaken(
+          roomId: 'room-a',
+          startsAt: utc,
+          existing: [(roomId: 'room-a', startsAt: local)],
+        ),
+        isTrue,
+      );
+    });
   });
 
   group('refund window', () {
@@ -297,35 +314,47 @@ void main() {
       );
     });
 
+    test('a finished session that was not cancelled is past', () {
+      expect(
+        GroupRules.bucketForMember(
+          groupCancelled: false,
+          memberActive: true,
+          endsAt: now,
+          now: now,
+        ),
+        GroupListBucket.past,
+      );
+    });
+
     test(
-      'a cancelled group, a left seat, or a finished session is history',
+      'a cancelled group or a left seat is cancelled, even after the end',
       () {
         expect(
-          GroupRules.isUpcomingForMember(
+          GroupRules.bucketForMember(
             groupCancelled: true,
             memberActive: true,
             endsAt: endsAt,
             now: now,
           ),
-          isFalse,
+          GroupListBucket.cancelled,
         );
         expect(
-          GroupRules.isUpcomingForMember(
+          GroupRules.bucketForMember(
             groupCancelled: false,
             memberActive: false,
             endsAt: endsAt,
             now: now,
           ),
-          isFalse,
+          GroupListBucket.cancelled,
         );
         expect(
-          GroupRules.isUpcomingForMember(
-            groupCancelled: false,
-            memberActive: true,
+          GroupRules.bucketForMember(
+            groupCancelled: true,
+            memberActive: false,
             endsAt: now,
             now: now,
           ),
-          isFalse,
+          GroupListBucket.cancelled,
         );
       },
     );

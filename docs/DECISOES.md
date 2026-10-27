@@ -37,7 +37,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## O criador exclui o grupo, não sai dele
 
 - **Data:** 2026-10-27
-- **Decisão:** quem criou o grupo não tem “sair”. Para desfazer a própria presença, exclui o grupo. Não há transferência de organizador nesta versão. Excluir cancela o evento para todo mundo que ainda está no grupo e devolve o pagamento simulado integral, mesmo que falte menos de 2 horas, porque o cancelamento é do organizador. O grupo some da busca e continua em Meus grupos, na aba Passados/Cancelados, com o reembolso. O horário da sala volta a ficar livre.
+- **Decisão:** quem criou o grupo não tem “sair”. Para desfazer a própria presença, exclui o grupo, e só enquanto a sessão não começou. Não há transferência de organizador nesta versão. Excluir cancela o evento para todo mundo que ainda está no grupo e devolve o pagamento simulado integral, mesmo que falte menos de 2 horas, porque o cancelamento é do organizador. O grupo some da busca e continua em Meus grupos, na aba Cancelados, com o reembolso. O horário da sala volta a ficar livre.
 - **Motivo:** um grupo sem organizador fica sem ninguém para excluir ou editar. Transferir a cadeira de criador pede uma escolha de sucessor que esta versão não tem. O reembolso integral evita punir quem só entrou porque o organizador marcou o jogo.
 - **Onde está no código:** `GroupRules.refundForOrganizer`, `FakeGroupRepository.deleteGroup` e `LeaveGroupFailureReason.creatorMustDelete`. O botão “Excluir grupo” só aparece para o criador. A frase do diálogo está em `GroupMessages.deleteBody`.
 - **Como trocar depois:** para permitir transferência, o `leave` do criador passa a exigir um `newCreatorUserId` e só então tira a cadeira antiga. A função SQL `delete_group` do rascunho ganharia uma irmã `transfer_group`. Até lá, o criador exclui.
@@ -45,9 +45,9 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Reembolso simulado na saída voluntária
 
 - **Data:** 2026-10-27
-- **Decisão:** sair com 2 horas ou mais de antecedência devolve o pagamento simulado. Sair com menos de 2 horas não devolve. Exatamente 2 horas ainda devolve. Entrar numa sessão que começa em menos de 2 horas e depois sair também não devolve: a conta é o instante da saída contra o início, não o instante da entrada. O limite é `GroupRules.refundDeadline`. O “agora” vem de um `Clock` injetável (`clockProvider`). Não há `DateTime.now` espalhado; só `SystemClock` lê o relógio do aparelho.
-- **Motivo:** o dono pediu um aviso antes de confirmar, e testes que não dependem do minuto em que a suíte roda. Uma constante única deixa o texto da tela e a regra no mesmo número.
-- **Onde está no código:** `GroupRules.refundsOnParticipantCancel` e `refundForParticipantCancel`. O diálogo de saída lê a mesma função antes de chamar o repositório. O repositório calcula de novo na hora da saída.
+- **Decisão:** sair com 2 horas ou mais de antecedência devolve o pagamento simulado. Sair com menos de 2 horas não devolve. Exatamente 2 horas ainda devolve. Entrar numa sessão que começa em menos de 2 horas e depois sair também não devolve: a conta é o instante da saída contra o início, não o instante da entrada. O limite é `GroupRules.refundDeadline`. O “agora” vem de um `Clock` injetável (`clockProvider`). Não há `DateTime.now` espalhado; só `SystemClock` lê o relógio do aparelho. O diálogo lê o relógio na hora em que abre. Quem decide o reembolso é o repositório, de novo, na confirmação. Se o relógio andou com o diálogo aberto e o resultado for outro, a tela avisa que o horário mudou e diz o que foi registrado.
+- **Motivo:** o dono pediu um aviso antes de confirmar, e testes que não dependem do minuto em que a suíte roda. Uma constante única deixa o texto da tela e a regra no mesmo número. O diálogo não pode travar o resultado, senão um aviso de reembolso vira mentira quando o prazo vence com ele aberto.
+- **Onde está no código:** `GroupRules.refundsOnParticipantCancel` e `refundForParticipantCancel`. O diálogo está em `GroupDetailScreen._leave`. O repositório calcula de novo na hora da saída. A frase de divergência é `GroupMessages.leavePreviewChanged`.
 - **Como trocar depois:** mudar `refundDeadline`. Os testes que fixam 2 horas, 1 minuto a mais e 1 minuto a menos falham de propósito. Se a casa passar a reembolsar por percentual, a função devolve um valor em centavos em vez de sim ou não, e o diálogo mostra esse valor.
 
 ## Sair do grupo é definitivo
@@ -61,10 +61,18 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Não entrar em grupo que já começou
 
 - **Data:** 2026-10-27
-- **Decisão:** no instante do início, ou depois, ninguém novo entra e ninguém cria grupo naquele horário. A sessão que já terminou sai da busca e vai para Passados. Uma sessão em andamento continua visível, sem o botão de entrar. Confirmar presença ainda pode, até a sessão terminar, inclusive depois de começar. Sair depois de começar não reembolsa. O criador ainda pode excluir até a sessão terminar.
+- **Decisão:** no instante do início, ou depois, ninguém novo entra e ninguém cria grupo naquele horário. A sessão que já terminou sai da busca e vai para Passados. Uma sessão em andamento continua visível, sem o botão de entrar. Confirmar presença ainda pode, até a sessão terminar, inclusive depois de começar. Sair depois de começar não reembolsa. O criador não exclui nem remove ninguém depois que a sessão começou.
 - **Motivo:** chegar no meio do jogo não cabe numa sala que já fechou a porta. Esconder o grupo no minuto em que começa tiraria a tela de quem já está nele.
 - **Onde está no código:** `GroupRules.hasStarted` e `hasEnded`. `listByCity` esconde cancelados e encerrados. Criar num horário passado devolve “Esse horário já passou. Escolha um horário que ainda não começou.”
 - **Como trocar depois:** se a casa aceitar entrada atrasada, `hasStarted` deixa de bloquear o `join` e o botão volta. O encerramento pode passar a usar só a data, sem a duração.
+
+## Depois que a sessão começou, o criador não desfaz o grupo
+
+- **Data:** 2026-10-27
+- **Decisão:** no instante do início, ou depois, o criador não exclui o grupo e não remove participante. A tela mostra “A sessão já começou.” e esconde esses botões. O repositório recusa mesmo assim, com `sessionStarted`. Sessão já encerrada continua recusada com `sessionEnded`. Antes do início, excluir e remover seguem com reembolso integral do organizador.
+- **Motivo:** com a sessão em andamento, cancelar a sala ou tirar alguém no meio do jogo apaga o que já está acontecendo. O plano se desfaz antes de começar; depois disso o grupo fica até terminar.
+- **Onde está no código:** `FakeGroupRepository.deleteGroup` e `removeMember`, `GroupMessages.sessionAlreadyStarted`, e a barra do detalhe.
+- **Como trocar depois:** tirar a checagem `hasStarted` desses dois métodos e voltar a mostrar Excluir e Remover até a sessão terminar. A frase sai da tela.
 
 ## Uma pessoa, um horário
 
@@ -85,17 +93,17 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Meus grupos
 
 - **Data:** 2026-10-27
-- **Decisão:** a home tem “Meus grupos”, com as abas Próximos e Passados/Cancelados. Entram grupos criados e grupos em que a pessoa entrou. Próximos são cadeiras ainda ativas cuja sessão não terminou. Passados/Cancelados são sessão encerrada, grupo excluído, saída voluntária ou remoção pelo organizador.
-- **Motivo:** a busca é para achar vaga. O histórico da pessoa, inclusive o reembolso, não pode sumir quando o grupo sai da lista da cidade.
-- **Onde está no código:** rota `/groups/mine`, `MyGroupsScreen` e `GroupRules.isUpcomingForMember`.
-- **Como trocar depois:** uma terceira aba “Em andamento” usaria `hasStarted` sem `hasEnded`. A função de classificação ganha um terceiro valor.
+- **Decisão:** a home tem “Meus grupos”, com três abas: Próximos, Passados e Cancelados. Entram grupos criados e grupos em que a pessoa entrou. Próximos são cadeiras ainda ativas cuja sessão não terminou, inclusive a que já começou. Passados são sessões que já terminaram e não foram canceladas, com a pessoa ainda na cadeira. Cancelados são grupo excluído, saída voluntária ou remoção pelo organizador, mesmo que a sessão também já tenha acabado. Cada aba tem a própria lista e o próprio texto de vazio.
+- **Motivo:** a busca é para achar vaga. O histórico da pessoa, inclusive o reembolso, não pode sumir quando o grupo sai da lista da cidade. Misturar sessão encerrada com cancelamento na mesma aba escondia o motivo de cada linha.
+- **Onde está no código:** rota `/groups/mine`, `MyGroupsScreen`, `splitMyGroups` e `GroupRules.bucketForMember`.
+- **Como trocar depois:** uma aba “Em andamento” usaria `hasStarted` sem `hasEnded` e sairia de Próximos. Voltar a juntar Passados e Cancelados é desfazer `bucketForMember` num único “não é próximo”.
 
 ## Editar o grupo
 
 - **Data:** 2026-10-27
-- **Decisão:** o criador edita o número de pessoas desejado e uma observação. O número não fica abaixo de quem já entrou, não fica abaixo de 2 e não passa da capacidade da sala. A observação tem no máximo 280 caracteres, já sem espaços nas pontas. Não se edita grupo cancelado nem sessão encerrada.
-- **Motivo:** o tamanho pedido na criação erra, e o grupo precisa de um lugar curto para “chegar 15 minutos antes” sem virar um chat.
-- **Onde está no código:** `GroupRules.validateTotalSpots`, `GroupRules.maxNoteLength` e `FakeGroupRepository.edit`.
+- **Decisão:** o criador edita o número de pessoas desejado e uma observação. O número não fica abaixo das vagas ocupadas, não fica abaixo de 2 e não passa da capacidade da sala. Ocupadas é um número só, `Group.occupiedSpots`: o maior entre `filledSpots` e as cadeiras que ainda ocupam lugar. A tela e o repositório leem esse número. A observação tem no máximo 280 caracteres, já sem espaços nas pontas. Não se edita grupo cancelado nem sessão encerrada.
+- **Motivo:** o tamanho pedido na criação erra, e o grupo precisa de um lugar curto para “chegar 15 minutos antes” sem virar um chat. Dois cálculos de “quem já entrou” fariam o stepper aceitar um tamanho que o repositório recusa.
+- **Onde está no código:** `Group.occupiedSpots`, `GroupRules.validateTotalSpots`, `GroupRules.maxNoteLength` e `FakeGroupRepository.edit`.
 - **Como trocar depois:** se a observação virar mensagem para cada pessoa, ela sai do grupo e vira uma tabela de avisos. O teto de 280 caracteres muda na constante.
 
 ## Link do grupo

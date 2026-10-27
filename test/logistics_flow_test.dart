@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/groups/data/fake_group_repository.dart';
+import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 import 'support/pump_app.dart';
+import 'support/sample_clock.dart';
 
 void main() {
   testWidgets('confirms attendance and copies the group link', (tester) async {
@@ -90,12 +95,19 @@ void main() {
     await _home(tester);
     await tester.tap(find.byKey(AppKeys.myGroups));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Passados/Cancelados'));
+    await tester.tap(find.text('Cancelados'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Reembolsado'), findsWidgets);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsOneWidget,
+    );
+    await tester.tap(find.text('Passados'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nenhuma sessão passada'), findsOneWidget);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
+      findsNothing,
     );
   });
 
@@ -122,9 +134,14 @@ void main() {
     await _home(tester);
     await tester.tap(find.byKey(AppKeys.myGroups));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Passados/Cancelados'));
+    await tester.tap(find.text('Cancelados'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Sem reembolso'), findsWidgets);
+    expect(find.text('Nenhuma sessão passada'), findsNothing);
+    await tester.tap(find.text('Passados'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nenhuma sessão passada'), findsOneWidget);
+    expect(find.textContaining('Sem reembolso'), findsNothing);
   });
 
   testWidgets('the creator deletes the group after a confirmation', (
@@ -166,10 +183,15 @@ void main() {
     await tester.tap(find.byKey(AppKeys.myGroups));
     await tester.pumpAndSettle();
     expect(find.text('1 de 3 vagas'), findsNothing);
-    await tester.tap(find.text('Passados/Cancelados'));
+    await tester.tap(find.text('Cancelados'));
     await tester.pumpAndSettle();
     expect(find.text('A Estufa'), findsWidgets);
     expect(find.textContaining('Reembolsado'), findsWidgets);
+    expect(find.text('Nenhum cancelamento'), findsNothing);
+    await tester.tap(find.text('Passados'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nenhuma sessão passada'), findsOneWidget);
+    expect(find.text('A Estufa'), findsNothing);
   });
 
   testWidgets('a past slot and an overlapping booking explain themselves', (
@@ -222,6 +244,89 @@ void main() {
     expect(find.text(GroupMessages.alreadyStartedHint), findsOneWidget);
     expect(_submitEnabled(tester), isFalse);
   });
+
+  testWidgets(
+    'advancing the clock while the leave dialog is open follows the repository',
+    (tester) async {
+      final clock = FixedClock(sampleNow);
+      await pumpScapeMatch(
+        tester,
+        overrides: [
+          clockProvider.overrideWithValue(clock),
+          fakeDatabaseProvider.overrideWithValue(loadSampleDatabase()),
+        ],
+      );
+      await _openGroup(
+        tester,
+        SampleIds.saoPaulo,
+        SampleIds.groupSpCoberturaOpen,
+      );
+      await tester.tap(find.byKey(AppKeys.joinButton));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(AppKeys.leaveGroup));
+      await tester.pumpAndSettle();
+      expect(find.text(GroupMessages.leaveWithRefundBody), findsOneWidget);
+
+      final startsAt = sampleNow.add(const Duration(days: 3, hours: 6));
+      clock.instant = startsAt.subtract(const Duration(hours: 1));
+
+      await tester.tap(find.byKey(AppKeys.dialogConfirm));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(GroupMessages.leavePreviewChanged(refunded: false)),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Sem reembolso'), findsWidgets);
+      expect(_spotSummary(tester), '1 de 4 vagas');
+    },
+  );
+
+  testWidgets(
+    'a started session tells the creator it can no longer be deleted',
+    (tester) async {
+      final clock = FixedClock(sampleNow);
+      final database = loadSampleDatabase();
+      final groups = FakeGroupRepository(
+        database,
+        clock: clock,
+        latency: Duration.zero,
+      );
+      final created = await groups.create(
+        CreateGroupRequest(
+          cityId: SampleIds.portoAlegre,
+          houseId: SampleIds.housePoaRedencao,
+          roomId: SampleIds.roomPoaEstufa,
+          slotId: SampleIds.slotPoaEstufaFree,
+          extraSpots: 2,
+          creatorUserId: 'user-local',
+          creatorDisplayName: 'Você',
+        ),
+      );
+      final group = (created as CreateGroupSuccess).group;
+      final index = database.groups.indexWhere((item) => item.id == group.id);
+      database.groups[index] = group.copyWith(
+        startsAt: sampleNow.subtract(const Duration(minutes: 10)),
+      );
+
+      await pumpScapeMatch(
+        tester,
+        overrides: [
+          clockProvider.overrideWithValue(clock),
+          fakeDatabaseProvider.overrideWithValue(database),
+        ],
+      );
+      await tester.tap(find.byKey(AppKeys.myGroups));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(AppKeys.groupCard(group.id)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(GroupMessages.sessionAlreadyStarted), findsOneWidget);
+      expect(find.byKey(AppKeys.deleteGroup), findsNothing);
+      expect(find.byKey(AppKeys.leaveGroup), findsNothing);
+    },
+  );
 }
 
 Future<void> _openGroup(

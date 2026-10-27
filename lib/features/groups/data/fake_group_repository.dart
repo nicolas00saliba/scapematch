@@ -228,17 +228,17 @@ class FakeGroupRepository implements GroupRepository {
     required String userId,
   }) async {
     await _pause();
-    final located = _lookupSeat(groupId, userId);
-    if (located is _SeatProblem) {
-      return ConfirmAttendanceFailure(_confirmProblem(located.kind));
+    switch (_lookupSeat(groupId, userId)) {
+      case _SeatProblem(:final kind):
+        return ConfirmAttendanceFailure(_confirmProblem(kind));
+      case _SeatFound(:final index, :final group, :final member):
+        final updated = _replaceMember(
+          group,
+          member.copyWith(attendance: AttendanceStatus.confirmed),
+        );
+        _database.groups[index] = updated;
+        return ConfirmAttendanceSuccess(updated);
     }
-    final found = located as _SeatFound;
-    final updated = _replaceMember(
-      found.group,
-      found.member.copyWith(attendance: AttendanceStatus.confirmed),
-    );
-    _database.groups[found.index] = updated;
-    return ConfirmAttendanceSuccess(updated);
   }
 
   @override
@@ -247,37 +247,41 @@ class FakeGroupRepository implements GroupRepository {
     required String userId,
   }) async {
     await _pause();
-    final located = _lookupSeat(groupId, userId);
-    if (located is _SeatProblem) {
-      return LeaveGroupFailure(_leaveProblem(located.kind));
+    switch (_lookupSeat(groupId, userId)) {
+      case _SeatProblem(:final kind):
+        return LeaveGroupFailure(_leaveProblem(kind));
+      case _SeatFound(
+        index: final index,
+        group: final current,
+        member: final member,
+      ):
+        if (member.isCreator) {
+          return const LeaveGroupFailure(
+            LeaveGroupFailureReason.creatorMustDelete,
+          );
+        }
+        final outcome = GroupRules.refundForParticipantCancel(
+          startsAt: current.startsAt,
+          now: clock.now(),
+        );
+        final updatedPeople = [
+          for (final person in current.participants)
+            if (person.id == member.id)
+              person.copyWith(
+                attendance: AttendanceStatus.cancelled,
+                refund: outcome.status,
+                refundReason: outcome.reason,
+              )
+            else
+              person,
+        ];
+        final updated = current.copyWith(
+          participants: updatedPeople,
+          filledSpots: _occupied(updatedPeople),
+        );
+        _database.groups[index] = updated;
+        return LeaveGroupSuccess(updated);
     }
-    final found = located as _SeatFound;
-    final current = found.group;
-    final member = found.member;
-    if (member.isCreator) {
-      return const LeaveGroupFailure(LeaveGroupFailureReason.creatorMustDelete);
-    }
-    final outcome = GroupRules.refundForParticipantCancel(
-      startsAt: current.startsAt,
-      now: clock.now(),
-    );
-    final updatedPeople = [
-      for (final person in current.participants)
-        if (person.id == member.id)
-          person.copyWith(
-            attendance: AttendanceStatus.cancelled,
-            refund: outcome.status,
-            refundReason: outcome.reason,
-          )
-        else
-          person,
-    ];
-    final updated = current.copyWith(
-      participants: updatedPeople,
-      filledSpots: _occupied(updatedPeople),
-    );
-    _database.groups[found.index] = updated;
-    return LeaveGroupSuccess(updated);
   }
 
   @override
@@ -302,6 +306,9 @@ class FakeGroupRepository implements GroupRepository {
     final now = clock.now();
     if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
       return const DeleteGroupFailure(DeleteGroupFailureReason.sessionEnded);
+    }
+    if (GroupRules.hasStarted(startsAt: current.startsAt, now: now)) {
+      return const DeleteGroupFailure(DeleteGroupFailureReason.sessionStarted);
     }
     final outcome = GroupRules.refundForOrganizer(
       RefundReason.organizerCancelledEvent,
@@ -348,6 +355,11 @@ class FakeGroupRepository implements GroupRepository {
     }
     if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
       return const RemoveMemberFailure(RemoveMemberFailureReason.sessionEnded);
+    }
+    if (GroupRules.hasStarted(startsAt: current.startsAt, now: now)) {
+      return const RemoveMemberFailure(
+        RemoveMemberFailureReason.sessionStarted,
+      );
     }
     Participant? target;
     for (final person in current.participants) {
@@ -414,9 +426,7 @@ class FakeGroupRepository implements GroupRepository {
     if (GroupRules.noteTooLong(note)) {
       return const EditGroupFailure(EditGroupFailureReason.noteTooLong);
     }
-    final occupied = current.filledSpots > _occupied(current.participants)
-        ? current.filledSpots
-        : _occupied(current.participants);
+    final occupied = current.occupiedSpots;
     final validation = GroupRules.validateTotalSpots(
       totalSpots: totalSpots,
       occupiedSpots: occupied,
@@ -480,7 +490,7 @@ class FakeGroupRepository implements GroupRepository {
     return false;
   }
 
-  Object _lookupSeat(String groupId, String userId) {
+  _SeatLookup _lookupSeat(String groupId, String userId) {
     final index = _indexOf(groupId);
     if (index < 0) {
       return const _SeatProblem(_SeatKind.notFound);
@@ -553,13 +563,17 @@ class FakeGroupRepository implements GroupRepository {
 
 enum _SeatKind { notFound, cancelled, ended, notMember }
 
-class _SeatProblem {
+sealed class _SeatLookup {
+  const _SeatLookup();
+}
+
+class _SeatProblem extends _SeatLookup {
   const _SeatProblem(this.kind);
 
   final _SeatKind kind;
 }
 
-class _SeatFound {
+class _SeatFound extends _SeatLookup {
   const _SeatFound(this.index, this.group, this.member);
 
   final int index;

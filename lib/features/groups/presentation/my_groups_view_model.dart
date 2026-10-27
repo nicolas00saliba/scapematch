@@ -18,30 +18,35 @@ final myGroupsViewModelProvider =
       MyGroupsViewModel.new,
     );
 
-/// Splits [groups] into upcoming seats and the history tab.
-({List<Group> upcoming, List<Group> history}) splitMyGroups({
+/// Splits [groups] into Próximos, Passados and Cancelados.
+({List<Group> upcoming, List<Group> past, List<Group> cancelled})
+splitMyGroups({
   required List<Group> groups,
   required String userId,
   required DateTime now,
 }) {
   final upcoming = <Group>[];
-  final history = <Group>[];
+  final past = <Group>[];
+  final cancelled = <Group>[];
   for (final group in groups) {
     final member = group.participantForUser(userId);
     final active = member != null && member.occupiesSeat;
-    final isUpcoming = GroupRules.isUpcomingForMember(
+    switch (GroupRules.bucketForMember(
       groupCancelled: group.isCancelled,
       memberActive: active,
       endsAt: group.endsAt,
       now: now,
-    );
-    if (isUpcoming) {
-      upcoming.add(group);
-    } else {
-      history.add(group);
+    )) {
+      case GroupListBucket.upcoming:
+        upcoming.add(group);
+      case GroupListBucket.past:
+        past.add(group);
+      case GroupListBucket.cancelled:
+        cancelled.add(group);
     }
   }
   upcoming.sort((a, b) => a.startsAt.compareTo(b.startsAt));
-  history.sort((a, b) => b.startsAt.compareTo(a.startsAt));
-  return (upcoming: upcoming, history: history);
+  past.sort((a, b) => b.startsAt.compareTo(a.startsAt));
+  cancelled.sort((a, b) => b.startsAt.compareTo(a.startsAt));
+  return (upcoming: upcoming, past: past, cancelled: cancelled);
 }

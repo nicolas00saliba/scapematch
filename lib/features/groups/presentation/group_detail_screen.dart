@@ -34,6 +34,10 @@ class GroupDetailScreen extends ConsumerStatefulWidget {
 class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
   var _busy = false;
 
+  /// Refund the leave dialog promised. Compared with the repository result
+  /// after the person confirms, because the clock may have moved.
+  bool? _leavePreview;
+
   @override
   Widget build(BuildContext context) {
     final detail = ref.watch(groupDetailViewModelProvider(widget.groupId));
@@ -115,6 +119,15 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             foreground: AppColors.teal,
             icon: Icons.check_circle,
             text: GroupMessages.joinedBanner,
+          ),
+        ],
+        if (_leaveMismatch(me) case final mismatch?) ...[
+          const SizedBox(height: 12),
+          _Banner(
+            color: AppColors.copperSoft,
+            foreground: AppColors.copperInk,
+            icon: Icons.update,
+            text: mismatch,
           ),
         ],
         const SizedBox(height: 16),
@@ -266,6 +279,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     Participant person,
   ) {
     return _canEdit(group, userId, now) &&
+        !GroupRules.hasStarted(startsAt: group.startsAt, now: now) &&
         !person.isCreator &&
         person.occupiesSeat &&
         !person.isLocalUser;
@@ -288,17 +302,29 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         );
       }
       if (me.isCreator) {
-        buttons.add(
-          FilledButton(
-            key: AppKeys.deleteGroup,
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+        if (started) {
+          buttons.add(
+            Text(
+              GroupMessages.sessionAlreadyStarted,
+              key: AppKeys.sessionStarted,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
-            onPressed: _busy ? null : _delete,
-            child: const Text('Excluir grupo'),
-          ),
-        );
+          );
+        } else {
+          buttons.add(
+            FilledButton(
+              key: AppKeys.deleteGroup,
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              onPressed: _busy ? null : _delete,
+              child: const Text('Excluir grupo'),
+            ),
+          );
+        }
       } else {
         buttons.add(
           OutlinedButton(
@@ -306,7 +332,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
-            onPressed: _busy ? null : () => _leave(group, now),
+            onPressed: _busy ? null : () => _leave(group),
             child: const Text('Sair do grupo'),
           ),
         );
@@ -397,15 +423,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     });
   }
 
-  Future<void> _leave(Group group, DateTime now) async {
-    final refunds = GroupRules.refundsOnParticipantCancel(
+  Future<void> _leave(Group group) async {
+    final previewRefunds = GroupRules.refundsOnParticipantCancel(
       startsAt: group.startsAt,
-      now: now,
+      now: ref.read(clockProvider).now(),
     );
-    final accepted = await showLeaveDialog(context, refunds: refunds);
+    final accepted = await showLeaveDialog(context, refunds: previewRefunds);
     if (!accepted || !mounted) {
       return;
     }
+    setState(() => _leavePreview = previewRefunds);
     await _run(() async {
       final result = await ref
           .read(groupDetailViewModelProvider(widget.groupId).notifier)
@@ -414,11 +441,26 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         return;
       }
       final message = switch (result) {
-        LeaveGroupSuccess(:final group) => _leaveSnack(group),
+        LeaveGroupSuccess(:final group) => _leaveSnack(
+          group,
+          previewRefunds: previewRefunds,
+        ),
         LeaveGroupFailure() => GroupMessages.actionFailed,
       };
       _snack(message);
     });
+  }
+
+  String? _leaveMismatch(Participant? me) {
+    final preview = _leavePreview;
+    if (preview == null || me == null || me.occupiesSeat) {
+      return null;
+    }
+    final refunded = me.refund == RefundStatus.refunded;
+    if (refunded == preview) {
+      return null;
+    }
+    return GroupMessages.leavePreviewChanged(refunded: refunded);
   }
 
   Participant? _local(Group group) {
@@ -430,13 +472,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     return null;
   }
 
-  String _leaveSnack(Group group) {
-    final me = _local(group);
-    if (me?.refundReason == RefundReason.cancelledInTime ||
-        me?.refund == RefundStatus.refunded) {
-      return GroupMessages.leaveRefunded;
+  String _leaveSnack(Group group, {required bool previewRefunds}) {
+    final refunded = _local(group)?.refund == RefundStatus.refunded;
+    if (refunded != previewRefunds) {
+      return GroupMessages.leavePreviewChanged(refunded: refunded);
     }
-    return GroupMessages.leaveDenied;
+    return refunded ? GroupMessages.leaveRefunded : GroupMessages.leaveDenied;
   }
 
   Future<void> _delete() async {
@@ -454,7 +495,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       _snack(
         reason == null
             ? GroupMessages.deletedSnack
-            : GroupMessages.actionFailed,
+            : GroupMessages.deleteFailure(reason),
       );
     });
   }
@@ -474,7 +515,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       _snack(
         reason == null
             ? GroupMessages.removedSnack
-            : GroupMessages.actionFailed,
+            : GroupMessages.removeFailure(reason),
       );
     });
   }

@@ -308,7 +308,7 @@ Nada disso está ligado ao app. O desenho acompanha [DECISOES.md](DECISOES.md).
 - `groups.note` e `groups.price_cents`: observação do criador e o preço fictício copiado da sala.
 - O índice único de sala e horário ignora grupo cancelado, para o horário voltar a ficar livre.
 - Sair com `starts_at - now() >= interval '2 hours'` grava `refunded` / `cancelled_in_time`. Menos que isso grava `denied` / `cancelled_too_late`. Exatamente 2 horas reembolsa. O criador não sai: a função recusa.
-- `delete_group` e `remove_member` gravam `refunded` com `organizer_cancelled_event` ou `organizer_removed_member`, mesmo dentro das 2 horas. Quem já tinha saído fica com o reembolso da própria saída.
+- `delete_group` e `remove_member` gravam `refunded` com `organizer_cancelled_event` ou `organizer_removed_member`, mesmo dentro das 2 horas, e só enquanto `starts_at > now()`. No instante do início, ou depois, as duas funções recusam (`session_started`, ou `session_ended` se a sessão já terminou) e não mudam as cadeiras. Quem já tinha saído fica com o reembolso da própria saída.
 - `join_group` também recusa sessão já iniciada (`starts_at <= now()`), grupo cancelado, conta que já saiu daquele grupo, e conta com outra cadeira ativa cujo intervalo cruza `[starts_at, starts_at + duration)`.
 - `confirm_attendance` só muda `joined` para `confirmed` enquanto a sessão não terminou.
 - `edit_group` muda `total_spots` e `note`. O total não fica abaixo de quem ainda ocupa cadeira, nem abaixo de 2, nem acima da capacidade.

@@ -65,7 +65,7 @@ Usamos Riverpod 3, sem gerador de código, para o arquivo continuar legível.
 - `AsyncNotifier` guarda algo que vem de um `Future` (a lista, o detalhe). O widget usa `when` para carregando, erro e dado.
 - O retry automático do Riverpod 3 está desligado em `lib/app/retry.dart`. Quem tenta de novo é a pessoa, no botão.
 
-A navegação é o `go_router` em `lib/app/router.dart`: `/`, `/groups`, `/groups/new`, `/groups/mine`, `/groups/:groupId`. As rotas `new` e `mine` vêm antes de `:groupId` para essas palavras não virarem um id. `/groups/mine` é a tela Meus grupos, com as abas Próximos e Passados/Cancelados.
+A navegação é o `go_router` em `lib/app/router.dart`: `/`, `/groups`, `/groups/new`, `/groups/mine`, `/groups/:groupId`. As rotas `new` e `mine` vêm antes de `:groupId` para essas palavras não virarem um id. `/groups/mine` é a tela Meus grupos, com as abas Próximos, Passados e Cancelados.
 
 ## O que é fictício, no código
 

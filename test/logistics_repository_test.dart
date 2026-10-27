@@ -7,6 +7,7 @@ import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 import 'support/sample_clock.dart';
 
@@ -206,6 +207,58 @@ void main() {
       );
     },
   );
+
+  test('a started session cannot be deleted or lose a participant', () async {
+    final created = await groups.create(
+      _request(
+        extraSpots: 2,
+        creatorUserId: 'user-ana',
+        creatorDisplayName: 'Ana',
+      ),
+    );
+    final group = (created as CreateGroupSuccess).group;
+    final guest = await groups.join(
+      group.id,
+      participantUserId: 'user-bia',
+      participantName: 'Bia',
+      markAsLocalUser: false,
+    );
+    final memberId = (guest as JoinSuccess).group.participants
+        .firstWhere((person) => person.userId == 'user-bia')
+        .id;
+    _shift(database, group.id, sampleNow.subtract(const Duration(minutes: 10)));
+
+    final removed = await groups.removeMember(
+      group.id,
+      actorUserId: 'user-ana',
+      memberId: memberId,
+    );
+    expect(
+      (removed as RemoveMemberFailure).reason,
+      RemoveMemberFailureReason.sessionStarted,
+    );
+    expect(
+      GroupMessages.removeFailure(RemoveMemberFailureReason.sessionStarted),
+      'A sessão já começou.',
+    );
+
+    final deleted = await groups.deleteGroup(group.id, userId: 'user-ana');
+    expect(
+      (deleted as DeleteGroupFailure).reason,
+      DeleteGroupFailureReason.sessionStarted,
+    );
+    final still = await groups.getById(group.id);
+    expect(still!.isCancelled, isFalse);
+    expect(still.participantForUser('user-bia')!.occupiesSeat, isTrue);
+    expect(still.filledSpots, 2);
+
+    _shift(database, group.id, sampleNow.subtract(const Duration(hours: 3)));
+    final ended = await groups.deleteGroup(group.id, userId: 'user-ana');
+    expect(
+      (ended as DeleteGroupFailure).reason,
+      DeleteGroupFailureReason.sessionEnded,
+    );
+  });
 
   test('a non-creator cannot delete a group', () async {
     final result = await groups.deleteGroup(
@@ -408,6 +461,52 @@ void main() {
     final updated = (saved as EditGroupSuccess).group;
     expect(updated.totalSpots, group.roomCapacity);
     expect(updated.note, 'Levar documento');
+  });
+
+  test('edit uses the same occupied count as the group', () async {
+    final created = await groups.create(
+      _request(
+        extraSpots: 2,
+        creatorUserId: 'user-ana',
+        creatorDisplayName: 'Ana',
+      ),
+    );
+    final group = (created as CreateGroupSuccess).group;
+    await groups.join(
+      group.id,
+      participantUserId: 'user-bia',
+      participantName: 'Bia',
+      markAsLocalUser: false,
+    );
+    final index = database.groups.indexWhere((item) => item.id == group.id);
+    final seated = database.groups[index];
+    expect(seated.seatedCount, 2);
+    database.groups[index] = seated.copyWith(filledSpots: 1);
+    expect(database.groups[index].occupiedSpots, 2);
+
+    final tooSmall = await groups.edit(
+      group.id,
+      actorUserId: 'user-ana',
+      totalSpots: 1,
+      note: '',
+    );
+    expect(
+      (tooSmall as EditGroupFailure).reason,
+      EditGroupFailureReason.belowOccupancy,
+    );
+
+    database.groups[index] = database.groups[index].copyWith(filledSpots: 4);
+    expect(database.groups[index].occupiedSpots, 4);
+    final belowStored = await groups.edit(
+      group.id,
+      actorUserId: 'user-ana',
+      totalSpots: 3,
+      note: '',
+    );
+    expect(
+      (belowStored as EditGroupFailure).reason,
+      EditGroupFailureReason.belowOccupancy,
+    );
   });
 }
 

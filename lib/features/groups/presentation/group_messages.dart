@@ -121,6 +121,44 @@ abstract final class GroupMessages {
   static const leaveWithoutRefundAction = 'Sair sem reembolso';
   static const keepSeatAction = 'Voltar';
 
+  /// The dialog used [preview] and the repository, which decides, stored
+  /// the other outcome because the clock moved while the dialog was open.
+  static String leavePreviewChanged({required bool refunded}) {
+    if (refunded) {
+      return 'O horário mudou enquanto o aviso estava aberto. Você saiu do grupo e o reembolso simulado foi registrado.';
+    }
+    return 'O horário mudou enquanto o aviso estava aberto. Você saiu do grupo e não há reembolso.';
+  }
+
+  static const sessionAlreadyStarted = 'A sessão já começou.';
+
+  static String deleteFailure(DeleteGroupFailureReason reason) {
+    return switch (reason) {
+      DeleteGroupFailureReason.notFound => 'Não encontramos esse grupo.',
+      DeleteGroupFailureReason.notCreator =>
+        'Só quem criou o grupo pode excluí-lo.',
+      DeleteGroupFailureReason.alreadyCancelled =>
+        'Este grupo já foi cancelado.',
+      DeleteGroupFailureReason.sessionStarted => sessionAlreadyStarted,
+      DeleteGroupFailureReason.sessionEnded => 'Esta sessão já terminou.',
+    };
+  }
+
+  static String removeFailure(RemoveMemberFailureReason reason) {
+    return switch (reason) {
+      RemoveMemberFailureReason.notFound => 'Não encontramos esse grupo.',
+      RemoveMemberFailureReason.notCreator =>
+        'Só quem criou o grupo pode remover alguém.',
+      RemoveMemberFailureReason.memberNotFound =>
+        'Essa pessoa não está mais no grupo.',
+      RemoveMemberFailureReason.cannotRemoveCreator =>
+        'Quem criou o grupo não pode ser removido.',
+      RemoveMemberFailureReason.groupCancelled => 'Este grupo foi cancelado.',
+      RemoveMemberFailureReason.sessionStarted => sessionAlreadyStarted,
+      RemoveMemberFailureReason.sessionEnded => 'Esta sessão já terminou.',
+    };
+  }
+
   static String get deleteTitle => 'Excluir grupo?';
 
   static String get deleteBody =>

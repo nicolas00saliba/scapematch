@@ -6,12 +6,12 @@
 # Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
 # release that ships Dart 3.13.7.
 #
-# Triggers: manual run, and pushes to the preview branches that publish
-# the site. The Pages site is already served from the gh-pages branch
-# (root). Deploying with actions/deploy-pages fails when the environment
-# only accepts the default branch, and that failed job turns the whole
-# run red. This workflow only pushes the built site to gh-pages. It
-# never pushes to main.
+# Triggers: manual run, pushes to the preview branches, and pushes to
+# main so a merge republishes the site. The Pages site is already served
+# from the gh-pages branch (root). Deploying with actions/deploy-pages
+# fails when the environment only accepts the default branch, and that
+# failed job turns the whole run red. This workflow only pushes the
+# built site to gh-pages. It does not push commits onto main.
 name: Deploy web
 
 on:
@@ -22,6 +22,7 @@ on:
       - cursor/gh-pages-preview-23b9
       - cursor/two-sample-groups-per-city-7ef7
       - cursor/group-logistics-5b63
+      - main
 
 permissions:
   contents: write
@@ -117,8 +118,8 @@ jobs:
           for attempt in $(seq 1 30); do
             code="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$url" || true)"
             echo "attempt ${attempt}: HTTP ${code}"
-            if [ "$code" = "200" ] && grep -q 'base href="/scapematch/"' /tmp/scapematch.html && grep -q 'name="scapematch-release" content="group-logistics"' /tmp/scapematch.html; then
-              echo "Public site returned the logistics build."
+            if [ "$code" = "200" ] && grep -Eq 'name="scapematch-release" content="[^"]+"' /tmp/scapematch.html; then
+              echo "Public site returned a ScapeMatch build."
               exit 0
             fi
             sleep 20

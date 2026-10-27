@@ -79,6 +79,18 @@ class Group {
   int get confirmedCount =>
       participants.where((person) => person.isConfirmed).length;
 
+  /// People who still hold a seat. Cancelled seats are not counted.
+  int get seatedCount =>
+      participants.where((person) => person.occupiesSeat).length;
+
+  /// Floor for the size the creator may save.
+  ///
+  /// [filledSpots] can be higher than the roster when a group is marked
+  /// full without one person per seat. The edit screen and the repository
+  /// both use this number, so the stepper and the saved check cannot drift.
+  int get occupiedSpots =>
+      filledSpots > seatedCount ? filledSpots : seatedCount;
+
   bool get joinedByMe =>
       participants.any((person) => person.isLocalUser && person.occupiesSeat);
 
@@ -104,7 +116,6 @@ class Group {
     String? note,
     DateTime? startsAt,
     DateTime? cancelledAt,
-    bool clearCancelled = false,
   }) {
     return Group(
       id: id,
@@ -126,7 +137,7 @@ class Group {
       participants: participants ?? this.participants,
       priceCents: priceCents,
       note: note ?? this.note,
-      cancelledAt: clearCancelled ? null : (cancelledAt ?? this.cancelledAt),
+      cancelledAt: cancelledAt ?? this.cancelledAt,
     );
   }
 }

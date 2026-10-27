@@ -49,7 +49,7 @@ class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final occupied = widget.group.filledSpots;
+    final occupied = widget.group.occupiedSpots;
     final minimum = GroupRules.minimumTotalSpots(occupiedSpots: occupied);
     final maximum = widget.group.roomCapacity;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;

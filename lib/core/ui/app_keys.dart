@@ -34,7 +34,9 @@ abstract final class AppKeys {
   static const editSave = Key('edit-save');
   static const editError = Key('edit-error');
   static const myGroupsUpcoming = Key('my-groups-upcoming');
-  static const myGroupsHistory = Key('my-groups-history');
+  static const myGroupsPast = Key('my-groups-past');
+  static const myGroupsCancelled = Key('my-groups-cancelled');
+  static const sessionStarted = Key('session-started');
   static const groupNote = Key('group-note');
 
   static Key removeMember(String id) => Key('remove-member-$id');

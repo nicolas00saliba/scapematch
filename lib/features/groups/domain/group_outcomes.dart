@@ -125,6 +125,7 @@ enum DeleteGroupFailureReason {
   notFound,
   notCreator,
   alreadyCancelled,
+  sessionStarted,
   sessionEnded,
 }
 
@@ -150,6 +151,7 @@ enum RemoveMemberFailureReason {
   memberNotFound,
   cannotRemoveCreator,
   groupCancelled,
+  sessionStarted,
   sessionEnded,
 }
 
