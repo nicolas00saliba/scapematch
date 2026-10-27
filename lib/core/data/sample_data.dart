@@ -1,0 +1,567 @@
+import 'package:scapematch/core/data/fake_database.dart';
+import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/catalog/domain/escape_house.dart';
+import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/cities/domain/city.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
+import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/domain/participant.dart';
+
+/// Fictional catalog used until real venue data exists.
+///
+/// Nothing in this file comes from an escape-room website. Names, schedules,
+/// and groups are invented so the screens can be built and tested. Replacing
+/// [buildSampleDatabase] is the intended way to plug in another source.
+///
+/// Each city starts with two groups: one almost full and one with more open
+/// seats, both within the room capacity. The almost-full group starts 90
+/// minutes after [now], inside the refund window. The other starts three
+/// days later, outside it. The create-group screen does not offer a free
+/// date picker. It lists the catalog slots of the chosen room, and every
+/// room keeps several free future times.
+FakeDatabase buildSampleDatabase({required DateTime now}) {
+  final schedule = _SampleSchedule(now);
+  final curitiba = _city(SampleIds.curitiba, 'Curitiba', 'PR', 'Paraná');
+  final saoPaulo = _city(SampleIds.saoPaulo, 'São Paulo', 'SP', 'São Paulo');
+  final rio = _city(
+    SampleIds.rioDeJaneiro,
+    'Rio de Janeiro',
+    'RJ',
+    'Rio de Janeiro',
+  );
+  final beloHorizonte = _city(
+    SampleIds.beloHorizonte,
+    'Belo Horizonte',
+    'MG',
+    'Minas Gerais',
+  );
+  final portoAlegre = _city(
+    SampleIds.portoAlegre,
+    'Porto Alegre',
+    'RS',
+    'Rio Grande do Sul',
+  );
+
+  final ruaXv = _house('cwb-rua-xv', curitiba, 'Mistério da Rua XV', 'Centro');
+  final batel = _house('cwb-batel', curitiba, 'Portal do Batel', 'Batel');
+  final augusta = _house(
+    'sp-augusta',
+    saoPaulo,
+    'Escape Augusta',
+    'Consolação',
+  );
+  final liberdade = _house(
+    'sp-liberdade',
+    saoPaulo,
+    'Sala 25 Liberdade',
+    'Liberdade',
+  );
+  final copacabana = _house(
+    'rj-copa',
+    rio,
+    'Chave de Copacabana',
+    'Copacabana',
+  );
+  final santaTeresa = _house(
+    'rj-santa',
+    rio,
+    'Escuridão de Santa Teresa',
+    'Santa Teresa',
+  );
+  final savassi = _house(
+    'bh-savassi',
+    beloHorizonte,
+    'Enigma Savassi',
+    'Savassi',
+  );
+  final mina = _house('bh-mina', beloHorizonte, 'Mina Central', 'Centro');
+  final cais = _house(
+    'poa-cais',
+    portoAlegre,
+    'Cais do Mistério',
+    'Centro Histórico',
+  );
+  final redencao = _house(
+    SampleIds.housePoaRedencao,
+    portoAlegre,
+    'Clube da Redenção',
+    'Bom Fim',
+  );
+
+  final cofre = _room(
+    SampleIds.roomCwbCofre,
+    ruaXv,
+    'O Cofre do Café',
+    'Um café que fecha a porta sozinho',
+    6,
+    60,
+    Difficulty.medium,
+  );
+  final laboratorio = _room(
+    'room-cwb-lab',
+    ruaXv,
+    'O Laboratório do Botânico',
+    'Plantas que não deveriam existir',
+    5,
+    70,
+    Difficulty.hard,
+  );
+  final opera = _room(
+    'room-cwb-opera',
+    batel,
+    'Enigma no Ópera',
+    'Uma noite que não acaba',
+    8,
+    60,
+    Difficulty.easy,
+  );
+  final metro = _room(
+    SampleIds.roomSpMetro,
+    augusta,
+    'Metrô Perdido',
+    'A linha que sumiu do mapa',
+    6,
+    75,
+    Difficulty.hard,
+  );
+  final cobertura = _room(
+    'room-sp-cobertura',
+    augusta,
+    'Cobertura da Paulista',
+    'Um jantar no último andar',
+    4,
+    60,
+    Difficulty.medium,
+  );
+  final izakaya = _room(
+    'room-sp-izakaya',
+    liberdade,
+    'O Izakaya Secreto',
+    'O reservado dos fundos',
+    5,
+    60,
+    Difficulty.medium,
+  );
+  final apartamento = _room(
+    'room-rj-apartamento',
+    copacabana,
+    'O Apartamento da Avenida',
+    'A janela que não abre',
+    6,
+    60,
+    Difficulty.medium,
+  );
+  final bond = _room(
+    'room-rj-bond',
+    santaTeresa,
+    'O Bond Quebrado',
+    'O último bonde da serra',
+    7,
+    80,
+    Difficulty.hard,
+  );
+  final bar = _room(
+    'room-bh-bar',
+    savassi,
+    'O Bar do Mercado',
+    'A conta que não fecha',
+    5,
+    50,
+    Difficulty.easy,
+  );
+  final elevador = _room(
+    'room-bh-elevador',
+    mina,
+    'O Elevador da Serra',
+    'A descida que demora demais',
+    8,
+    75,
+    Difficulty.hard,
+  );
+  final porao = _room(
+    'room-poa-porao',
+    cais,
+    'O Porão do Cais',
+    'Caixas que chegaram sem dono',
+    6,
+    60,
+    Difficulty.medium,
+  );
+  final estufa = _room(
+    SampleIds.roomPoaEstufa,
+    redencao,
+    'A Estufa',
+    'O jardim que trancou a porta',
+    4,
+    45,
+    Difficulty.easy,
+  );
+
+  final slotCofreSat = schedule.soonSlot('slot-cwb-cofre-sat', cofre.id);
+  final slotCofreSun = schedule.free('slot-cwb-cofre-sun', cofre.id, 0);
+  final slotLabSat = schedule.free('slot-cwb-lab-sat', laboratorio.id, 0);
+  final slotOperaFri = schedule.free('slot-cwb-opera-fri', opera.id, 0);
+  final slotOperaSat = schedule.laterSlot('slot-cwb-opera-sat', opera.id);
+  final slotMetroSat = schedule.soonSlot('slot-sp-metro-sat', metro.id);
+  final slotMetroSun = schedule.free('slot-sp-metro-sun', metro.id, 0);
+  final slotCoberturaFri = schedule.laterSlot(
+    'slot-sp-cobertura-fri',
+    cobertura.id,
+  );
+  final slotIzakayaSat = schedule.free('slot-sp-izakaya-sat', izakaya.id, 0);
+  final slotIzakayaSun = schedule.free('slot-sp-izakaya-sun', izakaya.id, 1);
+  final slotIzakayaOverlap = schedule.at(
+    SampleIds.slotSpIzakayaOverlap,
+    izakaya.id,
+    now.add(const Duration(minutes: 100)),
+  );
+  final slotAptoSat = schedule.soonSlot('slot-rj-apto-sat', apartamento.id);
+  final slotAptoFri = schedule.free('slot-rj-apto-fri', apartamento.id, 0);
+  final slotBondSun = schedule.laterSlot('slot-rj-bond-sun', bond.id);
+  final slotBondSat = schedule.free('slot-rj-bond-sat', bond.id, 0);
+  final slotBarFri = schedule.soonSlot('slot-bh-bar-fri', bar.id);
+  final slotBarSat = schedule.free('slot-bh-bar-sat', bar.id, 0);
+  final slotElevadorSun = schedule.free('slot-bh-elevador-sun', elevador.id, 0);
+  final slotElevadorSat = schedule.laterSlot(
+    'slot-bh-elevador-sat',
+    elevador.id,
+  );
+  final slotPoraoSat = schedule.free('slot-poa-porao-sat', porao.id, 0);
+  final slotPoraoSun = schedule.laterSlot('slot-poa-porao-sun', porao.id);
+  final slotEstufaFri = schedule.soonSlot('slot-poa-estufa-fri', estufa.id);
+  final slotEstufaSat = schedule.free('slot-poa-estufa-sat', estufa.id, 0);
+  final slotEstufaFree = schedule.free(
+    SampleIds.slotPoaEstufaFree,
+    estufa.id,
+    1,
+  );
+
+  // Two groups per city. One is almost full (1 or 2 open seats). The other
+  // has more open seats. They use different rooms, so the rest of each
+  // city's rooms and start times stay free for new groups.
+  final groups = [
+    _group(
+      id: 'grp-cwb-cofre-almost',
+      city: curitiba,
+      house: ruaXv,
+      room: cofre,
+      slot: slotCofreSat,
+      totalSpots: 6,
+      names: ['Marina', 'Caio', 'Helena', 'Davi', 'Léo'],
+    ),
+    _group(
+      id: 'grp-cwb-opera-open',
+      city: curitiba,
+      house: batel,
+      room: opera,
+      slot: slotOperaSat,
+      totalSpots: 8,
+      names: ['Caê', 'Vera', 'Nuno'],
+      note: 'Chegar 15 minutos antes.',
+    ),
+    _group(
+      id: SampleIds.groupSpMetroAlmost,
+      city: saoPaulo,
+      house: augusta,
+      room: metro,
+      slot: slotMetroSat,
+      totalSpots: 6,
+      names: ['Lia', 'Miguel', 'Tainá', 'Rafa', 'João'],
+    ),
+    _group(
+      id: SampleIds.groupSpCoberturaOpen,
+      city: saoPaulo,
+      house: augusta,
+      room: cobertura,
+      slot: slotCoberturaFri,
+      totalSpots: 4,
+      names: ['Paula'],
+    ),
+    _group(
+      id: 'grp-rj-apto-almost',
+      city: rio,
+      house: copacabana,
+      room: apartamento,
+      slot: slotAptoSat,
+      totalSpots: 6,
+      names: ['Íris', 'Tomás', 'Luna', 'Breno'],
+    ),
+    _group(
+      id: 'grp-rj-bond-open',
+      city: rio,
+      house: santaTeresa,
+      room: bond,
+      slot: slotBondSun,
+      totalSpots: 7,
+      names: ['Duda', 'Enzo'],
+    ),
+    _group(
+      id: 'grp-bh-bar-almost',
+      city: beloHorizonte,
+      house: savassi,
+      room: bar,
+      slot: slotBarFri,
+      totalSpots: 5,
+      names: ['Cecília', 'Hugo', 'Nanda', 'Pablo'],
+    ),
+    _group(
+      id: 'grp-bh-elevador-open',
+      city: beloHorizonte,
+      house: mina,
+      room: elevador,
+      slot: slotElevadorSat,
+      totalSpots: 8,
+      names: ['Olívia', 'Ravi', 'Sol'],
+    ),
+    _group(
+      id: 'grp-poa-estufa-almost',
+      city: portoAlegre,
+      house: redencao,
+      room: estufa,
+      slot: slotEstufaFri,
+      totalSpots: 4,
+      names: ['Téo', 'Valentina', 'Will'],
+    ),
+    _group(
+      id: 'grp-poa-porao-open',
+      city: portoAlegre,
+      house: cais,
+      room: porao,
+      slot: slotPoraoSun,
+      totalSpots: 6,
+      names: ['Rosa', 'Saulo'],
+    ),
+  ];
+
+  return FakeDatabase(
+    cities: [curitiba, saoPaulo, rio, beloHorizonte, portoAlegre],
+    houses: [
+      ruaXv,
+      batel,
+      augusta,
+      liberdade,
+      copacabana,
+      santaTeresa,
+      savassi,
+      mina,
+      cais,
+      redencao,
+    ],
+    rooms: [
+      cofre,
+      laboratorio,
+      opera,
+      metro,
+      cobertura,
+      izakaya,
+      apartamento,
+      bond,
+      bar,
+      elevador,
+      porao,
+      estufa,
+    ],
+    slots: _padRoomSlots(schedule, [
+      slotCofreSat,
+      slotCofreSun,
+      slotLabSat,
+      slotOperaFri,
+      slotOperaSat,
+      slotMetroSat,
+      slotMetroSun,
+      slotCoberturaFri,
+      slotIzakayaSat,
+      slotIzakayaSun,
+      slotIzakayaOverlap,
+      slotAptoSat,
+      slotAptoFri,
+      slotBondSun,
+      slotBondSat,
+      slotBarFri,
+      slotBarSat,
+      slotElevadorSun,
+      slotElevadorSat,
+      slotPoraoSat,
+      slotPoraoSun,
+      slotEstufaFri,
+      slotEstufaSat,
+      slotEstufaFree,
+    ]),
+    groups: groups,
+  );
+}
+
+City _city(String id, String name, String stateCode, String stateName) {
+  return City(id: id, name: name, stateCode: stateCode, stateName: stateName);
+}
+
+EscapeHouse _house(String id, City city, String name, String neighborhood) {
+  return EscapeHouse(
+    id: id,
+    cityId: city.id,
+    name: name,
+    neighborhood: neighborhood,
+  );
+}
+
+EscapeRoom _room(
+  String id,
+  EscapeHouse house,
+  String name,
+  String theme,
+  int capacity,
+  int durationMinutes,
+  Difficulty difficulty,
+) {
+  return EscapeRoom(
+    id: id,
+    houseId: house.id,
+    name: name,
+    theme: theme,
+    capacity: capacity,
+    durationMinutes: durationMinutes,
+    difficulty: difficulty,
+    priceCents: _priceCents(capacity, difficulty),
+  );
+}
+
+int _priceCents(int capacity, Difficulty difficulty) {
+  final base = switch (difficulty) {
+    Difficulty.easy => 8900,
+    Difficulty.medium => 10900,
+    Difficulty.hard => 12900,
+  };
+  return base + (capacity * 100);
+}
+
+/// How many future start times the create-group sheet must offer.
+///
+/// One of them may already host the city's sample group. The rest stay
+/// empty. A past slot is added on top so "this time already started" can
+/// be tried without filling the future grid.
+const _minimumFutureSlotsPerRoom = 4;
+
+class _SampleSchedule {
+  _SampleSchedule(this.now);
+
+  final DateTime now;
+
+  DateTime get soonAt => _minute(now.add(const Duration(minutes: 90)));
+
+  DateTime get laterAt => _minute(now.add(const Duration(days: 3, hours: 6)));
+
+  DateTime get past => _minute(now.subtract(const Duration(hours: 3)));
+
+  DateTime freeAt(int index) {
+    return _minute(now.add(Duration(hours: 26 + (index * 24))));
+  }
+
+  TimeSlot soonSlot(String id, String roomId) => _take(id, roomId, soonAt);
+
+  TimeSlot laterSlot(String id, String roomId) => _take(id, roomId, laterAt);
+
+  TimeSlot free(String id, String roomId, int index) {
+    return _take(id, roomId, freeAt(index));
+  }
+
+  TimeSlot at(String id, String roomId, DateTime startsAt) {
+    return _take(id, roomId, _minute(startsAt));
+  }
+
+  TimeSlot _take(String id, String roomId, DateTime startsAt) {
+    return TimeSlot(id: id, roomId: roomId, startsAt: startsAt);
+  }
+}
+
+DateTime _minute(DateTime value) {
+  return DateTime(value.year, value.month, value.day, value.hour, value.minute);
+}
+
+List<TimeSlot> _padRoomSlots(_SampleSchedule schedule, List<TimeSlot> slots) {
+  final byRoom = <String, List<TimeSlot>>{};
+  for (final slot in slots) {
+    byRoom.putIfAbsent(slot.roomId, () => []).add(slot);
+  }
+  final padded = [...slots];
+  for (final entry in byRoom.entries) {
+    final used = entry.value.map((slot) => slot.startsAt).toSet();
+    final roomId = entry.key;
+    if (used.add(schedule.past)) {
+      padded.add(
+        TimeSlot(id: '$roomId-past', roomId: roomId, startsAt: schedule.past),
+      );
+    }
+    var future = entry.value
+        .where((slot) => slot.startsAt.isAfter(schedule.now))
+        .length;
+    var index = 0;
+    while (future < _minimumFutureSlotsPerRoom && index < 24) {
+      final startsAt = schedule.freeAt(index);
+      index += 1;
+      if (!startsAt.isAfter(schedule.now) || !used.add(startsAt)) {
+        continue;
+      }
+      padded.add(
+        TimeSlot(
+          id: '$roomId-extra-$index',
+          roomId: roomId,
+          startsAt: startsAt,
+        ),
+      );
+      future += 1;
+    }
+  }
+  return padded;
+}
+
+Group _group({
+  required String id,
+  required City city,
+  required EscapeHouse house,
+  required EscapeRoom room,
+  required TimeSlot slot,
+  required int totalSpots,
+  required List<String> names,
+  String note = '',
+}) {
+  assert(house.cityId == city.id, id);
+  assert(room.houseId == house.id, id);
+  assert(slot.roomId == room.id, id);
+  assert(names.isNotEmpty, id);
+  assert(names.length <= totalSpots, id);
+  assert(totalSpots <= room.capacity, id);
+  return Group(
+    id: id,
+    cityId: city.id,
+    cityName: city.name,
+    houseId: house.id,
+    houseName: house.name,
+    neighborhood: house.neighborhood,
+    roomId: room.id,
+    roomName: room.name,
+    roomTheme: room.theme,
+    roomCapacity: room.capacity,
+    durationMinutes: room.durationMinutes,
+    difficulty: room.difficulty,
+    slotId: slot.id,
+    startsAt: slot.startsAt,
+    filledSpots: names.length,
+    totalSpots: totalSpots,
+    priceCents: room.priceCents,
+    note: note,
+    participants: [
+      for (var index = 0; index < names.length; index++)
+        Participant(
+          id: '$id-p$index',
+          displayName: names[index],
+          isCreator: index == 0,
+          isLocalUser: false,
+          attendance: index == 0
+              ? AttendanceStatus.confirmed
+              : AttendanceStatus.joined,
+        ),
+    ],
+  );
+}

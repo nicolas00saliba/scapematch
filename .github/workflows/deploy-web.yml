@@ -1,0 +1,129 @@
+# Publishes the Flutter web release on GitHub Pages.
+#
+# Public project URL: https://nicolas00saliba.github.io/scapematch/
+# --base-href must stay /scapematch/ (leading and trailing slash).
+#
+# Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
+# release that ships Dart 3.13.7.
+#
+# Triggers: manual run, pushes to the preview branches, and pushes to
+# main so a merge republishes the site. The Pages site is already served
+# from the gh-pages branch (root). Deploying with actions/deploy-pages
+# fails when the environment only accepts the default branch, and that
+# failed job turns the whole run red. This workflow only pushes the
+# built site to gh-pages. It does not push commits onto main.
+name: Deploy web
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gh-pages-preview
+      - cursor/gh-pages-preview-23b9
+      - cursor/two-sample-groups-per-city-7ef7
+      - cursor/group-logistics-5b63
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scapematch-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web
+        run: flutter build web --release --base-href /scapematch/
+
+      - name: Check base href
+        run: grep -F 'base href="/scapematch/"' build/web/index.html
+
+      # Pages serves 404.html for paths the static host does not know.
+      # Copying the shell lets go_router open /groups and the other routes.
+      - name: Add SPA fallback and disable Jekyll
+        run: |
+          cp build/web/index.html build/web/404.html
+          touch build/web/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/web
+          include-hidden-files: "true"
+
+      - name: Upload web site for the gh-pages fallback
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-site
+          path: build/web
+          include-hidden-files: "true"
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-gh-pages:
+    name: Push gh-pages branch
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download site
+        uses: actions/download-artifact@v8
+        with:
+          name: web-site
+          path: _site
+
+      - name: Publish the site on gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish ScapeMatch web preview
+
+  check:
+    name: Check public URL
+    needs: publish-gh-pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request the project site
+        run: |
+          url="https://nicolas00saliba.github.io/scapematch/"
+          echo "### ScapeMatch web" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+          # The first gh-pages publish stayed 404 for longer than four minutes.
+          for attempt in $(seq 1 30); do
+            code="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$url" || true)"
+            echo "attempt ${attempt}: HTTP ${code}"
+            if [ "$code" = "200" ] && grep -Eq 'name="scapematch-release" content="[^"]+"' /tmp/scapematch.html; then
+              echo "Public site returned a ScapeMatch build."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "The public URL did not return the Flutter shell."
+          echo "An admin may still need to enable Pages. See the workflow log from the deploy job."
+          exit 1
