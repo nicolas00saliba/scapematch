@@ -87,5 +87,19 @@ ThemeData buildAppTheme() {
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: AppColors.teal,
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: Colors.white,
+      indicatorColor: AppColors.tealSoft,
+      height: 68,
+      surfaceTintColor: Colors.transparent,
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        final selected = states.contains(WidgetState.selected);
+        return TextStyle(
+          fontSize: 12,
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+          color: selected ? AppColors.teal : AppColors.muted,
+        );
+      }),
+    ),
   );
 }

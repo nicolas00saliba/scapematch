@@ -55,6 +55,64 @@ class ErrorView extends StatelessWidget {
   }
 }
 
+/// Aviso curto para caber dentro de uma lista que já rola.
+///
+/// [LoadingView] e [EmptyView] ocupam a tela inteira. Na Home, grupos e
+/// notícias dividem o mesmo scroll, então o estado fica neste bloco.
+class InlineNotice extends StatelessWidget {
+  const InlineNotice({
+    super.key,
+    required this.message,
+    this.loading = false,
+    this.actionKey,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String message;
+  final bool loading;
+  final Key? actionKey;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (loading) ...[
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+            const SizedBox(height: 10),
+          ],
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.muted,
+              height: 1.35,
+            ),
+          ),
+          if (onAction != null) ...[
+            const SizedBox(height: 10),
+            FilledButton(
+              key: actionKey,
+              onPressed: onAction,
+              child: Text(actionLabel ?? 'Tentar de novo'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class EmptyView extends StatelessWidget {
   const EmptyView({
     super.key,

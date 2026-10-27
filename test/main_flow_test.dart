@@ -35,6 +35,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       300,
+      scrollable: verticalScrollable,
     );
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
@@ -79,11 +80,13 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
       300,
+      scrollable: verticalScrollable,
     );
     expect(find.text('Cheio'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       300,
+      scrollable: verticalScrollable,
     );
     await tester.tap(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),

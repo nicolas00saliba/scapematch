@@ -271,7 +271,9 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     if (group == null || !mounted) {
       return;
     }
-    context.push('/groups/${group.id}');
+    // Substitui o formulário. O voltar do detalhe vai para a Home, e o
+    // mesmo envio não fica disponível para criar o grupo de novo.
+    context.pushReplacement('/groups/${group.id}');
   }
 }
 

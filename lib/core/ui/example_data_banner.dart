@@ -23,7 +23,7 @@ class ExampleDataBanner extends StatelessWidget {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Dados de exemplo. Casas, salas, horários e grupos são fictícios.',
+                'Dados de exemplo. Casas, salas, horários, grupos e notícias são fictícios.',
                 style: TextStyle(
                   color: AppColors.copperInk,
                   height: 1.35,

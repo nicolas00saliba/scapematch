@@ -10,6 +10,7 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
+import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// Form state for "create a group".
@@ -241,7 +242,10 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     switch (result) {
       case CreateGroupSuccess(:final group):
         state = state.copyWith(submitting: false);
+        // A aba Meus grupos continua montada no shell. Sem invalidar os dois,
+        // ela mostra a lista de antes da criação.
         ref.invalidate(findGroupsViewModelProvider);
+        ref.invalidate(myGroupsViewModelProvider);
         return group;
       case CreateGroupFailure(:final reason):
         state = state.copyWith(submitting: false, failure: reason);
