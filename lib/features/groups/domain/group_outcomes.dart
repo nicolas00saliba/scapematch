@@ -42,6 +42,9 @@ enum CreateGroupFailureReason {
   unknownSelection,
   belowMinimum,
   exceedsRoomCapacity,
+
+  /// Another group already occupies this room at this start time.
+  duplicateSession,
 }
 
 class GroupNotFoundException implements Exception {

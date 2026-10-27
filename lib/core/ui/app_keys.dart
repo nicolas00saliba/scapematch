@@ -13,6 +13,7 @@ abstract final class AppKeys {
   static const extraSpotsValue = Key('extra-spots-value');
   static const createSubmit = Key('create-submit');
   static const capacityError = Key('capacity-error');
+  static const createFailure = Key('create-failure');
   static const retry = Key('retry');
 
   static Key cityOption(String id) => Key('city-option-$id');

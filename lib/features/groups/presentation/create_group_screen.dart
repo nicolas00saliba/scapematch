@@ -118,11 +118,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             children: [
               IconButton(
                 key: AppKeys.extraSpotsDecrement,
-                onPressed: state.extraSpots <= 1
-                    ? null
-                    : () => ref
+                onPressed: state.canDecrementExtraSpots
+                    ? () => ref
                           .read(createGroupViewModelProvider.notifier)
-                          .setExtraSpots(state.extraSpots - 1),
+                          .setExtraSpots(state.extraSpots - 1)
+                    : null,
                 icon: const Icon(Icons.remove),
                 tooltip: 'Diminuir vagas',
               ),
@@ -135,11 +135,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
               IconButton(
                 key: AppKeys.extraSpotsIncrement,
-                onPressed: state.extraSpots >= 12
-                    ? null
-                    : () => ref
+                onPressed: state.canIncrementExtraSpots
+                    ? () => ref
                           .read(createGroupViewModelProvider.notifier)
-                          .setExtraSpots(state.extraSpots + 1),
+                          .setExtraSpots(state.extraSpots + 1)
+                    : null,
                 icon: const Icon(Icons.add),
                 tooltip: 'Aumentar vagas',
               ),
@@ -164,13 +164,15 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
             ),
           ],
-          if (state.failure != null && capacityMessage == null) ...[
+          if (state.failure != null) ...[
             const SizedBox(height: 8),
             Text(
               _failureMessage(state.failure!),
+              key: AppKeys.createFailure,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.error,
                 fontWeight: FontWeight.w700,
+                height: 1.35,
               ),
             ),
           ],
@@ -208,6 +210,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         'O grupo precisa de mais gente além de você.',
       CreateGroupFailureReason.unknownSelection =>
         'Confira cidade, casa, sala e horário.',
+      CreateGroupFailureReason.duplicateSession =>
+        'Já existe um grupo nessa sala nesse horário. Escolha outro horário.',
     };
   }
 

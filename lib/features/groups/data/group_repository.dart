@@ -11,7 +11,14 @@ abstract class GroupRepository {
 
   Future<Group?> getById(String id);
 
-  Future<JoinResult> join(String groupId, {required String participantName});
+  /// Adds the person immediately. There is no organizer approval step.
+  /// See docs/DECISOES.md. A future Supabase implementation must do the
+  /// seat check and the insert in one database transaction.
+  Future<JoinResult> join(
+    String groupId, {
+    required String participantUserId,
+    required String participantName,
+  });
 
   Future<CreateGroupResult> create(CreateGroupRequest request);
 }

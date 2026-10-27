@@ -40,9 +40,9 @@ cd build/web && python3 -m http.server 8080
 1. Na home, escolher uma cidade. O app não assume Curitiba: a cidade começa vazia e é o filtro principal, no mesmo espírito do campo de origem de um app de passagem.
 2. **Encontrar grupo**: lista os grupos da cidade, com o filtro **Quase cheios** (ainda dá para entrar e faltam 1 ou 2 vagas).
 3. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém.
-4. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala.
+4. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. Não nascem dois grupos na mesma sala no mesmo horário.
 
-Não existe conta. Quem usa o app aparece como “Você”.
+Não existe conta. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo continua “Você”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois.
 
 ## Estrutura de pastas
 
@@ -59,8 +59,11 @@ lib/
     groups/                 # achar, ver e criar grupo
     home/
   providers/                # liga as interfaces aos dados fictícios
-test/                       # regras, repositório e um fluxo de tela
+test/                       # regras, repositório e fluxos de tela
 docs/ARQUITETURA.md         # explicação curta das camadas
+docs/DECISOES.md            # decisões provisórias do produto
+docs/DADOS_REAIS.md         # como uma casa entra sem coleta escondida
+docs/SUPABASE_ESQUEMA.md    # rascunho de tabelas, RLS e join atômico
 ```
 
 Cada feature segue o mesmo desenho:
@@ -87,7 +90,9 @@ As cidades de exemplo são Curitiba, São Paulo, Rio de Janeiro, Belo Horizonte 
 
 ## Próximos passos
 
-1. **Supabase / PostgreSQL** por trás das mesmas interfaces (`CityRepository`, `CatalogRepository`, `GroupRepository`), sem reescrever as telas.
-2. Conta de usuário, para “Você” virar uma pessoa de verdade.
-3. Trocar o catálogo fictício por salas e agendas reais, coletadas dos sites das casas.
+1. **Supabase / PostgreSQL** por trás das mesmas interfaces (`CityRepository`, `CatalogRepository`, `GroupRepository`), sem reescrever as telas. Entrar no grupo tem de ser a função atômica descrita em [docs/SUPABASE_ESQUEMA.md](docs/SUPABASE_ESQUEMA.md).
+2. Conta de usuário no lugar de `currentUserProvider`. O nome “Você” sai quando o provider passar a ler a sessão.
+3. Trocar o catálogo fictício por salas e agendas que cada casa entregar (arquivo, API ou parceria). O encaixe é o `ExperienceSource`. O que pode e o que não pode ser coletado está em [docs/DADOS_REAIS.md](docs/DADOS_REAIS.md).
 4. Publicar nas lojas quando o fluxo estiver estável com dados reais.
+
+O CI (`.github/workflows/ci.yml`) roda `flutter pub get`, `flutter analyze`, `flutter test` e `flutter build web` com o Flutter 3.47.8, que é o stable que traz o Dart 3.13.7 pedido no `pubspec.yaml`.

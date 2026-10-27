@@ -25,6 +25,24 @@ void main() {
       expect(GroupRules.isAlmostFull(filledSpots: 1, totalSpots: 6), isFalse);
       expect(GroupRules.isAlmostFull(filledSpots: 2, totalSpots: 6), isFalse);
     });
+
+    test('the open-seat limit is the GroupRules constant', () {
+      expect(GroupRules.almostFullMaxOpenSeats, 2);
+      expect(
+        GroupRules.isAlmostFull(
+          filledSpots: 4,
+          totalSpots: 4 + GroupRules.almostFullMaxOpenSeats,
+        ),
+        isTrue,
+      );
+      expect(
+        GroupRules.isAlmostFull(
+          filledSpots: 4,
+          totalSpots: 4 + GroupRules.almostFullMaxOpenSeats + 1,
+        ),
+        isFalse,
+      );
+    });
   });
 
   group('creating a group', () {
@@ -54,6 +72,55 @@ void main() {
       expect(
         GroupRules.validateGroupSize(extraSpots: 0, roomCapacity: 6),
         GroupSizeValidation.belowMinimum,
+      );
+    });
+
+    test('the extra-seat ceiling is the room, not a fixed 12', () {
+      expect(GroupRules.minExtraSpots, 1);
+      expect(GroupRules.maxExtraSpots(roomCapacity: null), isNull);
+      expect(GroupRules.maxExtraSpots(roomCapacity: 6), 5);
+      expect(GroupRules.clampExtraSpots(0), 1);
+      expect(GroupRules.clampExtraSpots(20), 20);
+      expect(GroupRules.clampExtraSpots(12, roomCapacity: 6), 5);
+      expect(GroupRules.clampExtraSpots(3, roomCapacity: 8), 3);
+    });
+  });
+
+  group('one group per room and time', () {
+    final at = DateTime(2026, 11, 8, 16);
+
+    test('rejects the same room at the same start', () {
+      expect(
+        GroupRules.roomAndTimeTaken(
+          roomId: 'room-a',
+          startsAt: at,
+          existing: [(roomId: 'room-a', startsAt: at)],
+        ),
+        isTrue,
+      );
+    });
+
+    test('allows the same room at another time', () {
+      expect(
+        GroupRules.roomAndTimeTaken(
+          roomId: 'room-a',
+          startsAt: at,
+          existing: [
+            (roomId: 'room-a', startsAt: at.add(const Duration(hours: 2))),
+          ],
+        ),
+        isFalse,
+      );
+    });
+
+    test('allows another room at the same time', () {
+      expect(
+        GroupRules.roomAndTimeTaken(
+          roomId: 'room-b',
+          startsAt: at,
+          existing: [(roomId: 'room-a', startsAt: at)],
+        ),
+        isFalse,
       );
     });
   });

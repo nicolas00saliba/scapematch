@@ -1,0 +1,35 @@
+# Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer.
+# 3.47.8 is the stable release that ships Dart 3.13.7. Older 3.47
+# patch releases ship an earlier Dart and fail `flutter pub get`.
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  flutter:
+    name: Analyze, test, and build web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build web
+        run: flutter build web --release

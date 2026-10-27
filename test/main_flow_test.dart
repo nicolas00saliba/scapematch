@@ -123,26 +123,26 @@ void main() {
   ) async {
     await pumpScapeMatch(tester);
 
-    await _selectCity(tester, SampleIds.portoAlegre);
+    await _selectCity(tester, SampleIds.saoPaulo);
     await tester.tap(find.byKey(AppKeys.createGroup));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(AppKeys.selectionField('house')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.option(SampleIds.housePoaRedencao)));
+    await tester.tap(find.byKey(AppKeys.option(SampleIds.houseSpAugusta)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(AppKeys.selectionField('room')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.option(SampleIds.roomPoaEstufa)));
+    await tester.tap(find.byKey(AppKeys.option(SampleIds.roomSpMetro)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(AppKeys.selectionField('slot')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.option(SampleIds.slotPoaEstufaFree)));
+    await tester.tap(find.byKey(AppKeys.option(SampleIds.slotSpMetroSun)));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('até 4 pessoas'), findsOneWidget);
+    expect(find.textContaining('até 6 pessoas'), findsOneWidget);
     expect(_submitEnabled(tester), isTrue);
 
     final formScroll = find.descendant(
@@ -154,10 +154,29 @@ void main() {
       200,
       scrollable: formScroll,
     );
-    await tester.tap(find.byKey(AppKeys.extraSpotsIncrement));
-    await tester.pump();
-    await tester.tap(find.byKey(AppKeys.extraSpotsIncrement));
-    await tester.pump();
+    for (var tap = 0; tap < 3; tap++) {
+      await tester.tap(find.byKey(AppKeys.extraSpotsIncrement));
+      await tester.pump();
+    }
+
+    expect(find.byKey(AppKeys.extraSpotsValue), findsOneWidget);
+    expect(_extraSpots(tester), '5');
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(AppKeys.extraSpotsIncrement))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(AppKeys.selectionField('room')),
+      -200,
+      scrollable: formScroll,
+    );
+    await tester.tap(find.byKey(AppKeys.selectionField('room')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.option(SampleIds.roomSpCobertura)));
+    await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.capacityError),
@@ -170,7 +189,19 @@ void main() {
     await tester.tap(find.byKey(AppKeys.extraSpotsDecrement));
     await tester.pump();
 
+    expect(_extraSpots(tester), '3');
     expect(find.byKey(AppKeys.capacityError), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.byKey(AppKeys.selectionField('slot')),
+      -200,
+      scrollable: formScroll,
+    );
+    await tester.tap(find.byKey(AppKeys.selectionField('slot')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.option(SampleIds.slotSpCoberturaFri)));
+    await tester.pumpAndSettle();
+
     expect(_submitEnabled(tester), isTrue);
   });
 
@@ -212,4 +243,8 @@ bool _submitEnabled(WidgetTester tester) {
           .widget<FilledButton>(find.byKey(AppKeys.createSubmit))
           .onPressed !=
       null;
+}
+
+String _extraSpots(WidgetTester tester) {
+  return tester.widget<Text>(find.byKey(AppKeys.extraSpotsValue)).data!;
 }

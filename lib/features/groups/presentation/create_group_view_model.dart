@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/features/account/presentation/current_user_provider.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
@@ -67,6 +68,18 @@ class CreateGroupState {
       sizeValidation == GroupSizeValidation.valid &&
       !submitting &&
       !loadingOptions;
+
+  bool get canDecrementExtraSpots => extraSpots > GroupRules.minExtraSpots;
+
+  /// No fixed ceiling. The room capacity, via [GroupRules], is the limit
+  /// once a room is selected. Before that, the stepper stays open.
+  bool get canIncrementExtraSpots {
+    final max = GroupRules.maxExtraSpots(roomCapacity: room?.capacity);
+    if (max == null) {
+      return true;
+    }
+    return extraSpots < max;
+  }
 
   int get groupSize => 1 + extraSpots;
 
@@ -180,7 +193,10 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
   }
 
   void setExtraSpots(int value) {
-    final spots = value.clamp(1, 12);
+    final spots = GroupRules.clampExtraSpots(
+      value,
+      roomCapacity: state.room?.capacity,
+    );
     state = state.copyWith(extraSpots: spots, clearFailure: true);
   }
 
@@ -190,6 +206,7 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
       return null;
     }
     state = state.copyWith(submitting: true, clearFailure: true);
+    final user = ref.read(currentUserProvider);
     final result = await ref
         .read(groupRepositoryProvider)
         .create(
@@ -199,6 +216,8 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
             roomId: state.roomId!,
             slotId: state.slotId!,
             extraSpots: state.extraSpots,
+            creatorUserId: user.id,
+            creatorDisplayName: user.displayName,
           ),
         );
     if (!ref.mounted) {

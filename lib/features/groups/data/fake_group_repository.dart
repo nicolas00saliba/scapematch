@@ -56,6 +56,7 @@ class FakeGroupRepository implements GroupRepository {
   @override
   Future<JoinResult> join(
     String groupId, {
+    required String participantUserId,
     required String participantName,
   }) async {
     await _pause();
@@ -65,7 +66,11 @@ class FakeGroupRepository implements GroupRepository {
     }
     final current = _database.groups[index];
     // Already inside wins over "full", so a second tap explains itself.
-    if (current.joinedByMe) {
+    // Entry is immediate: the organizer does not have to approve.
+    final alreadyInside = current.participants.any(
+      (person) => person.userId == participantUserId || person.isLocalUser,
+    );
+    if (alreadyInside) {
       return const JoinFailure(JoinFailureReason.alreadyJoined);
     }
     if (!GroupRules.canJoin(
@@ -79,7 +84,8 @@ class FakeGroupRepository implements GroupRepository {
       participants: [
         ...current.participants,
         Participant(
-          id: _database.nextParticipantId(groupId),
+          id: _database.nextParticipantId(),
+          userId: participantUserId,
           displayName: participantName,
           isCreator: false,
           isLocalUser: true,
@@ -124,6 +130,20 @@ class FakeGroupRepository implements GroupRepository {
         break;
     }
 
+    final taken = GroupRules.roomAndTimeTaken(
+      roomId: room.id,
+      startsAt: slot.startsAt,
+      existing: [
+        for (final group in _database.groups)
+          (roomId: group.roomId, startsAt: group.startsAt),
+      ],
+    );
+    if (taken) {
+      return const CreateGroupFailure(
+        CreateGroupFailureReason.duplicateSession,
+      );
+    }
+
     final id = _database.nextGroupId();
     final group = Group(
       id: id,
@@ -144,8 +164,9 @@ class FakeGroupRepository implements GroupRepository {
       totalSpots: 1 + request.extraSpots,
       participants: [
         Participant(
-          id: _database.nextParticipantId(id),
-          displayName: 'Você',
+          id: _database.nextParticipantId(),
+          userId: request.creatorUserId,
+          displayName: request.creatorDisplayName,
           isCreator: true,
           isLocalUser: true,
         ),

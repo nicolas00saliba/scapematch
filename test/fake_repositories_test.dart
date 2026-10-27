@@ -120,6 +120,7 @@ void main() {
     final before = await groups.getById(SampleIds.groupSpCoberturaFull);
     final result = await groups.join(
       SampleIds.groupSpCoberturaFull,
+      participantUserId: 'user-local',
       participantName: 'Você',
     );
 
@@ -133,6 +134,7 @@ void main() {
   test('join fills the last seat and then refuses another entry', () async {
     final result = await groups.join(
       SampleIds.groupSpMetroAlmost,
+      participantUserId: 'user-local',
       participantName: 'Você',
     );
 
@@ -145,6 +147,7 @@ void main() {
 
     final second = await groups.join(
       SampleIds.groupSpMetroAlmost,
+      participantUserId: 'user-local',
       participantName: 'Você',
     );
     expect(second, isA<JoinFailure>());
@@ -156,7 +159,7 @@ void main() {
   test('create rejects a group larger than the room', () async {
     final before = database.groups.length;
     final result = await groups.create(
-      const CreateGroupRequest(
+      _request(
         cityId: SampleIds.portoAlegre,
         houseId: SampleIds.housePoaRedencao,
         roomId: SampleIds.roomPoaEstufa,
@@ -178,12 +181,13 @@ void main() {
     () async {
       final before = database.groups.length;
       final result = await groups.create(
-        const CreateGroupRequest(
+        _request(
           cityId: SampleIds.portoAlegre,
           houseId: SampleIds.housePoaRedencao,
           roomId: SampleIds.roomPoaEstufa,
           slotId: SampleIds.slotPoaEstufaFree,
           extraSpots: 3,
+          creatorDisplayName: 'Ana Teste',
         ),
       );
 
@@ -195,10 +199,108 @@ void main() {
       expect(group.totalSpots, 4);
       expect(group.roomCapacity, 4);
       expect(group.joinedByMe, isTrue);
+      expect(group.participants.single.displayName, 'Ana Teste');
+      expect(group.participants.single.userId, 'user-local');
+      expect(group.participants.single.id, startsWith('ptc-local-'));
       expect(database.groups, hasLength(before + 1));
 
       final listed = await groups.listByCity(SampleIds.portoAlegre);
       expect(listed.map((item) => item.id), contains(group.id));
     },
+  );
+
+  test('create rejects a group that repeats a room and start time', () async {
+    final before = database.groups.length;
+    final result = await groups.create(
+      _request(
+        cityId: SampleIds.portoAlegre,
+        houseId: SampleIds.housePoaRedencao,
+        roomId: SampleIds.roomPoaEstufa,
+        slotId: SampleIds.slotPoaEstufaTaken,
+        extraSpots: 2,
+      ),
+    );
+
+    expect(result, isA<CreateGroupFailure>());
+    expect(
+      (result as CreateGroupFailure).reason,
+      CreateGroupFailureReason.duplicateSession,
+    );
+    expect(database.groups, hasLength(before));
+  });
+
+  test('a second create on a newly used slot is rejected', () async {
+    final first = await groups.create(
+      _request(
+        cityId: SampleIds.portoAlegre,
+        houseId: SampleIds.housePoaRedencao,
+        roomId: SampleIds.roomPoaEstufa,
+        slotId: SampleIds.slotPoaEstufaFree,
+        extraSpots: 2,
+      ),
+    );
+    expect(first, isA<CreateGroupSuccess>());
+
+    final second = await groups.create(
+      _request(
+        cityId: SampleIds.portoAlegre,
+        houseId: SampleIds.housePoaRedencao,
+        roomId: SampleIds.roomPoaEstufa,
+        slotId: SampleIds.slotPoaEstufaFree,
+        extraSpots: 2,
+      ),
+    );
+    expect(second, isA<CreateGroupFailure>());
+    expect(
+      (second as CreateGroupFailure).reason,
+      CreateGroupFailureReason.duplicateSession,
+    );
+  });
+
+  test('joining two groups mints two participant ids', () async {
+    final first = await groups.join(
+      SampleIds.groupSpMetroAlmost,
+      participantUserId: 'user-local',
+      participantName: 'Ana Teste',
+    );
+    final second = await groups.join(
+      SampleIds.groupSpMetroOpen,
+      participantUserId: 'user-local',
+      participantName: 'Ana Teste',
+    );
+
+    final joinedFirst = first as JoinSuccess;
+    final joinedSecond = second as JoinSuccess;
+    final firstId = joinedFirst.group.participants.last.id;
+    final secondId = joinedSecond.group.participants.last.id;
+    expect(firstId, isNot(secondId));
+    expect(joinedFirst.group.participants.last.displayName, 'Ana Teste');
+    expect(joinedFirst.group.participants.last.userId, 'user-local');
+
+    final everyId = [
+      for (final group in database.groups)
+        for (final person in group.participants) person.id,
+    ];
+    expect(everyId.toSet(), hasLength(everyId.length));
+  });
+}
+
+CreateGroupRequest _request({
+  required String cityId,
+  required String houseId,
+  required String roomId,
+  required String slotId,
+  required int extraSpots,
+  String creatorUserId = 'user-local',
+  String creatorDisplayName = 'Você',
+}) {
+  return CreateGroupRequest(
+    cityId: cityId,
+    houseId: houseId,
+    roomId: roomId,
+    slotId: slotId,
+    extraSpots: extraSpots,
+    creatorUserId: creatorUserId,
+    creatorDisplayName: creatorDisplayName,
   );
 }

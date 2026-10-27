@@ -10,6 +10,7 @@ import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 
@@ -58,7 +59,7 @@ class FindGroupsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Quase cheios: ainda dá para entrar e faltam 1 ou 2 vagas.',
+                  'Quase cheios: ainda dá para entrar e faltam 1 ou ${GroupRules.almostFullMaxOpenSeats} vagas.',
                   style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: AppColors.muted),
                 ),
@@ -119,7 +120,7 @@ class FindGroupsScreen extends ConsumerWidget {
           return EmptyView(
             title: almostFull ? 'Nenhum grupo quase cheio' : 'Nenhum grupo',
             message: almostFull
-                ? 'Ninguém está a uma ou duas vagas de fechar em $place. Veja todos os grupos.'
+                ? 'Ninguém está a 1 ou ${GroupRules.almostFullMaxOpenSeats} vagas de fechar em $place. Veja todos os grupos.'
                 : 'Ainda não há grupos de exemplo em $place.',
           );
         }

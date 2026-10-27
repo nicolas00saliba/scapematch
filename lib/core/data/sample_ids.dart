@@ -11,6 +11,12 @@ abstract final class SampleIds {
   static const housePoaRedencao = 'poa-redencao';
   static const roomPoaEstufa = 'room-poa-estufa';
   static const slotPoaEstufaFree = 'slot-poa-estufa-free';
+  static const slotPoaEstufaTaken = 'slot-poa-estufa-fri';
+
+  static const houseSpAugusta = 'sp-augusta';
+  static const roomSpCobertura = 'room-sp-cobertura';
+  static const slotSpMetroSun = 'slot-sp-metro-sun';
+  static const slotSpCoberturaFri = 'slot-sp-cobertura-fri';
 
   static const roomSpMetro = 'room-sp-metro';
   static const roomCwbCofre = 'room-cwb-cofre';
