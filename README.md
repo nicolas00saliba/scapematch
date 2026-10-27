@@ -40,7 +40,7 @@ cd build/web && python3 -m http.server 8080
 1. Na home, escolher uma cidade. O app não assume Curitiba: a cidade começa vazia e é o filtro principal, no mesmo espírito do campo de origem de um app de passagem.
 2. **Encontrar grupo**: lista os grupos da cidade, com o filtro **Quase cheios** (ainda dá para entrar e faltam 1 ou 2 vagas).
 3. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém.
-4. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. Não nascem dois grupos na mesma sala no mesmo horário.
+4. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. O horário é uma das opções da sala, não uma data livre. Não nascem dois grupos na mesma sala no mesmo horário.
 
 Não existe conta. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo continua “Você”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois.
 
@@ -86,7 +86,9 @@ O mapa completo, com o caminho de uma tela, está em [docs/ARQUITETURA.md](docs/
 
 Tudo que aparece sobre casas e grupos. Os nomes (Escape Augusta, O Cofre do Café, e os outros) foram inventados. Não vêm de site de casa nenhuma. As datas de exemplo estão em novembro de 2026 para a demonstração não depender do dia de hoje.
 
-As cidades de exemplo são Curitiba, São Paulo, Rio de Janeiro, Belo Horizonte e Porto Alegre, cada uma com casas, salas e grupos diferentes.
+As cidades de exemplo são Curitiba, São Paulo, Rio de Janeiro, Belo Horizonte e Porto Alegre, cada uma com casas e salas diferentes. Cada cidade começa com dois grupos: um quase cheio (falta 1 ou 2 vagas) e outro com mais vagas abertas, ambos dentro da capacidade da sala. O resto dos horários fica livre para criar grupos novos.
+
+A tela de criar grupo não abre um calendário. Ela lista os horários cadastrados da sala, em novembro de 2026. Cada sala tem pelo menos quatro horários, então dá para criar vários grupos na mesma sala sem repetir o começo.
 
 ## Próximos passos
 

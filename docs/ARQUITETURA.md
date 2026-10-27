@@ -66,6 +66,8 @@ A navegação é o `go_router` em `lib/app/router.dart`: `/`, `/groups`, `/group
 
 `buildSampleDatabase()` em `lib/core/data/sample_data.dart` cria tudo. `FakeDatabase` segura as listas. Casas, salas e horários não mudam. A lista de grupos muda quando alguém entra ou cria um grupo, e só até o app fechar.
 
+Cada cidade nasce com dois grupos: um quase cheio e outro com mais vagas abertas, os dois dentro da capacidade da sala e em salas diferentes. Os outros horários ficam livres. A tela de criar grupo não pede data e hora soltas: o seletor mostra os horários da sala. Há pelo menos quatro por sala, para caber vários grupos sem colidir no mesmo começo.
+
 O banner laranja nas telas repete o aviso para quem está usando, não só para quem lê o código.
 
 Quem usa o app não está escrito como o texto “Você” dentro do repositório. O nome vem de `currentUserProvider` (`lib/features/account/`). Hoje esse provider devolve um usuário fictício, ainda chamado Você. Quando houver login, a troca é a implementação desse provider.

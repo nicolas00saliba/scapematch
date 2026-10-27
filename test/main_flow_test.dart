@@ -32,14 +32,16 @@ void main() {
       findsOneWidget,
     );
     await tester.scrollUntilVisible(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroOpen)),
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       300,
     );
     expect(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroOpen)),
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsOneWidget,
     );
+    expect(find.text('Metrô Perdido'), findsOneWidget);
     expect(find.text('O Cofre do Café'), findsNothing);
+    expect(find.text('O Izakaya Secreto'), findsNothing);
 
     await tester.tap(find.byKey(AppKeys.almostFullFilter));
     await tester.pumpAndSettle();
@@ -49,15 +51,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpIzakayaAlmost)),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroOpen)),
-      findsNothing,
-    );
-    expect(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaFull)),
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsNothing,
     );
 
@@ -82,19 +76,50 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaFull)),
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
+      300,
+    );
+    expect(find.text('Cheio'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       300,
     );
     await tester.tap(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaFull)),
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Entrar no grupo'), findsOneWidget);
+    expect(find.text('1 de 4 vagas'), findsOneWidget);
+    expect(_joinEnabled(tester), isTrue);
+  });
+
+  testWidgets('a filled group shows Grupo cheio and blocks entry', (
+    tester,
+  ) async {
+    final database = buildSampleDatabase();
+    final index = database.groups.indexWhere(
+      (group) => group.id == SampleIds.groupSpMetroAlmost,
+    );
+    final current = database.groups[index];
+    database.groups[index] = current.copyWith(filledSpots: current.totalSpots);
+
+    await pumpScapeMatch(
+      tester,
+      overrides: [fakeDatabaseProvider.overrideWithValue(database)],
+    );
+
+    await _selectCity(tester, SampleIds.saoPaulo);
+    await tester.tap(find.byKey(AppKeys.findGroup));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Grupo cheio'), findsOneWidget);
-    final joinButton = tester.widget<FilledButton>(
-      find.byKey(AppKeys.joinButton),
-    );
-    expect(joinButton.onPressed, isNull);
+    expect(_spotSummary(tester), '6 de 6 vagas');
+    expect(_joinEnabled(tester), isFalse);
   });
 
   testWidgets('changing the city changes which groups are listed', (
@@ -236,6 +261,11 @@ Future<void> _selectCity(WidgetTester tester, String cityId) async {
 
 String _spotSummary(WidgetTester tester) {
   return tester.widget<Text>(find.byKey(AppKeys.spotSummary)).data!;
+}
+
+bool _joinEnabled(WidgetTester tester) {
+  final button = tester.widget<FilledButton>(find.byKey(AppKeys.joinButton));
+  return button.onPressed != null;
 }
 
 bool _submitEnabled(WidgetTester tester) {

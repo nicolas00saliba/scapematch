@@ -7,6 +7,7 @@ import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
+import 'package:scapematch/features/groups/domain/group_rules.dart';
 
 void main() {
   late FakeDatabase database;
@@ -42,7 +43,7 @@ void main() {
       houseNamesByCity[cityId] = houses.map((house) => house.name).toSet();
 
       final cityGroups = await groups.listByCity(cityId);
-      expect(cityGroups, isNotEmpty, reason: cityId);
+      expect(cityGroups, hasLength(2), reason: cityId);
       expect(cityGroups.every((group) => group.cityId == cityId), isTrue);
 
       final almostFull = await groups.listByCity(cityId, almostFullOnly: true);
@@ -97,37 +98,83 @@ void main() {
       almostFullOnly: true,
     );
 
+    expect(all, hasLength(2));
+    expect(almost, hasLength(1));
+    expect(almost.single.id, SampleIds.groupSpMetroAlmost);
+    expect(almost.single.openSeats, inInclusiveRange(1, 2));
     expect(
-      almost.map((group) => group.id),
-      contains(SampleIds.groupSpMetroAlmost),
+      all.map((group) => group.id),
+      contains(SampleIds.groupSpCoberturaOpen),
     );
     expect(
       almost.map((group) => group.id),
-      contains(SampleIds.groupSpIzakayaAlmost),
+      isNot(contains(SampleIds.groupSpCoberturaOpen)),
     );
-    expect(
-      almost.map((group) => group.id),
-      isNot(contains(SampleIds.groupSpMetroOpen)),
-    );
-    expect(
-      almost.map((group) => group.id),
-      isNot(contains(SampleIds.groupSpCoberturaFull)),
-    );
-    expect(all.length, greaterThan(almost.length));
+  });
+
+  test('each city leaves several free times on every room', () async {
+    for (final cityId in SampleIds.cities) {
+      final cityGroups = await groups.listByCity(cityId);
+      final almost = cityGroups.where((group) => group.isAlmostFull);
+      final open = cityGroups.where(
+        (group) => !group.isAlmostFull && !group.isFull,
+      );
+      expect(almost, hasLength(1), reason: cityId);
+      expect(open, hasLength(1), reason: cityId);
+      expect(
+        open.single.openSeats,
+        greaterThan(GroupRules.almostFullMaxOpenSeats),
+        reason: cityId,
+      );
+      expect(
+        cityGroups.map((group) => group.roomId).toSet(),
+        hasLength(2),
+        reason: cityId,
+      );
+
+      final houses = await catalog.listHousesByCity(cityId);
+      for (final house in houses) {
+        final rooms = await catalog.listRoomsByHouse(house.id);
+        expect(rooms, isNotEmpty, reason: house.name);
+        for (final room in rooms) {
+          final slots = await catalog.listSlotsByRoom(room.id);
+          final taken = cityGroups
+              .where((group) => group.roomId == room.id)
+              .map((group) => group.startsAt)
+              .toSet();
+          final free = slots.where((slot) => !taken.contains(slot.startsAt));
+          expect(slots.length, greaterThanOrEqualTo(4), reason: room.name);
+          expect(free.length, greaterThanOrEqualTo(3), reason: room.name);
+        }
+      }
+    }
+
+    final sessions = [
+      for (final group in database.groups)
+        '${group.roomId}|${group.startsAt.toIso8601String()}',
+    ];
+    expect(sessions.toSet(), hasLength(database.groups.length));
   });
 
   test('does not join a full group', () async {
-    final before = await groups.getById(SampleIds.groupSpCoberturaFull);
+    final index = database.groups.indexWhere(
+      (group) => group.id == SampleIds.groupSpMetroAlmost,
+    );
+    final current = database.groups[index];
+    database.groups[index] = current.copyWith(filledSpots: current.totalSpots);
+    final before = database.groups[index];
+
     final result = await groups.join(
-      SampleIds.groupSpCoberturaFull,
+      SampleIds.groupSpMetroAlmost,
       participantUserId: 'user-local',
       participantName: 'Você',
     );
 
     expect(result, isA<JoinFailure>());
     expect((result as JoinFailure).reason, JoinFailureReason.full);
-    final after = await groups.getById(SampleIds.groupSpCoberturaFull);
-    expect(after!.filledSpots, before!.filledSpots);
+    final after = await groups.getById(SampleIds.groupSpMetroAlmost);
+    expect(after!.filledSpots, before.filledSpots);
+    expect(after.isFull, isTrue);
     expect(after.participants, hasLength(before.participants.length));
   });
 
@@ -264,7 +311,7 @@ void main() {
       participantName: 'Ana Teste',
     );
     final second = await groups.join(
-      SampleIds.groupSpMetroOpen,
+      SampleIds.groupSpCoberturaOpen,
       participantUserId: 'user-local',
       participantName: 'Ana Teste',
     );

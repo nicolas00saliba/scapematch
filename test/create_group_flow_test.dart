@@ -83,6 +83,26 @@ void main() {
     expect(find.text('Você está neste grupo'), findsNothing);
     expect(find.text('Criar grupo'), findsWidgets);
   });
+
+  testWidgets('the slot sheet lists several times for the same room', (
+    tester,
+  ) async {
+    await pumpScapeMatch(tester);
+
+    await _selectCity(tester, SampleIds.saoPaulo);
+    await tester.tap(find.byKey(AppKeys.createGroup));
+    await tester.pumpAndSettle();
+    await _pick(tester, 'house', SampleIds.houseSpAugusta);
+    await _pick(tester, 'room', SampleIds.roomSpMetro);
+    await tester.tap(find.byKey(AppKeys.selectionField('slot')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ListTile), findsAtLeastNWidgets(4));
+    expect(
+      find.byKey(AppKeys.option(SampleIds.slotSpMetroSun)),
+      findsOneWidget,
+    );
+  });
 }
 
 Future<void> _selectCity(WidgetTester tester, String cityId) async {

@@ -13,6 +13,12 @@ import 'package:scapematch/features/groups/domain/participant.dart';
 /// Nothing in this file comes from an escape-room website. Names, schedules,
 /// and groups are invented so the screens can be built and tested. Replacing
 /// [buildSampleDatabase] is the intended way to plug in another source.
+///
+/// Each city starts with two groups: one almost full and one with more open
+/// seats, both within the room capacity. The create-group screen does not
+/// offer a free date picker. It lists the catalog slots of the chosen room,
+/// and every room has at least four November 2026 times so several new groups
+/// can be created there without sharing a start time.
 FakeDatabase buildSampleDatabase() {
   final curitiba = _city(SampleIds.curitiba, 'Curitiba', 'PR', 'Paraná');
   final saoPaulo = _city(SampleIds.saoPaulo, 'São Paulo', 'SP', 'São Paulo');
@@ -220,6 +226,9 @@ FakeDatabase buildSampleDatabase() {
   final slotEstufaSat = _slot('slot-poa-estufa-sat', estufa.id, 7, 21);
   final slotEstufaFree = _slot(SampleIds.slotPoaEstufaFree, estufa.id, 8, 16);
 
+  // Two groups per city. One is almost full (1 or 2 open seats). The other
+  // has more open seats. They use different rooms, so the rest of each
+  // city's rooms and start times stay free for new groups.
   final groups = [
     _group(
       id: 'grp-cwb-cofre-almost',
@@ -227,35 +236,8 @@ FakeDatabase buildSampleDatabase() {
       house: ruaXv,
       room: cofre,
       slot: slotCofreSat,
-      totalSpots: 5,
-      names: ['Marina', 'Caio', 'Helena', 'Davi'],
-    ),
-    _group(
-      id: 'grp-cwb-cofre-open',
-      city: curitiba,
-      house: ruaXv,
-      room: cofre,
-      slot: slotCofreSun,
       totalSpots: 6,
-      names: ['Lívia', 'Bruno'],
-    ),
-    _group(
-      id: 'grp-cwb-lab-full',
-      city: curitiba,
-      house: ruaXv,
-      room: laboratorio,
-      slot: slotLabSat,
-      totalSpots: 5,
-      names: ['Ana', 'Pedro', 'Rita', 'Igor', 'Sofia'],
-    ),
-    _group(
-      id: 'grp-cwb-opera-almost',
-      city: curitiba,
-      house: batel,
-      room: opera,
-      slot: slotOperaFri,
-      totalSpots: 8,
-      names: ['Teo', 'Nina', 'Otto', 'Bia', 'Leo', 'Maya'],
+      names: ['Marina', 'Caio', 'Helena', 'Davi', 'Léo'],
     ),
     _group(
       id: 'grp-cwb-opera-open',
@@ -276,40 +258,13 @@ FakeDatabase buildSampleDatabase() {
       names: ['Lia', 'Miguel', 'Tainá', 'Rafa', 'João'],
     ),
     _group(
-      id: SampleIds.groupSpMetroOpen,
-      city: saoPaulo,
-      house: augusta,
-      room: metro,
-      slot: slotMetroSun,
-      totalSpots: 6,
-      names: ['Diego'],
-    ),
-    _group(
-      id: SampleIds.groupSpCoberturaFull,
+      id: SampleIds.groupSpCoberturaOpen,
       city: saoPaulo,
       house: augusta,
       room: cobertura,
       slot: slotCoberturaFri,
       totalSpots: 4,
-      names: ['Paula', 'Heitor', 'Lara', 'Otto'],
-    ),
-    _group(
-      id: SampleIds.groupSpIzakayaAlmost,
-      city: saoPaulo,
-      house: liberdade,
-      room: izakaya,
-      slot: slotIzakayaSat,
-      totalSpots: 5,
-      names: ['Yumi', 'Caio', 'Beto'],
-    ),
-    _group(
-      id: 'grp-sp-izakaya-open',
-      city: saoPaulo,
-      house: liberdade,
-      room: izakaya,
-      slot: slotIzakayaSun,
-      totalSpots: 5,
-      names: ['Noemi'],
+      names: ['Paula'],
     ),
     _group(
       id: 'grp-rj-apto-almost',
@@ -321,31 +276,13 @@ FakeDatabase buildSampleDatabase() {
       names: ['Íris', 'Tomás', 'Luna', 'Breno'],
     ),
     _group(
-      id: 'grp-rj-apto-open',
-      city: rio,
-      house: copacabana,
-      room: apartamento,
-      slot: slotAptoFri,
-      totalSpots: 5,
-      names: ['Gabi'],
-    ),
-    _group(
-      id: 'grp-rj-bond-almost',
+      id: 'grp-rj-bond-open',
       city: rio,
       house: santaTeresa,
       room: bond,
       slot: slotBondSun,
       totalSpots: 7,
-      names: ['Duda', 'Enzo', 'Kauê', 'Mel', 'Rui', 'Tina'],
-    ),
-    _group(
-      id: 'grp-rj-bond-full',
-      city: rio,
-      house: santaTeresa,
-      room: bond,
-      slot: slotBondSat,
-      totalSpots: 7,
-      names: ['Ari', 'Bia', 'Cris', 'Dani', 'Eli', 'Fran', 'Guto'],
+      names: ['Duda', 'Enzo'],
     ),
     _group(
       id: 'grp-bh-bar-almost',
@@ -357,24 +294,6 @@ FakeDatabase buildSampleDatabase() {
       names: ['Cecília', 'Hugo', 'Nanda', 'Pablo'],
     ),
     _group(
-      id: 'grp-bh-bar-open',
-      city: beloHorizonte,
-      house: savassi,
-      room: bar,
-      slot: slotBarSat,
-      totalSpots: 5,
-      names: ['Iara', 'Léo'],
-    ),
-    _group(
-      id: 'grp-bh-elevador-almost',
-      city: beloHorizonte,
-      house: mina,
-      room: elevador,
-      slot: slotElevadorSun,
-      totalSpots: 8,
-      names: ['Alana', 'Beto', 'Cora', 'Davi', 'Eva', 'Felipe'],
-    ),
-    _group(
       id: 'grp-bh-elevador-open',
       city: beloHorizonte,
       house: mina,
@@ -382,24 +301,6 @@ FakeDatabase buildSampleDatabase() {
       slot: slotElevadorSat,
       totalSpots: 8,
       names: ['Olívia', 'Ravi', 'Sol'],
-    ),
-    _group(
-      id: 'grp-poa-porao-almost',
-      city: portoAlegre,
-      house: cais,
-      room: porao,
-      slot: slotPoraoSat,
-      totalSpots: 6,
-      names: ['Manu', 'Natan', 'Olga', 'Pietro', 'Quésia'],
-    ),
-    _group(
-      id: 'grp-poa-porao-open',
-      city: portoAlegre,
-      house: cais,
-      room: porao,
-      slot: slotPoraoSun,
-      totalSpots: 6,
-      names: ['Rosa', 'Saulo'],
     ),
     _group(
       id: 'grp-poa-estufa-almost',
@@ -411,13 +312,13 @@ FakeDatabase buildSampleDatabase() {
       names: ['Téo', 'Valentina', 'Will'],
     ),
     _group(
-      id: 'grp-poa-estufa-full',
+      id: 'grp-poa-porao-open',
       city: portoAlegre,
-      house: redencao,
-      room: estufa,
-      slot: slotEstufaSat,
-      totalSpots: 4,
-      names: ['Alice', 'Benício', 'Clara', 'Dante'],
+      house: cais,
+      room: porao,
+      slot: slotPoraoSun,
+      totalSpots: 6,
+      names: ['Rosa', 'Saulo'],
     ),
   ];
 
@@ -449,7 +350,7 @@ FakeDatabase buildSampleDatabase() {
       porao,
       estufa,
     ],
-    slots: [
+    slots: _padRoomSlots([
       slotCofreSat,
       slotCofreSun,
       slotLabSat,
@@ -473,7 +374,7 @@ FakeDatabase buildSampleDatabase() {
       slotEstufaFri,
       slotEstufaSat,
       slotEstufaFree,
-    ],
+    ]),
     groups: groups,
   );
 }
@@ -517,6 +418,56 @@ TimeSlot _slot(String id, String roomId, int day, int hour, [int minute = 0]) {
     roomId: roomId,
     startsAt: DateTime(2026, 11, day, hour, minute),
   );
+}
+
+/// How many start times the create-group sheet must offer for one room.
+///
+/// One or two of them may already host the city's sample groups. The rest
+/// stay empty, so the same room can take several new groups.
+const _minimumSlotsPerRoom = 4;
+
+/// Extra November 2026 times used only when a room was short of the minimum.
+/// Skipped when that room already starts at the same clock time.
+const _fillerStarts = <(int, int, int)>[
+  (6, 19, 0),
+  (7, 16, 0),
+  (7, 19, 30),
+  (8, 15, 0),
+  (6, 21, 0),
+  (8, 18, 0),
+  (7, 11, 0),
+  (8, 11, 30),
+];
+
+List<TimeSlot> _padRoomSlots(List<TimeSlot> slots) {
+  final byRoom = <String, List<TimeSlot>>{};
+  for (final slot in slots) {
+    byRoom.putIfAbsent(slot.roomId, () => []).add(slot);
+  }
+  final padded = [...slots];
+  for (final entry in byRoom.entries) {
+    final used = entry.value.map((slot) => slot.startsAt).toSet();
+    var added = 0;
+    for (final (day, hour, minute) in _fillerStarts) {
+      if (entry.value.length + added >= _minimumSlotsPerRoom) {
+        break;
+      }
+      final startsAt = DateTime(2026, 11, day, hour, minute);
+      if (!used.add(startsAt)) {
+        continue;
+      }
+      added += 1;
+      padded.add(
+        TimeSlot(
+          id: '${entry.key}-extra-$added',
+          roomId: entry.key,
+          startsAt: startsAt,
+        ),
+      );
+    }
+    assert(entry.value.length + added >= _minimumSlotsPerRoom, entry.key);
+  }
+  return padded;
 }
 
 Group _group({

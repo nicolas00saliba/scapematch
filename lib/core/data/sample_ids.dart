@@ -22,9 +22,7 @@ abstract final class SampleIds {
   static const roomCwbCofre = 'room-cwb-cofre';
 
   static const groupSpMetroAlmost = 'grp-sp-metro-almost';
-  static const groupSpMetroOpen = 'grp-sp-metro-open';
-  static const groupSpCoberturaFull = 'grp-sp-cobertura-full';
-  static const groupSpIzakayaAlmost = 'grp-sp-izakaya-almost';
+  static const groupSpCoberturaOpen = 'grp-sp-cobertura-open';
 
   static const cities = [
     curitiba,

@@ -17,7 +17,7 @@ void main() {
   test('participant ids skip values already stored on a group', () {
     final database = buildSampleDatabase();
     final index = database.groups.indexWhere(
-      (group) => group.id == SampleIds.groupSpMetroOpen,
+      (group) => group.id == SampleIds.groupSpCoberturaOpen,
     );
     final current = database.groups[index];
     database.groups[index] = current.copyWith(

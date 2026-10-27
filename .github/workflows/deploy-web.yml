@@ -6,8 +6,9 @@
 # Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
 # release that ships Dart 3.13.7.
 #
-# Triggers: manual run, and pushes to gh-pages-preview (or this preview
-# branch, which is the equivalent while the site is being set up).
+# Triggers: manual run, and pushes to the preview branches that publish
+# the site. cursor/two-sample-groups-per-city-7ef7 is included so that
+# branch deploys this sample-data change.
 # The github-pages environment often allows deploys from the default
 # branch only. This workflow tries Actions deployment first and, if that
 # is rejected, pushes the built site to the gh-pages branch. It never
@@ -20,6 +21,7 @@ on:
     branches:
       - gh-pages-preview
       - cursor/gh-pages-preview-23b9
+      - cursor/two-sample-groups-per-city-7ef7
 
 permissions:
   actions: write
@@ -156,7 +158,8 @@ jobs:
           url="https://nicolas00saliba.github.io/scapematch/"
           echo "### ScapeMatch web" >> "$GITHUB_STEP_SUMMARY"
           echo "$url" >> "$GITHUB_STEP_SUMMARY"
-          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+          # The first gh-pages publish stayed 404 for longer than four minutes.
+          for attempt in $(seq 1 30); do
             code="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$url" || true)"
             echo "attempt ${attempt}: HTTP ${code}"
             if [ "$code" = "200" ] && grep -q 'base href="/scapematch/"' /tmp/scapematch.html; then
