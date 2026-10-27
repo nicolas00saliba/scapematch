@@ -9,24 +9,23 @@ import 'package:scapematch/features/catalog/domain/schedule_availability.dart';
 /// This class does not open files, assets, or the network. Callers pass
 /// the text. [AssetExperienceSource] is the example that loads a bundled file.
 class JsonExperienceSource implements ExperienceSource {
-  JsonExperienceSource({
-    required this.houseId,
-    required Future<String> Function() readJson,
-  }) : _readJson = readJson;
+  JsonExperienceSource({required this.houseId, required this.readJson});
 
   JsonExperienceSource.fromJsonString({
     required this.houseId,
     required String json,
-  }) : _readJson = (() async => json);
+  }) : readJson = (() async => json);
 
   @override
   final String houseId;
 
-  final Future<String> Function() _readJson;
+  /// Loads the raw JSON document. Public so a file or asset adapter in
+  /// another library can pass it without a private constructor parameter.
+  final Future<String> Function() readJson;
 
   @override
   Future<ExperienceOffering> fetchOffering() async {
-    final raw = jsonDecode(await _readJson());
+    final raw = jsonDecode(await readJson());
     final offering = parseExperienceOffering(raw);
     if (offering.houseId != houseId) {
       throw FormatException(
