@@ -139,6 +139,10 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
     }
   }
 
+  /// Atualiza o detalhe e as duas listas. Entrar, sair, cancelar, excluir,
+  /// confirmar presença, remover participante e editar passam por aqui.
+  /// Meus grupos fica montado no shell, então a invalidação não pode ser
+  /// só da busca.
   void _publish(Group group) {
     state = AsyncData(group);
     ref.invalidate(findGroupsViewModelProvider);

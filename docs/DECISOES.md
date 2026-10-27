@@ -141,7 +141,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Feed de notícias fictícias
 
 - **Data:** 2026-10-27
-- **Decisão:** o feed lê `NewsRepository`. Hoje isso é o `FakeNewsRepository`, com notícias inventadas e datas relativas ao `clockProvider`. O modelo é `NewsItem`: id, título, resumo, categoria, casa, cidade, imagem, data, link de origem opcional e tipo de fonte (site, Instagram ou curadoria). Há dez notícias em Curitiba e mais algumas em São Paulo, Rio de Janeiro, Belo Horizonte e Porto Alegre. O chip “Todas” começa selecionado. Os outros chips são Novas salas, Horários, Promoções e Eventos. Tocar de novo num chip de categoria não tira o filtro; “Todas” tira. A ordem é a mais recente primeiro. Ranking, nesta versão, entra como Evento, porque não há um quinto chip. Tocar no cartão abre um detalhe simples. O link de origem aparece como texto e o app não abre o navegador. Uma notícia de Curitiba não tem foto: o app desenha um degradê e escreve “Ilustração fictícia”.
+- **Decisão:** o feed lê `NewsRepository`. Hoje isso é o `FakeNewsRepository`, com notícias inventadas e datas relativas ao `clockProvider`. O modelo é `NewsItem`: id, título, resumo, categoria, casa, cidade, imagem, data, link de origem opcional e tipo de fonte (site, Instagram ou curadoria). Há dez notícias em Curitiba e mais algumas em São Paulo, Rio de Janeiro, Belo Horizonte e Porto Alegre. O chip “Todas” começa selecionado. Os outros chips são Novas salas, Horários, Promoções e Eventos. Tocar de novo num chip de categoria não tira o filtro; “Todas” tira. A ordem é a mais recente primeiro. Ranking, nesta versão, entra como Evento, porque não há um quinto chip. Tocar no cartão abre um detalhe simples. O link de origem aparece como texto e o app não abre o navegador. Duas notícias de Curitiba não usam arquivo: a grade de sexta desenha o ícone da categoria, e o combo de café desenha um degradê com xícara (`NewsIllustration.coffee`), porque a foto da biblioteca não combina com essa história. As duas escrevem “Ilustração fictícia” na imagem. O rótulo de acessibilidade da figura é o título da notícia. Trocar cidade ou chip não pisca o spinner: `skipLoadingOnReload` mantém o que já estava na tela. O spinner aparece na primeira carga.
 - **Motivo:** o dono pediu o feed agora, com dados caprichados, e a troca por uma fonte real sem mexer na tela. Abrir um link fictício levaria a um endereço que não existe. Um quinto chip de ranking esperaria uma categoria que ele não listou.
 - **Onde está no código:** `lib/features/news/`. A lista passa por `filterNews`. As imagens ficam em `assets/images/news/`. O provider é `newsRepositoryProvider`.
 - **Como trocar depois:** apontar `newsRepositoryProvider` para uma classe que implementa `NewsRepository`. A imagem pode ser um asset ou uma URL `http(s)`; o widget `NewsArtwork` já trata os dois, e o vazio continua no degradê. Se o link passar a abrir, a troca é no detalhe, não no modelo. Um chip de ranking seria um valor novo em `NewsCategory`.
@@ -149,7 +149,31 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## A imagem da notícia não prende a tela ao asset
 
 - **Data:** 2026-10-27
-- **Decisão:** o campo `image` é um texto opcional. Caminho `assets/...` desenha um asset. URL `http` ou `https` desenha a rede. Qualquer outro valor, ou vazio, vira a ilustração gerada. Os exemplos usam só assets e um vazio. Nenhum exemplo chama a rede.
-- **Motivo:** uma fonte real vai mandar URL. Se o campo se chamasse só “asset”, a tela teria de mudar no dia da troca.
-- **Onde está no código:** `NewsItem.image` e `NewsArtwork`.
-- **Como trocar depois:** o repositório real preenche `image` com a URL pública que a casa autorizou. Foto de marketing continua sujeita à seção de termos em [DADOS_REAIS.md](DADOS_REAIS.md).
+- **Decisão:** o campo `image` é um texto opcional. Caminho `assets/...` desenha um asset. URL `http` ou `https` desenha a rede. Qualquer outro valor, ou vazio, vira a ilustração gerada. Os exemplos usam só assets e vazios. Nenhum exemplo chama a rede. Os JPEG de `assets/images/news/` têm cerca de 800 px de largura e qualidade perto de 75, cada um abaixo de 150 KB. `NewsArtwork` decodifica com `cacheWidth` 800. O `semanticLabel` é o título, não a frase “Ilustração fictícia”.
+- **Motivo:** uma fonte real vai mandar URL. Se o campo se chamasse só “asset”, a tela teria de mudar no dia da troca. Arquivo grande demais pesa no repositório e na web sem ganho visível no cartão, que cabe em menos de 560 px.
+- **Onde está no código:** `NewsItem.image`, `NewsIllustration` e `NewsArtwork`.
+- **Como trocar depois:** o repositório real preenche `image` com a URL pública que a casa autorizou. Foto de marketing continua sujeita à seção de termos em [DADOS_REAIS.md](DADOS_REAIS.md). Um ícone novo entra em `NewsIllustration` e no `switch` de `NewsArtwork`.
+
+## A busca da Home zera quando a Home sai da árvore
+
+- **Data:** 2026-10-27
+- **Decisão:** `groupSearchQueryProvider` é autoDispose. O provider da lista já filtrada (`filteredGroupsProvider`) também é, senão ele seguraria a busca viva para sempre e a Home recriada mostraria a lista filtrada com o campo vazio. Trocar para a aba Meus grupos não apaga o texto: o `IndexedStack` do shell mantém a Home montada, e o campo de texto vive nela. Preservar a busca ao trocar de aba é o comportamento desejado. Se a Home sair da árvore, a busca zera.
+- **Motivo:** a busca é estado da tela, não um filtro global. AutoDispose acompanha os outros providers de tela. Deixar o provider comum faria o texto sobreviver a uma Home que já foi destruída, sem o campo mostrar esse texto.
+- **Onde está no código:** `groupSearchQueryProvider` e `filteredGroupsProvider` em `find_groups_view_model.dart`.
+- **Como trocar depois:** se a busca precisar sobreviver mesmo com a Home fora da árvore, os dois providers deixam de ser autoDispose e o campo passa a ler o texto guardado ao abrir.
+
+## Criar grupo também atualiza Meus grupos
+
+- **Data:** 2026-10-27
+- **Decisão:** toda mudança de grupo invalida a busca e Meus grupos. Criar, entrar, sair, cancelar (excluir o grupo), confirmar presença, remover participante e editar. O detalhe já fazia isso em `_publish`. Criar grupo passou a fazer o mesmo. A aba fica montada no `StatefulShellRoute`, então o provider não se recria sozinho.
+- **Motivo:** abrir Meus grupos, voltar à Home e criar um grupo deixava a aba com a lista antiga. A pessoa só via o grupo novo se a aba tivesse sido descartada.
+- **Onde está no código:** `CreateGroupViewModel.submit` e `GroupDetailViewModel._publish`.
+- **Como trocar depois:** se Meus grupos deixar de ficar montada, a invalidação continua correta. Um provider que escuta o repositório no lugar de `invalidate` pode substituir as duas chamadas.
+
+## Detalhe da notícia aberto direto tem volta para a Home
+
+- **Data:** 2026-10-27
+- **Decisão:** `/news/:id` aberto sem pilha (deep link, ou `go`) mostra um botão que leva para a Home. Se a pessoa chegou pelo cartão, o voltar normal continua, porque há pilha.
+- **Motivo:** sem pilha o AppBar não desenha voltar, e a notícia ficava sem saída.
+- **Onde está no código:** `NewsDetailScreen`, botão `AppKeys.newsBackHome`.
+- **Como trocar depois:** se o detalhe passar a abrir dentro do shell, o botão sai e a barra inferior volta a ser o caminho.

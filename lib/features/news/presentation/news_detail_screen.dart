@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/relative_time.dart';
+import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
@@ -22,7 +24,12 @@ class NewsDetailScreen extends ConsumerWidget {
     final now = ref.watch(clockProvider).now();
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Novidade')),
+      appBar: AppBar(
+        title: const Text('Novidade'),
+        // Deep link chega sem pilha. O voltar padrão não aparece, então
+        // o botão leva para a Home.
+        leading: context.canPop() ? null : const _HomeBackButton(),
+      ),
       body: detail.when(
         loading: () => const LoadingView(message: 'Carregando a novidade...'),
         error: (error, stackTrace) => ErrorView(
@@ -44,6 +51,20 @@ class NewsDetailScreen extends ConsumerWidget {
   }
 }
 
+class _HomeBackButton extends StatelessWidget {
+  const _HomeBackButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: AppKeys.newsBackHome,
+      tooltip: 'Voltar para a Home',
+      icon: const BackButtonIcon(),
+      onPressed: () => context.go('/'),
+    );
+  }
+}
+
 class _Detail extends StatelessWidget {
   const _Detail({required this.item, required this.now});
 
@@ -61,7 +82,12 @@ class _Detail extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: NewsArtwork(image: item.image, category: item.category),
+          child: NewsArtwork(
+            image: item.image,
+            category: item.category,
+            semanticLabel: item.title,
+            illustration: item.illustration,
+          ),
         ),
         const SizedBox(height: 16),
         Text(

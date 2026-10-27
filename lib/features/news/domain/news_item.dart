@@ -1,6 +1,12 @@
 /// Categoria do feed. Os nomes na tela ficam em `news_labels.dart`.
 enum NewsCategory { newRoom, schedule, promotion, event }
 
+/// Desenho do app quando não há arquivo de imagem.
+///
+/// [category] usa o ícone da categoria. [coffee] é o degradê com xícara,
+/// para a notícia do combo de café não reaproveitar a foto da biblioteca.
+enum NewsIllustration { category, coffee }
+
 /// De onde a notícia diz que veio. Ainda não há coleta de verdade.
 enum NewsSourceKind { website, instagram, manual }
 
@@ -20,6 +26,7 @@ class NewsItem {
     required this.publishedAt,
     required this.sourceKind,
     this.image,
+    this.illustration = NewsIllustration.category,
     this.sourceUrl,
   });
 
@@ -34,6 +41,9 @@ class NewsItem {
   /// Caminho de asset (`assets/...`) ou URL `http(s)`. Vazio gera uma
   /// ilustração no código. A tela trata os dois formatos.
   final String? image;
+
+  /// Qual degradê desenhar quando [image] é nula.
+  final NewsIllustration illustration;
 
   final DateTime publishedAt;
 

@@ -97,7 +97,7 @@ As cidades de exemplo são Curitiba, São Paulo, Rio de Janeiro, Belo Horizonte 
 
 A tela de criar grupo não abre um calendário. Ela lista os horários cadastrados da sala, calculados a partir do relógio do app. Cada sala tem pelo menos quatro horários futuros e um horário que já passou.
 
-As notícias também são inventadas. Curitiba tem dez. As outras cidades de exemplo têm algumas. As figuras em `assets/images/news/` são ilustrações fictícias, não fotos de casas. Uma notícia não tem figura e o app desenha um degradê. Os links usam o domínio `.invalid` e a tela não abre o navegador.
+As notícias também são inventadas. Curitiba tem dez. As outras cidades de exemplo têm algumas. As figuras em `assets/images/news/` são ilustrações fictícias, não fotos de casas, em JPEG de cerca de 800 px. A grade de sexta não tem figura e o app desenha um degradê. O combo de café usa um degradê com xícara, não a foto da biblioteca. Os links usam o domínio `.invalid` e a tela não abre o navegador. Um link direto de notícia, sem pilha, mostra voltar para a Home.
 
 ## Próximos passos
 

@@ -30,6 +30,11 @@ void main() {
       items.singleWhere((item) => item.id == SampleNewsIds.cwbGrade).image,
       isNull,
     );
+    final combo = items.singleWhere(
+      (item) => item.id == SampleNewsIds.cwbCombo,
+    );
+    expect(combo.image, isNull);
+    expect(combo.illustration, NewsIllustration.coffee);
   });
 
   test('filter keeps the city, the category, and newest first', () {

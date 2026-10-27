@@ -186,7 +186,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       houseName: 'Mistério da Rua XV',
       cityId: SampleIds.curitiba,
       cityName: curitiba,
-      image: NewsImages.biblioteca,
+      illustration: NewsIllustration.coffee,
       publishedAt: now.subtract(const Duration(minutes: 30)),
       sourceKind: NewsSourceKind.manual,
     ),
@@ -292,6 +292,7 @@ NewsItem _item({
   required DateTime publishedAt,
   required NewsSourceKind sourceKind,
   String? image,
+  NewsIllustration illustration = NewsIllustration.category,
   String? sourceUrl,
 }) {
   return NewsItem(
@@ -303,6 +304,7 @@ NewsItem _item({
     cityId: cityId,
     cityName: cityName,
     image: image,
+    illustration: illustration,
     publishedAt: publishedAt,
     sourceUrl: sourceUrl,
     sourceKind: sourceKind,

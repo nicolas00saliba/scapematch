@@ -19,6 +19,10 @@ final almostFullOnlyProvider =
     );
 
 /// Texto da busca compacta da Home. Não dispara outra ida ao repositório.
+///
+/// AutoDispose: a busca zera quando a Home sai da árvore. Trocar para a aba
+/// Meus grupos não apaga o texto, porque o shell mantém a Home montada. O
+/// campo e este provider somem juntos.
 class GroupSearchController extends Notifier<String> {
   @override
   String build() => '';
@@ -32,7 +36,9 @@ class GroupSearchController extends Notifier<String> {
 }
 
 final groupSearchQueryProvider =
-    NotifierProvider<GroupSearchController, String>(GroupSearchController.new);
+    NotifierProvider.autoDispose<GroupSearchController, String>(
+      GroupSearchController.new,
+    );
 
 /// Lista da cidade, com o filtro de quase cheios.
 ///
@@ -58,7 +64,13 @@ final findGroupsViewModelProvider =
     );
 
 /// A lista da cidade com o texto da busca aplicado em memória.
-final filteredGroupsProvider = Provider<AsyncValue<List<Group>>>((ref) {
+///
+/// Também é autoDispose. Um provider comum seguraria
+/// [groupSearchQueryProvider] vivo para sempre, e a Home recriada
+/// mostraria a lista filtrada com o campo vazio.
+final filteredGroupsProvider = Provider.autoDispose<AsyncValue<List<Group>>>((
+  ref,
+) {
   final query = ref.watch(groupSearchQueryProvider);
   return ref
       .watch(findGroupsViewModelProvider)

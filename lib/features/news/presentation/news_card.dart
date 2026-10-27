@@ -39,7 +39,12 @@ class NewsCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              NewsArtwork(image: item.image, category: item.category),
+              NewsArtwork(
+                image: item.image,
+                category: item.category,
+                semanticLabel: item.title,
+                illustration: item.illustration,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                 child: Column(

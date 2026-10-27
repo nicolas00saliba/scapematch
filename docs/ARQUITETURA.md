@@ -40,7 +40,7 @@ Tela  ->  view model  ->  repositório (interface)  ->  fonte de dados
 
 A rota antiga `/groups` redireciona para `/`. Meus grupos continua em `/groups/mine`.
 
-Entrar num grupo é o mesmo desenho, com um passo a mais: `GroupDetailViewModel.join` chama `GroupRepository.join`. O repositório devolve sucesso ou um motivo (`cheio`, `já entrou`, `não achou`). Não usa exceção para um grupo cheio, porque isso é uma resposta normal. A lista é atualizada na memória e a tela de baixo é invalidada para recarregar.
+Entrar num grupo é o mesmo desenho, com um passo a mais: `GroupDetailViewModel.join` chama `GroupRepository.join`. O repositório devolve sucesso ou um motivo (`cheio`, `já entrou`, `não achou`). Não usa exceção para um grupo cheio, porque isso é uma resposta normal. A lista é atualizada na memória. Criar, entrar, sair, excluir, confirmar presença, remover participante e editar invalidam a busca e Meus grupos. A aba fica montada no shell, então ela não recarrega sozinha.
 
 ## Onde estão as regras
 
@@ -77,7 +77,7 @@ Cada cidade nasce com dois grupos: um quase cheio e outro com mais vagas abertas
 
 O preço por pessoa é fictício e fica na sala, em centavos. O grupo copia esse número quando nasce. O pagamento marcado como pago, e o reembolso, também são simulados.
 
-O feed de exemplo nasce em `buildSampleNews`, com a mesma hora do `clockProvider`. São dez notícias em Curitiba e mais algumas nas outras cidades. Texto, link e ilustração são inventados. Uma notícia não tem arquivo de imagem e o app desenha um degradê. O banner laranja nas telas repete o aviso para quem está usando, não só para quem lê o código. Ele também cita as notícias.
+O feed de exemplo nasce em `buildSampleNews`, com a mesma hora do `clockProvider`. São dez notícias em Curitiba e mais algumas nas outras cidades. Texto, link e ilustração são inventados. A grade de sexta não tem arquivo e o app desenha um degradê. O combo de café também não usa a foto da biblioteca: o degradê traz um ícone de xícara. Os JPEG do feed têm cerca de 800 px de largura. O banner laranja nas telas repete o aviso para quem está usando, não só para quem lê o código. Ele também cita as notícias.
 
 Quem usa o app não está escrito como o texto “Você” dentro do repositório. O nome vem de `currentUserProvider` (`lib/features/account/`). Hoje esse provider devolve um usuário fictício, ainda chamado Você. Quando houver login, a troca é a implementação desse provider.
 

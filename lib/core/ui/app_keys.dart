@@ -38,6 +38,7 @@ abstract final class AppKeys {
   static const newsFeed = Key('news-feed');
   static const newsCategoryAll = Key('news-category-all');
   static const newsRetry = Key('news-retry');
+  static const newsBackHome = Key('news-back-home');
   static const myGroupsUpcoming = Key('my-groups-upcoming');
   static const myGroupsPast = Key('my-groups-past');
   static const myGroupsCancelled = Key('my-groups-cancelled');

@@ -104,7 +104,10 @@ class NewsSection extends ConsumerWidget {
       );
     }
 
+    // Cidade ou chip novo mantém os cartões. O spinner só aparece na
+    // primeira carga, para a lista não piscar.
     return news.when(
+      skipLoadingOnReload: true,
       loading: () =>
           const InlineNotice(message: 'Carregando novidades...', loading: true),
       error: (error, stackTrace) => InlineNotice(

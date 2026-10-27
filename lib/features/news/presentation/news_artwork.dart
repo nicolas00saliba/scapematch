@@ -6,12 +6,28 @@ import 'package:scapematch/features/news/presentation/news_labels.dart';
 /// Foto fictícia, URL http(s) ou ilustração desenhada no código.
 ///
 /// O cartão e o detalhe usam este widget. Trocar a origem da imagem não
-/// muda a tela que chama.
+/// muda a tela que chama. O arquivo já vem perto de 800 px; [cacheWidth]
+/// evita decodificar maior do que a tela precisa.
 class NewsArtwork extends StatelessWidget {
-  const NewsArtwork({super.key, required this.image, required this.category});
+  const NewsArtwork({
+    super.key,
+    required this.image,
+    required this.category,
+    required this.semanticLabel,
+    this.illustration = NewsIllustration.category,
+  });
 
   final String? image;
   final NewsCategory category;
+
+  /// Texto de acessibilidade desta figura. Cada notícia manda o próprio,
+  /// em geral o título.
+  final String semanticLabel;
+
+  final NewsIllustration illustration;
+
+  /// Largura de decode, alinhada ao JPEG de cerca de 800 px.
+  static const decodeWidth = 800;
 
   @override
   Widget build(BuildContext context) {
@@ -33,30 +49,39 @@ class NewsArtwork extends StatelessWidget {
 
   Widget _picture() {
     final path = image;
-    if (path == null || path.isEmpty) {
-      return _GeneratedArtwork(category: category);
-    }
-    if (path.startsWith('assets/')) {
+    if (path != null && path.startsWith('assets/')) {
       return Image.asset(
         path,
         fit: BoxFit.cover,
-        semanticLabel: 'Ilustração fictícia',
-        errorBuilder: (context, error, stackTrace) {
-          return _GeneratedArtwork(category: category);
-        },
+        cacheWidth: decodeWidth,
+        semanticLabel: semanticLabel,
+        errorBuilder: (context, error, stackTrace) => _generated(),
       );
     }
-    if (path.startsWith('https://') || path.startsWith('http://')) {
+    if (path != null &&
+        (path.startsWith('https://') || path.startsWith('http://'))) {
       return Image.network(
         path,
         fit: BoxFit.cover,
-        semanticLabel: 'Ilustração fictícia',
-        errorBuilder: (context, error, stackTrace) {
-          return _GeneratedArtwork(category: category);
-        },
+        cacheWidth: decodeWidth,
+        semanticLabel: semanticLabel,
+        errorBuilder: (context, error, stackTrace) => _generated(),
       );
     }
-    return _GeneratedArtwork(category: category);
+    return _generated();
+  }
+
+  Widget _generated() {
+    return Semantics(
+      label: semanticLabel,
+      image: true,
+      child: ExcludeSemantics(
+        child: _GeneratedArtwork(
+          category: category,
+          illustration: illustration,
+        ),
+      ),
+    );
   }
 }
 
@@ -86,29 +111,36 @@ class NewsCategoryBadge extends StatelessWidget {
 }
 
 class _GeneratedArtwork extends StatelessWidget {
-  const _GeneratedArtwork({required this.category});
+  const _GeneratedArtwork({required this.category, required this.illustration});
 
   final NewsCategory category;
+  final NewsIllustration illustration;
 
   @override
   Widget build(BuildContext context) {
-    final (colors, icon) = switch (category) {
-      NewsCategory.newRoom => (
-        [AppColors.teal, const Color(0xFF1E6B66)],
-        Icons.meeting_room_outlined,
+    final (colors, icon) = switch (illustration) {
+      NewsIllustration.coffee => (
+        [const Color(0xFF6F4E37), AppColors.copper],
+        Icons.coffee,
       ),
-      NewsCategory.schedule => (
-        [const Color(0xFF245C6B), AppColors.teal],
-        Icons.schedule,
-      ),
-      NewsCategory.promotion => (
-        [AppColors.copper, const Color(0xFF8C3E16)],
-        Icons.local_offer_outlined,
-      ),
-      NewsCategory.event => (
-        [const Color(0xFF3E2A55), AppColors.teal],
-        Icons.celebration_outlined,
-      ),
+      NewsIllustration.category => switch (category) {
+        NewsCategory.newRoom => (
+          [AppColors.teal, const Color(0xFF1E6B66)],
+          Icons.meeting_room_outlined,
+        ),
+        NewsCategory.schedule => (
+          [const Color(0xFF245C6B), AppColors.teal],
+          Icons.schedule,
+        ),
+        NewsCategory.promotion => (
+          [AppColors.copper, const Color(0xFF8C3E16)],
+          Icons.local_offer_outlined,
+        ),
+        NewsCategory.event => (
+          [const Color(0xFF3E2A55), AppColors.teal],
+          Icons.celebration_outlined,
+        ),
+      },
     };
 
     return DecoratedBox(

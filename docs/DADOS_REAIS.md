@@ -89,7 +89,7 @@ Nada disso está implementado. Não há cliente HTTP no projeto.
 
 ## Feed de novidades
 
-O feed da Home é outra interface, `NewsRepository` (`lib/features/news/data/news_repository.dart`). Não é o catálogo de salas. A casa continua dona da grade. A notícia é um aviso: sala nova, horário, promoção, evento. Hoje quem implementa a interface é o `FakeNewsRepository`. Os textos, as casas e os links são inventados. As ilustrações estão em `assets/images/news/` e também são fictícias. A tela lê o repositório. Trocar a fonte é apontar `newsRepositoryProvider` para outra classe. O cartão e o detalhe ficam.
+O feed da Home é outra interface, `NewsRepository` (`lib/features/news/data/news_repository.dart`). Não é o catálogo de salas. A casa continua dona da grade. A notícia é um aviso: sala nova, horário, promoção, evento. Hoje quem implementa a interface é o `FakeNewsRepository`. Os textos, as casas e os links são inventados. As ilustrações estão em `assets/images/news/` e também são fictícias, cada JPEG com cerca de 800 px de largura. A tela lê o repositório. Trocar a fonte é apontar `newsRepositoryProvider` para outra classe. O cartão e o detalhe ficam.
 
 O que uma fonte real precisaria devolver é o mesmo `NewsItem`: id, título, resumo, categoria, nome da casa, cidade, imagem, data de publicação, link de origem opcional e o tipo da fonte (site, Instagram ou curadoria manual). A cidade é o filtro da Home. Sem cidade, o feed não mostra notícia nenhuma.
 
