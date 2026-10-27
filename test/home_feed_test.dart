@@ -9,7 +9,9 @@ import 'package:scapematch/app/scapematch_app.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/cities/data/selected_city_store.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'package:scapematch/features/news/data/fake_news_repository.dart';
@@ -23,6 +25,104 @@ import 'support/pump_app.dart';
 import 'support/sample_clock.dart';
 
 void main() {
+  testWidgets(
+    'opening Home with no saved city shows Curitiba groups and feed',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await pumpScapeMatch(
+        tester,
+        overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
+      );
+
+      expect(find.text('Escolha uma cidade'), findsNothing);
+      expect(
+        find.text('Escolha a cidade acima para ver os grupos.'),
+        findsNothing,
+      );
+      expect(
+        find.text('Escolha a cidade acima para ver as novidades.'),
+        findsNothing,
+      );
+      expect(find.text('Curitiba'), findsWidgets);
+      expect(
+        find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+        findsOneWidget,
+      );
+      expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spLinha)), findsNothing);
+    },
+  );
+
+  testWidgets('a saved city wins over the Curitiba default', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      SelectedCityStore.storageKey: SampleIds.saoPaulo,
+    });
+    final store = SelectedCityStore();
+    await store.load();
+
+    await pumpScapeMatch(
+      tester,
+      overrides: [
+        clockProvider.overrideWithValue(FixedClock(sampleNow)),
+        selectedCityStoreProvider.overrideWithValue(store),
+      ],
+    );
+
+    expect(find.text('São Paulo'), findsWidgets);
+    expect(find.text('Curitiba'), findsNothing);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
+      findsNothing,
+    );
+    expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spLinha)), findsOneWidget);
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+      findsNothing,
+    );
+  });
+
+  testWidgets('choosing a city is what the next open reads', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await pumpScapeMatch(
+      tester,
+      overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
+    );
+
+    await _selectCity(tester, SampleIds.rioDeJaneiro);
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getString(SelectedCityStore.storageKey),
+      SampleIds.rioDeJaneiro,
+    );
+
+    final restored = SelectedCityStore();
+    await restored.load();
+    // Outro ProviderScope no mesmo lugar não pode mudar a quantidade de
+    // overrides. A árvore sai antes da “próxima abertura”.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpScapeMatch(
+      tester,
+      overrides: [
+        clockProvider.overrideWithValue(FixedClock(sampleNow)),
+        selectedCityStoreProvider.overrideWithValue(restored),
+      ],
+    );
+
+    expect(find.text('Rio de Janeiro'), findsWidgets);
+    expect(find.text('O Apartamento da Avenida'), findsWidgets);
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+      findsNothing,
+    );
+  });
+
   testWidgets('the feed sits below the search and follows city and category', (
     tester,
   ) async {
@@ -35,17 +135,6 @@ void main() {
       tester.getTopLeft(find.byKey(AppKeys.newsFeed)).dy,
       greaterThan(tester.getTopLeft(find.byKey(AppKeys.groupSearch)).dy),
     );
-    expect(
-      find.text('Escolha a cidade acima para ver as novidades.'),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
-      findsNothing,
-    );
-
-    await _selectCity(tester, SampleIds.curitiba);
-
     expect(
       find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
       findsOneWidget,

@@ -16,8 +16,12 @@ void main() {
   ) async {
     await pumpScapeMatch(tester);
 
-    expect(find.text('Escolha uma cidade'), findsOneWidget);
-    expect(find.text('Curitiba'), findsNothing);
+    expect(find.text('Escolha uma cidade'), findsNothing);
+    expect(find.text('Curitiba'), findsWidgets);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
+      findsOneWidget,
+    );
     expect(find.text('Encontrar grupo'), findsOneWidget);
     expect(find.text('Criar grupo'), findsOneWidget);
     expect(find.textContaining('Dados de exemplo'), findsOneWidget);

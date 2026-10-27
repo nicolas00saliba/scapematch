@@ -49,9 +49,6 @@ class FindGroupsViewModel extends AsyncNotifier<List<Group>> {
   Future<List<Group>> build() {
     final cityId = ref.watch(selectedCityIdProvider);
     final almostFullOnly = ref.watch(almostFullOnlyProvider);
-    if (cityId == null) {
-      return Future.value(const []);
-    }
     return ref
         .watch(groupRepositoryProvider)
         .listByCity(cityId, almostFullOnly: almostFullOnly);

@@ -37,7 +37,7 @@ cd build/web && python3 -m http.server 8080
 
 ## O que dá para fazer agora
 
-1. O app abre na **Home**. A barra de baixo tem **Home** à esquerda e **Meus grupos** à direita. A cidade começa vazia: o app não assume Curitiba. A cidade é o filtro dos grupos e das notícias.
+1. O app abre na **Home**. A barra de baixo tem **Home** à esquerda e **Meus grupos** à direita. Sem cidade salva, Curitiba já entra selecionada. Uma escolha salva prevalece e fica no aparelho (`shared_preferences`). A cidade é o filtro dos grupos e das notícias. O seletor continua na tela para trocar.
 2. **Encontrar grupo**, no topo da Home: busca por sala ou casa, filtro **Quase cheios** (ainda dá para entrar e faltam 1 ou 2 vagas) e o atalho **Criar grupo**. Os cartões da lista são curtos. O detalhe continua com preço, presença e o resto da logística.
 3. **Novidades**, logo abaixo, no mesmo scroll. Chips: Todas, Novas salas, Horários, Promoções e Eventos. O feed é fictício e fica atrás de um `NewsRepository`. Tocar numa notícia abre o detalhe. O link de origem, quando existe, só é mostrado.
 4. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém. Não entra quem já está em outro grupo no mesmo horário, nem em sessão que já começou.
