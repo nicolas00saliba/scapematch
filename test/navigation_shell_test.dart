@@ -25,11 +25,17 @@ void main() {
     );
 
     final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(bar.destinations, hasLength(3));
     expect((bar.destinations[0] as NavigationDestination).label, 'Home');
     expect((bar.destinations[1] as NavigationDestination).label, 'Meus grupos');
+    expect((bar.destinations[2] as NavigationDestination).label, 'Conta');
     expect(
       tester.getCenter(find.byKey(AppKeys.homeTab)).dx,
       lessThan(tester.getCenter(find.byKey(AppKeys.myGroups)).dx),
+    );
+    expect(
+      tester.getCenter(find.byKey(AppKeys.myGroups)).dx,
+      lessThan(tester.getCenter(find.byKey(AppKeys.accountTab)).dx),
     );
 
     await tester.tap(find.byKey(AppKeys.myGroups));

@@ -19,7 +19,10 @@ import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
-  const CreateGroupScreen({super.key});
+  const CreateGroupScreen({super.key, this.prefilledRoomId});
+
+  /// Sala já escolhida num cartão. A casa entra junto; o horário continua vazio.
+  final String? prefilledRoomId;
 
   @override
   ConsumerState<CreateGroupScreen> createState() => _CreateGroupScreenState();
@@ -33,7 +36,9 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       if (!mounted) {
         return;
       }
-      ref.read(createGroupViewModelProvider.notifier).loadInitial();
+      ref
+          .read(createGroupViewModelProvider.notifier)
+          .loadInitial(roomId: widget.prefilledRoomId);
     });
   }
 

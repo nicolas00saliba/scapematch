@@ -1,5 +1,6 @@
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 
 /// Houses, rooms, and time slots.
@@ -12,4 +13,10 @@ abstract class CatalogRepository {
   Future<List<EscapeHouse>> listHousesByCity(String cityId);
   Future<List<EscapeRoom>> listRoomsByHouse(String houseId);
   Future<List<TimeSlot>> listSlotsByRoom(String roomId);
+
+  /// Salas da cidade, com o nome da casa e da cidade já copiados.
+  Future<List<RoomListing>> listRoomsByCity(String cityId);
+
+  /// Uma sala pelo id, em qualquer cidade. Nulo se o id não existe.
+  Future<RoomListing?> findRoom(String roomId);
 }

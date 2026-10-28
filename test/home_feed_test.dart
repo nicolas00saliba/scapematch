@@ -152,10 +152,10 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(
-      find.byKey(AppKeys.newsCategory(NewsCategory.promotion.name)),
+    await _tapNewsChip(
+      tester,
+      AppKeys.newsCategory(NewsCategory.promotion.name),
     );
-    await tester.pumpAndSettle();
 
     expect(
       find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
@@ -170,8 +170,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(AppKeys.newsCategoryAll));
-    await tester.pumpAndSettle();
+    await _tapNewsChip(tester, AppKeys.newsCategoryAll);
     expect(
       find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
       findsOneWidget,
@@ -191,10 +190,10 @@ void main() {
   ) async {
     await pumpScapeMatch(tester);
     await _selectCity(tester, SampleIds.portoAlegre);
-    await tester.tap(
-      find.byKey(AppKeys.newsCategory(NewsCategory.promotion.name)),
+    await _tapNewsChip(
+      tester,
+      AppKeys.newsCategory(NewsCategory.promotion.name),
     );
-    await tester.pumpAndSettle();
 
     expect(
       find.textContaining('Nenhuma novidade de promoções em Porto Alegre.'),
@@ -396,10 +395,13 @@ void main() {
       findsOneWidget,
     );
 
-    repository.pause = Completer<void>();
-    await tester.tap(
-      find.byKey(AppKeys.newsCategory(NewsCategory.promotion.name)),
+    final promotions = find.byKey(
+      AppKeys.newsCategory(NewsCategory.promotion.name),
     );
+    await tester.ensureVisible(promotions);
+    await tester.pumpAndSettle();
+    repository.pause = Completer<void>();
+    await tester.tap(promotions);
     await tester.pump();
 
     expect(find.text('Carregando novidades...'), findsNothing);
@@ -419,6 +421,8 @@ void main() {
       findsOneWidget,
     );
 
+    await tester.ensureVisible(find.byKey(AppKeys.citySelector));
+    await tester.pumpAndSettle();
     repository.pause = Completer<void>();
     await tester.tap(find.byKey(AppKeys.citySelector));
     await tester.pumpAndSettle();
@@ -476,7 +480,17 @@ void main() {
   });
 }
 
+Future<void> _tapNewsChip(WidgetTester tester, Key key) async {
+  final chip = find.byKey(key);
+  await tester.ensureVisible(chip);
+  await tester.pumpAndSettle();
+  await tester.tap(chip);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _selectCity(WidgetTester tester, String cityId) async {
+  await tester.ensureVisible(find.byKey(AppKeys.citySelector));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(AppKeys.citySelector));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(AppKeys.cityOption(cityId)));

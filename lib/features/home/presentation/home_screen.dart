@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/features/catalog/presentation/room_carousels_section.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
@@ -26,6 +27,8 @@ class HomeScreen extends StatelessWidget {
             ExampleDataBanner(),
             SizedBox(height: 16),
             FindGroupsSection(),
+            SizedBox(height: 22),
+            RoomCarouselsSection(),
             SizedBox(height: 22),
             NewsSection(),
           ],
@@ -53,7 +56,7 @@ class _HomeHeader extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Grupos e novidades de escape room na sua cidade.',
+          'Grupos, salas e novidades de escape room na sua cidade.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: AppColors.muted,
             height: 1.35,

@@ -34,6 +34,12 @@ abstract final class AppKeys {
   static const editSave = Key('edit-save');
   static const editError = Key('edit-error');
   static const homeTab = Key('home-tab');
+  static const accountTab = Key('account-tab');
+  static const accountSettings = Key('account-settings');
+  static const accountGreeting = Key('account-greeting');
+  static const accountWallet = Key('account-wallet');
+  static const giftCode = Key('gift-code');
+  static const giftRedeem = Key('gift-redeem');
   static const groupSearch = Key('group-search');
   static const newsFeed = Key('news-feed');
   static const newsCategoryAll = Key('news-category-all');
@@ -53,4 +59,10 @@ abstract final class AppKeys {
   static Key newsCategory(String id) => Key('news-category-$id');
   static Key option(String id) => Key('option-$id');
   static Key selectionField(String name) => Key('selection-$name');
+  static Key roomCarousel(String category) => Key('room-carousel-$category');
+  static Key roomCard(String id) => Key('room-card-$id');
+  static Key roomFindGroup(String id) => Key('room-find-group-$id');
+  static Key roomCreateGroup(String id) => Key('room-create-group-$id');
+  static Key roomSeeAll(String category) => Key('room-see-all-$category');
+  static Key accountDestination(String name) => Key('account-$name');
 }

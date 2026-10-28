@@ -156,8 +156,52 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     return CreateGroupState(cityId: ref.read(selectedCityIdProvider));
   }
 
-  Future<void> loadInitial() {
-    return _loadHouses(state.cityId);
+  Future<void> loadInitial({String? roomId}) async {
+    await _loadHouses(state.cityId);
+    if (roomId == null || !ref.mounted) {
+      return;
+    }
+    await _prefillRoom(roomId);
+  }
+
+  /// Casa e sala do cartão. O horário fica para a pessoa escolher.
+  Future<void> _prefillRoom(String roomId) async {
+    // O spinner precisa existir antes do await. Sem um frame agendado, o
+    // teste (e a tela) acham que o formulário já terminou de carregar.
+    final generation = ++_generation;
+    state = state.copyWith(loadingOptions: true, clearFailure: true);
+    final listing = await ref.read(catalogRepositoryProvider).findRoom(roomId);
+    if (!ref.mounted || generation != _generation) {
+      return;
+    }
+    if (listing == null || listing.cityId != state.cityId) {
+      state = state.copyWith(loadingOptions: false);
+      return;
+    }
+    final rooms = await ref
+        .read(catalogRepositoryProvider)
+        .listRoomsByHouse(listing.houseId);
+    if (!ref.mounted || generation != _generation) {
+      return;
+    }
+    final slots = await ref
+        .read(catalogRepositoryProvider)
+        .listSlotsByRoom(roomId);
+    if (!ref.mounted || generation != _generation) {
+      return;
+    }
+    final known = rooms.any((room) => room.id == roomId);
+    if (!known) {
+      state = state.copyWith(loadingOptions: false);
+      return;
+    }
+    state = state.copyWith(
+      houseId: listing.houseId,
+      rooms: rooms,
+      roomId: roomId,
+      slots: slots,
+      loadingOptions: false,
+    );
   }
 
   Future<void> selectCity(City city) async {

@@ -37,18 +37,20 @@ cd build/web && python3 -m http.server 8080
 
 ## O que dá para fazer agora
 
-1. O app abre na **Home**. A barra de baixo tem **Home** à esquerda e **Meus grupos** à direita. Sem cidade salva, Curitiba já entra selecionada. Uma escolha salva prevalece e fica no aparelho (`shared_preferences`). A cidade é o filtro dos grupos e das notícias. O seletor continua na tela para trocar.
+1. O app abre na **Home**. A barra de baixo é **Home**, **Meus grupos** e **Conta**. Sem cidade salva, Curitiba já entra selecionada. Uma escolha salva prevalece e fica no aparelho (`shared_preferences`). A cidade é o filtro dos grupos, das salas e das notícias. O seletor continua na tela para trocar.
 2. **Encontrar grupo**, no topo da Home: busca por sala ou casa, filtro **Quase cheios** (ainda dá para entrar e faltam 1 ou 2 vagas) e o atalho **Criar grupo**. Os cartões da lista são curtos. O detalhe continua com preço, presença e o resto da logística.
-3. **Novidades**, logo abaixo, no mesmo scroll. Chips: Todas, Novas salas, Horários, Promoções e Eventos. O feed é fictício e fica atrás de um `NewsRepository`. Tocar numa notícia abre o detalhe. O link de origem, quando existe, só é mostrado.
-4. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém. Não entra quem já está em outro grupo no mesmo horário, nem em sessão que já começou.
-5. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. O horário é uma das opções da sala, não uma data livre. Não nascem dois grupos na mesma sala no mesmo horário. Um horário que já passou é recusado.
-6. **Confirmar presença** na lista de quem já está. O criador confirma a própria. O detalhe mostra quantas presenças estão confirmadas.
-7. **Sair do grupo**, se você não é o criador. Com 2 horas ou mais de antecedência o pagamento simulado é reembolsado. Com menos de 2 horas, a tela avisa antes de confirmar que não há reembolso. A vaga volta a ficar livre. Exatamente 2 horas ainda reembolsa. Sair é definitivo naquele grupo.
-8. **Excluir grupo**, só para quem criou. Isso cancela o evento para todo mundo e reembolsa integralmente, mesmo em cima da hora. Quem não criou não vê o botão. O criador não sai: ele exclui.
-9. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
-10. **Meus grupos**, na aba da direita, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
+3. **Salas**, no meio da Home, em carrosséis por tema (Terror, Mistério, Aventura, Sci-fi, Steampunk, Egito). Cada cartão tem foto, sala, casa, cidade e os botões **Achar grupo** e **Criar grupo**. Achar grupo abre os grupos daquela sala. Criar grupo abre o formulário com a sala já escolhida. **Ver tudo** lista o tema inteiro na cidade.
+4. **Novidades**, no fim do mesmo scroll. Chips: Todas, Novas salas, Horários, Promoções e Eventos. O feed é fictício e fica atrás de um `NewsRepository`. Tocar numa notícia abre o detalhe. O link de origem, quando existe, só é mostrado.
+5. **Conta**, na aba da direita: “Olá, Nícolas”, a carteira fictícia e os atalhos Perfil, Meus parceiros de jogo, Indique e ganhe, Ajuda, Resgatar vale-presente e a engrenagem de configurações. As telas dizem que o dado é de exemplo.
+6. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém. Não entra quem já está em outro grupo no mesmo horário, nem em sessão que já começou.
+7. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. O horário é uma das opções da sala, não uma data livre. Não nascem dois grupos na mesma sala no mesmo horário. Um horário que já passou é recusado. Pelo cartão da sala, a casa e a sala já vêm preenchidas.
+8. **Confirmar presença** na lista de quem já está. O criador confirma a própria. O detalhe mostra quantas presenças estão confirmadas.
+9. **Sair do grupo**, se você não é o criador. Com 2 horas ou mais de antecedência o pagamento simulado é reembolsado. Com menos de 2 horas, a tela avisa antes de confirmar que não há reembolso. A vaga volta a ficar livre. Exatamente 2 horas ainda reembolsa. Sair é definitivo naquele grupo.
+10. **Excluir grupo**, só para quem criou. Isso cancela o evento para todo mundo e reembolsa integralmente, mesmo em cima da hora. Quem não criou não vê o botão. O criador não sai: ele exclui.
+11. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
+12. **Meus grupos**, na aba do meio, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
 
-Não existe conta. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo continua “Você”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois.
+A aba Conta existe, mas ainda não há login. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo é “Nícolas”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois. A carteira, o vale e os parceiros de jogo são placeholders.
 
 ## Estrutura de pastas
 
@@ -99,10 +101,12 @@ A tela de criar grupo não abre um calendário. Ela lista os horários cadastrad
 
 As notícias também são inventadas. Curitiba tem dez. As outras cidades de exemplo têm algumas. As figuras em `assets/images/news/` são ilustrações fictícias, não fotos de casas, em JPEG de cerca de 800 px. A grade de sexta não tem figura e o app desenha um degradê. O combo de café usa um degradê com xícara, não a foto da biblioteca. Os links usam o domínio `.invalid` e a tela não abre o navegador. Um link direto de notícia, sem pilha, mostra voltar para a Home.
 
+As salas dos carrosséis usam essas mesmas figuras, por tema. Aventura tem um arquivo novo em `assets/images/rooms/aventura.jpg`, também fictício e abaixo de 150 KB. Curitiba ganhou quatro salas só para os temas que ainda não tinham exemplo (Terror, Sci-fi, Steampunk e Egito). Elas não têm grupo marcado.
+
 ## Próximos passos
 
 1. **Supabase / PostgreSQL** por trás das mesmas interfaces (`CityRepository`, `CatalogRepository`, `GroupRepository`), sem reescrever as telas. Entrar no grupo tem de ser a função atômica descrita em [docs/SUPABASE_ESQUEMA.md](docs/SUPABASE_ESQUEMA.md).
-2. Conta de usuário no lugar de `currentUserProvider`. O nome “Você” sai quando o provider passar a ler a sessão.
+2. Conta de usuário no lugar de `currentUserProvider`. O nome “Nícolas” sai quando o provider passar a ler a sessão. A carteira e o vale passam a ser de verdade, ou saem.
 3. Trocar o catálogo fictício por salas e agendas que cada casa entregar (arquivo, API ou parceria). O encaixe é o `ExperienceSource`. O feed troca o `NewsRepository` pelo mesmo tipo de cuidado: site só com permissão, Instagram pela API oficial ou curadoria manual, cache e atribuição da fonte. O que pode e o que não pode ser coletado está em [docs/DADOS_REAIS.md](docs/DADOS_REAIS.md).
 4. Publicar nas lojas quando o fluxo estiver estável com dados reais.
 
