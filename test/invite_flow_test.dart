@@ -10,6 +10,7 @@ import 'package:scapematch/core/sharing/invite_message.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
+import 'package:scapematch/features/auth/data/pending_invite_store.dart';
 import 'package:scapematch/features/auth/presentation/login_screen.dart';
 import 'package:scapematch/features/auth/presentation/signup_screen.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
@@ -246,10 +247,71 @@ void main() {
     );
     await _openInvite(tester, 'grupo-que-nao-existe');
     expect(find.text('Convite não encontrado'), findsOneWidget);
+    await tester.tap(find.byKey(AppKeys.inviteMissingHome));
+    await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.groupSearch), findsOneWidget);
 
     await _openInvite(tester, SampleIds.groupSpCoberturaOpen);
     expect(find.text('Este grupo já começou'), findsOneWidget);
     expect(find.text('Participar'), findsNothing);
+  });
+
+  testWidgets('a reload between Participar and signup still joins', (
+    tester,
+  ) async {
+    final clock = FixedClock(sampleNow);
+    final database = buildSampleDatabase(now: sampleNow);
+    final groups = FakeGroupRepository(
+      database,
+      clock: clock,
+      latency: Duration.zero,
+    );
+
+    Future<void> openApp(PendingInviteStore store) {
+      return pumpScapeMatch(
+        tester,
+        overrides: [
+          clockProvider.overrideWithValue(clock),
+          fakeDatabaseProvider.overrideWithValue(database),
+          groupRepositoryProvider.overrideWithValue(groups),
+          authRepositoryProvider.overrideWithValue(
+            FakeAuthRepository(signedIn: null),
+          ),
+          pendingInviteStoreProvider.overrideWithValue(store),
+        ],
+      );
+    }
+
+    final first = PendingInviteStore();
+    await openApp(first);
+    await _openInvite(tester, SampleIds.groupSpCoberturaOpen);
+    await tester.tap(find.byKey(AppKeys.participate));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(first.groupId, SampleIds.groupSpCoberturaOpen);
+
+    // Nova abertura: o store da memória some. O que vale é o que foi gravado.
+    await tester.pumpWidget(const SizedBox.shrink());
+    final restored = PendingInviteStore();
+    expect(restored.groupId, isNull);
+    await restored.load();
+    expect(restored.groupId, SampleIds.groupSpCoberturaOpen);
+
+    await openApp(restored);
+    GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/cadastro');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(AppKeys.signupName), 'Ana');
+    await tester.enterText(
+      find.byKey(AppKeys.signupEmail),
+      'ana.reload@exemplo.invalid',
+    );
+    await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await tester.tap(find.byKey(AppKeys.signupSubmit));
+    await tester.pumpAndSettle();
+
+    expect(find.text(GroupMessages.joinedBanner), findsOneWidget);
+    expect(find.text('Ana'), findsWidgets);
+    expect(restored.groupId, isNull);
   });
 
   testWidgets('invite and auth fit a phone and a wide window', (tester) async {

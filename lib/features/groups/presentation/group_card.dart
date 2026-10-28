@@ -128,7 +128,6 @@ class _StatusPill extends StatelessWidget {
           color: foreground,
           fontWeight: FontWeight.w700,
           fontSize: 12,
-          fontFamily: 'Roboto',
         ),
       ),
     );

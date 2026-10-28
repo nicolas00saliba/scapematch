@@ -29,6 +29,7 @@ abstract final class AppKeys {
   static const inviteShare = Key('invite-share');
   static const inviteImage = Key('invite-image');
   static const participate = Key('participate');
+  static const inviteMissingHome = Key('invite-missing-home');
   static const loginEmail = Key('login-email');
   static const loginPassword = Key('login-password');
   static const loginSubmit = Key('login-submit');

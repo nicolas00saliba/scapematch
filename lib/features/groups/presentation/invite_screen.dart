@@ -30,10 +30,13 @@ class InviteScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Convite')),
       body: detail.when(
         loading: () => const LoadingView(message: 'Carregando o convite...'),
-        error: (error, stackTrace) => const EmptyView(
+        error: (error, stackTrace) => EmptyView(
           title: 'Convite não encontrado',
           message: 'Esse link não aponta para um grupo de exemplo.',
           icon: Icons.link_off,
+          actionKey: AppKeys.inviteMissingHome,
+          actionLabel: 'Ir para a Home',
+          onAction: () => context.go('/'),
         ),
         data: (group) => _InviteBody(group: group, now: now),
       ),
