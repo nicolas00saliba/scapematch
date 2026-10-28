@@ -36,92 +36,97 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final cityId = ref.watch(selectedCityIdProvider);
     final almostFull = ref.watch(almostFullOnlyProvider);
     final query = ref.watch(groupSearchQueryProvider);
-    final groups = ref.watch(filteredGroupsProvider);
+    final showResults = query.trim().isNotEmpty || almostFull;
+    final groups = showResults ? ref.watch(filteredGroupsProvider) : null;
     final cityName = _cityName(ref, cityId);
 
     return Column(
+      key: AppKeys.findGroup,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Encontrar grupo',
-          key: AppKeys.findGroup,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          key: AppKeys.groupSearch,
-          controller: _search,
-          textInputAction: TextInputAction.search,
-          onChanged: (value) {
-            ref.read(groupSearchQueryProvider.notifier).setQuery(value);
-          },
-          decoration: InputDecoration(
-            isDense: true,
-            hintText: 'Buscar sala ou casa',
-            prefixIcon: const Icon(Icons.search),
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.line),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.line),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Semantics(
-              identifier: 'almost-full-filter',
-              button: true,
-              label: almostFull
-                  ? 'Filtro Quase cheios ativado'
-                  : 'Filtro Quase cheios',
-              child: FilterChip(
-                key: AppKeys.almostFullFilter,
-                label: const Text('Quase cheios'),
-                selected: almostFull,
-                onSelected: (value) {
-                  ref.read(almostFullOnlyProvider.notifier).setEnabled(value);
+            Expanded(
+              child: TextField(
+                key: AppKeys.groupSearch,
+                controller: _search,
+                textInputAction: TextInputAction.search,
+                onChanged: (value) {
+                  ref.read(groupSearchQueryProvider.notifier).setQuery(value);
                 },
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Buscar sala ou casa',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.line),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.line),
+                  ),
+                ),
               ),
             ),
-            FilledButton.tonalIcon(
-              key: AppKeys.createGroup,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 40),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            const SizedBox(width: 8),
+            Flexible(
+              child: FilledButton.tonalIcon(
+                key: AppKeys.createGroup,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                onPressed: () => context.push('/groups/new'),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text(
+                  'Criar grupo',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              onPressed: () => context.push('/groups/new'),
-              icon: const Icon(Icons.add),
-              label: const Text('Criar grupo'),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Quase cheios: ainda dá para entrar e faltam 1 ou ${GroupRules.almostFullMaxOpenSeats} vagas.',
-          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.muted),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Semantics(
+            identifier: 'almost-full-filter',
+            button: true,
+            label: almostFull
+                ? 'Filtro Quase cheios ativado'
+                : 'Filtro Quase cheios',
+            child: FilterChip(
+              key: AppKeys.almostFullFilter,
+              visualDensity: VisualDensity.compact,
+              label: const Text('Quase cheios'),
+              selected: almostFull,
+              onSelected: (value) {
+                ref.read(almostFullOnlyProvider.notifier).setEnabled(value);
+              },
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        _list(context, ref, cityName, almostFull, query, groups),
+        if (showResults && groups != null) ...[
+          const SizedBox(height: 8),
+          KeyedSubtree(
+            key: AppKeys.groupResults,
+            child: _list(context, ref, cityName, almostFull, query, groups),
+          ),
+        ],
       ],
     );
   }

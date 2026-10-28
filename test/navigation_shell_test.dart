@@ -17,7 +17,7 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.byType(MyGroupsScreen), findsNothing);
     expect(find.byType(BackButton), findsNothing);
-    expect(find.text('Encontrar grupo'), findsOneWidget);
+    expect(find.byKey(AppKeys.groupSearch), findsOneWidget);
     expect(find.byKey(AppKeys.newsFeed), findsOneWidget);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,

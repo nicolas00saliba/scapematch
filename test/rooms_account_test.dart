@@ -21,10 +21,20 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.roomCarousel('mystery')),
       400,
-      scrollable: verticalScrollable,
+      scrollable: find
+          .descendant(
+            of: find.byType(SingleChildScrollView),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+            ),
+          )
+          .first,
     );
     await tester.scrollUntilVisible(
-      find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
+      find.descendant(
+        of: find.byKey(AppKeys.roomCarousel('mystery')),
+        matching: find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
+      ),
       300,
       scrollable: find.descendant(
         of: find.byKey(AppKeys.roomCarousel('mystery')),
@@ -39,7 +49,10 @@ void main() {
     expect(find.byKey(AppKeys.roomSeeAll('mystery')), findsOneWidget);
     expect(find.text('Ver tudo'), findsWidgets);
     expect(
-      find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
+      find.descendant(
+        of: find.byKey(AppKeys.roomCarousel('mystery')),
+        matching: find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
+      ),
       findsOneWidget,
     );
     expect(find.text('Mistério da Rua XV'), findsWidgets);
@@ -228,7 +241,9 @@ void main() {
         .height;
     expect(listHeight - tallest, inInclusiveRange(-1, 4));
 
-    final button = find.byKey(AppKeys.roomFindGroup(SampleIds.roomCwbCofre));
+    final button = find
+        .byKey(AppKeys.roomFindGroup(SampleIds.roomCwbCofre))
+        .first;
     await tester.ensureVisible(button);
     await tester.pumpAndSettle();
     expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
@@ -290,7 +305,10 @@ Future<void> _openRoomAction(WidgetTester tester, Key key) async {
     400,
     scrollable: verticalScrollable,
   );
-  final target = find.byKey(key);
+  final target = find.descendant(
+    of: find.byKey(AppKeys.roomCarousel('mystery')),
+    matching: find.byKey(key),
+  );
   await tester.scrollUntilVisible(
     target,
     300,

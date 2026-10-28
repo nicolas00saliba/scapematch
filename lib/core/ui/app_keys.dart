@@ -65,5 +65,13 @@ abstract final class AppKeys {
   static Key roomCreateGroup(String id) => Key('room-create-group-$id');
   static Key roomGroupsCreate(String id) => Key('room-groups-create-$id');
   static Key roomSeeAll(String category) => Key('room-see-all-$category');
+  static Key carouselPrevious(String id) => Key('carousel-previous-$id');
+  static Key carouselNext(String id) => Key('carousel-next-$id');
+  static const newsSeeAll = Key('news-see-all');
+  static const promoCarousel = Key('promo-carousel');
+  static const promoDots = Key('promo-dots');
+  static const popularRooms = Key('popular-rooms');
+  static const popularSeeAll = Key('popular-see-all');
+  static const groupResults = Key('group-results');
   static Key accountDestination(String name) => Key('account-$name');
 }

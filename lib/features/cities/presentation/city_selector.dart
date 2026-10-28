@@ -11,9 +11,17 @@ import 'package:scapematch/features/cities/presentation/selected_city_controller
 /// [onSelected] lets the create-group screen reload houses after the change.
 /// Other screens leave it null and only update the shared selection.
 class CitySelector extends ConsumerWidget {
-  const CitySelector({super.key, this.prominent = true, this.onSelected});
+  const CitySelector({
+    super.key,
+    this.prominent = true,
+    this.compact = false,
+    this.onSelected,
+  });
 
   final bool prominent;
+
+  /// Uma linha baixa, para caber ao lado do título da Home.
+  final bool compact;
   final ValueChanged<City>? onSelected;
 
   @override
@@ -22,14 +30,16 @@ class CitySelector extends ConsumerWidget {
     final selectedId = ref.watch(selectedCityIdProvider);
 
     return cities.when(
-      loading: () => const _CityPlaceholder(
+      loading: () => _CityPlaceholder(
         title: 'Carregando cidades...',
         subtitle: 'Um momento.',
+        compact: compact,
       ),
       error: (error, stackTrace) => _CityPlaceholder(
         title: 'Não foi possível carregar',
         subtitle: 'Toque para tentar de novo.',
         showProgress: false,
+        compact: compact,
         onTap: () => ref.invalidate(citiesProvider),
       ),
       data: (list) {
@@ -42,6 +52,7 @@ class CitySelector extends ConsumerWidget {
         }
         return _CityField(
           prominent: prominent,
+          compact: compact,
           city: selected,
           onTap: () => _pick(context, ref, list, selectedId),
         );
@@ -115,11 +126,13 @@ class CitySelector extends ConsumerWidget {
 class _CityField extends StatelessWidget {
   const _CityField({
     required this.prominent,
+    required this.compact,
     required this.city,
     required this.onTap,
   });
 
   final bool prominent;
+  final bool compact;
   final City? city;
   final VoidCallback onTap;
 
@@ -130,6 +143,51 @@ class _CityField extends StatelessWidget {
     final label = selected
         ? 'Cidade selecionada: ${city!.name}, ${city!.stateName}. Toque para trocar.'
         : 'Cidade. Nenhuma cidade selecionada. Toque para escolher.';
+
+    if (compact) {
+      return Semantics(
+        button: true,
+        identifier: 'city-selector',
+        label: label,
+        excludeSemantics: true,
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: selected ? AppColors.teal : AppColors.line),
+          ),
+          child: InkWell(
+            key: AppKeys.citySelector,
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.route, color: AppColors.teal, size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      city?.name ?? 'Cidade',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.expand_more,
+                    color: AppColors.teal,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Semantics(
       button: true,
@@ -213,12 +271,14 @@ class _CityPlaceholder extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.showProgress = true,
+    this.compact = false,
     this.onTap,
   });
 
   final String title;
   final String subtitle;
   final bool showProgress;
+  final bool compact;
   final VoidCallback? onTap;
 
   @override
@@ -234,7 +294,7 @@ class _CityPlaceholder extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: EdgeInsets.all(compact ? 10 : 18),
           child: Row(
             children: [
               showProgress
@@ -251,9 +311,11 @@ class _CityPlaceholder extends StatelessWidget {
                   children: [
                     Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    Text(subtitle),
+                    if (!compact) Text(subtitle),
                   ],
                 ),
               ),

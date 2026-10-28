@@ -20,16 +20,16 @@ void main() {
     expect(find.text('Curitiba'), findsWidgets);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('Encontrar grupo'), findsOneWidget);
+    expect(find.byKey(AppKeys.groupSearch), findsOneWidget);
     expect(find.text('Criar grupo'), findsWidgets);
     expect(find.textContaining('Dados de exemplo'), findsOneWidget);
 
     await _selectCity(tester, SampleIds.saoPaulo);
     expect(find.text('São Paulo'), findsWidgets);
 
-    await tester.tap(find.byKey(AppKeys.findGroup));
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Augusta');
     await tester.pumpAndSettle();
 
     expect(
@@ -126,7 +126,7 @@ void main() {
     );
 
     await _selectCity(tester, SampleIds.saoPaulo);
-    await tester.tap(find.byKey(AppKeys.findGroup));
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Metrô');
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
@@ -144,7 +144,7 @@ void main() {
     await pumpScapeMatch(tester);
 
     await _selectCity(tester, SampleIds.saoPaulo);
-    await tester.tap(find.byKey(AppKeys.findGroup));
+    await tester.ensureVisible(find.byKey(AppKeys.groupSearch));
     await tester.pumpAndSettle();
     expect(find.text('Metrô Perdido'), findsWidgets);
     expect(find.text('O Cofre do Café'), findsNothing);
@@ -266,7 +266,7 @@ void main() {
     );
 
     await _selectCity(tester, SampleIds.beloHorizonte);
-    await tester.tap(find.byKey(AppKeys.findGroup));
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Bar');
     await tester.pumpAndSettle();
 
     expect(find.text('Não foi possível carregar os grupos.'), findsOneWidget);
@@ -275,6 +275,8 @@ void main() {
 }
 
 Future<void> _selectCity(WidgetTester tester, String cityId) async {
+  await tester.ensureVisible(find.byKey(AppKeys.citySelector));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(AppKeys.citySelector));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(AppKeys.cityOption(cityId)));

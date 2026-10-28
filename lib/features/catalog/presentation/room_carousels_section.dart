@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/arrow_carousel.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
@@ -11,53 +12,71 @@ import 'package:scapematch/features/catalog/presentation/room_card.dart';
 import 'package:scapematch/features/catalog/presentation/room_catalog_view_model.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 
-/// Carrosséis de salas da cidade, um por tema que tenha pelo menos uma sala.
-class RoomCarouselsSection extends ConsumerWidget {
-  const RoomCarouselsSection({super.key});
+/// Temas com sala na cidade, na ordem do produto.
+List<RoomCategory> visibleRoomCategories(List<RoomListing> listings) {
+  return [
+    for (final category in roomCategoryOrder)
+      if (listings.any((listing) => listing.room.category == category))
+        category,
+  ];
+}
+
+/// Um trecho dos carrosséis de tema.
+///
+/// [start] é o índice entre os temas visíveis. [count] nulo vai até o fim.
+/// Os dois primeiros são secundários; o restante, terciário.
+class RoomThemeSpan extends ConsumerWidget {
+  const RoomThemeSpan({super.key, required this.start, this.count});
+
+  final int start;
+  final int? count;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rooms = ref.watch(roomCatalogViewModelProvider);
     return rooms.when(
       skipLoadingOnReload: true,
-      loading: () =>
-          const InlineNotice(message: 'Carregando salas...', loading: true),
-      error: (error, stackTrace) => InlineNotice(
-        message: 'Não foi possível carregar as salas.',
-        actionLabel: 'Tentar de novo',
-        onAction: () => ref.invalidate(roomCatalogViewModelProvider),
-      ),
+      loading: () => start == 0
+          ? const InlineNotice(message: 'Carregando salas...', loading: true)
+          : const SizedBox.shrink(),
+      error: (error, stackTrace) => start == 0
+          ? InlineNotice(
+              message: 'Não foi possível carregar as salas.',
+              actionLabel: 'Tentar de novo',
+              onAction: () => ref.invalidate(roomCatalogViewModelProvider),
+            )
+          : const SizedBox.shrink(),
       data: (listings) {
-        if (listings.isEmpty) {
-          return const InlineNotice(
-            message: 'Ainda não há salas de exemplo nesta cidade.',
-          );
+        final categories = visibleRoomCategories(listings);
+        if (start >= categories.length) {
+          return const SizedBox.shrink();
         }
-        final sections = <Widget>[];
-        for (final category in roomCategoryOrder) {
-          final inCategory = [
-            for (final listing in listings)
-              if (listing.room.category == category) listing,
-          ];
-          if (inCategory.isEmpty) {
-            continue;
-          }
-          if (sections.isNotEmpty) {
-            sections.add(const SizedBox(height: 18));
-          }
-          sections.add(_Carousel(category: category, rooms: inCategory));
-        }
+        final end = count == null
+            ? categories.length
+            : math.min(categories.length, start + count!);
+        final slice = categories.sublist(start, end);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: sections,
+          children: [
+            for (var index = 0; index < slice.length; index++) ...[
+              if (index > 0) const SizedBox(height: 12),
+              _ThemeCarousel(
+                category: slice[index],
+                rooms: [
+                  for (final listing in listings)
+                    if (listing.room.category == slice[index]) listing,
+                ],
+              ),
+            ],
+          ],
         );
       },
     );
   }
 }
 
-class _Carousel extends StatelessWidget {
-  const _Carousel({required this.category, required this.rooms});
+class _ThemeCarousel extends StatelessWidget {
+  const _ThemeCarousel({required this.category, required this.rooms});
 
   final RoomCategory category;
   final List<RoomListing> rooms;
@@ -66,6 +85,10 @@ class _Carousel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final label = roomCategoryLabel(category);
+    final height = rooms
+        .map((listing) => roomCardHeight(context, listing))
+        .reduce(math.max)
+        .ceilToDouble();
     return Column(
       key: AppKeys.roomCarousel(category.name),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -75,13 +98,18 @@ class _Carousel extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: theme.textTheme.titleLarge?.copyWith(
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
             TextButton(
               key: AppKeys.roomSeeAll(category.name),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: const Size(40, 40),
+              ),
               onPressed: () {
                 context.push('/rooms/category/${category.name}');
               },
@@ -89,26 +117,13 @@ class _Carousel extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(
-          height: _carouselHeight(context, rooms),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.zero,
-            itemCount: rooms.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) => RoomCard(listing: rooms[index]),
-          ),
+        ArrowCarousel(
+          id: category.name,
+          height: height,
+          itemCount: rooms.length,
+          itemBuilder: (context, index) => RoomCard(listing: rooms[index]),
         ),
       ],
     );
   }
-}
-
-/// A faixa fica da altura do cartão mais alto do tema, já com o textScale.
-double _carouselHeight(BuildContext context, List<RoomListing> rooms) {
-  var tallest = 0.0;
-  for (final listing in rooms) {
-    tallest = math.max(tallest, roomCardHeight(context, listing));
-  }
-  return tallest.ceilToDouble();
 }

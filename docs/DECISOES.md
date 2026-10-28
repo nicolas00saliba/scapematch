@@ -202,6 +202,14 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Onde está no código:** `RoomCategory` em cada `EscapeRoom` de `sample_data.dart`. A Home usa `RoomCarouselsSection` e `roomCardHeight`. “Ver tudo” é `/rooms/category/:category`. “Achar grupo” é `/rooms/:roomId/groups`. “Criar grupo” do cartão é `/groups/new?roomId=`. O da lista da sala usa `AppKeys.roomGroupsCreate`. O pino é `ScapePinIcon`.
 - **Como trocar depois:** um tema novo entra no enum, na ordem, no rótulo e na foto. Se a busca passar a ficar abaixo dos carrosséis, a troca é a ordem dos widgets em `HomeScreen`. Se a foto passar a ser por sala, o cartão deixa de ler `roomCategoryImage`.
 
+## A Home começa pelos carrosséis
+
+- **Data:** 2026-10-28
+- **Decisão:** o topo da Home fica baixo: “ScapeMatch” e a cidade na mesma linha, o aviso de dados de exemplo recolhido num chip, a busca ao lado de Criar grupo e o chip Quase cheios. O subtítulo longo sai. A lista vertical de grupos sai da abertura. Ela só aparece quando a pessoa digita na busca, ou quando liga Quase cheios com o campo vazio (aí a lista é só dos quase cheios). Logo abaixo vêm os carrosséis, nesta ordem: Novidades (primário, no lugar em que o primeiro tema ficava), os dois primeiros temas com sala (secundários; em Curitiba, Terror e Mistério), o carrossel de promoções sem título de seção (só o flyer, setas e pontos), os temas restantes (terciários) e Salas mais procuradas. A ordem fictícia de procura está em `popularRoomRank`. Todo carrossel tem setas Anterior e Próximo, que somem na ponta e avançam uma página com animação, além do arraste. Novidades, temas e Salas mais procuradas têm “Ver tudo”. As promoções são quatro flyers fictícios e não aplicam desconto. Na tela de 390×844, com a barra inferior e sem inset extra de status, a faixa de Novidades cabe inteira e o carrossel de Terror aparece cortado, cerca de um terço visível.
+- **Motivo:** o dono pediu a densidade de apps como o Sympla e a Buser: o que se descobre (novidades e salas) entra na primeira tela, e a busca não empurra isso para baixo com uma lista longa.
+- **Onde está no código:** `HomeScreen`, `NewsSection`, `RoomThemeSpan`, `PromoCarousel`, `PopularRoomsSection`, `ArrowCarousel` e `FindGroupsSection`. “Ver tudo” de novidades é `/news`. O das salas mais procuradas é `/rooms/popular`.
+- **Como trocar depois:** outra ordem é a sequência em `HomeScreen`. Um ranking real substitui `popularRoomRank`. Se a promoção passar a valer no preço, o flyer deixa de ser só imagem e o repositório de grupos aplica a regra.
+
 ## Aba Conta
 
 - **Data:** 2026-10-28
