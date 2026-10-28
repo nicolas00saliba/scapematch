@@ -20,7 +20,7 @@ void main() {
     expect(find.text('Curitiba'), findsWidgets);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsNothing,
+      findsOneWidget,
     );
     expect(find.byKey(AppKeys.groupSearch), findsOneWidget);
     expect(find.text('Criar grupo'), findsWidgets);

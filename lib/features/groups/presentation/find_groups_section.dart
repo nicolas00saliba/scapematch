@@ -6,10 +6,12 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
+import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 
 /// Busca de grupo comprimida, no topo da Home.
 class FindGroupsSection extends ConsumerStatefulWidget {
@@ -42,8 +44,8 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
     final cityId = ref.watch(selectedCityIdProvider);
     final almostFull = ref.watch(almostFullOnlyProvider);
     final query = ref.watch(groupSearchQueryProvider);
-    final showResults = query.trim().isNotEmpty || almostFull;
-    final groups = showResults ? ref.watch(filteredGroupsProvider) : null;
+    final gameTypeId = ref.watch(selectedGameTypeIdProvider);
+    final groups = ref.watch(filteredGroupsProvider);
     final cityName = _cityName(ref, cityId);
 
     return Column(
@@ -76,13 +78,19 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             ),
           ),
         ),
-        if (showResults && groups != null) ...[
-          const SizedBox(height: 8),
-          KeyedSubtree(
-            key: AppKeys.groupResults,
-            child: _list(context, ref, cityName, almostFull, query, groups),
+        const SizedBox(height: 8),
+        KeyedSubtree(
+          key: AppKeys.groupResults,
+          child: _list(
+            context,
+            ref,
+            cityName,
+            almostFull,
+            query,
+            gameTypeId,
+            groups,
           ),
-        ],
+        ),
       ],
     );
   }
@@ -230,6 +238,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
     String? cityName,
     bool almostFull,
     String query,
+    String gameTypeId,
     AsyncValue<List<Group>> groups,
   ) {
     return groups.when(
@@ -244,34 +253,115 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
       data: (items) {
         if (items.isEmpty) {
           return InlineNotice(
-            message: _emptyMessage(cityName, almostFull, query),
+            message: _emptyMessage(cityName, almostFull, query, gameTypeId),
           );
         }
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var index = 0; index < items.length; index++) ...[
-              if (index > 0) const SizedBox(height: 10),
-              GroupCard(
-                group: items[index],
-                onTap: () => context.push('/groups/${items[index].id}'),
-              ),
-            ],
-          ],
+        return _GroupWindow(
+          groups: items,
+          onOpen: (group) => context.push('/groups/${group.id}'),
         );
       },
     );
   }
 
-  String _emptyMessage(String? cityName, bool almostFull, String query) {
+  String _emptyMessage(
+    String? cityName,
+    bool almostFull,
+    String query,
+    String gameTypeId,
+  ) {
     final place = cityName ?? 'esta cidade';
     final text = query.trim();
+    final kind = gameTypeId == GameTypes.all
+        ? ''
+        : ' de ${GameTypes.labelOf(gameTypeId)}';
     if (text.isNotEmpty) {
-      return 'Nenhum grupo com “$text” em $place.';
+      return 'Nenhum grupo$kind com “$text” em $place.';
     }
     if (almostFull) {
-      return 'Ninguém está a 1 ou ${GroupRules.almostFullMaxOpenSeats} vagas de fechar em $place. Veja todos os grupos.';
+      return 'Ninguém está a 1 ou ${GroupRules.almostFullMaxOpenSeats} vagas de fechar$kind em $place. Veja todos os grupos.';
     }
-    return 'Ainda não há grupos de exemplo em $place.';
+    return 'Ainda não há grupos de exemplo$kind em $place.';
+  }
+}
+
+/// Altura da janela. Um cartão cabe inteiro. Dois já pedem rolagem.
+/// A barra só entra quando o conteúdo passa dessa altura.
+const groupWindowHeight = 210.0;
+
+/// Controller próprio da janela. A rolagem da página continua sendo a primária.
+final class GroupWindowController extends ScrollController {}
+
+class _GroupWindow extends StatefulWidget {
+  const _GroupWindow({required this.groups, required this.onOpen});
+
+  final List<Group> groups;
+  final ValueChanged<Group> onOpen;
+
+  @override
+  State<_GroupWindow> createState() => _GroupWindowState();
+}
+
+class _GroupWindowState extends State<_GroupWindow> {
+  final _scroll = GroupWindowController();
+  var _overflows = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_syncOverflow);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncOverflow());
+  }
+
+  @override
+  void didUpdateWidget(_GroupWindow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncOverflow());
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_syncOverflow);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _syncOverflow() {
+    if (!mounted || !_scroll.hasClients) {
+      return;
+    }
+    final overflows = _scroll.position.maxScrollExtent > 1;
+    if (overflows == _overflows) {
+      return;
+    }
+    setState(() => _overflows = overflows);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: AppKeys.groupWindow,
+      height: groupWindowHeight,
+      child: Scrollbar(
+        controller: _scroll,
+        thumbVisibility: _overflows,
+        child: SingleChildScrollView(
+          controller: _scroll,
+          primary: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < widget.groups.length; index++) ...[
+                if (index > 0) const SizedBox(height: 10),
+                GroupCard(
+                  group: widget.groups[index],
+                  onTap: () => widget.onOpen(widget.groups[index]),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

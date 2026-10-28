@@ -17,9 +17,9 @@ final homeNewsProvider = FutureProvider.autoDispose<List<NewsItem>>((ref) {
   return ref.watch(newsRepositoryProvider).list(cityId: cityId);
 });
 
-/// Altura da foto no carrossel primário. O valor deixa a faixa inteira na
-/// primeira tela de 390×844 e ainda mostra a foto e o título do Terror.
-const newsCarouselImageHeight = 204.0;
+/// Altura da foto no carrossel primário. Cabe a faixa inteira na primeira
+/// tela de 390×844 junto com a janela de grupos e um pedaço do Terror.
+const newsCarouselImageHeight = 150.0;
 const newsCarouselCardWidth = 340.0;
 
 double newsCarouselCardHeight(BuildContext context) {

@@ -4,11 +4,15 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/scapematch_app.dart';
+import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 
 /// The page scroll. A single-line search field also owns a horizontal
-/// scrollable, so `scrollUntilVisible` needs this narrower finder.
+/// scrollable, and the group window has its own vertical one.
 final Finder verticalScrollable = find.byWidgetPredicate(
-  (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+  (widget) =>
+      widget is Scrollable &&
+      widget.axis == Axis.vertical &&
+      widget.controller is! GroupWindowController,
 );
 
 Future<void> pumpScapeMatch(

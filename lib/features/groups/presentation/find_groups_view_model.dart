@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// Whether the list is limited to groups that are almost full.
@@ -69,10 +71,27 @@ final filteredGroupsProvider = Provider.autoDispose<AsyncValue<List<Group>>>((
   ref,
 ) {
   final query = ref.watch(groupSearchQueryProvider);
+  final gameTypeId = ref.watch(selectedGameTypeIdProvider);
   return ref
       .watch(findGroupsViewModelProvider)
-      .whenData((groups) => filterGroupsByText(groups, query));
+      .whenData(
+        (groups) => filterGroupsByGameType(
+          filterGroupsByText(groups, query),
+          gameTypeId,
+        ),
+      );
 });
+
+/// Todos devolve a lista. Outro id fica só com os grupos daquele tipo.
+List<Group> filterGroupsByGameType(List<Group> groups, String gameTypeId) {
+  if (gameTypeId == GameTypes.all) {
+    return groups;
+  }
+  return [
+    for (final group in groups)
+      if (group.gameType == gameTypeId) group,
+  ];
+}
 
 /// Casa, sala ou bairro. Texto vazio devolve a mesma lista.
 List<Group> filterGroupsByText(List<Group> groups, String query) {

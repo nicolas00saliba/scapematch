@@ -47,7 +47,7 @@ void main() {
       expect(find.text('Curitiba'), findsWidgets);
       expect(
         find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-        findsNothing,
+        findsOneWidget,
       );
       expect(
         find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
@@ -529,7 +529,7 @@ void main() {
     );
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
-      findsNothing,
+      findsOneWidget,
     );
   });
 }

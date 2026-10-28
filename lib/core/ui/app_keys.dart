@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 /// Stable keys shared by the screens and the widget tests.
 abstract final class AppKeys {
   static const citySelector = Key('city-selector');
+  static const gameTypeSelector = Key('game-type-selector');
+  static const groupWindow = Key('group-window');
   static const findGroup = Key('find-group');
   static const createGroup = Key('create-group');
   static const almostFullFilter = Key('almost-full-filter');
@@ -54,6 +56,7 @@ abstract final class AppKeys {
   static Key removeMember(String id) => Key('remove-member-$id');
 
   static Key cityOption(String id) => Key('city-option-$id');
+  static Key gameTypeOption(String id) => Key('game-type-option-$id');
   static Key groupCard(String id) => Key('group-card-$id');
   static Key newsCard(String id) => Key('news-card-$id');
   static Key newsCategory(String id) => Key('news-category-$id');

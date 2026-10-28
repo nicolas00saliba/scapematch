@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
@@ -39,9 +40,10 @@ void main() {
     expect(find.text('Promoções'), findsNothing);
     expect(find.text('2 por 1 às quartas'), findsNothing);
     expect(find.byKey(AppKeys.promoDots), findsOneWidget);
+    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsNothing,
+      findsOneWidget,
     );
   });
 
@@ -98,25 +100,13 @@ void main() {
     expect(terror.bottom, greaterThan(viewportBottom));
     final visible = viewportBottom - terror.top;
     final fraction = visible / terror.height;
-    final roomTitle = find.descendant(
-      of: find.byKey(AppKeys.roomCarousel('terror')),
-      matching: find.text('O Sótão da Rua XV'),
-    );
-    expect(roomTitle, findsOneWidget);
-    final titleTop = tester.getTopLeft(roomTitle).dy;
-    expect(
-      titleTop,
-      lessThan(viewportBottom - 16),
-      reason: 'a foto e o título do Terror precisam começar na primeira tela',
-    );
     expect(
       fraction,
-      inInclusiveRange(0.50, 0.60),
+      greaterThan(0.05),
       reason:
           'fraction=$fraction terror=${terror.height} news=${news.height} '
           'view=${viewportBottom - viewportTop} newsBottom=${news.bottom} '
-          'viewBottom=$viewportBottom terrorTop=${terror.top} '
-          'titleTop=$titleTop',
+          'viewBottom=$viewportBottom terrorTop=${terror.top}',
     );
   });
 
@@ -388,6 +378,75 @@ void main() {
       }
     },
   );
+
+  testWidgets('city and game type fit side by side at 390px', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await pumpScapeMatch(tester);
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+
+    final city = tester.getRect(find.byKey(AppKeys.citySelector));
+    final game = tester.getRect(find.byKey(AppKeys.gameTypeSelector));
+    expect((city.center.dy - game.center.dy).abs(), lessThan(8));
+    expect(city.right, lessThanOrEqualTo(game.left));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the group window scrolls almost-full groups and obeys filters', (
+    tester,
+  ) async {
+    await pumpScapeMatch(tester);
+    final scrollable = find.descendant(
+      of: find.byKey(AppKeys.groupWindow),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+      ),
+    );
+    expect(
+      tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
+      greaterThan(1),
+    );
+    expect(
+      tester
+          .widget<Scrollbar>(
+            find.descendant(
+              of: find.byKey(AppKeys.groupWindow),
+              matching: find.byType(Scrollbar),
+            ),
+          )
+          .thumbVisibility,
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(AppKeys.gameTypeSelector));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(AppKeys.groupCard('grp-cwb-porao-rpg')), findsOneWidget);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
+      findsNothing,
+    );
+    expect(
+      tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
+      lessThanOrEqualTo(1),
+    );
+    expect(
+      tester
+          .widget<Scrollbar>(
+            find.descendant(
+              of: find.byKey(AppKeys.groupWindow),
+              matching: find.byType(Scrollbar),
+            ),
+          )
+          .thumbVisibility,
+      isFalse,
+    );
+  });
 
   testWidgets('the example-data notice is a small chip', (tester) async {
     await pumpScapeMatch(tester);

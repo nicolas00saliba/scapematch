@@ -6,6 +6,8 @@ import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/scapematch_app.dart';
 import 'package:scapematch/features/cities/data/selected_city_store.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/groups/data/selected_game_type_store.dart';
+import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,13 +18,18 @@ Future<void> main() async {
   // A cidade entra no primeiro frame. Sem isso, a Home pisca o aviso de
   // “escolha a cidade” antes de ler o que foi salvo.
   final cityStore = SelectedCityStore();
+  final gameTypeStore = SelectedGameTypeStore();
   await cityStore.load();
+  await gameTypeStore.load();
   runApp(
     ProviderScope(
       // The screens already offer "Tentar de novo". A background retry
       // would hide the error state the user is supposed to see.
       retry: noAutomaticRetry,
-      overrides: [selectedCityStoreProvider.overrideWithValue(cityStore)],
+      overrides: [
+        selectedCityStoreProvider.overrideWithValue(cityStore),
+        selectedGameTypeStoreProvider.overrideWithValue(gameTypeStore),
+      ],
       child: const ScapeMatchApp(),
     ),
   );

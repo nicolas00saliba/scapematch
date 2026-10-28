@@ -5,6 +5,7 @@ import 'package:scapematch/features/catalog/presentation/popular_rooms_section.d
 import 'package:scapematch/features/catalog/presentation/room_carousels_section.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
+import 'package:scapematch/features/groups/presentation/game_type_selector.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
@@ -70,6 +71,8 @@ class _HomeHeader extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         const Expanded(child: CitySelector(compact: true)),
+        const SizedBox(width: 8),
+        const Expanded(child: GameTypeSelector()),
       ],
     );
   }

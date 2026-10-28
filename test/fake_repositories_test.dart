@@ -48,8 +48,12 @@ void main() {
       houseNamesByCity[cityId] = houses.map((house) => house.name).toSet();
 
       final cityGroups = await groups.listByCity(cityId);
-      expect(cityGroups, hasLength(2), reason: cityId);
       expect(cityGroups.every((group) => group.cityId == cityId), isTrue);
+      if (cityId == SampleIds.curitiba) {
+        expect(cityGroups.length, greaterThan(2), reason: cityId);
+      } else {
+        expect(cityGroups, hasLength(2), reason: cityId);
+      }
 
       final almostFull = await groups.listByCity(cityId, almostFullOnly: true);
       expect(almostFull, isNotEmpty, reason: cityId);
@@ -124,18 +128,22 @@ void main() {
       final open = cityGroups.where(
         (group) => !group.isAlmostFull && !group.isFull,
       );
-      expect(almost, hasLength(1), reason: cityId);
       expect(open, hasLength(1), reason: cityId);
       expect(
         open.single.openSeats,
         greaterThan(GroupRules.almostFullMaxOpenSeats),
         reason: cityId,
       );
-      expect(
-        cityGroups.map((group) => group.roomId).toSet(),
-        hasLength(2),
-        reason: cityId,
-      );
+      if (cityId == SampleIds.curitiba) {
+        expect(almost.length, inInclusiveRange(8, 10), reason: cityId);
+      } else {
+        expect(almost, hasLength(1), reason: cityId);
+        expect(
+          cityGroups.map((group) => group.roomId).toSet(),
+          hasLength(2),
+          reason: cityId,
+        );
+      }
 
       final houses = await catalog.listHousesByCity(cityId);
       for (final house in houses) {
