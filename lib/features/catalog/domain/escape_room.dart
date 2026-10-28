@@ -1,4 +1,5 @@
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/catalog/domain/room_category.dart';
 
 /// One playable room. [capacity] is the room limit, not the group size.
 class EscapeRoom {
@@ -7,6 +8,7 @@ class EscapeRoom {
     required this.houseId,
     required this.name,
     required this.theme,
+    required this.category,
     required this.capacity,
     required this.durationMinutes,
     required this.difficulty,
@@ -17,6 +19,9 @@ class EscapeRoom {
   final String houseId;
   final String name;
   final String theme;
+
+  /// Carousel grouping. [theme] stays the short invented blurb.
+  final RoomCategory category;
 
   /// Maximum number of players the room allows, including the creator.
   final int capacity;

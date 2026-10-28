@@ -203,6 +203,8 @@ void main() {
     await tester.pumpAndSettle();
     await _home(tester);
 
+    await tester.ensureVisible(find.byKey(AppKeys.createGroup));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.createGroup));
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.houseSpLiberdade);

@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/app_shell.dart';
+import 'package:scapematch/features/account/presentation/account_destination_screen.dart';
+import 'package:scapematch/features/account/presentation/account_screen.dart';
+import 'package:scapematch/features/catalog/presentation/room_category_screen.dart';
+import 'package:scapematch/features/catalog/presentation/room_groups_screen.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_screen.dart';
@@ -9,11 +13,11 @@ import 'package:scapematch/features/news/presentation/news_detail_screen.dart';
 
 /// Rotas do app.
 ///
-/// A barra tem dois ramos: `/` (Home, à esquerda) e `/groups/mine`
-/// (Meus grupos, à direita). O app abre na Home. Criar grupo, o detalhe do
-/// grupo e o detalhe da notícia abrem por cima da barra. `new` continua
-/// antes de `:groupId` para a palavra não virar um id. `/groups` sem sufixo
-/// volta para a Home, que agora é a busca.
+/// A barra tem três ramos: `/` (Home), `/groups/mine` (Meus grupos) e
+/// `/account` (Conta). O app abre na Home. Criar grupo, o detalhe do grupo,
+/// o detalhe da notícia, a lista de uma sala e as páginas da Conta abrem
+/// por cima da barra. `new` continua antes de `:groupId` para a palavra não
+/// virar um id. `/groups` sem sufixo volta para a Home.
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/',
@@ -47,12 +51,48 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/account',
+                name: 'account',
+                builder: (context, state) => const AccountScreen(),
+              ),
+            ],
+          ),
         ],
       ),
       GoRoute(
         path: '/groups/new',
         name: 'create-group',
-        builder: (context, state) => const CreateGroupScreen(),
+        builder: (context, state) => CreateGroupScreen(
+          prefilledRoomId: state.uri.queryParameters['roomId'],
+        ),
+      ),
+      GoRoute(
+        path: '/rooms/category/:category',
+        name: 'room-category',
+        builder: (context, state) {
+          return RoomCategoryScreen(
+            categoryName: state.pathParameters['category']!,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/rooms/:roomId/groups',
+        name: 'room-groups',
+        builder: (context, state) {
+          return RoomGroupsScreen(roomId: state.pathParameters['roomId']!);
+        },
+      ),
+      GoRoute(
+        path: '/account/:destination',
+        name: 'account-destination',
+        builder: (context, state) {
+          return AccountDestinationScreen(
+            destinationName: state.pathParameters['destination']!,
+          );
+        },
       ),
       GoRoute(
         path: '/groups/:groupId',

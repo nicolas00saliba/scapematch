@@ -3,6 +3,7 @@ import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
@@ -95,6 +96,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     ruaXv,
     'O Cofre do Café',
     'Um café que fecha a porta sozinho',
+    RoomCategory.mystery,
     6,
     60,
     Difficulty.medium,
@@ -104,24 +106,67 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     ruaXv,
     'O Laboratório do Botânico',
     'Plantas que não deveriam existir',
+    RoomCategory.adventure,
     5,
     70,
     Difficulty.hard,
+  );
+  final sotao = _room(
+    'room-cwb-sotao',
+    ruaXv,
+    'O Sótão da Rua XV',
+    'O andar que ninguém aluga',
+    RoomCategory.terror,
+    5,
+    60,
+    Difficulty.hard,
+  );
+  final nave = _room(
+    'room-cwb-nave',
+    ruaXv,
+    'A Nave do Centro',
+    'Um porão que virou cabine',
+    RoomCategory.scienceFiction,
+    6,
+    70,
+    Difficulty.medium,
   );
   final opera = _room(
     'room-cwb-opera',
     batel,
     'Enigma no Ópera',
     'Uma noite que não acaba',
+    RoomCategory.mystery,
     8,
     60,
     Difficulty.easy,
+  );
+  final engrenagem = _room(
+    'room-cwb-engrenagem',
+    batel,
+    'Engrenagem do Batel',
+    'Relógios que andam para trás',
+    RoomCategory.steampunk,
+    6,
+    75,
+    Difficulty.hard,
+  );
+  final tumba = _room(
+    'room-cwb-tumba',
+    batel,
+    'A Tumba do Parque',
+    'Uma câmara que não está no mapa',
+    RoomCategory.egypt,
+    6,
+    60,
+    Difficulty.medium,
   );
   final metro = _room(
     SampleIds.roomSpMetro,
     augusta,
     'Metrô Perdido',
     'A linha que sumiu do mapa',
+    RoomCategory.scienceFiction,
     6,
     75,
     Difficulty.hard,
@@ -131,6 +176,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     augusta,
     'Cobertura da Paulista',
     'Um jantar no último andar',
+    RoomCategory.mystery,
     4,
     60,
     Difficulty.medium,
@@ -140,6 +186,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     liberdade,
     'O Izakaya Secreto',
     'O reservado dos fundos',
+    RoomCategory.mystery,
     5,
     60,
     Difficulty.medium,
@@ -149,6 +196,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     copacabana,
     'O Apartamento da Avenida',
     'A janela que não abre',
+    RoomCategory.terror,
     6,
     60,
     Difficulty.medium,
@@ -158,6 +206,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     santaTeresa,
     'O Bond Quebrado',
     'O último bonde da serra',
+    RoomCategory.adventure,
     7,
     80,
     Difficulty.hard,
@@ -167,6 +216,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     savassi,
     'O Bar do Mercado',
     'A conta que não fecha',
+    RoomCategory.mystery,
     5,
     50,
     Difficulty.easy,
@@ -176,6 +226,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     mina,
     'O Elevador da Serra',
     'A descida que demora demais',
+    RoomCategory.adventure,
     8,
     75,
     Difficulty.hard,
@@ -185,6 +236,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     cais,
     'O Porão do Cais',
     'Caixas que chegaram sem dono',
+    RoomCategory.terror,
     6,
     60,
     Difficulty.medium,
@@ -194,9 +246,130 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     redencao,
     'A Estufa',
     'O jardim que trancou a porta',
+    RoomCategory.adventure,
     4,
     45,
     Difficulty.easy,
+  );
+  final trilha = _room(
+    'room-cwb-trilha',
+    batel,
+    'A Trilha do Bosque',
+    'Um caminho que fecha atrás de você',
+    RoomCategory.adventure,
+    6,
+    70,
+    Difficulty.medium,
+  );
+  final poraoXv = _room(
+    'room-cwb-porao',
+    ruaXv,
+    'O Porão sem Luz',
+    'A escada que some no meio',
+    RoomCategory.terror,
+    5,
+    60,
+    Difficulty.hard,
+  );
+  final satelite = _room(
+    'room-cwb-satelite',
+    batel,
+    'O Satélite do Batel',
+    'Uma cabine que não responde',
+    RoomCategory.scienceFiction,
+    6,
+    75,
+    Difficulty.medium,
+  );
+  final caldeira = _room(
+    'room-cwb-caldeira',
+    ruaXv,
+    'A Caldeira da XV',
+    'Vapor que marca as horas',
+    RoomCategory.steampunk,
+    6,
+    70,
+    Difficulty.medium,
+  );
+  final sarcofago = _room(
+    'room-cwb-sarcofago',
+    ruaXv,
+    'O Sarcófago da XV',
+    'Uma tampa que não devia existir',
+    RoomCategory.egypt,
+    5,
+    60,
+    Difficulty.hard,
+  );
+  final antena = _room(
+    'room-sp-antena',
+    augusta,
+    'A Antena da Augusta',
+    'O sinal que não volta',
+    RoomCategory.scienceFiction,
+    5,
+    70,
+    Difficulty.medium,
+  );
+  final espelho = _room(
+    'room-rj-espelho',
+    copacabana,
+    'O Espelho de Copacabana',
+    'O reflexo que chega atrasado',
+    RoomCategory.terror,
+    5,
+    60,
+    Difficulty.medium,
+  );
+  final ladeira = _room(
+    'room-rj-ladeira',
+    santaTeresa,
+    'A Ladeira da Serra',
+    'Os degraus que mudam de lugar',
+    RoomCategory.adventure,
+    6,
+    75,
+    Difficulty.hard,
+  );
+  final cofreSavassi = _room(
+    'room-bh-cofre',
+    savassi,
+    'O Cofre da Savassi',
+    'A senha que o bar esqueceu',
+    RoomCategory.mystery,
+    5,
+    60,
+    Difficulty.medium,
+  );
+  final minaAberta = _room(
+    'room-bh-mina-aberta',
+    mina,
+    'A Mina Aberta',
+    'Um túnel com o mapa errado',
+    RoomCategory.adventure,
+    7,
+    80,
+    Difficulty.hard,
+  );
+  final armario = _room(
+    'room-poa-armario',
+    cais,
+    'O Armário do Cais',
+    'A porta que range sozinha',
+    RoomCategory.terror,
+    4,
+    50,
+    Difficulty.easy,
+  );
+  final bonde = _room(
+    'room-poa-bonde',
+    redencao,
+    'O Bonde do Bom Fim',
+    'O trilho que acaba no parque',
+    RoomCategory.adventure,
+    6,
+    70,
+    Difficulty.medium,
   );
 
   final slotCofreSat = schedule.soonSlot('slot-cwb-cofre-sat', cofre.id);
@@ -237,6 +410,38 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     estufa.id,
     1,
   );
+  final slotSotao = schedule.free('slot-cwb-sotao-free', sotao.id, 2);
+  final slotNave = schedule.free('slot-cwb-nave-free', nave.id, 2);
+  final slotEngrenagem = schedule.free(
+    'slot-cwb-engrenagem-free',
+    engrenagem.id,
+    2,
+  );
+  final slotTumba = schedule.free('slot-cwb-tumba-free', tumba.id, 2);
+  final slotTrilha = schedule.free('slot-cwb-trilha-free', trilha.id, 3);
+  final slotPoraoXv = schedule.free('slot-cwb-porao-free', poraoXv.id, 3);
+  final slotSatelite = schedule.free('slot-cwb-satelite-free', satelite.id, 3);
+  final slotCaldeira = schedule.free('slot-cwb-caldeira-free', caldeira.id, 3);
+  final slotSarcofago = schedule.free(
+    'slot-cwb-sarcofago-free',
+    sarcofago.id,
+    3,
+  );
+  final slotAntena = schedule.free('slot-sp-antena-free', antena.id, 3);
+  final slotEspelho = schedule.free('slot-rj-espelho-free', espelho.id, 3);
+  final slotLadeira = schedule.free('slot-rj-ladeira-free', ladeira.id, 3);
+  final slotCofreSavassi = schedule.free(
+    'slot-bh-cofre-free',
+    cofreSavassi.id,
+    3,
+  );
+  final slotMinaAberta = schedule.free(
+    'slot-bh-mina-aberta-free',
+    minaAberta.id,
+    3,
+  );
+  final slotArmario = schedule.free('slot-poa-armario-free', armario.id, 3);
+  final slotBonde = schedule.free('slot-poa-bonde-free', bonde.id, 3);
 
   // Two groups per city. One is almost full (1 or 2 open seats). The other
   // has more open seats. They use different rooms, so the rest of each
@@ -352,7 +557,11 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     rooms: [
       cofre,
       laboratorio,
+      sotao,
+      nave,
       opera,
+      engrenagem,
+      tumba,
       metro,
       cobertura,
       izakaya,
@@ -362,6 +571,18 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       elevador,
       porao,
       estufa,
+      trilha,
+      poraoXv,
+      satelite,
+      caldeira,
+      sarcofago,
+      antena,
+      espelho,
+      ladeira,
+      cofreSavassi,
+      minaAberta,
+      armario,
+      bonde,
     ],
     slots: _padRoomSlots(schedule, [
       slotCofreSat,
@@ -388,6 +609,22 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotEstufaFri,
       slotEstufaSat,
       slotEstufaFree,
+      slotSotao,
+      slotNave,
+      slotEngrenagem,
+      slotTumba,
+      slotTrilha,
+      slotPoraoXv,
+      slotSatelite,
+      slotCaldeira,
+      slotSarcofago,
+      slotAntena,
+      slotEspelho,
+      slotLadeira,
+      slotCofreSavassi,
+      slotMinaAberta,
+      slotArmario,
+      slotBonde,
     ]),
     groups: groups,
   );
@@ -411,6 +648,7 @@ EscapeRoom _room(
   EscapeHouse house,
   String name,
   String theme,
+  RoomCategory category,
   int capacity,
   int durationMinutes,
   Difficulty difficulty,
@@ -420,6 +658,7 @@ EscapeRoom _room(
     houseId: house.id,
     name: name,
     theme: theme,
+    category: category,
     capacity: capacity,
     durationMinutes: durationMinutes,
     difficulty: difficulty,

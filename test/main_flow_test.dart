@@ -23,7 +23,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Encontrar grupo'), findsOneWidget);
-    expect(find.text('Criar grupo'), findsOneWidget);
+    expect(find.text('Criar grupo'), findsWidgets);
     expect(find.textContaining('Dados de exemplo'), findsOneWidget);
 
     await _selectCity(tester, SampleIds.saoPaulo);
@@ -45,10 +45,13 @@ void main() {
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsOneWidget,
     );
-    expect(find.text('Metrô Perdido'), findsOneWidget);
+    expect(find.text('Metrô Perdido'), findsWidgets);
     expect(find.text('O Cofre do Café'), findsNothing);
-    expect(find.text('O Izakaya Secreto'), findsNothing);
+    // A sala entra no carrossel mesmo sem grupo na lista.
+    expect(find.text('O Izakaya Secreto'), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(AppKeys.almostFullFilter));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.almostFullFilter));
     await tester.pumpAndSettle();
 
@@ -77,6 +80,8 @@ void main() {
     expect(find.text('Entrar no grupo'), findsNothing);
 
     await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(AppKeys.almostFullFilter));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.almostFullFilter));
     await tester.pumpAndSettle();

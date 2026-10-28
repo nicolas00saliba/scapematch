@@ -4,10 +4,10 @@ import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 
-/// Barra inferior. A Home fica à esquerda de Meus grupos.
+/// Barra inferior. A ordem é Home, Meus grupos, Conta.
 ///
 /// O índice segue os ramos do [StatefulShellRoute]: 0 é a Home, 1 é Meus
-/// grupos. O app abre na Home porque a rota inicial é `/`.
+/// grupos, 2 é a Conta. O app abre na Home porque a rota inicial é `/`.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -44,6 +44,12 @@ class AppShell extends StatelessWidget {
                   icon: Icon(Icons.event_available_outlined),
                   selectedIcon: Icon(Icons.event_available),
                   label: 'Meus grupos',
+                ),
+                NavigationDestination(
+                  key: AppKeys.accountTab,
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Conta',
                 ),
               ],
             ),

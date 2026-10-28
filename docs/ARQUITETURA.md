@@ -28,15 +28,17 @@ Tela  ->  view model  ->  repositório (interface)  ->  fonte de dados
 
 ## Como a Home funciona
 
-1. O app abre em `/`, a Home. A barra inferior tem a Home à esquerda e Meus grupos à direita. As duas abas são ramos de um `StatefulShellRoute`, então cada uma guarda o próprio scroll.
-2. A cidade começa em Curitiba quando não há escolha salva. O `main` lê `SelectedCityStore` (shared_preferences; na web, localStorage) antes do primeiro frame e o seletor já mostra essa cidade. Trocar grava o id. A escolha salva prevalece. A mesma cidade filtra os grupos e o feed.
+1. O app abre em `/`, a Home. A barra inferior é Home, Meus grupos, Conta. As três abas são ramos de um `StatefulShellRoute`, então cada uma guarda o próprio scroll.
+2. A cidade começa em Curitiba quando não há escolha salva. O `main` lê `SelectedCityStore` (shared_preferences; na web, localStorage) antes do primeiro frame e o seletor já mostra essa cidade. Trocar grava o id. A escolha salva prevalece. A mesma cidade filtra os grupos, as salas e o feed.
 3. Em cima, `FindGroupsSection` observa `filteredGroupsProvider`. O `FindGroupsViewModel` lê a cidade e o filtro “Quase cheios” e chama `GroupRepository.listByCity`. O texto “Buscar sala ou casa” filtra essa lista em memória, sem outra ida ao repositório. O atalho Criar grupo abre `/groups/new` por cima da barra.
 4. O `FakeGroupRepository` filtra `FakeDatabase.groups`. Esses grupos foram montados em `sample_data.dart`.
 5. A seção desenha um dos três estados, num bloco curto (a Home inteira é um scroll só):
    - carregando
    - erro, com “Tentar de novo”
    - lista, ou o vazio se a cidade não tem grupo naquele filtro
-6. Logo abaixo, `NewsSection` observa `newsFeedViewModelProvider`. O view model chama `NewsRepository.list` com a cidade e a categoria do chip. O `FakeNewsRepository` aplica `filterNews` na lista de `sample_news.dart`. Os estados são os mesmos: carregando, erro, vazio ou os cartões. Tocar num cartão abre `/news/:id`.
+6. No meio, `RoomCarouselsSection` observa `roomCatalogViewModelProvider`. O catálogo devolve as salas da cidade já com casa e cidade. Elas se agrupam por `RoomCategory`. “Achar grupo” abre `/rooms/:roomId/groups`. “Criar grupo” abre `/groups/new?roomId=`, e o formulário preenche casa e sala. “Ver tudo” abre `/rooms/category/:category`.
+7. Embaixo, `NewsSection` observa `newsFeedViewModelProvider`. O view model chama `NewsRepository.list` com a cidade e a categoria do chip. O `FakeNewsRepository` aplica `filterNews` na lista de `sample_news.dart`. Os estados são os mesmos: carregando, erro, vazio ou os cartões. Tocar num cartão abre `/news/:id`.
+8. A aba Conta (`/account`) lê `currentUserProvider` para a saudação. Os destinos (`/account/:destination`) são placeholders. O nome de exemplo é Nícolas.
 
 A rota antiga `/groups` redireciona para `/`. Meus grupos continua em `/groups/mine`.
 
@@ -79,7 +81,7 @@ O preço por pessoa é fictício e fica na sala, em centavos. O grupo copia esse
 
 O feed de exemplo nasce em `buildSampleNews`, com a mesma hora do `clockProvider`. São dez notícias em Curitiba e mais algumas nas outras cidades. Texto, link e ilustração são inventados. A grade de sexta não tem arquivo e o app desenha um degradê. O combo de café também não usa a foto da biblioteca: o degradê traz um ícone de xícara. Os JPEG do feed têm cerca de 800 px de largura. O banner laranja nas telas repete o aviso para quem está usando, não só para quem lê o código. Ele também cita as notícias.
 
-Quem usa o app não está escrito como o texto “Você” dentro do repositório. O nome vem de `currentUserProvider` (`lib/features/account/`). Hoje esse provider devolve um usuário fictício, ainda chamado Você. Quando houver login, a troca é a implementação desse provider.
+Quem usa o app não está escrito como um nome fixo dentro do repositório. O nome vem de `currentUserProvider` (`lib/features/account/`). Hoje esse provider devolve um usuário fictício chamado Nícolas. Quando houver login, a troca é a implementação desse provider. A frase “Você está neste grupo” é texto da tela.
 
 ## Entrar no grupo no Supabase tem de ser atômico
 
