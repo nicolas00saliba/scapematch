@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 
@@ -300,7 +301,7 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
                         parent: const ClampingScrollPhysics(),
                       ),
                       padding: EdgeInsets.zero,
-                      cacheExtent: 800,
+                      scrollCacheExtent: const ScrollCacheExtent.pixels(800),
                       itemExtent: layout.stride,
                       itemCount: widget.itemCount,
                       itemBuilder: (context, index) {
