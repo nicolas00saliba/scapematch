@@ -34,6 +34,19 @@ void main() {
     expect(link, '/convite/${group.id}');
     expect(whatsAppShareUrl(message), contains('https://wa.me/?text='));
     expect(whatsAppShareUrl('a b'), contains('a%20b'));
+
+    final onGroup = Uri.parse(
+      'https://nicolas00saliba.github.io/scapematch/groups/${group.id}',
+    );
+    expect(
+      groupLink(group.id, onWeb: true, page: onGroup, baseHref: '/scapematch/'),
+      'https://nicolas00saliba.github.io/scapematch/convite/${group.id}',
+    );
+    final local = Uri.parse('http://127.0.0.1:8766/groups/${group.id}');
+    expect(
+      groupLink(group.id, onWeb: true, page: local, baseHref: '/'),
+      'http://127.0.0.1:8766/convite/${group.id}',
+    );
   });
 
   testWidgets('a logged-out invite shows the group and signup joins it', (

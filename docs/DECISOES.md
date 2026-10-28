@@ -141,7 +141,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Link do grupo
 
 - **Data:** 2026-10-27
-- **Decisão:** atualizada em “Convite do grupo”. Antes, o detalhe só copiava `/groups/:id`. No navegador, o link inclui o prefixo da página (por exemplo `/scapematch/`).
+- **Decisão:** atualizada em “Convite do grupo”. Antes, o detalhe só copiava `/groups/:id`. No navegador, a URL usa o `<base href>` (por exemplo `/scapematch/`) e a rota `/convite/:id`, sem repetir a página que está aberta.
 - **Motivo:** a rota já existe. Copiar é o bastante para mandar o grupo no chat, sem pedir permissão de compartilhamento nativo.
 - **Onde está no código:** `groupLink` em `lib/core/sharing/group_link.dart`.
 - **Como trocar depois:** trocar a função por `Share.share` quando o app for para as lojas. A rota continua a mesma.
