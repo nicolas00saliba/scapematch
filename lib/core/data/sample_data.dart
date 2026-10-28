@@ -251,6 +251,126 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     45,
     Difficulty.easy,
   );
+  final trilha = _room(
+    'room-cwb-trilha',
+    batel,
+    'A Trilha do Bosque',
+    'Um caminho que fecha atrás de você',
+    RoomCategory.adventure,
+    6,
+    70,
+    Difficulty.medium,
+  );
+  final poraoXv = _room(
+    'room-cwb-porao',
+    ruaXv,
+    'O Porão sem Luz',
+    'A escada que some no meio',
+    RoomCategory.terror,
+    5,
+    60,
+    Difficulty.hard,
+  );
+  final satelite = _room(
+    'room-cwb-satelite',
+    batel,
+    'O Satélite do Batel',
+    'Uma cabine que não responde',
+    RoomCategory.scienceFiction,
+    6,
+    75,
+    Difficulty.medium,
+  );
+  final caldeira = _room(
+    'room-cwb-caldeira',
+    ruaXv,
+    'A Caldeira da XV',
+    'Vapor que marca as horas',
+    RoomCategory.steampunk,
+    6,
+    70,
+    Difficulty.medium,
+  );
+  final sarcofago = _room(
+    'room-cwb-sarcofago',
+    ruaXv,
+    'O Sarcófago da XV',
+    'Uma tampa que não devia existir',
+    RoomCategory.egypt,
+    5,
+    60,
+    Difficulty.hard,
+  );
+  final antena = _room(
+    'room-sp-antena',
+    augusta,
+    'A Antena da Augusta',
+    'O sinal que não volta',
+    RoomCategory.scienceFiction,
+    5,
+    70,
+    Difficulty.medium,
+  );
+  final espelho = _room(
+    'room-rj-espelho',
+    copacabana,
+    'O Espelho de Copacabana',
+    'O reflexo que chega atrasado',
+    RoomCategory.terror,
+    5,
+    60,
+    Difficulty.medium,
+  );
+  final ladeira = _room(
+    'room-rj-ladeira',
+    santaTeresa,
+    'A Ladeira da Serra',
+    'Os degraus que mudam de lugar',
+    RoomCategory.adventure,
+    6,
+    75,
+    Difficulty.hard,
+  );
+  final cofreSavassi = _room(
+    'room-bh-cofre',
+    savassi,
+    'O Cofre da Savassi',
+    'A senha que o bar esqueceu',
+    RoomCategory.mystery,
+    5,
+    60,
+    Difficulty.medium,
+  );
+  final minaAberta = _room(
+    'room-bh-mina-aberta',
+    mina,
+    'A Mina Aberta',
+    'Um túnel com o mapa errado',
+    RoomCategory.adventure,
+    7,
+    80,
+    Difficulty.hard,
+  );
+  final armario = _room(
+    'room-poa-armario',
+    cais,
+    'O Armário do Cais',
+    'A porta que range sozinha',
+    RoomCategory.terror,
+    4,
+    50,
+    Difficulty.easy,
+  );
+  final bonde = _room(
+    'room-poa-bonde',
+    redencao,
+    'O Bonde do Bom Fim',
+    'O trilho que acaba no parque',
+    RoomCategory.adventure,
+    6,
+    70,
+    Difficulty.medium,
+  );
 
   final slotCofreSat = schedule.soonSlot('slot-cwb-cofre-sat', cofre.id);
   final slotCofreSun = schedule.free('slot-cwb-cofre-sun', cofre.id, 0);
@@ -298,6 +418,30 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     2,
   );
   final slotTumba = schedule.free('slot-cwb-tumba-free', tumba.id, 2);
+  final slotTrilha = schedule.free('slot-cwb-trilha-free', trilha.id, 3);
+  final slotPoraoXv = schedule.free('slot-cwb-porao-free', poraoXv.id, 3);
+  final slotSatelite = schedule.free('slot-cwb-satelite-free', satelite.id, 3);
+  final slotCaldeira = schedule.free('slot-cwb-caldeira-free', caldeira.id, 3);
+  final slotSarcofago = schedule.free(
+    'slot-cwb-sarcofago-free',
+    sarcofago.id,
+    3,
+  );
+  final slotAntena = schedule.free('slot-sp-antena-free', antena.id, 3);
+  final slotEspelho = schedule.free('slot-rj-espelho-free', espelho.id, 3);
+  final slotLadeira = schedule.free('slot-rj-ladeira-free', ladeira.id, 3);
+  final slotCofreSavassi = schedule.free(
+    'slot-bh-cofre-free',
+    cofreSavassi.id,
+    3,
+  );
+  final slotMinaAberta = schedule.free(
+    'slot-bh-mina-aberta-free',
+    minaAberta.id,
+    3,
+  );
+  final slotArmario = schedule.free('slot-poa-armario-free', armario.id, 3);
+  final slotBonde = schedule.free('slot-poa-bonde-free', bonde.id, 3);
 
   // Two groups per city. One is almost full (1 or 2 open seats). The other
   // has more open seats. They use different rooms, so the rest of each
@@ -427,6 +571,18 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       elevador,
       porao,
       estufa,
+      trilha,
+      poraoXv,
+      satelite,
+      caldeira,
+      sarcofago,
+      antena,
+      espelho,
+      ladeira,
+      cofreSavassi,
+      minaAberta,
+      armario,
+      bonde,
     ],
     slots: _padRoomSlots(schedule, [
       slotCofreSat,
@@ -457,6 +613,18 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotNave,
       slotEngrenagem,
       slotTumba,
+      slotTrilha,
+      slotPoraoXv,
+      slotSatelite,
+      slotCaldeira,
+      slotSarcofago,
+      slotAntena,
+      slotEspelho,
+      slotLadeira,
+      slotCofreSavassi,
+      slotMinaAberta,
+      slotArmario,
+      slotBonde,
     ]),
     groups: groups,
   );

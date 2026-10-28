@@ -26,10 +26,7 @@ class AccountScreen extends ConsumerWidget {
             key: AppKeys.accountSettings,
             tooltip: 'Configurações',
             onPressed: () => context.push('/account/settings'),
-            icon: const Icon(
-              Icons.settings_outlined,
-              semanticLabel: 'Configurações',
-            ),
+            icon: const Icon(Icons.settings_outlined),
           ),
         ],
       ),
@@ -186,7 +183,7 @@ class _AccountTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              Icon(item.icon, color: AppColors.teal, semanticLabel: item.title),
+              Icon(item.icon, color: AppColors.teal),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

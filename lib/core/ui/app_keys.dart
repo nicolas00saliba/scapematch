@@ -63,6 +63,7 @@ abstract final class AppKeys {
   static Key roomCard(String id) => Key('room-card-$id');
   static Key roomFindGroup(String id) => Key('room-find-group-$id');
   static Key roomCreateGroup(String id) => Key('room-create-group-$id');
+  static Key roomGroupsCreate(String id) => Key('room-groups-create-$id');
   static Key roomSeeAll(String category) => Key('room-see-all-$category');
   static Key accountDestination(String name) => Key('account-$name');
 }

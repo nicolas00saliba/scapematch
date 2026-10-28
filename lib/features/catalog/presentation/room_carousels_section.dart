@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -88,9 +90,10 @@ class _Carousel extends StatelessWidget {
           ],
         ),
         SizedBox(
-          height: 360,
+          height: _carouselHeight(context, rooms),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
             itemCount: rooms.length,
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) => RoomCard(listing: rooms[index]),
@@ -99,4 +102,13 @@ class _Carousel extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A faixa fica da altura do cartão mais alto do tema, já com o textScale.
+double _carouselHeight(BuildContext context, List<RoomListing> rooms) {
+  var tallest = 0.0;
+  for (final listing in rooms) {
+    tallest = math.max(tallest, roomCardHeight(context, listing));
+  }
+  return tallest.ceilToDouble();
 }

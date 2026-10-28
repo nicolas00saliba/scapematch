@@ -101,7 +101,7 @@ A tela de criar grupo não abre um calendário. Ela lista os horários cadastrad
 
 As notícias também são inventadas. Curitiba tem dez. As outras cidades de exemplo têm algumas. As figuras em `assets/images/news/` são ilustrações fictícias, não fotos de casas, em JPEG de cerca de 800 px. A grade de sexta não tem figura e o app desenha um degradê. O combo de café usa um degradê com xícara, não a foto da biblioteca. Os links usam o domínio `.invalid` e a tela não abre o navegador. Um link direto de notícia, sem pilha, mostra voltar para a Home.
 
-As salas dos carrosséis usam essas mesmas figuras, por tema. Aventura tem um arquivo novo em `assets/images/rooms/aventura.jpg`, também fictício e abaixo de 150 KB. Curitiba ganhou quatro salas só para os temas que ainda não tinham exemplo (Terror, Sci-fi, Steampunk e Egito). Elas não têm grupo marcado.
+As salas dos carrosséis usam essas mesmas figuras, por tema. Aventura tem um arquivo novo em `assets/images/rooms/aventura.jpg`, também fictício e abaixo de 150 KB. Cada tema que aparece numa cidade tem pelo menos duas salas, para o carrossel rolar. Várias dessas salas não têm grupo marcado.
 
 ## Próximos passos
 

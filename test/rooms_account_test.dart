@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
@@ -65,6 +67,17 @@ void main() {
       find.descendant(
         of: find.byType(RoomGroupsScreen),
         matching: find.byKey(AppKeys.groupCard('grp-cwb-opera-open')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(AppKeys.roomGroupsCreate(SampleIds.roomCwbCofre)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(RoomGroupsScreen),
+        matching: find.byKey(AppKeys.roomCreateGroup(SampleIds.roomCwbCofre)),
       ),
       findsNothing,
     );
@@ -153,6 +166,93 @@ void main() {
       find.textContaining('Nada nesta tela altera o app de verdade.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('each Curitiba carousel scrolls past the first card', (
+    tester,
+  ) async {
+    await pumpScapeMatch(tester);
+    for (final category in const [
+      'terror',
+      'mystery',
+      'adventure',
+      'scienceFiction',
+      'steampunk',
+      'egypt',
+    ]) {
+      final carousel = find.byKey(AppKeys.roomCarousel(category));
+      await tester.scrollUntilVisible(
+        carousel,
+        400,
+        scrollable: verticalScrollable,
+      );
+      final scrollable = find.descendant(
+        of: carousel,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
+        ),
+      );
+      final position = tester.state<ScrollableState>(scrollable).position;
+      expect(position.maxScrollExtent, greaterThan(0), reason: category);
+      final before = position.pixels;
+      await tester.drag(scrollable, const Offset(-140, 0));
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(before), reason: category);
+    }
+  });
+
+  testWidgets('room carousel matches the card and stays tappable at 1.6x', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpScapeMatch(tester);
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    await tester.pumpAndSettle();
+
+    final carousel = find.byKey(AppKeys.roomCarousel('mystery'));
+    await tester.scrollUntilVisible(
+      carousel,
+      400,
+      scrollable: verticalScrollable,
+    );
+    final cards = find.descendant(of: carousel, matching: find.byType(Card));
+    var tallest = 0.0;
+    for (final element in cards.evaluate()) {
+      final box = element.renderObject! as RenderBox;
+      tallest = math.max(tallest, box.size.height);
+    }
+    final listHeight = tester
+        .getSize(find.descendant(of: carousel, matching: find.byType(ListView)))
+        .height;
+    expect(listHeight - tallest, inInclusiveRange(-1, 4));
+
+    final button = find.byKey(AppKeys.roomFindGroup(SampleIds.roomCwbCofre));
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+    final label = find.descendant(
+      of: button,
+      matching: find.text('Achar grupo'),
+    );
+    final natural = TextPainter(
+      text: const TextSpan(
+        text: 'Achar grupo',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          height: 1.2,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(tester.element(button)),
+    )..layout();
+    expect(
+      tester.getSize(label).width,
+      greaterThanOrEqualTo(natural.width - 1),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Home and Conta fit a 360 wide phone', (tester) async {

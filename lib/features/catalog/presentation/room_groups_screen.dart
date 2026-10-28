@@ -64,7 +64,7 @@ class RoomGroupsScreen extends ConsumerWidget {
                 ],
               const SizedBox(height: 16),
               FilledButton.icon(
-                key: AppKeys.roomCreateGroup(roomId),
+                key: AppKeys.roomGroupsCreate(roomId),
                 onPressed: room == null
                     ? null
                     : () => context.push('/groups/new?roomId=$roomId'),

@@ -47,8 +47,8 @@ class AppShell extends StatelessWidget {
                 ),
                 NavigationDestination(
                   key: AppKeys.accountTab,
-                  icon: Icon(Icons.person_outline, semanticLabel: 'Conta'),
-                  selectedIcon: Icon(Icons.person, semanticLabel: 'Conta'),
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
                   label: 'Conta',
                 ),
               ],
