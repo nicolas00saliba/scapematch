@@ -11,10 +11,10 @@ abstract final class GameTypes {
 
   static const choices = <({String id, String label, String shortLabel})>[
     (id: all, label: 'Todos', shortLabel: 'Todos'),
-    (id: escapeRoom, label: 'Escape room', shortLabel: 'Escape room'),
+    (id: escapeRoom, label: 'Escape room', shortLabel: 'Escape'),
     (id: rpg, label: 'RPG', shortLabel: 'RPG'),
     (id: boardGame, label: 'Jogos de tabuleiro', shortLabel: 'Tabuleiro'),
-    (id: laserTag, label: 'Laser tag', shortLabel: 'Laser tag'),
+    (id: laserTag, label: 'Laser tag', shortLabel: 'Laser'),
     (id: immersive, label: 'Imersivo', shortLabel: 'Imersivo'),
   ];
 

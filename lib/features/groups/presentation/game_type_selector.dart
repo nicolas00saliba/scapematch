@@ -32,6 +32,7 @@ class GameTypeSelector extends ConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
                   Icons.casino_outlined,
@@ -39,14 +40,12 @@ class GameTypeSelector extends ConsumerWidget {
                   size: 18,
                 ),
                 const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    shortLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                Text(
+                  shortLabel,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const Icon(Icons.expand_more, color: AppColors.teal, size: 18),

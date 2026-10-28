@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
@@ -436,13 +437,18 @@ void main() {
     expect(city.right, lessThanOrEqualTo(game.left));
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byKey(AppKeys.gameTypeSelector));
-    await tester.pumpAndSettle();
-    expect(find.text('Jogos de tabuleiro'), findsOneWidget);
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.boardGame)));
-    await tester.pumpAndSettle();
-    expect(find.text('Tabuleiro'), findsOneWidget);
-    expect(find.text('Jogos de tabuleiro'), findsNothing);
+    final longestCity = _widestCity(tester);
+    for (final cityId in [SampleIds.curitiba, longestCity]) {
+      await _selectCity(tester, cityId);
+      for (final choice in GameTypes.choices) {
+        await tester.tap(find.byKey(AppKeys.gameTypeSelector));
+        await tester.pumpAndSettle();
+        expect(find.text(choice.label), findsWidgets);
+        await tester.tap(find.byKey(AppKeys.gameTypeOption(choice.id)));
+        await tester.pumpAndSettle();
+        _expectClosedGameLabelFits(tester, choice.shortLabel);
+      }
+    }
   });
 
   testWidgets('the group window scrolls almost-full groups and obeys filters', (
@@ -595,6 +601,69 @@ Future<void> _tapPromoNext(WidgetTester tester) async {
   final next = find.byKey(AppKeys.carouselNext('promos'));
   await tester.ensureVisible(next);
   await tester.tap(next);
+  await tester.pumpAndSettle();
+}
+
+String _widestCity(WidgetTester tester) {
+  const names = <String, String>{
+    SampleIds.curitiba: 'Curitiba',
+    SampleIds.saoPaulo: 'São Paulo',
+    SampleIds.rioDeJaneiro: 'Rio de Janeiro',
+    SampleIds.beloHorizonte: 'Belo Horizonte',
+    SampleIds.portoAlegre: 'Porto Alegre',
+  };
+  final sample = tester.widget<Text>(
+    find.descendant(
+      of: find.byKey(AppKeys.citySelector),
+      matching: find.text('Curitiba'),
+    ),
+  );
+  var widest = SampleIds.curitiba;
+  var widestWidth = 0.0;
+  for (final entry in names.entries) {
+    final painter = TextPainter(
+      text: TextSpan(text: entry.value, style: sample.style),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(
+        tester.element(find.byKey(AppKeys.citySelector)),
+      ),
+      maxLines: 1,
+    )..layout();
+    if (painter.width > widestWidth) {
+      widestWidth = painter.width;
+      widest = entry.key;
+    }
+  }
+  return widest;
+}
+
+void _expectClosedGameLabelFits(WidgetTester tester, String label) {
+  final finder = find.descendant(
+    of: find.byKey(AppKeys.gameTypeSelector),
+    matching: find.text(label),
+  );
+  expect(finder, findsOneWidget, reason: label);
+  final paragraph = tester.renderObject<RenderParagraph>(finder);
+  expect(
+    paragraph.didExceedMaxLines,
+    isFalse,
+    reason: '$label está cortado no seletor fechado',
+  );
+  final painter = TextPainter(
+    text: TextSpan(text: label, style: paragraph.text.style),
+    textDirection: TextDirection.ltr,
+    textScaler: paragraph.textScaler,
+    maxLines: 1,
+  )..layout(maxWidth: paragraph.size.width);
+  expect(painter.didExceedMaxLines, isFalse, reason: label);
+  expect(painter.width, lessThanOrEqualTo(paragraph.size.width + 0.5));
+}
+
+Future<void> _selectCity(WidgetTester tester, String cityId) async {
+  await tester.ensureVisible(find.byKey(AppKeys.citySelector));
+  await tester.tap(find.byKey(AppKeys.citySelector));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(AppKeys.cityOption(cityId)));
   await tester.pumpAndSettle();
 }
 

@@ -162,26 +162,29 @@ class _CityField extends StatelessWidget {
             onTap: onTap,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.route, color: AppColors.teal, size: 18),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.route, color: AppColors.teal, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
                       city?.name ?? 'Cidade',
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
-                  const Icon(
-                    Icons.expand_more,
-                    color: AppColors.teal,
-                    size: 20,
-                  ),
-                ],
+                    const Icon(
+                      Icons.expand_more,
+                      color: AppColors.teal,
+                      size: 18,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -281,6 +284,41 @@ class _CityPlaceholder extends StatelessWidget {
   final bool compact;
   final VoidCallback? onTap;
 
+  Widget _placeholderRow(
+    bool showProgress,
+    String title,
+    String subtitle,
+    bool expanded,
+  ) {
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          maxLines: 1,
+          overflow: expanded ? TextOverflow.ellipsis : TextOverflow.visible,
+          softWrap: false,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        if (expanded) Text(subtitle),
+      ],
+    );
+    return Row(
+      mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        showProgress
+            ? const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              )
+            : const Icon(Icons.refresh, color: AppColors.teal),
+        const SizedBox(width: 14),
+        if (expanded) Expanded(child: text) else text,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -295,32 +333,13 @@ class _CityPlaceholder extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.all(compact ? 10 : 18),
-          child: Row(
-            children: [
-              showProgress
-                  ? const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2.4),
-                    )
-                  : const Icon(Icons.refresh, color: AppColors.teal),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    if (!compact) Text(subtitle),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          child: compact
+              ? FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: _placeholderRow(showProgress, title, subtitle, false),
+                )
+              : _placeholderRow(showProgress, title, subtitle, true),
         ),
       ),
     );

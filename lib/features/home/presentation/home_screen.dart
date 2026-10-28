@@ -70,9 +70,10 @@ class _HomeHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
+        // A cidade encolhe com reticências. O jogo fica da largura do rótulo.
         const Expanded(child: CitySelector(compact: true)),
         const SizedBox(width: 8),
-        const Expanded(child: GameTypeSelector()),
+        const GameTypeSelector(),
       ],
     );
   }
