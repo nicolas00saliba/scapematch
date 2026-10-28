@@ -7,6 +7,7 @@ import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
@@ -19,8 +20,9 @@ import 'package:scapematch/features/groups/domain/participant.dart';
 /// Each city starts with two groups: one almost full and one with more open
 /// seats, both within the room capacity. The almost-full group starts 90
 /// minutes after [now], inside the refund window. The other starts three
-/// days later, outside it. The create-group screen does not offer a free
-/// date picker. It lists the catalog slots of the chosen room, and every
+/// days later, outside it. Curitiba ganha mais grupos quase cheios para a
+/// janela da Home ter o que rolar. O create-group screen does not offer a
+/// free date picker. It lists the catalog slots of the chosen room, and every
 /// room keeps several free future times.
 FakeDatabase buildSampleDatabase({required DateTime now}) {
   final schedule = _SampleSchedule(now);
@@ -442,10 +444,51 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   );
   final slotArmario = schedule.free('slot-poa-armario-free', armario.id, 3);
   final slotBonde = schedule.free('slot-poa-bonde-free', bonde.id, 3);
+  // Horários fora da grade livre, só para os grupos extras de Curitiba.
+  final slotLabQuase = schedule.at(
+    'slot-cwb-lab-quase',
+    laboratorio.id,
+    now.add(const Duration(hours: 6)),
+  );
+  final slotSotaoQuase = schedule.at(
+    'slot-cwb-sotao-quase',
+    sotao.id,
+    now.add(const Duration(hours: 9)),
+  );
+  final slotNaveQuase = schedule.at(
+    'slot-cwb-nave-quase',
+    nave.id,
+    now.add(const Duration(hours: 12)),
+  );
+  final slotEngrenagemQuase = schedule.at(
+    'slot-cwb-engrenagem-quase',
+    engrenagem.id,
+    now.add(const Duration(hours: 18)),
+  );
+  final slotTumbaQuase = schedule.at(
+    'slot-cwb-tumba-quase',
+    tumba.id,
+    now.add(const Duration(hours: 30)),
+  );
+  final slotTrilhaQuase = schedule.at(
+    'slot-cwb-trilha-quase',
+    trilha.id,
+    now.add(const Duration(hours: 40)),
+  );
+  final slotPoraoQuase = schedule.at(
+    'slot-cwb-porao-quase',
+    poraoXv.id,
+    now.add(const Duration(hours: 60)),
+  );
+  final slotSateliteQuase = schedule.at(
+    'slot-cwb-satelite-quase',
+    satelite.id,
+    now.add(const Duration(hours: 66)),
+  );
 
   // Two groups per city. One is almost full (1 or 2 open seats). The other
-  // has more open seats. They use different rooms, so the rest of each
-  // city's rooms and start times stay free for new groups.
+  // has more open seats. Curitiba also has eight more almost-full groups so
+  // the home window can scroll. They use their own start times.
   final groups = [
     _group(
       id: 'grp-cwb-cofre-almost',
@@ -465,6 +508,86 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       totalSpots: 8,
       names: ['Caê', 'Vera', 'Nuno'],
       note: 'Chegar 15 minutos antes.',
+    ),
+    _group(
+      id: 'grp-cwb-lab-quase',
+      city: curitiba,
+      house: ruaXv,
+      room: laboratorio,
+      slot: slotLabQuase,
+      totalSpots: 5,
+      names: ['Ana', 'Bia', 'Caio', 'Duda'],
+    ),
+    _group(
+      id: 'grp-cwb-sotao-quase',
+      city: curitiba,
+      house: ruaXv,
+      room: sotao,
+      slot: slotSotaoQuase,
+      totalSpots: 5,
+      names: ['Eva', 'Fábio', 'Gabi'],
+    ),
+    _group(
+      id: 'grp-cwb-nave-quase',
+      city: curitiba,
+      house: ruaXv,
+      room: nave,
+      slot: slotNaveQuase,
+      totalSpots: 6,
+      names: ['Hugo', 'Iara', 'Júlio', 'Kai', 'Lara'],
+    ),
+    _group(
+      id: 'grp-cwb-engrenagem-quase',
+      city: curitiba,
+      house: batel,
+      room: engrenagem,
+      slot: slotEngrenagemQuase,
+      totalSpots: 6,
+      names: ['Milo', 'Nina', 'Otto', 'Pietra'],
+    ),
+    _group(
+      id: 'grp-cwb-tumba-imersivo',
+      city: curitiba,
+      house: batel,
+      room: tumba,
+      slot: slotTumbaQuase,
+      totalSpots: 6,
+      names: ['Quim', 'Rita', 'Sara', 'Téo', 'Uma'],
+      gameType: GameTypes.immersive,
+      roomName: 'Ritual imersivo da tumba',
+    ),
+    _group(
+      id: 'grp-cwb-trilha-laser',
+      city: curitiba,
+      house: batel,
+      room: trilha,
+      slot: slotTrilhaQuase,
+      totalSpots: 6,
+      names: ['Vini', 'Wanda', 'Xande', 'Yara'],
+      gameType: GameTypes.laserTag,
+      roomName: 'Arena laser da trilha',
+    ),
+    _group(
+      id: 'grp-cwb-porao-rpg',
+      city: curitiba,
+      house: ruaXv,
+      room: poraoXv,
+      slot: slotPoraoQuase,
+      totalSpots: 5,
+      names: ['Zeca', 'Aline', 'Bruno', 'Cris'],
+      gameType: GameTypes.rpg,
+      roomName: 'Mesa de RPG no porão',
+    ),
+    _group(
+      id: 'grp-cwb-satelite-tabuleiro',
+      city: curitiba,
+      house: batel,
+      room: satelite,
+      slot: slotSateliteQuase,
+      totalSpots: 6,
+      names: ['Dani', 'Elio', 'Fran', 'Guto', 'Hélio'],
+      gameType: GameTypes.boardGame,
+      roomName: 'Noite de tabuleiro no Batel',
     ),
     _group(
       id: SampleIds.groupSpMetroAlmost,
@@ -625,6 +748,14 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotMinaAberta,
       slotArmario,
       slotBonde,
+      slotLabQuase,
+      slotSotaoQuase,
+      slotNaveQuase,
+      slotEngrenagemQuase,
+      slotTumbaQuase,
+      slotTrilhaQuase,
+      slotPoraoQuase,
+      slotSateliteQuase,
     ]),
     groups: groups,
   );
@@ -764,6 +895,8 @@ Group _group({
   required int totalSpots,
   required List<String> names,
   String note = '',
+  String gameType = GameTypes.escapeRoom,
+  String? roomName,
 }) {
   assert(house.cityId == city.id, id);
   assert(room.houseId == house.id, id);
@@ -779,7 +912,7 @@ Group _group({
     houseName: house.name,
     neighborhood: house.neighborhood,
     roomId: room.id,
-    roomName: room.name,
+    roomName: roomName ?? room.name,
     roomTheme: room.theme,
     roomCapacity: room.capacity,
     durationMinutes: room.durationMinutes,
@@ -789,6 +922,7 @@ Group _group({
     filledSpots: names.length,
     totalSpots: totalSpots,
     priceCents: room.priceCents,
+    gameType: gameType,
     note: note,
     participants: [
       for (var index = 0; index < names.length; index++)

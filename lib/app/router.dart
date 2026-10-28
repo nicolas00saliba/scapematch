@@ -3,12 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/app_shell.dart';
 import 'package:scapematch/features/account/presentation/account_destination_screen.dart';
 import 'package:scapematch/features/account/presentation/account_screen.dart';
+import 'package:scapematch/features/catalog/presentation/popular_rooms_screen.dart';
 import 'package:scapematch/features/catalog/presentation/room_category_screen.dart';
 import 'package:scapematch/features/catalog/presentation/room_groups_screen.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
+import 'package:scapematch/features/news/presentation/news_browse_screen.dart';
 import 'package:scapematch/features/news/presentation/news_detail_screen.dart';
 
 /// Rotas do app.
@@ -70,6 +72,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: '/rooms/popular',
+        name: 'popular-rooms',
+        builder: (context, state) => const PopularRoomsScreen(),
+      ),
+      GoRoute(
         path: '/rooms/category/:category',
         name: 'room-category',
         builder: (context, state) {
@@ -101,6 +108,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           final groupId = state.pathParameters['groupId']!;
           return GroupDetailScreen(groupId: groupId);
         },
+      ),
+      GoRoute(
+        path: '/news',
+        name: 'news',
+        builder: (context, state) => const NewsBrowseScreen(),
       ),
       GoRoute(
         path: '/news/:newsId',

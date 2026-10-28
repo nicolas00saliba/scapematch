@@ -140,6 +140,10 @@ void main() {
     expect(find.text('Nenhuma sessão passada'), findsNothing);
     await tester.tap(find.text('Passados'));
     await tester.pumpAndSettle();
+    // O aviso de saída é um snackbar. Sem animação na Home, o tempo dele
+    // não anda sozinho.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     expect(find.text('Nenhuma sessão passada'), findsOneWidget);
     expect(find.textContaining('Sem reembolso'), findsNothing);
   });
@@ -175,7 +179,7 @@ void main() {
     expect(find.byKey(AppKeys.deleteGroup), findsNothing);
 
     await _home(tester);
-    await tester.tap(find.byKey(AppKeys.findGroup));
+    await tester.ensureVisible(find.byKey(AppKeys.groupSearch));
     await tester.pumpAndSettle();
     expect(find.text('1 de 3 vagas'), findsNothing);
 
@@ -337,7 +341,10 @@ Future<void> _openGroup(
   String groupId,
 ) async {
   await _selectCity(tester, cityId);
-  await tester.tap(find.byKey(AppKeys.findGroup));
+  await tester.enterText(
+    find.byKey(AppKeys.groupSearch),
+    groupId == SampleIds.groupSpCoberturaOpen ? 'Cobertura' : 'Metrô',
+  );
   await tester.pumpAndSettle();
   await tester.scrollUntilVisible(
     find.byKey(AppKeys.groupCard(groupId)),

@@ -323,7 +323,9 @@ _FooterPlan _footerPlan({
     _buttonHeight,
     _textHeight('Achar grupo', buttonStyle, scaler, double.infinity, 1),
   );
-  final fitsWithCity = cityWidth + _buttonGap + pairWidth <= maxWidth;
+  // Folga para o botão não estourar a linha por causa do padding do tema.
+  final limit = maxWidth - 8;
+  final fitsWithCity = cityWidth + _buttonGap + pairWidth <= limit;
   if (fitsWithCity) {
     return _FooterPlan(
       buttonsOnOwnLine: false,
@@ -331,7 +333,7 @@ _FooterPlan _footerPlan({
       height: math.max(cityLine, buttonLine),
     );
   }
-  final stackButtons = pairWidth > maxWidth;
+  final stackButtons = pairWidth > limit;
   final buttonsHeight = stackButtons
       ? buttonLine + _buttonGap + buttonLine
       : buttonLine;

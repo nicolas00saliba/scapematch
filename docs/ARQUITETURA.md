@@ -30,14 +30,11 @@ Tela  ->  view model  ->  repositório (interface)  ->  fonte de dados
 
 1. O app abre em `/`, a Home. A barra inferior é Home, Meus grupos, Conta. As três abas são ramos de um `StatefulShellRoute`, então cada uma guarda o próprio scroll.
 2. A cidade começa em Curitiba quando não há escolha salva. O `main` lê `SelectedCityStore` (shared_preferences; na web, localStorage) antes do primeiro frame e o seletor já mostra essa cidade. Trocar grava o id. A escolha salva prevalece. A mesma cidade filtra os grupos, as salas e o feed.
-3. Em cima, `FindGroupsSection` observa `filteredGroupsProvider`. O `FindGroupsViewModel` lê a cidade e o filtro “Quase cheios” e chama `GroupRepository.listByCity`. O texto “Buscar sala ou casa” filtra essa lista em memória, sem outra ida ao repositório. O atalho Criar grupo abre `/groups/new` por cima da barra.
+3. O topo é `FindGroupsSection`: busca com o hint inteiro e Criar grupo na mesma linha quando cabe; em tela estreita o botão vira só o ícone +, com o nome “Criar grupo”. O chip Quase cheios fica abaixo. O aviso de dados de exemplo é um chip pequeno, não uma barra. A lista de grupos fica numa janela com rolagem própria. O texto, o chip, a cidade e o tipo de jogo filtram em memória (`filterGroupsByText`, `filterGroupsByGameType`). Criar grupo abre `/groups/new`.
 4. O `FakeGroupRepository` filtra `FakeDatabase.groups`. Esses grupos foram montados em `sample_data.dart`.
-5. A seção desenha um dos três estados, num bloco curto (a Home inteira é um scroll só):
-   - carregando
-   - erro, com “Tentar de novo”
-   - lista, ou o vazio se a cidade não tem grupo naquele filtro
-6. No meio, `RoomCarouselsSection` observa `roomCatalogViewModelProvider`. O catálogo devolve as salas da cidade já com casa e cidade. Elas se agrupam por `RoomCategory`. “Achar grupo” abre `/rooms/:roomId/groups`. “Criar grupo” abre `/groups/new?roomId=`, e o formulário preenche casa e sala. “Ver tudo” abre `/rooms/category/:category`.
-7. Embaixo, `NewsSection` observa `newsFeedViewModelProvider`. O view model chama `NewsRepository.list` com a cidade e a categoria do chip. O `FakeNewsRepository` aplica `filterNews` na lista de `sample_news.dart`. Os estados são os mesmos: carregando, erro, vazio ou os cartões. Tocar num cartão abre `/news/:id`.
+5. A janela de grupos mostra carregando, erro ou os cartões. A barra vertical só entra quando o conteúdo passa da altura.
+6. Em seguida, `NewsSection` lê `homeNewsProvider` (cidade, sem chip) e desenha o carrossel primário. “Ver tudo” abre `/news`, onde os chips filtram `newsFeedViewModelProvider`.
+7. `RoomThemeSpan` desenha os temas. Os dois primeiros ficam antes de `PromoCarousel`. O resto fica depois. `PopularRoomsSection` fecha a página. As setas estão em `ArrowCarousel`. Nas promoções, `pageExtent` faz cada toque andar um flyer. “Achar grupo” abre `/rooms/:roomId/groups`. “Criar grupo” do cartão abre `/groups/new?roomId=`.
 8. A aba Conta (`/account`) lê `currentUserProvider` para a saudação. Os destinos (`/account/:destination`) são placeholders. O nome de exemplo é Nícolas.
 
 A rota antiga `/groups` redireciona para `/`. Meus grupos continua em `/groups/mine`.

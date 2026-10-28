@@ -43,7 +43,7 @@ void main() {
     expect(find.byType(CreateGroupScreen), findsNothing);
     expect(find.byKey(AppKeys.createSubmit), findsNothing);
 
-    await tester.tap(find.byKey(AppKeys.findGroup));
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Estufa');
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(

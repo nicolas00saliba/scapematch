@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/features/catalog/presentation/popular_rooms_section.dart';
 import 'package:scapematch/features/catalog/presentation/room_carousels_section.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
+import 'package:scapematch/features/groups/presentation/game_type_selector.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
+import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
-/// Tela inicial: busca de grupo em cima, feed de novidades embaixo.
+/// Home densa: topo curto e carrosséis logo em seguida.
+///
+/// Primário: novidades. Secundários: os dois primeiros temas com sala.
+/// Depois, promoções sem título. Terciários: o restante dos temas e as
+/// salas mais procuradas.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -15,22 +21,26 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const AppScaffold(
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, 28),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             _HomeHeader(),
-            SizedBox(height: 16),
-            CitySelector(),
-            SizedBox(height: 12),
+            SizedBox(height: 6),
             ExampleDataBanner(),
-            SizedBox(height: 16),
+            SizedBox(height: 6),
             FindGroupsSection(),
-            SizedBox(height: 22),
-            RoomCarouselsSection(),
-            SizedBox(height: 22),
+            SizedBox(height: 8),
             NewsSection(),
+            SizedBox(height: 8),
+            RoomThemeSpan(start: 0, count: 2),
+            SizedBox(height: 8),
+            PromoCarousel(),
+            SizedBox(height: 12),
+            RoomThemeSpan(start: 2),
+            SizedBox(height: 12),
+            PopularRoomsSection(),
           ],
         ),
       ),
@@ -44,24 +54,26 @@ class _HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text(
-          'ScapeMatch',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.4,
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'ScapeMatch',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Grupos, salas e novidades de escape room na sua cidade.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: AppColors.muted,
-            height: 1.35,
-          ),
-        ),
+        const SizedBox(width: 8),
+        // A cidade encolhe com reticências. O jogo fica da largura do rótulo.
+        const Expanded(child: CitySelector(compact: true)),
+        const SizedBox(width: 8),
+        const GameTypeSelector(),
       ],
     );
   }

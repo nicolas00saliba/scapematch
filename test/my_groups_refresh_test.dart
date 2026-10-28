@@ -56,6 +56,8 @@ void main() {
     await tester.tap(find.byKey(AppKeys.homeTab));
     await tester.pumpAndSettle();
     await _selectCity(tester, SampleIds.saoPaulo);
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cobertura');
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       300,

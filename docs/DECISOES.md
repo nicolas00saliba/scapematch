@@ -2,6 +2,22 @@
 
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
+## Tipo de jogo no topo
+
+- **Data:** 2026-10-28
+- **Decisão:** ao lado da cidade há um seletor provisório de tipo de jogo: Todos, Escape room, RPG, Jogos de tabuleiro, Laser tag e Imersivo. A escolha fica no aparelho, na chave `selected_game_type`, do mesmo jeito que a cidade. Ela filtra só a janela de grupos. Salas, notícias e carrosséis de tema continuam iguais, porque o catálogo ainda é todo de escape room. Os grupos extras de Curitiba incluem escape room, RPG, tabuleiro, laser tag e imersivo, com nome da atividade (não o da sala de escape) para o filtro mostrar um resultado coerente. No seletor fechado os rótulos são Todos, Escape, RPG, Tabuleiro, Laser e Imersivo; a folha mantém o nome completo. A cidade é que encolhe com reticências, para o jogo não cortar.
+- **Motivo:** o dono quer o lugar do filtro antes de existir um catálogo de verdade, e a Home precisa continuar mostrando Novidades e salas quando a pessoa escolhe outro jogo.
+- **Onde está no código:** `GameTypeSelector`, `SelectedGameTypeStore` e `filterGroupsByGameType`. O `main` lê o store antes do primeiro frame.
+- **Como trocar depois:** quando cada sala tiver um tipo, o mesmo id filtra os carrosséis e o feed. Até lá, mudar a lista é editar `GameTypes.choices`.
+
+## Janela de grupos na Home
+
+- **Data:** 2026-10-28
+- **Decisão:** os grupos formados voltam para a abertura, numa janela que encolhe até o conteúdo e no máximo cabe cerca de um cartão e o começo do seguinte. A barra de rolagem vertical só aparece quando os cartões não cabem. Um arrasto que passa do fim ou do começo da janela continua na página. Curitiba tem grupos quase cheios a mais, de exemplo, para essa barra existir no protótipo. As promoções continuam sem título, com setas, antes dos temas terciários.
+- **Motivo:** a compressão tinha tirado os grupos e empurrado as promoções para fora da vista. A janela devolve os grupos sem ocupar a página inteira.
+- **Onde está no código:** `FindGroupsSection` (`groupWindowMaxHeight`) e os grupos extras em `sample_data.dart`.
+- **Como trocar depois:** o teto da janela é a constante `groupWindowMaxHeight`. Um feed real substitui os grupos extras.
+
 ## Entrada livre no grupo
 
 - **Data:** 2026-10-27
@@ -201,6 +217,14 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Motivo:** o dono pediu a descoberta no estilo de carrosséis, sem tirar a busca nem o feed. As fotos reaproveitam as figuras fictícias do feed. Aventura ganhou um arquivo novo em `assets/images/rooms/`, porque não havia uma figura desse tema. Tudo continua inventado.
 - **Onde está no código:** `RoomCategory` em cada `EscapeRoom` de `sample_data.dart`. A Home usa `RoomCarouselsSection` e `roomCardHeight`. “Ver tudo” é `/rooms/category/:category`. “Achar grupo” é `/rooms/:roomId/groups`. “Criar grupo” do cartão é `/groups/new?roomId=`. O da lista da sala usa `AppKeys.roomGroupsCreate`. O pino é `ScapePinIcon`.
 - **Como trocar depois:** um tema novo entra no enum, na ordem, no rótulo e na foto. Se a busca passar a ficar abaixo dos carrosséis, a troca é a ordem dos widgets em `HomeScreen`. Se a foto passar a ser por sala, o cartão deixa de ler `roomCategoryImage`.
+
+## A Home começa pelos carrosséis
+
+- **Data:** 2026-10-28
+- **Decisão:** o topo da Home fica baixo: “ScapeMatch” e a cidade na mesma linha, o aviso de dados de exemplo é um chip pequeno alinhado à esquerda, e não uma barra da largura da tela. A busca fica larga o bastante para o texto “Buscar sala ou casa”; quando essa linha não cabe, Criar grupo vira um botão + com o nome acessível “Criar grupo”. O chip Quase cheios continua abaixo. O subtítulo longo sai. A lista de grupos fica numa janela de altura fixa logo abaixo da busca. A barra de rolagem só aparece quando os cartões passam dessa altura. A busca, o chip Quase cheios, a cidade e o tipo de jogo filtram essa lista. Logo abaixo vêm os carrosséis, nesta ordem: Novidades (primário, no lugar em que o primeiro tema ficava), os dois primeiros temas com sala (secundários; em Curitiba, Terror e Mistério), o carrossel de promoções sem título de seção (só o flyer, setas e pontos), os temas restantes (terciários) e Salas mais procuradas. A ordem fictícia de procura está em `popularRoomRank`. Todo carrossel tem setas Anterior e Próximo, que somem na ponta e avançam com animação, além do arraste. Novidades, temas e Salas mais procuradas avançam a largura visível. As promoções avançam um flyer por vez (o cartaz mais o vão), para não pular um cartaz. Os pontos são um por parada que a seta alcança, contados pela largura do flyer desde o primeiro frame, e o último acende quando a faixa chega ao fim. Setas e pontos se recalculam quando a tela ou a fonte mudam. Novidades, temas e Salas mais procuradas têm “Ver tudo”. As promoções são quatro flyers fictícios e não aplicam desconto. Na tela de 390×844, com a barra inferior e sem inset extra de status, a faixa de Novidades cabe inteira. O Terror entra cortado: a foto e o título da primeira sala já aparecem. Isso passa de um terço do bloco, porque os botões do cartão ficam abaixo do título.
+- **Motivo:** o dono pediu a densidade de apps como o Sympla e a Buser: o que se descobre (novidades e salas) entra na primeira tela, e a busca não empurra isso para baixo com uma lista longa.
+- **Onde está no código:** `HomeScreen`, `NewsSection`, `RoomThemeSpan`, `PromoCarousel`, `PopularRoomsSection`, `ArrowCarousel` e `FindGroupsSection`. “Ver tudo” de novidades é `/news`. O das salas mais procuradas é `/rooms/popular`.
+- **Como trocar depois:** outra ordem é a sequência em `HomeScreen`. Um ranking real substitui `popularRoomRank`. Se a promoção passar a valer no preço, o flyer deixa de ser só imagem e o repositório de grupos aplica a regra.
 
 ## Aba Conta
 

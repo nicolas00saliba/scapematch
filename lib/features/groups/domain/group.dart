@@ -1,4 +1,5 @@
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
@@ -27,6 +28,7 @@ class Group {
     required this.totalSpots,
     required this.participants,
     required this.priceCents,
+    this.gameType = GameTypes.escapeRoom,
     this.note = '',
     this.cancelledAt,
   });
@@ -56,6 +58,9 @@ class Group {
 
   /// Fictional price per person, in cents, copied from the room.
   final int priceCents;
+
+  /// Tipo fictício do grupo. As salas ainda são todas de escape room.
+  final String gameType;
 
   /// Optional note the creator can edit. Empty when they wrote nothing.
   final String note;
@@ -116,6 +121,7 @@ class Group {
     String? note,
     DateTime? startsAt,
     DateTime? cancelledAt,
+    String? gameType,
   }) {
     return Group(
       id: id,
@@ -136,6 +142,7 @@ class Group {
       totalSpots: totalSpots ?? this.totalSpots,
       participants: participants ?? this.participants,
       priceCents: priceCents,
+      gameType: gameType ?? this.gameType,
       note: note ?? this.note,
       cancelledAt: cancelledAt ?? this.cancelledAt,
     );

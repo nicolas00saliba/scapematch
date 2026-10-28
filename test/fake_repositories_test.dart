@@ -5,6 +5,7 @@ import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 
@@ -48,8 +49,12 @@ void main() {
       houseNamesByCity[cityId] = houses.map((house) => house.name).toSet();
 
       final cityGroups = await groups.listByCity(cityId);
-      expect(cityGroups, hasLength(2), reason: cityId);
       expect(cityGroups.every((group) => group.cityId == cityId), isTrue);
+      if (cityId == SampleIds.curitiba) {
+        expect(cityGroups.length, greaterThan(2), reason: cityId);
+      } else {
+        expect(cityGroups, hasLength(2), reason: cityId);
+      }
 
       final almostFull = await groups.listByCity(cityId, almostFullOnly: true);
       expect(almostFull, isNotEmpty, reason: cityId);
@@ -117,6 +122,31 @@ void main() {
     );
   });
 
+  test('Curitiba groups cover every game type with a matching name', () {
+    final curitiba = database.groups.where(
+      (group) => group.cityId == SampleIds.curitiba,
+    );
+    expect(
+      curitiba.map((group) => group.gameType).toSet(),
+      containsAll([
+        GameTypes.escapeRoom,
+        GameTypes.rpg,
+        GameTypes.boardGame,
+        GameTypes.laserTag,
+        GameTypes.immersive,
+      ]),
+    );
+    final rpg = curitiba.singleWhere(
+      (group) => group.gameType == GameTypes.rpg,
+    );
+    expect(rpg.roomName, 'Mesa de RPG no porão');
+    expect(rpg.roomName, isNot(contains('Porão sem Luz')));
+    expect(
+      curitiba.where((group) => group.isAlmostFull).length,
+      inInclusiveRange(8, 10),
+    );
+  });
+
   test('each city leaves several free times on every room', () async {
     for (final cityId in SampleIds.cities) {
       final cityGroups = await groups.listByCity(cityId);
@@ -124,18 +154,22 @@ void main() {
       final open = cityGroups.where(
         (group) => !group.isAlmostFull && !group.isFull,
       );
-      expect(almost, hasLength(1), reason: cityId);
       expect(open, hasLength(1), reason: cityId);
       expect(
         open.single.openSeats,
         greaterThan(GroupRules.almostFullMaxOpenSeats),
         reason: cityId,
       );
-      expect(
-        cityGroups.map((group) => group.roomId).toSet(),
-        hasLength(2),
-        reason: cityId,
-      );
+      if (cityId == SampleIds.curitiba) {
+        expect(almost.length, inInclusiveRange(8, 10), reason: cityId);
+      } else {
+        expect(almost, hasLength(1), reason: cityId);
+        expect(
+          cityGroups.map((group) => group.roomId).toSet(),
+          hasLength(2),
+          reason: cityId,
+        );
+      }
 
       final houses = await catalog.listHousesByCity(cityId);
       for (final house in houses) {
