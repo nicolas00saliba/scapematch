@@ -8,6 +8,7 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Aba Conta. O desenho é do ScapeMatch: cartões claros, verde e cobre.
 class AccountScreen extends ConsumerWidget {
@@ -61,53 +62,61 @@ class AccountScreen extends ConsumerWidget {
   }
 }
 
-/// Créditos fictícios. 4000 centavos são R$ 40,00 que ninguém cobra.
-const accountWalletCents = 4000;
-
-class _WalletCard extends StatelessWidget {
+class _WalletCard extends ConsumerWidget {
   const _WalletCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Semantics(
-      container: true,
-      label:
-          'Carteira ScapeMatch, ${formatPrice(accountWalletCents)} em créditos fictícios',
-      child: Material(
-        color: AppColors.teal,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Carteira ScapeMatch',
-                key: AppKeys.accountWallet,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
+    final balance = ref.watch(walletBalanceProvider);
+    final amount = balance.maybeWhen(
+      data: (money) => formatPrice(money.cents),
+      orElse: () => '—',
+    );
+    return Material(
+      key: AppKeys.accountWallet,
+      color: AppColors.teal,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Carteira ScapeMatch',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(height: 8),
-              Text(
-                formatPrice(accountWalletCents),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              amount,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Créditos fictícios. Reembolsos simulados apareceriam aqui. Nada é cobrado.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.tealSoft,
-                  height: 1.35,
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Créditos fictícios. Reembolsos simulados apareceriam aqui. Nada é cobrado.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.tealSoft,
+                height: 1.35,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 14),
+            FilledButton(
+              key: AppKeys.accountAddBalance,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.teal,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () => context.push('/account/wallet/top-up'),
+              child: const Text('Adicionar saldo'),
+            ),
+          ],
         ),
       ),
     );
@@ -148,16 +157,16 @@ const _items = <_AccountItem>[
     icon: Icons.card_giftcard_outlined,
   ),
   _AccountItem(
+    destination: AccountDestination.cards,
+    title: 'Cartões cadastrados',
+    subtitle: 'Formas de pagamento da sua conta',
+    icon: Icons.credit_card_outlined,
+  ),
+  _AccountItem(
     destination: AccountDestination.help,
     title: 'Ajuda',
     subtitle: 'Respostas curtas desta versão',
     icon: Icons.help_outline,
-  ),
-  _AccountItem(
-    destination: AccountDestination.gift,
-    title: 'Resgatar vale-presente',
-    subtitle: 'Nenhum código é aceito ainda',
-    icon: Icons.confirmation_number_outlined,
   ),
 ];
 

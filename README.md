@@ -41,7 +41,7 @@ cd build/web && python3 -m http.server 8080
 2. **Topo curto:** cidade e tipo de jogo lado a lado, aviso de exemplo num chip pequeno, busca com o hint inteiro (em tela estreita, **Criar grupo** fica só o +) e o filtro **Quase cheios**. Os grupos ficam numa janela com rolagem, e a lista segue a busca, o filtro, a cidade e o tipo de jogo.
 3. Abaixo dos grupos, a ordem é **Promoções**, **Novidades** e **Salas**. Cada carrossel tem setas que andam um quadro inteiro e param com o cartão alinhado, no toque e no arrasto. No celular cabe um quadro; na coluna larga, dois. Novidades tem **Ver tudo**.
 4. **Salas** é um carrossel só, filtrado pela cidade e pelo tipo de jogo. O cartão tem foto, sala, casa, cidade e os botões **Achar grupo** e **Criar grupo**. Achar grupo abre os grupos daquela sala. Criar grupo abre o formulário com a sala já escolhida.
-5. **Conta**, na aba da direita: “Olá, Nícolas”, a carteira fictícia e os atalhos Perfil, Meus parceiros de jogo, Indique e ganhe, Ajuda, Resgatar vale-presente e a engrenagem de configurações. As telas dizem que o dado é de exemplo.
+5. **Conta**, na aba da direita: “Olá, Nícolas”, a carteira fictícia com **Adicionar saldo**, e os atalhos Perfil, Meus parceiros de jogo, Indique e ganhe, Cartões cadastrados e Ajuda, mais a engrenagem de configurações. Adicionar saldo e Adicionar cartão ainda não cobram nem pedem número de cartão. As telas dizem que o dado é de exemplo.
 6. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém. Não entra quem já está em outro grupo no mesmo horário, nem em sessão que já começou.
 7. **Criar grupo**: cidade, casa, sala, horário e quantas vagas você procura além de você. Você + vagas não podem passar da capacidade da sala. O tamanho do grupo é independente da lotação máxima da sala. O horário é uma das opções da sala, não uma data livre. Não nascem dois grupos na mesma sala no mesmo horário. Um horário que já passou é recusado. Pelo cartão da sala, a casa e a sala já vêm preenchidas.
 8. **Confirmar presença** na lista de quem já está. O criador confirma a própria. O detalhe mostra quantas presenças estão confirmadas.
@@ -50,7 +50,7 @@ cd build/web && python3 -m http.server 8080
 11. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
 12. **Meus grupos**, na aba do meio, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
 
-A aba Conta existe, mas ainda não há login. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo é “Nícolas”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois. A carteira, o vale e os parceiros de jogo são placeholders.
+A aba Conta existe, mas ainda não há login. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo é “Nícolas”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois. A carteira lê `WalletRepository` (saldo de exemplo) e os cartões leem `PaymentMethodsRepository` (lista vazia). O plano do pagamento real está em [docs/PAGAMENTOS_PLANO.md](docs/PAGAMENTOS_PLANO.md).
 
 ## Estrutura de pastas
 
@@ -106,7 +106,7 @@ As salas dos carrosséis usam essas mesmas figuras, por tema. Aventura tem um ar
 ## Próximos passos
 
 1. **Supabase / PostgreSQL** por trás das mesmas interfaces (`CityRepository`, `CatalogRepository`, `GroupRepository`), sem reescrever as telas. Entrar no grupo tem de ser a função atômica descrita em [docs/SUPABASE_ESQUEMA.md](docs/SUPABASE_ESQUEMA.md).
-2. Conta de usuário no lugar de `currentUserProvider`. O nome “Nícolas” sai quando o provider passar a ler a sessão. A carteira e o vale passam a ser de verdade, ou saem.
+2. Conta de usuário no lugar de `currentUserProvider`. O nome “Nícolas” sai quando o provider passar a ler a sessão. A carteira e os cartões passam a ser de verdade pelo caminho em [docs/PAGAMENTOS_PLANO.md](docs/PAGAMENTOS_PLANO.md).
 3. Trocar o catálogo fictício por salas e agendas que cada casa entregar (arquivo, API ou parceria). O encaixe é o `ExperienceSource`. O feed troca o `NewsRepository` pelo mesmo tipo de cuidado: site só com permissão, Instagram pela API oficial ou curadoria manual, cache e atribuição da fonte. O que pode e o que não pode ser coletado está em [docs/DADOS_REAIS.md](docs/DADOS_REAIS.md).
 4. Publicar nas lojas quando o fluxo estiver estável com dados reais.
 

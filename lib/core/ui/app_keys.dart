@@ -40,8 +40,14 @@ abstract final class AppKeys {
   static const accountSettings = Key('account-settings');
   static const accountGreeting = Key('account-greeting');
   static const accountWallet = Key('account-wallet');
-  static const giftCode = Key('gift-code');
-  static const giftRedeem = Key('gift-redeem');
+  static const accountAddBalance = Key('account-add-balance');
+  static const addCard = Key('add-card');
+  static const addCardNotice = Key('add-card-notice');
+  static const addBalanceConfirm = Key('add-balance-confirm');
+  static const topUpOtherAmount = Key('top-up-other-amount');
+  static const payWithCard = Key('pay-with-card');
+  static const payWithPix = Key('pay-with-pix');
+  static Key topUpAmount(int cents) => Key('top-up-$cents');
   static const groupSearch = Key('group-search');
   static const newsFeed = Key('news-feed');
   static const newsCategoryAll = Key('news-category-all');

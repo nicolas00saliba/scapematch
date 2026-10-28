@@ -2,6 +2,14 @@
 
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
+## Conta: carteira, cartões e saldo
+
+- **Data:** 2026-10-28
+- **Decisão:** a lista da Conta é Perfil, Meus parceiros de jogo, Indique e ganhe, Cartões cadastrados e Ajuda. “Resgatar vale-presente” saiu. Cartões cadastrados abre uma lista vazia, “Nenhum cartão cadastrado”, e o botão Adicionar cartão só avisa que o cadastro chega em breve. Não há campo de número, validade nem código de segurança. No quadro verde da Carteira ScapeMatch há o botão Adicionar saldo, em branco com texto verde. Ele abre uma tela de preparativos com R$ 20, R$ 50, R$ 100 e outro valor, e as formas Cartão cadastrado e Pix desligadas, com “Em breve”. Confirmar fica desligado. Nada é cobrado e o saldo não muda. O saldo da carteira é o do `WalletRepository` (hoje R$ 40,00, a soma de um crédito de exemplo). Os cartões vêm do `PaymentMethodsRepository`, hoje vazio. Um método de pagamento só guarda bandeira, quatro últimos dígitos e apelido. O plano do que falta está em [PAGAMENTOS_PLANO.md](PAGAMENTOS_PLANO.md).
+- **Motivo:** o dono quer o lugar da carteira e dos cartões antes do pagamento de verdade, sem coletar dado de cartão nesta versão.
+- **Onde está no código:** `AccountScreen`, `PaymentMethodsBody`, `AddBalanceScreen`, `WalletRepository`, `PaymentMethodsRepository` e os providers em `lib/providers/repositories.dart`.
+- **Como trocar depois:** o provider aponta para a implementação do Supabase e do gateway. A tela de confirmar passa a chamar `addBalance` com uma chave de idempotência. O cadastro de cartão passa a guardar o token do provedor, não o número.
+
 ## Ordem da Home e quadros inteiros
 
 - **Data:** 2026-10-28
@@ -245,7 +253,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Aba Conta
 
 - **Data:** 2026-10-28
-- **Decisão:** a barra fica Home, Meus grupos, Conta. A Conta cumprimenta com “Olá,” e o nome do usuário atual. O exemplo é “Olá, Nícolas”. Há um cartão “Carteira ScapeMatch” com R$ 40,00 de créditos fictícios. A lista, em cartões, é Perfil, Meus parceiros de jogo, Indique e ganhe, Ajuda e Resgatar vale-presente. A engrenagem no topo abre Configurações. Cada destino é uma tela curta que diz que o dado é de exemplo. Nada disso cobra, paga ou grava um perfil de verdade.
-- **Motivo:** o dono pediu um lugar de conta no espírito de um app de passagens, com o visual do ScapeMatch e os nomes adaptados (viajantes viram parceiros de jogo). A carteira e o vale existem para a pessoa ver o lugar, não para movimentar dinheiro.
+- **Decisão:** a lista e a carteira desta seção foram atualizadas em “Conta: carteira, cartões e saldo”. O que segue vale para o resto: a barra fica Home, Meus grupos, Conta. A Conta cumprimenta com “Olá,” e o nome do usuário atual. O exemplo é “Olá, Nícolas”. A engrenagem no topo abre Configurações. Cada destino é uma tela curta que diz que o dado é de exemplo. Nada disso cobra, paga ou grava um perfil de verdade.
+- **Motivo:** o dono pediu um lugar de conta no espírito de um app de passagens, com o visual do ScapeMatch e os nomes adaptados (viajantes viram parceiros de jogo).
 - **Onde está no código:** ramo 2 do `StatefulShellRoute` (`/account`), `AccountScreen` e `AccountDestinationScreen`. O nome vem de `currentUserProvider`.
-- **Como trocar depois:** login de verdade substitui o provider. A carteira passa a ler um saldo. O vale passa a validar um código. Os textos de “fictício” saem dessas telas.
+- **Como trocar depois:** login de verdade substitui o provider. O saldo e os cartões seguem o plano em [PAGAMENTOS_PLANO.md](PAGAMENTOS_PLANO.md). Os textos de “fictício” saem dessas telas.
