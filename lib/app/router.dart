@@ -12,6 +12,7 @@ import 'package:scapematch/features/groups/presentation/my_groups_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'package:scapematch/features/news/presentation/news_browse_screen.dart';
 import 'package:scapematch/features/news/presentation/news_detail_screen.dart';
+import 'package:scapematch/features/wallet/presentation/add_balance_screen.dart';
 
 /// Rotas do app.
 ///
@@ -91,6 +92,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           return RoomGroupsScreen(roomId: state.pathParameters['roomId']!);
         },
+      ),
+      GoRoute(
+        path: '/account/wallet/top-up',
+        name: 'add-balance',
+        builder: (context, state) => const AddBalanceScreen(),
       ),
       GoRoute(
         path: '/account/:destination',

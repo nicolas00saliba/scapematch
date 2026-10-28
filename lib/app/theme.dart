@@ -55,6 +55,7 @@ ThemeData buildAppTheme() {
         color: AppColors.ink,
         fontSize: 20,
         fontWeight: FontWeight.w700,
+        fontFamily: 'Roboto',
       ),
     ),
     cardTheme: CardThemeData(
@@ -70,7 +71,11 @@ ThemeData buildAppTheme() {
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(52),
         shape: rounded,
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Roboto',
+        ),
       ),
     ),
     chipTheme: ChipThemeData(
@@ -80,6 +85,7 @@ ThemeData buildAppTheme() {
       labelStyle: const TextStyle(
         color: AppColors.ink,
         fontWeight: FontWeight.w600,
+        fontFamily: 'Roboto',
       ),
       side: const BorderSide(color: AppColors.line),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),

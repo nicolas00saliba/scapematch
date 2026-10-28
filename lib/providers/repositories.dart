@@ -13,6 +13,10 @@ import 'package:scapematch/features/groups/data/group_repository.dart';
 import 'package:scapematch/features/news/data/fake_news_repository.dart';
 import 'package:scapematch/features/news/data/news_repository.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
+import 'package:scapematch/features/payments/data/fake_payment_methods_repository.dart';
+import 'package:scapematch/features/payments/data/payment_methods_repository.dart';
+import 'package:scapematch/features/wallet/data/fake_wallet_repository.dart';
+import 'package:scapematch/features/wallet/data/wallet_repository.dart';
 
 /// Wall clock for rules that compare a session with "now".
 ///
@@ -46,6 +50,20 @@ final groupRepositoryProvider = Provider<GroupRepository>((ref) {
 
 /// Feed fictício. A Home lê [newsRepositoryProvider], não a lista de exemplo.
 /// Trocar pela fonte real é apontar este provider para outra classe.
+/// Saldo fictício da Conta. A tela lê este provider, não um número solto.
+/// Trocar pelo livro-razão real é apontar para outra classe.
+final walletRepositoryProvider = Provider<WalletRepository>((ref) {
+  return FakeWalletRepository();
+});
+
+/// Cartões cadastrados. Hoje a lista vem vazia. O cadastro real entra
+/// com token do provedor, sem número completo neste app.
+final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((
+  ref,
+) {
+  return FakePaymentMethodsRepository();
+});
+
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {
   final now = ref.watch(clockProvider).now();
   return FakeNewsRepository(items: buildSampleNews(now));

@@ -1,43 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/theme.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
 
 /// Tela curta de um item da Conta. Tudo aqui é placeholder fictício.
-class AccountDestinationScreen extends ConsumerStatefulWidget {
+class AccountDestinationScreen extends ConsumerWidget {
   const AccountDestinationScreen({super.key, required this.destinationName});
 
   final String destinationName;
 
   @override
-  ConsumerState<AccountDestinationScreen> createState() =>
-      _AccountDestinationScreenState();
-}
-
-class _AccountDestinationScreenState
-    extends ConsumerState<AccountDestinationScreen> {
-  final _giftCode = TextEditingController();
-  String? _giftMessage;
-
-  @override
-  void dispose() {
-    _giftCode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final destination = accountDestinationByName(widget.destinationName);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final destination = accountDestinationByName(destinationName);
     final title = switch (destination) {
       AccountDestination.profile => 'Perfil',
       AccountDestination.partners => 'Meus parceiros de jogo',
       AccountDestination.referral => 'Indique e ganhe',
+      AccountDestination.cards => 'Cartões cadastrados',
       AccountDestination.help => 'Ajuda',
-      AccountDestination.gift => 'Resgatar vale-presente',
       AccountDestination.settings => 'Configurações',
       null => 'Conta',
     };
@@ -52,13 +36,17 @@ class _AccountDestinationScreenState
           if (destination == null)
             const Text('Essa página não existe.')
           else
-            ..._body(destination),
+            ..._body(context, ref, destination),
         ],
       ),
     );
   }
 
-  List<Widget> _body(AccountDestination destination) {
+  List<Widget> _body(
+    BuildContext context,
+    WidgetRef ref,
+    AccountDestination destination,
+  ) {
     final name = ref.watch(currentUserProvider).displayName;
     final theme = Theme.of(context);
     return switch (destination) {
@@ -95,6 +83,7 @@ class _AccountDestinationScreenState
               'Código fictício. Indique e ganhe não paga nada nesta versão.',
         ),
       ],
+      AccountDestination.cards => [const PaymentMethodsBody()],
       AccountDestination.help => [
         const _InfoCard(
           title: 'Como achar um grupo?',
@@ -105,35 +94,6 @@ class _AccountDestinationScreenState
           title: 'Os dados são de exemplo',
           subtitle: 'Casas, salas, notícias e a carteira foram inventados. Nada é cobrado.',
         ),
-      ],
-      AccountDestination.gift => [
-        const Text(
-          'Digite um código. Nenhum vale é aceito nesta versão. O resgate é fictício.',
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          key: AppKeys.giftCode,
-          controller: _giftCode,
-          decoration: const InputDecoration(
-            labelText: 'Código do vale',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          key: AppKeys.giftRedeem,
-          onPressed: () {
-            setState(() {
-              _giftMessage =
-                  'Nenhum vale é aceito nesta versão. O resgate é fictício.';
-            });
-          },
-          child: const Text('Resgatar'),
-        ),
-        if (_giftMessage != null) ...[
-          const SizedBox(height: 12),
-          Text(_giftMessage!),
-        ],
       ],
       AccountDestination.settings => [
         const _InfoCard(
