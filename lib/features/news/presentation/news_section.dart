@@ -19,7 +19,7 @@ final homeNewsProvider = FutureProvider.autoDispose<List<NewsItem>>((ref) {
 
 /// Altura da foto no carrossel primário. O valor deixa a faixa inteira na
 /// primeira tela de 390×844 e corta o tema seguinte.
-const newsCarouselImageHeight = 336.0;
+const newsCarouselImageHeight = 280.0;
 const newsCarouselCardWidth = 340.0;
 
 double newsCarouselCardHeight(BuildContext context) {
@@ -27,31 +27,30 @@ double newsCarouselCardHeight(BuildContext context) {
   final scaler = MediaQuery.textScalerOf(context);
   const width = newsCarouselCardWidth;
   const pad = 12.0;
-  final title = _lineHeight(
-    'Sala nova: A Biblioteca Proibida',
-    theme.textTheme.titleSmall!.copyWith(
-      fontWeight: FontWeight.w800,
-      height: 1.2,
-    ),
-    scaler,
-    width - pad * 2,
-    2,
+  final contentWidth = width - pad * 2;
+  final titleStyle = theme.textTheme.titleSmall!.copyWith(
+    fontWeight: FontWeight.w800,
+    height: 1.2,
   );
+  // A amostra curta cabe em uma linha e a altura vinha menor que o título
+  // real. Duas linhas ficam reservadas em qualquer textScale.
+  final title = _lineHeight('Ag', titleStyle, scaler, contentWidth, 1) * 2;
   final meta = _lineHeight(
     'Portal do Batel',
     theme.textTheme.labelMedium!,
     scaler,
-    width - pad * 2,
+    contentWidth,
     1,
   );
   final when = _lineHeight(
-    'há 2 h',
+    'há 30 min',
     theme.textTheme.bodySmall!,
     scaler,
-    width - pad * 2,
+    contentWidth,
     1,
   );
-  return newsCarouselImageHeight + 8 + meta + 4 + title + 2 + when + pad;
+  return (newsCarouselImageHeight + 8 + meta + 4 + title + 2 + when + pad)
+      .ceilToDouble();
 }
 
 double _lineHeight(

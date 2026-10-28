@@ -43,6 +43,7 @@ class PromoCarousel extends StatelessWidget {
   const PromoCarousel({super.key});
 
   static const cardWidth = 300.0;
+  static const gap = 12.0;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +54,9 @@ class PromoCarousel extends StatelessWidget {
         id: 'promos',
         height: height,
         itemCount: promoFlyers.length,
+        gap: gap,
+        // Um flyer por toque. A largura da tela pularia o cartaz seguinte.
+        pageExtent: cardWidth + gap,
         showDots: true,
         itemBuilder: (context, index) {
           final flyer = promoFlyers[index];

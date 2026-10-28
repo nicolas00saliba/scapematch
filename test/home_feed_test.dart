@@ -94,14 +94,8 @@ void main() {
 
     expect(find.text('São Paulo'), findsWidgets);
     expect(find.text('Curitiba'), findsNothing);
-    expect(
-      find.byKey(AppKeys.roomCard(SampleIds.roomSpMetro)),
-      findsWidgets,
-    );
-    expect(
-      find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
-      findsNothing,
-    );
+    expect(find.byKey(AppKeys.roomCard(SampleIds.roomSpMetro)), findsWidgets);
+    expect(find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)), findsNothing);
     expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spLinha)), findsOneWidget);
     expect(
       find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
@@ -202,7 +196,10 @@ void main() {
     await tester.pumpAndSettle();
     await _selectCity(tester, SampleIds.saoPaulo);
     await _scrollNews(tester, AppKeys.newsCard(SampleNewsIds.spLinha));
-    expect(find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)), findsNothing);
+    expect(
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+      findsNothing,
+    );
     expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spLinha)), findsWidgets);
     expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spPromo)), findsWidgets);
   });
@@ -283,7 +280,9 @@ void main() {
     );
     await _selectCity(tester, SampleIds.curitiba);
     await _scrollNews(tester, AppKeys.newsCard(SampleNewsIds.cwbBiblioteca));
-    final card = find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)).first;
+    final card = find
+        .byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca))
+        .first;
     final rect = tester.getRect(card);
     await tester.tapAt(Offset(rect.left + 24, rect.center.dy));
     await tester.pumpAndSettle();
@@ -385,7 +384,27 @@ void main() {
     );
 
     await _selectCity(tester, SampleIds.curitiba);
-    await _scrollNews(tester, AppKeys.newsCard(SampleNewsIds.cwbBiblioteca));
+    // Em 320px a busca fica na linha de baixo e o centro da faixa horizontal
+    // cai na barra. O salto no controller monta o cartão sem depender do toque.
+    final newsScroll = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(AppKeys.newsFeed),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
+        ),
+      ),
+    );
+    final card = find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca));
+    while (card.evaluate().isEmpty &&
+        newsScroll.position.pixels < newsScroll.position.maxScrollExtent) {
+      newsScroll.position.jumpTo(
+        (newsScroll.position.pixels + 300).clamp(
+          0.0,
+          newsScroll.position.maxScrollExtent,
+        ),
+      );
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);

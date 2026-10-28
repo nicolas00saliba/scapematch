@@ -19,6 +19,9 @@ class FindGroupsSection extends ConsumerStatefulWidget {
   ConsumerState<FindGroupsSection> createState() => _FindGroupsSectionState();
 }
 
+const _searchPrefixSlot = 28.0;
+const _searchEndPad = 4.0;
+
 class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
   late final TextEditingController _search;
 
@@ -48,57 +51,10 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: TextField(
-                key: AppKeys.groupSearch,
-                controller: _search,
-                textInputAction: TextInputAction.search,
-                onChanged: (value) {
-                  ref.read(groupSearchQueryProvider.notifier).setQuery(value);
-                },
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: 'Buscar sala ou casa',
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppColors.line),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppColors.line),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: FilledButton.tonalIcon(
-                key: AppKeys.createGroup,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(44, 44),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-                onPressed: () => context.push('/groups/new'),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text(
-                  'Criar grupo',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return _searchBar(context, constraints.maxWidth);
+          },
         ),
         const SizedBox(height: 6),
         Align(
@@ -129,6 +85,130 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         ],
       ],
     );
+  }
+
+  Widget _searchBar(BuildContext context, double width) {
+    final theme = Theme.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    final hintStyle =
+        theme.textTheme.bodyLarge ?? const TextStyle(fontSize: 16);
+    final buttonStyle =
+        theme.filledButtonTheme.style?.textStyle?.resolve({}) ??
+        const TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
+    final hintWidth = _textWidth('Buscar sala ou casa', hintStyle, scaler);
+    final labelWidth = _textWidth('Criar grupo', buttonStyle, scaler);
+    // O ícone de busca fica estreito de propósito: o hint precisa caber
+    // inteiro numa tela de 390px, e o prefixo padrão come essa largura.
+    const fieldChrome = _searchPrefixSlot + _searchEndPad + 4;
+    const gap = 8.0;
+    const labeledChrome = 18.0 + 8.0 + 24.0;
+    const iconButton = 48.0;
+    final withLabel =
+        fieldChrome + hintWidth + gap + labeledChrome + labelWidth;
+    final withIcon = fieldChrome + hintWidth + gap + iconButton;
+    final field = _searchField();
+    if (withLabel <= width) {
+      return Row(
+        children: [
+          Expanded(child: field),
+          const SizedBox(width: gap),
+          _labeledCreate(context),
+        ],
+      );
+    }
+    if (withIcon <= width) {
+      return Row(
+        children: [
+          Expanded(child: field),
+          const SizedBox(width: gap),
+          _iconCreate(context),
+        ],
+      );
+    }
+    final create = labelWidth + labeledChrome <= width
+        ? _labeledCreate(context)
+        : _iconCreate(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field,
+        const SizedBox(height: 8),
+        Align(alignment: Alignment.centerLeft, child: create),
+      ],
+    );
+  }
+
+  Widget _searchField() {
+    return TextField(
+      key: AppKeys.groupSearch,
+      controller: _search,
+      textInputAction: TextInputAction.search,
+      onChanged: (value) {
+        ref.read(groupSearchQueryProvider.notifier).setQuery(value);
+      },
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: 'Buscar sala ou casa',
+        prefixIcon: const Icon(Icons.search, size: 20),
+        prefixIconConstraints: const BoxConstraints(
+          minWidth: _searchPrefixSlot,
+          minHeight: 40,
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.fromLTRB(0, 10, _searchEndPad, 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.line),
+        ),
+      ),
+    );
+  }
+
+  Widget _labeledCreate(BuildContext context) {
+    return FilledButton.tonalIcon(
+      key: AppKeys.createGroup,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(44, 48),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+      ),
+      onPressed: () => context.push('/groups/new'),
+      icon: const Icon(Icons.add, size: 18),
+      label: const Text(
+        'Criar grupo',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _iconCreate(BuildContext context) {
+    return IconButton.filledTonal(
+      key: AppKeys.createGroup,
+      tooltip: 'Criar grupo',
+      onPressed: () => context.push('/groups/new'),
+      style: IconButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        fixedSize: const Size(48, 48),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      icon: const Icon(Icons.add),
+    );
+  }
+
+  double _textWidth(String text, TextStyle style, TextScaler scaler) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    return painter.width;
   }
 
   String? _cityName(WidgetRef ref, String cityId) {

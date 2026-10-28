@@ -38,8 +38,8 @@ cd build/web && python3 -m http.server 8080
 ## O que dá para fazer agora
 
 1. O app abre na **Home**. A barra de baixo é **Home**, **Meus grupos** e **Conta**. Sem cidade salva, Curitiba já entra selecionada. Uma escolha salva prevalece e fica no aparelho (`shared_preferences`). A cidade é o filtro dos grupos, das salas e das notícias. O seletor continua na tela para trocar.
-2. **Topo curto:** cidade ao lado do nome, aviso de exemplo recolhido, busca ao lado de **Criar grupo** e o filtro **Quase cheios**. A lista de grupos só aparece quando há texto na busca, ou quando o filtro está ligado.
-3. **Novidades** é o primeiro carrossel. Depois vêm os temas de sala, um carrossel de promoções sem título (só o cartaz), os temas restantes e **Salas mais procuradas**. Todos têm setas. Novidades, temas e salas mais procuradas têm **Ver tudo**.
+2. **Topo curto:** cidade ao lado do nome, aviso de exemplo num chip pequeno, busca com o hint inteiro (em tela estreita, **Criar grupo** fica só o +) e o filtro **Quase cheios**. A lista de grupos só aparece quando há texto na busca, ou quando o filtro está ligado.
+3. **Novidades** é o primeiro carrossel. Depois vêm os temas de sala, um carrossel de promoções sem título (só o cartaz), os temas restantes e **Salas mais procuradas**. Todos têm setas. Nas promoções, cada toque mostra o flyer seguinte. Novidades, temas e salas mais procuradas têm **Ver tudo**.
 4. **Salas** nos carrosséis: foto, sala, casa, cidade e os botões **Achar grupo** e **Criar grupo**. Achar grupo abre os grupos daquela sala. Criar grupo abre o formulário com a sala já escolhida.
 5. **Conta**, na aba da direita: “Olá, Nícolas”, a carteira fictícia e os atalhos Perfil, Meus parceiros de jogo, Indique e ganhe, Ajuda, Resgatar vale-presente e a engrenagem de configurações. As telas dizem que o dado é de exemplo.
 6. Abrir um grupo e tocar em **Entrar no grupo**. A vaga muda na hora, só nesta sessão. Grupo cheio não aceita mais ninguém. Não entra quem já está em outro grupo no mesmo horário, nem em sessão que já começou.
