@@ -33,8 +33,8 @@ Tela  ->  view model  ->  repositório (interface)  ->  fonte de dados
 3. O topo é `FindGroupsSection`: busca com o hint inteiro e Criar grupo na mesma linha quando cabe; em tela estreita o botão vira só o ícone +, com o nome “Criar grupo”. O chip Quase cheios fica abaixo. O aviso de dados de exemplo é um chip pequeno, não uma barra. A lista de grupos fica numa janela com rolagem própria. O texto, o chip, a cidade e o tipo de jogo filtram em memória (`filterGroupsByText`, `filterGroupsByGameType`). Criar grupo abre `/groups/new`.
 4. O `FakeGroupRepository` filtra `FakeDatabase.groups`. Esses grupos foram montados em `sample_data.dart`.
 5. A janela de grupos mostra carregando, erro ou os cartões. A barra vertical só entra quando o conteúdo passa da altura.
-6. Em seguida, `NewsSection` lê `homeNewsProvider` (cidade, sem chip) e desenha o carrossel primário. “Ver tudo” abre `/news`, onde os chips filtram `newsFeedViewModelProvider`.
-7. `RoomThemeSpan` desenha os temas. Os dois primeiros ficam antes de `PromoCarousel`. O resto fica depois. `PopularRoomsSection` fecha a página. As setas estão em `ArrowCarousel`. Nas promoções, `pageExtent` faz cada toque andar um flyer. “Achar grupo” abre `/rooms/:roomId/groups`. “Criar grupo” do cartão abre `/groups/new?roomId=`.
+6. Abaixo da janela vêm, nesta ordem, `PromoCarousel`, `NewsSection` e `RoomsCarousel`. `NewsSection` lê `homeNewsProvider` (cidade e tipo de jogo, sem chip). “Ver tudo” abre `/news`, onde os chips filtram `newsFeedViewModelProvider` só por categoria. O carrossel de salas é um só e respeita a cidade e o tipo de jogo. “Achar grupo” abre `/rooms/:roomId/groups`. “Criar grupo” do cartão abre `/groups/new?roomId=`.
+7. As setas estão em `ArrowCarousel`. Cada toque anda um quadro inteiro (`CarouselLayout`). Soltar o dedo alinha no quadro mais próximo. Não há carrossel por tema nem “Salas mais procuradas” na Home.
 8. A aba Conta (`/account`) lê `currentUserProvider` para a saudação. Os destinos (`/account/:destination`) são placeholders. O nome de exemplo é Nícolas.
 
 A rota antiga `/groups` redireciona para `/`. Meus grupos continua em `/groups/mine`.

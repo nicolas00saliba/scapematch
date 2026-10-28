@@ -13,44 +13,22 @@ import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('Curitiba carousels show a room card with the city pin', (
+  testWidgets('the room carousel shows a card with the city pin', (
     tester,
   ) async {
     await pumpScapeMatch(tester);
-
-    await tester.scrollUntilVisible(
-      find.byKey(AppKeys.roomCarousel('mystery')),
-      400,
-      scrollable: find
-          .descendant(
-            of: find.byType(SingleChildScrollView),
-            matching: find.byWidgetPredicate(
-              (widget) => widget is Scrollable && widget.axis == Axis.vertical,
-            ),
-          )
-          .first,
-    );
-    await tester.scrollUntilVisible(
-      find.descendant(
-        of: find.byKey(AppKeys.roomCarousel('mystery')),
-        matching: find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
-      ),
-      300,
-      scrollable: find.descendant(
-        of: find.byKey(AppKeys.roomCarousel('mystery')),
-        matching: find.byWidgetPredicate(
-          (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
-        ),
-      ),
+    await _revealRoom(
+      tester,
+      find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
     );
 
-    expect(find.byKey(AppKeys.roomCarousel('terror')), findsOneWidget);
-    expect(find.byKey(AppKeys.roomCarousel('mystery')), findsOneWidget);
-    expect(find.byKey(AppKeys.roomSeeAll('mystery')), findsOneWidget);
-    expect(find.text('Ver tudo'), findsWidgets);
+    expect(find.byKey(AppKeys.roomsCarousel), findsOneWidget);
+    expect(find.byKey(AppKeys.roomCarousel('terror')), findsNothing);
+    expect(find.byKey(AppKeys.roomSeeAll('mystery')), findsNothing);
+    expect(find.text('Salas mais procuradas'), findsNothing);
     expect(
       find.descendant(
-        of: find.byKey(AppKeys.roomCarousel('mystery')),
+        of: find.byKey(AppKeys.roomsCarousel),
         matching: find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
       ),
       findsOneWidget,
@@ -181,37 +159,37 @@ void main() {
     );
   });
 
-  testWidgets('each Curitiba carousel scrolls past the first card', (
+  testWidgets('the room carousel snaps one whole card at a time', (
     tester,
   ) async {
     await pumpScapeMatch(tester);
-    for (final category in const [
-      'terror',
-      'mystery',
-      'adventure',
-      'scienceFiction',
-      'steampunk',
-      'egypt',
-    ]) {
-      final carousel = find.byKey(AppKeys.roomCarousel(category));
-      await tester.scrollUntilVisible(
-        carousel,
-        400,
-        scrollable: verticalScrollable,
-      );
-      final scrollable = find.descendant(
-        of: carousel,
-        matching: find.byWidgetPredicate(
-          (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
-        ),
-      );
-      final position = tester.state<ScrollableState>(scrollable).position;
-      expect(position.maxScrollExtent, greaterThan(0), reason: category);
-      final before = position.pixels;
-      await tester.drag(scrollable, const Offset(-140, 0));
-      await tester.pumpAndSettle();
-      expect(position.pixels, greaterThan(before), reason: category);
-    }
+    final carousel = find.byKey(AppKeys.roomsCarousel);
+    await tester.scrollUntilVisible(
+      carousel,
+      400,
+      scrollable: verticalScrollable,
+    );
+    final scrollable = find.descendant(
+      of: carousel,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
+      ),
+    );
+    final position = tester.state<ScrollableState>(scrollable).position;
+    expect(position.maxScrollExtent, greaterThan(0));
+    final before = position.pixels;
+    final next = find.byKey(AppKeys.carouselNext('rooms'));
+    await tester.ensureVisible(next);
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(before + 40));
+    final stride = position.pixels - before;
+    final view = tester.getRect(scrollable);
+    final item = find.byKey(AppKeys.carouselItem('rooms', 1));
+    final rect = tester.getRect(item);
+    expect(rect.left, closeTo(view.left, 2));
+    expect(rect.right, lessThanOrEqualTo(view.right + 1));
+    expect(position.pixels, closeTo(stride, 1));
   });
 
   testWidgets('room carousel matches the card and stays tappable at 1.6x', (
@@ -224,7 +202,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     await tester.pumpAndSettle();
 
-    final carousel = find.byKey(AppKeys.roomCarousel('mystery'));
+    final carousel = find.byKey(AppKeys.roomsCarousel);
     await tester.scrollUntilVisible(
       carousel,
       400,
@@ -241,25 +219,18 @@ void main() {
         .height;
     expect(listHeight - tallest, inInclusiveRange(-1, 4));
 
-    final button = find
-        .byKey(AppKeys.roomFindGroup(SampleIds.roomCwbCofre))
-        .first;
-    await tester.ensureVisible(button);
-    await tester.pumpAndSettle();
+    final button = await _revealRoom(
+      tester,
+      find.byKey(AppKeys.roomFindGroup(SampleIds.roomCwbCofre)),
+    );
     expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
     final label = find.descendant(
       of: button,
       matching: find.text('Achar grupo'),
     );
+    final labelStyle = tester.widget<Text>(label).style;
     final natural = TextPainter(
-      text: const TextSpan(
-        text: 'Achar grupo',
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          height: 1.2,
-        ),
-      ),
+      text: TextSpan(text: 'Achar grupo', style: labelStyle),
       textDirection: TextDirection.ltr,
       textScaler: MediaQuery.textScalerOf(tester.element(button)),
     )..layout();
@@ -275,21 +246,7 @@ void main() {
     tester.view.physicalSize = const Size(360, 780);
     tester.view.devicePixelRatio = 1;
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(AppKeys.roomCarousel('egypt')),
-      400,
-      scrollable: verticalScrollable,
-    );
-    await tester.scrollUntilVisible(
-      find.byKey(AppKeys.roomCard('room-cwb-tumba')),
-      300,
-      scrollable: find.descendant(
-        of: find.byKey(AppKeys.roomCarousel('egypt')),
-        matching: find.byWidgetPredicate(
-          (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
-        ),
-      ),
-    );
+    await _revealRoom(tester, find.byKey(AppKeys.roomCard('room-cwb-tumba')));
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(AppKeys.accountTab));
@@ -300,28 +257,38 @@ void main() {
 }
 
 Future<void> _openRoomAction(WidgetTester tester, Key key) async {
+  final target = await _revealRoom(tester, find.byKey(key));
+  await tester.tap(target);
+  await tester.pumpAndSettle();
+}
+
+Future<Finder> _revealRoom(WidgetTester tester, Finder target) async {
   await tester.scrollUntilVisible(
-    find.byKey(AppKeys.roomCarousel('mystery')),
+    find.byKey(AppKeys.roomsCarousel),
     400,
     scrollable: verticalScrollable,
   );
-  final target = find.descendant(
-    of: find.byKey(AppKeys.roomCarousel('mystery')),
-    matching: find.byKey(key),
-  );
-  await tester.scrollUntilVisible(
-    target,
-    300,
-    scrollable: find.descendant(
-      of: find.byKey(AppKeys.roomCarousel('mystery')),
-      matching: find.byWidgetPredicate(
-        (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
-      ),
+  final scrollable = find.descendant(
+    of: find.byKey(AppKeys.roomsCarousel),
+    matching: find.byWidgetPredicate(
+      (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
     ),
   );
-  // O centro do botão precisa caber na tela. Um pedaço visível não basta.
-  await tester.ensureVisible(target);
-  await tester.pumpAndSettle();
-  await tester.tap(target);
-  await tester.pumpAndSettle();
+  for (var step = 0; step < 30; step++) {
+    if (target.evaluate().isNotEmpty) {
+      final rect = tester.getRect(target.first);
+      final view = tester.getRect(scrollable);
+      if (rect.left >= view.left - 1 && rect.right <= view.right + 1) {
+        await tester.ensureVisible(target.first);
+        await tester.pumpAndSettle();
+        return target.first;
+      }
+    }
+    final next = find.byKey(AppKeys.carouselNext('rooms'));
+    expect(next, findsOneWidget, reason: 'o cartão não entrou no carrossel');
+    await tester.ensureVisible(next);
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+  }
+  fail('não achei o cartão no carrossel de salas');
 }

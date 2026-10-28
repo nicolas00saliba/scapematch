@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
-import 'package:scapematch/features/catalog/presentation/popular_rooms_section.dart';
-import 'package:scapematch/features/catalog/presentation/room_carousels_section.dart';
+import 'package:scapematch/features/catalog/presentation/rooms_carousel.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 import 'package:scapematch/features/groups/presentation/game_type_selector.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
-/// Home densa: topo curto e carrosséis logo em seguida.
-///
-/// Primário: novidades. Secundários: os dois primeiros temas com sala.
-/// Depois, promoções sem título. Terciários: o restante dos temas e as
-/// salas mais procuradas.
+/// Home: cidade e jogo, grupos, promoções, novidades e um carrossel de salas.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -31,16 +26,12 @@ class HomeScreen extends StatelessWidget {
             ExampleDataBanner(),
             SizedBox(height: 6),
             FindGroupsSection(),
-            SizedBox(height: 8),
-            NewsSection(),
-            SizedBox(height: 8),
-            RoomThemeSpan(start: 0, count: 2),
-            SizedBox(height: 8),
+            SizedBox(height: 12),
             PromoCarousel(),
             SizedBox(height: 12),
-            RoomThemeSpan(start: 2),
+            NewsSection(),
             SizedBox(height: 12),
-            PopularRoomsSection(),
+            RoomsCarousel(),
           ],
         ),
       ),

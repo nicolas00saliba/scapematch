@@ -9,7 +9,7 @@ final selectedGameTypeStoreProvider = Provider<SelectedGameTypeStore>(
   (ref) => SelectedGameTypeStore(),
 );
 
-/// Tipo de jogo atual. Não filtra salas nem notícias nesta versão.
+/// Tipo de jogo atual. Filtra a janela de grupos, as novidades e as salas.
 class SelectedGameTypeController extends Notifier<String> {
   @override
   String build() => ref.watch(selectedGameTypeStoreProvider).resolve();

@@ -1,3 +1,5 @@
+import 'package:scapematch/features/groups/domain/game_type.dart';
+
 /// Categoria do feed. Os nomes na tela ficam em `news_labels.dart`.
 enum NewsCategory { newRoom, schedule, promotion, event }
 
@@ -28,6 +30,7 @@ class NewsItem {
     this.image,
     this.illustration = NewsIllustration.category,
     this.sourceUrl,
+    this.gameType = GameTypes.escapeRoom,
   });
 
   final String id;
@@ -51,4 +54,8 @@ class NewsItem {
   final String? sourceUrl;
 
   final NewsSourceKind sourceKind;
+
+  /// Gênero da notícia, no mesmo id de [GameTypes]. Uma fonte real preenche
+  /// este campo. Sem ele, a notícia conta como escape room.
+  final String gameType;
 }

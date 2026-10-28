@@ -38,41 +38,61 @@ const promoFlyers = <PromoFlyer>[
   ),
 ];
 
-/// Carrossel de promoções sem título de seção: só o flyer, setas e pontos.
+/// Promoções sem página própria: título curto, flyer, setas e pontos.
 class PromoCarousel extends StatelessWidget {
   const PromoCarousel({super.key});
 
-  static const cardWidth = 300.0;
   static const gap = 12.0;
+  static const preferredItemWidth = carouselPreferredItemWidth;
 
   @override
   Widget build(BuildContext context) {
-    const height = cardWidth * 9 / 16;
-    return KeyedSubtree(
+    final theme = Theme.of(context);
+    return Column(
       key: AppKeys.promoCarousel,
-      child: ArrowCarousel(
-        id: 'promos',
-        height: height,
-        itemCount: promoFlyers.length,
-        gap: gap,
-        // Um flyer por toque. A largura da tela pularia o cartaz seguinte.
-        pageExtent: cardWidth + gap,
-        showDots: true,
-        itemBuilder: (context, index) {
-          final flyer = promoFlyers[index];
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.asset(
-              flyer.asset,
-              width: cardWidth,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Promoções',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final layout = CarouselLayout.fit(
+              viewport: constraints.maxWidth,
+              itemCount: promoFlyers.length,
+              gap: gap,
+              preferredItemWidth: preferredItemWidth,
+            );
+            final height = layout.itemWidth * 9 / 16;
+            return ArrowCarousel(
+              id: 'promos',
               height: height,
-              fit: BoxFit.cover,
-              cacheWidth: 800,
-              semanticLabel: flyer.title,
-            ),
-          );
-        },
-      ),
+              itemCount: promoFlyers.length,
+              gap: gap,
+              preferredItemWidth: preferredItemWidth,
+              showDots: true,
+              itemBuilder: (context, index) {
+                final flyer = promoFlyers[index];
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    flyer.asset,
+                    width: double.infinity,
+                    height: height,
+                    fit: BoxFit.cover,
+                    cacheWidth: 800,
+                    semanticLabel: flyer.title,
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -49,6 +49,11 @@ void main() {
         find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
         findsOneWidget,
       );
+      await revealCarouselItem(
+        tester,
+        'rooms',
+        find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
+      );
       expect(
         find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)),
         findsWidgets,
@@ -94,8 +99,18 @@ void main() {
 
     expect(find.text('São Paulo'), findsWidgets);
     expect(find.text('Curitiba'), findsNothing);
+    await revealCarouselItem(
+      tester,
+      'rooms',
+      find.byKey(AppKeys.roomCard(SampleIds.roomSpMetro)),
+    );
     expect(find.byKey(AppKeys.roomCard(SampleIds.roomSpMetro)), findsWidgets);
     expect(find.byKey(AppKeys.roomCard(SampleIds.roomCwbCofre)), findsNothing);
+    await revealCarouselItem(
+      tester,
+      'news',
+      find.byKey(AppKeys.newsCard(SampleNewsIds.spLinha)),
+    );
     expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spLinha)), findsOneWidget);
     expect(
       find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
@@ -201,6 +216,11 @@ void main() {
       findsNothing,
     );
     expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spLinha)), findsWidgets);
+    await revealCarouselItem(
+      tester,
+      'news',
+      find.byKey(AppKeys.newsCard(SampleNewsIds.spPromo)),
+    );
     expect(find.byKey(AppKeys.newsCard(SampleNewsIds.spPromo)), findsWidgets);
   });
 

@@ -1,4 +1,5 @@
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
 
 /// Ilustrações fictícias do feed. Não são fotos de casas reais.
@@ -29,9 +30,13 @@ abstract final class SampleNewsIds {
   static const rjHorario = 'news-rj-horario';
   static const bhPromo = 'news-bh-promo';
   static const poaEvento = 'news-poa-evento';
+  static const cwbRpg = 'news-cwb-rpg';
+  static const cwbTabuleiro = 'news-cwb-tabuleiro';
+  static const cwbLaser = 'news-cwb-laser';
+  static const cwbImersivo = 'news-cwb-imersivo';
 }
 
-/// Dez notícias em Curitiba e mais algumas nas outras cidades de exemplo.
+/// Quatorze notícias em Curitiba e mais algumas nas outras cidades de exemplo.
 ///
 /// Texto, casas e links são inventados. As datas são relativas a [now], o
 /// mesmo relógio dos grupos de exemplo. Nada aqui foi copiado de um site.
@@ -278,6 +283,66 @@ List<NewsItem> buildSampleNews(DateTime now) {
       publishedAt: now.subtract(const Duration(hours: 26)),
       sourceKind: NewsSourceKind.manual,
     ),
+    _item(
+      id: SampleNewsIds.cwbRpg,
+      title: 'Mesa nova: o porão abre campanha às quintas',
+      summary:
+          'Uma mesa de RPG de exemplo no Batel. A história cabe numa noite '
+          'e não veio de nenhum clube real.',
+      category: NewsCategory.event,
+      houseName: 'Portal do Batel',
+      cityId: SampleIds.curitiba,
+      cityName: curitiba,
+      image: NewsImages.grupo,
+      publishedAt: now.subtract(const Duration(minutes: 40)),
+      sourceKind: NewsSourceKind.manual,
+      gameType: GameTypes.rpg,
+    ),
+    _item(
+      id: SampleNewsIds.cwbTabuleiro,
+      title: 'Noite de tabuleiro com caixa emprestada',
+      summary:
+          'O clube fictício da Rua XV deixa uma caixa na mesa até o último '
+          'ônibus. Não há loja nem estoque de verdade.',
+      category: NewsCategory.newRoom,
+      houseName: 'Mistério da Rua XV',
+      cityId: SampleIds.curitiba,
+      cityName: curitiba,
+      image: NewsImages.biblioteca,
+      publishedAt: now.subtract(const Duration(hours: 5)),
+      sourceKind: NewsSourceKind.website,
+      gameType: GameTypes.boardGame,
+    ),
+    _item(
+      id: SampleNewsIds.cwbLaser,
+      title: 'Arena laser do parque ganha horário de domingo',
+      summary:
+          'Coletes que acendem no escuro, só neste exemplo. O parque não '
+          'tem arena de verdade com esse nome.',
+      category: NewsCategory.schedule,
+      houseName: 'Portal do Batel',
+      cityId: SampleIds.curitiba,
+      cityName: curitiba,
+      image: NewsImages.scifi,
+      publishedAt: now.subtract(const Duration(hours: 30)),
+      sourceKind: NewsSourceKind.instagram,
+      gameType: GameTypes.laserTag,
+    ),
+    _item(
+      id: SampleNewsIds.cwbImersivo,
+      title: 'Ritual imersivo sem narrador atrás da cortina',
+      summary:
+          'A sala inteira entra na história. O ritual é inventado para o '
+          'protótipo e não descreve uma casa existente.',
+      category: NewsCategory.event,
+      houseName: 'Portal do Batel',
+      cityId: SampleIds.curitiba,
+      cityName: curitiba,
+      image: NewsImages.egito,
+      publishedAt: now.subtract(const Duration(days: 3)),
+      sourceKind: NewsSourceKind.manual,
+      gameType: GameTypes.immersive,
+    ),
   ];
 }
 
@@ -294,6 +359,7 @@ NewsItem _item({
   String? image,
   NewsIllustration illustration = NewsIllustration.category,
   String? sourceUrl,
+  String gameType = GameTypes.escapeRoom,
 }) {
   return NewsItem(
     id: id,
@@ -308,5 +374,6 @@ NewsItem _item({
     publishedAt: publishedAt,
     sourceUrl: sourceUrl,
     sourceKind: sourceKind,
+    gameType: gameType,
   );
 }

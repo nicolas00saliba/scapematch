@@ -1,3 +1,4 @@
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
 
 /// Filtra o feed pela cidade e, se houver, pela categoria.
@@ -29,4 +30,15 @@ List<NewsItem> filterNews(
         return a.id.compareTo(b.id);
       });
   return List.unmodifiable(filtered);
+}
+
+/// A Home usa o seletor de jogo. [GameTypes.all] devolve a lista como veio.
+List<NewsItem> filterNewsByGameType(List<NewsItem> items, String gameTypeId) {
+  if (gameTypeId == GameTypes.all) {
+    return List<NewsItem>.unmodifiable(items);
+  }
+  return List<NewsItem>.unmodifiable([
+    for (final item in items)
+      if (item.gameType == gameTypeId) item,
+  ]);
 }
