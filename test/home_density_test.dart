@@ -98,13 +98,25 @@ void main() {
     expect(terror.bottom, greaterThan(viewportBottom));
     final visible = viewportBottom - terror.top;
     final fraction = visible / terror.height;
+    final roomTitle = find.descendant(
+      of: find.byKey(AppKeys.roomCarousel('terror')),
+      matching: find.text('O Sótão da Rua XV'),
+    );
+    expect(roomTitle, findsOneWidget);
+    final titleTop = tester.getTopLeft(roomTitle).dy;
+    expect(
+      titleTop,
+      lessThan(viewportBottom - 16),
+      reason: 'a foto e o título do Terror precisam começar na primeira tela',
+    );
     expect(
       fraction,
-      inInclusiveRange(0.22, 0.45),
+      inInclusiveRange(0.50, 0.60),
       reason:
           'fraction=$fraction terror=${terror.height} news=${news.height} '
           'view=${viewportBottom - viewportTop} newsBottom=${news.bottom} '
-          'viewBottom=$viewportBottom terrorTop=${terror.top}',
+          'viewBottom=$viewportBottom terrorTop=${terror.top} '
+          'titleTop=$titleTop',
     );
   });
 
@@ -222,6 +234,26 @@ void main() {
       tester.getSize(when).width,
       greaterThanOrEqualTo(whenPainter.width - 1),
     );
+  });
+
+  testWidgets('four promo flyers show the reachable dots before any tap', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await pumpScapeMatch(tester);
+    tester.view.physicalSize = const Size(390, 844);
+    // Um pump aplica a largura. O seguinte é o pós-layout, quando a lista
+    // ainda estima o extent e, sem a conta pelo conteúdo, pinta 5 pontos.
+    await tester.pump();
+    await tester.pump();
+
+    expect(_promoDotCount(tester), 4);
+    await tester.pumpAndSettle();
+    expect(_promoDotCount(tester), promoFlyers.length);
+    expect(_promoDotCount(tester), _reachablePromoStops(tester));
   });
 
   testWidgets(
@@ -436,6 +468,28 @@ Future<void> _tapPromoNext(WidgetTester tester) async {
   await tester.ensureVisible(next);
   await tester.tap(next);
   await tester.pumpAndSettle();
+}
+
+int _promoDotCount(WidgetTester tester) {
+  return tester.widget<Row>(find.byKey(AppKeys.promoDots)).children.length;
+}
+
+/// Paradas de um passo por flyer, com a largura que o carrossel realmente tem.
+int _reachablePromoStops(WidgetTester tester) {
+  final viewport = tester.getSize(find.byKey(AppKeys.promoCarousel)).width;
+  const step = PromoCarousel.cardWidth + PromoCarousel.gap;
+  final content =
+      promoFlyers.length * PromoCarousel.cardWidth +
+      (promoFlyers.length - 1) * PromoCarousel.gap;
+  final maxScroll = content - viewport;
+  var pages = 1;
+  var offset = 0.0;
+  while (offset < maxScroll - 1) {
+    final next = offset + step;
+    offset = next > maxScroll ? maxScroll : next;
+    pages++;
+  }
+  return pages;
 }
 
 int _activeDot(WidgetTester tester) {
