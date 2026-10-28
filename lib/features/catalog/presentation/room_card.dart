@@ -19,12 +19,16 @@ const _buttonHeight = 48.0;
 const _buttonGap = 8.0;
 
 /// Altura do cartão para o carrossel acompanhar o conteúdo, inclusive o
-/// textScale. O rodapé quebra os botões quando pino, cidade e os dois
-/// rótulos não cabem na mesma linha.
-double roomCardHeight(BuildContext context, RoomListing listing) {
+/// textScale. [width] é a largura do quadro. O rodapé quebra os botões
+/// quando pino, cidade e os dois rótulos não cabem na mesma linha.
+double roomCardHeight(
+  BuildContext context,
+  RoomListing listing, {
+  double width = roomCardWidth,
+}) {
   final theme = Theme.of(context);
   final scaler = MediaQuery.textScalerOf(context);
-  final contentWidth = roomCardWidth - (_pad * 2);
+  final contentWidth = width - (_pad * 2);
   final titleStyle = _titleStyle(theme);
   final houseStyle = _houseStyle(theme);
   final footer = _footerHeight(
@@ -58,49 +62,46 @@ class RoomCard extends StatelessWidget {
     final room = listing.room;
     final image = roomCategoryImage(room.category);
 
-    return SizedBox(
-      width: roomCardWidth,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: _photoHeight,
-              child: Image.asset(
-                image,
-                key: AppKeys.roomCard(room.id),
-                fit: BoxFit.cover,
-                cacheWidth: decodeWidth,
-                semanticLabel: room.name,
-              ),
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: _photoHeight,
+            child: Image.asset(
+              image,
+              key: AppKeys.roomCard(room.id),
+              fit: BoxFit.cover,
+              cacheWidth: decodeWidth,
+              semanticLabel: room.name,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(_pad, _textTop, _pad, _pad),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    room.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: _titleStyle(theme),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    listing.houseName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: _houseStyle(theme),
-                  ),
-                  const SizedBox(height: 8),
-                  _RoomFooter(listing: listing),
-                ],
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(_pad, _textTop, _pad, _pad),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  room.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: _titleStyle(theme),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  listing.houseName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _houseStyle(theme),
+                ),
+                const SizedBox(height: 8),
+                _RoomFooter(listing: listing),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -261,11 +262,12 @@ class _RoomAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inherited = Theme.of(context).textTheme.labelLarge;
     final style = FilledButton.styleFrom(
       minimumSize: const Size(48, _buttonHeight),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      textStyle: _buttonTextStyle,
+      textStyle: _buttonTextStyle.copyWith(fontFamily: inherited?.fontFamily),
     );
     final child = Text(label, semanticsLabel: semanticsLabel);
     if (filled) {

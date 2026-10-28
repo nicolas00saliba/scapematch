@@ -4,12 +4,72 @@ import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 
-/// Faixa horizontal com swipe e setas.
+/// Largura em que um quadro ainda se lê. A faixa cabe um ou dois quadros
+/// inteiros, o que essa largura permitir na tela.
+const carouselPreferredItemWidth = 250.0;
+
+/// Quanto da faixa um carrossel ocupa, em quadros inteiros.
 ///
-/// Sem [pageExtent], a seta anda a largura visível. Com ele, anda essa
-/// distância (um card mais o vão). A seta some na ponta. O clique funciona
-/// com mouse, sem arrastar. Os pontos, quando aparecem, são as paradas que
-/// a seta realmente alcança.
+/// Um quadro só preenche a largura visível: o vão fica depois da borda, e o
+/// próximo quadro não aparece cortado. Dois ou mais dividem a largura e o
+/// vão, sem sobra. Cada parada anda um quadro.
+class CarouselLayout {
+  const CarouselLayout({
+    required this.itemWidth,
+    required this.gap,
+    required this.perView,
+    required this.stops,
+  });
+
+  final double itemWidth;
+  final double gap;
+  final int perView;
+  final int stops;
+
+  double get stride => itemWidth + gap;
+
+  static CarouselLayout fit({
+    required double viewport,
+    required int itemCount,
+    double gap = 12,
+    double preferredItemWidth = carouselPreferredItemWidth,
+  }) {
+    final count = math.max(1, itemCount);
+    final safeGap = math.max(0.0, gap);
+    if (viewport <= 1) {
+      final width = preferredItemWidth > 1 ? preferredItemWidth : 280.0;
+      return CarouselLayout(
+        itemWidth: width,
+        gap: safeGap,
+        perView: 1,
+        stops: count,
+      );
+    }
+    final preferred = preferredItemWidth.clamp(1.0, viewport);
+    var perView = ((viewport + safeGap) / (preferred + safeGap)).floor();
+    if (perView < 1) {
+      perView = 1;
+    }
+    if (perView > count) {
+      perView = count;
+    }
+    final itemWidth = perView == 1
+        ? viewport
+        : (viewport - ((perView - 1) * safeGap)) / perView;
+    return CarouselLayout(
+      itemWidth: itemWidth,
+      gap: safeGap,
+      perView: perView,
+      stops: math.max(1, count - perView + 1),
+    );
+  }
+}
+
+/// Faixa horizontal que descansa sempre em quadros inteiros.
+///
+/// A seta anda um quadro, com animação, e some na ponta. Soltar o dedo
+/// alinha no quadro mais próximo. Os pontos, quando aparecem, são essas
+/// paradas — contadas pela largura, não pela estimativa da lista.
 class ArrowCarousel extends StatefulWidget {
   const ArrowCarousel({
     super.key,
@@ -19,7 +79,7 @@ class ArrowCarousel extends StatefulWidget {
     required this.itemBuilder,
     this.gap = 12,
     this.showDots = false,
-    this.pageExtent,
+    this.preferredItemWidth = carouselPreferredItemWidth,
   });
 
   final String id;
@@ -28,18 +88,20 @@ class ArrowCarousel extends StatefulWidget {
   final IndexedWidgetBuilder itemBuilder;
   final double gap;
   final bool showDots;
-
-  /// Distância de cada toque na seta. Nulo usa a largura visível.
-  final double? pageExtent;
+  final double preferredItemWidth;
 
   @override
   State<ArrowCarousel> createState() => _ArrowCarouselState();
 }
 
 class _ArrowCarouselState extends State<ArrowCarousel> {
-  final _controller = ScrollController();
+  final _controller = ScrollController(keepScrollOffset: false);
+  final _stride = _CarouselStride();
   Size? _mediaSize;
   TextScaler? _textScaler;
+  CarouselLayout? _layout;
+  int _index = 0;
+  bool _holdIndex = false;
 
   @override
   void initState() {
@@ -63,10 +125,18 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
     if (!sizeChanged && !scaleChanged) {
       return;
     }
-    // O layout novo só existe depois deste frame. Sem isso, seta e ponto
-    // ficam com a medida antiga até alguém arrastar.
+    if (sizeChanged) {
+      // A lista prende o offset antigo no fim novo. Segurar o índice
+      // mantém o quadro em que a pessoa estava.
+      _holdIndex = true;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (!mounted) {
+        return;
+      }
+      if (_holdIndex) {
+        _realign();
+      } else {
         setState(() {});
       }
     });
@@ -80,10 +150,24 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
   }
 
   void _onScroll() {
-    if (mounted) {
-      setState(() {});
+    if (!mounted || _holdIndex || _layout == null || !_ready()) {
+      return;
     }
+    final next = _indexFor(_layout!, _controller.position.pixels);
+    if (next == _index) {
+      final back = _canGo(-1, _layout!);
+      final forward = _canGo(1, _layout!);
+      if (back == _showingBack && forward == _showingForward) {
+        return;
+      }
+    }
+    setState(() {
+      _index = next;
+    });
   }
+
+  bool _showingBack = false;
+  bool _showingForward = false;
 
   bool _ready() {
     return _controller.hasClients &&
@@ -91,51 +175,82 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
         widget.itemCount > 0;
   }
 
-  bool _canGo(int direction) {
-    if (!_ready()) {
+  bool _canGo(int direction, CarouselLayout layout) {
+    if (layout.stops <= 1 || widget.itemCount <= 1) {
       return false;
     }
-    final position = _controller.position;
-    final limit = _travelLimit(position);
-    if (limit <= 1) {
+    if (!_ready()) {
+      return direction > 0;
+    }
+    final pixels = _controller.position.pixels;
+    final max = _travelLimit(layout);
+    if (max <= 1) {
       return false;
     }
     if (direction < 0) {
-      return position.pixels > 1;
+      return pixels > 1;
     }
-    return position.pixels < limit - 1;
+    return pixels < max - 1;
   }
 
-  /// A lista estima o fim antes de medir todos os cards e infla o extent.
-  /// Com [ArrowCarousel.pageExtent], o fim real é o conteúdo conhecido.
-  double _travelLimit(ScrollPosition position) {
-    final known = _knownMaxScroll(position.viewportDimension);
-    if (known == null) {
-      return position.maxScrollExtent;
+  double _travelLimit(CarouselLayout layout) {
+    final known = _maxFor(layout);
+    if (!_ready()) {
+      return known;
     }
-    return math.min(known, position.maxScrollExtent);
+    return math.min(known, _controller.position.maxScrollExtent);
   }
 
-  double? _knownMaxScroll(double viewport) {
-    final extent = widget.pageExtent;
-    if (extent == null ||
-        extent <= 0 ||
-        widget.itemCount <= 0 ||
-        viewport <= 0) {
-      return null;
+  double _maxFor(CarouselLayout layout) {
+    if (layout.stops <= 1) {
+      return 0;
     }
-    final content = widget.itemCount * extent - widget.gap;
-    return math.max(0.0, content - viewport);
+    return (layout.stops - 1) * layout.stride;
+  }
+
+  int _indexFor(CarouselLayout layout, double pixels) {
+    if (layout.stride <= 1 || layout.stops <= 1) {
+      return 0;
+    }
+    return (pixels / layout.stride).round().clamp(0, layout.stops - 1);
+  }
+
+  void _realign() {
+    if (!_ready()) {
+      _holdIndex = false;
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+    final layout = CarouselLayout.fit(
+      viewport: _controller.position.viewportDimension,
+      itemCount: widget.itemCount,
+      gap: widget.gap,
+      preferredItemWidth: widget.preferredItemWidth,
+    );
+    final index = _index.clamp(0, layout.stops - 1);
+    final target = (index * layout.stride).clamp(0.0, _travelLimit(layout));
+    if ((_controller.position.pixels - target).abs() > 0.5) {
+      _controller.jumpTo(target);
+    }
+    _index = index;
+    _holdIndex = false;
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _page(int direction) async {
-    if (!_canGo(direction)) {
+    final layout = _layout;
+    if (layout == null || !_canGo(direction, layout) || !_ready()) {
       return;
     }
-    final position = _controller.position;
-    final target =
-        (position.pixels + (direction * _step(position, widget.pageExtent)))
-            .clamp(0.0, _travelLimit(position));
+    final current = _indexFor(layout, _controller.position.pixels);
+    final target = ((current + direction) * layout.stride).clamp(
+      0.0,
+      _travelLimit(layout),
+    );
     await _controller.animateTo(
       target,
       duration: const Duration(milliseconds: 320),
@@ -145,67 +260,100 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final carousel = SizedBox(
-      height: widget.height,
-      child: Stack(
-        children: [
-          NotificationListener<ScrollMetricsNotification>(
-            onNotification: (notification) {
-              if (mounted) {
-                setState(() {});
-              }
-              return false;
-            },
-            child: ListView.separated(
-              controller: _controller,
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.zero,
-              itemCount: widget.itemCount,
-              separatorBuilder: (context, index) => SizedBox(width: widget.gap),
-              itemBuilder: widget.itemBuilder,
-            ),
-          ),
-          if (_canGo(-1))
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: _CarouselArrow(
-                  carouselId: widget.id,
-                  forward: false,
-                  onPressed: () => _page(-1),
-                ),
-              ),
-            ),
-          if (_canGo(1))
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: _CarouselArrow(
-                  carouselId: widget.id,
-                  forward: true,
-                  onPressed: () => _page(1),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-    if (!widget.showDots) {
-      return carousel;
-    }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final viewport = constraints.maxWidth;
-        final maxScroll =
-            _knownMaxScroll(viewport) ??
-            (_ready() ? _controller.position.maxScrollExtent : 0.0);
-        final step = _stepFor(viewport);
-        final pages = _stopCount(maxScroll, step);
-        final current = _stopIndex(maxScroll, step, pages);
+        final layout = CarouselLayout.fit(
+          viewport: constraints.maxWidth,
+          itemCount: widget.itemCount,
+          gap: widget.gap,
+          preferredItemWidth: widget.preferredItemWidth,
+        );
+        _layout = layout;
+        // A Scrollable só troca a física se o tipo mudar. O passo vive
+        // neste objeto, lido na hora de soltar o dedo.
+        _stride.value = layout.stride;
+        final canBack = _canGo(-1, layout);
+        final canForward = _canGo(1, layout);
+        _showingBack = canBack;
+        _showingForward = canForward;
+        final carousel = RepaintBoundary(
+          key: AppKeys.carouselFrame(widget.id),
+          child: SizedBox(
+            height: widget.height,
+            child: Stack(
+              children: [
+                NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (notification) {
+                    if (mounted && !_holdIndex) {
+                      setState(() {});
+                    }
+                    return false;
+                  },
+                  child: ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(scrollbars: false),
+                    child: ListView.builder(
+                      controller: _controller,
+                      scrollDirection: Axis.horizontal,
+                      physics: _ItemSnapPhysics(
+                        stride: _stride,
+                        parent: const ClampingScrollPhysics(),
+                      ),
+                      padding: EdgeInsets.zero,
+                      cacheExtent: 800,
+                      itemExtent: layout.stride,
+                      itemCount: widget.itemCount,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: EdgeInsets.only(right: widget.gap),
+                          child: SizedBox(
+                            key: AppKeys.carouselItem(widget.id, index),
+                            width: layout.itemWidth,
+                            height: widget.height,
+                            child: widget.itemBuilder(context, index),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                if (canBack)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    height: _arrowBand(widget.height),
+                    child: Center(
+                      child: _CarouselArrow(
+                        carouselId: widget.id,
+                        forward: false,
+                        onPressed: () => _page(-1),
+                      ),
+                    ),
+                  ),
+                if (canForward)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    height: _arrowBand(widget.height),
+                    child: Center(
+                      child: _CarouselArrow(
+                        carouselId: widget.id,
+                        forward: true,
+                        onPressed: () => _page(1),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+        if (!widget.showDots) {
+          return carousel;
+        }
+        final pages = layout.stops;
+        final current = _ready()
+            ? _indexFor(layout, _controller.position.pixels)
+            : _index.clamp(0, pages - 1);
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -217,40 +365,10 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
       },
     );
   }
-
-  double _stepFor(double viewport) {
-    final extent = widget.pageExtent;
-    if (extent != null && extent > 0) {
-      return extent;
-    }
-    if (viewport > 0) {
-      return viewport;
-    }
-    return 1;
-  }
-
-  int _stopIndex(double maxScroll, double step, int pages) {
-    if (!_ready() || pages <= 1) {
-      return 0;
-    }
-    final position = _controller.position;
-    if (position.pixels >= maxScroll - 1) {
-      return pages - 1;
-    }
-    var best = 0;
-    var bestDistance = double.infinity;
-    var offset = 0.0;
-    for (var index = 0; index < pages; index++) {
-      final distance = (position.pixels - offset).abs();
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = index;
-      }
-      offset = math.min(offset + step, maxScroll);
-    }
-    return best;
-  }
 }
+
+/// A seta fica na faixa da foto, para não cobrir título nem botão.
+double _arrowBand(double height) => math.min(120, height);
 
 class _CarouselArrow extends StatelessWidget {
   const _CarouselArrow({
@@ -311,32 +429,51 @@ class _Dots extends StatelessWidget {
   }
 }
 
-double _step(ScrollPosition position, double? pageExtent) {
-  final extent = pageExtent;
-  if (extent != null && extent > 0) {
-    return extent;
-  }
-  final view = position.viewportDimension;
-  if (view <= 0) {
-    return 1;
-  }
-  return view;
+/// O passo do snap. A [Scrollable] guarda a primeira física; este valor
+/// muda quando a tela muda, sem criar outra posição de rolagem.
+class _CarouselStride {
+  double value = 1;
 }
 
-/// Paradas que a seta alcança, inclusive a sobra menor que um passo.
-int _stopCount(double maxScroll, double step) {
-  if (maxScroll <= 1 || step <= 0) {
-    return 1;
+/// Soltar o arrasto alinha no quadro mais próximo. Não continua o impulso.
+class _ItemSnapPhysics extends ScrollPhysics {
+  const _ItemSnapPhysics({required this.stride, super.parent});
+
+  final _CarouselStride stride;
+
+  @override
+  _ItemSnapPhysics applyTo(ScrollPhysics? ancestor) {
+    return _ItemSnapPhysics(stride: stride, parent: buildParent(ancestor));
   }
-  var pages = 1;
-  var offset = 0.0;
-  while (offset < maxScroll - 1 && pages < 64) {
-    final next = math.min(offset + step, maxScroll);
-    if (next <= offset + 0.5) {
-      break;
+
+  double _target(ScrollMetrics position) {
+    final step = stride.value;
+    final max = position.maxScrollExtent;
+    if (step <= 1 || max <= 1) {
+      return position.pixels.clamp(0.0, max);
     }
-    offset = next;
-    pages++;
+    final index = (position.pixels / step).round();
+    final maxIndex = (max / step).round();
+    return (index.clamp(0, maxIndex) * step).clamp(0.0, max);
   }
-  return pages;
+
+  @override
+  Simulation? createBallisticSimulation(
+    ScrollMetrics position,
+    double velocity,
+  ) {
+    final tolerance = toleranceFor(position);
+    final target = _target(position);
+    if (velocity.abs() < tolerance.velocity &&
+        (target - position.pixels).abs() < tolerance.distance) {
+      return null;
+    }
+    return ScrollSpringSimulation(
+      spring,
+      position.pixels,
+      target,
+      0,
+      tolerance: tolerance,
+    );
+  }
 }

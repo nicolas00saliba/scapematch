@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,49 +9,63 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
+import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
+import 'package:scapematch/features/news/domain/news_query.dart';
 import 'package:scapematch/features/news/presentation/news_artwork.dart';
 import 'package:scapematch/providers/repositories.dart';
 
-/// Novidades da cidade, sem o filtro de chip. O chip fica em “Ver tudo”.
-final homeNewsProvider = FutureProvider.autoDispose<List<NewsItem>>((ref) {
+/// Novidades da cidade e do tipo de jogo. O chip de categoria fica em “Ver tudo”.
+final homeNewsProvider = FutureProvider.autoDispose<List<NewsItem>>((
+  ref,
+) async {
   final cityId = ref.watch(selectedCityIdProvider);
-  return ref.watch(newsRepositoryProvider).list(cityId: cityId);
+  final gameTypeId = ref.watch(selectedGameTypeIdProvider);
+  final items = await ref.watch(newsRepositoryProvider).list(cityId: cityId);
+  return filterNewsByGameType(items, gameTypeId);
 });
 
-/// Altura da foto no carrossel primário. Cabe a faixa inteira na primeira
-/// tela de 390×844 junto com a janela de grupos e um pedaço do Terror.
-const newsCarouselImageHeight = 80.0;
-const newsCarouselCardWidth = 340.0;
+/// Foto do cartão. O texto embaixo é que precisa ser lido.
+const newsCarouselImageHeight = 112.0;
 
-double newsCarouselCardHeight(BuildContext context) {
+double newsCarouselCardHeight(BuildContext context, double cardWidth) {
   final theme = Theme.of(context);
   final scaler = MediaQuery.textScalerOf(context);
-  const width = newsCarouselCardWidth;
-  const pad = 12.0;
-  final contentWidth = width - pad * 2;
-  final titleStyle = theme.textTheme.titleSmall!.copyWith(
-    fontWeight: FontWeight.w800,
-    height: 1.2,
+  final contentWidth = math.max(40.0, cardWidth - 24);
+  final chip = _lineHeight(
+    'Jogos de tabuleiro',
+    _chipStyle(theme),
+    scaler,
+    contentWidth,
+    1,
   );
-  // A amostra curta cabe em uma linha e a altura vinha menor que o título
-  // real. Duas linhas ficam reservadas em qualquer textScale.
-  final title = _lineHeight('Ag', titleStyle, scaler, contentWidth, 1) * 2;
-  final meta = _lineHeight(
-    'Portal do Batel',
-    theme.textTheme.labelMedium!,
+  final title = _lineHeight('Ag', _titleStyle(theme), scaler, contentWidth, 1);
+  final summary = _lineHeight(
+    'Ag',
+    _summaryStyle(theme),
     scaler,
     contentWidth,
     1,
   );
   final when = _lineHeight(
-    'há 30 min',
-    theme.textTheme.bodySmall!,
+    'há 30 min · 27 out',
+    _whenStyle(theme),
     scaler,
     contentWidth,
     1,
   );
-  return (newsCarouselImageHeight + 8 + meta + 4 + title + 2 + when + pad)
+  return (newsCarouselImageHeight +
+          8 +
+          chip +
+          6 +
+          8 +
+          (title * 2) +
+          4 +
+          (summary * 2) +
+          4 +
+          when +
+          12)
       .ceilToDouble();
 }
 
@@ -70,7 +86,32 @@ double _lineHeight(
   return painter.height;
 }
 
-/// Carrossel primário da Home.
+TextStyle _titleStyle(ThemeData theme) {
+  return theme.textTheme.titleSmall!.copyWith(
+    fontWeight: FontWeight.w800,
+    height: 1.2,
+  );
+}
+
+TextStyle _summaryStyle(ThemeData theme) {
+  return theme.textTheme.bodyMedium!.copyWith(
+    color: AppColors.muted,
+    height: 1.35,
+  );
+}
+
+TextStyle _whenStyle(ThemeData theme) {
+  return theme.textTheme.bodySmall!.copyWith(color: AppColors.muted);
+}
+
+TextStyle _chipStyle(ThemeData theme) {
+  return theme.textTheme.labelMedium!.copyWith(
+    color: AppColors.teal,
+    fontWeight: FontWeight.w800,
+  );
+}
+
+/// Carrossel de novidades da Home.
 class NewsSection extends ConsumerWidget {
   const NewsSection({super.key});
 
@@ -79,7 +120,7 @@ class NewsSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final news = ref.watch(homeNewsProvider);
     final now = ref.watch(clockProvider).now();
-    final cardHeight = newsCarouselCardHeight(context);
+    final gameTypeId = ref.watch(selectedGameTypeIdProvider);
 
     return Column(
       key: AppKeys.newsFeed,
@@ -121,22 +162,37 @@ class NewsSection extends ConsumerWidget {
           ),
           data: (items) {
             if (items.isEmpty) {
-              return const InlineNotice(
-                message: 'Ainda não há novidades de exemplo nesta cidade.',
+              final kind = gameTypeId == GameTypes.all
+                  ? ''
+                  : ' de ${GameTypes.labelOf(gameTypeId)}';
+              return InlineNotice(
+                message: 'Ainda não há novidades de exemplo$kind nesta cidade.',
               );
             }
-            final height = cardHeight < 120 ? 120.0 : cardHeight;
-            return ArrowCarousel(
-              id: 'news',
-              height: height,
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return _NewsStripCard(
-                  item: item,
-                  now: now,
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final layout = CarouselLayout.fit(
+                  viewport: constraints.maxWidth,
+                  itemCount: items.length,
+                  preferredItemWidth: carouselPreferredItemWidth,
+                );
+                final height = math.max(
+                  160.0,
+                  newsCarouselCardHeight(context, layout.itemWidth),
+                );
+                return ArrowCarousel(
+                  id: 'news',
                   height: height,
-                  onTap: () => context.push('/news/${item.id}'),
+                  itemCount: items.length,
+                  preferredItemWidth: carouselPreferredItemWidth,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return _NewsStripCard(
+                      item: item,
+                      now: now,
+                      onTap: () => context.push('/news/${item.id}'),
+                    );
+                  },
                 );
               },
             );
@@ -151,79 +207,79 @@ class _NewsStripCard extends StatelessWidget {
   const _NewsStripCard({
     required this.item,
     required this.now,
-    required this.height,
     required this.onTap,
   });
 
   final NewsItem item;
   final DateTime now;
-  final double height;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final when = formatRelativeTime(publishedAt: item.publishedAt, now: now);
-    return SizedBox(
-      width: newsCarouselCardWidth,
-      height: height,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: AppKeys.newsCard(item.id),
-          onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: newsCarouselImageHeight,
-                width: double.infinity,
-                child: Image(
-                  image: _image(item),
-                  fit: BoxFit.cover,
-                  semanticLabel: item.title,
-                  errorBuilder: (context, error, stackTrace) =>
-                      ColoredBox(color: AppColors.tealSoft),
-                ),
+    final date = formatShortDate(item.publishedAt);
+    final genre = GameTypes.labelOf(item.gameType);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: AppKeys.newsCard(item.id),
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: newsCarouselImageHeight,
+              width: double.infinity,
+              child: Image(
+                image: _image(item),
+                fit: BoxFit.cover,
+                semanticLabel: item.title,
+                errorBuilder: (context, error, stackTrace) =>
+                    ColoredBox(color: AppColors.tealSoft),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.houseName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: AppColors.teal,
-                        fontWeight: FontWeight.w800,
-                      ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                      ),
+                    decoration: BoxDecoration(
+                      color: AppColors.tealSoft,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      when,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.muted,
-                      ),
-                    ),
-                  ],
-                ),
+                    child: Text(genre, style: _chipStyle(theme)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _titleStyle(theme),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _summaryStyle(theme),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$when · $date',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _whenStyle(theme),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

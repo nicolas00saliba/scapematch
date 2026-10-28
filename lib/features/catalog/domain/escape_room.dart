@@ -1,5 +1,6 @@
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 
 /// One playable room. [capacity] is the room limit, not the group size.
 class EscapeRoom {
@@ -13,6 +14,7 @@ class EscapeRoom {
     required this.durationMinutes,
     required this.difficulty,
     required this.priceCents,
+    this.gameType = GameTypes.escapeRoom,
   });
 
   final String id;
@@ -30,4 +32,7 @@ class EscapeRoom {
 
   /// Fictional price per person, in cents. Nothing is charged.
   final int priceCents;
+
+  /// Mesmo id de [GameTypes]. Uma sala antiga sem o campo conta como escape.
+  final String gameType;
 }

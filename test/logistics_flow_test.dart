@@ -140,9 +140,17 @@ void main() {
     expect(find.text('Nenhuma sessão passada'), findsNothing);
     await tester.tap(find.text('Passados'));
     await tester.pumpAndSettle();
-    // O aviso de saída é um snackbar. Sem animação na Home, o tempo dele
-    // não anda sozinho.
-    await tester.pump(const Duration(seconds: 5));
+    // O timer do snackbar começa quando a entrada termina. Vários pumps
+    // curtos deixam essa duração passar; limpar o que sobrar evita o
+    // aviso cobrir a lista.
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    for (final messenger in tester.stateList<ScaffoldMessengerState>(
+      find.byType(ScaffoldMessenger),
+    )) {
+      messenger.clearSnackBars();
+    }
     await tester.pumpAndSettle();
     expect(find.text('Nenhuma sessão passada'), findsOneWidget);
     expect(find.textContaining('Sem reembolso'), findsNothing);

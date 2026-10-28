@@ -48,6 +48,7 @@ void main() {
     expect(find.text('Metrô Perdido'), findsWidgets);
     expect(find.text('O Cofre do Café'), findsNothing);
     // A sala entra no carrossel mesmo sem grupo na lista.
+    await revealCarouselItem(tester, 'rooms', find.text('O Izakaya Secreto'));
     expect(find.text('O Izakaya Secreto'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(AppKeys.almostFullFilter));

@@ -373,6 +373,50 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     70,
     Difficulty.medium,
   );
+  final mesaRpg = _room(
+    'room-cwb-mesa',
+    batel,
+    'Mesa longa do Batel',
+    'Uma campanha que cabe numa noite',
+    RoomCategory.adventure,
+    6,
+    180,
+    Difficulty.medium,
+    gameType: GameTypes.rpg,
+  );
+  final tabuleiro = _room(
+    'room-cwb-tabuleiro',
+    ruaXv,
+    'Clube de tabuleiro da XV',
+    'Caixas abertas até o último ônibus',
+    RoomCategory.mystery,
+    8,
+    120,
+    Difficulty.easy,
+    gameType: GameTypes.boardGame,
+  );
+  final arenaLaser = _room(
+    'room-cwb-arena',
+    batel,
+    'Arena laser do Parque',
+    'Coletes que acendem no escuro',
+    RoomCategory.scienceFiction,
+    10,
+    30,
+    Difficulty.easy,
+    gameType: GameTypes.laserTag,
+  );
+  final camara = _room(
+    'room-cwb-camara',
+    batel,
+    'Câmara imersiva do Parque',
+    'A sala inteira entra na história',
+    RoomCategory.egypt,
+    8,
+    90,
+    Difficulty.medium,
+    gameType: GameTypes.immersive,
+  );
 
   final slotCofreSat = schedule.soonSlot('slot-cwb-cofre-sat', cofre.id);
   final slotCofreSun = schedule.free('slot-cwb-cofre-sun', cofre.id, 0);
@@ -444,6 +488,14 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   );
   final slotArmario = schedule.free('slot-poa-armario-free', armario.id, 3);
   final slotBonde = schedule.free('slot-poa-bonde-free', bonde.id, 3);
+  final slotMesa = schedule.free('slot-cwb-mesa-free', mesaRpg.id, 4);
+  final slotTabuleiro = schedule.free(
+    'slot-cwb-tabuleiro-free',
+    tabuleiro.id,
+    4,
+  );
+  final slotArena = schedule.free('slot-cwb-arena-free', arenaLaser.id, 4);
+  final slotCamara = schedule.free('slot-cwb-camara-free', camara.id, 4);
   // Horários fora da grade livre, só para os grupos extras de Curitiba.
   final slotLabQuase = schedule.at(
     'slot-cwb-lab-quase',
@@ -706,6 +758,10 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       minaAberta,
       armario,
       bonde,
+      mesaRpg,
+      tabuleiro,
+      arenaLaser,
+      camara,
     ],
     slots: _padRoomSlots(schedule, [
       slotCofreSat,
@@ -748,6 +804,10 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotMinaAberta,
       slotArmario,
       slotBonde,
+      slotMesa,
+      slotTabuleiro,
+      slotArena,
+      slotCamara,
       slotLabQuase,
       slotSotaoQuase,
       slotNaveQuase,
@@ -782,8 +842,9 @@ EscapeRoom _room(
   RoomCategory category,
   int capacity,
   int durationMinutes,
-  Difficulty difficulty,
-) {
+  Difficulty difficulty, {
+  String gameType = GameTypes.escapeRoom,
+}) {
   return EscapeRoom(
     id: id,
     houseId: house.id,
@@ -794,6 +855,7 @@ EscapeRoom _room(
     durationMinutes: durationMinutes,
     difficulty: difficulty,
     priceCents: _priceCents(capacity, difficulty),
+    gameType: gameType,
   );
 }
 

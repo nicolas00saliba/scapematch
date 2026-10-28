@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
-import 'package:scapematch/features/catalog/presentation/room_card.dart';
+import 'package:scapematch/core/ui/arrow_carousel.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
@@ -15,36 +15,22 @@ import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('home sections follow primary, secondary, promos, tertiary', (
+  testWidgets('home order is groups, promos, news, then one room carousel', (
     tester,
   ) async {
     await pumpScapeMatch(tester);
 
     double top(Key key) => tester.getTopLeft(find.byKey(key)).dy;
-    expect(
-      top(AppKeys.newsFeed),
-      lessThan(top(AppKeys.roomCarousel('terror'))),
-    );
-    expect(
-      top(AppKeys.roomCarousel('terror')),
-      lessThan(top(AppKeys.roomCarousel('mystery'))),
-    );
-    expect(
-      top(AppKeys.roomCarousel('mystery')),
-      lessThan(top(AppKeys.promoCarousel)),
-    );
-    expect(
-      top(AppKeys.promoCarousel),
-      lessThan(top(AppKeys.roomCarousel('adventure'))),
-    );
-    expect(
-      top(AppKeys.roomCarousel('adventure')),
-      lessThan(top(AppKeys.popularRooms)),
-    );
-    expect(find.text('Promoções'), findsNothing);
+    expect(top(AppKeys.groupWindow), lessThan(top(AppKeys.promoCarousel)));
+    expect(top(AppKeys.promoCarousel), lessThan(top(AppKeys.newsFeed)));
+    expect(top(AppKeys.newsFeed), lessThan(top(AppKeys.roomsCarousel)));
+    expect(find.text('Promoções'), findsOneWidget);
+    expect(find.text('Novidades'), findsOneWidget);
+    expect(find.text('Salas'), findsOneWidget);
+    expect(find.text('Salas mais procuradas'), findsNothing);
+    expect(find.byKey(AppKeys.roomCarousel('terror')), findsNothing);
     expect(find.text('2 por 1 às quartas'), findsNothing);
     expect(find.byKey(AppKeys.promoDots), findsOneWidget);
-    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
       findsOneWidget,
@@ -56,9 +42,8 @@ void main() {
   ) async {
     await pumpScapeMatch(tester);
     await _page(tester, 'news');
-    await _page(tester, 'terror');
+    await _page(tester, 'rooms');
     await _page(tester, 'promos');
-    await _page(tester, 'popular');
 
     final promoScroll = find.descendant(
       of: find.byKey(AppKeys.promoCarousel),
@@ -81,9 +66,7 @@ void main() {
     expect(end.pixels, greaterThan(0));
   });
 
-  testWidgets('the first screen shows news and a slice of Terror', (
-    tester,
-  ) async {
+  testWidgets('the first screen reaches the promo carousel', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -96,28 +79,19 @@ void main() {
     final scrollable = tester.state<ScrollableState>(verticalScrollable);
     final viewportTop = tester.getTopLeft(verticalScrollable).dy;
     final viewportBottom = viewportTop + scrollable.position.viewportDimension;
-    final news = tester.getRect(find.byKey(AppKeys.newsFeed));
-    final terror = tester.getRect(find.byKey(AppKeys.roomCarousel('terror')));
-    final card = find
-        .descendant(
-          of: find.byKey(AppKeys.roomCarousel('terror')),
-          matching: find.byType(RoomCard),
-        )
-        .first;
-    final cardRect = tester.getRect(card);
+    final groups = tester.getRect(find.byKey(AppKeys.groupWindow));
+    final promos = tester.getRect(find.byKey(AppKeys.promoCarousel));
 
-    expect(news.bottom, lessThanOrEqualTo(viewportBottom + 1));
-    expect(terror.bottom, greaterThan(viewportBottom));
-    final visible = (viewportBottom - cardRect.top).clamp(0.0, cardRect.height);
-    final fraction = visible / cardRect.height;
+    expect(groups.top, greaterThanOrEqualTo(viewportTop - 1));
+    expect(promos.top, greaterThan(groups.bottom - 1));
+    expect(promos.top, lessThan(viewportBottom));
+    final visible = (viewportBottom - promos.top).clamp(0.0, promos.height);
     expect(
-      fraction,
-      inInclusiveRange(0.28, 0.42),
+      visible,
+      greaterThan(80),
       reason:
-          'fraction=$fraction card=${cardRect.height} visible=$visible '
-          'news=${news.height} view=${viewportBottom - viewportTop} '
-          'newsBottom=${news.bottom} viewBottom=$viewportBottom '
-          'cardTop=${cardRect.top}',
+          'visible=$visible promo=${promos.height} '
+          'view=${viewportBottom - viewportTop}',
     );
   });
 
@@ -130,7 +104,7 @@ void main() {
     tester.view.physicalSize = const Size(360, 800);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.byKey(AppKeys.popularRooms),
+      find.byKey(AppKeys.roomsCarousel),
       400,
       scrollable: verticalScrollable,
     );
@@ -146,25 +120,40 @@ void main() {
   ) async {
     await pumpScapeMatch(tester);
     final context = tester.element(find.byKey(AppKeys.newsFeed));
-    final reserved = newsCarouselCardHeight(context);
+    final sampleCard = find
+        .descendant(
+          of: find.byKey(AppKeys.newsFeed),
+          matching: find.byType(Card),
+        )
+        .first;
+    final cardWidth = tester.getSize(sampleCard).width;
+    final reserved = newsCarouselCardHeight(context, cardWidth);
     final scaler = MediaQuery.textScalerOf(context);
     final theme = Theme.of(context);
-    const contentWidth = newsCarouselCardWidth - 24;
+    final contentWidth = cardWidth - 24;
     final titleStyle = theme.textTheme.titleSmall!.copyWith(
       fontWeight: FontWeight.w800,
       height: 1.2,
     );
+    final summaryStyle = theme.textTheme.bodyMedium!.copyWith(
+      color: AppColors.muted,
+      height: 1.35,
+    );
     final oneTitle = _textHeight('Ag', titleStyle, scaler, contentWidth, 1);
+    final oneSummary = _textHeight('Ag', summaryStyle, scaler, contentWidth, 1);
     final whenLine = _textHeight(
-      'há 30 min',
+      'há 30 min · 27 out',
       theme.textTheme.bodySmall!,
       scaler,
       contentWidth,
       1,
     );
-    final meta = _textHeight(
-      'Portal do Batel',
-      theme.textTheme.labelMedium!,
+    final chip = _textHeight(
+      'Jogos de tabuleiro',
+      theme.textTheme.labelMedium!.copyWith(
+        color: AppColors.teal,
+        fontWeight: FontWeight.w800,
+      ),
       scaler,
       contentWidth,
       1,
@@ -174,10 +163,13 @@ void main() {
       greaterThanOrEqualTo(
         newsCarouselImageHeight +
             8 +
-            meta +
-            4 +
+            chip +
+            6 +
+            8 +
             (oneTitle * 2) +
-            2 +
+            4 +
+            (oneSummary * 2) +
+            4 +
             whenLine +
             12,
       ),
@@ -213,6 +205,24 @@ void main() {
     final titleRect = tester.getRect(titleFinder);
     expect(titleRect.top, greaterThanOrEqualTo(cardRect.top - 0.5));
     expect(titleRect.bottom, lessThanOrEqualTo(cardRect.bottom + 0.5));
+
+    final story = buildSampleNews(DateTime(2026, 10, 27, 12))
+        .singleWhere((item) => item.id == title.id);
+    final summary = find.descendant(
+      of: card,
+      matching: find.text(story.summary),
+    );
+    expect(summary, findsOneWidget);
+    final summaryRect = tester.getRect(summary);
+    expect(summaryRect.top, greaterThanOrEqualTo(titleRect.bottom - 0.5));
+    expect(summaryRect.bottom, lessThanOrEqualTo(cardRect.bottom + 0.5));
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.text(GameTypes.labelOf(story.gameType)),
+      ),
+      findsOneWidget,
+    );
 
     final when = find.descendant(
       of: card,
@@ -274,8 +284,13 @@ void main() {
       final scroll = _promoScroll(tester);
       final before = scroll.pixels;
       await _tapPromoNext(tester);
-      final step = PromoCarousel.cardWidth + PromoCarousel.gap;
-      expect(scroll.pixels - before, closeTo(step, 1));
+      final step = CarouselLayout.fit(
+        viewport: scroll.viewportDimension,
+        itemCount: promoFlyers.length,
+        gap: PromoCarousel.gap,
+        preferredItemWidth: PromoCarousel.preferredItemWidth,
+      ).stride;
+      expect(scroll.pixels - before, closeTo(step, 1.5));
 
       final carousel = tester.getRect(find.byKey(AppKeys.promoCarousel));
       final second = find.byWidgetPredicate(
@@ -534,19 +549,74 @@ void main() {
     final rowWidth = tester.getSize(find.byKey(AppKeys.findGroup)).width;
     expect(chipWidth, lessThan(rowWidth * 0.7));
   });
+
+  testWidgets('the game type filters news and the single room carousel', (
+    tester,
+  ) async {
+    await pumpScapeMatch(tester);
+    await tester.tap(find.byKey(AppKeys.gameTypeSelector));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Mesa longa do Batel'),
+      400,
+      scrollable: verticalScrollable,
+    );
+    expect(find.text('Mesa longa do Batel'), findsOneWidget);
+    expect(find.text('O Cofre do Café'), findsNothing);
+    expect(find.text('Clube de tabuleiro da XV'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Mesa nova: o porão abre campanha às quintas'),
+      400,
+      scrollable: verticalScrollable,
+    );
+    expect(
+      find.text('Mesa nova: o porão abre campanha às quintas'),
+      findsOneWidget,
+    );
+    expect(find.text('Sala nova: A Biblioteca Proibida'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(AppKeys.newsFeed),
+        matching: find.text('RPG'),
+      ),
+      findsWidgets,
+    );
+  });
 }
 
 Future<void> _scrollNews(WidgetTester tester, Finder card) async {
-  await tester.scrollUntilVisible(
-    card,
-    280,
-    scrollable: find.descendant(
-      of: find.byKey(AppKeys.newsFeed),
-      matching: find.byWidgetPredicate(
-        (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
-      ),
+  final scrollable = find.descendant(
+    of: find.byKey(AppKeys.newsFeed),
+    matching: find.byWidgetPredicate(
+      (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
     ),
   );
+  for (var step = 0; step < 24; step++) {
+    if (_fullyInView(tester, card, scrollable)) {
+      return;
+    }
+    final next = find.byKey(AppKeys.carouselNext('news'));
+    if (next.evaluate().isEmpty) {
+      break;
+    }
+    await tester.ensureVisible(next);
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+  }
+  expect(_fullyInView(tester, card, scrollable), isTrue);
+}
+
+bool _fullyInView(WidgetTester tester, Finder target, Finder view) {
+  if (target.evaluate().isEmpty || view.evaluate().isEmpty) {
+    return false;
+  }
+  final rect = tester.getRect(target);
+  final bounds = tester.getRect(view);
+  return rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1;
 }
 
 ({String id, String text}) _twoLineTitle(
@@ -680,20 +750,13 @@ int _promoDotCount(WidgetTester tester) {
 
 /// Paradas de um passo por flyer, com a largura que o carrossel realmente tem.
 int _reachablePromoStops(WidgetTester tester) {
-  final viewport = tester.getSize(find.byKey(AppKeys.promoCarousel)).width;
-  const step = PromoCarousel.cardWidth + PromoCarousel.gap;
-  final content =
-      promoFlyers.length * PromoCarousel.cardWidth +
-      (promoFlyers.length - 1) * PromoCarousel.gap;
-  final maxScroll = content - viewport;
-  var pages = 1;
-  var offset = 0.0;
-  while (offset < maxScroll - 1) {
-    final next = offset + step;
-    offset = next > maxScroll ? maxScroll : next;
-    pages++;
-  }
-  return pages;
+  final viewport = _promoScroll(tester).viewportDimension;
+  return CarouselLayout.fit(
+    viewport: viewport,
+    itemCount: promoFlyers.length,
+    gap: PromoCarousel.gap,
+    preferredItemWidth: PromoCarousel.preferredItemWidth,
+  ).stops;
 }
 
 int _activeDot(WidgetTester tester) {

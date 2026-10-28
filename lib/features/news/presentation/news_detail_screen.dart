@@ -7,6 +7,7 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
 import 'package:scapematch/features/news/presentation/news_artwork.dart';
 import 'package:scapematch/features/news/presentation/news_feed_view_model.dart';
@@ -99,8 +100,16 @@ class _Detail extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          '${item.cityName} · $when · $source',
+          '${item.cityName} · $when · ${formatShortDate(item.publishedAt)} · $source',
           style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          GameTypes.labelOf(item.gameType),
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: AppColors.teal,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 12),
         Text(

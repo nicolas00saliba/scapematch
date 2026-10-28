@@ -73,6 +73,10 @@ abstract final class AppKeys {
   static const newsSeeAll = Key('news-see-all');
   static const promoCarousel = Key('promo-carousel');
   static const promoDots = Key('promo-dots');
+  static const roomsCarousel = Key('rooms-carousel');
+  static Key carouselItem(String id, int index) =>
+      Key('carousel-item-$id-$index');
+  static Key carouselFrame(String id) => Key('carousel-frame-$id');
   static const popularRooms = Key('popular-rooms');
   static const popularSeeAll = Key('popular-see-all');
   static const groupResults = Key('group-results');
