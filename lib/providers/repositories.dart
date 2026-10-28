@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/time/clock.dart';
+import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
+import 'package:scapematch/features/auth/data/pending_invite_store.dart';
+import 'package:scapematch/features/auth/domain/auth_repository.dart';
 import 'package:scapematch/features/catalog/data/asset_experience_source.dart';
 import 'package:scapematch/features/catalog/data/catalog_repository.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
@@ -20,6 +23,17 @@ import 'package:scapematch/features/news/data/sample_news.dart';
 /// the same instant, so a session that starts in 90 minutes stays inside
 /// the refund window for the whole session.
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
+
+/// Sessão fictícia. O app começa com Nícolas. Um teste de convite passa
+/// `signedIn: null` para ver a tela sem login.
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  return FakeAuthRepository();
+});
+
+/// Grupo que a pessoa escolheu antes de entrar na conta.
+final pendingInviteStoreProvider = Provider<PendingInviteStore>((ref) {
+  return PendingInviteStore();
+});
 
 /// One in-memory database for the whole session.
 ///

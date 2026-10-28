@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/scapematch_app.dart';
+import 'package:scapematch/app/url_strategy.dart';
 import 'package:scapematch/features/cities/data/selected_city_store.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/data/selected_game_type_store.dart';
@@ -11,6 +12,7 @@ import 'package:scapematch/features/groups/presentation/selected_game_type_contr
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  configureUrlStrategy();
   // The handle is intentionally not disposed: semantics stay on so screen
   // readers and the web accessibility tree can see the controls.
   SemanticsBinding.instance.ensureSemantics();

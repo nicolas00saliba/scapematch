@@ -1,12 +1,11 @@
 import 'package:flutter/foundation.dart';
 
-/// Link for one group.
+/// Link público de um grupo.
 ///
-/// Off the web this is the go_router path (`/groups/:id`). On the web it is
-/// an absolute URL under the page that is open, so a GitHub Pages base path
-/// such as `/scapematch/` is kept.
+/// Fora da web é a rota go_router `/convite/:id`. Na web é uma URL absoluta
+/// da página aberta, então o prefixo do GitHub Pages (`/scapematch/`) fica.
 String groupLink(String groupId, {Uri? page, bool? onWeb}) {
-  final route = '/groups/$groupId';
+  final route = '/convite/$groupId';
   final web = onWeb ?? kIsWeb;
   if (!web) {
     return route;

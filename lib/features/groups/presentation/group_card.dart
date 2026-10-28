@@ -5,10 +5,16 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 
 class GroupCard extends StatelessWidget {
-  const GroupCard({super.key, required this.group, required this.onTap});
+  const GroupCard({
+    super.key,
+    required this.group,
+    required this.onTap,
+    this.onInvite,
+  });
 
   final Group group;
   final VoidCallback onTap;
+  final VoidCallback? onInvite;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +74,19 @@ class GroupCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                if (onInvite != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      key: AppKeys.inviteOnCard(group.id),
+                      onPressed: onInvite,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Convidar'),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -109,6 +128,7 @@ class _StatusPill extends StatelessWidget {
           color: foreground,
           fontWeight: FontWeight.w700,
           fontSize: 12,
+          fontFamily: 'Roboto',
         ),
       ),
     );

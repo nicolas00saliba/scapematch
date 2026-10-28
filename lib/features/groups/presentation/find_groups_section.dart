@@ -14,6 +14,7 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
+import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 
 /// Busca de grupo comprimida, no topo da Home.
@@ -263,6 +264,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
           groups: items,
           maxHeight: items.length <= 1 ? double.infinity : groupWindowMaxHeight,
           onOpen: (group) => context.push('/groups/${group.id}'),
+          onInvite: (group) => showInviteSheet(context, group),
         );
       },
     );
@@ -301,11 +303,13 @@ class _GroupWindow extends StatefulWidget {
     required this.groups,
     required this.maxHeight,
     required this.onOpen,
+    required this.onInvite,
   });
 
   final List<Group> groups;
   final double maxHeight;
   final ValueChanged<Group> onOpen;
+  final ValueChanged<Group> onInvite;
 
   @override
   State<_GroupWindow> createState() => _GroupWindowState();
@@ -368,6 +372,7 @@ class _GroupWindowState extends State<_GroupWindow> {
                   GroupCard(
                     group: widget.groups[index],
                     onTap: () => widget.onOpen(widget.groups[index]),
+                    onInvite: () => widget.onInvite(widget.groups[index]),
                   ),
                 ],
               ],

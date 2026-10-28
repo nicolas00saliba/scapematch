@@ -130,10 +130,18 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Onde está no código:** `Group.occupiedSpots`, `GroupRules.validateTotalSpots`, `GroupRules.maxNoteLength` e `FakeGroupRepository.edit`.
 - **Como trocar depois:** se a observação virar mensagem para cada pessoa, ela sai do grupo e vira uma tabela de avisos. O teto de 280 caracteres muda na constante.
 
+## Convite do grupo
+
+- **Data:** 2026-10-28
+- **Decisão:** cada grupo tem Convidar na tela do grupo, nos cartões da busca e em Meus grupos. A folha mostra a mensagem (sala, casa, cidade, data e hora, vagas restantes e o link), Copiar link, WhatsApp (`https://wa.me/?text=...`) e Compartilhar. Compartilhar usa a Web Share API no navegador quando ela existe; nos testes e onde ela falta, a folha avisa para copiar a mensagem. O cartão visual (sala, casa, cidade, horário, vagas e a marca) aparece na folha. Enviar esse cartão como imagem fica para depois: na web isso não é estável, então o convite que viaja é o texto com o link. O link é `/convite/:groupId`, com a URL sem `#`. O GitHub Pages já publica o `index.html` também como `404.html`, então o caminho abre o app. Quem abre sem sessão vê o grupo inteiro, só para ler. Participar sem sessão grava o id em `pending_group_id` e abre Entrar, com Fazer cadastro embaixo. Login e cadastro são fictícios, atrás de `AuthRepository`. Ao terminar o cadastro ou um login, a intenção é consumida e a pessoa entra na hora, com as regras que já existem. Se a vaga acabou, a mensagem diz isso e a intenção some. Quem já está na sessão entra direto. O app continua abrindo logado como Nícolas. A regra de o criador não remover nem excluir depois que a sessão começou não muda.
+- **Motivo:** o dono quer mandar o grupo e deixar a pessoa entrar pelo link, sem cobrar e sem um backend ainda.
+- **Onde está no código:** `groupLink`, `inviteMessage`, `InviteScreen`, `showInviteSheet`, `PendingInviteStore`, `AuthRepository` e `consumePendingInvite`.
+- **Como trocar depois:** ver [CONVITES_PLANO.md](CONVITES_PLANO.md).
+
 ## Link do grupo
 
 - **Data:** 2026-10-27
-- **Decisão:** o detalhe copia o link da rota go_router `/groups/:id`. No navegador, o link inclui o prefixo da página (por exemplo `/scapematch/`). Não há serviço de compartilhamento do sistema além da área de transferência.
+- **Decisão:** atualizada em “Convite do grupo”. Antes, o detalhe só copiava `/groups/:id`. No navegador, o link inclui o prefixo da página (por exemplo `/scapematch/`).
 - **Motivo:** a rota já existe. Copiar é o bastante para mandar o grupo no chat, sem pedir permissão de compartilhamento nativo.
 - **Onde está no código:** `groupLink` em `lib/core/sharing/group_link.dart`.
 - **Como trocar depois:** trocar a função por `Share.share` quando o app for para as lojas. A rota continua a mesma.

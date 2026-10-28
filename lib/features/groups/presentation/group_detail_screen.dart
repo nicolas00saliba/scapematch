@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
-import 'package:scapematch/core/sharing/group_link.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
@@ -19,6 +18,7 @@ import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/edit_group_sheet.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_dialogs.dart';
+import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -33,10 +33,26 @@ class GroupDetailScreen extends ConsumerStatefulWidget {
 
 class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
   var _busy = false;
+  var _shownNotice = false;
 
   /// Refund the leave dialog promised. Compared with the repository result
   /// after the person confirms, because the clock may have moved.
   bool? _leavePreview;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final extra = GoRouterState.of(context).extra;
+    if (_shownNotice || extra is! String || extra.isEmpty) {
+      return;
+    }
+    _shownNotice = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _snack(extra);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,12 +64,6 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         title: const Text('Grupo'),
         actions: detail.maybeWhen(
           data: (group) => [
-            IconButton(
-              key: AppKeys.shareGroup,
-              tooltip: 'Copiar link do grupo',
-              onPressed: () => _share(group.id),
-              icon: const Icon(Icons.link),
-            ),
             if (_canEdit(group, userId, now))
               IconButton(
                 key: AppKeys.editGroup,
@@ -103,6 +113,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
         const ExampleDataBanner(),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: AppKeys.inviteGroup,
+          onPressed: () => showInviteSheet(context, group),
+          icon: const Icon(Icons.ios_share),
+          label: const Text('Convidar'),
+        ),
         if (group.isCancelled) ...[
           const SizedBox(height: 12),
           _Banner(
@@ -518,21 +535,6 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             : GroupMessages.removeFailure(reason),
       );
     });
-  }
-
-  Future<void> _share(String groupId) async {
-    try {
-      await Clipboard.setData(ClipboardData(text: groupLink(groupId)));
-      if (!mounted) {
-        return;
-      }
-      _snack(GroupMessages.linkCopied);
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      _snack(GroupMessages.linkFailed);
-    }
   }
 
   Future<void> _run(Future<void> Function() action) async {

@@ -42,6 +42,7 @@ ThemeData buildAppTheme() {
 
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Roboto',
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.cream,
     dividerColor: AppColors.line,
@@ -55,6 +56,7 @@ ThemeData buildAppTheme() {
         color: AppColors.ink,
         fontSize: 20,
         fontWeight: FontWeight.w700,
+        fontFamily: 'Roboto',
       ),
     ),
     cardTheme: CardThemeData(
@@ -70,7 +72,28 @@ ThemeData buildAppTheme() {
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(52),
         shape: rounded,
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Roboto',
+        ),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        textStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Roboto',
+        ),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Roboto',
+        ),
       ),
     ),
     chipTheme: ChipThemeData(
@@ -80,6 +103,7 @@ ThemeData buildAppTheme() {
       labelStyle: const TextStyle(
         color: AppColors.ink,
         fontWeight: FontWeight.w600,
+        fontFamily: 'Roboto',
       ),
       side: const BorderSide(color: AppColors.line),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -97,6 +121,7 @@ ThemeData buildAppTheme() {
         return TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+          fontFamily: 'Roboto',
           color: selected ? AppColors.teal : AppColors.muted,
         );
       }),
