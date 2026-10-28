@@ -546,22 +546,26 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Milo', 'Nina', 'Otto', 'Pietra'],
     ),
     _group(
-      id: 'grp-cwb-tumba-quase',
+      id: 'grp-cwb-tumba-imersivo',
       city: curitiba,
       house: batel,
       room: tumba,
       slot: slotTumbaQuase,
       totalSpots: 6,
       names: ['Quim', 'Rita', 'Sara', 'Téo', 'Uma'],
+      gameType: GameTypes.immersive,
+      roomName: 'Ritual imersivo da tumba',
     ),
     _group(
-      id: 'grp-cwb-trilha-quase',
+      id: 'grp-cwb-trilha-laser',
       city: curitiba,
       house: batel,
       room: trilha,
       slot: slotTrilhaQuase,
       totalSpots: 6,
       names: ['Vini', 'Wanda', 'Xande', 'Yara'],
+      gameType: GameTypes.laserTag,
+      roomName: 'Arena laser da trilha',
     ),
     _group(
       id: 'grp-cwb-porao-rpg',
@@ -572,6 +576,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       totalSpots: 5,
       names: ['Zeca', 'Aline', 'Bruno', 'Cris'],
       gameType: GameTypes.rpg,
+      roomName: 'Mesa de RPG no porão',
     ),
     _group(
       id: 'grp-cwb-satelite-tabuleiro',
@@ -582,6 +587,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       totalSpots: 6,
       names: ['Dani', 'Elio', 'Fran', 'Guto', 'Hélio'],
       gameType: GameTypes.boardGame,
+      roomName: 'Noite de tabuleiro no Batel',
     ),
     _group(
       id: SampleIds.groupSpMetroAlmost,
@@ -890,6 +896,7 @@ Group _group({
   required List<String> names,
   String note = '',
   String gameType = GameTypes.escapeRoom,
+  String? roomName,
 }) {
   assert(house.cityId == city.id, id);
   assert(room.houseId == house.id, id);
@@ -905,7 +912,7 @@ Group _group({
     houseName: house.name,
     neighborhood: house.neighborhood,
     roomId: room.id,
-    roomName: room.name,
+    roomName: roomName ?? room.name,
     roomTheme: room.theme,
     roomCapacity: room.capacity,
     durationMinutes: room.durationMinutes,

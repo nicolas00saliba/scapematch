@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/theme.dart';
@@ -258,6 +261,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         }
         return _GroupWindow(
           groups: items,
+          maxHeight: items.length <= 1 ? double.infinity : groupWindowMaxHeight,
           onOpen: (group) => context.push('/groups/${group.id}'),
         );
       },
@@ -285,17 +289,22 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
   }
 }
 
-/// Altura da janela. Um cartão cabe inteiro. Dois já pedem rolagem.
-/// A barra só entra quando o conteúdo passa dessa altura.
-const groupWindowHeight = 210.0;
+/// Teto da janela. Com poucos cartões ela encolhe até o conteúdo.
+/// A barra só entra quando o conteúdo passa desse teto.
+const groupWindowMaxHeight = 176.0;
 
 /// Controller próprio da janela. A rolagem da página continua sendo a primária.
 final class GroupWindowController extends ScrollController {}
 
 class _GroupWindow extends StatefulWidget {
-  const _GroupWindow({required this.groups, required this.onOpen});
+  const _GroupWindow({
+    required this.groups,
+    required this.maxHeight,
+    required this.onOpen,
+  });
 
   final List<Group> groups;
+  final double maxHeight;
   final ValueChanged<Group> onOpen;
 
   @override
@@ -339,29 +348,108 @@ class _GroupWindowState extends State<_GroupWindow> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return _CapHeight(
       key: AppKeys.groupWindow,
-      height: groupWindowHeight,
-      child: Scrollbar(
-        controller: _scroll,
-        thumbVisibility: _overflows,
-        child: SingleChildScrollView(
+      maxHeight: widget.maxHeight,
+      child: NotificationListener<OverscrollNotification>(
+        onNotification: _chainOverscrollToPage,
+        child: Scrollbar(
           controller: _scroll,
-          primary: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var index = 0; index < widget.groups.length; index++) ...[
-                if (index > 0) const SizedBox(height: 10),
-                GroupCard(
-                  group: widget.groups[index],
-                  onTap: () => widget.onOpen(widget.groups[index]),
-                ),
+          thumbVisibility: _overflows,
+          child: SingleChildScrollView(
+            controller: _scroll,
+            primary: false,
+            physics: const ClampingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < widget.groups.length; index++) ...[
+                  if (index > 0) const SizedBox(height: 10),
+                  GroupCard(
+                    group: widget.groups[index],
+                    onTap: () => widget.onOpen(widget.groups[index]),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  /// O arrasto que passa do fim (ou do começo) da janela segue na página.
+  /// Sem isso, um toque que começa dentro da janela nunca move o resto da Home.
+  bool _chainOverscrollToPage(OverscrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    // O scroll da página esconde o PrimaryScrollController dos filhos.
+    // O contexto da janela está fora da rolagem interna, então o ancestral
+    // vertical é a página.
+    final page = Scrollable.maybeOf(context, axis: Axis.vertical);
+    if (page == null || !page.position.hasContentDimensions) {
+      return false;
+    }
+    final position = page.position;
+    final target = (position.pixels + notification.overscroll).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target != position.pixels) {
+      position.jumpTo(target);
+    }
+    return true;
+  }
+}
+
+/// Fica da altura do conteúdo, até [maxHeight]. Acima disso, o filho rola.
+class _CapHeight extends SingleChildRenderObjectWidget {
+  const _CapHeight({super.key, required this.maxHeight, required super.child});
+
+  final double maxHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _RenderCapHeight(maxHeight);
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderCapHeight renderObject) {
+    renderObject.maxHeight = maxHeight;
+  }
+}
+
+class _RenderCapHeight extends RenderProxyBox {
+  _RenderCapHeight(this._maxHeight);
+
+  double _maxHeight;
+
+  set maxHeight(double value) {
+    if (_maxHeight == value) {
+      return;
+    }
+    _maxHeight = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void performLayout() {
+    final child = this.child;
+    if (child == null) {
+      size = Size(constraints.maxWidth, 0);
+      return;
+    }
+    final width = constraints.maxWidth;
+    child.layout(
+      BoxConstraints(minWidth: width, maxWidth: width),
+      parentUsesSize: true,
+    );
+    final natural = child.size.height;
+    final height = math.min(natural, _maxHeight);
+    if (natural > _maxHeight) {
+      child.layout(BoxConstraints.tightFor(width: width, height: height));
+    }
+    size = Size(width, height);
   }
 }

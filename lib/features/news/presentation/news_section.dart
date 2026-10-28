@@ -19,7 +19,7 @@ final homeNewsProvider = FutureProvider.autoDispose<List<NewsItem>>((ref) {
 
 /// Altura da foto no carrossel primário. Cabe a faixa inteira na primeira
 /// tela de 390×844 junto com a janela de grupos e um pedaço do Terror.
-const newsCarouselImageHeight = 150.0;
+const newsCarouselImageHeight = 80.0;
 const newsCarouselCardWidth = 340.0;
 
 double newsCarouselCardHeight(BuildContext context) {

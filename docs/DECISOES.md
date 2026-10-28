@@ -5,7 +5,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Tipo de jogo no topo
 
 - **Data:** 2026-10-28
-- **Decisão:** ao lado da cidade há um seletor provisório de tipo de jogo: Todos, Escape room, RPG, Jogos de tabuleiro, Laser tag e Imersivo. A escolha fica no aparelho, na chave `selected_game_type`, do mesmo jeito que a cidade. Ela filtra só a janela de grupos. Salas, notícias e carrosséis de tema continuam iguais, porque o catálogo ainda é todo de escape room. Os grupos extras de Curitiba trazem dois exemplos de outro tipo (RPG e tabuleiro) para o filtro ter o que mostrar.
+- **Decisão:** ao lado da cidade há um seletor provisório de tipo de jogo: Todos, Escape room, RPG, Jogos de tabuleiro, Laser tag e Imersivo. A escolha fica no aparelho, na chave `selected_game_type`, do mesmo jeito que a cidade. Ela filtra só a janela de grupos. Salas, notícias e carrosséis de tema continuam iguais, porque o catálogo ainda é todo de escape room. Os grupos extras de Curitiba incluem escape room, RPG, tabuleiro, laser tag e imersivo, com nome da atividade (não o da sala de escape) para o filtro mostrar um resultado coerente. No seletor fechado, “Jogos de tabuleiro” aparece como “Tabuleiro”; a folha mantém o nome completo.
 - **Motivo:** o dono quer o lugar do filtro antes de existir um catálogo de verdade, e a Home precisa continuar mostrando Novidades e salas quando a pessoa escolhe outro jogo.
 - **Onde está no código:** `GameTypeSelector`, `SelectedGameTypeStore` e `filterGroupsByGameType`. O `main` lê o store antes do primeiro frame.
 - **Como trocar depois:** quando cada sala tiver um tipo, o mesmo id filtra os carrosséis e o feed. Até lá, mudar a lista é editar `GameTypes.choices`.
@@ -13,10 +13,10 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Janela de grupos na Home
 
 - **Data:** 2026-10-28
-- **Decisão:** os grupos formados voltam para a abertura, dentro de uma área de altura fixa. A barra de rolagem vertical só aparece quando os cartões não cabem. Curitiba tem grupos quase cheios a mais, de exemplo, para essa barra existir no protótipo. As promoções continuam sem título, com setas, antes dos temas terciários.
+- **Decisão:** os grupos formados voltam para a abertura, numa janela que encolhe até o conteúdo e no máximo cabe cerca de um cartão e o começo do seguinte. A barra de rolagem vertical só aparece quando os cartões não cabem. Um arrasto que passa do fim ou do começo da janela continua na página. Curitiba tem grupos quase cheios a mais, de exemplo, para essa barra existir no protótipo. As promoções continuam sem título, com setas, antes dos temas terciários.
 - **Motivo:** a compressão tinha tirado os grupos e empurrado as promoções para fora da vista. A janela devolve os grupos sem ocupar a página inteira.
-- **Onde está no código:** `FindGroupsSection` (`groupWindowHeight`) e os grupos extras em `sample_data.dart`.
-- **Como trocar depois:** a altura da janela é a constante `groupWindowHeight`. Um feed real substitui os grupos extras.
+- **Onde está no código:** `FindGroupsSection` (`groupWindowMaxHeight`) e os grupos extras em `sample_data.dart`.
+- **Como trocar depois:** o teto da janela é a constante `groupWindowMaxHeight`. Um feed real substitui os grupos extras.
 
 ## Entrada livre no grupo
 

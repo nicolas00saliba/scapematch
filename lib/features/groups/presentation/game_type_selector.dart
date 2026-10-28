@@ -14,6 +14,7 @@ class GameTypeSelector extends ConsumerWidget {
     final theme = Theme.of(context);
     final selectedId = ref.watch(selectedGameTypeIdProvider);
     final label = GameTypes.labelOf(selectedId);
+    final shortLabel = GameTypes.shortLabelOf(selectedId);
     return Semantics(
       button: true,
       label: 'Tipo de jogo selecionado: $label. Toque para trocar.',
@@ -40,7 +41,7 @@ class GameTypeSelector extends ConsumerWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    label,
+                    shortLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -81,12 +82,12 @@ class GameTypeSelector extends ConsumerWidget {
               ),
               for (final choice in GameTypes.choices)
                 ListTile(
-                  key: AppKeys.gameTypeOption(choice.$1),
-                  title: Text(choice.$2),
-                  trailing: choice.$1 == selectedId
+                  key: AppKeys.gameTypeOption(choice.id),
+                  title: Text(choice.label),
+                  trailing: choice.id == selectedId
                       ? const Icon(Icons.check, color: AppColors.teal)
                       : null,
-                  onTap: () => Navigator.of(context).pop(choice.$1),
+                  onTap: () => Navigator.of(context).pop(choice.id),
                 ),
             ],
           ),

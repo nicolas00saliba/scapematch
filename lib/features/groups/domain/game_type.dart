@@ -9,30 +9,36 @@ abstract final class GameTypes {
   static const laserTag = 'laser-tag';
   static const immersive = 'immersive';
 
-  static const choices = <(String id, String label)>[
-    (all, 'Todos'),
-    (escapeRoom, 'Escape room'),
-    (rpg, 'RPG'),
-    (boardGame, 'Jogos de tabuleiro'),
-    (laserTag, 'Laser tag'),
-    (immersive, 'Imersivo'),
+  static const choices = <({String id, String label, String shortLabel})>[
+    (id: all, label: 'Todos', shortLabel: 'Todos'),
+    (id: escapeRoom, label: 'Escape room', shortLabel: 'Escape room'),
+    (id: rpg, label: 'RPG', shortLabel: 'RPG'),
+    (id: boardGame, label: 'Jogos de tabuleiro', shortLabel: 'Tabuleiro'),
+    (id: laserTag, label: 'Laser tag', shortLabel: 'Laser tag'),
+    (id: immersive, label: 'Imersivo', shortLabel: 'Imersivo'),
   ];
 
-  static String labelOf(String id) {
-    for (final choice in choices) {
-      if (choice.$1 == id) {
-        return choice.$2;
-      }
-    }
-    return 'Todos';
-  }
+  /// Nome completo, usado na folha de opções.
+  static String labelOf(String id) => _choice(id).label;
+
+  /// Nome curto do seletor fechado, para caber ao lado da cidade.
+  static String shortLabelOf(String id) => _choice(id).shortLabel;
 
   static bool isKnown(String id) {
     for (final choice in choices) {
-      if (choice.$1 == id) {
+      if (choice.id == id) {
         return true;
       }
     }
     return false;
+  }
+
+  static ({String id, String label, String shortLabel}) _choice(String id) {
+    for (final choice in choices) {
+      if (choice.id == id) {
+        return choice;
+      }
+    }
+    return choices.first;
   }
 }

@@ -1,9 +1,12 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/catalog/presentation/room_card.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
+import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
@@ -94,19 +97,26 @@ void main() {
     final viewportBottom = viewportTop + scrollable.position.viewportDimension;
     final news = tester.getRect(find.byKey(AppKeys.newsFeed));
     final terror = tester.getRect(find.byKey(AppKeys.roomCarousel('terror')));
+    final card = find
+        .descendant(
+          of: find.byKey(AppKeys.roomCarousel('terror')),
+          matching: find.byType(RoomCard),
+        )
+        .first;
+    final cardRect = tester.getRect(card);
 
     expect(news.bottom, lessThanOrEqualTo(viewportBottom + 1));
-    expect(terror.top, lessThan(viewportBottom));
     expect(terror.bottom, greaterThan(viewportBottom));
-    final visible = viewportBottom - terror.top;
-    final fraction = visible / terror.height;
+    final visible = (viewportBottom - cardRect.top).clamp(0.0, cardRect.height);
+    final fraction = visible / cardRect.height;
     expect(
       fraction,
-      greaterThan(0.05),
+      inInclusiveRange(0.28, 0.42),
       reason:
-          'fraction=$fraction terror=${terror.height} news=${news.height} '
-          'view=${viewportBottom - viewportTop} newsBottom=${news.bottom} '
-          'viewBottom=$viewportBottom terrorTop=${terror.top}',
+          'fraction=$fraction card=${cardRect.height} visible=$visible '
+          'news=${news.height} view=${viewportBottom - viewportTop} '
+          'newsBottom=${news.bottom} viewBottom=$viewportBottom '
+          'cardTop=${cardRect.top}',
     );
   });
 
@@ -379,6 +389,38 @@ void main() {
     },
   );
 
+  testWidgets('a touch drag past the group window scrolls the page', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await pumpScapeMatch(tester);
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+
+    final windowScroll = tester.state<ScrollableState>(_groupWindowScroll);
+    final page = tester.state<ScrollableState>(verticalScrollable).position;
+    windowScroll.position.jumpTo(windowScroll.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    final before = page.pixels;
+
+    final rect = tester.getRect(find.byKey(AppKeys.groupWindow));
+    await tester.dragFrom(
+      rect.center,
+      const Offset(0, -180),
+      kind: PointerDeviceKind.touch,
+    );
+    await tester.pump();
+
+    expect(page.pixels, greaterThan(before + 40));
+    expect(
+      windowScroll.position.pixels,
+      closeTo(windowScroll.position.maxScrollExtent, 1),
+    );
+  });
+
   testWidgets('city and game type fit side by side at 390px', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -393,6 +435,14 @@ void main() {
     expect((city.center.dy - game.center.dy).abs(), lessThan(8));
     expect(city.right, lessThanOrEqualTo(game.left));
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(AppKeys.gameTypeSelector));
+    await tester.pumpAndSettle();
+    expect(find.text('Jogos de tabuleiro'), findsOneWidget);
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.boardGame)));
+    await tester.pumpAndSettle();
+    expect(find.text('Tabuleiro'), findsOneWidget);
+    expect(find.text('Jogos de tabuleiro'), findsNothing);
   });
 
   testWidgets('the group window scrolls almost-full groups and obeys filters', (
@@ -408,6 +458,10 @@ void main() {
     expect(
       tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
       greaterThan(1),
+    );
+    expect(
+      tester.getSize(find.byKey(AppKeys.groupWindow)).height,
+      closeTo(groupWindowMaxHeight, 1),
     );
     expect(
       tester
@@ -427,9 +481,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(AppKeys.groupCard('grp-cwb-porao-rpg')), findsOneWidget);
+    expect(find.text('Mesa de RPG no porão'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(AppKeys.groupWindow),
+        matching: find.text('O Porão sem Luz'),
+      ),
+      findsNothing,
+    );
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
       findsNothing,
+    );
+    final cardHeight = tester
+        .getSize(find.byKey(AppKeys.groupCard('grp-cwb-porao-rpg')))
+        .height;
+    expect(
+      tester.getSize(find.byKey(AppKeys.groupWindow)).height,
+      closeTo(cardHeight, 2),
     );
     expect(
       tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
@@ -528,6 +597,13 @@ Future<void> _tapPromoNext(WidgetTester tester) async {
   await tester.tap(next);
   await tester.pumpAndSettle();
 }
+
+final Finder _groupWindowScroll = find.descendant(
+  of: find.byKey(AppKeys.groupWindow),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+  ),
+);
 
 int _promoDotCount(WidgetTester tester) {
   return tester.widget<Row>(find.byKey(AppKeys.promoDots)).children.length;

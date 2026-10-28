@@ -5,6 +5,7 @@ import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
+import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 
@@ -118,6 +119,31 @@ void main() {
     expect(
       almost.map((group) => group.id),
       isNot(contains(SampleIds.groupSpCoberturaOpen)),
+    );
+  });
+
+  test('Curitiba groups cover every game type with a matching name', () {
+    final curitiba = database.groups.where(
+      (group) => group.cityId == SampleIds.curitiba,
+    );
+    expect(
+      curitiba.map((group) => group.gameType).toSet(),
+      containsAll([
+        GameTypes.escapeRoom,
+        GameTypes.rpg,
+        GameTypes.boardGame,
+        GameTypes.laserTag,
+        GameTypes.immersive,
+      ]),
+    );
+    final rpg = curitiba.singleWhere(
+      (group) => group.gameType == GameTypes.rpg,
+    );
+    expect(rpg.roomName, 'Mesa de RPG no porão');
+    expect(rpg.roomName, isNot(contains('Porão sem Luz')));
+    expect(
+      curitiba.where((group) => group.isAlmostFull).length,
+      inInclusiveRange(8, 10),
     );
   });
 
