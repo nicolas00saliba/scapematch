@@ -28,8 +28,9 @@ import 'package:scapematch/features/wallet/data/wallet_repository.dart';
 /// the refund window for the whole session.
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
 
-/// Sessão fictícia. O app começa com Nícolas. Um teste de convite passa
-/// `signedIn: null` para ver a tela sem login.
+/// Sessão fictícia. O app começa com Nícolas nesta mesma instância.
+/// `signOut` zera a sessão; um `FakeAuthRepository` novo não é criado,
+/// então o app continua deslogado até um login.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return FakeAuthRepository();
 });

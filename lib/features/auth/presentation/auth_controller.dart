@@ -33,4 +33,9 @@ class AuthController extends Notifier<CurrentUser?> {
     state = ref.read(authRepositoryProvider).signedInUser;
     return error;
   }
+
+  Future<void> signOut() async {
+    await ref.read(authRepositoryProvider).signOut();
+    state = ref.read(authRepositoryProvider).signedInUser;
+  }
 }

@@ -56,6 +56,8 @@ abstract final class AppKeys {
   static const accountSettings = Key('account-settings');
   static const accountGreeting = Key('account-greeting');
   static const accountWallet = Key('account-wallet');
+  static const accountSignOut = Key('account-sign-out');
+  static const accountSignIn = Key('account-sign-in');
   static const accountAddBalance = Key('account-add-balance');
   static const addCard = Key('add-card');
   static const addCardNotice = Key('add-card-notice');
