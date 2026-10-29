@@ -1,35 +1,40 @@
 import 'package:flutter/foundation.dart';
+import 'package:scapematch/core/sharing/web_base.dart';
 
-/// Link for one group.
+/// Link público de um grupo.
 ///
-/// Off the web this is the go_router path (`/groups/:id`). On the web it is
-/// an absolute URL under the page that is open, so a GitHub Pages base path
-/// such as `/scapematch/` is kept.
-String groupLink(String groupId, {Uri? page, bool? onWeb}) {
-  final route = '/groups/$groupId';
+/// Fora da web é a rota go_router `/convite/:id`. Na web é a URL absoluta
+/// com o `<base href>` (no GitHub Pages, `/scapematch/`), sem a rota que
+/// estiver aberta.
+String groupLink(String groupId, {Uri? page, bool? onWeb, String? baseHref}) {
+  final route = '/convite/$groupId';
   final web = onWeb ?? kIsWeb;
   if (!web) {
     return route;
   }
   final current = page ?? Uri.base;
-  return current
-      .replace(
-        path: _joinBasePath(current.path, route),
-        query: '',
-        fragment: '',
-      )
-      .toString();
+  final prefix = _deploymentPrefix(baseHref ?? webBaseHref());
+  final path = prefix.isEmpty ? route : '$prefix$route';
+  return Uri(
+    scheme: current.scheme,
+    host: current.host,
+    port: current.hasPort ? current.port : null,
+    path: path,
+  ).toString();
 }
 
-String _joinBasePath(String basePath, String route) {
-  var prefix = basePath;
-  if (prefix.endsWith('index.html')) {
-    prefix = prefix.substring(0, prefix.length - 'index.html'.length);
+/// `/` e `/scapematch/` viram vazio e `/scapematch`.
+String _deploymentPrefix(String href) {
+  final parsed = href.contains('://') ? Uri.parse(href) : null;
+  var path = parsed?.path ?? href;
+  if (path.isEmpty || path == '/') {
+    return '';
   }
-  if (prefix.endsWith('/')) {
-    prefix = prefix.substring(0, prefix.length - 1);
+  if (!path.startsWith('/')) {
+    path = '/$path';
   }
-  final suffix = route.startsWith('/') ? route : '/$route';
-  final joined = '$prefix$suffix';
-  return joined.startsWith('/') ? joined : '/$joined';
+  while (path.endsWith('/') && path.length > 1) {
+    path = path.substring(0, path.length - 1);
+  }
+  return path == '/' ? '' : path;
 }

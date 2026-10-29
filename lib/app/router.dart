@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/app_shell.dart';
 import 'package:scapematch/features/account/presentation/account_destination_screen.dart';
 import 'package:scapematch/features/account/presentation/account_screen.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/login_screen.dart';
+import 'package:scapematch/features/auth/presentation/signup_screen.dart';
+import 'package:scapematch/features/groups/presentation/invite_screen.dart';
 import 'package:scapematch/features/catalog/presentation/popular_rooms_screen.dart';
 import 'package:scapematch/features/catalog/presentation/room_category_screen.dart';
 import 'package:scapematch/features/catalog/presentation/room_groups_screen.dart';
@@ -25,8 +29,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
-      if (state.uri.path == '/groups') {
+      final path = state.uri.path;
+      if (path == '/groups') {
         return '/';
+      }
+      // Detalhe interno sem sessão vira o convite público.
+      final detail = RegExp(r'^/groups/([^/]+)$').firstMatch(path);
+      final id = detail?.group(1);
+      if (id != null && id != 'mine' && id != 'new') {
+        if (ref.read(authSessionProvider) == null) {
+          return '/convite/$id';
+        }
       }
       return null;
     },
@@ -64,6 +77,23 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/convite/:groupId',
+        name: 'invite',
+        builder: (context, state) {
+          return InviteScreen(groupId: state.pathParameters['groupId']!);
+        },
+      ),
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/cadastro',
+        name: 'signup',
+        builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
         path: '/groups/new',

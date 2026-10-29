@@ -71,6 +71,7 @@ lib/
 test/                       # regras, repositório e fluxos de tela
 docs/ARQUITETURA.md         # explicação curta das camadas
 docs/DECISOES.md            # decisões provisórias do produto
+docs/CONVITES_PLANO.md      # o que o link de convite ainda não faz
 docs/DADOS_REAIS.md         # como uma casa entra sem coleta escondida
 docs/SUPABASE_ESQUEMA.md    # rascunho de tabelas, RLS e join atômico
 ```

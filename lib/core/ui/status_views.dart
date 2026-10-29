@@ -119,11 +119,17 @@ class EmptyView extends StatelessWidget {
     required this.title,
     required this.message,
     this.icon = Icons.groups_outlined,
+    this.actionKey,
+    this.actionLabel,
+    this.onAction,
   });
 
   final String title;
   final String message;
   final IconData icon;
+  final Key? actionKey;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -152,6 +158,14 @@ class EmptyView extends StatelessWidget {
                 height: 1.4,
               ),
             ),
+            if (onAction != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                key: actionKey,
+                onPressed: onAction,
+                child: Text(actionLabel ?? 'Continuar'),
+              ),
+            ],
           ],
         ),
       ),

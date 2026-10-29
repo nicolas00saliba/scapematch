@@ -12,6 +12,7 @@ import 'package:scapematch/features/account/presentation/current_user_provider.d
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -112,6 +113,7 @@ class _GroupList extends StatelessWidget {
           group: group,
           member: group.participantForUser(userId),
           onTap: () => context.push('/groups/${group.id}'),
+          onInvite: () => showInviteSheet(context, group),
         );
       },
     );
@@ -123,11 +125,13 @@ class _MyGroupCard extends StatelessWidget {
     required this.group,
     required this.member,
     required this.onTap,
+    required this.onInvite,
   });
 
   final Group group;
   final Participant? member;
   final VoidCallback onTap;
+  final VoidCallback onInvite;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +192,18 @@ class _MyGroupCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: AppKeys.inviteOnCard(group.id),
+                  onPressed: onInvite,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Convidar'),
+                ),
+              ),
             ],
           ),
         ),

@@ -60,10 +60,12 @@ void main() {
       );
     });
 
+    await tester.tap(find.byKey(AppKeys.inviteGroup));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.shareGroup));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(copied, contains('/groups/${SampleIds.groupSpCoberturaOpen}'));
+    expect(copied, contains('/convite/${SampleIds.groupSpCoberturaOpen}'));
   });
 
   testWidgets('leaving at least two hours ahead explains the refund first', (

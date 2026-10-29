@@ -178,7 +178,10 @@ abstract final class GroupMessages {
   static const cancelledBanner =
       'O organizador cancelou este grupo. Quem estava inscrito recebe reembolso integral.';
   static const linkCopied = 'Link do grupo copiado.';
-  static const linkFailed = 'Não foi possível copiar o link.';
+  static const inviteBecameFull =
+      'O grupo lotou antes de você entrar. A vaga não ficou sua.';
+  static const inviteImageLater =
+      'O cartão como imagem ainda não é enviado. Use o link.';
   static const confirmSuccess = 'Presença confirmada.';
   static const leaveRefunded =
       'Você saiu do grupo. Reembolso simulado registrado.';
