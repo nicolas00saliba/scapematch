@@ -173,6 +173,11 @@ abstract final class GroupMessages {
 
   static const removeAction = 'Remover';
 
+  static const signInToSeeGroups = 'Entre para ver seus grupos';
+  static const signInToSeeGroupsBody =
+      'Esta lista é da sua conta. Sem entrar, ela não mostra o usuário de exemplo.';
+  static const signIn = 'Entrar';
+
   static const joinedBanner = 'Você está neste grupo';
   static const leftBanner = 'Você já saiu deste grupo';
   static const cancelledBanner =

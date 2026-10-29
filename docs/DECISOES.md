@@ -5,10 +5,10 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Sair da conta
 
 - **Data:** 2026-10-29
-- **Decisão:** a aba Conta, com sessão, tem “Sair da conta” no fim da lista. Um diálogo pergunta “Sair da conta?” e oferece Ficar ou Sair. Sair chama `AuthRepository.signOut` na instância que o app já usa. A sessão fica nula e a Conta mostra “Você saiu da conta” com Entrar, que abre o login de exemplo. O e-mail `nicolas@exemplo.invalid` e a senha `senha-exemplo` entram de novo. O app continua abrindo logado como Nícolas; sair não cria outro `FakeAuthRepository` já logado. Sem sessão, a carteira e a lista da conta não aparecem. As telas de grupo que ainda leem `currentUserProvider` seguem com o usuário de exemplo quando a sessão é nula, para o restante do app não mudar de dono no meio de um grupo.
-- **Motivo:** o dono quer encerrar a sessão de exemplo e entrar de novo, sem um backend.
-- **Onde está no código:** `AccountScreen`, `AccountMessages`, `AuthController.signOut` e `authRepositoryProvider`.
-- **Como trocar depois:** o Supabase Auth ocupa o mesmo `signOut`. Aí `currentUserProvider` deixa de cair no usuário de exemplo.
+- **Decisão:** a aba Conta, com sessão, tem “Sair da conta” no fim da lista. Um diálogo pergunta “Sair da conta?” e oferece Ficar ou Sair. Sair chama `AuthRepository.signOut` na instância que o app já usa. A sessão fica nula e a Conta mostra “Você saiu da conta” com Entrar, que abre o login de exemplo e, ao concluir, volta para a Conta. O e-mail `nicolas@exemplo.invalid` e a senha `senha-exemplo` entram de novo. O app continua abrindo logado como Nícolas; sair não cria outro `FakeAuthRepository` já logado. Sem sessão, a carteira e a lista da conta não aparecem. Meus grupos mostra “Entre para ver seus grupos” e não lista o usuário de exemplo. Criar grupo sem sessão abre o login e, ao entrar, volta para o formulário. O convite público continua sem conta. Recarregar a página volta logado como Nícolas: a sessão só existe na memória e o disco não guarda quem saiu.
+- **Motivo:** o dono quer encerrar a sessão de exemplo e entrar de novo, sem um backend, e sem ver os grupos do usuário de exemplo enquanto está de fora.
+- **Onde está no código:** `AccountScreen`, `AccountMessages`, `AuthController.signOut`, `authRepositoryProvider`, `MyGroupsScreen`, `MyGroupsViewModel`, o redirect de `/groups/new` e `afterAuthLocation`.
+- **Como trocar depois:** o Supabase Auth ocupa o mesmo `signOut` e persiste a sessão. Aí um reload não volta logado sozinho, e `currentUserProvider` deixa de cair no usuário de exemplo.
 
 ## Conta: carteira, cartões e saldo
 

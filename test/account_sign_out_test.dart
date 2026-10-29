@@ -69,8 +69,8 @@ void main() {
     await tester.tap(find.byKey(AppKeys.loginSubmit));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(AppKeys.accountTab));
-    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(AccountScreen), findsOneWidget);
     expect(find.text('Olá, Nícolas'), findsOneWidget);
     final back = tester.element(find.text('Olá, Nícolas'));
     final restored = ProviderScope.containerOf(back);

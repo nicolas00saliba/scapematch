@@ -9,6 +9,7 @@ import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/account_messages.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Aba Conta. O desenho é do ScapeMatch: cartões claros, verde e cobre.
@@ -68,11 +69,6 @@ class AccountScreen extends ConsumerWidget {
               foregroundColor: theme.colorScheme.error,
               side: BorderSide(color: theme.colorScheme.error),
               minimumSize: const Size.fromHeight(48),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Roboto',
-              ),
             ),
             child: const Text(AccountMessages.signOut),
           ),
@@ -90,12 +86,6 @@ class AccountScreen extends ConsumerWidget {
           content: const Text(AccountMessages.signOutBody),
           actions: [
             TextButton(
-              style: TextButton.styleFrom(
-                textStyle: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Roboto',
-                ),
-              ),
               onPressed: () => Navigator.pop(context, false),
               child: const Text(AccountMessages.signOutStay),
             ),
@@ -142,7 +132,7 @@ class _SignedOutAccount extends StatelessWidget {
           const SizedBox(height: 16),
           FilledButton(
             key: AppKeys.accountSignIn,
-            onPressed: () => context.push('/login'),
+            onPressed: () => context.push(loginLocation('/account')),
             child: const Text(AccountMessages.signInAgain),
           ),
         ],

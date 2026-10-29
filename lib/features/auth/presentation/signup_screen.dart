@@ -5,6 +5,7 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -62,7 +63,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     }
     final groupId = pending.groupId;
     if (groupId == null) {
-      context.go('/');
+      final next = GoRouterState.of(context).uri.queryParameters['next'];
+      context.go(afterAuthLocation(next));
       return;
     }
     context.go('/groups/$groupId', extra: pending.notice);

@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
@@ -265,8 +265,11 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     if (!state.canSubmitAt(now)) {
       return null;
     }
+    final user = ref.read(authSessionProvider);
+    if (user == null) {
+      return null;
+    }
     state = state.copyWith(submitting: true, clearFailure: true);
-    final user = ref.read(currentUserProvider);
     final result = await ref
         .read(groupRepositoryProvider)
         .create(
