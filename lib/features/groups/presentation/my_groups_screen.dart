@@ -8,7 +8,8 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
-import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -21,9 +22,23 @@ class MyGroupsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authSessionProvider);
+    if (session == null) {
+      return AppScaffold(
+        appBar: AppBar(title: const Text('Meus grupos')),
+        body: EmptyView(
+          title: GroupMessages.signInToSeeGroups,
+          message: GroupMessages.signInToSeeGroupsBody,
+          icon: Icons.lock_outline,
+          actionKey: AppKeys.myGroupsSignIn,
+          actionLabel: GroupMessages.signIn,
+          onAction: () => context.push(loginLocation('/groups/mine')),
+        ),
+      );
+    }
     final groups = ref.watch(myGroupsViewModelProvider);
     final now = ref.watch(clockProvider).now();
-    final userId = ref.watch(currentUserProvider).id;
+    final userId = session.id;
 
     return AppScaffold(
       appBar: AppBar(title: const Text('Meus grupos')),

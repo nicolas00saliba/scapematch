@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -8,8 +8,11 @@ import 'package:scapematch/providers/repositories.dart';
 class MyGroupsViewModel extends AsyncNotifier<List<Group>> {
   @override
   Future<List<Group>> build() {
-    final userId = ref.watch(currentUserProvider).id;
-    return ref.watch(groupRepositoryProvider).listForUser(userId);
+    final session = ref.watch(authSessionProvider);
+    if (session == null) {
+      return Future.value(const []);
+    }
+    return ref.watch(groupRepositoryProvider).listForUser(session.id);
   }
 }
 

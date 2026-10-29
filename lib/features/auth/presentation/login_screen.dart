@@ -5,6 +5,7 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -55,7 +56,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     final groupId = pending.groupId;
     if (groupId == null) {
-      context.go('/');
+      final next = GoRouterState.of(context).uri.queryParameters['next'];
+      context.go(afterAuthLocation(next));
       return;
     }
     final notice = pending.notice;
@@ -102,7 +104,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const SizedBox(height: 8),
           TextButton(
             key: AppKeys.goToSignup,
-            onPressed: _busy ? null : () => context.push('/cadastro'),
+            onPressed: _busy
+                ? null
+                : () {
+                    final next = GoRouterState.of(context)
+                        .uri
+                        .queryParameters['next'];
+                    final location = next == null
+                        ? '/cadastro'
+                        : '/cadastro?next=${Uri.encodeQueryComponent(next)}';
+                    context.push(location);
+                  },
             child: const Text('Fazer cadastro'),
           ),
         ],

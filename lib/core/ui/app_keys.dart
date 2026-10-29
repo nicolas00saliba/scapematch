@@ -56,6 +56,8 @@ abstract final class AppKeys {
   static const accountSettings = Key('account-settings');
   static const accountGreeting = Key('account-greeting');
   static const accountWallet = Key('account-wallet');
+  static const accountSignOut = Key('account-sign-out');
+  static const accountSignIn = Key('account-sign-in');
   static const accountAddBalance = Key('account-add-balance');
   static const addCard = Key('add-card');
   static const addCardNotice = Key('add-card-notice');
@@ -69,6 +71,7 @@ abstract final class AppKeys {
   static const newsCategoryAll = Key('news-category-all');
   static const newsRetry = Key('news-retry');
   static const newsBackHome = Key('news-back-home');
+  static const myGroupsSignIn = Key('my-groups-sign-in');
   static const myGroupsUpcoming = Key('my-groups-upcoming');
   static const myGroupsPast = Key('my-groups-past');
   static const myGroupsCancelled = Key('my-groups-cancelled');

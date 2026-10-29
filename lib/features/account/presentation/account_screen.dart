@@ -7,7 +7,9 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
-import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/account/presentation/account_messages.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Aba Conta. O desenho é do ScapeMatch: cartões claros, verde e cobre.
@@ -16,7 +18,11 @@ class AccountScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = ref.watch(currentUserProvider).displayName;
+    final session = ref.watch(authSessionProvider);
+    if (session == null) {
+      return const _SignedOutAccount();
+    }
+    final name = session.displayName;
     final theme = Theme.of(context);
 
     return AppScaffold(
@@ -56,6 +62,79 @@ class AccountScreen extends ConsumerWidget {
             _AccountTile(item: item),
             const SizedBox(height: 10),
           ],
+          OutlinedButton(
+            key: AppKeys.accountSignOut,
+            onPressed: () => _signOut(context, ref),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: theme.colorScheme.error,
+              side: BorderSide(color: theme.colorScheme.error),
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: const Text(AccountMessages.signOut),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(AccountMessages.signOutTitle),
+          content: const Text(AccountMessages.signOutBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text(AccountMessages.signOutStay),
+            ),
+            FilledButton(
+              key: AppKeys.dialogConfirm,
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text(AccountMessages.signOutConfirm),
+            ),
+          ],
+        );
+      },
+    );
+    if (leave != true || !context.mounted) {
+      return;
+    }
+    await ref.read(authSessionProvider.notifier).signOut();
+  }
+}
+
+class _SignedOutAccount extends StatelessWidget {
+  const _SignedOutAccount();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AppScaffold(
+      appBar: AppBar(title: const Text('Conta')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        children: [
+          const ExampleDataBanner(),
+          const SizedBox(height: 16),
+          Text(
+            AccountMessages.signedOutTitle,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            AccountMessages.signedOutBody,
+            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            key: AppKeys.accountSignIn,
+            onPressed: () => context.push(loginLocation('/account')),
+            child: const Text(AccountMessages.signInAgain),
+          ),
         ],
       ),
     );

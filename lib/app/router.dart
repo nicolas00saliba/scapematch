@@ -4,6 +4,7 @@ import 'package:scapematch/app/app_shell.dart';
 import 'package:scapematch/features/account/presentation/account_destination_screen.dart';
 import 'package:scapematch/features/account/presentation/account_screen.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/auth/presentation/login_screen.dart';
 import 'package:scapematch/features/auth/presentation/signup_screen.dart';
 import 'package:scapematch/features/groups/presentation/invite_screen.dart';
@@ -32,6 +33,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       final path = state.uri.path;
       if (path == '/groups') {
         return '/';
+      }
+      // Criar grupo exige sessão. O login devolve a pessoa ao formulário.
+      if (path == '/groups/new' && ref.read(authSessionProvider) == null) {
+        final roomId = state.uri.queryParameters['roomId'];
+        final next = Uri(
+          path: '/groups/new',
+          queryParameters: roomId == null || roomId.isEmpty
+              ? null
+              : {'roomId': roomId},
+        ).toString();
+        return loginLocation(next);
       }
       // Detalhe interno sem sessão vira o convite público.
       final detail = RegExp(r'^/groups/([^/]+)$').firstMatch(path);

@@ -4,9 +4,9 @@ import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 
 /// Who is using the app in this session.
 ///
-/// Segue a sessão. Sem sessão, continua o usuário de exemplo, para as
-/// telas que já existem não quebrarem. O convite olha [authSessionProvider]
-/// para saber se a pessoa está logada de verdade.
+/// Segue a sessão. Sem sessão, ainda devolve o usuário de exemplo para
+/// telas que exigem um dono. Meus grupos, Criar grupo e o convite não usam
+/// esse fallback: eles leem [authSessionProvider] e pedem login.
 final currentUserProvider = Provider<CurrentUser>((ref) {
   return ref.watch(authSessionProvider) ?? sampleCurrentUser;
 });

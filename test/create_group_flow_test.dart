@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
-import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 import 'support/pump_app.dart';
 
@@ -15,8 +16,13 @@ void main() {
     await pumpScapeMatch(
       tester,
       overrides: [
-        currentUserProvider.overrideWithValue(
-          const CurrentUser(id: 'user-ana', displayName: 'Ana Teste'),
+        authRepositoryProvider.overrideWithValue(
+          FakeAuthRepository(
+            signedIn: const CurrentUser(
+              id: 'user-ana',
+              displayName: 'Ana Teste',
+            ),
+          ),
         ),
       ],
     );
