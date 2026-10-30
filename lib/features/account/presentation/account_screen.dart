@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
@@ -10,6 +9,7 @@ import 'package:scapematch/features/account/presentation/account_destination.dar
 import 'package:scapematch/features/account/presentation/account_messages.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Aba Conta. O desenho é do ScapeMatch: cartões claros, verde e cobre.
@@ -24,6 +24,7 @@ class AccountScreen extends ConsumerWidget {
     }
     final name = session.displayName;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return AppScaffold(
       appBar: AppBar(
@@ -53,7 +54,9 @@ class AccountScreen extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             'Sua conta de exemplo nesta versão.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 16),
           const _WalletCard(),
@@ -62,6 +65,8 @@ class AccountScreen extends ConsumerWidget {
             _AccountTile(item: item),
             const SizedBox(height: 10),
           ],
+          const _ReplayIntroButton(),
+          const SizedBox(height: 10),
           OutlinedButton(
             key: AppKeys.accountSignOut,
             onPressed: () => _signOut(context, ref),
@@ -111,6 +116,7 @@ class _SignedOutAccount extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return AppScaffold(
       appBar: AppBar(title: const Text('Conta')),
       body: ListView(
@@ -127,7 +133,9 @@ class _SignedOutAccount extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             AccountMessages.signedOutBody,
-            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 16),
           FilledButton(
@@ -135,8 +143,25 @@ class _SignedOutAccount extends StatelessWidget {
             onPressed: () => context.push(loginLocation('/account')),
             child: const Text(AccountMessages.signInAgain),
           ),
+          const SizedBox(height: 10),
+          const _ReplayIntroButton(),
         ],
       ),
+    );
+  }
+}
+
+class _ReplayIntroButton extends StatelessWidget {
+  const _ReplayIntroButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      key: AppKeys.accountIntro,
+      onPressed: () => context.go('/introducao'),
+      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      icon: const Icon(Icons.slideshow_outlined),
+      label: const Text(OnboardingMessages.replay),
     );
   }
 }
@@ -147,6 +172,7 @@ class _WalletCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final balance = ref.watch(walletBalanceProvider);
     final amount = balance.maybeWhen(
       data: (money) => formatPrice(money.cents),
@@ -154,7 +180,7 @@ class _WalletCard extends ConsumerWidget {
     );
     return Material(
       key: AppKeys.accountWallet,
-      color: AppColors.teal,
+      color: scheme.primary,
       borderRadius: BorderRadius.circular(20),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -164,7 +190,7 @@ class _WalletCard extends ConsumerWidget {
             Text(
               'Carteira ScapeMatch',
               style: theme.textTheme.titleMedium?.copyWith(
-                color: Colors.white,
+                color: scheme.onPrimary,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -172,7 +198,7 @@ class _WalletCard extends ConsumerWidget {
             Text(
               amount,
               style: theme.textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
+                color: scheme.onPrimary,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -180,7 +206,7 @@ class _WalletCard extends ConsumerWidget {
             Text(
               'Créditos fictícios. Reembolsos simulados apareceriam aqui. Nada é cobrado.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.tealSoft,
+                color: scheme.onPrimary,
                 height: 1.35,
               ),
             ),
@@ -188,8 +214,8 @@ class _WalletCard extends ConsumerWidget {
             FilledButton(
               key: AppKeys.accountAddBalance,
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.teal,
+                backgroundColor: scheme.surface,
+                foregroundColor: scheme.primary,
                 minimumSize: const Size.fromHeight(48),
               ),
               onPressed: () => context.push('/account/wallet/top-up'),
@@ -257,11 +283,12 @@ class _AccountTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: InkWell(
         key: AppKeys.accountDestination(item.destination.name),
@@ -271,7 +298,7 @@ class _AccountTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              Icon(item.icon, color: AppColors.teal),
+              Icon(item.icon, color: scheme.primary),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -286,13 +313,13 @@ class _AccountTile extends StatelessWidget {
                     Text(
                       item.subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.muted,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.muted),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
             ],
           ),
         ),

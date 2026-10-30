@@ -15,6 +15,8 @@ import 'package:scapematch/features/groups/presentation/create_group_screen.dart
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:scapematch/features/news/presentation/news_browse_screen.dart';
 import 'package:scapematch/features/news/presentation/news_detail_screen.dart';
 import 'package:scapematch/features/wallet/presentation/add_balance_screen.dart';
@@ -31,6 +33,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     redirect: (context, state) {
       final path = state.uri.path;
+      // A Home da primeira abertura é a introdução. Um convite direto não
+      // passa por aqui: só `/` redireciona, e só enquanto ninguém viu.
+      if (path == '/' && !ref.read(onboardingSeenProvider)) {
+        return '/introducao';
+      }
       if (path == '/groups') {
         return '/';
       }
@@ -89,6 +96,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/introducao',
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/convite/:groupId',

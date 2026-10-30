@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
@@ -98,7 +97,10 @@ class CitySelector extends ConsumerWidget {
                           title: Text(city.name),
                           subtitle: Text(city.stateName),
                           trailing: city.id == selectedId
-                              ? const Icon(Icons.check, color: AppColors.teal)
+                              ? Icon(
+                                  Icons.check,
+                                  color: Theme.of(context).colorScheme.primary,
+                                )
                               : null,
                           onTap: () => Navigator.pop(context, city),
                         ),
@@ -139,6 +141,7 @@ class _CityField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final selected = city != null;
     final label = selected
         ? 'Cidade selecionada: ${city!.name}, ${city!.stateName}. Toque para trocar.'
@@ -151,10 +154,10 @@ class _CityField extends StatelessWidget {
         label: label,
         excludeSemantics: true,
         child: Material(
-          color: Colors.white,
+          color: scheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: selected ? AppColors.teal : AppColors.line),
+            side: BorderSide(color: selected ? scheme.primary : scheme.outline),
           ),
           child: InkWell(
             key: AppKeys.citySelector,
@@ -168,7 +171,7 @@ class _CityField extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.route, color: AppColors.teal, size: 18),
+                    Icon(Icons.route, color: scheme.primary, size: 18),
                     const SizedBox(width: 6),
                     Text(
                       city?.name ?? 'Cidade',
@@ -178,11 +181,7 @@ class _CityField extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const Icon(
-                      Icons.expand_more,
-                      color: AppColors.teal,
-                      size: 18,
-                    ),
+                    Icon(Icons.expand_more, color: scheme.primary, size: 18),
                   ],
                 ),
               ),
@@ -198,11 +197,11 @@ class _CityField extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       child: Material(
-        color: Colors.white,
+        color: scheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: selected ? AppColors.teal : AppColors.line,
+            color: selected ? scheme.primary : scheme.outline,
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -221,10 +220,10 @@ class _CityField extends StatelessWidget {
                   width: prominent ? 48 : 40,
                   height: prominent ? 48 : 40,
                   decoration: BoxDecoration(
-                    color: AppColors.tealSoft,
+                    color: scheme.primaryContainer,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.route, color: AppColors.teal),
+                  child: Icon(Icons.route, color: scheme.primary),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -236,7 +235,7 @@ class _CityField extends StatelessWidget {
                         style: theme.textTheme.labelSmall?.copyWith(
                           letterSpacing: 1.2,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.teal,
+                          color: scheme.primary,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -245,7 +244,9 @@ class _CityField extends StatelessWidget {
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.4,
-                          color: selected ? AppColors.ink : AppColors.muted,
+                          color: selected
+                              ? scheme.onSurface
+                              : scheme.onSurfaceVariant,
                         ),
                       ),
                       Text(
@@ -253,13 +254,13 @@ class _CityField extends StatelessWidget {
                             ? 'Toque para ver as cidades'
                             : '${city!.stateName} · ${city!.stateCode}',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.muted,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.expand_more, color: AppColors.teal),
+                Icon(Icons.expand_more, color: scheme.primary),
               ],
             ),
           ),
@@ -289,6 +290,7 @@ class _CityPlaceholder extends StatelessWidget {
     String title,
     String subtitle,
     bool expanded,
+    Color refreshColor,
   ) {
     final text = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,7 +314,7 @@ class _CityPlaceholder extends StatelessWidget {
                 height: 28,
                 child: CircularProgressIndicator(strokeWidth: 2.4),
               )
-            : const Icon(Icons.refresh, color: AppColors.teal),
+            : Icon(Icons.refresh, color: refreshColor),
         const SizedBox(width: 14),
         if (expanded) Expanded(child: text) else text,
       ],
@@ -322,10 +324,10 @@ class _CityPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: InkWell(
         key: AppKeys.citySelector,
@@ -337,9 +339,21 @@ class _CityPlaceholder extends StatelessWidget {
               ? FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: _placeholderRow(showProgress, title, subtitle, false),
+                  child: _placeholderRow(
+                    showProgress,
+                    title,
+                    subtitle,
+                    false,
+                    Theme.of(context).colorScheme.primary,
+                  ),
                 )
-              : _placeholderRow(showProgress, title, subtitle, true),
+              : _placeholderRow(
+                  showProgress,
+                  title,
+                  subtitle,
+                  true,
+                  Theme.of(context).colorScheme.primary,
+                ),
         ),
       ),
     );

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/relative_time.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
@@ -94,20 +93,22 @@ class _Detail extends StatelessWidget {
         Text(
           item.houseName,
           style: theme.textTheme.labelLarge?.copyWith(
-            color: AppColors.teal,
+            color: theme.colorScheme.primary,
             fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           '${item.cityName} · $when · ${formatShortDate(item.publishedAt)} · $source',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           GameTypes.labelOf(item.gameType),
           style: theme.textTheme.labelLarge?.copyWith(
-            color: AppColors.teal,
+            color: theme.colorScheme.primary,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -135,12 +136,16 @@ class _Detail extends StatelessWidget {
           const SizedBox(height: 4),
           SelectableText(
             item.sourceUrl!,
-            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.teal),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'O app mostra o endereço e não abre o navegador.',
-            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.muted),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
         const SizedBox(height: 20),

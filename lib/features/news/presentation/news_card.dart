@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/relative_time.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
@@ -22,6 +21,7 @@ class NewsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final when = formatRelativeTime(publishedAt: item.publishedAt, now: now);
     final source = newsSourceLabel(item.sourceKind);
 
@@ -53,7 +53,7 @@ class NewsCard extends StatelessWidget {
                     Text(
                       item.houseName,
                       style: theme.textTheme.labelLarge?.copyWith(
-                        color: AppColors.teal,
+                        color: scheme.primary,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -61,7 +61,7 @@ class NewsCard extends StatelessWidget {
                     Text(
                       '$when · $source',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.muted,
+                        color: scheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -81,7 +81,7 @@ class NewsCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.muted,
+                        color: scheme.onSurfaceVariant,
                         height: 1.35,
                       ),
                     ),

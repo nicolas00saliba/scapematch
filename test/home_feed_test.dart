@@ -14,6 +14,8 @@ import 'package:scapematch/features/cities/presentation/selected_city_controller
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
+import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/news/presentation/news_browse_screen.dart';
 import 'package:scapematch/features/news/data/fake_news_repository.dart';
 import 'package:scapematch/features/news/data/news_repository.dart';
@@ -278,6 +280,9 @@ void main() {
       ProviderScope(
         retry: noAutomaticRetry,
         overrides: [
+          onboardingStoreProvider.overrideWithValue(
+            OnboardingStore(seen: true),
+          ),
           newsRepositoryProvider.overrideWithValue(_HangingNewsRepository()),
           selectedCityIdProvider.overrideWithBuild(
             (ref, notifier) => SampleIds.beloHorizonte,
@@ -393,7 +398,15 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
     await tester.pumpWidget(
-      const ProviderScope(retry: noAutomaticRetry, child: ScapeMatchApp()),
+      ProviderScope(
+        retry: noAutomaticRetry,
+        overrides: [
+          onboardingStoreProvider.overrideWithValue(
+            OnboardingStore(seen: true),
+          ),
+        ],
+        child: const ScapeMatchApp(),
+      ),
     );
     await tester.pumpAndSettle();
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
 import 'package:scapematch/features/news/presentation/news_labels.dart';
 
@@ -92,16 +91,17 @@ class NewsCategoryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF142421).withValues(alpha: 0.72),
+        color: scheme.inverseSurface.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
         newsCategoryLabel(category),
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: scheme.onInverseSurface,
           fontWeight: FontWeight.w700,
           fontSize: 12,
         ),
@@ -118,43 +118,45 @@ class _GeneratedArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (colors, icon) = switch (illustration) {
+    final scheme = Theme.of(context).colorScheme;
+    // Fundo e tinta são um par do esquema, para o texto continuar legível
+    // no claro e no escuro. Um degradê misturaria pares que não contrastam.
+    final (color, icon, ink) = switch (illustration) {
       NewsIllustration.coffee => (
-        [const Color(0xFF6F4E37), AppColors.copper],
+        scheme.secondary,
         Icons.coffee,
+        scheme.onSecondary,
       ),
       NewsIllustration.category => switch (category) {
         NewsCategory.newRoom => (
-          [AppColors.teal, const Color(0xFF1E6B66)],
+          scheme.primary,
           Icons.meeting_room_outlined,
+          scheme.onPrimary,
         ),
         NewsCategory.schedule => (
-          [const Color(0xFF245C6B), AppColors.teal],
+          scheme.primaryContainer,
           Icons.schedule,
+          scheme.onPrimaryContainer,
         ),
         NewsCategory.promotion => (
-          [AppColors.copper, const Color(0xFF8C3E16)],
+          scheme.tertiary,
           Icons.local_offer_outlined,
+          scheme.onTertiary,
         ),
         NewsCategory.event => (
-          [const Color(0xFF3E2A55), AppColors.teal],
+          scheme.secondaryContainer,
           Icons.celebration_outlined,
+          scheme.onSecondaryContainer,
         ),
       },
     };
 
     return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
+      decoration: BoxDecoration(color: color),
       child: Stack(
         children: [
-          Center(child: Icon(icon, color: Colors.white70, size: 42)),
-          const Positioned(
+          Center(child: Icon(icon, color: ink, size: 42)),
+          Positioned(
             left: 12,
             right: 12,
             bottom: 10,
@@ -162,7 +164,7 @@ class _GeneratedArtwork extends StatelessWidget {
               'Ilustração fictícia',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: ink,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),

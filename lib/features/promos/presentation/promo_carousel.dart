@@ -52,11 +52,31 @@ class PromoCarousel extends StatelessWidget {
       key: AppKeys.promoCarousel,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Promoções',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+        Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.tertiary,
+                shape: BoxShape.circle,
+                border: Border.all(color: theme.colorScheme.onTertiary),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  Icons.local_offer_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onTertiary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Promoções',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         LayoutBuilder(

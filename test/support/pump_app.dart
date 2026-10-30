@@ -6,6 +6,8 @@ import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/scapematch_app.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
+import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 
 /// The page scroll. A single-line search field also owns a horizontal
 /// scrollable, and the group window has its own vertical one.
@@ -19,6 +21,7 @@ final Finder verticalScrollable = find.byWidgetPredicate(
 Future<void> pumpScapeMatch(
   WidgetTester tester, {
   List<Override> overrides = const [],
+  bool showOnboarding = false,
 }) async {
   tester.view.physicalSize = const Size(400, 1800);
   tester.view.devicePixelRatio = 1;
@@ -28,7 +31,16 @@ Future<void> pumpScapeMatch(
   await tester.pumpWidget(
     ProviderScope(
       retry: noAutomaticRetry,
-      overrides: overrides,
+      overrides: [
+        // A suíte abre na Home. Quem testa a introdução passa o store
+        // e liga [showOnboarding], porque o mesmo provider não pode
+        // ser sobrescrito duas vezes.
+        if (!showOnboarding)
+          onboardingStoreProvider.overrideWithValue(
+            OnboardingStore(seen: true),
+          ),
+        ...overrides,
+      ],
       child: const ScapeMatchApp(),
     ),
   );

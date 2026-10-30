@@ -14,6 +14,13 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
 
   @override
   Widget build(BuildContext context) {
+    final status = ScapeStatusColors.of(context);
+    final textStyle = TextStyle(
+      color: status.onAlertContainer,
+      height: 1.3,
+      fontWeight: FontWeight.w600,
+      fontSize: 13,
+    );
     return Align(
       alignment: Alignment.centerLeft,
       child: Semantics(
@@ -22,7 +29,7 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
             ? 'Aviso: os dados desta versão são fictícios e servem só como exemplo. Toque para recolher.'
             : 'Aviso: os dados desta versão são fictícios e servem só como exemplo. Toque para ler.',
         child: Material(
-          color: AppColors.copperSoft,
+          color: status.alertContainer,
           borderRadius: BorderRadius.circular(20),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
@@ -32,17 +39,12 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
               child: _open
                   ? ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 280),
-                      child: const Text(
+                      child: Text(
                         'Dados de exemplo. Casas, salas, horários, grupos e notícias são fictícios.',
-                        style: TextStyle(
-                          color: AppColors.copperInk,
-                          height: 1.3,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
+                        style: textStyle,
                       ),
                     )
-                  : const FittedBox(
+                  : FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Row(
@@ -50,17 +52,15 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
                         children: [
                           Icon(
                             Icons.info_outline,
-                            color: AppColors.copper,
+                            color: status.alert,
                             size: 16,
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
                             'Dados de exemplo',
                             maxLines: 1,
-                            style: TextStyle(
-                              color: AppColors.copperInk,
+                            style: textStyle.copyWith(
                               fontWeight: FontWeight.w700,
-                              fontSize: 13,
                             ),
                           ),
                         ],

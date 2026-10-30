@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
@@ -108,7 +107,7 @@ class _AddBalanceScreenState extends State<AddBalanceScreen> {
           Text(
             'Em breve. Nada é cobrado e o saldo não muda.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.muted,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.35,
             ),
           ),
@@ -132,11 +131,12 @@ class _SoonOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: ListTile(
         key: optionKey,
@@ -146,7 +146,7 @@ class _SoonOption extends StatelessWidget {
         subtitle: const Text('Em breve'),
         titleTextStyle: theme.textTheme.titleSmall?.copyWith(
           fontWeight: FontWeight.w800,
-          color: AppColors.muted,
+          color: scheme.onSurfaceVariant,
         ),
       ),
     );
