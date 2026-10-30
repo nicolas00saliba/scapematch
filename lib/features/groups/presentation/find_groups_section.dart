@@ -265,9 +265,9 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
   }
 }
 
-/// Teto da janela. Com poucos cartões ela encolhe até o conteúdo.
-/// A barra só entra quando o conteúdo passa desse teto.
-const groupWindowMaxHeight = 176.0;
+/// Teto da janela. Cabe um cartão inteiro, com respiro, e o começo do
+/// seguinte. A barra só entra quando o conteúdo passa desse teto.
+const groupWindowMaxHeight = 340.0;
 
 /// Um cartão visível encolhe a janela. Dois ou mais usam o teto.
 double groupWindowHeightFor(int visibleCount) {

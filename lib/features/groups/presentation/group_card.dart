@@ -45,95 +45,97 @@ class GroupCard extends StatelessWidget {
           child: InkWell(
             key: AppKeys.groupCard(group.id),
             onTap: onTap,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (group.coverAsset.isNotEmpty)
-                  SizedBox(
-                    width: 108,
-                    height: 148,
-                    child: ScapePhoto(
-                      asset: group.coverAsset,
-                      semanticLabel: group.roomName,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (group.coverAsset.isNotEmpty)
+                    SizedBox(
+                      width: 112,
+                      child: ScapePhoto(
+                        asset: group.coverAsset,
+                        semanticLabel: group.roomName,
+                      ),
                     ),
-                  ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          group.roomName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        _StatusPill(group: group),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${group.houseName} · ${group.neighborhood}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.schedule,
-                              size: 16,
-                              color: scheme.primary,
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            group.roomName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(formatSession(group.startsAt)),
+                          ),
+                          const SizedBox(height: 4),
+                          _StatusPill(group: group),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${group.houseName} · ${group.neighborhood}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          spots,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        _AvatarRow(people: seated, filled: group.filledSpots),
-                        const SizedBox(height: 2),
-                        Text(
-                          GroupMessages.phaseLabel(
-                            group.phaseAt(now),
-                            missing: group.spotsUntilClose,
-                            started: started,
-                          ),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.secondary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        if (onInvite != null)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              key: AppKeys.inviteOnCard(group.id),
-                              onPressed: onInvite,
-                              style: TextButton.styleFrom(
-                                foregroundColor: scheme.secondary,
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 16,
+                                color: scheme.primary,
                               ),
-                              child: const Text('Convidar'),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(formatSession(group.startsAt)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            spots,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                      ],
+                          const SizedBox(height: 6),
+                          _AvatarRow(people: seated, filled: group.filledSpots),
+                          const SizedBox(height: 2),
+                          Text(
+                            GroupMessages.phaseLabel(
+                              group.phaseAt(now),
+                              missing: group.spotsUntilClose,
+                              started: started,
+                            ),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.secondary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (onInvite != null)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                key: AppKeys.inviteOnCard(group.id),
+                                onPressed: onInvite,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: scheme.secondary,
+                                  visualDensity: VisualDensity.compact,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Convidar'),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

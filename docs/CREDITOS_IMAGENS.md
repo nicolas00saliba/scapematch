@@ -1,13 +1,13 @@
 # Créditos das imagens
 
-Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar.
+Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license), ou do Pexels, na [licença Pexels](https://www.pexels.com/license/). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar.
 
-| Arquivo | Foto no Unsplash |
+| Arquivo | Foto |
 | --- | --- |
-| `assets/images/onboarding/encontrar.jpg` | https://unsplash.com/photos/1529156069898-49953e39b3ac |
-| `assets/images/onboarding/cidade.jpg` | https://unsplash.com/photos/1511895426328-dc8714191300 |
-| `assets/images/onboarding/convidar.jpg` | https://unsplash.com/photos/1528605248644-14dd04022da1 |
-| `assets/images/onboarding/reservar.jpg` | https://unsplash.com/photos/1519671482749-fd09be7ccebf |
+| `assets/images/onboarding/encontrar.jpg` | https://unsplash.com/photos/1543269865-cbf427effbad |
+| `assets/images/onboarding/cidade.jpg` | https://unsplash.com/photos/1522202176988-66273c2fd55f |
+| `assets/images/onboarding/convidar.jpg` | https://www.pexels.com/photo/7149165/ |
+| `assets/images/onboarding/reservar.jpg` | https://www.pexels.com/photo/3184183/ |
 | `assets/images/rooms/gallery/terror.jpg` | https://unsplash.com/photos/1509248961158-e54f6934749c |
 | `assets/images/rooms/gallery/misterio.jpg` | https://unsplash.com/photos/1521587760476-6c12a4b040da |
 | `assets/images/rooms/gallery/aventura.jpg` | https://unsplash.com/photos/1441974231531-c6227db76b6e |

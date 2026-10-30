@@ -79,7 +79,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Data:** 2026-10-28
 - **Decisão:** os grupos formados voltam para a abertura, numa janela que encolhe até o conteúdo e no máximo cabe cerca de um cartão e o começo do seguinte. A barra de rolagem vertical só aparece quando os cartões não cabem. Um arrasto que passa do fim ou do começo da janela continua na página. Curitiba tem grupos quase cheios a mais, de exemplo, para essa barra existir no protótipo. As promoções ficam logo abaixo dessa janela — ver “Ordem da Home e quadros inteiros”.
 - **Motivo:** a compressão tinha tirado os grupos e empurrado as promoções para fora da vista. A janela devolve os grupos sem ocupar a página inteira.
-- **Onde está no código:** `FindGroupsSection` (`groupWindowMaxHeight`) e os grupos extras em `sample_data.dart`.
+- **Onde está no código:** `FindGroupsSection` (`groupWindowMaxHeight`, alto o bastante para o cartão inteiro) e os grupos extras em `sample_data.dart`.
 - **Como trocar depois:** o teto da janela é a constante `groupWindowMaxHeight`. Um feed real substitui os grupos extras.
 
 ## Entrada livre no grupo
