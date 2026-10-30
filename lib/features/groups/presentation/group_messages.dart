@@ -89,12 +89,16 @@ abstract final class GroupMessages {
         'Já existe um grupo nessa sala nesse horário. Escolha outro horário.',
       CreateGroupFailureReason.alreadyStarted =>
         'Esse horário já passou. Escolha um horário que ainda não começou.',
+      CreateGroupFailureReason.tooCloseToStart => tooCloseToStart,
       CreateGroupFailureReason.overlapsAnotherGroup => 'Você já está em outro grupo nesse horário. Escolha um horário que não se sobreponha.',
     };
   }
 
   static const alreadyStartedHint =
       'Esse horário já passou. Escolha um horário que ainda não começou.';
+
+  static const tooCloseToStart =
+      'Falta 1 h ou menos para o início. Escolha um horário com mais antecedência, para o grupo ter prazo de fechar.';
 
   static String editFailure(EditGroupFailureReason reason) {
     return switch (reason) {

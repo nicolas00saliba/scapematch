@@ -183,9 +183,9 @@ class GroupRules {
 
   /// Prazo para atingir o mínimo. Sempre antes do início.
   ///
-  /// Com 24 h ou mais de antecedência, o prazo é 24 h antes. Com menos,
-  /// é 1 h antes: o mais cedo desses dois instantes que ainda está no
-  /// futuro na hora de criar o grupo.
+  /// Com mais de 24 h de antecedência, o prazo é 24 h antes. Com mais de
+  /// 1 h e até 24 h, é 1 h antes. Com 1 h ou menos a criação é recusada:
+  /// esse prazo já estaria no passado.
   static DateTime closeDeadline({
     required DateTime startsAt,
     required DateTime now,
@@ -195,6 +195,20 @@ class GroupRules {
       return dayBefore;
     }
     return startsAt.subtract(shortCloseLead);
+  }
+
+  /// A sessão ainda não começou e falta no máximo [shortCloseLead].
+  ///
+  /// Exatamente 1 h também entra: o prazo curto seria o instante atual
+  /// e o grupo nasceria já cancelado.
+  static bool tooCloseToCreate({
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    if (!now.isBefore(startsAt)) {
+      return false;
+    }
+    return startsAt.difference(now) <= shortCloseLead;
   }
 
   /// O prazo passou e o mínimo não foi atingido. O portal da casa não entra aqui.

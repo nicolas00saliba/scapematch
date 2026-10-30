@@ -60,6 +60,7 @@ enum CreateGroupFailureReason {
   /// Another group already occupies this room at this start time.
   duplicateSession,
   alreadyStarted,
+  tooCloseToStart,
   overlapsAnotherGroup,
 }
 

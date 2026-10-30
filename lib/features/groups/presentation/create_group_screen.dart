@@ -48,6 +48,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     final theme = Theme.of(context);
     final capacityMessage = _capacityMessage(state);
     final started = state.slotHasStarted(now);
+    final tooClose = state.slotTooClose(now);
 
     return AppScaffold(
       appBar: AppBar(title: const Text('Criar grupo')),
@@ -178,6 +179,18 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             const SizedBox(height: 8),
             Text(
               GroupMessages.alreadyStartedHint,
+              key: AppKeys.createFailure,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (tooClose) ...[
+            const SizedBox(height: 8),
+            Text(
+              GroupMessages.tooCloseToStart,
               key: AppKeys.createFailure,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.error,

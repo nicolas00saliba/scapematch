@@ -243,7 +243,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         return _GroupWindow(
           groups: visible,
           now: ref.watch(clockProvider).now(),
-          maxHeight: items.length <= 1 ? double.infinity : groupWindowMaxHeight,
+          maxHeight: groupWindowHeightFor(visible.length),
           onOpen: (group) => context.push('/groups/${group.id}'),
           onInvite: (group) => showInviteSheet(context, group),
         );
@@ -267,6 +267,14 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
 /// Teto da janela. Com poucos cartões ela encolhe até o conteúdo.
 /// A barra só entra quando o conteúdo passa desse teto.
 const groupWindowMaxHeight = 176.0;
+
+/// Um cartão visível encolhe a janela. Dois ou mais usam o teto.
+double groupWindowHeightFor(int visibleCount) {
+  if (visibleCount <= 1) {
+    return double.infinity;
+  }
+  return groupWindowMaxHeight;
+}
 
 /// Controller próprio da janela. A rolagem da página continua sendo a primária.
 final class GroupWindowController extends ScrollController {}

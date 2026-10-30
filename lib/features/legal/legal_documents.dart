@@ -30,7 +30,7 @@ Cada casa define a antecedência mínima para devolver o valor. Cancelar dentro 
 
 Se o grupo não atingir o mínimo até o prazo, ele é cancelado e todo mundo que estava na cadeira recebe reembolso integral simulado.
 
-Quem falta sem confirmar presença acumula falta. Três faltas em 60 dias pausam novas entradas por 30 dias. Esta conta é provisória.
+Não confirmar presença não conta como falta. A falta sem aviso vai ser marcada pela casa no futuro; esta versão não marca sozinha. Se a casa marcar três faltas em 60 dias, novas entradas pausam por 30 dias. Esta conta é provisória.
 ''';
 
   static const under18 =

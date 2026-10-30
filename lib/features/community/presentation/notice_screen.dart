@@ -4,6 +4,33 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
+import 'package:scapematch/providers/repositories.dart';
+
+/// Gera os lembretes ao abrir Avisos, sem efeito colateral no build da tela.
+class NoticeInbox extends AsyncNotifier<List<AppNotice>> {
+  @override
+  Future<List<AppNotice>> build() async {
+    final session = ref.watch(authSessionProvider);
+    ref.watch(communityTickProvider);
+    if (session == null) {
+      return const [];
+    }
+    final groups = await ref
+        .watch(groupRepositoryProvider)
+        .listForUser(session.id);
+    final board = ref.read(communityBoardProvider);
+    board.syncReminders(
+      groups: groups,
+      userId: session.id,
+      now: ref.read(clockProvider).now(),
+    );
+    return board.visibleFor(session.id);
+  }
+}
+
+final noticeInboxProvider = AsyncNotifierProvider<NoticeInbox, List<AppNotice>>(
+  NoticeInbox.new,
+);
 
 class NoticeScreen extends ConsumerWidget {
   const NoticeScreen({super.key});
@@ -11,11 +38,9 @@ class NoticeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authSessionProvider);
-    ref.watch(communityTickProvider);
+    final inbox = ref.watch(noticeInboxProvider);
     final board = ref.watch(communityBoardProvider);
-    final notices = user == null
-        ? const <AppNotice>[]
-        : board.visibleFor(user.id);
+    final notices = inbox.asData?.value ?? const <AppNotice>[];
     final theme = Theme.of(context);
     return AppScaffold(
       appBar: AppBar(title: const Text('Avisos')),
@@ -44,7 +69,9 @@ class NoticeScreen extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 12),
-          if (notices.isEmpty)
+          if (inbox.isLoading && !inbox.hasValue)
+            const Text('Carregando avisos...')
+          else if (notices.isEmpty)
             const Text('Nenhum aviso agora.')
           else
             for (final notice in notices)

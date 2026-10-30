@@ -73,8 +73,17 @@ class CreateGroupState {
     return hasRequiredSelections &&
         sizeValidation == GroupSizeValidation.valid &&
         !started &&
+        !slotTooClose(now) &&
         !submitting &&
         !loadingOptions;
+  }
+
+  bool slotTooClose(DateTime now) {
+    final selected = slot;
+    if (selected == null) {
+      return false;
+    }
+    return GroupRules.tooCloseToCreate(startsAt: selected.startsAt, now: now);
   }
 
   bool slotHasStarted(DateTime now) {

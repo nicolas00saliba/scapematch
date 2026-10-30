@@ -251,6 +251,11 @@ class FakeGroupRepository implements GroupRepository {
     if (GroupRules.hasStarted(startsAt: slot.startsAt, now: now)) {
       return const CreateGroupFailure(CreateGroupFailureReason.alreadyStarted);
     }
+    if (GroupRules.tooCloseToCreate(startsAt: slot.startsAt, now: now)) {
+      return const CreateGroupFailure(
+        CreateGroupFailureReason.tooCloseToStart,
+      );
+    }
 
     final taken = GroupRules.roomAndTimeTaken(
       roomId: room.id,

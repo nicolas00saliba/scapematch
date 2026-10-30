@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scapematch/app/retry.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/data/sample_data.dart';
@@ -12,6 +14,7 @@ import 'package:scapematch/features/auth/presentation/signup_screen.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
+import 'package:scapematch/features/community/presentation/notice_screen.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
@@ -20,6 +23,7 @@ import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
+import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -766,6 +770,14 @@ void main() {
       overrides: [
         clockProvider.overrideWithValue(FixedClock(sampleNow)),
         communityBoardProvider.overrideWithValue(board),
+        groupRepositoryProvider.overrideWithValue(
+          FakeGroupRepository(
+            loadSampleDatabase(),
+            clock: FixedClock(sampleNow),
+            latency: Duration.zero,
+            board: board,
+          ),
+        ),
       ],
     );
     GoRouter.of(tester.element(find.byType(Scaffold).first))
@@ -777,6 +789,118 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Sala do Cofre perto do prazo'), findsNothing);
+  });
+
+  test('creating a group inside the last hour is refused', () async {
+    final now = sampleNow;
+    final inside = await _createAt(
+      now,
+      now.add(const Duration(minutes: 40)),
+      'slot-inside-hour',
+    );
+    expect(inside, isA<CreateGroupFailure>());
+    expect(
+      (inside as CreateGroupFailure).reason,
+      CreateGroupFailureReason.tooCloseToStart,
+    );
+    expect(
+      GroupMessages.createFailure(CreateGroupFailureReason.tooCloseToStart),
+      contains('1 h'),
+    );
+
+    final exact = await _createAt(
+      now,
+      now.add(const Duration(hours: 1)),
+      'slot-exact-hour',
+    );
+    expect(
+      (exact as CreateGroupFailure).reason,
+      CreateGroupFailureReason.tooCloseToStart,
+    );
+
+    final ok = await _createAt(
+      now,
+      now.add(const Duration(hours: 1, minutes: 1)),
+      'slot-just-over-hour',
+    );
+    final group = (ok as CreateGroupSuccess).group;
+    expect(group.closesAt, group.startsAt.subtract(const Duration(hours: 1)));
+    expect(group.isCancelled, isFalse);
+  });
+
+  test('the refund draft leaves no-shows for the house', () {
+    expect(LegalDocuments.refundBody, isNot(contains('acumula falta')));
+    expect(LegalDocuments.refundBody, contains('marcada pela casa'));
+  });
+
+  test('the home window height follows the cards still on screen', () {
+    expect(groupWindowHeightFor(1), double.infinity);
+    expect(groupWindowHeightFor(2), groupWindowMaxHeight);
+  });
+
+  testWidgets('a reserved seat still offers the waitlist', (tester) async {
+    final now = sampleNow;
+    final database = buildSampleDatabase(now: now);
+    final board = CommunityBoard();
+    final groups = FakeGroupRepository(
+      database,
+      clock: FixedClock(now),
+      latency: Duration.zero,
+      board: board,
+    );
+    await groups.joinWaitlist(
+      groupId: SampleIds.groupCwbCofreAlmost,
+      userId: 'user-bia',
+      displayName: 'Bia',
+    );
+    await groups.getById(SampleIds.groupCwbCofreAlmost);
+    await pumpScapeMatch(
+      tester,
+      overrides: [
+        clockProvider.overrideWithValue(FixedClock(now)),
+        fakeDatabaseProvider.overrideWithValue(database),
+        communityBoardProvider.overrideWithValue(board),
+        groupRepositoryProvider.overrideWithValue(groups),
+      ],
+    );
+    await tester.tap(
+      find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(GroupMessages.seatReserved), findsOneWidget);
+    expect(find.byKey(AppKeys.joinWaitlist), findsOneWidget);
+    await tester.tap(find.byKey(AppKeys.joinWaitlist));
+    await tester.pumpAndSettle();
+    expect(find.text(GroupMessages.waitlistJoined), findsOneWidget);
+  });
+
+  testWidgets('opening notices syncs reminders without Meus grupos', (
+    tester,
+  ) async {
+    final now = sampleNow;
+    final database = buildSampleDatabase(now: now);
+    _setCreator(database, SampleIds.groupCwbCofreAlmost, 'user-local');
+    final board = CommunityBoard();
+    final groups = FakeGroupRepository(
+      database,
+      clock: FixedClock(now),
+      latency: Duration.zero,
+      board: board,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: noAutomaticRetry,
+        overrides: [
+          clockProvider.overrideWithValue(FixedClock(now)),
+          fakeDatabaseProvider.overrideWithValue(database),
+          communityBoardProvider.overrideWithValue(board),
+          groupRepositoryProvider.overrideWithValue(groups),
+        ],
+        child: const MaterialApp(home: NoticeScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('está perto'), findsOneWidget);
   });
 }
 
@@ -841,6 +965,33 @@ Participant _withUser(Participant person, String userId) {
     payment: person.payment,
     refund: person.refund,
     refundReason: person.refundReason,
+  );
+}
+
+Future<CreateGroupResult> _createAt(
+  DateTime now,
+  DateTime start,
+  String slotId,
+) {
+  final database = buildSampleDatabase(now: now);
+  final room = database.roomById(SampleIds.roomSpCobertura)!;
+  final house = database.houseById(room.houseId)!;
+  final slot = TimeSlot(id: slotId, roomId: room.id, startsAt: start);
+  final groups = FakeGroupRepository(
+    _withSlot(database, slot),
+    clock: FixedClock(now),
+    latency: Duration.zero,
+  );
+  return groups.create(
+    CreateGroupRequest(
+      cityId: house.cityId,
+      houseId: house.id,
+      roomId: room.id,
+      slotId: slot.id,
+      extraSpots: 1,
+      creatorUserId: 'user-ana',
+      creatorDisplayName: 'Ana',
+    ),
   );
 }
 

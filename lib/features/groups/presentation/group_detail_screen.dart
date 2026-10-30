@@ -581,6 +581,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             child: Text(GroupMessages.seatReserved),
           ),
         );
+        buttons.add(
+          OutlinedButton(
+            key: AppKeys.joinWaitlist,
+            onPressed: _busy ? null : () => _wait(group),
+            child: const Text(GroupMessages.waitlistJoin),
+          ),
+        );
       } else if (group.isFull) {
         buttons.add(
           const FilledButton(
