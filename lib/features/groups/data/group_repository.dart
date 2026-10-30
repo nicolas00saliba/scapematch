@@ -17,6 +17,26 @@ abstract class GroupRepository {
   ///
   /// [markAsLocalUser] is the session flag the sample UI still reads.
   /// Tests that seat a second person pass false.
+  /// Entra na fila quando o grupo está cheio. Nulo quando a pessoa foi anotada.
+  Future<String?> joinWaitlist({
+    required String groupId,
+    required String userId,
+    required String displayName,
+  });
+
+  /// Aceita a oferta da fila, se ainda estiver no prazo.
+  Future<JoinResult> acceptWaitlist({
+    required String groupId,
+    required String userId,
+    required String displayName,
+  });
+
+  /// Recusa a oferta e passa a vaga para a próxima pessoa.
+  Future<void> declineWaitlist({
+    required String groupId,
+    required String userId,
+  });
+
   Future<JoinResult> join(
     String groupId, {
     required String participantUserId,

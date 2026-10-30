@@ -48,6 +48,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     final theme = Theme.of(context);
     final capacityMessage = _capacityMessage(state);
     final started = state.slotHasStarted(now);
+    final tooClose = state.slotTooClose(now);
 
     return AppScaffold(
       appBar: AppBar(title: const Text('Criar grupo')),
@@ -186,6 +187,18 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
             ),
           ],
+          if (tooClose) ...[
+            const SizedBox(height: 8),
+            Text(
+              GroupMessages.tooCloseToStart,
+              key: AppKeys.createFailure,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
           if (state.failure != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -219,6 +232,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       GroupSizeValidation.valid => null,
       GroupSizeValidation.belowMinimum =>
         'Informe pelo menos 1 vaga além de você.',
+      GroupSizeValidation.belowRoomMinimum =>
+        'Esta sala pede pelo menos ${state.room!.minimumPlayers} pessoas no grupo.',
       GroupSizeValidation.exceedsRoomCapacity =>
         'Você + ${state.extraSpots} vagas ultrapassa a capacidade da sala (${state.room!.capacity}).',
     };

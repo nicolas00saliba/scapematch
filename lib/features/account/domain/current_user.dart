@@ -5,7 +5,11 @@
 /// provider that returns this object should read the signed-in user and
 /// keep the same fields.
 class CurrentUser {
-  const CurrentUser({required this.id, required this.displayName});
+  const CurrentUser({
+    required this.id,
+    required this.displayName,
+    this.birthDate,
+  });
 
   /// Stable id for this person. Today it is local. Tomorrow it is the
   /// account id from the auth provider.
@@ -13,6 +17,9 @@ class CurrentUser {
 
   /// Name other people see on the group. The sample user is Nícolas.
   final String displayName;
+
+  /// Data informada no cadastro. O usuário de exemplo não tem uma.
+  final DateTime? birthDate;
 }
 
 /// Fictional signed-in user used until login replaces the provider.

@@ -1,5 +1,6 @@
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
+import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
@@ -50,6 +51,8 @@ abstract final class GroupMessages {
         person.isLocalUser
             ? 'Reembolsado · o organizador removeu você do grupo'
             : 'Reembolsado · o organizador removeu esta pessoa',
+      RefundReason.groupDidNotClose =>
+        'Reembolsado · o grupo não fechou até o prazo',
     };
   }
 
@@ -65,6 +68,10 @@ abstract final class GroupMessages {
         'Você já saiu deste grupo e não pode entrar de novo.',
       JoinFailureReason.groupCancelled => 'Este grupo foi cancelado.',
       JoinFailureReason.sessionEnded => 'Esta sessão já terminou.',
+      JoinFailureReason.blocked => 'Alguém deste grupo bloqueou a sua conta.',
+      JoinFailureReason.restricted => 'A conta está em pausa por faltas sem aviso. Tente de novo quando a pausa acabar.',
+      JoinFailureReason.seatReserved => seatReserved,
+      JoinFailureReason.offerExpired => offerExpired,
     };
   }
 
@@ -74,18 +81,24 @@ abstract final class GroupMessages {
         'O grupo ficou maior do que a sala permite.',
       CreateGroupFailureReason.belowMinimum =>
         'O grupo precisa de mais gente além de você.',
+      CreateGroupFailureReason.belowRoomMinimum =>
+        'O total de vagas ficou abaixo do mínimo da sala.',
       CreateGroupFailureReason.unknownSelection =>
         'Confira cidade, casa, sala e horário.',
       CreateGroupFailureReason.duplicateSession =>
         'Já existe um grupo nessa sala nesse horário. Escolha outro horário.',
       CreateGroupFailureReason.alreadyStarted =>
         'Esse horário já passou. Escolha um horário que ainda não começou.',
+      CreateGroupFailureReason.tooCloseToStart => tooCloseToStart,
       CreateGroupFailureReason.overlapsAnotherGroup => 'Você já está em outro grupo nesse horário. Escolha um horário que não se sobreponha.',
     };
   }
 
   static const alreadyStartedHint =
       'Esse horário já passou. Escolha um horário que ainda não começou.';
+
+  static const tooCloseToStart =
+      'Falta 1 h ou menos para o início. Escolha um horário com mais antecedência, para o grupo ter prazo de fechar.';
 
   static String editFailure(EditGroupFailureReason reason) {
     return switch (reason) {
@@ -96,6 +109,8 @@ abstract final class GroupMessages {
         'Não dá para ficar com menos vagas do que as pessoas que já entraram.',
       EditGroupFailureReason.belowMinimum =>
         'O grupo precisa de pelo menos 2 pessoas.',
+      EditGroupFailureReason.belowRoomMinimum =>
+        'O total de vagas ficou abaixo do mínimo da sala.',
       EditGroupFailureReason.exceedsRoomCapacity =>
         'O grupo não pode passar da capacidade da sala.',
       EditGroupFailureReason.noteTooLong =>
@@ -196,4 +211,59 @@ abstract final class GroupMessages {
   static const removedSnack = 'Participante removido com reembolso integral.';
   static const savedSnack = 'Grupo atualizado.';
   static const actionFailed = 'Não foi possível completar a ação.';
+
+  static const readyToReserve = 'Pronto para reservar';
+  static const missedCloseBanner =
+      'O grupo não atingiu o mínimo até o prazo e foi cancelado. O reembolso simulado é integral.';
+  static const waitlistJoin = 'Entrar na lista de espera';
+  static const waitlistAccept = 'Aceitar a vaga';
+  static const waitlistDecline = 'Recusar a vaga';
+  static const waitlistJoined = 'Você entrou na lista de espera.';
+  static const waitlistDeclined =
+      'Você recusou a vaga. Ela segue para a próxima pessoa.';
+  static const seatReserved =
+      'Essa vaga está reservada para quem recebeu a oferta.';
+  static const offerExpired = 'O prazo para aceitar a vaga acabou.';
+  static const attendanceOptional =
+      'Confirmar presença é opcional. Não tocar nesse botão não conta como falta. A falta sem aviso só entra quando a casa marcar, e isso ainda não acontece nesta versão.';
+  static const openMaps = 'Abrir no Google Maps';
+  static const openWaze = 'Abrir no Waze';
+  static const report = 'Denunciar';
+  static const block = 'Bloquear';
+  static const blockedSnack =
+      'Pessoa bloqueada. Ela some dos seus grupos e dos cartões da Home, e não entra em grupo em que você esteja.';
+  static const reportedSnack =
+      'Denúncia registrada neste exemplo. Ninguém é punido de verdade.';
+
+  static String spotsUntilClose(int missing) {
+    if (missing == 1) {
+      return 'Falta 1 para fechar';
+    }
+    return 'Faltam $missing para fechar';
+  }
+
+  static String phaseLabel(
+    GroupPhase phase, {
+    required int missing,
+    bool started = false,
+  }) {
+    if (phase == GroupPhase.forming && started) {
+      return 'Sessão já começou';
+    }
+    return switch (phase) {
+      GroupPhase.forming => spotsUntilClose(missing),
+      GroupPhase.readyToReserve => readyToReserve,
+      GroupPhase.awaitingHouse => 'Aguardando a casa',
+      GroupPhase.confirmed => 'Reserva confirmada',
+      GroupPhase.refused => 'A casa recusou',
+      GroupPhase.awaitingPayments => 'Aguardando pagamentos',
+      GroupPhase.cancelled => 'Cancelado',
+    };
+  }
+
+  static String closesAtLabel(String when) => 'Prazo para fechar: $when';
+
+  static String cancelWindowLabel(int hours) {
+    return 'Cancelar com $hours h ou mais de antecedência devolve o pagamento simulado. Menos que isso, não.';
+  }
 }

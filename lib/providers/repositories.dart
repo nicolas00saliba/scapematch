@@ -5,6 +5,7 @@ import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
 import 'package:scapematch/features/auth/data/pending_invite_store.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/catalog/data/asset_experience_source.dart';
 import 'package:scapematch/features/catalog/data/catalog_repository.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
@@ -60,6 +61,7 @@ final groupRepositoryProvider = Provider<GroupRepository>((ref) {
   return FakeGroupRepository(
     ref.watch(fakeDatabaseProvider),
     clock: ref.watch(clockProvider),
+    board: ref.watch(communityBoardProvider),
   );
 });
 

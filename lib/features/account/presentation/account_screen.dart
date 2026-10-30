@@ -67,6 +67,8 @@ class AccountScreen extends ConsumerWidget {
           ],
           const _ReplayIntroButton(),
           const SizedBox(height: 10),
+          const _AccountLinks(signedIn: true),
+          const SizedBox(height: 10),
           OutlinedButton(
             key: AppKeys.accountSignOut,
             onPressed: () => _signOut(context, ref),
@@ -145,6 +147,8 @@ class _SignedOutAccount extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           const _ReplayIntroButton(),
+          const SizedBox(height: 10),
+          const _AccountLinks(signedIn: false),
         ],
       ),
     );
@@ -162,6 +166,59 @@ class _ReplayIntroButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       icon: const Icon(Icons.slideshow_outlined),
       label: const Text(OnboardingMessages.replay),
+    );
+  }
+}
+
+class _AccountLinks extends StatelessWidget {
+  const _AccountLinks({required this.signedIn});
+
+  final bool signedIn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (signedIn)
+          OutlinedButton(
+            key: AppKeys.accountNotices,
+            onPressed: () => context.push('/account/notices'),
+            child: const Text('Avisos'),
+          ),
+        if (signedIn) const SizedBox(height: 8),
+        OutlinedButton(
+          key: AppKeys.accountLegal,
+          onPressed: () => context.push('/legal/termos'),
+          child: const Text('Termos de uso'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          key: AppKeys.accountPrivacy,
+          onPressed: () => context.push('/legal/privacidade'),
+          child: const Text('Privacidade'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          key: AppKeys.accountRefund,
+          onPressed: () => context.push('/legal/reembolso'),
+          child: const Text('Reembolso'),
+        ),
+        if (signedIn) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            key: AppKeys.accountData,
+            onPressed: () => context.push('/account/data'),
+            child: const Text('Meus dados'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            key: AppKeys.accountDelete,
+            onPressed: () => context.push('/account/delete'),
+            child: const Text('Pedir exclusão da conta'),
+          ),
+        ],
+      ],
     );
   }
 }

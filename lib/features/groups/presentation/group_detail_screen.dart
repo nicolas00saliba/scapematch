@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/core/sharing/external_places.dart';
+import 'package:scapematch/core/sharing/external_url.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
@@ -16,10 +20,12 @@ import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/edit_group_sheet.dart';
+import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_dialogs.dart';
-import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
+import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class GroupDetailScreen extends ConsumerStatefulWidget {
@@ -129,7 +135,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             color: status.alertContainer,
             foreground: status.onAlertContainer,
             icon: Icons.event_busy,
-            text: GroupMessages.cancelledBanner,
+            text:
+                group.participants.any(
+                  (person) =>
+                      person.refundReason == RefundReason.groupDidNotClose,
+                )
+                ? GroupMessages.missedCloseBanner
+                : GroupMessages.cancelledBanner,
           ),
         ],
         if (me != null && me.occupiesSeat && !group.isCancelled) ...[
@@ -243,6 +255,65 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ),
         const SizedBox(height: 4),
         Text(
+          GroupMessages.phaseLabel(
+            group.phaseAt(now),
+            missing: group.spotsUntilClose,
+            started: !now.isBefore(group.startsAt),
+          ),
+          key: AppKeys.groupPhase,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.secondary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (group.showCloseDeadline(now))
+          Text(
+            GroupMessages.closesAtLabel(formatSession(group.closesAtResolved)),
+            key: AppKeys.closeDeadline,
+          ),
+        if (me != null &&
+            me.occupiesSeat &&
+            !group.isCancelled &&
+            now.isBefore(group.startsAt))
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(GroupMessages.attendanceOptional),
+          ),
+        Text(GroupMessages.cancelWindowLabel(group.cancelWindow.inHours)),
+        if (group.streetAddress.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            '${group.streetAddress} · ${group.neighborhood} · ${group.cityName}',
+            key: AppKeys.roomAddress,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                key: AppKeys.openMaps,
+                onPressed: () => openExternalUrl(
+                  googleMapsUri(
+                    '${group.streetAddress}, ${group.neighborhood}, ${group.cityName}',
+                  ),
+                ),
+                child: const Text(GroupMessages.openMaps),
+              ),
+              OutlinedButton(
+                key: AppKeys.openWaze,
+                onPressed: () => openExternalUrl(
+                  wazeUri(
+                    '${group.streetAddress}, ${group.neighborhood}, ${group.cityName}',
+                  ),
+                ),
+                child: const Text(GroupMessages.openWaze),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 4),
+        Text(
           GroupMessages.confirmedCount(group.confirmedCount),
           key: AppKeys.confirmedCount,
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -268,23 +339,49 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ),
         const SizedBox(height: 8),
         for (final person in roster)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(
-              backgroundColor: scheme.primaryContainer,
-              foregroundColor: scheme.onPrimaryContainer,
-              child: Text(_initial(person.displayName)),
+          if (_visible(person))
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
+                child: Text(_initial(person.displayName)),
+              ),
+              title: Text(person.displayName),
+              subtitle: Text(_personSubtitle(person)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_canModerate(person))
+                    PopupMenuButton<String>(
+                      key: AppKeys.memberMenu(person.id),
+                      onSelected: (value) {
+                        if (value == 'block') {
+                          _block(person);
+                        } else {
+                          _report(person);
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: 'report',
+                          child: Text(GroupMessages.report),
+                        ),
+                        PopupMenuItem(
+                          value: 'block',
+                          child: Text(GroupMessages.block),
+                        ),
+                      ],
+                    ),
+                  if (_canRemove(group, userId, now, person))
+                    TextButton(
+                      key: AppKeys.removeMember(person.id),
+                      onPressed: _busy ? null : () => _remove(person),
+                      child: const Text('Remover'),
+                    ),
+                ],
+              ),
             ),
-            title: Text(person.displayName),
-            subtitle: Text(_personSubtitle(person)),
-            trailing: _canRemove(group, userId, now, person)
-                ? TextButton(
-                    key: AppKeys.removeMember(person.id),
-                    onPressed: _busy ? null : () => _remove(person),
-                    child: const Text('Remover'),
-                  )
-                : null,
-          ),
       ],
     );
   }
@@ -296,6 +393,90 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       return '$status · ${GroupMessages.paymentLabel}';
     }
     return '$status · $refund';
+  }
+
+  bool _visible(Participant person) {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return true;
+    }
+    final key = CommunityBoard.personKey(
+      userId: person.userId,
+      seatId: person.id,
+    );
+    return !ref.read(communityBoardProvider).isBlocked(viewer.id, key);
+  }
+
+  bool _canModerate(Participant person) {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return false;
+    }
+    return person.userId != viewer.id;
+  }
+
+  void _block(Participant person) {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return;
+    }
+    ref
+        .read(communityBoardProvider)
+        .block(
+          viewer.id,
+          CommunityBoard.personKey(userId: person.userId, seatId: person.id),
+        );
+    ref.read(communityTickProvider.notifier).bump();
+    setState(() {});
+    _snack(GroupMessages.blockedSnack);
+  }
+
+  Future<void> _report(Participant person) async {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return;
+    }
+    final reason = await showDialog<ReportReason>(
+      context: context,
+      builder: (context) {
+        return SimpleDialog(
+          title: const Text(GroupMessages.report),
+          children: [
+            for (final item in ReportReason.values)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, item),
+                child: Text(_reportLabel(item)),
+              ),
+          ],
+        );
+      },
+    );
+    if (reason == null) {
+      return;
+    }
+    ref
+        .read(communityBoardProvider)
+        .report(
+          byUserId: viewer.id,
+          targetKey: CommunityBoard.personKey(
+            userId: person.userId,
+            seatId: person.id,
+          ),
+          reason: reason,
+          at: ref.read(clockProvider).now(),
+        );
+    if (mounted) {
+      _snack(GroupMessages.reportedSnack);
+    }
+  }
+
+  String _reportLabel(ReportReason reason) {
+    return switch (reason) {
+      ReportReason.harassment => 'Assédio',
+      ReportReason.spam => 'Spam',
+      ReportReason.noShow => 'Falta sem aviso',
+      ReportReason.other => 'Outro motivo',
+    };
   }
 
   bool _canRemove(
@@ -371,11 +552,40 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             child: Text(GroupMessages.leftBanner),
           ),
         );
+      } else if (_openOffer(group, now) != null) {
+        buttons.add(
+          FilledButton(
+            key: AppKeys.waitlistAccept,
+            onPressed: _busy ? null : () => _acceptOffer(group),
+            child: const Text(GroupMessages.waitlistAccept),
+          ),
+        );
+        buttons.add(
+          OutlinedButton(
+            key: AppKeys.waitlistDecline,
+            onPressed: _busy ? null : () => _declineOffer(group),
+            child: const Text(GroupMessages.waitlistDecline),
+          ),
+        );
       } else if (started) {
         buttons.add(
           const FilledButton(
             onPressed: null,
             child: Text('Este grupo já começou'),
+          ),
+        );
+      } else if (_seatReserved(group, now)) {
+        buttons.add(
+          const FilledButton(
+            onPressed: null,
+            child: Text(GroupMessages.seatReserved),
+          ),
+        );
+        buttons.add(
+          OutlinedButton(
+            key: AppKeys.joinWaitlist,
+            onPressed: _busy ? null : () => _wait(group),
+            child: const Text(GroupMessages.waitlistJoin),
           ),
         );
       } else if (group.isFull) {
@@ -384,6 +594,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             key: AppKeys.joinButton,
             onPressed: null,
             child: Text('Grupo cheio'),
+          ),
+        );
+        buttons.add(
+          OutlinedButton(
+            key: AppKeys.joinWaitlist,
+            onPressed: _busy ? null : () => _wait(group),
+            child: const Text(GroupMessages.waitlistJoin),
           ),
         );
       } else {
@@ -416,6 +633,92 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ],
       ],
     );
+  }
+
+  WaitlistEntry? _openOffer(Group group, DateTime now) {
+    final session = ref.read(authSessionProvider);
+    if (session == null) {
+      return null;
+    }
+    final entry = ref
+        .read(communityBoardProvider)
+        .entryFor(group.id, session.id);
+    if (entry == null ||
+        !ref.read(communityBoardProvider).offerStillOpen(entry, now)) {
+      return null;
+    }
+    return entry;
+  }
+
+  bool _seatReserved(Group group, DateTime now) {
+    final session = ref.read(authSessionProvider);
+    final held = ref
+        .read(communityBoardProvider)
+        .openOfferCount(group.id, now, exceptUserId: session?.id);
+    return group.openSeats > 0 && group.openSeats <= held;
+  }
+
+  Future<void> _acceptOffer(Group group) async {
+    final user = ref.read(authSessionProvider);
+    if (user == null) {
+      return;
+    }
+    await _run(() async {
+      final result = await ref
+          .read(groupRepositoryProvider)
+          .acceptWaitlist(
+            groupId: group.id,
+            userId: user.id,
+            displayName: user.displayName,
+          );
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(groupDetailViewModelProvider(group.id));
+      ref.invalidate(findGroupsViewModelProvider);
+      ref.invalidate(myGroupsViewModelProvider);
+      final message = switch (result) {
+        JoinSuccess() => 'Você entrou no grupo.',
+        JoinFailure(:final reason) => GroupMessages.joinFailure(reason),
+      };
+      _snack(message);
+    });
+  }
+
+  Future<void> _declineOffer(Group group) async {
+    final user = ref.read(authSessionProvider);
+    if (user == null) {
+      return;
+    }
+    await _run(() async {
+      await ref
+          .read(groupRepositoryProvider)
+          .declineWaitlist(groupId: group.id, userId: user.id);
+      if (!mounted) {
+        return;
+      }
+      ref.read(communityTickProvider.notifier).bump();
+      ref.invalidate(groupDetailViewModelProvider(group.id));
+      _snack(GroupMessages.waitlistDeclined);
+    });
+  }
+
+  Future<void> _wait(Group group) async {
+    final user = ref.read(authSessionProvider);
+    if (user == null) {
+      return;
+    }
+    final message = await ref
+        .read(groupRepositoryProvider)
+        .joinWaitlist(
+          groupId: group.id,
+          userId: user.id,
+          displayName: user.displayName,
+        );
+    if (!mounted) {
+      return;
+    }
+    _snack(message ?? GroupMessages.waitlistJoined);
   }
 
   Future<void> _join() async {
@@ -453,6 +756,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final previewRefunds = GroupRules.refundsOnParticipantCancel(
       startsAt: group.startsAt,
       now: ref.read(clockProvider).now(),
+      window: group.cancelWindow,
     );
     final accepted = await showLeaveDialog(context, refunds: previewRefunds);
     if (!accepted || !mounted) {

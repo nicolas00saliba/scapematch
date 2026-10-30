@@ -13,6 +13,25 @@ abstract final class AppKeys {
   static const accountIntro = Key('account-intro');
   static const joinButton = Key('join-button');
   static const spotSummary = Key('spot-summary');
+  static const groupPhase = Key('group-phase');
+  static const roomAddress = Key('room-address');
+  static const openMaps = Key('open-maps');
+  static const openWaze = Key('open-waze');
+  static const joinWaitlist = Key('join-waitlist');
+  static const waitlistAccept = Key('waitlist-accept');
+  static const waitlistDecline = Key('waitlist-decline');
+  static const closeDeadline = Key('close-deadline');
+  static const signupBirthDay = Key('signup-birth-day');
+  static const signupBirthMonth = Key('signup-birth-month');
+  static const signupBirthYear = Key('signup-birth-year');
+  static const signupTerms = Key('signup-terms');
+  static const accountNotices = Key('account-notices');
+  static const accountLegal = Key('account-legal');
+  static const accountPrivacy = Key('account-privacy');
+  static const accountRefund = Key('account-refund');
+  static const accountData = Key('account-data');
+  static const accountDelete = Key('account-delete');
+  static const accountDeleteConfirm = Key('account-delete-confirm');
   static const extraSpotsIncrement = Key('extra-spots-increment');
   static const extraSpotsDecrement = Key('extra-spots-decrement');
   static const extraSpotsValue = Key('extra-spots-value');
@@ -82,6 +101,8 @@ abstract final class AppKeys {
   static const groupNote = Key('group-note');
 
   static Key removeMember(String id) => Key('remove-member-$id');
+  static Key memberMenu(String id) => Key('member-menu-$id');
+  static Key noticePref(String kind) => Key('notice-pref-$kind');
 
   static Key cityOption(String id) => Key('city-option-$id');
   static Key gameTypeOption(String id) => Key('game-type-option-$id');

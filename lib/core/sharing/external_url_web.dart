@@ -1,26 +1,13 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
+import 'package:scapematch/core/sharing/external_url_launch.dart';
+
 @JS('window')
 external JSObject get _window;
 
-/// `window.open` para o WhatsApp.
-Future<bool> openExternalUrl(Uri uri) async {
-  try {
-    final open = _window['open'];
-    if (open == null) {
-      return false;
-    }
-    (open as JSFunction).callAsFunction(
-      _window,
-      uri.toString().toJS,
-      '_blank'.toJS,
-    );
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
+/// Nova aba na web. O mesmo helper no celular abre o app do link.
+Future<bool> openExternalUrl(Uri uri) => launchExternalUrl(uri);
 
 /// Web Share API. Se o navegador não tiver, devolve falso.
 Future<bool> sharePlainText(String text) async {

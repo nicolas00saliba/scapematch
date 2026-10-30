@@ -6,14 +6,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 /// Busca de grupo comprimida, no topo da Home.
 class FindGroupsSection extends ConsumerStatefulWidget {
@@ -224,14 +227,23 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         onAction: () => ref.invalidate(findGroupsViewModelProvider),
       ),
       data: (items) {
-        if (items.isEmpty) {
+        final viewer = ref.watch(authSessionProvider);
+        ref.watch(communityTickProvider);
+        final board = ref.watch(communityBoardProvider);
+        final visible = [
+          for (final group in items)
+            if (viewer == null || !board.hiddenFromHome(viewer.id, group))
+              group,
+        ];
+        if (visible.isEmpty) {
           return InlineNotice(
             message: _emptyMessage(cityName, query, gameTypeId),
           );
         }
         return _GroupWindow(
-          groups: items,
-          maxHeight: items.length <= 1 ? double.infinity : groupWindowMaxHeight,
+          groups: visible,
+          now: ref.watch(clockProvider).now(),
+          maxHeight: groupWindowHeightFor(visible.length),
           onOpen: (group) => context.push('/groups/${group.id}'),
           onInvite: (group) => showInviteSheet(context, group),
         );
@@ -256,18 +268,28 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
 /// A barra só entra quando o conteúdo passa desse teto.
 const groupWindowMaxHeight = 176.0;
 
+/// Um cartão visível encolhe a janela. Dois ou mais usam o teto.
+double groupWindowHeightFor(int visibleCount) {
+  if (visibleCount <= 1) {
+    return double.infinity;
+  }
+  return groupWindowMaxHeight;
+}
+
 /// Controller próprio da janela. A rolagem da página continua sendo a primária.
 final class GroupWindowController extends ScrollController {}
 
 class _GroupWindow extends StatefulWidget {
   const _GroupWindow({
     required this.groups,
+    required this.now,
     required this.maxHeight,
     required this.onOpen,
     required this.onInvite,
   });
 
   final List<Group> groups;
+  final DateTime now;
   final double maxHeight;
   final ValueChanged<Group> onOpen;
   final ValueChanged<Group> onInvite;
@@ -331,6 +353,7 @@ class _GroupWindowState extends State<_GroupWindow> {
                 for (var index = 0; index < widget.groups.length; index++) ...[
                   if (index > 0) const SizedBox(height: 10),
                   GroupCard(
+                    now: widget.now,
                     group: widget.groups[index],
                     onTap: () => widget.onOpen(widget.groups[index]),
                     onInvite: () => widget.onInvite(widget.groups[index]),

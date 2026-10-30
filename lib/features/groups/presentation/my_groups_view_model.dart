@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -7,12 +8,22 @@ import 'package:scapematch/providers/repositories.dart';
 /// Groups the current user created or joined, including cancelled ones.
 class MyGroupsViewModel extends AsyncNotifier<List<Group>> {
   @override
-  Future<List<Group>> build() {
+  Future<List<Group>> build() async {
     final session = ref.watch(authSessionProvider);
     if (session == null) {
-      return Future.value(const []);
+      return const [];
     }
-    return ref.watch(groupRepositoryProvider).listForUser(session.id);
+    final groups = await ref
+        .watch(groupRepositoryProvider)
+        .listForUser(session.id);
+    ref
+        .read(communityBoardProvider)
+        .syncReminders(
+          groups: groups,
+          userId: session.id,
+          now: ref.read(clockProvider).now(),
+        );
+    return groups;
   }
 }
 

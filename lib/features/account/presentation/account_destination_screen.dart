@@ -97,7 +97,7 @@ class AccountDestinationScreen extends ConsumerWidget {
       AccountDestination.settings => [
         const _InfoCard(
           title: 'Notificações',
-          subtitle: 'Desligadas. Este interruptor ainda não existe.',
+          subtitle: 'Os lembretes ficam em Avisos, na Conta. O push do celular espera a conta de verdade.',
         ),
         const SizedBox(height: 8),
         const _InfoCard(

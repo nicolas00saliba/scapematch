@@ -26,10 +26,19 @@ class AuthController extends Notifier<CurrentUser?> {
     required String name,
     required String email,
     required String password,
+    required DateTime birthDate,
+    required bool acceptedTerms,
   }) async {
     final error = await ref
         .read(authRepositoryProvider)
-        .signUp(name: name, email: email, password: password);
+        .signUp(
+          name: name,
+          email: email,
+          password: password,
+          birthDate: birthDate,
+          now: ref.read(clockProvider).now(),
+          acceptedTerms: acceptedTerms,
+        );
     state = ref.read(authRepositoryProvider).signedInUser;
     return error;
   }

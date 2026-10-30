@@ -1,5 +1,7 @@
 import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
+import 'package:scapematch/features/groups/domain/group_rules.dart';
+import 'package:scapematch/features/legal/legal_documents.dart';
 
 /// Contas só na memória. A senha não sai deste objeto e não vai para o disco.
 ///
@@ -39,7 +41,16 @@ class FakeAuthRepository implements AuthRepository {
     required String name,
     required String email,
     required String password,
+    required DateTime birthDate,
+    required DateTime now,
+    required bool acceptedTerms,
   }) async {
+    if (!acceptedTerms) {
+      return LegalDocuments.termsRequired;
+    }
+    if (!GroupRules.isAdult(birthDate: birthDate, now: now)) {
+      return LegalDocuments.under18;
+    }
     final key = _normalize(email);
     if (_accounts.containsKey(key)) {
       return 'Esse e-mail já está neste exemplo. Entre com ele.';
@@ -47,6 +58,7 @@ class FakeAuthRepository implements AuthRepository {
     final user = CurrentUser(
       id: 'user-signup-$_nextId',
       displayName: name.trim(),
+      birthDate: birthDate,
     );
     _nextId += 1;
     _accounts[key] = (user: user, password: password);

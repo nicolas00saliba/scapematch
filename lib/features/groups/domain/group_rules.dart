@@ -63,10 +63,15 @@ class GroupRules {
   ///
   /// The floor is [minExtraSpots]. The ceiling is [maxExtraSpots] when a
   /// room is known. Without a room, only the floor applies.
-  static int clampExtraSpots(int value, {int? roomCapacity}) {
-    var spots = value < minExtraSpots ? minExtraSpots : value;
+  static int clampExtraSpots(
+    int value, {
+    int? roomCapacity,
+    int minimumPlayers = minGroupSize,
+  }) {
+    final floor = minimumExtraSpots(minimumPlayers: minimumPlayers);
+    var spots = value < floor ? floor : value;
     final max = maxExtraSpots(roomCapacity: roomCapacity);
-    if (max != null && max >= minExtraSpots && spots > max) {
+    if (max != null && max >= floor && spots > max) {
       spots = max;
     }
     return spots;
@@ -75,12 +80,25 @@ class GroupRules {
   /// [extraSpots] is how many people the creator is still looking for.
   /// The creator already takes one seat, so creator + extraSpots must fit
   /// in the room.
+  /// Vagas além do criador para o grupo caber no mínimo da sala.
+  static int minimumExtraSpots({int minimumPlayers = minGroupSize}) {
+    final needed = minimumPlayers - 1;
+    if (needed < minExtraSpots) {
+      return minExtraSpots;
+    }
+    return needed;
+  }
+
   static GroupSizeValidation validateGroupSize({
     required int extraSpots,
     required int roomCapacity,
+    int minimumPlayers = minGroupSize,
   }) {
     if (extraSpots < minExtraSpots) {
       return GroupSizeValidation.belowMinimum;
+    }
+    if (1 + extraSpots < minimumPlayers) {
+      return GroupSizeValidation.belowRoomMinimum;
     }
     if (1 + extraSpots > roomCapacity) {
       return GroupSizeValidation.exceedsRoomCapacity;
@@ -125,15 +143,21 @@ class GroupRules {
   static bool refundsOnParticipantCancel({
     required DateTime startsAt,
     required DateTime now,
+    Duration? window,
   }) {
-    return startsAt.difference(now) >= refundDeadline;
+    return startsAt.difference(now) >= (window ?? refundDeadline);
   }
 
   static RefundOutcome refundForParticipantCancel({
     required DateTime startsAt,
     required DateTime now,
+    Duration? window,
   }) {
-    if (refundsOnParticipantCancel(startsAt: startsAt, now: now)) {
+    if (refundsOnParticipantCancel(
+      startsAt: startsAt,
+      now: now,
+      window: window,
+    )) {
       return const RefundOutcome(
         status: RefundStatus.refunded,
         reason: RefundReason.cancelledInTime,
@@ -143,6 +167,104 @@ class GroupRules {
       status: RefundStatus.denied,
       reason: RefundReason.cancelledTooLate,
     );
+  }
+
+  /// 24 h antes do início, quando o grupo nasce com essa folga.
+  static const closeLead = Duration(hours: 24);
+
+  /// 1 h antes do início, quando falta menos de [closeLead] para a sessão.
+  static const shortCloseLead = Duration(hours: 1);
+
+  /// Lembrete "em até 24 h". O piso é [reminder2h], não a janela de reembolso.
+  static const reminder24h = Duration(hours: 24);
+
+  /// Lembrete "em até 2 h".
+  static const reminder2h = Duration(hours: 2);
+
+  /// Prazo para atingir o mínimo. Sempre antes do início.
+  ///
+  /// Com mais de 24 h de antecedência, o prazo é 24 h antes. Com mais de
+  /// 1 h e até 24 h, é 1 h antes. Com 1 h ou menos a criação é recusada:
+  /// esse prazo já estaria no passado.
+  static DateTime closeDeadline({
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    final dayBefore = startsAt.subtract(closeLead);
+    if (dayBefore.isAfter(now)) {
+      return dayBefore;
+    }
+    return startsAt.subtract(shortCloseLead);
+  }
+
+  /// A sessão ainda não começou e falta no máximo [shortCloseLead].
+  ///
+  /// Exatamente 1 h também entra: o prazo curto seria o instante atual
+  /// e o grupo nasceria já cancelado.
+  static bool tooCloseToCreate({
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    if (!now.isBefore(startsAt)) {
+      return false;
+    }
+    return startsAt.difference(now) <= shortCloseLead;
+  }
+
+  /// O prazo passou e o mínimo não foi atingido. O portal da casa não entra aqui.
+  ///
+  /// Depois do início a sessão não vira "não fechou": o prazo já ficou para
+  /// trás e quem abre o grupo vê que ele começou.
+  static bool missedMinimum({
+    required bool alreadyCancelled,
+    required bool portalOwned,
+    required int filledSpots,
+    required int minimumSpots,
+    required DateTime closesAt,
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    if (alreadyCancelled || portalOwned) {
+      return false;
+    }
+    // Sessão já começada não vira "não fechou": ela só não aceita mais gente.
+    if (!now.isBefore(startsAt)) {
+      return false;
+    }
+    return !now.isBefore(closesAt) && filledSpots < minimumSpots;
+  }
+
+  static const noShowWindow = Duration(days: 60);
+  static const noShowLimit = 3;
+  static const noShowRestriction = Duration(days: 30);
+  static const waitlistAcceptWindow = Duration(hours: 2);
+  static const paymentReminderWindow = Duration(hours: 6);
+
+  static List<DateTime> noShowsInWindow(List<DateTime> dates, DateTime now) {
+    final start = now.subtract(noShowWindow);
+    return [
+      for (final date in dates)
+        if (!date.isBefore(start) && !date.isAfter(now)) date,
+    ]..sort();
+  }
+
+  /// Três faltas na janela travam novas entradas por [noShowRestriction]
+  /// a partir da falta mais recente.
+  static bool joinRestricted(List<DateTime> dates, DateTime now) {
+    final recent = noShowsInWindow(dates, now);
+    if (recent.length < noShowLimit) {
+      return false;
+    }
+    return now.isBefore(recent.last.add(noShowRestriction));
+  }
+
+  static bool isAdult({required DateTime birthDate, required DateTime now}) {
+    final eighteenth = DateTime(
+      birthDate.year + 18,
+      birthDate.month,
+      birthDate.day,
+    );
+    return !now.isBefore(eighteenth);
   }
 
   /// The organizer cancelled the event or removed the person. The simulated
@@ -179,6 +301,7 @@ class GroupRules {
     required int totalSpots,
     required int occupiedSpots,
     required int roomCapacity,
+    int minimumPlayers = minGroupSize,
   }) {
     if (totalSpots > roomCapacity) {
       return TotalSpotsValidation.exceedsRoomCapacity;
@@ -188,6 +311,9 @@ class GroupRules {
     }
     if (totalSpots < minGroupSize) {
       return TotalSpotsValidation.belowMinimum;
+    }
+    if (totalSpots < minimumPlayers) {
+      return TotalSpotsValidation.belowRoomMinimum;
     }
     return TotalSpotsValidation.valid;
   }
@@ -240,11 +366,17 @@ class GroupRules {
 
 enum GroupListBucket { upcoming, past, cancelled }
 
-enum GroupSizeValidation { valid, belowMinimum, exceedsRoomCapacity }
+enum GroupSizeValidation {
+  valid,
+  belowMinimum,
+  belowRoomMinimum,
+  exceedsRoomCapacity,
+}
 
 enum TotalSpotsValidation {
   valid,
   belowMinimum,
+  belowRoomMinimum,
   belowOccupancy,
   exceedsRoomCapacity,
 }

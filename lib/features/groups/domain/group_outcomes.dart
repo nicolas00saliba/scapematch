@@ -29,6 +29,10 @@ enum JoinFailureReason {
   membershipClosed,
   groupCancelled,
   sessionEnded,
+  blocked,
+  restricted,
+  seatReserved,
+  offerExpired,
 }
 
 sealed class CreateGroupResult {
@@ -50,11 +54,13 @@ final class CreateGroupFailure extends CreateGroupResult {
 enum CreateGroupFailureReason {
   unknownSelection,
   belowMinimum,
+  belowRoomMinimum,
   exceedsRoomCapacity,
 
   /// Another group already occupies this room at this start time.
   duplicateSession,
   alreadyStarted,
+  tooCloseToStart,
   overlapsAnotherGroup,
 }
 
@@ -176,6 +182,7 @@ enum EditGroupFailureReason {
   notCreator,
   belowOccupancy,
   belowMinimum,
+  belowRoomMinimum,
   exceedsRoomCapacity,
   noteTooLong,
   groupCancelled,

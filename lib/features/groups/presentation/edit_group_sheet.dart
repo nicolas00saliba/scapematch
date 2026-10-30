@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,7 +51,10 @@ class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final occupied = widget.group.occupiedSpots;
-    final minimum = GroupRules.minimumTotalSpots(occupiedSpots: occupied);
+    final minimum = math.max(
+      GroupRules.minimumTotalSpots(occupiedSpots: occupied),
+      widget.group.minimumSpots,
+    );
     final maximum = widget.group.roomCapacity;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
 

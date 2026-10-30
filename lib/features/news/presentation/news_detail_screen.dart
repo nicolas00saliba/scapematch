@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/relative_time.dart';
+import 'package:scapematch/core/sharing/external_url.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
@@ -140,9 +141,14 @@ class _Detail extends StatelessWidget {
               color: theme.colorScheme.primary,
             ),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () => openExternalUrl(Uri.parse(item.sourceUrl!)),
+            child: const Text('Abrir link'),
+          ),
           const SizedBox(height: 4),
           Text(
-            'O app mostra o endereço e não abre o navegador.',
+            'Na web o link abre em outra aba. No celular, no app correspondente.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
