@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 
@@ -12,25 +11,26 @@ class InviteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final open = group.openSeats;
     final spots = open == 1 ? '1 vaga restante' : '$open vagas restantes';
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            color: AppColors.teal,
+            color: scheme.primary,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Text(
               'ScapeMatch',
               style: theme.textTheme.titleMedium?.copyWith(
-                color: Colors.white,
+                color: scheme.onPrimary,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -50,7 +50,7 @@ class InviteCard extends StatelessWidget {
                 Text(
                   '${group.houseName} · ${group.cityName}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.muted,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -60,7 +60,7 @@ class InviteCard extends StatelessWidget {
                   spots,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: AppColors.teal,
+                    color: scheme.secondary,
                   ),
                 ),
               ],

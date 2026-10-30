@@ -24,6 +24,7 @@ void main() {
     );
     expect(find.byKey(AppKeys.groupSearch), findsOneWidget);
     expect(find.text('Criar grupo'), findsWidgets);
+    expect(find.text('Quase cheios'), findsNothing);
     expect(find.textContaining('Dados de exemplo'), findsOneWidget);
 
     await _selectCity(tester, SampleIds.saoPaulo);
@@ -51,20 +52,11 @@ void main() {
     await revealCarouselItem(tester, 'rooms', find.text('O Izakaya Secreto'));
     expect(find.text('O Izakaya Secreto'), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(AppKeys.almostFullFilter));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.almostFullFilter));
-    await tester.pumpAndSettle();
-
-    expect(
+    await tester.scrollUntilVisible(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
-      findsOneWidget,
+      300,
+      scrollable: verticalScrollable,
     );
-    expect(
-      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
-      findsNothing,
-    );
-
     await tester.tap(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
     );
@@ -82,17 +74,21 @@ void main() {
 
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(AppKeys.almostFullFilter));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.almostFullFilter));
-    await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
       300,
       scrollable: verticalScrollable,
     );
-    expect(find.text('Cheio'), findsOneWidget);
+    await tester.tap(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
+    );
+    await tester.pumpAndSettle();
+    expect(_spotSummary(tester), '6 de 6 vagas');
+    expect(find.text('Entrar no grupo'), findsNothing);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
     await tester.scrollUntilVisible(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       300,

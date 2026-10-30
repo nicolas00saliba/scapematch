@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
@@ -120,7 +119,9 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           const SizedBox(height: 4),
           Text(
             'Pessoas que ainda faltam, sem contar você.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           Row(
@@ -302,6 +303,7 @@ class _SelectionField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final shown = value ?? hint;
     return Semantics(
       button: true,
@@ -309,10 +311,10 @@ class _SelectionField extends StatelessWidget {
       label: '$label. $shown',
       excludeSemantics: true,
       child: Material(
-        color: Colors.white,
+        color: scheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: scheme.outlineVariant),
         ),
         child: InkWell(
           key: fieldKey,
@@ -329,7 +331,7 @@ class _SelectionField extends StatelessWidget {
                       Text(
                         label,
                         style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppColors.teal,
+                          color: scheme.primary,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -339,8 +341,8 @@ class _SelectionField extends StatelessWidget {
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: value == null
-                              ? AppColors.muted
-                              : AppColors.ink,
+                              ? scheme.onSurfaceVariant
+                              : scheme.onSurface,
                         ),
                       ),
                     ],
@@ -348,7 +350,7 @@ class _SelectionField extends StatelessWidget {
                 ),
                 Icon(
                   Icons.expand_more,
-                  color: enabled ? AppColors.teal : AppColors.line,
+                  color: enabled ? scheme.primary : scheme.outline,
                 ),
               ],
             ),

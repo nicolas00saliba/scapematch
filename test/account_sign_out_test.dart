@@ -115,4 +115,11 @@ Future<void> _scrollToSignOut(WidgetTester tester) async {
     200,
     scrollable: scrollable,
   );
+  final button = find.byKey(AppKeys.accountSignOut);
+  final bar = find.byType(NavigationBar);
+  if (bar.evaluate().isNotEmpty &&
+      tester.getCenter(button).dy >= tester.getTopLeft(bar).dy - 8) {
+    await tester.drag(scrollable, const Offset(0, -160));
+    await tester.pumpAndSettle();
+  }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
@@ -19,6 +18,7 @@ class GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final spots = '${group.filledSpots} de ${group.totalSpots} vagas';
 
     return Semantics(
@@ -56,13 +56,13 @@ class GroupCard extends StatelessWidget {
                 Text(
                   '${group.houseName} · ${group.neighborhood}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.muted,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.schedule, size: 16, color: AppColors.teal),
+                    Icon(Icons.schedule, size: 16, color: scheme.primary),
                     const SizedBox(width: 6),
                     Expanded(child: Text(formatSession(group.startsAt))),
                   ],
@@ -81,6 +81,7 @@ class GroupCard extends StatelessWidget {
                       key: AppKeys.inviteOnCard(group.id),
                       onPressed: onInvite,
                       style: TextButton.styleFrom(
+                        foregroundColor: scheme.secondary,
                         visualDensity: VisualDensity.compact,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -103,17 +104,29 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, background, foreground) = switch ((
+    final scheme = Theme.of(context).colorScheme;
+    final (label, background, foreground, border) = switch ((
       group.isFull,
       group.isAlmostFull,
     )) {
-      (true, _) => ('Cheio', AppColors.line, AppColors.muted),
+      (true, _) => (
+        'Cheio',
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
+        scheme.outline,
+      ),
       (false, true) => (
         'Quase cheio',
-        AppColors.copperSoft,
-        AppColors.copperInk,
+        scheme.tertiary,
+        scheme.onTertiary,
+        scheme.onTertiary,
       ),
-      _ => ('Aberto', AppColors.tealSoft, AppColors.teal),
+      _ => (
+        'Aberto',
+        scheme.primaryContainer,
+        scheme.onPrimaryContainer,
+        scheme.primaryContainer,
+      ),
     };
 
     return Container(
@@ -121,6 +134,7 @@ class _StatusPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: border),
       ),
       child: Text(
         label,

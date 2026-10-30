@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
@@ -64,8 +63,9 @@ class _CategoryList extends ConsumerWidget {
               cityName == null
                   ? 'Salas de exemplo.'
                   : 'Salas de exemplo em $cityName.',
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: AppColors.muted),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             for (var index = 0; index < inCategory.length; index++) ...[

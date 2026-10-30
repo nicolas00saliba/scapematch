@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
@@ -176,7 +175,7 @@ class _MyGroupCard extends StatelessWidget {
               Text(
                 '${group.houseName} · ${group.cityName}',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.muted,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 8),

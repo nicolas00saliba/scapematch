@@ -10,6 +10,8 @@ import 'package:scapematch/features/cities/data/selected_city_store.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/data/selected_game_type_store.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
+import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 Future<void> main() async {
@@ -23,9 +25,11 @@ Future<void> main() async {
   // “escolha a cidade” antes de ler o que foi salvo.
   final cityStore = SelectedCityStore();
   final gameTypeStore = SelectedGameTypeStore();
+  final onboarding = OnboardingStore();
   final pendingInvites = PendingInviteStore();
   await cityStore.load();
   await gameTypeStore.load();
+  await onboarding.load();
   // Sem este load, recarregar a página entre Participar e o cadastro
   // cria um store vazio e a pessoa não entra no grupo.
   await pendingInvites.load();
@@ -37,6 +41,7 @@ Future<void> main() async {
       overrides: [
         selectedCityStoreProvider.overrideWithValue(cityStore),
         selectedGameTypeStoreProvider.overrideWithValue(gameTypeStore),
+        onboardingStoreProvider.overrideWithValue(onboarding),
         pendingInviteStoreProvider.overrideWithValue(pendingInvites),
       ],
       child: const ScapeMatchApp(),

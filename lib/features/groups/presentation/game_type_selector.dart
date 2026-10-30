@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
@@ -12,6 +11,7 @@ class GameTypeSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final selectedId = ref.watch(selectedGameTypeIdProvider);
     final label = GameTypes.labelOf(selectedId);
     final shortLabel = GameTypes.shortLabelOf(selectedId);
@@ -20,10 +20,10 @@ class GameTypeSelector extends ConsumerWidget {
       label: 'Tipo de jogo selecionado: $label. Toque para trocar.',
       excludeSemantics: true,
       child: Material(
-        color: Colors.white,
+        color: scheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: AppColors.teal),
+          side: BorderSide(color: scheme.primary),
         ),
         child: InkWell(
           key: AppKeys.gameTypeSelector,
@@ -34,11 +34,7 @@ class GameTypeSelector extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.casino_outlined,
-                  color: AppColors.teal,
-                  size: 18,
-                ),
+                Icon(Icons.casino_outlined, color: scheme.primary, size: 18),
                 const SizedBox(width: 6),
                 Text(
                   shortLabel,
@@ -48,7 +44,7 @@ class GameTypeSelector extends ConsumerWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const Icon(Icons.expand_more, color: AppColors.teal, size: 18),
+                Icon(Icons.expand_more, color: scheme.primary, size: 18),
               ],
             ),
           ),
@@ -84,7 +80,10 @@ class GameTypeSelector extends ConsumerWidget {
                   key: AppKeys.gameTypeOption(choice.id),
                   title: Text(choice.label),
                   trailing: choice.id == selectedId
-                      ? const Icon(Icons.check, color: AppColors.teal)
+                      ? Icon(
+                          Icons.check,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
                       : null,
                   onTap: () => Navigator.of(context).pop(choice.id),
                 ),

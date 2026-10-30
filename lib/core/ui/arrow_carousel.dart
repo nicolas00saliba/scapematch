@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 
 /// Largura em que um quadro ainda se lê. A faixa cabe um ou dois quadros
@@ -392,11 +391,11 @@ class _CarouselArrow extends StatelessWidget {
       tooltip: label,
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.teal,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.primary,
         minimumSize: const Size(44, 44),
         fixedSize: const Size(44, 44),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: Theme.of(context).colorScheme.outline),
       ),
       icon: Icon(forward ? Icons.chevron_right : Icons.chevron_left),
     );
@@ -411,6 +410,7 @@ class _Dots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       key: AppKeys.promoDots,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -421,8 +421,11 @@ class _Dots extends StatelessWidget {
             height: 7,
             margin: const EdgeInsets.symmetric(horizontal: 3),
             decoration: BoxDecoration(
-              color: index == current ? AppColors.teal : AppColors.line,
+              color: index == current ? scheme.tertiary : scheme.outlineVariant,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: index == current ? scheme.onTertiary : scheme.outline,
+              ),
             ),
           ),
       ],

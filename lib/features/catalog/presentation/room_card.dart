@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -376,7 +375,9 @@ TextStyle _titleStyle(ThemeData theme) {
 }
 
 TextStyle _houseStyle(ThemeData theme) {
-  return theme.textTheme.bodySmall!.copyWith(color: AppColors.muted);
+  return theme.textTheme.bodySmall!.copyWith(
+    color: theme.colorScheme.onSurfaceVariant,
+  );
 }
 
 TextStyle _cityStyle(ThemeData theme) {

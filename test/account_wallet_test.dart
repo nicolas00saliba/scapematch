@@ -54,11 +54,14 @@ void main() {
     expect(button.bottom, lessThanOrEqualTo(wallet.bottom + 1));
     expect(button.left, greaterThanOrEqualTo(wallet.left));
     expect(button.right, lessThanOrEqualTo(wallet.right + 1));
+    final scheme = Theme.of(
+      tester.element(find.byKey(AppKeys.accountAddBalance)),
+    ).colorScheme;
     final style = tester
         .widget<FilledButton>(find.byKey(AppKeys.accountAddBalance))
         .style;
-    expect(style?.backgroundColor?.resolve({}), Colors.white);
-    expect(style?.foregroundColor?.resolve({}), isNot(Colors.white));
+    expect(style?.backgroundColor?.resolve({}), scheme.surface);
+    expect(style?.foregroundColor?.resolve({}), scheme.primary);
   });
 
   testWidgets('account, cards and top-up fit a phone and a wide window', (

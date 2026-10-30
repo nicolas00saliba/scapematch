@@ -2,7 +2,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
@@ -136,7 +135,7 @@ void main() {
       height: 1.2,
     );
     final summaryStyle = theme.textTheme.bodyMedium!.copyWith(
-      color: AppColors.muted,
+      color: theme.colorScheme.onSurfaceVariant,
       height: 1.35,
     );
     final oneTitle = _textHeight('Ag', titleStyle, scaler, contentWidth, 1);
@@ -151,7 +150,7 @@ void main() {
     final chip = _textHeight(
       'Jogos de tabuleiro',
       theme.textTheme.labelMedium!.copyWith(
-        color: AppColors.teal,
+        color: theme.colorScheme.primary,
         fontWeight: FontWeight.w800,
       ),
       scaler,
@@ -765,7 +764,10 @@ int _activeDot(WidgetTester tester) {
   for (var index = 0; index < row.children.length; index++) {
     final box = row.children[index] as Container;
     final color = (box.decoration! as BoxDecoration).color;
-    if (color == AppColors.teal) {
+    final accent = Theme.of(tester.element(find.byKey(AppKeys.promoDots)))
+        .colorScheme
+        .tertiary;
+    if (color == accent) {
       active = index;
     }
   }

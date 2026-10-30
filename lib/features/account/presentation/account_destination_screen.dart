@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
@@ -108,7 +107,9 @@ class AccountDestinationScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         Text(
           'Nada nesta tela altera o app de verdade.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     };
@@ -124,11 +125,12 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -145,7 +147,7 @@ class _InfoCard extends StatelessWidget {
             Text(
               subtitle,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.muted,
+                color: scheme.onSurfaceVariant,
                 height: 1.35,
               ),
             ),

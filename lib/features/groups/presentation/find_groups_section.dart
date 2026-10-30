@@ -4,14 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
-import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
@@ -46,7 +44,6 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
   @override
   Widget build(BuildContext context) {
     final cityId = ref.watch(selectedCityIdProvider);
-    final almostFull = ref.watch(almostFullOnlyProvider);
     final query = ref.watch(groupSearchQueryProvider);
     final gameTypeId = ref.watch(selectedGameTypeIdProvider);
     final groups = ref.watch(filteredGroupsProvider);
@@ -62,38 +59,10 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             return _searchBar(context, constraints.maxWidth);
           },
         ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Semantics(
-            identifier: 'almost-full-filter',
-            button: true,
-            label: almostFull
-                ? 'Filtro Quase cheios ativado'
-                : 'Filtro Quase cheios',
-            child: FilterChip(
-              key: AppKeys.almostFullFilter,
-              visualDensity: VisualDensity.compact,
-              label: const Text('Quase cheios'),
-              selected: almostFull,
-              onSelected: (value) {
-                ref.read(almostFullOnlyProvider.notifier).setEnabled(value);
-              },
-            ),
-          ),
-        ),
         const SizedBox(height: 8),
         KeyedSubtree(
           key: AppKeys.groupResults,
-          child: _list(
-            context,
-            ref,
-            cityName,
-            almostFull,
-            query,
-            gameTypeId,
-            groups,
-          ),
+          child: _list(context, ref, cityName, query, gameTypeId, groups),
         ),
       ],
     );
@@ -151,6 +120,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
   }
 
   Widget _searchField() {
+    final scheme = Theme.of(context).colorScheme;
     return TextField(
       key: AppKeys.groupSearch,
       controller: _search,
@@ -167,15 +137,15 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
           minHeight: 40,
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: scheme.surface,
         contentPadding: const EdgeInsets.fromLTRB(0, 10, _searchEndPad, 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.line),
+          borderSide: BorderSide(color: scheme.outline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.line),
+          borderSide: BorderSide(color: scheme.outline),
         ),
       ),
     );
@@ -240,7 +210,6 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
     BuildContext context,
     WidgetRef ref,
     String? cityName,
-    bool almostFull,
     String query,
     String gameTypeId,
     AsyncValue<List<Group>> groups,
@@ -257,7 +226,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
       data: (items) {
         if (items.isEmpty) {
           return InlineNotice(
-            message: _emptyMessage(cityName, almostFull, query, gameTypeId),
+            message: _emptyMessage(cityName, query, gameTypeId),
           );
         }
         return _GroupWindow(
@@ -270,12 +239,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
     );
   }
 
-  String _emptyMessage(
-    String? cityName,
-    bool almostFull,
-    String query,
-    String gameTypeId,
-  ) {
+  String _emptyMessage(String? cityName, String query, String gameTypeId) {
     final place = cityName ?? 'esta cidade';
     final text = query.trim();
     final kind = gameTypeId == GameTypes.all
@@ -283,9 +247,6 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         : ' de ${GameTypes.labelOf(gameTypeId)}';
     if (text.isNotEmpty) {
       return 'Nenhum grupo$kind com “$text” em $place.';
-    }
-    if (almostFull) {
-      return 'Ninguém está a 1 ou ${GroupRules.almostFullMaxOpenSeats} vagas de fechar$kind em $place. Veja todos os grupos.';
     }
     return 'Ainda não há grupos de exemplo$kind em $place.';
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
@@ -79,11 +78,12 @@ class _MethodTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),

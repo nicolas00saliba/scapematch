@@ -2,6 +2,30 @@
 
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
+## Paleta Noite de Mistério
+
+- **Data:** 2026-10-30
+- **Decisão:** o app usa a paleta Noite de Mistério nos tokens do `ColorScheme` do Material 3, com tema claro e tema escuro. O escuro segue o modo do sistema. O roxo é a cor principal. O vinho (`secondary`) colore ações secundárias, como Convidar. O dourado (`tertiary`) é destaque de preenchimento, como o selo “Quase cheio” e o marcador de Promoções, com o texto escuro `onTertiary` por cima. O dourado não é cor de texto em fundo claro: esse par não chega no contraste AA. Sucesso e alerta ficam em `ScapeStatusColors`. O fundo da página é o `scaffoldBackgroundColor`; o cartão é `surface`. Não há cor de marca solta fora desses tokens.
+- **Motivo:** o dono escolheu essa paleta para o app inteiro, e a próxima troca deve acontecer num lugar só.
+- **Onde está no código:** `buildAppTheme` em `lib/app/theme.dart`. `ScapeMatchApp` liga `theme`, `darkTheme` e `ThemeMode.system`.
+- **Como trocar depois:** editar os dois `ColorScheme` e o `ScapeStatusColors`. As telas leem o tema, então não precisam de outro hex.
+
+## Introdução na primeira abertura
+
+- **Data:** 2026-10-30
+- **Decisão:** quem abre o app pela primeira vez vê quatro telas curtas antes da Home: achar gente para completar o grupo, salas e grupos na cidade, criar um grupo e convidar, dividir e pagar a reserva. Há Pular e Próximo. Na última tela, Começar abre a Home. Pular também abre a Home e marca a introdução como vista. A segunda tela escolhe a cidade, com Curitiba como padrão, e o tipo de jogo. As duas escolhas usam as mesmas preferências da Home (`selected_city_id` e `selected_game_type`). A chave `onboarding_seen` no aparelho impede a introdução de voltar sozinha. A aba Conta, com ou sem sessão, tem “Ver introdução”. Não pede conta. Um link de convite não é interceptado: só a Home (`/`) redireciona enquanto a introdução não foi vista.
+- **Motivo:** a pessoa precisa entender a proposta antes da lista, e poder pular. A cidade já existia como preferência; a introdução só a mostra no começo.
+- **Onde está no código:** `OnboardingScreen`, `OnboardingStore`, o redirect de `/` em `router.dart`, o `main` que lê o store antes do primeiro frame, e o botão em `AccountScreen`.
+- **Como trocar depois:** outra ordem ou outro texto fica em `OnboardingMessages`. Uma conta de verdade continua sem ser exigida aqui. Se a introdução passar a voltar para a Conta quando foi aberta de lá, o destino deixa de ser sempre `/`.
+
+## O chip Quase cheios saiu da Home
+
+- **Data:** 2026-10-30
+- **Decisão:** o chip “Quase cheios” sai da Home, junto com o estado que só existia para ligá-lo. A janela de grupos continua como estava com o filtro desligado: cidade, busca e tipo de jogo. O selo “Quase cheio” do cartão permanece. A regra continua sendo 1 ou 2 vagas abertas (`GroupRules.almostFullMaxOpenSeats`).
+- **Motivo:** a janela já é o lugar dos grupos que estão se formando. O chip repetia isso.
+- **Onde está no código:** `FindGroupsSection` não tem mais o chip. O selo está em `GroupCard`. A regra está em `GroupRules.isAlmostFull`.
+- **Como trocar depois:** se a janela passar a listar só os quase cheios, o filtro volta para `listByCity`, não para um chip separado.
+
 ## Sair da conta
 
 - **Data:** 2026-10-29
@@ -55,7 +79,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Data:** 2026-10-27
 - **Decisão:** “Quase cheios” significa que ainda dá para entrar e faltam 1 ou 2 vagas. O 2 não fica espalhado pelo código: é a constante `GroupRules.almostFullMaxOpenSeats`.
 - **Motivo:** o filtro é para quem quer um grupo que está perto de fechar, não para listar todo mundo. O dono pediu 1 ou 2, com a porta aberta para mudar o número sem reescrever a regra.
-- **Onde está no código:** `lib/features/groups/domain/group_rules.dart`. O texto do filtro na lista lê essa constante.
+- **Onde está no código:** `lib/features/groups/domain/group_rules.dart`. O selo “Quase cheio” do cartão usa essa constante. O chip da Home saiu em 2026-10-30.
 - **Como trocar depois:** alterar `almostFullMaxOpenSeats`. Os testes que fixam o valor 2 vão falhar de propósito, para a mudança ser vista. O texto “1 ou N” acompanha a constante. Um limite diferente de 2 pode pedir uma frase melhor (por exemplo “até N vagas”).
 
 ## Um grupo por sala e horário

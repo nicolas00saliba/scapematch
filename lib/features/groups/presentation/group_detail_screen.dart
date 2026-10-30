@@ -101,6 +101,8 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
 
   Widget _content(Group group, DateTime now, String userId) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final status = ScapeStatusColors.of(context);
     final progress = group.totalSpots == 0
         ? 0.0
         : (group.filledSpots / group.totalSpots).clamp(0, 1).toDouble();
@@ -117,23 +119,24 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         OutlinedButton.icon(
           key: AppKeys.inviteGroup,
           onPressed: () => showInviteSheet(context, group),
+          style: OutlinedButton.styleFrom(foregroundColor: scheme.secondary),
           icon: const Icon(Icons.ios_share),
           label: const Text('Convidar'),
         ),
         if (group.isCancelled) ...[
           const SizedBox(height: 12),
           _Banner(
-            color: AppColors.copperSoft,
-            foreground: AppColors.copperInk,
+            color: status.alertContainer,
+            foreground: status.onAlertContainer,
             icon: Icons.event_busy,
             text: GroupMessages.cancelledBanner,
           ),
         ],
         if (me != null && me.occupiesSeat && !group.isCancelled) ...[
           const SizedBox(height: 12),
-          const _Banner(
-            color: AppColors.tealSoft,
-            foreground: AppColors.teal,
+          _Banner(
+            color: status.successContainer,
+            foreground: status.onSuccessContainer,
             icon: Icons.check_circle,
             text: GroupMessages.joinedBanner,
           ),
@@ -141,8 +144,8 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         if (_leaveMismatch(me) case final mismatch?) ...[
           const SizedBox(height: 12),
           _Banner(
-            color: AppColors.copperSoft,
-            foreground: AppColors.copperInk,
+            color: status.alertContainer,
+            foreground: status.onAlertContainer,
             icon: Icons.update,
             text: mismatch,
           ),
@@ -158,11 +161,15 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         const SizedBox(height: 4),
         Text(
           '${group.houseName} · ${group.neighborhood}',
-          style: theme.textTheme.titleMedium?.copyWith(color: AppColors.muted),
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
         ),
         Text(
           group.cityName,
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 16),
         _InfoPanel(
@@ -180,7 +187,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           ),
           key: AppKeys.countdown,
           style: theme.textTheme.titleMedium?.copyWith(
-            color: AppColors.teal,
+            color: scheme.primary,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -209,7 +216,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ),
         Text(
           'Por pessoa · pagamento simulado. Nada é cobrado de verdade.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
         ),
         if (me != null) ...[
           const SizedBox(height: 8),
@@ -246,8 +255,8 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           child: LinearProgressIndicator(
             value: progress,
             minHeight: 8,
-            backgroundColor: AppColors.tealSoft,
-            color: group.isFull ? AppColors.muted : AppColors.teal,
+            backgroundColor: scheme.primaryContainer,
+            color: group.isFull ? scheme.onSurfaceVariant : scheme.primary,
           ),
         ),
         const SizedBox(height: 20),
@@ -262,8 +271,8 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: CircleAvatar(
-              backgroundColor: AppColors.tealSoft,
-              foregroundColor: AppColors.teal,
+              backgroundColor: scheme.primaryContainer,
+              foregroundColor: scheme.onPrimaryContainer,
               child: Text(_initial(person.displayName)),
             ),
             title: Text(person.displayName),
@@ -620,12 +629,12 @@ class _InfoPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.tealSoft,
+        color: Theme.of(context).colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.teal),
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

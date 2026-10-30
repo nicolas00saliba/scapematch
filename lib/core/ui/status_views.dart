@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 
 class LoadingView extends StatelessWidget {
@@ -39,7 +38,11 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 40, color: AppColors.copper),
+            Icon(
+              Icons.error_outline,
+              size: 40,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -95,7 +98,7 @@ class InlineNotice extends StatelessWidget {
             message,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.muted,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.35,
             ),
           ),
@@ -140,7 +143,7 @@ class EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 42, color: AppColors.teal),
+            Icon(icon, size: 42, color: theme.colorScheme.primary),
             const SizedBox(height: 12),
             Text(
               title,
@@ -154,7 +157,7 @@ class EmptyView extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.muted,
+                color: theme.colorScheme.onSurfaceVariant,
                 height: 1.4,
               ),
             ),

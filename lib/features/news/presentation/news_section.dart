@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/relative_time.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
@@ -95,18 +94,20 @@ TextStyle _titleStyle(ThemeData theme) {
 
 TextStyle _summaryStyle(ThemeData theme) {
   return theme.textTheme.bodyMedium!.copyWith(
-    color: AppColors.muted,
+    color: theme.colorScheme.onSurfaceVariant,
     height: 1.35,
   );
 }
 
 TextStyle _whenStyle(ThemeData theme) {
-  return theme.textTheme.bodySmall!.copyWith(color: AppColors.muted);
+  return theme.textTheme.bodySmall!.copyWith(
+    color: theme.colorScheme.onSurfaceVariant,
+  );
 }
 
 TextStyle _chipStyle(ThemeData theme) {
   return theme.textTheme.labelMedium!.copyWith(
-    color: AppColors.teal,
+    color: theme.colorScheme.primary,
     fontWeight: FontWeight.w800,
   );
 }
@@ -236,7 +237,7 @@ class _NewsStripCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 semanticLabel: item.title,
                 errorBuilder: (context, error, stackTrace) =>
-                    ColoredBox(color: AppColors.tealSoft),
+                    ColoredBox(color: theme.colorScheme.primaryContainer),
               ),
             ),
             Padding(
@@ -250,7 +251,7 @@ class _NewsStripCard extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.tealSoft,
+                      color: theme.colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(genre, style: _chipStyle(theme)),

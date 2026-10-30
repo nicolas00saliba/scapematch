@@ -5,21 +5,6 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
-/// Whether the list is limited to groups that are almost full.
-class AlmostFullFilterController extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  void setEnabled(bool value) {
-    state = value;
-  }
-}
-
-final almostFullOnlyProvider =
-    NotifierProvider<AlmostFullFilterController, bool>(
-      AlmostFullFilterController.new,
-    );
-
 /// Texto da busca compacta da Home. Não dispara outra ida ao repositório.
 ///
 /// AutoDispose: a busca zera quando a Home sai da árvore. Trocar para a aba
@@ -42,7 +27,7 @@ final groupSearchQueryProvider =
       GroupSearchController.new,
     );
 
-/// Lista da cidade, com o filtro de quase cheios.
+/// Lista da cidade.
 ///
 /// A busca por texto fica em [filteredGroupsProvider], para cada letra não
 /// esperar de novo o repositório.
@@ -50,10 +35,7 @@ class FindGroupsViewModel extends AsyncNotifier<List<Group>> {
   @override
   Future<List<Group>> build() {
     final cityId = ref.watch(selectedCityIdProvider);
-    final almostFullOnly = ref.watch(almostFullOnlyProvider);
-    return ref
-        .watch(groupRepositoryProvider)
-        .listByCity(cityId, almostFullOnly: almostFullOnly);
+    return ref.watch(groupRepositoryProvider).listByCity(cityId);
   }
 }
 
