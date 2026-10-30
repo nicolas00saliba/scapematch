@@ -12,7 +12,7 @@ import 'package:scapematch/features/onboarding/presentation/onboarding_screen.da
 import 'support/pump_app.dart';
 
 void main() {
-  test('Noite de Mistério text pairs meet WCAG AA', () {
+  test('Cofre de Cobre text pairs meet WCAG AA', () {
     for (final brightness in Brightness.values) {
       final theme = buildAppTheme(brightness);
       final scheme = theme.colorScheme;

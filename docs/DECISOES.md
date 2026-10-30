@@ -2,11 +2,11 @@
 
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
-## Paleta Noite de Mistério
+## Paleta Cofre de Cobre
 
 - **Data:** 2026-10-30
-- **Decisão:** o app usa a paleta Noite de Mistério nos tokens do `ColorScheme` do Material 3, com tema claro e tema escuro. O escuro segue o modo do sistema. O roxo é a cor principal. O vinho (`secondary`) colore ações secundárias, como Convidar. O dourado (`tertiary`) é destaque de preenchimento, como o selo “Quase cheio” e o marcador de Promoções, com o texto escuro `onTertiary` por cima. O dourado não é cor de texto em fundo claro: esse par não chega no contraste AA. Sucesso e alerta ficam em `ScapeStatusColors`. O fundo da página é o `scaffoldBackgroundColor`; o cartão é `surface`. Não há cor de marca solta fora desses tokens.
-- **Motivo:** o dono escolheu essa paleta para o app inteiro, e a próxima troca deve acontecer num lugar só.
+- **Decisão:** o app volta ao verde-petróleo e ao cobre, na paleta Cofre de Cobre, nos tokens do `ColorScheme` do Material 3, com tema claro e tema escuro. O escuro segue o modo do sistema. O verde `#0F4C4A` é a cor principal. O cobre é `#9A4F24`, não o antigo `#B8612E`: branco em cima do cobre antigo não passava no contraste AA. O cobre colore ações secundárias, como Convidar e o botão tonal Criar grupo. O dourado `#E3A83F` (`tertiary`) é destaque de preenchimento, como o selo “Quase cheio” e o marcador de Promoções, com o texto escuro `onTertiary` por cima. Esse dourado não é cor de texto em fundo claro. Sucesso e alerta ficam em `ScapeStatusColors`. O fundo da página é o `scaffoldBackgroundColor` (`#F5F1EA` no claro); o cartão é `surface`. A Home fica com a cara de antes, sem o chip Quase cheios. Não há cor de marca solta fora desses tokens.
+- **Motivo:** o dono desistiu da Noite de Mistério e pediu o desenho anterior, com um cobre que aguenta texto branco.
 - **Onde está no código:** `buildAppTheme` em `lib/app/theme.dart`. `ScapeMatchApp` liga `theme`, `darkTheme` e `ThemeMode.system`.
 - **Como trocar depois:** editar os dois `ColorScheme` e o `ScapeStatusColors`. As telas leem o tema, então não precisam de outro hex.
 
