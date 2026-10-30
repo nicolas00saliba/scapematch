@@ -6,15 +6,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
-import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 /// Busca de grupo comprimida, no topo da Home.
 class FindGroupsSection extends ConsumerStatefulWidget {
@@ -225,13 +227,21 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         onAction: () => ref.invalidate(findGroupsViewModelProvider),
       ),
       data: (items) {
-        if (items.isEmpty) {
+        final viewer = ref.watch(authSessionProvider);
+        ref.watch(communityTickProvider);
+        final board = ref.watch(communityBoardProvider);
+        final visible = [
+          for (final group in items)
+            if (viewer == null || !board.hiddenFromHome(viewer.id, group))
+              group,
+        ];
+        if (visible.isEmpty) {
           return InlineNotice(
             message: _emptyMessage(cityName, query, gameTypeId),
           );
         }
         return _GroupWindow(
-          groups: items,
+          groups: visible,
           now: ref.watch(clockProvider).now(),
           maxHeight: items.length <= 1 ? double.infinity : groupWindowMaxHeight,
           onOpen: (group) => context.push('/groups/${group.id}'),

@@ -31,6 +31,12 @@ abstract class GroupRepository {
     required String displayName,
   });
 
+  /// Recusa a oferta e passa a vaga para a próxima pessoa.
+  Future<void> declineWaitlist({
+    required String groupId,
+    required String userId,
+  });
+
   Future<JoinResult> join(
     String groupId, {
     required String participantUserId,

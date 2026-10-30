@@ -23,6 +23,7 @@ class GroupCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final spots = '${group.filledSpots} de ${group.totalSpots} vagas';
+    final started = !now.isBefore(group.startsAt);
 
     return Semantics(
       button: true,
@@ -82,6 +83,7 @@ class GroupCard extends StatelessWidget {
                   GroupMessages.phaseLabel(
                     group.phaseAt(now),
                     missing: group.spotsUntilClose,
+                    started: started,
                   ),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: scheme.secondary,

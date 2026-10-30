@@ -1,13 +1,13 @@
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/time/clock.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
-import 'package:scapematch/features/groups/domain/group_rules.dart';
-import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/domain/group_phase.dart';
+import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
 /// Sample implementation of [GroupRepository].
@@ -96,7 +96,11 @@ class FakeGroupRepository implements GroupRepository {
     final now = clock.now();
     final entry = board.entryFor(groupId, userId);
     if (entry == null || !board.offerStillOpen(entry, now)) {
-      return const JoinFailure(JoinFailureReason.full);
+      final group = _find(groupId);
+      if (group != null) {
+        _syncWaitlist(group, now);
+      }
+      return const JoinFailure(JoinFailureReason.offerExpired);
     }
     final result = await join(
       groupId,
@@ -107,6 +111,19 @@ class FakeGroupRepository implements GroupRepository {
       board.removeWaitlist(groupId, userId);
     }
     return result;
+  }
+
+  @override
+  Future<void> declineWaitlist({
+    required String groupId,
+    required String userId,
+  }) async {
+    final now = clock.now();
+    board.removeWaitlist(groupId, userId);
+    final group = _find(groupId);
+    if (group != null) {
+      _syncWaitlist(group, now);
+    }
   }
 
   @override
@@ -126,10 +143,11 @@ class FakeGroupRepository implements GroupRepository {
     }
     final current = _database.groups[index];
     for (final person in current.participants) {
-      if (!person.isCreator || person.userId == null) {
+      final memberId = person.userId;
+      if (!person.occupiesSeat || memberId == null || memberId.isEmpty) {
         continue;
       }
-      if (board.isBlocked(person.userId!, participantUserId)) {
+      if (board.isBlocked(memberId, participantUserId)) {
         return const JoinFailure(JoinFailureReason.blocked);
       }
     }
@@ -164,6 +182,14 @@ class FakeGroupRepository implements GroupRepository {
     )) {
       return const JoinFailure(JoinFailureReason.full);
     }
+    final held = board.openOfferCount(
+      current.id,
+      now,
+      exceptUserId: participantUserId,
+    );
+    if (current.openSeats <= held) {
+      return const JoinFailure(JoinFailureReason.seatReserved);
+    }
     final updated = current.copyWith(
       filledSpots: current.filledSpots + 1,
       participants: [
@@ -178,6 +204,7 @@ class FakeGroupRepository implements GroupRepository {
       ],
     );
     _database.groups[index] = updated;
+    board.removeWaitlist(groupId, participantUserId);
     return JoinSuccess(updated);
   }
 
@@ -203,10 +230,15 @@ class FakeGroupRepository implements GroupRepository {
     final validation = GroupRules.validateGroupSize(
       extraSpots: request.extraSpots,
       roomCapacity: room.capacity,
+      minimumPlayers: room.minimumPlayers,
     );
     switch (validation) {
       case GroupSizeValidation.belowMinimum:
         return const CreateGroupFailure(CreateGroupFailureReason.belowMinimum);
+      case GroupSizeValidation.belowRoomMinimum:
+        return const CreateGroupFailure(
+          CreateGroupFailureReason.belowRoomMinimum,
+        );
       case GroupSizeValidation.exceedsRoomCapacity:
         return const CreateGroupFailure(
           CreateGroupFailureReason.exceedsRoomCapacity,
@@ -267,7 +299,7 @@ class FakeGroupRepository implements GroupRepository {
       minimumSpots: room.minimumPlayers,
       cancelWindow: room.cancelWindow,
       streetAddress: house.streetAddress,
-      closesAt: _closesAt(slot.startsAt, now),
+      closesAt: GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
       participants: [
         Participant(
           id: _database.nextParticipantId(),
@@ -341,7 +373,7 @@ class FakeGroupRepository implements GroupRepository {
           filledSpots: _occupied(updatedPeople),
         );
         _database.groups[index] = updated;
-        board.offerNext(groupId: groupId, now: clock.now());
+        _syncWaitlist(updated, clock.now());
         return LeaveGroupSuccess(updated);
     }
   }
@@ -459,6 +491,7 @@ class FakeGroupRepository implements GroupRepository {
       filledSpots: _occupied(updatedPeople),
     );
     _database.groups[index] = updated;
+    _syncWaitlist(updated, now);
     return RemoveMemberSuccess(updated);
   }
 
@@ -493,10 +526,13 @@ class FakeGroupRepository implements GroupRepository {
       totalSpots: totalSpots,
       occupiedSpots: occupied,
       roomCapacity: current.roomCapacity,
+      minimumPlayers: current.minimumSpots,
     );
     switch (validation) {
       case TotalSpotsValidation.belowMinimum:
         return const EditGroupFailure(EditGroupFailureReason.belowMinimum);
+      case TotalSpotsValidation.belowRoomMinimum:
+        return const EditGroupFailure(EditGroupFailureReason.belowRoomMinimum);
       case TotalSpotsValidation.belowOccupancy:
         return const EditGroupFailure(EditGroupFailureReason.belowOccupancy);
       case TotalSpotsValidation.exceedsRoomCapacity:
@@ -514,21 +550,24 @@ class FakeGroupRepository implements GroupRepository {
     return EditGroupSuccess(updated);
   }
 
-  DateTime _closesAt(DateTime startsAt, DateTime now) {
-    final dayBefore = startsAt.subtract(const Duration(hours: 24));
-    if (!dayBefore.isAfter(now)) {
-      return startsAt;
+  void _syncWaitlist(Group group, DateTime now) {
+    board.clearExpiredOffers(group.id, now);
+    var slack = group.openSeats - board.openOfferCount(group.id, now);
+    while (slack > 0) {
+      final offered = board.offerNext(groupId: group.id, now: now);
+      if (!offered) {
+        return;
+      }
+      slack -= 1;
     }
-    return dayBefore;
   }
 
   void _sweep(DateTime now) {
     for (var index = 0; index < _database.groups.length; index++) {
       final group = _database.groups[index];
-      _recordNoShows(group, now);
       final portal =
           group.phaseOverride != null && isPortalPhase(group.phaseOverride!);
-      if (!GroupRules.missedMinimum(
+      if (GroupRules.missedMinimum(
         alreadyCancelled: group.isCancelled,
         portalOwned: portal,
         filledSpots: group.filledSpots,
@@ -537,41 +576,31 @@ class FakeGroupRepository implements GroupRepository {
         startsAt: group.startsAt,
         now: now,
       )) {
+        final outcome = GroupRules.refundForOrganizer(
+          RefundReason.groupDidNotClose,
+        );
+        final closed = group.copyWith(
+          cancelledAt: now,
+          filledSpots: 0,
+          participants: [
+            for (final person in group.participants)
+              if (person.occupiesSeat)
+                person.copyWith(
+                  attendance: AttendanceStatus.cancelled,
+                  refund: outcome.status,
+                  refundReason: outcome.reason,
+                )
+              else
+                person,
+          ],
+        );
+        _database.groups[index] = closed;
+        board.recordClosedGroup(group, now);
         continue;
       }
-      final outcome = GroupRules.refundForOrganizer(
-        RefundReason.groupDidNotClose,
-      );
-      final closed = group.copyWith(
-        cancelledAt: now,
-        filledSpots: 0,
-        participants: [
-          for (final person in group.participants)
-            if (person.occupiesSeat)
-              person.copyWith(
-                attendance: AttendanceStatus.cancelled,
-                refund: outcome.status,
-                refundReason: outcome.reason,
-              )
-            else
-              person,
-        ],
-      );
-      _database.groups[index] = closed;
-      board.recordClosedGroup(group, now);
-    }
-  }
-
-  void _recordNoShows(Group group, DateTime now) {
-    if (!GroupRules.hasEnded(endsAt: group.endsAt, now: now)) {
-      return;
-    }
-    for (final person in group.participants) {
-      final userId = person.userId;
-      if (userId == null || !person.occupiesSeat || person.isConfirmed) {
-        continue;
+      if (!group.isCancelled) {
+        _syncWaitlist(group, now);
       }
-      board.markNoShow(userId: userId, groupId: group.id, at: group.endsAt);
     }
   }
 

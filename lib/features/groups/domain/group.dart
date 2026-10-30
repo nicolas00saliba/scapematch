@@ -78,7 +78,7 @@ class Group {
   /// Pessoas para o grupo ficar pronto para reservar. Vem da sala.
   final int minimumSpots;
 
-  /// Prazo para atingir [minimumSpots]. Sem data, o prazo é o início.
+  /// Prazo para atingir [minimumSpots]. Sem data, vale 1 h antes do início.
   final DateTime? closesAt;
 
   /// Janela de cancelamento com reembolso, copiada da casa.
@@ -101,7 +101,14 @@ class Group {
 
   bool get isCancelled => cancelledAt != null;
 
-  DateTime get closesAtResolved => closesAt ?? startsAt;
+  /// Prazo gravado, ou 1 h antes do início quando o grupo não tem data.
+  DateTime get closesAtResolved =>
+      closesAt ?? startsAt.subtract(GroupRules.shortCloseLead);
+
+  /// "Faltam X" e o prazo só enquanto o grupo ainda está se formando.
+  bool showCloseDeadline(DateTime now) {
+    return phaseAt(now) == GroupPhase.forming && now.isBefore(startsAt);
+  }
 
   GroupPhase phaseAt(DateTime now) {
     final override = phaseOverride;
@@ -177,9 +184,9 @@ class Group {
     DateTime? cancelledAt,
     String? gameType,
     int? minimumSpots,
-    DateTime? closesAt,
+    Object? closesAt = _absent,
     Duration? cancelWindow,
-    GroupPhase? phaseOverride,
+    Object? phaseOverride = _absent,
     String? streetAddress,
   }) {
     return Group(
@@ -205,10 +212,17 @@ class Group {
       note: note ?? this.note,
       cancelledAt: cancelledAt ?? this.cancelledAt,
       minimumSpots: minimumSpots ?? this.minimumSpots,
-      closesAt: closesAt ?? this.closesAt,
+      closesAt: identical(closesAt, _absent)
+          ? this.closesAt
+          : closesAt as DateTime?,
       cancelWindow: cancelWindow ?? this.cancelWindow,
-      phaseOverride: phaseOverride ?? this.phaseOverride,
+      phaseOverride: identical(phaseOverride, _absent)
+          ? this.phaseOverride
+          : phaseOverride as GroupPhase?,
       streetAddress: streetAddress ?? this.streetAddress,
     );
   }
 }
+
+/// Distinguishes "não passou o campo" de "passou nulo" no [Group.copyWith].
+const _absent = Object();

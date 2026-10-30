@@ -5,8 +5,10 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -35,6 +37,14 @@ class RoomGroupsScreen extends ConsumerWidget {
         ),
         data: (items) {
           final room = listing.asData?.value;
+          final viewer = ref.watch(authSessionProvider);
+          ref.watch(communityTickProvider);
+          final board = ref.watch(communityBoardProvider);
+          final visible = [
+            for (final group in items)
+              if (viewer == null || !board.hiddenFromHome(viewer.id, group))
+                group,
+          ];
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
@@ -48,19 +58,19 @@ class RoomGroupsScreen extends ConsumerWidget {
                   ),
                 ),
               const SizedBox(height: 12),
-              if (items.isEmpty)
+              if (visible.isEmpty)
                 InlineNotice(
                   message: room == null
                       ? 'Essa sala não está no catálogo de exemplo.'
                       : 'Ainda não há grupo nesta sala. Crie um.',
                 )
               else
-                for (var index = 0; index < items.length; index++) ...[
+                for (var index = 0; index < visible.length; index++) ...[
                   if (index > 0) const SizedBox(height: 10),
                   GroupCard(
-                    group: items[index],
+                    group: visible[index],
                     now: ref.watch(clockProvider).now(),
-                    onTap: () => context.push('/groups/${items[index].id}'),
+                    onTap: () => context.push('/groups/${visible[index].id}'),
                   ),
                 ],
               const SizedBox(height: 16),

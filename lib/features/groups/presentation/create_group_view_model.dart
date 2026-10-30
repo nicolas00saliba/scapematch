@@ -51,13 +51,14 @@ class CreateGroupState {
   TimeSlot? get slot => _byId(slots, slotId, (slot) => slot.id);
 
   GroupSizeValidation get sizeValidation {
-    final capacity = room?.capacity;
-    if (capacity == null) {
+    final selected = room;
+    if (selected == null) {
       return GroupSizeValidation.valid;
     }
     return GroupRules.validateGroupSize(
       extraSpots: extraSpots,
-      roomCapacity: capacity,
+      roomCapacity: selected.capacity,
+      minimumPlayers: selected.minimumPlayers,
     );
   }
 
@@ -84,7 +85,11 @@ class CreateGroupState {
     return GroupRules.hasStarted(startsAt: selected.startsAt, now: now);
   }
 
-  bool get canDecrementExtraSpots => extraSpots > GroupRules.minExtraSpots;
+  bool get canDecrementExtraSpots =>
+      extraSpots >
+      GroupRules.minimumExtraSpots(
+        minimumPlayers: room?.minimumPlayers ?? GroupRules.minGroupSize,
+      );
 
   /// No fixed ceiling. The room capacity, via [GroupRules], is the limit
   /// once a room is selected. Before that, the stepper stays open.
@@ -244,7 +249,16 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     if (!ref.mounted || generation != _generation) {
       return;
     }
-    state = state.copyWith(slots: slots, loadingOptions: false);
+    final selected = state.room;
+    final floor = GroupRules.minimumExtraSpots(
+      minimumPlayers: selected?.minimumPlayers ?? GroupRules.minGroupSize,
+    );
+    final spots = state.extraSpots < floor ? floor : state.extraSpots;
+    state = state.copyWith(
+      slots: slots,
+      extraSpots: spots,
+      loadingOptions: false,
+    );
   }
 
   void selectSlot(String slotId) {
@@ -255,6 +269,7 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     final spots = GroupRules.clampExtraSpots(
       value,
       roomCapacity: state.room?.capacity,
+      minimumPlayers: state.room?.minimumPlayers ?? GroupRules.minGroupSize,
     );
     state = state.copyWith(extraSpots: spots, clearFailure: true);
   }

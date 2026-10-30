@@ -9,6 +9,7 @@ import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
 /// Fictional catalog used until real venue data exists.
@@ -545,6 +546,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   // the home window can scroll. They use their own start times.
   final groups = [
     _group(
+      now: now,
       id: 'grp-cwb-cofre-almost',
       city: curitiba,
       house: ruaXv,
@@ -554,6 +556,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Marina', 'Caio', 'Helena', 'Davi', 'Léo'],
     ),
     _group(
+      now: now,
       id: 'grp-cwb-opera-open',
       city: curitiba,
       house: batel,
@@ -564,6 +567,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       note: 'Chegar 15 minutos antes.',
     ),
     _group(
+      now: now,
       id: 'grp-cwb-lab-quase',
       city: curitiba,
       house: ruaXv,
@@ -573,6 +577,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Ana', 'Bia', 'Caio', 'Duda'],
     ),
     _group(
+      now: now,
       id: 'grp-cwb-sotao-quase',
       city: curitiba,
       house: ruaXv,
@@ -582,6 +587,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Eva', 'Fábio', 'Gabi'],
     ),
     _group(
+      now: now,
       id: 'grp-cwb-nave-quase',
       city: curitiba,
       house: ruaXv,
@@ -591,6 +597,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Hugo', 'Iara', 'Júlio', 'Kai', 'Lara'],
     ),
     _group(
+      now: now,
       id: 'grp-cwb-engrenagem-quase',
       city: curitiba,
       house: batel,
@@ -600,6 +607,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Milo', 'Nina', 'Otto', 'Pietra'],
     ),
     _group(
+      now: now,
       id: 'grp-cwb-tumba-imersivo',
       city: curitiba,
       house: batel,
@@ -611,6 +619,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       roomName: 'Ritual imersivo da tumba',
     ),
     _group(
+      now: now,
       id: 'grp-cwb-trilha-laser',
       city: curitiba,
       house: batel,
@@ -622,6 +631,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       roomName: 'Arena laser da trilha',
     ),
     _group(
+      now: now,
       id: 'grp-cwb-porao-rpg',
       city: curitiba,
       house: ruaXv,
@@ -633,6 +643,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       roomName: 'Mesa de RPG no porão',
     ),
     _group(
+      now: now,
       id: 'grp-cwb-satelite-tabuleiro',
       city: curitiba,
       house: batel,
@@ -644,6 +655,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       roomName: 'Noite de tabuleiro no Batel',
     ),
     _group(
+      now: now,
       id: SampleIds.groupSpMetroAlmost,
       city: saoPaulo,
       house: augusta,
@@ -653,6 +665,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Lia', 'Miguel', 'Tainá', 'Rafa', 'João'],
     ),
     _group(
+      now: now,
       id: SampleIds.groupSpCoberturaOpen,
       city: saoPaulo,
       house: augusta,
@@ -662,6 +675,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Paula'],
     ),
     _group(
+      now: now,
       id: 'grp-rj-apto-almost',
       city: rio,
       house: copacabana,
@@ -671,6 +685,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Íris', 'Tomás', 'Luna', 'Breno'],
     ),
     _group(
+      now: now,
       id: 'grp-rj-bond-open',
       city: rio,
       house: santaTeresa,
@@ -680,6 +695,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Duda', 'Enzo'],
     ),
     _group(
+      now: now,
       id: 'grp-bh-bar-almost',
       city: beloHorizonte,
       house: savassi,
@@ -689,6 +705,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Cecília', 'Hugo', 'Nanda', 'Pablo'],
     ),
     _group(
+      now: now,
       id: 'grp-bh-elevador-open',
       city: beloHorizonte,
       house: mina,
@@ -698,6 +715,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Olívia', 'Ravi', 'Sol'],
     ),
     _group(
+      now: now,
       id: 'grp-poa-estufa-almost',
       city: portoAlegre,
       house: redencao,
@@ -707,6 +725,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Téo', 'Valentina', 'Will'],
     ),
     _group(
+      now: now,
       id: 'grp-poa-porao-open',
       city: portoAlegre,
       house: cais,
@@ -716,6 +735,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Rosa', 'Saulo'],
     ),
     _group(
+      now: now,
       id: 'grp-cwb-cofre-missed',
       city: curitiba,
       house: ruaXv,
@@ -982,6 +1002,7 @@ Group _group({
   String? roomName,
   int? minimumSpots,
   DateTime? closesAt,
+  required DateTime now,
 }) {
   assert(house.cityId == city.id, id);
   assert(room.houseId == house.id, id);
@@ -1010,7 +1031,8 @@ Group _group({
     gameType: gameType,
     note: note,
     minimumSpots: minimumSpots ?? room.minimumPlayers,
-    closesAt: closesAt,
+    closesAt:
+        closesAt ?? GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
     cancelWindow: room.cancelWindow,
     streetAddress: house.streetAddress,
     participants: [

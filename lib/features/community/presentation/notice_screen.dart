@@ -4,8 +4,6 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
-import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
-import 'package:scapematch/providers/repositories.dart';
 
 class NoticeScreen extends ConsumerWidget {
   const NoticeScreen({super.key});
@@ -15,11 +13,6 @@ class NoticeScreen extends ConsumerWidget {
     final user = ref.watch(authSessionProvider);
     ref.watch(communityTickProvider);
     final board = ref.watch(communityBoardProvider);
-    final now = ref.watch(clockProvider).now();
-    final groups = ref.watch(myGroupsViewModelProvider).value ?? const [];
-    if (user != null) {
-      board.syncReminders(groups: groups, userId: user.id, now: now);
-    }
     final notices = user == null
         ? const <AppNotice>[]
         : board.visibleFor(user.id);
@@ -41,11 +34,13 @@ class NoticeScreen extends ConsumerWidget {
               key: AppKeys.noticePref(kind.name),
               contentPadding: EdgeInsets.zero,
               title: Text(_prefTitle(kind)),
-              value: board.prefOn(kind),
-              onChanged: (value) {
-                board.setPref(kind, value);
-                ref.read(communityTickProvider.notifier).bump();
-              },
+              value: user == null || board.prefOn(user.id, kind),
+              onChanged: user == null
+                  ? null
+                  : (value) {
+                      board.setPref(user.id, kind, value);
+                      ref.read(communityTickProvider.notifier).bump();
+                    },
             ),
           ],
           const SizedBox(height: 12),

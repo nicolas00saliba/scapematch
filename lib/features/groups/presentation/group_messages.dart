@@ -68,9 +68,10 @@ abstract final class GroupMessages {
         'Você já saiu deste grupo e não pode entrar de novo.',
       JoinFailureReason.groupCancelled => 'Este grupo foi cancelado.',
       JoinFailureReason.sessionEnded => 'Esta sessão já terminou.',
-      JoinFailureReason.blocked =>
-        'Quem criou este grupo bloqueou a sua conta.',
+      JoinFailureReason.blocked => 'Alguém deste grupo bloqueou a sua conta.',
       JoinFailureReason.restricted => 'A conta está em pausa por faltas sem aviso. Tente de novo quando a pausa acabar.',
+      JoinFailureReason.seatReserved => seatReserved,
+      JoinFailureReason.offerExpired => offerExpired,
     };
   }
 
@@ -80,6 +81,8 @@ abstract final class GroupMessages {
         'O grupo ficou maior do que a sala permite.',
       CreateGroupFailureReason.belowMinimum =>
         'O grupo precisa de mais gente além de você.',
+      CreateGroupFailureReason.belowRoomMinimum =>
+        'O total de vagas ficou abaixo do mínimo da sala.',
       CreateGroupFailureReason.unknownSelection =>
         'Confira cidade, casa, sala e horário.',
       CreateGroupFailureReason.duplicateSession =>
@@ -102,6 +105,8 @@ abstract final class GroupMessages {
         'Não dá para ficar com menos vagas do que as pessoas que já entraram.',
       EditGroupFailureReason.belowMinimum =>
         'O grupo precisa de pelo menos 2 pessoas.',
+      EditGroupFailureReason.belowRoomMinimum =>
+        'O total de vagas ficou abaixo do mínimo da sala.',
       EditGroupFailureReason.exceedsRoomCapacity =>
         'O grupo não pode passar da capacidade da sala.',
       EditGroupFailureReason.noteTooLong =>
@@ -208,13 +213,21 @@ abstract final class GroupMessages {
       'O grupo não atingiu o mínimo até o prazo e foi cancelado. O reembolso simulado é integral.';
   static const waitlistJoin = 'Entrar na lista de espera';
   static const waitlistAccept = 'Aceitar a vaga';
+  static const waitlistDecline = 'Recusar a vaga';
   static const waitlistJoined = 'Você entrou na lista de espera.';
+  static const waitlistDeclined =
+      'Você recusou a vaga. Ela segue para a próxima pessoa.';
+  static const seatReserved =
+      'Essa vaga está reservada para quem recebeu a oferta.';
+  static const offerExpired = 'O prazo para aceitar a vaga acabou.';
+  static const attendanceOptional =
+      'Confirmar presença é opcional. Não tocar nesse botão não conta como falta. A falta sem aviso só entra quando a casa marcar, e isso ainda não acontece nesta versão.';
   static const openMaps = 'Abrir no Google Maps';
   static const openWaze = 'Abrir no Waze';
   static const report = 'Denunciar';
   static const block = 'Bloquear';
   static const blockedSnack =
-      'Pessoa bloqueada. Ela sai dos seus grupos nesta tela.';
+      'Pessoa bloqueada. Ela some dos seus grupos e dos cartões da Home, e não entra em grupo em que você esteja.';
   static const reportedSnack =
       'Denúncia registrada neste exemplo. Ninguém é punido de verdade.';
 
@@ -225,7 +238,14 @@ abstract final class GroupMessages {
     return 'Faltam $missing para fechar';
   }
 
-  static String phaseLabel(GroupPhase phase, {required int missing}) {
+  static String phaseLabel(
+    GroupPhase phase, {
+    required int missing,
+    bool started = false,
+  }) {
+    if (phase == GroupPhase.forming && started) {
+      return 'Sessão já começou';
+    }
     return switch (phase) {
       GroupPhase.forming => spotsUntilClose(missing),
       GroupPhase.readyToReserve => readyToReserve,

@@ -219,6 +219,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       GroupSizeValidation.valid => null,
       GroupSizeValidation.belowMinimum =>
         'Informe pelo menos 1 vaga além de você.',
+      GroupSizeValidation.belowRoomMinimum =>
+        'Esta sala pede pelo menos ${state.room!.minimumPlayers} pessoas no grupo.',
       GroupSizeValidation.exceedsRoomCapacity =>
         'Você + ${state.extraSpots} vagas ultrapassa a capacidade da sala (${state.room!.capacity}).',
     };

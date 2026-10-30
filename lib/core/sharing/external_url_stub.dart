@@ -1,21 +1,7 @@
-import 'package:url_launcher/url_launcher.dart';
+import 'package:scapematch/core/sharing/external_url_launch.dart';
 
-/// Abre o link fora da tela atual.
-///
-/// Na web, [webOnlyWindowName] `_blank` abre outra aba. No celular,
-/// [LaunchMode.externalApplication] abre o app correspondente.
-/// No teste não há plugin, então devolve falso.
-Future<bool> openExternalUrl(Uri uri) async {
-  try {
-    return await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-      webOnlyWindowName: '_blank',
-    );
-  } catch (_) {
-    return false;
-  }
-}
+/// Abre o link fora da tela atual. A implementação é a mesma da web.
+Future<bool> openExternalUrl(Uri uri) => launchExternalUrl(uri);
 
 /// Folha de compartilhar do sistema. No teste não existe.
 Future<bool> sharePlainText(String text) async => false;

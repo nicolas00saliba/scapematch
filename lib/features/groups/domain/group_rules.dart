@@ -63,10 +63,15 @@ class GroupRules {
   ///
   /// The floor is [minExtraSpots]. The ceiling is [maxExtraSpots] when a
   /// room is known. Without a room, only the floor applies.
-  static int clampExtraSpots(int value, {int? roomCapacity}) {
-    var spots = value < minExtraSpots ? minExtraSpots : value;
+  static int clampExtraSpots(
+    int value, {
+    int? roomCapacity,
+    int minimumPlayers = minGroupSize,
+  }) {
+    final floor = minimumExtraSpots(minimumPlayers: minimumPlayers);
+    var spots = value < floor ? floor : value;
     final max = maxExtraSpots(roomCapacity: roomCapacity);
-    if (max != null && max >= minExtraSpots && spots > max) {
+    if (max != null && max >= floor && spots > max) {
       spots = max;
     }
     return spots;
@@ -75,12 +80,25 @@ class GroupRules {
   /// [extraSpots] is how many people the creator is still looking for.
   /// The creator already takes one seat, so creator + extraSpots must fit
   /// in the room.
+  /// Vagas além do criador para o grupo caber no mínimo da sala.
+  static int minimumExtraSpots({int minimumPlayers = minGroupSize}) {
+    final needed = minimumPlayers - 1;
+    if (needed < minExtraSpots) {
+      return minExtraSpots;
+    }
+    return needed;
+  }
+
   static GroupSizeValidation validateGroupSize({
     required int extraSpots,
     required int roomCapacity,
+    int minimumPlayers = minGroupSize,
   }) {
     if (extraSpots < minExtraSpots) {
       return GroupSizeValidation.belowMinimum;
+    }
+    if (1 + extraSpots < minimumPlayers) {
+      return GroupSizeValidation.belowRoomMinimum;
     }
     if (1 + extraSpots > roomCapacity) {
       return GroupSizeValidation.exceedsRoomCapacity;
@@ -151,16 +169,38 @@ class GroupRules {
     );
   }
 
-  /// Quantas pessoas ainda faltam para o mínimo da sala.
-  static int spotsUntilMinimum({
-    required int filledSpots,
-    required int minimumSpots,
+  /// 24 h antes do início, quando o grupo nasce com essa folga.
+  static const closeLead = Duration(hours: 24);
+
+  /// 1 h antes do início, quando falta menos de [closeLead] para a sessão.
+  static const shortCloseLead = Duration(hours: 1);
+
+  /// Lembrete "em até 24 h". O piso é [reminder2h], não a janela de reembolso.
+  static const reminder24h = Duration(hours: 24);
+
+  /// Lembrete "em até 2 h".
+  static const reminder2h = Duration(hours: 2);
+
+  /// Prazo para atingir o mínimo. Sempre antes do início.
+  ///
+  /// Com 24 h ou mais de antecedência, o prazo é 24 h antes. Com menos,
+  /// é 1 h antes: o mais cedo desses dois instantes que ainda está no
+  /// futuro na hora de criar o grupo.
+  static DateTime closeDeadline({
+    required DateTime startsAt,
+    required DateTime now,
   }) {
-    final missing = minimumSpots - filledSpots;
-    return missing < 0 ? 0 : missing;
+    final dayBefore = startsAt.subtract(closeLead);
+    if (dayBefore.isAfter(now)) {
+      return dayBefore;
+    }
+    return startsAt.subtract(shortCloseLead);
   }
 
   /// O prazo passou e o mínimo não foi atingido. O portal da casa não entra aqui.
+  ///
+  /// Depois do início a sessão não vira "não fechou": o prazo já ficou para
+  /// trás e quem abre o grupo vê que ele começou.
   static bool missedMinimum({
     required bool alreadyCancelled,
     required bool portalOwned,
@@ -247,6 +287,7 @@ class GroupRules {
     required int totalSpots,
     required int occupiedSpots,
     required int roomCapacity,
+    int minimumPlayers = minGroupSize,
   }) {
     if (totalSpots > roomCapacity) {
       return TotalSpotsValidation.exceedsRoomCapacity;
@@ -256,6 +297,9 @@ class GroupRules {
     }
     if (totalSpots < minGroupSize) {
       return TotalSpotsValidation.belowMinimum;
+    }
+    if (totalSpots < minimumPlayers) {
+      return TotalSpotsValidation.belowRoomMinimum;
     }
     return TotalSpotsValidation.valid;
   }
@@ -308,11 +352,17 @@ class GroupRules {
 
 enum GroupListBucket { upcoming, past, cancelled }
 
-enum GroupSizeValidation { valid, belowMinimum, exceedsRoomCapacity }
+enum GroupSizeValidation {
+  valid,
+  belowMinimum,
+  belowRoomMinimum,
+  exceedsRoomCapacity,
+}
 
 enum TotalSpotsValidation {
   valid,
   belowMinimum,
+  belowRoomMinimum,
   belowOccupancy,
   exceedsRoomCapacity,
 }

@@ -1,23 +1,13 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
-import 'package:url_launcher/url_launcher.dart';
+import 'package:scapematch/core/sharing/external_url_launch.dart';
 
 @JS('window')
 external JSObject get _window;
 
 /// Nova aba na web. O mesmo helper no celular abre o app do link.
-Future<bool> openExternalUrl(Uri uri) async {
-  try {
-    return await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-      webOnlyWindowName: '_blank',
-    );
-  } catch (_) {
-    return false;
-  }
-}
+Future<bool> openExternalUrl(Uri uri) => launchExternalUrl(uri);
 
 /// Web Share API. Se o navegador não tiver, devolve falso.
 Future<bool> sharePlainText(String text) async {

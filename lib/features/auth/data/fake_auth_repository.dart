@@ -58,6 +58,7 @@ class FakeAuthRepository implements AuthRepository {
     final user = CurrentUser(
       id: 'user-signup-$_nextId',
       displayName: name.trim(),
+      birthDate: birthDate,
     );
     _nextId += 1;
     _accounts[key] = (user: user, password: password);

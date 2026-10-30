@@ -190,7 +190,19 @@ class _AccountLinks extends StatelessWidget {
         OutlinedButton(
           key: AppKeys.accountLegal,
           onPressed: () => context.push('/legal/termos'),
-          child: const Text('Termos e políticas'),
+          child: const Text('Termos de uso'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          key: AppKeys.accountPrivacy,
+          onPressed: () => context.push('/legal/privacidade'),
+          child: const Text('Privacidade'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          key: AppKeys.accountRefund,
+          onPressed: () => context.push('/legal/reembolso'),
+          child: const Text('Reembolso'),
         ),
         if (signedIn) ...[
           const SizedBox(height: 8),

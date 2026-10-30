@@ -28,8 +28,10 @@ class AccountDataScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           Text('Id: ${user?.id ?? '—'}'),
           const SizedBox(height: 8),
+          Text('Nascimento: ${_birthLabel(user?.birthDate)}'),
+          const SizedBox(height: 8),
           const Text(
-            'E-mail e data de nascimento ficam na conta criada no cadastro. A senha não aparece aqui.',
+            'E-mail e data de nascimento ficam salvos na conta criada no cadastro. A senha não aparece aqui.',
           ),
         ],
       ),
@@ -43,6 +45,10 @@ class AccountDeletionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    ref.watch(communityTickProvider);
+    final user = ref.watch(authSessionProvider);
+    final board = ref.watch(communityBoardProvider);
+    final requested = user != null && board.deletionRequested(user.id);
     return AppScaffold(
       appBar: AppBar(title: const Text('Excluir conta')),
       body: ListView(
@@ -52,18 +58,28 @@ class AccountDeletionScreen extends ConsumerWidget {
             'O pedido fica registrado neste exemplo. A conta não é apagada de verdade e nada sai deste aparelho.',
             style: theme.textTheme.bodyLarge,
           ),
+          if (requested) ...[
+            const SizedBox(height: 12),
+            const Text('Pedido já registrado.'),
+          ],
           const SizedBox(height: 16),
           FilledButton(
-            key: AppKeys.accountDelete,
+            key: AppKeys.accountDeleteConfirm,
             onPressed: () {
-              final user = ref.read(authSessionProvider);
-              if (user != null) {
-                ref.read(communityBoardProvider).deletionRequests.add(user.id);
+              final session = ref.read(authSessionProvider);
+              final memory = ref.read(communityBoardProvider);
+              if (session != null && !memory.deletionRequested(session.id)) {
+                memory.deletionRequests.add(session.id);
               }
+              ref.read(communityTickProvider.notifier).bump();
+              final stored =
+                  session != null && memory.deletionRequested(session.id);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text(
-                    'Pedido de exclusão registrado. A conta de exemplo continua.',
+                    stored
+                        ? 'Pedido de exclusão registrado. A conta de exemplo continua.'
+                        : 'Entre na conta para pedir a exclusão.',
                   ),
                 ),
               );
@@ -74,4 +90,13 @@ class AccountDeletionScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _birthLabel(DateTime? date) {
+  if (date == null) {
+    return 'não informada neste exemplo';
+  }
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return '$day/$month/${date.year}';
 }

@@ -49,7 +49,10 @@ class WaitlistEntry {
   final DateTime joinedAt;
   DateTime? offerExpiresAt;
 
-  bool get hasOpenOffer => offerExpiresAt != null;
+  bool hasOpenOfferAt(DateTime now) {
+    final expires = offerExpiresAt;
+    return expires != null && now.isBefore(expires);
+  }
 }
 
 class UserReport {
@@ -87,15 +90,29 @@ class CommunityBoard {
   final noShows = <NoShowMark>[];
   final waitlist = <WaitlistEntry>[];
   final notices = <AppNotice>[];
-  final prefs = <NoticeKind, bool>{
-    for (final kind in NoticeKind.values) kind: true,
-  };
+  final _prefs = <String, Map<NoticeKind, bool>>{};
   final deletionRequests = <String>[];
 
-  bool prefOn(NoticeKind kind) => prefs[kind] ?? true;
+  bool deletionRequested(String userId) => deletionRequests.contains(userId);
 
-  void setPref(NoticeKind kind, bool enabled) {
-    prefs[kind] = enabled;
+  bool prefOn(String userId, NoticeKind kind) => _prefs[userId]?[kind] ?? true;
+
+  void setPref(String userId, NoticeKind kind, bool enabled) {
+    _prefs.putIfAbsent(userId, () => {})[kind] = enabled;
+  }
+
+  /// A pessoa bloqueada some do cartão da Home de quem bloqueou.
+  bool hiddenFromHome(String viewerId, Group group) {
+    for (final person in group.participants) {
+      if (!person.occupiesSeat) {
+        continue;
+      }
+      final key = personKey(userId: person.userId, seatId: person.id);
+      if (isBlocked(viewerId, key)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static String personKey({String? userId, required String seatId}) {
@@ -196,18 +213,53 @@ class CommunityBoard {
     return null;
   }
 
-  /// Oferece a vaga ao primeiro da fila que ainda não tem oferta.
-  void offerNext({required String groupId, required DateTime now}) {
+  /// Tira da fila quem deixou a oferta vencer.
+  int clearExpiredOffers(String groupId, DateTime now) {
+    final before = waitlist.length;
+    waitlist.removeWhere((entry) {
+      if (entry.groupId != groupId) {
+        return false;
+      }
+      final expires = entry.offerExpiresAt;
+      return expires != null && !now.isBefore(expires);
+    });
+    return before - waitlist.length;
+  }
+
+  int openOfferCount(String groupId, DateTime now, {String? exceptUserId}) {
+    var count = 0;
+    for (final entry in waitlist) {
+      if (entry.groupId != groupId) {
+        continue;
+      }
+      if (exceptUserId != null && entry.userId == exceptUserId) {
+        continue;
+      }
+      if (entry.hasOpenOfferAt(now)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  /// Oferece a vaga à próxima pessoa que ainda não tem oferta aberta.
+  ///
+  /// Quem já tem oferta aberta é pulado. Oferta vencida sai antes, em
+  /// [clearExpiredOffers], para não segurar a fila.
+  bool offerNext({required String groupId, required DateTime now}) {
     WaitlistEntry? next;
     for (final entry in waitlist) {
-      if (entry.groupId != groupId || entry.hasOpenOffer) {
+      if (entry.groupId != groupId || entry.hasOpenOfferAt(now)) {
+        continue;
+      }
+      if (entry.offerExpiresAt != null) {
         continue;
       }
       next = entry;
       break;
     }
     if (next == null) {
-      return;
+      return false;
     }
     next.offerExpiresAt = now.add(GroupRules.waitlistAcceptWindow);
     _putNotice(
@@ -219,6 +271,7 @@ class CommunityBoard {
       at: now,
       groupId: groupId,
     );
+    return true;
   }
 
   bool offerStillOpen(WaitlistEntry entry, DateTime now) {
@@ -260,8 +313,8 @@ class CommunityBoard {
         continue;
       }
       final untilStart = group.startsAt.difference(now);
-      if (untilStart > GroupRules.refundDeadline &&
-          untilStart <= const Duration(hours: 24)) {
+      if (untilStart > GroupRules.reminder2h &&
+          untilStart <= GroupRules.reminder24h) {
         _putNotice(
           userId: userId,
           kind: NoticeKind.reminder24h,
@@ -271,8 +324,7 @@ class CommunityBoard {
           groupId: group.id,
         );
       }
-      if (untilStart > Duration.zero &&
-          untilStart <= GroupRules.refundDeadline) {
+      if (untilStart > Duration.zero && untilStart <= GroupRules.reminder2h) {
         _putNotice(
           userId: userId,
           kind: NoticeKind.reminder2h,
@@ -305,7 +357,7 @@ class CommunityBoard {
   List<AppNotice> visibleFor(String userId) {
     return [
       for (final notice in notices)
-        if (notice.userId == userId && prefOn(notice.kind)) notice,
+        if (notice.userId == userId && prefOn(userId, notice.kind)) notice,
     ];
   }
 
