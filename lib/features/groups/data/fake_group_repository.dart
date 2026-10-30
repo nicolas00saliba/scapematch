@@ -6,6 +6,8 @@ import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
+import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
 /// Sample implementation of [GroupRepository].
@@ -18,18 +20,21 @@ class FakeGroupRepository implements GroupRepository {
     this.clock = const SystemClock(),
     this.latency = const Duration(milliseconds: 280),
     this.failList = false,
-  });
+    CommunityBoard? board,
+  }) : board = board ?? CommunityBoard();
 
   final FakeDatabase _database;
   final Clock clock;
   final Duration latency;
   final bool failList;
+  final CommunityBoard board;
 
   @override
   Future<List<Group>> listByCity(
     String cityId, {
     bool almostFullOnly = false,
   }) async {
+    _sweep(clock.now());
     await _pause();
     if (failList) {
       throw Exception('sample list failed');
@@ -49,6 +54,7 @@ class FakeGroupRepository implements GroupRepository {
 
   @override
   Future<List<Group>> listForUser(String userId) async {
+    _sweep(clock.now());
     await _pause();
     final groups =
         _database.groups
@@ -60,8 +66,47 @@ class FakeGroupRepository implements GroupRepository {
 
   @override
   Future<Group?> getById(String id) async {
+    _sweep(clock.now());
     await _pause();
     return _find(id);
+  }
+
+  @override
+  Future<String?> joinWaitlist({
+    required String groupId,
+    required String userId,
+    required String displayName,
+  }) {
+    return Future.value(
+      board.joinWaitlist(
+        groupId: groupId,
+        userId: userId,
+        displayName: displayName,
+        now: clock.now(),
+      ),
+    );
+  }
+
+  @override
+  Future<JoinResult> acceptWaitlist({
+    required String groupId,
+    required String userId,
+    required String displayName,
+  }) async {
+    final now = clock.now();
+    final entry = board.entryFor(groupId, userId);
+    if (entry == null || !board.offerStillOpen(entry, now)) {
+      return const JoinFailure(JoinFailureReason.full);
+    }
+    final result = await join(
+      groupId,
+      participantUserId: userId,
+      participantName: displayName,
+    );
+    if (result is JoinSuccess) {
+      board.removeWaitlist(groupId, userId);
+    }
+    return result;
   }
 
   @override
@@ -76,7 +121,18 @@ class FakeGroupRepository implements GroupRepository {
     if (index < 0) {
       return const JoinFailure(JoinFailureReason.notFound);
     }
+    if (board.restricted(participantUserId, clock.now())) {
+      return const JoinFailure(JoinFailureReason.restricted);
+    }
     final current = _database.groups[index];
+    for (final person in current.participants) {
+      if (!person.isCreator || person.userId == null) {
+        continue;
+      }
+      if (board.isBlocked(person.userId!, participantUserId)) {
+        return const JoinFailure(JoinFailureReason.blocked);
+      }
+    }
     final now = clock.now();
     if (current.isCancelled) {
       return const JoinFailure(JoinFailureReason.groupCancelled);
@@ -208,6 +264,10 @@ class FakeGroupRepository implements GroupRepository {
       filledSpots: 1,
       totalSpots: 1 + request.extraSpots,
       priceCents: room.priceCents,
+      minimumSpots: room.minimumPlayers,
+      cancelWindow: room.cancelWindow,
+      streetAddress: house.streetAddress,
+      closesAt: _closesAt(slot.startsAt, now),
       participants: [
         Participant(
           id: _database.nextParticipantId(),
@@ -263,6 +323,7 @@ class FakeGroupRepository implements GroupRepository {
         final outcome = GroupRules.refundForParticipantCancel(
           startsAt: current.startsAt,
           now: clock.now(),
+          window: current.cancelWindow,
         );
         final updatedPeople = [
           for (final person in current.participants)
@@ -280,6 +341,7 @@ class FakeGroupRepository implements GroupRepository {
           filledSpots: _occupied(updatedPeople),
         );
         _database.groups[index] = updated;
+        board.offerNext(groupId: groupId, now: clock.now());
         return LeaveGroupSuccess(updated);
     }
   }
@@ -450,6 +512,67 @@ class FakeGroupRepository implements GroupRepository {
     );
     _database.groups[index] = updated;
     return EditGroupSuccess(updated);
+  }
+
+  DateTime _closesAt(DateTime startsAt, DateTime now) {
+    final dayBefore = startsAt.subtract(const Duration(hours: 24));
+    if (!dayBefore.isAfter(now)) {
+      return startsAt;
+    }
+    return dayBefore;
+  }
+
+  void _sweep(DateTime now) {
+    for (var index = 0; index < _database.groups.length; index++) {
+      final group = _database.groups[index];
+      _recordNoShows(group, now);
+      final portal =
+          group.phaseOverride != null && isPortalPhase(group.phaseOverride!);
+      if (!GroupRules.missedMinimum(
+        alreadyCancelled: group.isCancelled,
+        portalOwned: portal,
+        filledSpots: group.filledSpots,
+        minimumSpots: group.minimumSpots,
+        closesAt: group.closesAtResolved,
+        startsAt: group.startsAt,
+        now: now,
+      )) {
+        continue;
+      }
+      final outcome = GroupRules.refundForOrganizer(
+        RefundReason.groupDidNotClose,
+      );
+      final closed = group.copyWith(
+        cancelledAt: now,
+        filledSpots: 0,
+        participants: [
+          for (final person in group.participants)
+            if (person.occupiesSeat)
+              person.copyWith(
+                attendance: AttendanceStatus.cancelled,
+                refund: outcome.status,
+                refundReason: outcome.reason,
+              )
+            else
+              person,
+        ],
+      );
+      _database.groups[index] = closed;
+      board.recordClosedGroup(group, now);
+    }
+  }
+
+  void _recordNoShows(Group group, DateTime now) {
+    if (!GroupRules.hasEnded(endsAt: group.endsAt, now: now)) {
+      return;
+    }
+    for (final person in group.participants) {
+      final userId = person.userId;
+      if (userId == null || !person.occupiesSeat || person.isConfirmed) {
+        continue;
+      }
+      board.markNoShow(userId: userId, groupId: group.id, at: group.endsAt);
+    }
   }
 
   bool _listed(Group group, DateTime now) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 
@@ -8,11 +9,13 @@ class GroupCard extends StatelessWidget {
     super.key,
     required this.group,
     required this.onTap,
+    required this.now,
     this.onInvite,
   });
 
   final Group group;
   final VoidCallback onTap;
+  final DateTime now;
   final VoidCallback? onInvite;
 
   @override
@@ -72,6 +75,17 @@ class GroupCard extends StatelessWidget {
                   spots,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  GroupMessages.phaseLabel(
+                    group.phaseAt(now),
+                    missing: group.spotsUntilClose,
+                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.secondary,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 if (onInvite != null)

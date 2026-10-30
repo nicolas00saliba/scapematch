@@ -102,6 +102,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     6,
     60,
     Difficulty.medium,
+    minimumPlayers: 6,
   );
   final laboratorio = _room(
     'room-cwb-lab',
@@ -142,6 +143,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     8,
     60,
     Difficulty.easy,
+    cancelWindow: const Duration(hours: 24),
   );
   final engrenagem = _room(
     'room-cwb-engrenagem',
@@ -713,6 +715,21 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       totalSpots: 6,
       names: ['Rosa', 'Saulo'],
     ),
+    _group(
+      id: 'grp-cwb-cofre-missed',
+      city: curitiba,
+      house: ruaXv,
+      room: cofre,
+      slot: schedule.at(
+        'slot-cwb-cofre-missed',
+        cofre.id,
+        now.add(const Duration(days: 5)),
+      ),
+      totalSpots: 6,
+      names: ['Paula', 'Rui'],
+      minimumSpots: 6,
+      closesAt: now.subtract(const Duration(hours: 2)),
+    ),
   ];
 
   return FakeDatabase(
@@ -844,6 +861,8 @@ EscapeRoom _room(
   int durationMinutes,
   Difficulty difficulty, {
   String gameType = GameTypes.escapeRoom,
+  int minimumPlayers = 2,
+  Duration cancelWindow = const Duration(hours: 2),
 }) {
   return EscapeRoom(
     id: id,
@@ -856,6 +875,8 @@ EscapeRoom _room(
     difficulty: difficulty,
     priceCents: _priceCents(capacity, difficulty),
     gameType: gameType,
+    minimumPlayers: minimumPlayers,
+    cancelWindow: cancelWindow,
   );
 }
 
@@ -959,6 +980,8 @@ Group _group({
   String note = '',
   String gameType = GameTypes.escapeRoom,
   String? roomName,
+  int? minimumSpots,
+  DateTime? closesAt,
 }) {
   assert(house.cityId == city.id, id);
   assert(room.houseId == house.id, id);
@@ -986,6 +1009,10 @@ Group _group({
     priceCents: room.priceCents,
     gameType: gameType,
     note: note,
+    minimumSpots: minimumSpots ?? room.minimumPlayers,
+    closesAt: closesAt,
+    cancelWindow: room.cancelWindow,
+    streetAddress: house.streetAddress,
     participants: [
       for (var index = 0; index < names.length; index++)
         Participant(

@@ -1,22 +1,19 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
+import 'package:url_launcher/url_launcher.dart';
+
 @JS('window')
 external JSObject get _window;
 
-/// `window.open` para o WhatsApp.
+/// Nova aba na web. O mesmo helper no celular abre o app do link.
 Future<bool> openExternalUrl(Uri uri) async {
   try {
-    final open = _window['open'];
-    if (open == null) {
-      return false;
-    }
-    (open as JSFunction).callAsFunction(
-      _window,
-      uri.toString().toJS,
-      '_blank'.toJS,
+    return await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: '_blank',
     );
-    return true;
   } catch (_) {
     return false;
   }

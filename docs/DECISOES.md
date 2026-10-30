@@ -2,6 +2,14 @@
 
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
+## Grupo que fecha, casa, fila e conta
+
+- **Data:** 2026-10-30
+- **Decisão:** cada sala tem um mínimo de jogadores, além da capacidade. O grupo mostra “Faltam X para fechar” até chegar nesse mínimo e, então, “Pronto para reservar”. Há também uma data limite. Se o mínimo não for atingido até lá, o grupo é cancelado e quem estava na cadeira recebe reembolso integral simulado, com um aviso no app. A janela de cancelamento com reembolso é a da casa (o padrão continua 2 h; o Ópera de Curitiba usa 24 h), no lugar de um número único espalhado. Falta sem confirmar presença, depois que a sessão acaba, fica registrada. Três faltas em 60 dias pausam novas entradas por 30 dias. Essa conta é provisória. Grupo cheio tem lista de espera: a vaga aberta avisa o primeiro da fila, que tem 2 h para aceitar. A sala mostra o endereço de exemplo, com Google Maps e Waze. O cadastro exige aceite dos rascunhos de termos, privacidade (LGPD) e reembolso, todos marcados “a revisar juridicamente”, e a data de nascimento. Menor de 18 não cria conta; a frase é que menores só jogam acompanhados. A Conta liga os termos, os dados da conta e o pedido de exclusão, que nesta versão só fica registrado. Dá para denunciar e bloquear um membro. Quem foi bloqueado some da lista de quem bloqueou e não entra em grupo criado por essa pessoa. Avisos no app: 24 h antes, 2 h antes e quando o prazo de fechar está a menos de 6 h. Cada tipo liga e desliga. O push real espera o backend; hoje o quadro é só a memória do app. Link externo (WhatsApp, mapa, Waze, notícia) abre em outra aba na web e no app correspondente no celular, por um helper só. Os estados “aguardando a casa”, “confirmada”, “recusada” e “aguardando pagamentos” existem no modelo e ainda não são acionados: a confirmação da casa e o pagamento dividido esperam o portal de parceiros.
+- **Motivo:** o dono quer o esqueleto dessas regras com dados de exemplo, sem cobrar e sem o portal.
+- **Onde está no código:** `GroupPhase`, `GroupRules`, `CommunityBoard`, `FakeGroupRepository`, `SignupScreen`, `LegalScreen`, `NoticeScreen` e `openExternalUrl`.
+- **Como trocar depois:** o portal grava `phaseOverride`. O push ocupa o mesmo quadro de avisos. O texto jurídico substitui os rascunhos.
+
 ## Paleta Cofre de Cobre
 
 - **Data:** 2026-10-30

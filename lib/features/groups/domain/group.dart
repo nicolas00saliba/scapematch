@@ -1,5 +1,6 @@
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
+import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 
@@ -31,6 +32,11 @@ class Group {
     this.gameType = GameTypes.escapeRoom,
     this.note = '',
     this.cancelledAt,
+    this.minimumSpots = 2,
+    this.closesAt,
+    this.cancelWindow = GroupRules.refundDeadline,
+    this.phaseOverride,
+    this.streetAddress = '',
   });
 
   final String id;
@@ -65,8 +71,24 @@ class Group {
   /// Optional note the creator can edit. Empty when they wrote nothing.
   final String note;
 
-  /// Set when the creator deletes the group. Null while the group is active.
+  /// Set when the creator deletes the group, or when it misses the close
+  /// deadline. Null while the group is active.
   final DateTime? cancelledAt;
+
+  /// Pessoas para o grupo ficar pronto para reservar. Vem da sala.
+  final int minimumSpots;
+
+  /// Prazo para atingir [minimumSpots]. Sem data, o prazo é o início.
+  final DateTime? closesAt;
+
+  /// Janela de cancelamento com reembolso, copiada da casa.
+  final Duration cancelWindow;
+
+  /// Estados do portal (casa e pagamento). Nulo enquanto o app só forma o grupo.
+  final GroupPhase? phaseOverride;
+
+  /// Endereço fictício da sala, para o mapa.
+  final String streetAddress;
 
   int get openSeats =>
       GroupRules.openSeats(filledSpots: filledSpots, totalSpots: totalSpots);
@@ -78,6 +100,38 @@ class Group {
       GroupRules.isAlmostFull(filledSpots: filledSpots, totalSpots: totalSpots);
 
   bool get isCancelled => cancelledAt != null;
+
+  DateTime get closesAtResolved => closesAt ?? startsAt;
+
+  GroupPhase phaseAt(DateTime now) {
+    final override = phaseOverride;
+    if (override != null && isPortalPhase(override)) {
+      return override;
+    }
+    if (isCancelled) {
+      return GroupPhase.cancelled;
+    }
+    if (GroupRules.missedMinimum(
+      alreadyCancelled: false,
+      portalOwned: false,
+      filledSpots: filledSpots,
+      minimumSpots: minimumSpots,
+      closesAt: closesAtResolved,
+      startsAt: startsAt,
+      now: now,
+    )) {
+      return GroupPhase.cancelled;
+    }
+    if (filledSpots >= minimumSpots) {
+      return GroupPhase.readyToReserve;
+    }
+    return GroupPhase.forming;
+  }
+
+  int get spotsUntilClose {
+    final missing = minimumSpots - filledSpots;
+    return missing < 0 ? 0 : missing;
+  }
 
   DateTime get endsAt => startsAt.add(Duration(minutes: durationMinutes));
 
@@ -122,6 +176,11 @@ class Group {
     DateTime? startsAt,
     DateTime? cancelledAt,
     String? gameType,
+    int? minimumSpots,
+    DateTime? closesAt,
+    Duration? cancelWindow,
+    GroupPhase? phaseOverride,
+    String? streetAddress,
   }) {
     return Group(
       id: id,
@@ -145,6 +204,11 @@ class Group {
       gameType: gameType ?? this.gameType,
       note: note ?? this.note,
       cancelledAt: cancelledAt ?? this.cancelledAt,
+      minimumSpots: minimumSpots ?? this.minimumSpots,
+      closesAt: closesAt ?? this.closesAt,
+      cancelWindow: cancelWindow ?? this.cancelWindow,
+      phaseOverride: phaseOverride ?? this.phaseOverride,
+      streetAddress: streetAddress ?? this.streetAddress,
     );
   }
 }

@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/core/sharing/external_places.dart';
+import 'package:scapematch/core/sharing/external_url.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
@@ -243,6 +247,54 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ),
         const SizedBox(height: 4),
         Text(
+          GroupMessages.phaseLabel(
+            group.phaseAt(now),
+            missing: group.spotsUntilClose,
+          ),
+          key: AppKeys.groupPhase,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.secondary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        Text(
+          GroupMessages.closesAtLabel(formatSession(group.closesAtResolved)),
+        ),
+        Text(GroupMessages.cancelWindowLabel(group.cancelWindow.inHours)),
+        if (group.streetAddress.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            '${group.streetAddress} · ${group.neighborhood} · ${group.cityName}',
+            key: AppKeys.roomAddress,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                key: AppKeys.openMaps,
+                onPressed: () => openExternalUrl(
+                  googleMapsUri(
+                    '${group.streetAddress}, ${group.neighborhood}, ${group.cityName}',
+                  ),
+                ),
+                child: const Text(GroupMessages.openMaps),
+              ),
+              OutlinedButton(
+                key: AppKeys.openWaze,
+                onPressed: () => openExternalUrl(
+                  wazeUri(
+                    '${group.streetAddress}, ${group.neighborhood}, ${group.cityName}',
+                  ),
+                ),
+                child: const Text(GroupMessages.openWaze),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 4),
+        Text(
           GroupMessages.confirmedCount(group.confirmedCount),
           key: AppKeys.confirmedCount,
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -268,23 +320,49 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ),
         const SizedBox(height: 8),
         for (final person in roster)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(
-              backgroundColor: scheme.primaryContainer,
-              foregroundColor: scheme.onPrimaryContainer,
-              child: Text(_initial(person.displayName)),
+          if (_visible(person))
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
+                child: Text(_initial(person.displayName)),
+              ),
+              title: Text(person.displayName),
+              subtitle: Text(_personSubtitle(person)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_canModerate(person))
+                    PopupMenuButton<String>(
+                      key: AppKeys.memberMenu(person.id),
+                      onSelected: (value) {
+                        if (value == 'block') {
+                          _block(person);
+                        } else {
+                          _report(person);
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: 'report',
+                          child: Text(GroupMessages.report),
+                        ),
+                        PopupMenuItem(
+                          value: 'block',
+                          child: Text(GroupMessages.block),
+                        ),
+                      ],
+                    ),
+                  if (_canRemove(group, userId, now, person))
+                    TextButton(
+                      key: AppKeys.removeMember(person.id),
+                      onPressed: _busy ? null : () => _remove(person),
+                      child: const Text('Remover'),
+                    ),
+                ],
+              ),
             ),
-            title: Text(person.displayName),
-            subtitle: Text(_personSubtitle(person)),
-            trailing: _canRemove(group, userId, now, person)
-                ? TextButton(
-                    key: AppKeys.removeMember(person.id),
-                    onPressed: _busy ? null : () => _remove(person),
-                    child: const Text('Remover'),
-                  )
-                : null,
-          ),
       ],
     );
   }
@@ -296,6 +374,89 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       return '$status · ${GroupMessages.paymentLabel}';
     }
     return '$status · $refund';
+  }
+
+  bool _visible(Participant person) {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return true;
+    }
+    final key = CommunityBoard.personKey(
+      userId: person.userId,
+      seatId: person.id,
+    );
+    return !ref.read(communityBoardProvider).isBlocked(viewer.id, key);
+  }
+
+  bool _canModerate(Participant person) {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return false;
+    }
+    return person.userId != viewer.id;
+  }
+
+  void _block(Participant person) {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return;
+    }
+    ref
+        .read(communityBoardProvider)
+        .block(
+          viewer.id,
+          CommunityBoard.personKey(userId: person.userId, seatId: person.id),
+        );
+    setState(() {});
+    _snack(GroupMessages.blockedSnack);
+  }
+
+  Future<void> _report(Participant person) async {
+    final viewer = ref.read(authSessionProvider);
+    if (viewer == null) {
+      return;
+    }
+    final reason = await showDialog<ReportReason>(
+      context: context,
+      builder: (context) {
+        return SimpleDialog(
+          title: const Text(GroupMessages.report),
+          children: [
+            for (final item in ReportReason.values)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, item),
+                child: Text(_reportLabel(item)),
+              ),
+          ],
+        );
+      },
+    );
+    if (reason == null) {
+      return;
+    }
+    ref
+        .read(communityBoardProvider)
+        .report(
+          byUserId: viewer.id,
+          targetKey: CommunityBoard.personKey(
+            userId: person.userId,
+            seatId: person.id,
+          ),
+          reason: reason,
+          at: ref.read(clockProvider).now(),
+        );
+    if (mounted) {
+      _snack(GroupMessages.reportedSnack);
+    }
+  }
+
+  String _reportLabel(ReportReason reason) {
+    return switch (reason) {
+      ReportReason.harassment => 'Assédio',
+      ReportReason.spam => 'Spam',
+      ReportReason.noShow => 'Falta sem aviso',
+      ReportReason.other => 'Outro motivo',
+    };
   }
 
   bool _canRemove(
@@ -386,6 +547,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             child: Text('Grupo cheio'),
           ),
         );
+        buttons.add(
+          OutlinedButton(
+            key: AppKeys.joinWaitlist,
+            onPressed: _busy ? null : () => _wait(group),
+            child: const Text(GroupMessages.waitlistJoin),
+          ),
+        );
       } else {
         buttons.add(
           FilledButton(
@@ -416,6 +584,24 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ],
       ],
     );
+  }
+
+  Future<void> _wait(Group group) async {
+    final user = ref.read(authSessionProvider);
+    if (user == null) {
+      return;
+    }
+    final message = await ref
+        .read(groupRepositoryProvider)
+        .joinWaitlist(
+          groupId: group.id,
+          userId: user.id,
+          displayName: user.displayName,
+        );
+    if (!mounted) {
+      return;
+    }
+    _snack(message ?? GroupMessages.waitlistJoined);
   }
 
   Future<void> _join() async {
@@ -453,6 +639,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final previewRefunds = GroupRules.refundsOnParticipantCancel(
       startsAt: group.startsAt,
       now: ref.read(clockProvider).now(),
+      window: group.cancelWindow,
     );
     final accepted = await showLeaveDialog(context, refunds: previewRefunds);
     if (!accepted || !mounted) {

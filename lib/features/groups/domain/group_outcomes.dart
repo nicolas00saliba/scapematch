@@ -29,6 +29,8 @@ enum JoinFailureReason {
   membershipClosed,
   groupCancelled,
   sessionEnded,
+  blocked,
+  restricted,
 }
 
 sealed class CreateGroupResult {

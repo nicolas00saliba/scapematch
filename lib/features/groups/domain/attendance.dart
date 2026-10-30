@@ -18,6 +18,7 @@ enum RefundReason {
   cancelledTooLate,
   organizerCancelledEvent,
   organizerRemovedMember,
+  groupDidNotClose,
 }
 
 /// The refund a rule function returns. Screens translate it to Portuguese.

@@ -59,6 +59,7 @@ class RoomGroupsScreen extends ConsumerWidget {
                   if (index > 0) const SizedBox(height: 10),
                   GroupCard(
                     group: items[index],
+                    now: ref.watch(clockProvider).now(),
                     onTap: () => context.push('/groups/${items[index].id}'),
                   ),
                 ],

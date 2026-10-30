@@ -38,6 +38,14 @@ void main() {
 
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
+    final accountScroll = find.descendant(
+      of: find.byType(AccountScreen),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+      ),
+    );
+    tester.state<ScrollableState>(accountScroll).position.jumpTo(0);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.accountAddBalance));
     await tester.pumpAndSettle();
     await _capture(tester, find.text('Forma de pagamento'), dir, 'saldo-390');

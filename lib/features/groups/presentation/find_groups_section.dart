@@ -13,6 +13,7 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
+import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 
 /// Busca de grupo comprimida, no topo da Home.
@@ -231,6 +232,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         }
         return _GroupWindow(
           groups: items,
+          now: ref.watch(clockProvider).now(),
           maxHeight: items.length <= 1 ? double.infinity : groupWindowMaxHeight,
           onOpen: (group) => context.push('/groups/${group.id}'),
           onInvite: (group) => showInviteSheet(context, group),
@@ -262,12 +264,14 @@ final class GroupWindowController extends ScrollController {}
 class _GroupWindow extends StatefulWidget {
   const _GroupWindow({
     required this.groups,
+    required this.now,
     required this.maxHeight,
     required this.onOpen,
     required this.onInvite,
   });
 
   final List<Group> groups;
+  final DateTime now;
   final double maxHeight;
   final ValueChanged<Group> onOpen;
   final ValueChanged<Group> onInvite;
@@ -331,6 +335,7 @@ class _GroupWindowState extends State<_GroupWindow> {
                 for (var index = 0; index < widget.groups.length; index++) ...[
                   if (index > 0) const SizedBox(height: 10),
                   GroupCard(
+                    now: widget.now,
                     group: widget.groups[index],
                     onTap: () => widget.onOpen(widget.groups[index]),
                     onInvite: () => widget.onInvite(widget.groups[index]),

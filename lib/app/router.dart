@@ -19,6 +19,9 @@ import 'package:scapematch/features/onboarding/presentation/onboarding_controlle
 import 'package:scapematch/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:scapematch/features/news/presentation/news_browse_screen.dart';
 import 'package:scapematch/features/news/presentation/news_detail_screen.dart';
+import 'package:scapematch/features/account/presentation/account_privacy_screen.dart';
+import 'package:scapematch/features/community/presentation/notice_screen.dart';
+import 'package:scapematch/features/legal/legal_screen.dart';
 import 'package:scapematch/features/wallet/presentation/add_balance_screen.dart';
 
 /// Rotas do app.
@@ -118,6 +121,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/cadastro',
         name: 'signup',
         builder: (context, state) => const SignupScreen(),
+      ),
+      GoRoute(
+        path: '/legal/:document',
+        name: 'legal',
+        builder: (context, state) {
+          return LegalScreen(document: state.pathParameters['document'] ?? '');
+        },
+      ),
+      GoRoute(
+        path: '/account/notices',
+        name: 'notices',
+        builder: (context, state) => const NoticeScreen(),
+      ),
+      GoRoute(
+        path: '/account/data',
+        name: 'account-data',
+        builder: (context, state) => const AccountDataScreen(),
+      ),
+      GoRoute(
+        path: '/account/delete',
+        name: 'account-delete',
+        builder: (context, state) => const AccountDeletionScreen(),
       ),
       GoRoute(
         path: '/groups/new',

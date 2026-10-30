@@ -94,6 +94,7 @@ void main() {
       'ana@exemplo.invalid',
     );
     await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await _acceptAdultTerms(tester);
     await tester.tap(find.byKey(AppKeys.signupSubmit));
     await tester.pumpAndSettle();
 
@@ -167,6 +168,7 @@ void main() {
       'bia@exemplo.invalid',
     );
     await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await _acceptAdultTerms(tester);
     await tester.tap(find.byKey(AppKeys.signupSubmit));
     await tester.pumpAndSettle();
 
@@ -306,6 +308,7 @@ void main() {
       'ana.reload@exemplo.invalid',
     );
     await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await _acceptAdultTerms(tester);
     await tester.tap(find.byKey(AppKeys.signupSubmit));
     await tester.pumpAndSettle();
 
@@ -342,4 +345,14 @@ void main() {
 Future<void> _openInvite(WidgetTester tester, String id) async {
   GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/convite/$id');
   await tester.pumpAndSettle();
+}
+
+Future<void> _acceptAdultTerms(WidgetTester tester) async {
+  await tester.enterText(find.byKey(AppKeys.signupBirthDay), '1');
+  await tester.enterText(find.byKey(AppKeys.signupBirthMonth), '1');
+  await tester.enterText(find.byKey(AppKeys.signupBirthYear), '1990');
+  await tester.ensureVisible(find.byKey(AppKeys.signupTerms));
+  await tester.tap(find.byKey(AppKeys.signupTerms));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.byKey(AppKeys.signupSubmit));
 }

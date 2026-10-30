@@ -125,15 +125,21 @@ class GroupRules {
   static bool refundsOnParticipantCancel({
     required DateTime startsAt,
     required DateTime now,
+    Duration? window,
   }) {
-    return startsAt.difference(now) >= refundDeadline;
+    return startsAt.difference(now) >= (window ?? refundDeadline);
   }
 
   static RefundOutcome refundForParticipantCancel({
     required DateTime startsAt,
     required DateTime now,
+    Duration? window,
   }) {
-    if (refundsOnParticipantCancel(startsAt: startsAt, now: now)) {
+    if (refundsOnParticipantCancel(
+      startsAt: startsAt,
+      now: now,
+      window: window,
+    )) {
       return const RefundOutcome(
         status: RefundStatus.refunded,
         reason: RefundReason.cancelledInTime,
@@ -143,6 +149,68 @@ class GroupRules {
       status: RefundStatus.denied,
       reason: RefundReason.cancelledTooLate,
     );
+  }
+
+  /// Quantas pessoas ainda faltam para o mínimo da sala.
+  static int spotsUntilMinimum({
+    required int filledSpots,
+    required int minimumSpots,
+  }) {
+    final missing = minimumSpots - filledSpots;
+    return missing < 0 ? 0 : missing;
+  }
+
+  /// O prazo passou e o mínimo não foi atingido. O portal da casa não entra aqui.
+  static bool missedMinimum({
+    required bool alreadyCancelled,
+    required bool portalOwned,
+    required int filledSpots,
+    required int minimumSpots,
+    required DateTime closesAt,
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    if (alreadyCancelled || portalOwned) {
+      return false;
+    }
+    // Sessão já começada não vira "não fechou": ela só não aceita mais gente.
+    if (!now.isBefore(startsAt)) {
+      return false;
+    }
+    return !now.isBefore(closesAt) && filledSpots < minimumSpots;
+  }
+
+  static const noShowWindow = Duration(days: 60);
+  static const noShowLimit = 3;
+  static const noShowRestriction = Duration(days: 30);
+  static const waitlistAcceptWindow = Duration(hours: 2);
+  static const paymentReminderWindow = Duration(hours: 6);
+
+  static List<DateTime> noShowsInWindow(List<DateTime> dates, DateTime now) {
+    final start = now.subtract(noShowWindow);
+    return [
+      for (final date in dates)
+        if (!date.isBefore(start) && !date.isAfter(now)) date,
+    ]..sort();
+  }
+
+  /// Três faltas na janela travam novas entradas por [noShowRestriction]
+  /// a partir da falta mais recente.
+  static bool joinRestricted(List<DateTime> dates, DateTime now) {
+    final recent = noShowsInWindow(dates, now);
+    if (recent.length < noShowLimit) {
+      return false;
+    }
+    return now.isBefore(recent.last.add(noShowRestriction));
+  }
+
+  static bool isAdult({required DateTime birthDate, required DateTime now}) {
+    final eighteenth = DateTime(
+      birthDate.year + 18,
+      birthDate.month,
+      birthDate.day,
+    );
+    return !now.isBefore(eighteenth);
   }
 
   /// The organizer cancelled the event or removed the person. The simulated
