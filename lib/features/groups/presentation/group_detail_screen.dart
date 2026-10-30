@@ -11,7 +11,10 @@ import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
@@ -21,6 +24,7 @@ import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/edit_group_sheet.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
+import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_dialogs.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -116,272 +120,301 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final roster = group.isCancelled
         ? group.participants
         : group.participants.where((person) => person.occupiesSeat).toList();
+    final category = categoryForCover(group.coverAsset);
+    final photos = category == null
+        ? (group.coverAsset.isEmpty
+              ? const <String>[]
+              : <String>[group.coverAsset])
+        : roomGallery(category);
+    final categoryLabel = category == null ? null : roomCategoryLabel(category);
+    final started = !now.isBefore(group.startsAt);
+    final addressQuery =
+        '${group.streetAddress}, ${group.neighborhood}, ${group.cityName}';
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.only(bottom: 28),
       children: [
-        const ExampleDataBanner(),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          key: AppKeys.inviteGroup,
-          onPressed: () => showInviteSheet(context, group),
-          style: OutlinedButton.styleFrom(foregroundColor: scheme.secondary),
-          icon: const Icon(Icons.ios_share),
-          label: const Text('Convidar'),
-        ),
-        if (group.isCancelled) ...[
-          const SizedBox(height: 12),
-          _Banner(
-            color: status.alertContainer,
-            foreground: status.onAlertContainer,
-            icon: Icons.event_busy,
-            text:
-                group.participants.any(
-                  (person) =>
-                      person.refundReason == RefundReason.groupDidNotClose,
-                )
-                ? GroupMessages.missedCloseBanner
-                : GroupMessages.cancelledBanner,
-          ),
-        ],
-        if (me != null && me.occupiesSeat && !group.isCancelled) ...[
-          const SizedBox(height: 12),
-          _Banner(
-            color: status.successContainer,
-            foreground: status.onSuccessContainer,
-            icon: Icons.check_circle,
-            text: GroupMessages.joinedBanner,
-          ),
-        ],
-        if (_leaveMismatch(me) case final mismatch?) ...[
-          const SizedBox(height: 12),
-          _Banner(
-            color: status.alertContainer,
-            foreground: status.onAlertContainer,
-            icon: Icons.update,
-            text: mismatch,
-          ),
-        ],
-        const SizedBox(height: 16),
-        Text(
-          group.roomName,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${group.houseName} · ${group.neighborhood}',
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
-        Text(
-          group.cityName,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _InfoPanel(
-          icon: Icons.schedule,
-          title: formatSession(group.startsAt),
-          subtitle:
-              '${group.durationMinutes} min · ${group.difficulty.labelPt}',
-        ),
-        const SizedBox(height: 8),
-        Text(
-          formatStartsIn(
-            startsAt: group.startsAt,
-            endsAt: group.endsAt,
-            now: now,
-          ),
-          key: AppKeys.countdown,
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: scheme.primary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(group.roomTheme, style: theme.textTheme.bodyLarge),
-        if (group.note.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            group.note,
-            key: AppKeys.groupNote,
-            style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Text(
-          'O grupo quer ${group.totalSpots} pessoas. A sala comporta até ${group.roomCapacity}.',
-          style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          formatPrice(group.priceCents),
-          key: AppKeys.priceLabel,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        Text(
-          'Por pessoa · pagamento simulado. Nada é cobrado de verdade.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
-        if (me != null) ...[
-          const SizedBox(height: 8),
-          Text(GroupMessages.paymentLabel),
-          if (GroupMessages.refundLabel(me) != null)
-            Text(
-              GroupMessages.refundLabel(me)!,
-              key: AppKeys.refundStatus,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-              ),
-            ),
-        ],
-        const SizedBox(height: 12),
-        Text(
-          '${group.filledSpots} de ${group.totalSpots} vagas',
-          key: AppKeys.spotSummary,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          GroupMessages.phaseLabel(
-            group.phaseAt(now),
-            missing: group.spotsUntilClose,
-            started: !now.isBefore(group.startsAt),
-          ),
-          key: AppKeys.groupPhase,
-          style: theme.textTheme.titleSmall?.copyWith(
-            color: theme.colorScheme.secondary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        if (group.showCloseDeadline(now))
-          Text(
-            GroupMessages.closesAtLabel(formatSession(group.closesAtResolved)),
-            key: AppKeys.closeDeadline,
-          ),
-        if (me != null &&
-            me.occupiesSeat &&
-            !group.isCancelled &&
-            now.isBefore(group.startsAt))
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(GroupMessages.attendanceOptional),
-          ),
-        Text(GroupMessages.cancelWindowLabel(group.cancelWindow.inHours)),
-        if (group.streetAddress.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            '${group.streetAddress} · ${group.neighborhood} · ${group.cityName}',
-            key: AppKeys.roomAddress,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+        _GroupCover(group: group, categoryLabel: categoryLabel),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              OutlinedButton(
-                key: AppKeys.openMaps,
-                onPressed: () => openExternalUrl(
-                  googleMapsUri(
-                    '${group.streetAddress}, ${group.neighborhood}, ${group.cityName}',
-                  ),
+              const ExampleDataBanner(),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: AppKeys.inviteGroup,
+                onPressed: () => showInviteSheet(context, group),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: scheme.secondary,
+                  minimumSize: const Size.fromHeight(48),
                 ),
-                child: const Text(GroupMessages.openMaps),
+                icon: const Icon(Icons.ios_share),
+                label: const Text('Convidar'),
               ),
-              OutlinedButton(
-                key: AppKeys.openWaze,
-                onPressed: () => openExternalUrl(
-                  wazeUri(
-                    '${group.streetAddress}, ${group.neighborhood}, ${group.cityName}',
+              if (group.isCancelled) ...[
+                const SizedBox(height: 12),
+                _Banner(
+                  color: status.alertContainer,
+                  foreground: status.onAlertContainer,
+                  icon: Icons.event_busy,
+                  text:
+                      group.participants.any(
+                        (person) =>
+                            person.refundReason ==
+                            RefundReason.groupDidNotClose,
+                      )
+                      ? GroupMessages.missedCloseBanner
+                      : GroupMessages.cancelledBanner,
+                ),
+              ],
+              if (me != null && me.occupiesSeat && !group.isCancelled) ...[
+                const SizedBox(height: 12),
+                _Banner(
+                  color: status.successContainer,
+                  foreground: status.onSuccessContainer,
+                  icon: Icons.check_circle,
+                  text: GroupMessages.joinedBanner,
+                ),
+              ],
+              if (_leaveMismatch(me) case final mismatch?) ...[
+                const SizedBox(height: 12),
+                _Banner(
+                  color: status.alertContainer,
+                  foreground: status.onAlertContainer,
+                  icon: Icons.update,
+                  text: mismatch,
+                ),
+              ],
+              const SizedBox(height: 16),
+              _SectionCard(
+                icon: Icons.schedule,
+                title: 'Quando',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      formatSession(group.startsAt),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${group.durationMinutes} min · ${group.difficulty.labelPt}',
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      formatStartsIn(
+                        startsAt: group.startsAt,
+                        endsAt: group.endsAt,
+                        now: now,
+                      ),
+                      key: AppKeys.countdown,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionCard(
+                icon: Icons.groups_outlined,
+                title: 'Vagas',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${group.filledSpots} de ${group.totalSpots} vagas',
+                      key: AppKeys.spotSummary,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        backgroundColor: scheme.primaryContainer,
+                        color: group.isFull
+                            ? scheme.onSurfaceVariant
+                            : scheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      GroupMessages.phaseLabel(
+                        group.phaseAt(now),
+                        missing: group.spotsUntilClose,
+                        started: started,
+                      ),
+                      key: AppKeys.groupPhase,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: scheme.secondary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (group.showCloseDeadline(now))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          GroupMessages.closesAtLabel(
+                            formatSession(group.closesAtResolved),
+                          ),
+                          key: AppKeys.closeDeadline,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'O grupo quer ${group.totalSpots} pessoas. '
+                      'A sala comporta até ${group.roomCapacity}.',
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+                    ),
+                    if (me != null &&
+                        me.occupiesSeat &&
+                        !group.isCancelled &&
+                        now.isBefore(group.startsAt))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(GroupMessages.attendanceOptional),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      GroupMessages.confirmedCount(group.confirmedCount),
+                      key: AppKeys.confirmedCount,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionCard(
+                icon: Icons.payments_outlined,
+                title: 'Pagamento',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      formatPrice(group.priceCents),
+                      key: AppKeys.priceLabel,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Por pessoa · pagamento simulado. Nada é cobrado de verdade.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                    if (me != null) ...[
+                      const SizedBox(height: 8),
+                      Text(GroupMessages.paymentLabel),
+                      if (GroupMessages.refundLabel(me) != null)
+                        Text(
+                          GroupMessages.refundLabel(me)!,
+                          key: AppKeys.refundStatus,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.35,
+                          ),
+                        ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      GroupMessages.cancelWindowLabel(
+                        group.cancelWindow.inHours,
+                      ),
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              if (group.note.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _SectionCard(
+                  icon: Icons.sticky_note_2_outlined,
+                  title: 'Recado',
+                  child: Text(
+                    group.note,
+                    key: AppKeys.groupNote,
+                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
                   ),
                 ),
-                child: const Text(GroupMessages.openWaze),
+              ],
+              const SizedBox(height: 12),
+              _RoomProfile(
+                group: group,
+                photos: photos,
+                addressQuery: addressQuery,
+              ),
+              const SizedBox(height: 20),
+              _SectionCard(
+                icon: Icons.people_outline,
+                title: group.isCancelled ? 'Quem estava' : 'Quem já está',
+                child: Column(
+                  children: [
+                    for (final person in roster)
+                      if (_visible(person))
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: scheme.primaryContainer,
+                            foregroundColor: scheme.onPrimaryContainer,
+                            child: Text(_initial(person.displayName)),
+                          ),
+                          title: Text(person.displayName),
+                          subtitle: Text(_personSubtitle(person)),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_canModerate(person))
+                                PopupMenuButton<String>(
+                                  key: AppKeys.memberMenu(person.id),
+                                  onSelected: (value) {
+                                    if (value == 'block') {
+                                      _block(person);
+                                    } else {
+                                      _report(person);
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: 'report',
+                                      child: Text(GroupMessages.report),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'block',
+                                      child: Text(GroupMessages.block),
+                                    ),
+                                  ],
+                                ),
+                              if (_canRemove(group, userId, now, person))
+                                TextButton(
+                                  key: AppKeys.removeMember(person.id),
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _remove(person),
+                                  child: const Text('Remover'),
+                                ),
+                            ],
+                          ),
+                        ),
+                  ],
+                ),
               ),
             ],
           ),
-        ],
-        const SizedBox(height: 4),
-        Text(
-          GroupMessages.confirmedCount(group.confirmedCount),
-          key: AppKeys.confirmedCount,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
         ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(99),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 8,
-            backgroundColor: scheme.primaryContainer,
-            color: group.isFull ? scheme.onSurfaceVariant : scheme.primary,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          group.isCancelled ? 'Quem estava' : 'Quem já está',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        for (final person in roster)
-          if (_visible(person))
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: scheme.primaryContainer,
-                foregroundColor: scheme.onPrimaryContainer,
-                child: Text(_initial(person.displayName)),
-              ),
-              title: Text(person.displayName),
-              subtitle: Text(_personSubtitle(person)),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_canModerate(person))
-                    PopupMenuButton<String>(
-                      key: AppKeys.memberMenu(person.id),
-                      onSelected: (value) {
-                        if (value == 'block') {
-                          _block(person);
-                        } else {
-                          _report(person);
-                        }
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(
-                          value: 'report',
-                          child: Text(GroupMessages.report),
-                        ),
-                        PopupMenuItem(
-                          value: 'block',
-                          child: Text(GroupMessages.block),
-                        ),
-                      ],
-                    ),
-                  if (_canRemove(group, userId, now, person))
-                    TextButton(
-                      key: AppKeys.removeMember(person.id),
-                      onPressed: _busy ? null : () => _remove(person),
-                      child: const Text('Remover'),
-                    ),
-                ],
-              ),
-            ),
       ],
     );
   }
@@ -917,39 +950,344 @@ class _Banner extends StatelessWidget {
   }
 }
 
-class _InfoPanel extends StatelessWidget {
-  const _InfoPanel({
+/// Capa da sala escolhida. O Hero continua a foto do cartão.
+class _GroupCover extends StatelessWidget {
+  const _GroupCover({required this.group, this.categoryLabel});
+
+  final Group group;
+  final String? categoryLabel;
+
+  static const height = 300.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cover = group.coverAsset;
+    final photo = cover.isEmpty
+        ? const ColoredBox(color: Color(0xFF0E1716))
+        : ScapePhoto(asset: cover, semanticLabel: group.roomName);
+    final framed = cover.isEmpty
+        ? photo
+        : HeroMode(
+            enabled: scapeAnimationsEnabled(context),
+            child: Hero(
+              tag: groupHeroTag(group.id),
+              child: Material(
+                type: MaterialType.transparency,
+                child: SizedBox.expand(child: photo),
+              ),
+            ),
+          );
+
+    return SizedBox(
+      key: AppKeys.groupCover,
+      height: height,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          framed,
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x330E1716),
+                  Color(0x000E1716),
+                  Color(0xCC0E1716),
+                  Color(0xF20E1716),
+                ],
+                stops: [0, 0.28, 0.62, 1],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 18,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (categoryLabel != null) ...[
+                  _CoverChip(label: categoryLabel!),
+                  const SizedBox(height: 8),
+                ],
+                Text(
+                  group.roomName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${group.houseName} · ${group.neighborhood}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.92),
+                  ),
+                ),
+                Text(
+                  group.cityName,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.84),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoverChip extends StatelessWidget {
+  const _CoverChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    required this.child,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
       ),
-      child: Row(
+    );
+  }
+}
+
+/// Perfil da sala escolhida: fotos, história e a ficha, com o link completo.
+class _RoomProfile extends StatelessWidget {
+  const _RoomProfile({
+    required this.group,
+    required this.photos,
+    required this.addressQuery,
+  });
+
+  final Group group;
+  final List<String> photos;
+  final String addressQuery;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final address =
+        '${group.streetAddress} · ${group.neighborhood} · ${group.cityName}';
+    return _SectionCard(
+      icon: Icons.meeting_room_outlined,
+      title: 'Sobre a sala',
+      child: Column(
+        key: AppKeys.roomProfile,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          if (photos.isNotEmpty) ...[
+            SizedBox(
+              key: AppKeys.groupRoomGallery,
+              height: 112,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: photos.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      width: 148,
+                      child: ScapePhoto(
+                        asset: photos[index],
+                        semanticLabel: '${group.roomName}, foto ${index + 1}',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (group.roomTheme.isNotEmpty) ...[
+            Text(
+              'História',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              group.roomTheme,
+              style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
+            ),
+            const SizedBox(height: 8),
+          ],
+          _FactRow(
+            icon: Icons.timer_outlined,
+            label: 'Duração',
+            value: '${group.durationMinutes} min',
+          ),
+          _FactRow(
+            icon: Icons.speed,
+            label: 'Dificuldade',
+            value: group.difficulty.labelPt,
+          ),
+          _FactRow(
+            icon: Icons.groups_outlined,
+            label: 'Capacidade',
+            value: 'Até ${group.roomCapacity} pessoas',
+          ),
+          _FactRow(
+            icon: Icons.payments_outlined,
+            label: 'Preço',
+            value: '${formatPrice(group.priceCents)} por pessoa',
+          ),
+          _FactRow(
+            icon: Icons.storefront_outlined,
+            label: 'Casa',
+            value: group.houseName,
+          ),
+          if (group.streetAddress.isNotEmpty) ...[
+            _FactRow(
+              icon: Icons.place_outlined,
+              label: 'Endereço',
+              value: address,
+              valueKey: AppKeys.roomAddress,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: AppKeys.openMaps,
+                  onPressed: () => openExternalUrl(googleMapsUri(addressQuery)),
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text(GroupMessages.openMaps),
+                ),
+                OutlinedButton.icon(
+                  key: AppKeys.openWaze,
+                  onPressed: () => openExternalUrl(wazeUri(addressQuery)),
+                  icon: const Icon(Icons.navigation_outlined),
+                  label: const Text(GroupMessages.openWaze),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 4),
+          TextButton.icon(
+            key: AppKeys.openRoomDetail,
+            onPressed: () => context.push('/salas/${group.roomId}'),
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Ver a sala completa'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FactRow extends StatelessWidget {
+  const _FactRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueKey,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Key? valueKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: scheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(subtitle),
+                Text(
+                  value,
+                  key: valueKey,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
               ],
             ),
           ),

@@ -15,6 +15,16 @@ String roomCategoryLabel(RoomCategory category) {
 /// Tag compartilhada pelo cartão e pela capa da sala, para o voo Hero.
 String roomHeroTag(String roomId) => 'room-cover-$roomId';
 
+/// Tema da capa, quando a foto é a de um carrossel. Nulo se a capa for outra.
+RoomCategory? categoryForCover(String cover) {
+  for (final category in RoomCategory.values) {
+    if (roomCategoryImage(category) == cover) {
+      return category;
+    }
+  }
+  return null;
+}
+
 /// Capa do tema e mais duas fotos da galeria. Tudo local, sem hotlink.
 List<String> roomGallery(RoomCategory category) {
   final extra = switch (category) {

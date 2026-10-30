@@ -202,6 +202,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // A sala da Home (`/sala/:id`) vive dentro da aba. Aberta de um grupo,
+      // ela ficaria por baixo. Este caminho é a mesma tela, por cima do grupo.
+      GoRoute(
+        path: '/salas/:roomId',
+        name: 'room-from-group',
+        pageBuilder: (context, state) {
+          return scapePage(
+            key: state.pageKey,
+            child: RoomDetailScreen(roomId: state.pathParameters['roomId']!),
+          );
+        },
+      ),
       GoRoute(
         path: '/groups/:groupId',
         name: 'group-detail',

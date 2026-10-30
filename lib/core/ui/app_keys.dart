@@ -115,6 +115,10 @@ abstract final class AppKeys {
   static Key roomCard(String id) => Key('room-card-$id');
   static Key roomDetail(String id) => Key('room-detail-$id');
   static const roomGallery = Key('room-gallery');
+  static const groupCover = Key('group-cover');
+  static const roomProfile = Key('room-profile');
+  static const groupRoomGallery = Key('group-room-gallery');
+  static const openRoomDetail = Key('open-room-detail');
   static Key roomFindGroup(String id) => Key('room-find-group-$id');
   static Key roomCreateGroup(String id) => Key('room-create-group-$id');
   static Key roomGroupsCreate(String id) => Key('room-groups-create-$id');

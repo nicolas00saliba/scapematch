@@ -30,17 +30,18 @@ void main() {
         (widget) =>
             widget is Image &&
             widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName.contains('onboarding'),
+            (widget.image as AssetImage).assetName.endsWith(
+              'onboarding/encontrar.jpg',
+            ),
       ),
-      findsWidgets,
+      findsOneWidget,
     );
   });
 
   testWidgets('the room photo opens a gallery', (tester) async {
     await pumpScapeMatch(tester);
-    GoRouter.of(
-      tester.element(find.byType(Scaffold).first),
-    ).go('/sala/${SampleIds.roomCwbCofre}');
+    GoRouter.of(tester.element(find.byType(Scaffold).first))
+        .go('/sala/${SampleIds.roomCwbCofre}');
     await tester.pumpAndSettle();
     expect(find.byType(RoomDetailScreen), findsOneWidget);
     expect(find.byKey(AppKeys.roomGallery), findsOneWidget);

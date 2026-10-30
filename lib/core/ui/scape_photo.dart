@@ -7,11 +7,13 @@ class ScapePhoto extends StatelessWidget {
     required this.asset,
     this.semanticLabel,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
   });
 
   final String asset;
   final String? semanticLabel;
   final BoxFit fit;
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +22,7 @@ class ScapePhoto extends StatelessWidget {
       child: Image.asset(
         asset,
         fit: fit,
+        alignment: alignment,
         gaplessPlayback: true,
         semanticLabel: semanticLabel,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {

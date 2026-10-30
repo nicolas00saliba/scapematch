@@ -24,12 +24,17 @@ class _OnboardingPage {
     required this.title,
     required this.body,
     this.showPreferences = false,
+    this.alignment = Alignment.center,
   });
 
   final String asset;
   final String title;
   final String body;
   final bool showPreferences;
+
+  /// Sobe um pouco o enquadramento quando a foto é alta, para os rostos
+  /// não sumirem na faixa larga da web.
+  final Alignment alignment;
 }
 
 const _pages = <_OnboardingPage>[
@@ -37,6 +42,7 @@ const _pages = <_OnboardingPage>[
     asset: 'assets/images/onboarding/encontrar.jpg',
     title: OnboardingMessages.findTitle,
     body: OnboardingMessages.findBody,
+    alignment: Alignment(0, -0.2),
   ),
   _OnboardingPage(
     asset: 'assets/images/onboarding/cidade.jpg',
@@ -187,7 +193,11 @@ class _PageBody extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        ScapePhoto(asset: page.asset, semanticLabel: page.title),
+        ScapePhoto(
+          asset: page.asset,
+          semanticLabel: page.title,
+          alignment: page.alignment,
+        ),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(

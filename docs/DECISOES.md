@@ -8,6 +8,14 @@
 - **Onde está no código:** `OnboardingScreen`, `ScapePhoto`, `PressableScale`, `ShimmerBox`, `RoomDetailScreen`, `GroupCard` e `docs/CREDITOS_IMAGENS.md`.
 - **Como trocar depois:** outra foto entra em `assets/` e no crédito. O voo da sala é a tag `roomHeroTag`.
 
+## A tela do grupo mostra a sala
+
+- **Data:** 2026-10-30
+- **Decisão:** a tela do grupo abre com a capa da sala escolhida, a mesma foto do cartão. Um degradê escuro segura o nome, a casa e a cidade por cima. O voo usa `groupHeroTag`, separada de `roomHeroTag`, para a capa do grupo e a capa da sala não disputarem a mesma tag. Abaixo, cartões separam quando, vagas, pagamento, o recado e quem já está. A seção Sobre a sala traz a galeria do tema, a história curta da sala, duração, dificuldade, capacidade, preço, casa, endereço, Maps, Waze e o link “Ver a sala completa”. Esse link abre a mesma tela da sala, no caminho `/salas/:id`, por cima do grupo: `/sala/:id` vive na aba Home e abriria por baixo. Prazo, presenças, membros, convidar e entrar continuam. O botão principal segue fixo embaixo. A primeira foto da introdução passa a ser um grupo jogando junto, em ambiente interno, no lugar da foto em que uma pessoa aparecia no centro.
+- **Motivo:** a tela do grupo estava só em texto, e a primeira impressão pedia gente jogando junta.
+- **Onde está no código:** `GroupDetailScreen`, `GroupCard`, `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra capa entra no tema da sala. Outra foto de abertura entra em `assets/images/onboarding/encontrar.jpg` e no crédito.
+
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
 ## Grupo que fecha, casa, fila e conta

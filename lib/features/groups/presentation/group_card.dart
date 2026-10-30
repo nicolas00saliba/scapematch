@@ -7,6 +7,11 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
+/// Voo da capa: do cartão do grupo até a tela do grupo.
+///
+/// Não usa a tag da sala. As duas capas podem estar na mesma Home.
+String groupHeroTag(String groupId) => 'group-cover-$groupId';
+
 class GroupCard extends StatelessWidget {
   const GroupCard({
     super.key,
@@ -50,11 +55,20 @@ class GroupCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (group.coverAsset.isNotEmpty)
-                    SizedBox(
-                      width: 112,
-                      child: ScapePhoto(
-                        asset: group.coverAsset,
-                        semanticLabel: group.roomName,
+                    HeroMode(
+                      enabled: scapeAnimationsEnabled(context),
+                      child: Hero(
+                        tag: groupHeroTag(group.id),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: SizedBox(
+                            width: 112,
+                            child: ScapePhoto(
+                              asset: group.coverAsset,
+                              semanticLabel: group.roomName,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   Expanded(
