@@ -42,7 +42,7 @@ const _pages = <_OnboardingPage>[
     asset: 'assets/images/onboarding/encontrar.jpg',
     title: OnboardingMessages.findTitle,
     body: OnboardingMessages.findBody,
-    alignment: Alignment(0, -0.2),
+    alignment: Alignment.center,
   ),
   _OnboardingPage(
     asset: 'assets/images/onboarding/cidade.jpg',

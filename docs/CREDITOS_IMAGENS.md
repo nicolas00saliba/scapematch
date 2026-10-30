@@ -1,10 +1,10 @@
 # Créditos das imagens
 
-Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license), ou do Pexels, na [licença Pexels](https://www.pexels.com/license/). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar. A primeira tela da introdução usa um grupo jogando junto, em ambiente interno (Pexels 9068986, Yan Krukau).
+Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license), ou do Pexels, na [licença Pexels](https://www.pexels.com/license/). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar. A primeira tela da introdução usa um grupo numeroso junto, em ambiente interno (Pexels 20826894, Luca Istrate).
 
 | Arquivo | Foto |
 | --- | --- |
-| `assets/images/onboarding/encontrar.jpg` | https://www.pexels.com/photo/9068986/ |
+| `assets/images/onboarding/encontrar.jpg` | https://www.pexels.com/photo/20826894/ |
 | `assets/images/onboarding/cidade.jpg` | https://unsplash.com/photos/1522202176988-66273c2fd55f |
 | `assets/images/onboarding/convidar.jpg` | https://www.pexels.com/photo/7149165/ |
 | `assets/images/onboarding/reservar.jpg` | https://www.pexels.com/photo/3184183/ |
