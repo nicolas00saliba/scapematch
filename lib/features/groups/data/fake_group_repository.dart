@@ -1,5 +1,6 @@
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/time/clock.dart';
+import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
@@ -252,9 +253,7 @@ class FakeGroupRepository implements GroupRepository {
       return const CreateGroupFailure(CreateGroupFailureReason.alreadyStarted);
     }
     if (GroupRules.tooCloseToCreate(startsAt: slot.startsAt, now: now)) {
-      return const CreateGroupFailure(
-        CreateGroupFailureReason.tooCloseToStart,
-      );
+      return const CreateGroupFailure(CreateGroupFailureReason.tooCloseToStart);
     }
 
     final taken = GroupRules.roomAndTimeTaken(
@@ -304,6 +303,7 @@ class FakeGroupRepository implements GroupRepository {
       minimumSpots: room.minimumPlayers,
       cancelWindow: room.cancelWindow,
       streetAddress: house.streetAddress,
+      coverAsset: roomCategoryImage(room.category),
       closesAt: GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
       participants: [
         Participant(

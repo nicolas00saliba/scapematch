@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
-import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
@@ -17,47 +18,41 @@ class OnboardingScreen extends ConsumerStatefulWidget {
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-enum _Tone { primary, secondary, tertiary }
-
 class _OnboardingPage {
   const _OnboardingPage({
-    required this.icon,
+    required this.asset,
     required this.title,
     required this.body,
     this.showPreferences = false,
-    this.tone = _Tone.primary,
   });
 
-  final IconData icon;
+  final String asset;
   final String title;
   final String body;
   final bool showPreferences;
-  final _Tone tone;
 }
 
 const _pages = <_OnboardingPage>[
   _OnboardingPage(
-    icon: Icons.groups_outlined,
+    asset: 'assets/images/onboarding/encontrar.jpg',
     title: OnboardingMessages.findTitle,
     body: OnboardingMessages.findBody,
   ),
   _OnboardingPage(
-    icon: Icons.explore_outlined,
+    asset: 'assets/images/onboarding/cidade.jpg',
     title: OnboardingMessages.nearTitle,
     body: OnboardingMessages.nearBody,
     showPreferences: true,
   ),
   _OnboardingPage(
-    icon: Icons.ios_share_outlined,
+    asset: 'assets/images/onboarding/convidar.jpg',
     title: OnboardingMessages.inviteTitle,
     body: OnboardingMessages.inviteBody,
-    tone: _Tone.secondary,
   ),
   _OnboardingPage(
-    icon: Icons.payments_outlined,
+    asset: 'assets/images/onboarding/reservar.jpg',
     title: OnboardingMessages.payTitle,
     body: OnboardingMessages.payBody,
-    tone: _Tone.tertiary,
   ),
 ];
 
@@ -80,7 +75,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await _finish();
       return;
     }
-    await _page.nextPage(duration: _pageTurn, curve: Curves.easeOutCubic);
+    await _page.nextPage(
+      duration: scapeDuration(context, _pageTurn),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _finish() async {
@@ -93,86 +91,86 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: AppScaffold.maxWidth),
-            child: Column(
-              children: [
-                Expanded(
-                  child: PageView.builder(
-                    controller: _page,
-                    itemCount: _pages.length,
-                    onPageChanged: (index) => setState(() => _index = index),
-                    itemBuilder: (context, index) {
-                      return _PageBody(page: _pages[index]);
-                    },
-                  ),
-                ),
-                _dots(theme),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  child: Row(
-                    children: [
-                      TextButton(
-                        key: AppKeys.onboardingSkip,
-                        onPressed: _finish,
-                        child: const Text(OnboardingMessages.skip),
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: _page,
+            itemCount: _pages.length,
+            onPageChanged: (index) => setState(() => _index = index),
+            itemBuilder: (context, index) {
+              return _PageBody(page: _pages[index]);
+            },
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Row(
+                  children: [
+                    TextButton(
+                      key: AppKeys.onboardingSkip,
+                      onPressed: _finish,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
                       ),
-                      const Spacer(),
-                      FilledButton(
-                        key: _last
-                            ? AppKeys.onboardingStart
-                            : AppKeys.onboardingNext,
-                        onPressed: _next,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(132, 48),
-                        ),
-                        child: Text(
-                          _last
-                              ? OnboardingMessages.start
-                              : OnboardingMessages.next,
-                        ),
+                      child: const Text(OnboardingMessages.skip),
+                    ),
+                    const Spacer(),
+                    _dots(),
+                    const Spacer(),
+                    FilledButton(
+                      key: _last
+                          ? AppKeys.onboardingStart
+                          : AppKeys.onboardingNext,
+                      onPressed: _next,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(132, 48),
                       ),
-                    ],
-                  ),
+                      child: Text(
+                        _last
+                            ? OnboardingMessages.start
+                            : OnboardingMessages.next,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _dots(ThemeData theme) {
-    final scheme = theme.colorScheme;
+  Widget _dots() {
     return Semantics(
       label: 'Página ${_index + 1} de ${_pages.length}',
-      child: Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var index = 0; index < _pages.length; index++) ...[
-              if (index > 0) const SizedBox(width: 8),
-              AnimatedContainer(
-                duration: _pageTurn,
-                curve: Curves.easeOutCubic,
-                width: index == _index ? 22 : 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: index == _index ? scheme.primary : scheme.outline,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var index = 0; index < _pages.length; index++) ...[
+            if (index > 0) const SizedBox(width: 6),
+            AnimatedContainer(
+              duration: _pageTurn,
+              curve: Curves.easeOutCubic,
+              width: index == _index ? 18 : 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: index == _index
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -186,84 +184,70 @@ class _PageBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: (constraints.maxHeight - 40).clamp(0, double.infinity),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _IconBadge(icon: page.icon, tone: page.tone),
-                const SizedBox(height: 28),
-                Text(
-                  page.title,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  page.body,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-                if (page.showPreferences) ...[
-                  const SizedBox(height: 28),
-                  const _Preferences(),
-                ],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ScapePhoto(asset: page.asset, semanticLabel: page.title),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0x330E1716),
+                Color(0x000E1716),
+                Color(0xCC0E1716),
+                Color(0xF20E1716),
               ],
+              stops: [0, 0.28, 0.62, 1],
             ),
           ),
-        );
-      },
-    );
-  }
-}
-
-class _IconBadge extends StatelessWidget {
-  const _IconBadge({required this.icon, required this.tone});
-
-  final IconData icon;
-  final _Tone tone;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (background, foreground, border) = switch (tone) {
-      _Tone.primary => (
-        scheme.primaryContainer,
-        scheme.onPrimaryContainer,
-        scheme.primaryContainer,
-      ),
-      _Tone.secondary => (
-        scheme.secondaryContainer,
-        scheme.onSecondaryContainer,
-        scheme.secondaryContainer,
-      ),
-      _Tone.tertiary => (scheme.tertiary, scheme.onTertiary, scheme.onTertiary),
-    };
-    return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        color: background,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: border,
-          width: tone == _Tone.tertiary ? 2 : 0,
         ),
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, size: 56, color: foreground),
+        SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 88),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: (constraints.maxHeight - 116).clamp(
+                      0,
+                      double.infinity,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        page.title,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        page.body,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          height: 1.35,
+                        ),
+                      ),
+                      if (page.showPreferences) ...[
+                        const SizedBox(height: 18),
+                        const _Preferences(),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -274,37 +258,45 @@ class _Preferences extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final selected = ref.watch(selectedGameTypeIdProvider);
     final label = theme.textTheme.titleSmall?.copyWith(
       fontWeight: FontWeight.w800,
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(OnboardingMessages.cityHeading, style: label),
-        const SizedBox(height: 8),
-        const CitySelector(prominent: false),
-        const SizedBox(height: 20),
-        Text(OnboardingMessages.gameTypeHeading, style: label),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+    return Material(
+      color: scheme.surface.withValues(alpha: 0.94),
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final choice in GameTypes.choices)
-              ChoiceChip(
-                key: AppKeys.gameTypeOption(choice.id),
-                label: Text(choice.shortLabel),
-                selected: selected == choice.id,
-                onSelected: (_) {
-                  ref
-                      .read(selectedGameTypeIdProvider.notifier)
-                      .select(choice.id);
-                },
-              ),
+            Text(OnboardingMessages.cityHeading, style: label),
+            const SizedBox(height: 8),
+            const CitySelector(prominent: false),
+            const SizedBox(height: 16),
+            Text(OnboardingMessages.gameTypeHeading, style: label),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final choice in GameTypes.choices)
+                  ChoiceChip(
+                    key: AppKeys.gameTypeOption(choice.id),
+                    label: Text(choice.shortLabel),
+                    selected: selected == choice.id,
+                    onSelected: (_) {
+                      ref
+                          .read(selectedGameTypeIdProvider.notifier)
+                          .select(choice.id);
+                    },
+                  ),
+              ],
+            ),
           ],
         ),
-      ],
+      ),
     );
   }
 }

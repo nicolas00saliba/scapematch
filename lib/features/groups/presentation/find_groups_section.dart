@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
@@ -352,11 +353,14 @@ class _GroupWindowState extends State<_GroupWindow> {
               children: [
                 for (var index = 0; index < widget.groups.length; index++) ...[
                   if (index > 0) const SizedBox(height: 10),
-                  GroupCard(
-                    now: widget.now,
-                    group: widget.groups[index],
-                    onTap: () => widget.onOpen(widget.groups[index]),
-                    onInvite: () => widget.onInvite(widget.groups[index]),
+                  StaggerIn(
+                    index: index,
+                    child: GroupCard(
+                      now: widget.now,
+                      group: widget.groups[index],
+                      onTap: () => widget.onOpen(widget.groups[index]),
+                      onInvite: () => widget.onInvite(widget.groups[index]),
+                    ),
                   ),
                 ],
               ],

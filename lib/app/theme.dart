@@ -12,7 +12,7 @@ ThemeData buildAppTheme(Brightness brightness) {
   final status = dark ? _darkStatus : _lightStatus;
   final page = dark ? _darkPage : _lightPage;
   final rounded = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(22),
   );
 
   return ThemeData(
@@ -37,10 +37,12 @@ ThemeData buildAppTheme(Brightness brightness) {
     ),
     cardTheme: CardThemeData(
       color: scheme.surface,
-      elevation: 0,
+      elevation: 1,
+      shadowColor: const Color(0x140E1716),
+      surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
         side: BorderSide(color: scheme.outlineVariant),
       ),
     ),

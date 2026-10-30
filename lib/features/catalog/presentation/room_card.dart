@@ -4,13 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
+import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/catalog/presentation/scape_pin_icon.dart';
 
 /// Largura fixa do cartão no carrossel.
 const roomCardWidth = 300.0;
 
-const _photoHeight = 132.0;
+const _photoHeight = 168.0;
 const _pad = 12.0;
 const _textTop = 10.0;
 const _pinSize = 16.0;
@@ -53,54 +55,61 @@ class RoomCard extends StatelessWidget {
 
   final RoomListing listing;
 
-  static const decodeWidth = 800;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final room = listing.room;
     final image = roomCategoryImage(room.category);
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: _photoHeight,
-            child: Image.asset(
-              image,
-              key: AppKeys.roomCard(room.id),
-              fit: BoxFit.cover,
-              cacheWidth: decodeWidth,
-              semanticLabel: room.name,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(_pad, _textTop, _pad, _pad),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  room.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: _titleStyle(theme),
+    return PressableScale(
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: () => context.push('/sala/${room.id}'),
+              child: Hero(
+                tag: roomHeroTag(room.id),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: SizedBox(
+                    height: _photoHeight,
+                    child: ScapePhoto(
+                      key: AppKeys.roomCard(room.id),
+                      asset: image,
+                      semanticLabel: room.name,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  listing.houseName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: _houseStyle(theme),
-                ),
-                const SizedBox(height: 8),
-                _RoomFooter(listing: listing),
-              ],
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(_pad, _textTop, _pad, _pad),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    room.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _titleStyle(theme),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    listing.houseName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _houseStyle(theme),
+                  ),
+                  const SizedBox(height: 8),
+                  _RoomFooter(listing: listing),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

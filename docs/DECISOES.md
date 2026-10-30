@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## Sensação das telas
+
+- **Data:** 2026-10-30
+- **Decisão:** a introdução abre com foto em tela cheia, degradê escuro e a frase por cima. A primeira tela diz “Encontre pessoas para jogar”. O cartão da sala tem capa do tema e, ao toque na foto, cresce até a tela da sala, que tem uma galeria de três fotos locais. Os grupos da Home ganham a mesma capa e avatares empilhados de quem já entrou. Toque encolhe o cartão um pouco; no celular há uma vibração leve, na web não. No lugar do spinner fica uma faixa de brilho. Listas entram em cascata e o número de gente no cartão conta até o valor. Com reduzir movimento, isso tudo fica parado. Cantos ficam mais redondos e o cartão ganha sombra leve. A paleta continua Cofre de Cobre. Promoções, novidades e grupos que estão se formando continuam na Home. O mapa ao vivo fica para outro PR. Links externos continuam abrindo em outra aba na web.
+- **Motivo:** o dono quer a fluidez de um app de reserva, no celular e na web, sem trocar as regras.
+- **Onde está no código:** `OnboardingScreen`, `ScapePhoto`, `PressableScale`, `ShimmerBox`, `RoomDetailScreen`, `GroupCard` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra foto entra em `assets/` e no crédito. O voo da sala é a tag `roomHeroTag`.
+
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
 ## Grupo que fecha, casa, fila e conta

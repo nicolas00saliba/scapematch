@@ -113,6 +113,8 @@ abstract final class AppKeys {
   static Key selectionField(String name) => Key('selection-$name');
   static Key roomCarousel(String category) => Key('room-carousel-$category');
   static Key roomCard(String id) => Key('room-card-$id');
+  static Key roomDetail(String id) => Key('room-detail-$id');
+  static const roomGallery = Key('room-gallery');
   static Key roomFindGroup(String id) => Key('room-find-group-$id');
   static Key roomCreateGroup(String id) => Key('room-create-group-$id');
   static Key roomGroupsCreate(String id) => Key('room-groups-create-$id');
