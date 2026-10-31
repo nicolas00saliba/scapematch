@@ -11,16 +11,16 @@
 ## A tela do grupo mostra a sala
 
 - **Data:** 2026-10-30
-- **Decisão:** a tela do grupo abre com a capa da sala escolhida, a mesma foto do cartão. Um degradê escuro segura o nome, a casa e a cidade por cima. O voo usa `groupHeroTag`, separada de `roomHeroTag`, para a capa do grupo e a capa da sala não disputarem a mesma tag. Abaixo, cartões separam quando, vagas, pagamento, o recado e quem já está. A seção Sobre a sala traz a galeria do tema, a história curta da sala, duração, dificuldade, capacidade, preço, casa, endereço, Maps, Waze e o link “Ver a sala completa”. Esse link abre a mesma tela da sala, no caminho `/salas/:id`, por cima do grupo: `/sala/:id` vive na aba Home e abriria por baixo. Prazo, presenças, membros, convidar e entrar continuam. O botão principal segue fixo embaixo. A primeira foto da introdução é um grupo numeroso junto, em ambiente interno (Pexels 20826894). A foto do Jenga e a de uma pessoa sozinha saíram.
+- **Decisão:** a tela do grupo abre com a capa da sala escolhida, a mesma foto do cartão. Um degradê escuro segura o nome, a casa e a cidade por cima. O voo usa `groupHeroTag`, separada de `roomHeroTag`, para a capa do grupo e a capa da sala não disputarem a mesma tag. Abaixo, cartões separam quando, vagas, pagamento, o recado e quem já está. A seção Sobre a sala traz a galeria do tema, a história curta da sala, duração, dificuldade, capacidade, preço, casa, endereço, Maps, Waze e o link “Ver a sala completa”. Esse link abre a mesma tela da sala, no caminho `/salas/:id`, por cima do grupo: `/sala/:id` vive na aba Home e abriria por baixo. Prazo, presenças, membros, convidar e entrar continuam. O botão principal segue fixo embaixo. A primeira foto da introdução é um grupo numeroso num fliperama, em ambiente interno (Pexels 17368156). A foto do Jenga e a de uma pessoa sozinha saíram.
 - **Motivo:** a tela do grupo estava só em texto, e a primeira impressão pedia gente jogando junta.
 - **Onde está no código:** `GroupDetailScreen`, `GroupCard`, `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
 - **Como trocar depois:** outra capa entra no tema da sala. Outra foto de abertura entra em `assets/images/onboarding/encontrar.jpg` e no crédito.
 
 ## A primeira foto da introdução é um grupo grande
 
-- **Data:** 2026-10-30
-- **Decisão:** a tela “Encontre pessoas para jogar” usa Pexels 20826894 (Luca Istrate): um grupo grande, em ambiente interno, com vários rostos visíveis e gente interagindo. O enquadramento fica no centro, para o corte do celular e o da largura 1280 ainda mostrarem o grupo, com o texto embaixo no degradê. A foto do Jenga saiu.
-- **Motivo:** entre as fotos já baixadas, esta foi a única que continuou lendo como grupo de cinco ou mais, com rostos à vista, depois do corte de retrato e do corte largo. O karaokê (Pexels 29298514) tem a placa e a alegria, mas poucos rostos nítidos no corte largo. O boliche (Pexels 7429776) enquadra bem nos dois formatos, e para em quatro pessoas. O laser tag (Pexels 31107755) tem gente demais, com máscara e crianças. Nenhuma candidata baixada era uma escape room com grupo.
+- **Data:** 2026-10-31
+- **Decisão:** a tela “Encontre pessoas para jogar” usa Pexels 17368156 (Matheus Bertelli): cerca de dez adultos num fliperama, rostos visíveis, em ambiente interno. O enquadramento fica no centro. O corte do celular e o da largura 1280 ainda mostram o grupo, com o texto embaixo no degradê. A foto do Jenga saiu. A festa (Pexels 20826894) também saiu.
+- **Motivo:** o fliperama é diversão presencial em grupo e continua com mais de cinco rostos nos dois cortes. A festa tinha gente junta, sem o lugar da brincadeira. O karaokê (Pexels 29298514) tem a placa e a alegria, com poucos rostos nítidos no corte largo. O boliche (Pexels 7429776) enquadra bem e para em quatro pessoas. O laser tag (Pexels 31107755) tem muita gente, com máscara e crianças. Nenhuma candidata era uma escape room com grupo.
 - **Onde está no código:** `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
 - **Como trocar depois:** outra foto entra em `assets/images/onboarding/encontrar.jpg` e no crédito.
 
