@@ -35,9 +35,9 @@ const nearbyWideWidth = 960.0;
 const _panelWidth = 380.0;
 
 final nearbyCatalogProvider =
-    FutureProvider.autoDispose<
-      ({List<EscapeHouse> houses, List<Group> groups})
-    >((ref) async {
+    FutureProvider<({List<EscapeHouse> houses, List<Group> groups})>((
+      ref,
+    ) async {
       final cities = await ref.watch(cityRepositoryProvider).listCities();
       final catalog = ref.watch(catalogRepositoryProvider);
       final groupsRepo = ref.watch(groupRepositoryProvider);
@@ -61,7 +61,10 @@ class NearbyScreen extends ConsumerStatefulWidget {
   ConsumerState<NearbyScreen> createState() => _NearbyScreenState();
 }
 
-class _NearbyScreenState extends ConsumerState<NearbyScreen> {
+class _NearbyScreenState extends ConsumerState<NearbyScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   final _mapController = MapController();
   Timer? _seatTimer;
   var _radiusKm = 5;
@@ -273,26 +276,31 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final catalog = ref.watch(nearbyCatalogProvider);
     final cities = ref.watch(citiesProvider).asData?.value ?? const <City>[];
     final now = ref.watch(clockProvider).now();
     final fix = _fix;
-    return ColoredBox(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: fix == null || catalog.isLoading
-          ? const LoadingView(message: LiveMapMessages.loading)
-          : catalog.hasError
-          ? ErrorView(
-              message: LiveMapMessages.loadError,
-              onRetry: () => ref.invalidate(nearbyCatalogProvider),
-            )
-          : _ready(
-              context,
-              houses: catalog.requireValue.houses,
-              groups: catalog.requireValue.groups,
-              cities: cities,
-              now: now,
-            ),
+    // isLoading continua verdadeiro numa atualização que já tem a lista.
+    // Trocar o mapa pelo esqueleto nesse caso apaga a câmera no meio do gesto.
+    final data = catalog.value;
+    if (fix == null || data == null) {
+      return ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: catalog.hasError
+            ? ErrorView(
+                message: LiveMapMessages.loadError,
+                onRetry: () => ref.invalidate(nearbyCatalogProvider),
+              )
+            : const LoadingView(message: LiveMapMessages.loading),
+      );
+    }
+    return _ready(
+      context,
+      houses: data.houses,
+      groups: data.groups,
+      cities: cities,
+      now: now,
     );
   }
 
@@ -380,6 +388,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final center = LatLng(origin.latitude, origin.longitude);
     return FlutterMap(
+      key: const ValueKey('nearby-map'),
       mapController: _mapController,
       options: MapOptions(
         initialCenter: center,
@@ -395,6 +404,13 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
           _fitKey = null;
           _scheduleFit();
         },
+        onPositionChanged: (camera, hasGesture) {
+          if (!hasGesture) {
+            return;
+          }
+          // Sem setState: o gesto não reconstrói a tela nem pede o catálogo.
+          _lockCamera = true;
+        },
       ),
       children: [
         ColorFiltered(
@@ -403,7 +419,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
             urlTemplate: liveMapTileUrl(dark: dark),
             userAgentPackageName: 'dev.scapematch.app',
             tileProvider: ref.watch(mapTileProvider),
-            tileDisplay: const TileDisplay.instantaneous(),
+            tileDisplay: const TileDisplay.fadeIn(reloadStartOpacity: 1),
           ),
         ),
         Positioned.fill(

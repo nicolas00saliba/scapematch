@@ -33,6 +33,12 @@
 
   <title>ScapeMatch</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    /* O arraste do mapa no Chrome do Android não recarrega a página. */
+    html, body {
+      overscroll-behavior: none;
+    }
+  </style>
 </head>
 <body>
   <!--
