@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
@@ -222,21 +223,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final trimmed = name.trim();
-    final letter = trimmed.isEmpty ? '?' : trimmed[0].toUpperCase();
-    return CircleAvatar(
-      radius: 14,
-      backgroundColor: scheme.primary,
-      child: Text(
-        letter,
-        style: TextStyle(
-          color: scheme.onPrimary,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
+    return PersonAvatar(name: name, radius: 14);
   }
 }
 

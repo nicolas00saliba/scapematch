@@ -3,8 +3,119 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/map/domain/house_pin.dart';
 import 'package:scapematch/features/map/presentation/live_map_messages.dart';
+
+/// Pino com a foto da sala e o selo de vagas, por exemplo “5/6”.
+///
+/// O escolhido cresce. A caixa do marcador cabe nos dois tamanhos.
+class RoomPhotoPin extends StatelessWidget {
+  const RoomPhotoPin({
+    super.key,
+    required this.markerId,
+    required this.roomName,
+    required this.coverAsset,
+    required this.filled,
+    required this.total,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String markerId;
+  final String roomName;
+  final String coverAsset;
+  final int filled;
+  final int total;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final diameter = selected ? 74.0 : 50.0;
+    final duration = scapeDuration(context, const Duration(milliseconds: 180));
+    final badge = '$filled/$total';
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$roomName, $filled de $total',
+      child: GestureDetector(
+        key: AppKeys.mapPin(markerId),
+        onTap: onTap,
+        child: SizedBox(
+          width: 96,
+          height: 96,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              if (selected)
+                const SizedBox(
+                  key: AppKeys.mapPinSelected,
+                  width: 0,
+                  height: 0,
+                ),
+              AnimatedContainer(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                width: diameter,
+                height: diameter,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.surface,
+                  border: Border.all(
+                    color: selected ? scheme.tertiary : Colors.white,
+                    width: selected ? 4 : 2.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.shadow.withValues(alpha: 0.35),
+                      blurRadius: selected ? 10 : 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: coverAsset.isEmpty
+                    ? ColoredBox(color: scheme.primaryContainer)
+                    : ScapePhoto(asset: coverAsset, semanticLabel: roomName),
+              ),
+              AnimatedPositioned(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                right: (96 - diameter) / 2 - 6,
+                bottom: (96 - diameter) / 2 - 4,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    child: Text(
+                      badge,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 10,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Pino da casa. Grupo se formando pulsa, salvo com reduzir movimento.
 class MapPinButton extends StatefulWidget {

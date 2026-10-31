@@ -1,6 +1,6 @@
 # Créditos das imagens
 
-Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license), ou do Pexels, na [licença Pexels](https://www.pexels.com/license/). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar. A primeira tela da introdução usa um grupo numeroso num fliperama, em ambiente interno (Pexels 17368156, Matheus Bertelli).
+Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license), ou do Pexels, na [licença Pexels](https://www.pexels.com/license/). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar. A primeira tela da introdução usa um grupo numeroso num fliperama, em ambiente interno (Pexels 17368156, Matheus Bertelli). Os retratos `assets/images/people/01.jpg` a `04.jpg` são recortes da ilustração que já estava em `assets/images/news/grupo.jpg`.
 
 | Arquivo | Foto |
 | --- | --- |

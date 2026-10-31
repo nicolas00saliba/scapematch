@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scapematch/core/ui/person_avatar.dart';
+import 'package:scapematch/features/catalog/domain/room_category.dart';
+import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
@@ -218,12 +222,22 @@ void main() {
     expect(find.text('Mapa'), findsNothing);
     expect(find.text('Lista'), findsNothing);
 
+    expect(find.text('5/6'), findsWidgets);
+    final circle = find.descendant(
+      of: find.byKey(AppKeys.mapPin('grp-curitiba-near-0')),
+      matching: find.byType(AnimatedContainer),
+    );
+    final before = tester.getSize(circle);
     await tester.tap(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')));
     await tester.pumpAndSettle();
+    expect(tester.getSize(circle).width, greaterThan(before.width));
     expect(find.byKey(AppKeys.groupPinSheet), findsOneWidget);
     expect(find.text('O Relógio'), findsWidgets);
     expect(find.text(LiveMapMessages.seeGroup), findsOneWidget);
     expect(find.textContaining('km'), findsWidgets);
+    expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.speed), findsOneWidget);
+    expect(find.byType(PersonAvatar), findsWidgets);
 
     await tester.ensureVisible(find.byKey(AppKeys.groupPinOpen));
     await tester.pumpAndSettle();
@@ -266,6 +280,33 @@ void main() {
     expect(find.byKey(AppKeys.nearTab), findsOneWidget);
   });
 
+  testWidgets('wide screen keeps the circle, the dot and the pins on the map', (
+    tester,
+  ) async {
+    await _openNear(tester, const Size(1280, 800));
+    final map = tester.getRect(find.byType(FlutterMap));
+    expect(map.right, closeTo(1280, 1));
+    expect(map.left, greaterThan(300));
+    expect(map.width, greaterThan(800));
+    expect(
+      map.contains(tester.getRect(find.byKey(AppKeys.userDot)).center),
+      isTrue,
+    );
+    expect(
+      map.contains(
+        tester
+            .getRect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')))
+            .center,
+      ),
+      isTrue,
+    );
+    expect(find.byType(MarkerLayer), findsOneWidget);
+    expect(find.byKey(AppKeys.radiusCircle), findsOneWidget);
+    expect(find.byType(CircleLayer), findsNothing);
+    expect(find.text('5/6'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('reduce motion keeps the nearby map still', (tester) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         FakeAccessibilityFeatures(disableAnimations: true);
@@ -292,6 +333,32 @@ void main() {
   });
 }
 
+/// Guarda os tiles que o mapa pediu e devolve os que já baixamos.
+///
+/// O pedido em si sai de [HttpClient] real, fora da zona do teste: o cliente
+/// do widget responde 400, e o TLS feito de dentro dela quebra o handshake.
+class _CachedTiles extends TileProvider {
+  _CachedTiles(this.cache, this.wanted);
+
+  final Map<String, Uint8List> cache;
+  final Set<String> wanted;
+
+  @override
+  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
+    final key = '${coordinates.z}/${coordinates.x}/${coordinates.y}';
+    wanted.add(key);
+    final bytes = cache[key];
+    if (bytes == null) {
+      return MemoryImage(_emptyTile);
+    }
+    return MemoryImage(bytes);
+  }
+}
+
+final Uint8List _emptyTile = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+);
+
 /// O teste de widget troca o [HttpClient] por um que responde 400.
 /// [super.createHttpClient] devolve o cliente de verdade.
 class _RealHttpOverrides extends HttpOverrides {
@@ -305,139 +372,226 @@ class _RealHttpOverrides extends HttpOverrides {
   }
 }
 
-class _FetchedTiles extends TileProvider {
-  _FetchedTiles(this.images);
+Future<void> _saveMapShots(WidgetTester tester) async {
+  final dir = Directory('/opt/cursor/artifacts/live-map')
+    ..createSync(recursive: true);
+  await tester.runAsync(_loadFonts);
+  final client = await tester.runAsync(
+    () async => _RealHttpOverrides().createHttpClient(null),
+  );
+  expect(client, isNotNull);
+  addTearDown(() => client!.close(force: true));
+  final cache = <String, Uint8List>{};
+  final wanted = <String>{};
+  final tiles = _CachedTiles(cache, wanted);
 
-  final Map<String, Uint8List> images;
-
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
-    final key = '${coordinates.z}/${coordinates.x}/${coordinates.y}';
-    final bytes = images[key];
-    if (bytes == null) {
-      return MemoryImage(_emptyPng);
-    }
-    return MemoryImage(bytes);
+  Future<void> show(Size size) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = size;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpScapeMatch(
+      tester,
+      overrides: [
+        mapTileProvider.overrideWithValue(tiles),
+        userLocationSourceProvider.overrideWithValue(
+          FixedUserLocation.device(cityCenters[SampleIds.curitiba]!),
+        ),
+      ],
+    );
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = size;
+    await tester.pump();
+    await tester.tap(find.byKey(AppKeys.nearTab));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
   }
+
+  Future<void> open(Size size) async {
+    for (var pass = 0; pass < 4; pass++) {
+      await show(size);
+      final missing = [
+        for (final key in wanted)
+          if (!cache.containsKey(key)) key,
+      ];
+      if (missing.isNotEmpty) {
+        final fetched = await tester.runAsync(
+          () => _downloadTiles(client!, missing),
+        );
+        cache.addAll(fetched ?? const {});
+        continue;
+      }
+      await _precacheMapPhotos(tester);
+      for (var frame = 0; frame < 6; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      if (await _mapHasImagery(tester)) {
+        return;
+      }
+    }
+    fail('os tiles do mapa não carregaram (${cache.length}/${wanted.length})');
+  }
+
+  await open(const Size(390, 844));
+  await _captureFrame(tester, dir, 'map-phone.png', const Size(390, 844));
+
+  await tester.tap(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await _precacheMapPhotos(tester);
+  await tester.pump();
+  await tester.drag(find.byKey(AppKeys.groupPinSheet), const Offset(0, -420));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await _captureFrame(tester, dir, 'map-sheet.png', const Size(390, 844));
+
+  await open(const Size(1280, 800));
+  await _captureFrame(tester, dir, 'map-1280.png', const Size(1280, 800));
 }
 
-final Uint8List _emptyPng = base64Decode(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-);
+Future<void> _precacheMapPhotos(WidgetTester tester) async {
+  final context = tester.element(find.byKey(AppKeys.appFrame));
+  final assets = <String>{
+    ...PersonPortraits.assets,
+    for (final category in RoomCategory.values) ...[
+      roomCategoryImage(category),
+      ...roomGallery(category),
+    ],
+  };
+  await tester.runAsync(() async {
+    for (final asset in assets) {
+      await precacheImage(AssetImage(asset), context);
+    }
+  });
+  await tester.pump();
+}
 
-Future<Map<String, Uint8List>> _downloadCuritibaTiles() async {
-  final client = _RealHttpOverrides().createHttpClient(null);
+Future<Map<String, Uint8List>> _downloadTiles(
+  HttpClient client,
+  List<String> keys,
+) async {
   final images = <String, Uint8List>{};
-  final jobs = <(int, int, int)>[];
-  void window(int z, int x0, int x1, int y0, int y1) {
-    for (var x = x0; x <= x1; x++) {
-      for (var y = y0; y <= y1; y++) {
-        jobs.add((z, x, y));
+  var index = 0;
+  Future<void> worker() async {
+    while (index < keys.length) {
+      final key = keys[index];
+      index += 1;
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          final request = await client.getUrl(
+            Uri.parse('https://tile.openstreetmap.org/$key.png'),
+          );
+          request.headers.set(
+            HttpHeaders.userAgentHeader,
+            'scapematch/0.1 (dev.scapematch.app)',
+          );
+          final response = await request.close().timeout(
+            const Duration(seconds: 20),
+          );
+          if (response.statusCode != 200) {
+            await response.drain<void>();
+            continue;
+          }
+          final chunks = <int>[];
+          await for (final chunk in response) {
+            chunks.addAll(chunk);
+          }
+          final bytes = Uint8List.fromList(chunks);
+          if (bytes.length > 32) {
+            images[key] = bytes;
+            break;
+          }
+        } catch (_) {}
       }
     }
   }
 
-  window(12, 1484, 1490, 2344, 2350);
-  window(13, 2968, 2980, 4688, 4700);
-  window(14, 5944, 5954, 9384, 9394);
-  window(15, 11892, 11906, 18768, 18786);
-
-  Future<void> one((int, int, int) job) async {
-    final (z, x, y) = job;
-    final request = await client.getUrl(
-      Uri.parse(
-        liveMapTileUrl(dark: false)
-            .replaceAll('{z}', '$z')
-            .replaceAll('{x}', '$x')
-            .replaceAll('{y}', '$y'),
-      ),
-    );
-    request.headers.set(
-      HttpHeaders.userAgentHeader,
-      'scapematch/0.1 (dev.scapematch.app)',
-    );
-    final response = await request.close();
-    if (response.statusCode != 200) {
-      await response.drain<void>();
-      return;
-    }
-    final builder = BytesBuilder(copy: false);
-    await for (final chunk in response) {
-      builder.add(chunk);
-    }
-    images['$z/$x/$y'] = Uint8List.fromList(builder.takeBytes());
-  }
-
-  for (var index = 0; index < jobs.length; index += 12) {
-    final end = index + 12 < jobs.length ? index + 12 : jobs.length;
-    await Future.wait(jobs.sublist(index, end).map(one));
-  }
-  client.close(force: true);
+  await Future.wait([
+    for (var workerIndex = 0; workerIndex < 4; workerIndex++) worker(),
+  ]);
   return images;
 }
 
-Future<void> _saveMapShots(WidgetTester tester) async {
-  final dir = Directory('/opt/cursor/artifacts/live-map')
-    ..createSync(recursive: true);
-  final images = await tester.runAsync(_downloadCuritibaTiles);
-  expect(images, isNotNull);
-  expect(images!.length, greaterThan(20));
-  await tester.runAsync(_loadFonts);
-  await pumpScapeMatch(
-    tester,
-    overrides: [
-      mapTileProvider.overrideWithValue(_FetchedTiles(images)),
-      userLocationSourceProvider.overrideWithValue(
-        FixedUserLocation.device(cityCenters[SampleIds.curitiba]!),
-      ),
-    ],
-  );
-  final context = tester.element(find.text('ScapeMatch'));
-  await tester.runAsync(
-    () => precacheImage(
-      const AssetImage('assets/images/news/biblioteca.jpg'),
-      context,
-    ),
-  );
-
-  for (final entry in const <(Size, String)>[
-    (Size(390, 844), 'map-phone.png'),
-    (Size(1280, 800), 'map-1280.png'),
-  ]) {
-    tester.view.physicalSize = entry.$1;
-    tester.view.devicePixelRatio = 1;
-    await tester.pumpAndSettle();
-    if (find.byKey(AppKeys.mapSheet).evaluate().isEmpty) {
-      await tester.tap(find.byKey(AppKeys.nearTab));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pumpAndSettle();
+Future<ui.Image?> _snapshot(
+  WidgetTester tester,
+  RenderRepaintBoundary boundary,
+) async {
+  final pending = Completer<ui.Image?>();
+  tester.binding.addPostFrameCallback((_) {
+    try {
+      boundary
+          .toImage(pixelRatio: 1)
+          .then(
+            pending.complete,
+            onError: (Object error, StackTrace stack) {
+              // ignore: avoid_print
+              print('snapshot falhou: $error');
+              pending.complete(null);
+            },
+          );
+    } catch (error) {
+      // ignore: avoid_print
+      print('snapshot falhou: $error');
+      pending.complete(null);
     }
-    await tester.pump(const Duration(milliseconds: 1800));
-    await tester.pump(const Duration(milliseconds: 400));
-    final mapName = entry.$1.width == 390 ? 'map-phone.png' : 'map-1280.png';
-    await _capture(tester, find.byKey(AppKeys.mapAttribution), dir, mapName);
-    if (entry.$1.width == 390) {
-      await tester.tap(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')));
-      await tester.pumpAndSettle();
-      await tester.drag(
-        find.byKey(AppKeys.groupPinSheet),
-        const Offset(0, -280),
-      );
-      await tester.pumpAndSettle();
-      await _capture(
-        tester,
-        find.byKey(AppKeys.groupPinSheet),
-        dir,
-        'map-sheet.png',
-      );
-      Navigator.of(tester.element(find.byKey(AppKeys.groupPinSheet))).pop();
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(AppKeys.homeTab));
-      await tester.pumpAndSettle();
-      await _capture(tester, find.text('ScapeMatch'), dir, 'home.png');
+  });
+  await tester.pump();
+  final image = await tester.runAsync(() => pending.future);
+  return image;
+}
+
+Future<bool> _mapHasImagery(WidgetTester tester) async {
+  final render = tester.renderObject(find.byType(FlutterMap));
+  if (render is! RenderRepaintBoundary) {
+    // ignore: avoid_print
+    print('mapa sem boundary: ${render.runtimeType}');
+    return false;
+  }
+  final image = await _snapshot(tester, render);
+  final ready = image;
+  if (ready == null) {
+    // ignore: avoid_print
+    print('snapshot do mapa veio vazio');
+    return false;
+  }
+  final width = ready.width;
+  final height = ready.height;
+  final data = await tester.runAsync(
+    () => ready.toByteData(format: ui.ImageByteFormat.rawRgba),
+  );
+  ready.dispose();
+  if (data == null || width < 40 || height < 40) {
+    return false;
+  }
+  final bytes = data.buffer.asUint8List();
+  final deviation = _bandDeviation(bytes, width, height, height ~/ 2);
+  return deviation > 12;
+}
+
+double _bandDeviation(Uint8List bytes, int width, int height, int y0) {
+  final samples = <int>[];
+  final end = math.min(y0 + 24, height);
+  for (var y = y0; y < end; y += 2) {
+    for (var x = 8; x < width - 8; x += 8) {
+      final index = (y * width + x) * 4;
+      final red = bytes[index];
+      final green = bytes[index + 1];
+      final blue = bytes[index + 2];
+      samples.add(((red * 3) + (green * 6) + blue) ~/ 10);
     }
   }
+  if (samples.length < 8) {
+    return 0;
+  }
+  final mean = samples.reduce((a, b) => a + b) / samples.length;
+  var sum = 0.0;
+  for (final sample in samples) {
+    final delta = sample - mean;
+    sum += delta * delta;
+  }
+  return math.sqrt(sum / samples.length);
 }
 
 Future<void> _openNear(
@@ -486,33 +640,23 @@ Future<void> _loadFonts() async {
   await icons.load();
 }
 
-Future<void> _capture(
+Future<void> _captureFrame(
   WidgetTester tester,
-  Finder anchor,
   Directory dir,
   String name,
+  Size expected,
 ) async {
-  RenderRepaintBoundary? found;
-  tester.element(anchor).visitAncestorElements((ancestor) {
-    final render = ancestor.renderObject;
-    if (render is RenderRepaintBoundary) {
-      found = render;
-    }
-    return true;
-  });
-  final boundary = found;
-  if (boundary == null) {
-    return;
-  }
-  final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 1));
-  if (image == null) {
-    return;
-  }
+  final boundary = tester.renderObject(
+    find.byKey(AppKeys.appFrame),
+  ) as RenderRepaintBoundary;
+  final image = await _snapshot(tester, boundary);
+  expect(image, isNotNull);
+  expect(image!.width, expected.width.round());
+  expect(image.height, expected.height.round());
   final bytes = await tester.runAsync(
     () => image.toByteData(format: ui.ImageByteFormat.png),
   );
-  if (bytes == null) {
-    return;
-  }
-  File('${dir.path}/$name').writeAsBytesSync(bytes.buffer.asUint8List());
+  expect(bytes, isNotNull);
+  File('${dir.path}/$name').writeAsBytesSync(bytes!.buffer.asUint8List());
+  image.dispose();
 }

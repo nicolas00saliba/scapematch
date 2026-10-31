@@ -4,6 +4,7 @@ import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
@@ -36,6 +37,11 @@ class GroupPinSheet extends StatelessWidget {
         if (person.occupiesSeat) person,
     ];
     final gallery = categoryForCover(group.coverAsset);
+    final thumbs = <String>[
+      if (gallery != null)
+        for (final asset in roomGallery(gallery))
+          if (asset.isNotEmpty && asset != group.coverAsset) asset,
+    ];
     return Material(
       key: AppKeys.groupPinSheet,
       color: scheme.surface,
@@ -69,14 +75,14 @@ class GroupPinSheet extends StatelessWidget {
                 ),
               ),
             ),
-          if (gallery != null)
+          if (thumbs.isNotEmpty)
             SizedBox(
               height: 72,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 children: [
-                  for (final asset in roomGallery(gallery))
+                  for (final asset in thumbs)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ClipRRect(
@@ -113,8 +119,20 @@ class GroupPinSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '${group.difficulty.labelPt} · ${group.durationMinutes} min · ${formatPrice(group.priceCents)} por pessoa',
+                _SheetFact(
+                  icon: Icons.timer_outlined,
+                  label: 'Duração',
+                  value: '${group.durationMinutes} min',
+                ),
+                _SheetFact(
+                  icon: Icons.speed,
+                  label: 'Dificuldade',
+                  value: group.difficulty.labelPt,
+                ),
+                _SheetFact(
+                  icon: Icons.payments_outlined,
+                  label: 'Preço',
+                  value: '${formatPrice(group.priceCents)} por pessoa',
                 ),
                 const SizedBox(height: 18),
                 Text(
@@ -159,6 +177,53 @@ class GroupPinSheet extends StatelessWidget {
   }
 }
 
+class _SheetFact extends StatelessWidget {
+  const _SheetFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: scheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SheetAvatars extends StatelessWidget {
   const _SheetAvatars({required this.people});
 
@@ -166,26 +231,15 @@ class _SheetAvatars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final shown = people.take(5).toList();
     return Row(
       children: [
         for (final person in shown)
           Padding(
             padding: const EdgeInsets.only(right: 6),
-            child: CircleAvatar(
+            child: PersonAvatar(
+              name: person.displayName.isEmpty ? '?' : person.displayName,
               radius: 16,
-              backgroundColor: scheme.primaryContainer,
-              child: Text(
-                person.displayName.isEmpty
-                    ? '?'
-                    : person.displayName.characters.first.toUpperCase(),
-                style: TextStyle(
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                ),
-              ),
             ),
           ),
       ],

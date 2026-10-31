@@ -18,16 +18,21 @@ import 'package:scapematch/features/cities/presentation/selected_city_controller
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/map/data/sample_live_presence.dart';
 import 'package:scapematch/features/map/data/user_location.dart';
-import 'package:scapematch/features/map/domain/house_pin.dart';
 import 'package:scapematch/features/map/domain/nearby_group.dart';
 import 'package:scapematch/features/map/presentation/group_pin_sheet.dart';
 import 'package:scapematch/features/map/presentation/live_map_messages.dart';
 import 'package:scapematch/features/map/presentation/map_pin.dart';
 import 'package:scapematch/features/map/presentation/map_tiles.dart';
+import 'package:scapematch/features/map/presentation/radius_circle.dart';
 import 'package:scapematch/features/map/presentation/user_dot.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 const nearbyRadiiKm = <int>[2, 5, 10, 20];
+
+/// A partir daqui a lista vai para um painel à esquerda, no jeito de um mapa.
+const nearbyWideWidth = 960.0;
+
+const _panelWidth = 380.0;
 
 final nearbyCatalogProvider =
     FutureProvider.autoDispose<
@@ -66,6 +71,9 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
   var _lockCamera = false;
   var _mapReady = false;
   var _tabVisible = false;
+  var _wide = false;
+  var _fitQueued = false;
+  Size? _mapSize;
   String? _fitKey;
   GoRouter? _router;
 
@@ -148,35 +156,71 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
     return _centerOverride ?? _fix?.point ?? cityCenters['curitiba']!;
   }
 
-  void _fit(Size size) {
-    if (_lockCamera || !_mapReady) {
+  String _fitSignature(GeoPoint origin, Size size) {
+    return '${origin.latitude.toStringAsFixed(5)},'
+        '${origin.longitude.toStringAsFixed(5)},'
+        '$_radiusKm,${size.width.round()}x${size.height.round()},$_wide';
+  }
+
+  /// Enquadra o círculo no mapa, não na janela inteira.
+  ///
+  /// O tamanho vale o do painel do mapa. No celular a gaveta come a base,
+  /// então o círculo sobe. Na largura o mapa está livre e o círculo cabe
+  /// com uma margem só.
+  void _scheduleFit() {
+    if (_fitQueued || _lockCamera || !_mapReady) {
+      return;
+    }
+    final size = _mapSize;
+    if (size == null || size.width < 48 || size.height < 48) {
       return;
     }
     final origin = _origin;
-    final key =
-        '${origin.latitude},${origin.longitude},$_radiusKm,${size.width}';
-    if (_fitKey == key) {
+    final signature = _fitSignature(origin, size);
+    if (_fitKey == signature) {
       return;
     }
-    _fitKey = key;
-    final dLat = _radiusKm / 111.0;
-    final dLng =
-        _radiusKm / (111.0 * math.cos(origin.latitude * math.pi / 180));
+    _fitQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
+      _fitQueued = false;
+      if (!mounted || _lockCamera || !_mapReady) {
         return;
       }
+      final current = _mapSize;
+      if (current == null || current.width < 48 || current.height < 48) {
+        return;
+      }
+      final point = _origin;
+      final next = _fitSignature(point, current);
+      if (_fitKey == next) {
+        return;
+      }
+      _fitKey = next;
+      final dLat = _radiusKm / 111.0;
+      final dLng =
+          _radiusKm / (111.0 * math.cos(point.latitude * math.pi / 180));
       _mapController.fitCamera(
         CameraFit.bounds(
           bounds: LatLngBounds(
-            LatLng(origin.latitude - dLat, origin.longitude - dLng),
-            LatLng(origin.latitude + dLat, origin.longitude + dLng),
+            LatLng(point.latitude - dLat, point.longitude - dLng),
+            LatLng(point.latitude + dLat, point.longitude + dLng),
           ),
-          padding: EdgeInsets.fromLTRB(32, 132, 32, size.height * 0.36),
-          maxZoom: 15,
+          padding: _fitPadding(current),
+          maxZoom: 14,
         ),
       );
     });
+  }
+
+  EdgeInsets _fitPadding(Size size) {
+    final desired = _wide
+        ? const EdgeInsets.all(56)
+        : EdgeInsets.fromLTRB(28, 120, 28, size.height * 0.40);
+    if (desired.horizontal < size.width - 80 &&
+        desired.vertical < size.height - 80) {
+      return desired;
+    }
+    return const EdgeInsets.all(24);
   }
 
   Future<void> _openSheet(NearbyGroup item) async {
@@ -218,6 +262,13 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
         );
       },
     );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _lockCamera = false;
+      _fitKey = null;
+    });
   }
 
   @override
@@ -263,37 +314,76 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
     final cityName = _cityName(cities, ref.read(selectedCityIdProvider));
     return LayoutBuilder(
       builder: (context, constraints) {
-        _fit(constraints.biggest);
-        return Stack(
+        final wide = constraints.maxWidth >= nearbyWideWidth;
+        _wide = wide;
+        final map = _mapPane(context, origin, nearby);
+        if (!wide) {
+          return Stack(
+            children: [
+              Positioned.fill(child: map),
+              Positioned(
+                left: 12,
+                right: 12,
+                top: 0,
+                child: SafeArea(bottom: false, child: _top(context, cityName)),
+              ),
+              Positioned(
+                right: 10,
+                bottom: constraints.maxHeight * 0.34,
+                child: const _OsmCredit(),
+              ),
+              _drawer(context, nearby, now),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Positioned.fill(
-              child: RepaintBoundary(child: _map(context, origin, nearby)),
+            SizedBox(
+              width: _panelWidth,
+              child: _panel(context, nearby, now, cityName),
             ),
-            Positioned(
-              left: 12,
-              right: 12,
-              top: 0,
-              child: SafeArea(bottom: false, child: _top(context, cityName)),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
             ),
-            Positioned(
-              right: 10,
-              bottom: constraints.maxHeight * 0.34,
-              child: const _OsmCredit(),
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(child: map),
+                  const Positioned(right: 10, bottom: 12, child: _OsmCredit()),
+                ],
+              ),
             ),
-            _drawer(context, nearby, now),
           ],
         );
       },
     );
   }
 
+  Widget _mapPane(
+    BuildContext context,
+    GeoPoint origin,
+    List<NearbyGroup> nearby,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _mapSize = constraints.biggest;
+        _scheduleFit();
+        return RepaintBoundary(child: _map(context, origin, nearby));
+      },
+    );
+  }
+
   Widget _map(BuildContext context, GeoPoint origin, List<NearbyGroup> nearby) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final center = LatLng(origin.latitude, origin.longitude);
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        initialCenter: LatLng(origin.latitude, origin.longitude),
-        initialZoom: 13,
+        initialCenter: center,
+        initialZoom: 12,
         minZoom: 3,
         maxZoom: 18,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -302,11 +392,8 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
         ),
         onMapReady: () {
           _mapReady = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() => _fitKey = null);
-            }
-          });
+          _fitKey = null;
+          _scheduleFit();
         },
       ),
       children: [
@@ -319,44 +406,37 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
             tileDisplay: const TileDisplay.instantaneous(),
           ),
         ),
-        CircleLayer(
-          circles: [
-            CircleMarker(
-              point: LatLng(origin.latitude, origin.longitude),
-              radius: _radiusKm * 1000,
-              useRadiusInMeter: true,
-              color: const Color(0x221A73E8),
-              borderColor: const Color(0x991A73E8),
-              borderStrokeWidth: 2,
-            ),
-          ],
+        Positioned.fill(
+          child: RadiusCircleLayer(
+            key: AppKeys.radiusCircle,
+            center: center,
+            radiusMeters: _radiusKm * 1000,
+          ),
         ),
         MarkerLayer(
           markers: [
             for (final item in nearby)
               Marker(
                 point: LatLng(item.point.latitude, item.point.longitude),
-                width: _selectedGroupId == item.group.id ? 120 : 96,
-                height: 64,
+                width: 96,
+                height: 96,
                 alignment: Alignment.center,
-                child: MapPinButton(
-                  pin: HousePin(
-                    house: item.house,
-                    priceCents: item.group.priceCents,
-                    formingCount: 1,
-                    groups: [item.group],
-                  ),
+                child: RoomPhotoPin(
                   markerId: item.group.id,
+                  roomName: item.group.roomName,
+                  coverAsset: item.group.coverAsset,
+                  filled: item.group.filledSpots,
+                  total: item.group.totalSpots,
                   selected: _selectedGroupId == item.group.id,
                   onTap: () => _openSheet(item),
                 ),
               ),
             Marker(
-              point: LatLng(origin.latitude, origin.longitude),
-              width: 120,
-              height: 120,
+              point: center,
+              width: 132,
+              height: 132,
               alignment: Alignment.center,
-              child: UserDot(animate: _tabVisible),
+              child: UserDot(key: AppKeys.userDot, animate: _tabVisible),
             ),
           ],
         ),
@@ -418,8 +498,55 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
     );
   }
 
-  Widget _drawer(BuildContext context, List<NearbyGroup> nearby, DateTime now) {
+  Widget _panel(
+    BuildContext context,
+    List<NearbyGroup> nearby,
+    DateTime now,
+    String cityName,
+  ) {
     final scheme = Theme.of(context).colorScheme;
+    return Material(
+      key: AppKeys.mapSheet,
+      color: scheme.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    LiveMapMessages.nearTab,
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  _top(context, cityName),
+                  const SizedBox(height: 12),
+                  _heading(context, nearby, now),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              children: [for (final item in nearby) _row(context, item, now)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heading(
+    BuildContext context,
+    List<NearbyGroup> nearby,
+    DateTime now,
+  ) {
     final cities = ref.watch(citiesProvider).asData?.value ?? const <City>[];
     final nearestId = nearestCityWithFormingGroups(
       origin: _origin,
@@ -428,6 +555,31 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
       now: now,
     );
     final nearest = _cityName(cities, nearestId ?? '');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          nearby.isEmpty
+              ? LiveMapMessages.emptyRadius
+              : '${nearby.length} ${nearby.length == 1 ? 'grupo se formando' : 'grupos se formando'}',
+          key: nearby.isEmpty ? AppKeys.nearEmpty : null,
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        if (nearby.isEmpty && nearestId != null) ...[
+          const SizedBox(height: 8),
+          FilledButton(
+            key: AppKeys.nearEmptyCity,
+            onPressed: () => _jumpToCity(nearestId),
+            child: Text(LiveMapMessages.seeCity(nearest)),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _drawer(BuildContext context, List<NearbyGroup> nearby, DateTime now) {
+    final scheme = Theme.of(context).colorScheme;
     return DraggableScrollableSheet(
       initialChildSize: 0.32,
       minChildSize: 0.18,
@@ -453,22 +605,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                nearby.isEmpty
-                    ? LiveMapMessages.emptyRadius
-                    : '${nearby.length} ${nearby.length == 1 ? 'grupo se formando' : 'grupos se formando'}',
-                key: nearby.isEmpty ? AppKeys.nearEmpty : null,
-                style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              if (nearby.isEmpty && nearestId != null) ...[
-                const SizedBox(height: 8),
-                FilledButton(
-                  key: AppKeys.nearEmptyCity,
-                  onPressed: () => _jumpToCity(nearestId),
-                  child: Text(LiveMapMessages.seeCity(nearest)),
-                ),
-              ],
+              _heading(context, nearby, now),
               for (final item in nearby) _row(context, item, now),
             ],
           ),

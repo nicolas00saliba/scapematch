@@ -75,6 +75,9 @@ abstract final class AppKeys {
   static const editError = Key('edit-error');
   static const homeTab = Key('home-tab');
   static const nearTab = Key('near-tab');
+  static const appFrame = Key('app-frame');
+  static const userDot = Key('user-dot');
+  static const radiusCircle = Key('radius-circle');
   static const accountTab = Key('account-tab');
   static const accountSettings = Key('account-settings');
   static const accountGreeting = Key('account-greeting');

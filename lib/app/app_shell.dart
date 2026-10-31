@@ -14,49 +14,52 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: navigationShell,
-      bottomNavigationBar: ColoredBox(
-        color: scheme.surface,
-        child: Center(
-          heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: AppScaffold.maxWidth),
-            child: NavigationBar(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) {
-                navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
-                );
-              },
-              destinations: const [
-                NavigationDestination(
-                  key: AppKeys.homeTab,
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home',
-                ),
-                NavigationDestination(
-                  key: AppKeys.nearTab,
-                  icon: Icon(Icons.radar_outlined),
-                  selectedIcon: Icon(Icons.radar),
-                  label: 'Perto de você',
-                ),
-                NavigationDestination(
-                  key: AppKeys.myGroups,
-                  icon: Icon(Icons.event_available_outlined),
-                  selectedIcon: Icon(Icons.event_available),
-                  label: 'Meus grupos',
-                ),
-                NavigationDestination(
-                  key: AppKeys.accountTab,
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Conta',
-                ),
-              ],
+    return RepaintBoundary(
+      key: AppKeys.appFrame,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: navigationShell,
+        bottomNavigationBar: ColoredBox(
+          color: scheme.surface,
+          child: Center(
+            heightFactor: 1,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: AppScaffold.maxWidth),
+              child: NavigationBar(
+                selectedIndex: navigationShell.currentIndex,
+                onDestinationSelected: (index) {
+                  navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  );
+                },
+                destinations: const [
+                  NavigationDestination(
+                    key: AppKeys.homeTab,
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
+                  NavigationDestination(
+                    key: AppKeys.nearTab,
+                    icon: Icon(Icons.radar_outlined),
+                    selectedIcon: Icon(Icons.radar),
+                    label: 'Perto de você',
+                  ),
+                  NavigationDestination(
+                    key: AppKeys.myGroups,
+                    icon: Icon(Icons.event_available_outlined),
+                    selectedIcon: Icon(Icons.event_available),
+                    label: 'Meus grupos',
+                  ),
+                  NavigationDestination(
+                    key: AppKeys.accountTab,
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person),
+                    label: 'Conta',
+                  ),
+                ],
+              ),
             ),
           ),
         ),
