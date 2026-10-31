@@ -1,5 +1,29 @@
 # Decisões provisórias
 
+## O mapa largo e o pino com foto
+
+- **Data:** 2026-10-31
+- **Decisão:** em telas a partir de 960 px a lista fica num painel à esquerda, com 380 px, e o mapa ocupa o resto até a borda. No celular a gaveta continua embaixo. O círculo do raio é desenhado com `drawCircle`: o `CircleLayer` do flutter_map usa `drawPoints` e o disco some na web e quando o raio fica grande. A câmera enquadra esse círculo no tamanho do mapa. Ao fechar a ficha, a câmera volta para o raio, para não ficar presa no zoom da sala. O pino é a foto da sala num círculo, com o selo de vagas; o escolhido cresce. Os grupos de exemplo nos arredores variam de 4 a 10 pessoas, uns quase cheios e outros no começo. O ponto azul fica numa camada acima dos pinos, e um pino colado nele anda na tela só o bastante para os dois aparecerem. A ficha usa um retrato diferente por membro, recortado das fotos de exemplo, mostra duração e dificuldade com ícone, e não repete a capa nas miniaturas.
+- **Motivo:** no print largo o círculo, o ponto e os pinos sumiam, o mapa não ia até a borda, e a ficha mostrava letras e miniaturas vazias.
+- **Onde está no código:** `NearbyScreen`, `RadiusCircleLayer`, `RoomPhotoPin`, `GroupPinSheet` e `PersonAvatar`.
+- **Como trocar depois:** a largura do painel é `_panelWidth`. Outro retrato entra em `assets/images/people/`.
+
+## Perto de você
+
+- **Data:** 2026-10-31
+- **Decisão:** o mapa sai da Home e vira a aba **Perto de você**, entre Home e Meus grupos, com o ícone de radar. A Home volta a ser só a lista, com promoções, novidades e os grupos. O ponto da pessoa é azul, com ondas que se abrem e somem. Sem permissão, ou sem GPS, o mapa usa o centro da cidade selecionada, explica o motivo e oferece Tentar de novo. Um círculo translúcido marca o raio: 2, 5, 10 ou 20 km, começando em 5. Só grupos se formando dentro do raio viram pino. A gaveta lista esses grupos do mais perto ao mais longe, com a distância. Tocar no pino abre uma ficha arrastável, da metade da tela até quase cheia: a sala em cima (capa, nome, casa, distância, dificuldade, duração e preço) e o grupo embaixo (horário, vagas, avatares, prazo e Ver o grupo). O pino cresce e a câmera centraliza nele. Cada cidade de exemplo ganha dez casas nos arredores, cada uma com um grupo se formando. Se o raio não pega ninguém, um botão leva ao centro da cidade mais próxima que tem grupo. O convidado fictício a cada 5 segundos só entra enquanto a aba está aberta. Ondas e pulso param com reduzir movimento. A atribuição do OpenStreetMap continua visível.
+- **Motivo:** a pessoa quer sentir o que está perto, no celular e na web, sem misturar o mapa com a lista da Home.
+- **Onde está no código:** `NearbyScreen`, `formingWithinRadius`, `GeolocatorUserLocation`, `GroupPinSheet` e `UserDot`.
+- **Como trocar depois:** outro raio entra em `nearbyRadiiKm`. A permissão continua em `UserLocationSource`.
+
+## Mapa ao vivo
+
+- **Data:** 2026-10-31
+- **Decisão:** a Home tem Lista e Mapa. A lista continua como estava. O mapa ocupa a tela da cidade, com uma gaveta de cartões por cima, no jeito de um app de reserva. Cada casa de exemplo é um pino. Pino com grupo se formando mostra a contagem e pulsa; os outros mostram o menor preço da casa, em reais, sem centavos. Tocar no pino destaca os cartões daquela casa e traz o primeiro para a vista. O ícone de localização no cartão faz o caminho de volta e destaca o pino. Tocar no cartão abre o grupo com o mesmo voo da capa da lista. A faixa diz quantos grupos estão se formando agora na cidade, e o número conta até o valor. A cada 5 segundos um convidado fictício senta num grupo da cidade, de preferência num que ainda está se formando. Isso só roda com o mapa aberto. Não há backend: `SampleLivePresence` escreve no banco em memória. O canal que substitui esse timer está em [SUPABASE_ESQUEMA.md](SUPABASE_ESQUEMA.md). Os tiles são do OpenStreetMap, sem chave. O claro fica levemente aquecido; o escuro escurece o mesmo tile para acompanhar o petróleo. A atribuição “© OpenStreetMap” fica visível e abre o crédito em outra aba na web. Pinos próximos demais na tela viram um cluster; tocar nele aproxima. Cada pino e o mapa ficam num `RepaintBoundary`. O pulso e a contagem param com reduzir movimento. A rotação do mapa fica desligada. A frase antiga que deixava o mapa para outro PR fica substituída por esta.
+- **Motivo:** a pessoa quer ver a cidade viva, no celular e na web, sem chave paga e sem trocar as regras dos grupos.
+- **Onde está no código:** `LiveMapView`, `HomeSurfaceToggle`, `SampleLivePresence`, `clusterHousePins` e `mapTileProvider`.
+- **Como trocar depois:** o provider `sampleLivePresenceProvider` sai, e o mapa passa a reagir ao insert em `group_members`. Outro tile entra em `liveMapTileUrl`, com a atribuição correspondente. O raster gratuito do CARTO passou a pedir chave, por isso esta versão usa o servidor do OpenStreetMap.
+
 ## Sensação das telas
 
 - **Data:** 2026-10-30

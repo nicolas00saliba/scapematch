@@ -107,16 +107,26 @@ void main() {
     );
   });
 
-  testWidgets('the bar order is Home, Meus grupos, Conta', (tester) async {
+  testWidgets('the bar order is Home, Perto de você, Meus grupos, Conta', (
+    tester,
+  ) async {
     await pumpScapeMatch(tester);
 
     final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(bar.destinations, hasLength(3));
+    expect(bar.destinations, hasLength(4));
     expect((bar.destinations[0] as NavigationDestination).label, 'Home');
-    expect((bar.destinations[1] as NavigationDestination).label, 'Meus grupos');
-    expect((bar.destinations[2] as NavigationDestination).label, 'Conta');
+    expect(
+      (bar.destinations[1] as NavigationDestination).label,
+      'Perto de você',
+    );
+    expect((bar.destinations[2] as NavigationDestination).label, 'Meus grupos');
+    expect((bar.destinations[3] as NavigationDestination).label, 'Conta');
     expect(
       tester.getCenter(find.byKey(AppKeys.homeTab)).dx,
+      lessThan(tester.getCenter(find.byKey(AppKeys.nearTab)).dx),
+    );
+    expect(
+      tester.getCenter(find.byKey(AppKeys.nearTab)).dx,
       lessThan(tester.getCenter(find.byKey(AppKeys.myGroups)).dx),
     );
     expect(
@@ -137,7 +147,7 @@ void main() {
     expect(find.text('Meus parceiros de jogo'), findsOneWidget);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      2,
+      3,
     );
 
     await tester.tap(find.byKey(AppKeys.accountDestination('partners')));

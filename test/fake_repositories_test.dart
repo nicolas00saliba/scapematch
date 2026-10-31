@@ -50,11 +50,7 @@ void main() {
 
       final cityGroups = await groups.listByCity(cityId);
       expect(cityGroups.every((group) => group.cityId == cityId), isTrue);
-      if (cityId == SampleIds.curitiba) {
-        expect(cityGroups.length, greaterThan(2), reason: cityId);
-      } else {
-        expect(cityGroups, hasLength(2), reason: cityId);
-      }
+      expect(cityGroups.length, greaterThan(2), reason: cityId);
 
       final almostFull = await groups.listByCity(cityId, almostFullOnly: true);
       expect(almostFull, isNotEmpty, reason: cityId);
@@ -108,10 +104,14 @@ void main() {
       almostFullOnly: true,
     );
 
-    expect(all, hasLength(2));
-    expect(almost, hasLength(1));
-    expect(almost.single.id, SampleIds.groupSpMetroAlmost);
-    expect(almost.single.openSeats, inInclusiveRange(1, 2));
+    expect(all.length, greaterThan(2));
+    expect(almost.map((group) => group.id), contains(SampleIds.groupSpMetroAlmost));
+    expect(
+      almost
+          .singleWhere((group) => group.id == SampleIds.groupSpMetroAlmost)
+          .openSeats,
+      inInclusiveRange(1, 2),
+    );
     expect(
       all.map((group) => group.id),
       contains(SampleIds.groupSpCoberturaOpen),
@@ -143,7 +143,7 @@ void main() {
     expect(rpg.roomName, isNot(contains('Porão sem Luz')));
     expect(
       curitiba.where((group) => group.isAlmostFull).length,
-      inInclusiveRange(8, 10),
+      greaterThanOrEqualTo(8),
     );
   });
 
@@ -154,19 +154,20 @@ void main() {
       final open = cityGroups.where(
         (group) => !group.isAlmostFull && !group.isFull,
       );
-      expect(open, hasLength(1), reason: cityId);
       expect(
-        open.single.openSeats,
-        greaterThan(GroupRules.almostFullMaxOpenSeats),
+        open.where(
+          (group) => group.openSeats > GroupRules.almostFullMaxOpenSeats,
+        ),
+        isNotEmpty,
         reason: cityId,
       );
       if (cityId == SampleIds.curitiba) {
-        expect(almost.length, inInclusiveRange(8, 10), reason: cityId);
+        expect(almost.length, greaterThanOrEqualTo(8), reason: cityId);
       } else {
-        expect(almost, hasLength(1), reason: cityId);
+        expect(almost, isNotEmpty, reason: cityId);
         expect(
-          cityGroups.map((group) => group.roomId).toSet(),
-          hasLength(2),
+          cityGroups.map((group) => group.roomId).toSet().length,
+          greaterThan(2),
           reason: cityId,
         );
       }

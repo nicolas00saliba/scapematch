@@ -1,4 +1,5 @@
 import 'package:scapematch/core/data/fake_database.dart';
+import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
@@ -753,6 +754,12 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     ),
   ];
 
+  final nearby = _nearbyPlaces(
+    now: now,
+    schedule: schedule,
+    cities: [curitiba, saoPaulo, rio, beloHorizonte, portoAlegre],
+  );
+
   return FakeDatabase(
     cities: [curitiba, saoPaulo, rio, beloHorizonte, portoAlegre],
     houses: [
@@ -766,6 +773,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       mina,
       cais,
       redencao,
+      ...nearby.houses,
     ],
     rooms: [
       cofre,
@@ -800,6 +808,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       tabuleiro,
       arenaLaser,
       camara,
+      ...nearby.rooms,
     ],
     slots: _padRoomSlots(schedule, [
       slotCofreSat,
@@ -854,8 +863,9 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotTrilhaQuase,
       slotPoraoQuase,
       slotSateliteQuase,
+      ...nearby.slots,
     ]),
-    groups: groups,
+    groups: [...groups, ...nearby.groups],
   );
 }
 
@@ -864,12 +874,135 @@ City _city(String id, String name, String stateCode, String stateName) {
 }
 
 EscapeHouse _house(String id, City city, String name, String neighborhood) {
+  final point = _housePoints[id];
+  if (point == null) {
+    throw StateError('Casa $id sem ponto no mapa de exemplo.');
+  }
   return EscapeHouse(
     id: id,
     cityId: city.id,
     name: name,
     neighborhood: neighborhood,
+    latitude: point.$1,
+    longitude: point.$2,
   );
+}
+
+/// Pontos inventados dentro do bairro, só para o mapa de exemplo.
+///
+/// Não vêm de site de casa nenhuma. São coordenadas públicas de bairro,
+/// deslocadas, para o pino cair na região certa da cidade.
+const _housePoints = <String, (double, double)>{
+  'cwb-rua-xv': (-25.4296, -49.2712),
+  'cwb-batel': (-25.4422, -49.2904),
+  'sp-augusta': (-23.5556, -46.6584),
+  'sp-liberdade': (-23.5608, -46.6332),
+  'rj-copa': (-22.9718, -43.1854),
+  'rj-santa': (-22.9208, -43.1866),
+  'bh-savassi': (-19.9386, -43.9334),
+  'bh-mina': (-19.9172, -43.9348),
+  'poa-cais': (-30.0272, -51.2292),
+  'poa-redencao': (-30.0342, -51.2162),
+};
+
+/// Dez casas por cidade, em anéis de 1,6 km a 14 km, cada uma com um grupo
+/// que ainda está se formando. Os horários ficam fora da janela de 2 h,
+/// para o par “quase cheio agora / aberto depois” de cada cidade continuar
+/// único.
+({
+  List<EscapeHouse> houses,
+  List<EscapeRoom> rooms,
+  List<TimeSlot> slots,
+  List<Group> groups,
+})
+_nearbyPlaces({
+  required DateTime now,
+  required _SampleSchedule schedule,
+  required List<City> cities,
+}) {
+  const labels = <String>[
+    'O Relógio',
+    'A Chave',
+    'O Porão Novo',
+    'A Lanterna',
+    'O Farol',
+    'A Máscara',
+    'A Escada',
+    'O Espelho Partido',
+    'A Biblioteca',
+    'O Sinal',
+  ];
+  const distancesKm = <double>[1.6, 2.4, 3.2, 4.4, 4.9, 6.2, 7.4, 8.8, 11, 14];
+  // Tamanhos de 4 a 10. Uns quase cheios, outros acabando de começar.
+  // O mínimo é o total, então o grupo segue se formando até encher.
+  const totals = <int>[9, 8, 4, 10, 5, 7, 9, 4, 10, 6];
+  const rosters = <List<String>>[
+    ['Ana', 'Beto', 'Cris', 'Duda', 'Eva'],
+    ['Lia'],
+    ['Otto', 'Nara', 'Caio'],
+    ['Ivo', 'Bia', 'Davi', 'Fran', 'Guto', 'Hugo', 'Iara', 'João'],
+    ['Kai', 'Léo'],
+    ['Mia', 'Nuno', 'Olga', 'Pietra', 'Quim', 'Rita'],
+    ['Sol', 'Téo', 'Uma'],
+    ['Vera'],
+    ['Will', 'Yara', 'Zeca', 'Ala'],
+    ['Breno', 'Cecília', 'Dora', 'Enzo', 'Fábio'],
+  ];
+  final houses = <EscapeHouse>[];
+  final rooms = <EscapeRoom>[];
+  final slots = <TimeSlot>[];
+  final groups = <Group>[];
+  for (final city in cities) {
+    final center = cityCenters[city.id];
+    if (center == null) {
+      continue;
+    }
+    for (var index = 0; index < labels.length; index++) {
+      final id = '${city.id}-near-$index';
+      final point = offsetKm(
+        center,
+        kilometers: distancesKm[index],
+        bearingDegrees: index * 36,
+      );
+      final house = EscapeHouse(
+        id: id,
+        cityId: city.id,
+        name: '${labels[index]} de ${city.name}',
+        neighborhood: 'Arredores',
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+      final total = totals[index];
+      final room = _room(
+        'room-$id',
+        house,
+        labels[index],
+        'Uma sala de exemplo nos arredores',
+        RoomCategory.values[index % RoomCategory.values.length],
+        10,
+        60,
+        Difficulty.medium,
+      );
+      final startsAt = now.add(Duration(hours: 36 + (index * 5)));
+      final slot = schedule.at('slot-$id', room.id, startsAt);
+      final group = _group(
+        now: now,
+        id: 'grp-$id',
+        city: city,
+        house: house,
+        room: room,
+        slot: slot,
+        totalSpots: total,
+        names: rosters[index],
+        minimumSpots: total,
+      );
+      houses.add(house);
+      rooms.add(room);
+      slots.add(slot);
+      groups.add(group);
+    }
+  }
+  return (houses: houses, rooms: rooms, slots: slots, groups: groups);
 }
 
 EscapeRoom _room(

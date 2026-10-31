@@ -37,7 +37,7 @@ cd build/web && python3 -m http.server 8080
 
 ## O que dá para fazer agora
 
-1. O app abre na **Home**. A barra de baixo é **Home**, **Meus grupos** e **Conta**. Sem cidade salva, Curitiba já entra selecionada. Uma escolha salva prevalece e fica no aparelho (`shared_preferences`). A cidade é o filtro dos grupos, das salas e das notícias. O seletor continua na tela para trocar.
+1. O app abre na **Home**. A barra de baixo é **Home**, **Perto de você**, **Meus grupos** e **Conta**. Sem cidade salva, Curitiba já entra selecionada. Uma escolha salva prevalece e fica no aparelho (`shared_preferences`). A cidade é o filtro dos grupos, das salas e das notícias. O seletor continua na tela para trocar. **Perto de você** é o mapa: a sua posição, um raio de 5 km e os grupos que estão se formando perto.
 2. **Topo curto:** cidade e tipo de jogo lado a lado, aviso de exemplo num chip pequeno e busca com o hint inteiro (em tela estreita, **Criar grupo** fica só o +). Os grupos ficam numa janela com rolagem, e a lista segue a busca, a cidade e o tipo de jogo. Na primeira abertura há uma introdução curta, com Pular e a escolha da cidade. “Ver introdução”, na Conta, mostra de novo.
 3. Abaixo dos grupos, a ordem é **Promoções**, **Novidades** e **Salas**. Cada carrossel tem setas que andam um quadro inteiro e param com o cartão alinhado, no toque e no arrasto. No celular cabe um quadro; na coluna larga, dois. Novidades tem **Ver tudo**.
 4. **Salas** é um carrossel só, filtrado pela cidade e pelo tipo de jogo. O cartão tem foto, sala, casa, cidade e os botões **Achar grupo** e **Criar grupo**. Achar grupo abre os grupos daquela sala. Criar grupo abre o formulário com a sala já escolhida.

@@ -27,7 +27,10 @@ create table public.venues (
   id uuid primary key default gen_random_uuid(),
   city_id uuid not null references public.cities (id),
   name text not null,
-  neighborhood text not null
+  neighborhood text not null,
+  -- Ponto da casa. O mapa lê daqui. O exemplo usa um ponto fictício no bairro.
+  latitude double precision not null,
+  longitude double precision not null
 );
 
 create table public.rooms (
@@ -314,6 +317,35 @@ Nada disso está ligado ao app. O desenho acompanha [DECISOES.md](DECISOES.md).
 - `edit_group` muda `total_spots` e `note`. O total não fica abaixo de quem ainda ocupa cadeira, nem abaixo de 2, nem acima da capacidade.
 
 As funções `confirm_attendance`, `leave_group`, `delete_group`, `remove_member` e `edit_group` seguem o mesmo desenho de `join_group`: `security definer`, `search_path = public`, `auth.uid()`, e `for update` na linha do grupo. O app não ganha `update` direto em `groups` nem em `group_members`. O corpo delas fica para a migração de verdade e tem de cumprir o contrato desta seção.
+
+## Mapa ao vivo
+
+O app ainda não liga o cliente Supabase. A faixa e os pinos leem a lista de grupos que já existe. O que muda sozinho, hoje, é `SampleLivePresence`: a cada 5 segundos, com o mapa aberto, ela senta um convidado fictício no `FakeDatabase`.
+
+Quando o repositório for o Supabase, esse timer sai. O ponto de integração é um canal Realtime na tabela `group_members`, filtrado pela cidade do grupo. Um insert é alguém que sentou. Um update que cancela a cadeira é alguém que saiu. O mapa invalida a mesma lista (`findGroupsViewModelProvider`) e a faixa recalcula quantos grupos estão na fase “se formando”. A tela não ganha outra consulta.
+
+```sql
+-- Rascunho. Não executar nesta versão.
+alter publication supabase_realtime add table public.group_members;
+```
+
+```dart
+// Quando o cliente existir, no lugar de SampleLivePresence.takeSeat:
+// final channel = supabase.channel('live-seats');
+// channel.onPostgresChanges(
+//   event: PostgresChangeEvent.all,
+//   schema: 'public',
+//   table: 'group_members',
+//   callback: (_) {
+//     // A cidade continua sendo o filtro do app.
+//     // O callback só pede a lista de novo; não monta o grupo no widget.
+//     ref.invalidate(findGroupsViewModelProvider);
+//   },
+// );
+// channel.subscribe();
+```
+
+A publicação precisa estar ligada no projeto, e a policy de `select` em `group_members` tem de permitir a leitura de quem está na cadeira. Sem isso o canal não entrega o evento. O app não cria essa policy aqui.
 
 ## O que este rascunho não faz
 

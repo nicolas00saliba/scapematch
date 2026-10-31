@@ -17,6 +17,7 @@ import 'package:scapematch/features/groups/presentation/create_group_screen.dart
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
+import 'package:scapematch/features/map/presentation/nearby_screen.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:scapematch/features/news/presentation/news_browse_screen.dart';
@@ -28,8 +29,9 @@ import 'package:scapematch/features/wallet/presentation/add_balance_screen.dart'
 
 /// Rotas do app.
 ///
-/// A barra tem três ramos: `/` (Home), `/groups/mine` (Meus grupos) e
-/// `/account` (Conta). O app abre na Home. Criar grupo, o detalhe do grupo,
+/// A barra tem quatro ramos: `/` (Home), `/perto` (Perto de você),
+/// `/groups/mine` (Meus grupos) e `/account` (Conta). O app abre na Home.
+/// Criar grupo, o detalhe do grupo,
 /// o detalhe da notícia, a lista de uma sala e as páginas da Conta abrem
 /// por cima da barra. `new` continua antes de `:groupId` para a palavra não
 /// virar um id. `/groups` sem sufixo volta para a Home.
@@ -93,6 +95,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                     },
                   ),
                 ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/perto',
+                name: 'nearby',
+                builder: (context, state) => const NearbyScreen(),
               ),
             ],
           ),

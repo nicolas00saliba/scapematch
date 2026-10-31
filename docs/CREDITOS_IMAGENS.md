@@ -1,6 +1,6 @@
 # Créditos das imagens
 
-Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license), ou do Pexels, na [licença Pexels](https://www.pexels.com/license/). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar. A primeira tela da introdução usa um grupo numeroso num fliperama, em ambiente interno (Pexels 17368156, Matheus Bertelli).
+Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplash.com/license), ou do Pexels, na [licença Pexels](https://www.pexels.com/license/). Estão salvas no app, sem hotlink. As capas de tema que já existiam em `assets/images/news/` e `assets/images/rooms/aventura.jpg` continuam no lugar. A primeira tela da introdução usa um grupo numeroso num fliperama, em ambiente interno (Pexels 17368156, Matheus Bertelli). Os retratos `assets/images/people/01.jpg` a `08.jpg` são recortes de rostos dessas fotos de exemplo, uma pessoa diferente em cada arquivo.
 
 | Arquivo | Foto |
 | --- | --- |
@@ -15,3 +15,11 @@ Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplas
 | `assets/images/rooms/gallery/steampunk.jpg` | https://unsplash.com/photos/1518709268805-4e9042af9f23 |
 | `assets/images/rooms/gallery/egito.jpg` | https://unsplash.com/photos/1568322445389-f64ac2515020 |
 | `assets/images/rooms/gallery/amigos.jpg` | https://unsplash.com/photos/1610890716171-6b1bb98ffd09 |
+| `assets/images/people/01.jpg` | recorte de `assets/images/onboarding/convidar.jpg` |
+| `assets/images/people/02.jpg` | recorte de `assets/images/onboarding/cidade.jpg` |
+| `assets/images/people/03.jpg` | recorte de `assets/images/onboarding/encontrar.jpg` |
+| `assets/images/people/04.jpg` | recorte de `assets/images/onboarding/encontrar.jpg` |
+| `assets/images/people/05.jpg` | recorte de `assets/images/onboarding/encontrar.jpg` |
+| `assets/images/people/06.jpg` | recorte de `assets/images/onboarding/encontrar.jpg` |
+| `assets/images/people/07.jpg` | recorte de `assets/images/onboarding/encontrar.jpg` |
+| `assets/images/people/08.jpg` | recorte de `assets/images/onboarding/encontrar.jpg` |

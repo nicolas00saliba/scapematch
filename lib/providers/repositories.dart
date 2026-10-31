@@ -14,6 +14,9 @@ import 'package:scapematch/features/cities/data/city_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
+import 'package:scapematch/features/map/data/geolocator_user_location.dart';
+import 'package:scapematch/features/map/data/sample_live_presence.dart';
+import 'package:scapematch/features/map/data/user_location.dart';
 import 'package:scapematch/features/news/data/fake_news_repository.dart';
 import 'package:scapematch/features/news/data/news_repository.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
@@ -62,6 +65,18 @@ final groupRepositoryProvider = Provider<GroupRepository>((ref) {
     ref.watch(fakeDatabaseProvider),
     clock: ref.watch(clockProvider),
     board: ref.watch(communityBoardProvider),
+  );
+});
+
+/// Presença fictícia do mapa. O desenho do canal real está no esquema.
+final userLocationSourceProvider = Provider<UserLocationSource>((ref) {
+  return GeolocatorUserLocation();
+});
+
+final sampleLivePresenceProvider = Provider<SampleLivePresence>((ref) {
+  return SampleLivePresence(
+    database: ref.watch(fakeDatabaseProvider),
+    clock: ref.watch(clockProvider),
   );
 });
 
