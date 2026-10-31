@@ -1,0 +1,42 @@
+{
+  "houseId": "example-house",
+  "houseName": "Casa Exemplo",
+  "cityId": "sao-paulo",
+  "neighborhood": "Centro",
+  "origin": "local-json",
+  "rooms": [
+    {
+      "id": "example-room-galeria",
+      "name": "A Galeria de Exemplo",
+      "theme": "Sala inventada para o adaptador de JSON. Não vem de casa nenhuma.",
+      "capacity": 6,
+      "durationMinutes": 60,
+      "difficulty": "medium"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "example-session-integrated",
+      "roomId": "example-room-galeria",
+      "startsAt": "2026-11-14T19:00:00",
+      "availability": "integrated"
+    },
+    {
+      "id": "example-session-partner",
+      "roomId": "example-room-galeria",
+      "startsAt": "2026-11-15T16:00:00",
+      "availability": "partnerGrid"
+    },
+    {
+      "id": "example-session-proposed",
+      "roomId": "example-room-galeria",
+      "startsAt": "2026-11-15T21:00:00",
+      "availability": "proposed"
+    },
+    {
+      "id": "example-session-open",
+      "roomId": "example-room-galeria",
+      "availability": "toBeArranged"
+    }
+  ]
+}
