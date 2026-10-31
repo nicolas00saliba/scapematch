@@ -8,7 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scapematch/features/map/presentation/nearby_screen.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -324,6 +326,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a camera move does not bring the map skeleton back', (
+    tester,
+  ) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    await _openNear(tester, const Size(390, 844));
+    expect(find.text(LiveMapMessages.loading), findsNothing);
+    expect(find.byType(FlutterMap), findsOneWidget);
+    expect(
+      Theme.of(tester.element(find.byType(FlutterMap))).brightness,
+      Brightness.dark,
+    );
+
+    await tester.dragFrom(
+      tester.getCenter(find.byType(FlutterMap)),
+      const Offset(48, -36),
+    );
+    await tester.pump();
+    expect(find.text(LiveMapMessages.loading), findsNothing);
+    expect(find.byType(FlutterMap), findsOneWidget);
+
+    ProviderScope.containerOf(tester.element(find.byType(NearbyScreen)))
+        .invalidate(nearbyCatalogProvider);
+    await tester.pump();
+    expect(find.text(LiveMapMessages.loading), findsNothing);
+    expect(find.byType(FlutterMap), findsOneWidget);
+    for (var step = 0; step < 3; step++) {
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text(LiveMapMessages.loading), findsNothing);
+      expect(find.byType(FlutterMap), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('reduce motion keeps the nearby map still', (tester) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         FakeAccessibilityFeatures(disableAnimations: true);
@@ -466,6 +502,27 @@ Future<void> _saveMapShots(WidgetTester tester) async {
 
   await open(const Size(1280, 800));
   await _captureFrame(tester, dir, 'map-1280.png', const Size(1280, 800));
+
+  tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+  addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+  await open(const Size(390, 844));
+  await _captureFrame(tester, dir, 'map-dark-before.png', const Size(390, 844));
+  await tester.dragFrom(
+    tester.getCenter(find.byType(FlutterMap)),
+    const Offset(-56, 28),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 180));
+  expect(find.text(LiveMapMessages.loading), findsNothing);
+  await _captureFrame(tester, dir, 'map-dark-drag.png', const Size(390, 844));
+  await tester.dragFrom(
+    tester.getCenter(find.byType(FlutterMap)),
+    const Offset(36, -24),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 180));
+  expect(find.text(LiveMapMessages.loading), findsNothing);
+  await _captureFrame(tester, dir, 'map-dark-drag-2.png', const Size(390, 844));
 }
 
 Future<void> _precacheMapPhotos(WidgetTester tester) async {

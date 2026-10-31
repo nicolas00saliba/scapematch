@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## O mapa não recarrega no gesto
+
+- **Data:** 2026-10-31
+- **Decisão:** “Carregando o mapa...” só aparece na primeira entrada, enquanto ainda não há posição nem lista. Uma atualização que já tem dados (o convidado fictício, o raio, a troca de aba) mantém o `FlutterMap` e a câmera. O gesto não chama `setState` e trava o reenquadramento, para um resize do navegador não puxar o mapa de volta. O tile novo entra com fade por cima do anterior; o fundo vazio é a cor do tema. No Chrome do Android, `overscroll-behavior: none` impede o recarregar da página ao arrastar.
+- **Motivo:** no celular, arrastar o mapa trocava a tela inteira pelo esqueleto. `isLoading` é verdadeiro também quando a lista anterior ainda está lá, e o timer de presença invalida o catálogo.
+- **Onde está no código:** `NearbyScreen`, `mapTileProvider` e `web/index.html`.
+- **Como trocar depois:** o canal Realtime substitui o `invalidate` do timer. A câmera continua no mesmo `MapController`.
+
 ## O mapa largo e o pino com foto
 
 - **Data:** 2026-10-31

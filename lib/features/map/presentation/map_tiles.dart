@@ -3,13 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Tiles do mapa. OpenStreetMap, sem chave.
 ///
-/// O cache em disco fica desligado: na web o navegador já guarda o tile,
-/// e o teste troca este provider por uma imagem em memória.
+/// No celular o cache embutido guarda o tile. Na web esse cache não grava
+/// disco: o navegador já guarda a resposta, e um pedido antigo é cancelado
+/// quando o tile sai da tela. O teste troca este provider por memória.
 final mapTileProvider = Provider<TileProvider>((ref) {
-  final tiles = NetworkTileProvider(
-    silenceExceptions: true,
-    cachingProvider: DisabledMapCachingProvider(),
-  );
+  final tiles = NetworkTileProvider(silenceExceptions: true);
   ref.onDispose(tiles.dispose);
   return tiles;
 });
