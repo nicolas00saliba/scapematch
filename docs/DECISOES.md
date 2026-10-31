@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## Perto de você
+
+- **Data:** 2026-10-31
+- **Decisão:** o mapa sai da Home e vira a aba **Perto de você**, entre Home e Meus grupos, com o ícone de radar. A Home volta a ser só a lista, com promoções, novidades e os grupos. O ponto da pessoa é azul, com ondas que se abrem e somem. Sem permissão, ou sem GPS, o mapa usa o centro da cidade selecionada, explica o motivo e oferece Tentar de novo. Um círculo translúcido marca o raio: 2, 5, 10 ou 20 km, começando em 5. Só grupos se formando dentro do raio viram pino. A gaveta lista esses grupos do mais perto ao mais longe, com a distância. Tocar no pino abre uma ficha arrastável, da metade da tela até quase cheia: a sala em cima (capa, nome, casa, distância, dificuldade, duração e preço) e o grupo embaixo (horário, vagas, avatares, prazo e Ver o grupo). O pino cresce e a câmera centraliza nele. Cada cidade de exemplo ganha dez casas nos arredores, cada uma com um grupo se formando. Se o raio não pega ninguém, um botão leva ao centro da cidade mais próxima que tem grupo. O convidado fictício a cada 5 segundos só entra enquanto a aba está aberta. Ondas e pulso param com reduzir movimento. A atribuição do OpenStreetMap continua visível.
+- **Motivo:** a pessoa quer sentir o que está perto, no celular e na web, sem misturar o mapa com a lista da Home.
+- **Onde está no código:** `NearbyScreen`, `formingWithinRadius`, `GeolocatorUserLocation`, `GroupPinSheet` e `UserDot`.
+- **Como trocar depois:** outro raio entra em `nearbyRadiiKm`. A permissão continua em `UserLocationSource`.
+
 ## Mapa ao vivo
 
 - **Data:** 2026-10-31

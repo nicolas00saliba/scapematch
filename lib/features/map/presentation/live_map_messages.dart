@@ -2,6 +2,10 @@ import 'package:scapematch/core/formatting/money_format.dart';
 
 /// Textos do mapa ao vivo.
 abstract final class LiveMapMessages {
+  static const nearTab = 'Perto de você';
+  static const tryAgain = 'Tentar de novo';
+  static const seeGroup = 'Ver o grupo';
+  static const emptyRadius = 'Nenhum grupo se formando neste raio.';
   static const list = 'Lista';
   static const map = 'Mapa';
   static const sheetTitle = 'Grupos nesta cidade';
@@ -12,6 +16,18 @@ abstract final class LiveMapMessages {
   static const loadError = 'Não foi possível carregar o mapa.';
 
   static const osmCopyright = 'https://www.openstreetmap.org/copyright';
+
+  static String seeCity(String city) => 'Ver grupos em $city';
+
+  static String locationDenied(String city) {
+    return 'Sem permissão de localização. Mostrando o centro de $city.';
+  }
+
+  static String locationUnavailable(String city) {
+    return 'Localização indisponível. Mostrando o centro de $city.';
+  }
+
+  static String radiusLabel(int kilometers) => '$kilometers km';
 
   static String forming(int count, String city) {
     if (count == 0) {

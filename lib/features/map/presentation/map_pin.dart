@@ -13,11 +13,15 @@ class MapPinButton extends StatefulWidget {
     required this.pin,
     required this.selected,
     required this.onTap,
+    this.markerId,
   });
 
   final HousePin pin;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Id do pino. Sem isto, usa a casa.
+  final String? markerId;
 
   @override
   State<MapPinButton> createState() => _MapPinButtonState();
@@ -121,7 +125,7 @@ class _MapPinButtonState extends State<MapPinButton> {
                 shadowColor: scheme.shadow.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(20),
                 child: InkWell(
-                  key: AppKeys.mapPin(pin.house.id),
+                  key: AppKeys.mapPin(widget.markerId ?? pin.house.id),
                   customBorder: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),

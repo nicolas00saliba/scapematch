@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -9,17 +10,20 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
 import 'package:scapematch/features/map/data/sample_live_presence.dart';
+import 'package:scapematch/features/map/data/user_location.dart';
 import 'package:scapematch/features/map/domain/house_pin.dart';
 import 'package:scapematch/features/map/domain/live_seat.dart';
+import 'package:scapematch/features/map/domain/nearby_group.dart';
 import 'package:scapematch/features/map/domain/pin_cluster.dart';
 import 'package:scapematch/features/map/presentation/live_map_messages.dart';
-import 'package:scapematch/features/map/presentation/map_pin.dart';
 import 'package:scapematch/features/map/presentation/map_tiles.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 import 'support/memory_tiles.dart';
 import 'support/pump_app.dart';
@@ -32,34 +36,34 @@ void main() {
     final boxes =
         <String, ({double south, double north, double west, double east})>{
           SampleIds.curitiba: (
-            south: -25.6,
+            south: -25.7,
             north: -25.2,
-            west: -49.5,
-            east: -49.1,
+            west: -49.6,
+            east: -49.0,
           ),
           SampleIds.saoPaulo: (
             south: -23.8,
-            north: -23.4,
+            north: -23.3,
             west: -46.9,
             east: -46.4,
           ),
           SampleIds.rioDeJaneiro: (
-            south: -23.1,
-            north: -22.7,
+            south: -23.2,
+            north: -22.6,
             west: -43.5,
-            east: -43.0,
+            east: -42.9,
           ),
           SampleIds.beloHorizonte: (
-            south: -20.1,
-            north: -19.7,
-            west: -44.1,
-            east: -43.8,
+            south: -20.2,
+            north: -19.6,
+            west: -44.2,
+            east: -43.7,
           ),
           SampleIds.portoAlegre: (
-            south: -30.2,
-            north: -29.9,
-            west: -51.4,
-            east: -51.0,
+            south: -30.3,
+            north: -29.8,
+            west: -51.5,
+            east: -50.9,
           ),
         };
     for (final house in db.houses) {
@@ -97,7 +101,7 @@ void main() {
     expect(batel.priceCents, isNotNull);
     expect(
       formingGroupCount(pins.expand((pin) => pin.groups).toList(), now),
-      1,
+      greaterThan(1),
     );
   });
 
@@ -111,16 +115,62 @@ void main() {
       groups: const [],
       now: now,
     );
-    final apart = clusterHousePins(pins, zoom: 14);
+    final original = pins
+        .where(
+          (pin) => pin.house.id == 'cwb-rua-xv' || pin.house.id == 'cwb-batel',
+        )
+        .toList();
+    final apart = clusterHousePins(original, zoom: 14);
     expect(apart, hasLength(2));
     expect(apart.every((cluster) => !cluster.isCluster), isTrue);
 
-    final together = clusterHousePins(pins, zoom: 8);
+    final together = clusterHousePins(original, zoom: 8);
     expect(together, hasLength(1));
     expect(together.single.pins, hasLength(2));
 
     expect(pinPulseScale(t: 0.5, enabled: false), 1);
     expect(pinPulseScale(t: 0.5, enabled: true), greaterThan(1));
+  });
+
+  test('radius keeps the nearest groups first and drops the far ones', () {
+    final db = buildSampleDatabase(now: now);
+    final origin = cityCenters[SampleIds.curitiba]!;
+    final near = formingWithinRadius(
+      groups: db.groups,
+      houses: db.houses,
+      origin: origin,
+      radiusKm: 5,
+      now: now,
+    );
+    final wide = formingWithinRadius(
+      groups: db.groups,
+      houses: db.houses,
+      origin: origin,
+      radiusKm: 20,
+      now: now,
+    );
+    expect(near, isNotEmpty);
+    expect(wide.length, greaterThan(near.length));
+    for (var index = 1; index < near.length; index++) {
+      expect(
+        near[index].distanceKm,
+        greaterThanOrEqualTo(near[index - 1].distanceKm),
+      );
+    }
+    expect(near.every((item) => item.distanceKm <= 5), isTrue);
+    expect(wide.any((item) => item.distanceKm > 5), isTrue);
+    expect(formatDistanceKm(1.2), '1,2 km');
+    expect(formatDistanceKm(0.8), '800 m');
+
+    final far = const GeoPoint(0, 0);
+    final nearest = nearestCityWithFormingGroups(
+      origin: far,
+      centers: cityCenters,
+      groups: db.groups,
+      now: now,
+    );
+    expect(nearest, isNotNull);
+    expect(cityCenters.containsKey(nearest), isTrue);
   });
 
   test('the sample seat prefers a forming group and then stops when full', () {
@@ -147,91 +197,86 @@ void main() {
     expect(again!.groupId, isNot('grp-cwb-cofre-almost'));
   });
 
-  testWidgets('the map shows the city, a selected pin and the matching card', (
+  testWidgets('denied location explains the fallback and can try again', (
     tester,
   ) async {
-    for (final size in const [Size(390, 844), Size(1280, 800)]) {
-      await _openMap(tester, size);
-      expect(tester.takeException(), isNull, reason: '$size');
-      expect(_strip(tester), LiveMapMessages.forming(1, 'Curitiba'));
-      expect(find.text(LiveMapMessages.attribution), findsOneWidget);
-      expect(find.byKey(AppKeys.mapSheet), findsOneWidget);
-      expect(find.byKey(AppKeys.mapPin('cwb-rua-xv')), findsOneWidget);
-      expect(find.byKey(AppKeys.mapPin('cwb-batel')), findsOneWidget);
-      expect(find.byType(MapClusterButton), findsNothing, reason: '$size');
-
-      final sheet = tester.getRect(find.byKey(AppKeys.mapSheet));
-      final rua = tester.getRect(find.byKey(AppKeys.mapPin('cwb-rua-xv')));
-      expect(
-        rua.center.dy,
-        lessThan(sheet.top),
-        reason: '$size pin under sheet',
-      );
-
-      await tester.tap(find.byKey(AppKeys.mapPin('cwb-batel')));
-      await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byKey(AppKeys.mapPin('cwb-batel')),
-          matching: find.byKey(AppKeys.mapPinSelected),
-        ),
-        findsOneWidget,
-        reason: '$size',
-      );
-
-      await tester.tap(find.byKey(AppKeys.mapFocus('grp-cwb-cofre-almost')));
-      await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byKey(AppKeys.mapPin('cwb-rua-xv')),
-          matching: find.byKey(AppKeys.mapPinSelected),
-        ),
-        findsOneWidget,
-        reason: '$size card focuses pin',
-      );
-
-      await tester.tap(find.byKey(AppKeys.groupCard('grp-cwb-cofre-almost')));
-      await tester.pumpAndSettle();
-      expect(find.byType(GroupDetailScreen), findsOneWidget, reason: '$size');
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-    }
+    await _openNear(
+      tester,
+      const Size(390, 844),
+      location: const FixedUserLocation.denied(GeoPoint(0, 0)),
+    );
+    expect(find.byKey(AppKeys.nearNotice), findsOneWidget);
+    expect(find.textContaining('centro de Curitiba'), findsOneWidget);
+    expect(find.byKey(AppKeys.nearRetry), findsOneWidget);
+    expect(find.text(LiveMapMessages.attribution), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a sample guest joins and the strip counts it', (tester) async {
-    await _openMap(tester, const Size(390, 844));
-    expect(_strip(tester), LiveMapMessages.forming(1, 'Curitiba'));
+  testWidgets('a pin opens the room and group sheet', (tester) async {
+    await _openNear(tester, const Size(390, 844));
+    expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsOneWidget);
+    expect(find.text('Mapa'), findsNothing);
+    expect(find.text('Lista'), findsNothing);
 
-    await tester.pump(livePresenceInterval);
+    await tester.tap(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')));
     await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.groupPinSheet), findsOneWidget);
+    expect(find.text('O Relógio'), findsWidgets);
+    expect(find.text(LiveMapMessages.seeGroup), findsOneWidget);
+    expect(find.textContaining('km'), findsWidgets);
 
-    expect(find.byKey(AppKeys.liveJoin), findsOneWidget);
-    expect(find.textContaining('entrou em'), findsOneWidget);
-    expect(_strip(tester), LiveMapMessages.forming(0, 'Curitiba'));
-    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.byKey(AppKeys.groupPinOpen));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.groupPinOpen));
+    await tester.pumpAndSettle();
+    expect(find.byType(GroupDetailScreen), findsOneWidget);
   });
 
-  testWidgets('reduce motion keeps the map still and the list comes back', (
-    tester,
-  ) async {
-    tester.platformDispatcher.accessibilityFeaturesTestValue =
-        FakeAccessibilityFeatures(disableAnimations: true);
-    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
-    await _openMap(tester, const Size(390, 844));
-    expect(find.byKey(AppKeys.mapPin('cwb-rua-xv')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.text(LiveMapMessages.list));
+  testWidgets('outside the radius offers the nearest city', (tester) async {
+    await _openNear(
+      tester,
+      const Size(390, 844),
+      location: const FixedUserLocation.device(GeoPoint(0, 0)),
+    );
+    expect(find.byKey(AppKeys.nearEmpty), findsOneWidget);
+    expect(find.byKey(AppKeys.nearEmptyCity), findsOneWidget);
+    await tester.tap(find.byKey(AppKeys.nearEmptyCity));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.nearEmpty), findsNothing);
+    expect(find.byKey(AppKeys.mapSheet), findsOneWidget);
+  });
+
+  testWidgets('the home list has no map toggle', (tester) async {
+    await pumpScapeMatch(
+      tester,
+      overrides: [
+        mapTileProvider.overrideWithValue(MemoryTileProvider()),
+        userLocationSourceProvider.overrideWithValue(
+          const FixedUserLocation.denied(GeoPoint(0, 0)),
+        ),
+      ],
+    );
+    expect(find.text('Lista'), findsNothing);
+    expect(find.text('Mapa'), findsNothing);
     expect(find.byKey(AppKeys.findGroup), findsOneWidget);
-    expect(find.byKey(AppKeys.mapSheet), findsNothing);
+    expect(find.byKey(AppKeys.newsFeed), findsOneWidget);
+    expect(find.byKey(AppKeys.promoCarousel), findsOneWidget);
+    expect(find.byKey(AppKeys.nearTab), findsOneWidget);
+  });
+
+  testWidgets('reduce motion keeps the nearby map still', (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await _openNear(tester, const Size(390, 844));
+    expect(find.byType(FlutterMap), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('attribution tap does not throw', (tester) async {
-    await _openMap(tester, const Size(390, 844));
+    await _openNear(tester, const Size(390, 844));
     await tester.tap(find.byKey(AppKeys.mapAttribution));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -272,82 +317,13 @@ class _FetchedTiles extends TileProvider {
     if (bytes == null) {
       return MemoryImage(_emptyPng);
     }
-    return MemoryImage(Uint8List.fromList(bytes));
+    return MemoryImage(bytes);
   }
 }
 
-final Uint8List _emptyPng = Uint8List.fromList(const <int>[
-  137,
-  80,
-  78,
-  71,
-  13,
-  10,
-  26,
-  10,
-  0,
-  0,
-  0,
-  13,
-  73,
-  72,
-  68,
-  82,
-  0,
-  0,
-  0,
-  1,
-  0,
-  0,
-  0,
-  1,
-  8,
-  6,
-  0,
-  0,
-  0,
-  31,
-  21,
-  196,
-  137,
-  0,
-  0,
-  0,
-  13,
-  73,
-  68,
-  65,
-  84,
-  120,
-  156,
-  99,
-  248,
-  207,
-  240,
-  80,
-  15,
-  0,
-  4,
-  133,
-  1,
-  128,
-  132,
-  169,
-  140,
-  33,
-  0,
-  0,
-  0,
-  0,
-  73,
-  69,
-  78,
-  68,
-  174,
-  66,
-  96,
-  130,
-]);
+final Uint8List _emptyPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+);
 
 Future<Map<String, Uint8List>> _downloadCuritibaTiles() async {
   final client = _RealHttpOverrides().createHttpClient(null);
@@ -361,8 +337,10 @@ Future<Map<String, Uint8List>> _downloadCuritibaTiles() async {
     }
   }
 
+  window(12, 1484, 1490, 2344, 2350);
   window(13, 2968, 2980, 4688, 4700);
   window(14, 5944, 5954, 9384, 9394);
+  window(15, 11892, 11906, 18768, 18786);
 
   Future<void> one((int, int, int) job) async {
     final (z, x, y) = job;
@@ -387,7 +365,7 @@ Future<Map<String, Uint8List>> _downloadCuritibaTiles() async {
     await for (final chunk in response) {
       builder.add(chunk);
     }
-    images['$z/$x/$y'] = builder.takeBytes();
+    images['$z/$x/$y'] = Uint8List.fromList(builder.takeBytes());
   }
 
   for (var index = 0; index < jobs.length; index += 12) {
@@ -407,7 +385,12 @@ Future<void> _saveMapShots(WidgetTester tester) async {
   await tester.runAsync(_loadFonts);
   await pumpScapeMatch(
     tester,
-    overrides: [mapTileProvider.overrideWithValue(_FetchedTiles(images))],
+    overrides: [
+      mapTileProvider.overrideWithValue(_FetchedTiles(images)),
+      userLocationSourceProvider.overrideWithValue(
+        FixedUserLocation.device(cityCenters[SampleIds.curitiba]!),
+      ),
+    ],
   );
   final context = tester.element(find.text('ScapeMatch'));
   await tester.runAsync(
@@ -425,43 +408,62 @@ Future<void> _saveMapShots(WidgetTester tester) async {
     tester.view.devicePixelRatio = 1;
     await tester.pumpAndSettle();
     if (find.byKey(AppKeys.mapSheet).evaluate().isEmpty) {
-      await tester.tap(find.text(LiveMapMessages.map));
+      await tester.tap(find.byKey(AppKeys.nearTab));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
     }
-    await tester.tap(find.byKey(AppKeys.mapPin('cwb-rua-xv')));
-    await tester.pumpAndSettle();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(seconds: 4)),
-    );
-    await tester.pump();
-    await _capture(tester, find.byKey(AppKeys.liveStrip), dir, entry.$2);
+    await tester.pump(const Duration(milliseconds: 1800));
+    await tester.pump(const Duration(milliseconds: 400));
+    final mapName = entry.$1.width == 390 ? 'map-phone.png' : 'map-1280.png';
+    await _capture(tester, find.byKey(AppKeys.mapAttribution), dir, mapName);
     if (entry.$1.width == 390) {
-      await tester.tap(find.text(LiveMapMessages.list));
+      await tester.tap(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')));
       await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(AppKeys.groupPinSheet),
+        const Offset(0, -280),
+      );
+      await tester.pumpAndSettle();
+      await _capture(
+        tester,
+        find.byKey(AppKeys.groupPinSheet),
+        dir,
+        'map-sheet.png',
+      );
+      Navigator.of(tester.element(find.byKey(AppKeys.groupPinSheet))).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(AppKeys.homeTab));
+      await tester.pumpAndSettle();
+      await _capture(tester, find.text('ScapeMatch'), dir, 'home.png');
     }
   }
 }
 
-Future<void> _openMap(WidgetTester tester, Size size) async {
+Future<void> _openNear(
+  WidgetTester tester,
+  Size size, {
+  UserLocationSource? location,
+}) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await pumpScapeMatch(
     tester,
-    overrides: [mapTileProvider.overrideWithValue(MemoryTileProvider())],
+    overrides: [
+      mapTileProvider.overrideWithValue(MemoryTileProvider()),
+      userLocationSourceProvider.overrideWithValue(
+        location ?? FixedUserLocation.device(cityCenters[SampleIds.curitiba]!),
+      ),
+    ],
   );
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   await tester.pumpAndSettle();
-  await tester.tap(find.text(LiveMapMessages.map));
+  await tester.tap(find.byKey(AppKeys.nearTab));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump();
   await tester.pumpAndSettle();
-}
-
-String _strip(WidgetTester tester) {
-  return tester
-      .widget<Semantics>(find.byKey(AppKeys.liveStrip))
-      .properties
-      .label!;
 }
 
 Future<void> _loadFonts() async {

@@ -33,9 +33,7 @@ void main() {
         final cityGroups = database.groups.where(
           (group) => group.cityId == cityId,
         );
-        if (cityId != SampleIds.curitiba) {
-          expect(cityGroups, hasLength(2), reason: cityId);
-        }
+        expect(cityGroups.length, greaterThan(2), reason: cityId);
         final soon = cityGroups.where(
           (group) =>
               group.startsAt.isAfter(sampleNow) &&

@@ -3,10 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 
-/// Barra inferior. A ordem é Home, Meus grupos, Conta.
+/// Barra inferior. A ordem é Home, Perto de você, Meus grupos, Conta.
 ///
-/// O índice segue os ramos do [StatefulShellRoute]: 0 é a Home, 1 é Meus
-/// grupos, 2 é a Conta. O app abre na Home porque a rota inicial é `/`.
+/// O índice segue os ramos do [StatefulShellRoute]. O app abre na Home.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -38,6 +37,12 @@ class AppShell extends StatelessWidget {
                   icon: Icon(Icons.home_outlined),
                   selectedIcon: Icon(Icons.home),
                   label: 'Home',
+                ),
+                NavigationDestination(
+                  key: AppKeys.nearTab,
+                  icon: Icon(Icons.radar_outlined),
+                  selectedIcon: Icon(Icons.radar),
+                  label: 'Perto de você',
                 ),
                 NavigationDestination(
                   key: AppKeys.myGroups,

@@ -74,6 +74,7 @@ abstract final class AppKeys {
   static const editSave = Key('edit-save');
   static const editError = Key('edit-error');
   static const homeTab = Key('home-tab');
+  static const nearTab = Key('near-tab');
   static const accountTab = Key('account-tab');
   static const accountSettings = Key('account-settings');
   static const accountGreeting = Key('account-greeting');
@@ -141,6 +142,14 @@ abstract final class AppKeys {
   static const mapAttribution = Key('map-attribution');
   static const mapSheet = Key('map-sheet');
   static const mapPinSelected = Key('map-pin-selected');
+  static const nearNotice = Key('near-notice');
+  static const nearRetry = Key('near-retry');
+  static const nearEmpty = Key('near-empty');
+  static const nearEmptyCity = Key('near-empty-city');
+  static const groupPinSheet = Key('group-pin-sheet');
+  static const groupPinOpen = Key('group-pin-open');
+  static Key radiusChip(int kilometers) => Key('radius-$kilometers');
+  static Key nearbyCard(String groupId) => Key('nearby-card-$groupId');
   static Key mapPin(String houseId) => Key('map-pin-$houseId');
   static Key mapFocus(String groupId) => Key('map-focus-$groupId');
   static Key mapCluster(String id) => Key('map-cluster-$id');
