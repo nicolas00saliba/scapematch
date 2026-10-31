@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
@@ -88,7 +89,10 @@ class RoomsCarousel extends ConsumerWidget {
                   itemCount: filtered.length,
                   preferredItemWidth: carouselPreferredItemWidth,
                   itemBuilder: (context, index) {
-                    return RoomCard(listing: filtered[index]);
+                    return StaggerIn(
+                      index: index,
+                      child: RoomCard(listing: filtered[index]),
+                    );
                   },
                 );
               },

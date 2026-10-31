@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/shimmer_box.dart';
 
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key, required this.message});
@@ -14,7 +15,9 @@ class LoadingView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
+            const ShimmerBox(width: 180, height: 16, radius: 10),
+            const SizedBox(height: 8),
+            const ShimmerBox(width: 120, height: 16, radius: 10),
             const SizedBox(height: 16),
             Text(message, textAlign: TextAlign.center),
           ],
@@ -87,11 +90,7 @@ class InlineNotice extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (loading) ...[
-            const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.4),
-            ),
+            const ShimmerBox(width: 148, height: 14, radius: 8),
             const SizedBox(height: 10),
           ],
           Text(

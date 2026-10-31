@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
+import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_photo.dart';
 
 /// Flyer fictício. A arte já traz o texto. Não há desconto de verdade.
 class PromoFlyer {
@@ -97,15 +99,13 @@ class PromoCarousel extends StatelessWidget {
               showDots: true,
               itemBuilder: (context, index) {
                 final flyer = promoFlyers[index];
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.asset(
-                    flyer.asset,
-                    width: double.infinity,
-                    height: height,
-                    fit: BoxFit.cover,
-                    cacheWidth: 800,
-                    semanticLabel: flyer.title,
+                return PressableScale(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: ScapePhoto(
+                      asset: flyer.asset,
+                      semanticLabel: flyer.title,
+                    ),
                   ),
                 );
               },

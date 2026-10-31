@@ -5,6 +5,7 @@ import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
@@ -1035,6 +1036,7 @@ Group _group({
         closesAt ?? GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
     cancelWindow: room.cancelWindow,
     streetAddress: house.streetAddress,
+    coverAsset: roomCategoryImage(room.category),
     participants: [
       for (var index = 0; index < names.length; index++)
         Participant(

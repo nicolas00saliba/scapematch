@@ -37,6 +37,7 @@ class Group {
     this.cancelWindow = GroupRules.refundDeadline,
     this.phaseOverride,
     this.streetAddress = '',
+    this.coverAsset = '',
   });
 
   final String id;
@@ -89,6 +90,9 @@ class Group {
 
   /// Endereço fictício da sala, para o mapa.
   final String streetAddress;
+
+  /// Capa da sala. Vazio quando o grupo de teste não trouxe foto.
+  final String coverAsset;
 
   int get openSeats =>
       GroupRules.openSeats(filledSpots: filledSpots, totalSpots: totalSpots);
@@ -188,6 +192,7 @@ class Group {
     Duration? cancelWindow,
     Object? phaseOverride = _absent,
     String? streetAddress,
+    String? coverAsset,
   }) {
     return Group(
       id: id,
@@ -220,6 +225,7 @@ class Group {
           ? this.phaseOverride
           : phaseOverride as GroupPhase?,
       streetAddress: streetAddress ?? this.streetAddress,
+      coverAsset: coverAsset ?? this.coverAsset,
     );
   }
 }

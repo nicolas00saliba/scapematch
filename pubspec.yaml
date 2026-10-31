@@ -69,6 +69,8 @@ flutter:
     - assets/experience/example_house.json
     - assets/images/news/
     - assets/images/rooms/
+    - assets/images/rooms/gallery/
+    - assets/images/onboarding/
     - assets/images/promos/
 
   # An image asset can refer to one or more resolution-specific "variants", see

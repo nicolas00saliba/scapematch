@@ -1,5 +1,29 @@
 # Decisões provisórias
 
+## Sensação das telas
+
+- **Data:** 2026-10-30
+- **Decisão:** a introdução abre com foto em tela cheia, degradê escuro e a frase por cima. A primeira tela diz “Encontre pessoas para jogar”. O cartão da sala tem capa do tema e, ao toque na foto, cresce até a tela da sala, que tem uma galeria de três fotos locais. Os grupos da Home ganham a mesma capa e avatares empilhados de quem já entrou. Toque encolhe o cartão um pouco; no celular há uma vibração leve, na web não. No lugar do spinner fica uma faixa de brilho. Listas entram em cascata e o número de gente no cartão conta até o valor. Com reduzir movimento, isso tudo fica parado. Cantos ficam mais redondos e o cartão ganha sombra leve. A paleta continua Cofre de Cobre. Promoções, novidades e grupos que estão se formando continuam na Home. O mapa ao vivo fica para outro PR. Links externos continuam abrindo em outra aba na web.
+- **Motivo:** o dono quer a fluidez de um app de reserva, no celular e na web, sem trocar as regras.
+- **Onde está no código:** `OnboardingScreen`, `ScapePhoto`, `PressableScale`, `ShimmerBox`, `RoomDetailScreen`, `GroupCard` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra foto entra em `assets/` e no crédito. O voo da sala é a tag `roomHeroTag`.
+
+## A tela do grupo mostra a sala
+
+- **Data:** 2026-10-30
+- **Decisão:** a tela do grupo abre com a capa da sala escolhida, a mesma foto do cartão. Um degradê escuro segura o nome, a casa e a cidade por cima. O voo usa `groupHeroTag`, separada de `roomHeroTag`, para a capa do grupo e a capa da sala não disputarem a mesma tag. Abaixo, cartões separam quando, vagas, pagamento, o recado e quem já está. A seção Sobre a sala traz a galeria do tema, a história curta da sala, duração, dificuldade, capacidade, preço, casa, endereço, Maps, Waze e o link “Ver a sala completa”. Esse link abre a mesma tela da sala, no caminho `/salas/:id`, por cima do grupo: `/sala/:id` vive na aba Home e abriria por baixo. Prazo, presenças, membros, convidar e entrar continuam. O botão principal segue fixo embaixo. A primeira foto da introdução é um grupo numeroso num fliperama, em ambiente interno (Pexels 17368156). A foto do Jenga e a de uma pessoa sozinha saíram.
+- **Motivo:** a tela do grupo estava só em texto, e a primeira impressão pedia gente jogando junta.
+- **Onde está no código:** `GroupDetailScreen`, `GroupCard`, `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra capa entra no tema da sala. Outra foto de abertura entra em `assets/images/onboarding/encontrar.jpg` e no crédito.
+
+## A primeira foto da introdução é um grupo grande
+
+- **Data:** 2026-10-31
+- **Decisão:** a tela “Encontre pessoas para jogar” usa Pexels 17368156 (Matheus Bertelli): cerca de dez adultos num fliperama, rostos visíveis, em ambiente interno. O enquadramento fica no centro. O corte do celular e o da largura 1280 ainda mostram o grupo, com o texto embaixo no degradê. A foto do Jenga saiu. A festa (Pexels 20826894) também saiu.
+- **Motivo:** o fliperama é diversão presencial em grupo e continua com mais de cinco rostos nos dois cortes. A festa tinha gente junta, sem o lugar da brincadeira. O karaokê (Pexels 29298514) tem a placa e a alegria, com poucos rostos nítidos no corte largo. O boliche (Pexels 7429776) enquadra bem e para em quatro pessoas. O laser tag (Pexels 31107755) tem muita gente, com máscara e crianças. Nenhuma candidata era uma escape room com grupo.
+- **Onde está no código:** `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra foto entra em `assets/images/onboarding/encontrar.jpg` e no crédito.
+
 Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A data é o dia em que ela foi registrada neste arquivo.
 
 ## Grupo que fecha, casa, fila e conta
@@ -71,7 +95,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Data:** 2026-10-28
 - **Decisão:** os grupos formados voltam para a abertura, numa janela que encolhe até o conteúdo e no máximo cabe cerca de um cartão e o começo do seguinte. A barra de rolagem vertical só aparece quando os cartões não cabem. Um arrasto que passa do fim ou do começo da janela continua na página. Curitiba tem grupos quase cheios a mais, de exemplo, para essa barra existir no protótipo. As promoções ficam logo abaixo dessa janela — ver “Ordem da Home e quadros inteiros”.
 - **Motivo:** a compressão tinha tirado os grupos e empurrado as promoções para fora da vista. A janela devolve os grupos sem ocupar a página inteira.
-- **Onde está no código:** `FindGroupsSection` (`groupWindowMaxHeight`) e os grupos extras em `sample_data.dart`.
+- **Onde está no código:** `FindGroupsSection` (`groupWindowMaxHeight`, alto o bastante para o cartão inteiro) e os grupos extras em `sample_data.dart`.
 - **Como trocar depois:** o teto da janela é a constante `groupWindowMaxHeight`. Um feed real substitui os grupos extras.
 
 ## Entrada livre no grupo

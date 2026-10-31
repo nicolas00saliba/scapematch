@@ -5,7 +5,7 @@ abstract final class OnboardingMessages {
   static const start = 'Começar';
   static const replay = 'Ver introdução';
 
-  static const findTitle = 'Gente para jogar';
+  static const findTitle = 'Encontre pessoas para jogar';
   static const findBody = 'Ache gente para completar o grupo de escape room.';
 
   static const nearTitle = 'Perto de você';

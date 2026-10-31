@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/app_shell.dart';
+import 'package:scapematch/app/page_transition.dart';
 import 'package:scapematch/features/account/presentation/account_destination_screen.dart';
 import 'package:scapematch/features/account/presentation/account_screen.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
@@ -10,6 +11,7 @@ import 'package:scapematch/features/auth/presentation/signup_screen.dart';
 import 'package:scapematch/features/groups/presentation/invite_screen.dart';
 import 'package:scapematch/features/catalog/presentation/popular_rooms_screen.dart';
 import 'package:scapematch/features/catalog/presentation/room_category_screen.dart';
+import 'package:scapematch/features/catalog/presentation/room_detail_screen.dart';
 import 'package:scapematch/features/catalog/presentation/room_groups_screen.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/features/groups/presentation/group_detail_screen.dart';
@@ -77,6 +79,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/',
                 name: 'home',
                 builder: (context, state) => const HomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'sala/:roomId',
+                    name: 'room-detail',
+                    pageBuilder: (context, state) {
+                      return scapePage(
+                        key: state.pageKey,
+                        child: RoomDetailScreen(
+                          roomId: state.pathParameters['roomId']!,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -186,12 +202,27 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // A sala da Home (`/sala/:id`) vive dentro da aba. Aberta de um grupo,
+      // ela ficaria por baixo. Este caminho é a mesma tela, por cima do grupo.
+      GoRoute(
+        path: '/salas/:roomId',
+        name: 'room-from-group',
+        pageBuilder: (context, state) {
+          return scapePage(
+            key: state.pageKey,
+            child: RoomDetailScreen(roomId: state.pathParameters['roomId']!),
+          );
+        },
+      ),
       GoRoute(
         path: '/groups/:groupId',
         name: 'group-detail',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final groupId = state.pathParameters['groupId']!;
-          return GroupDetailScreen(groupId: groupId);
+          return scapePage(
+            key: state.pageKey,
+            child: GroupDetailScreen(groupId: groupId),
+          );
         },
       ),
       GoRoute(
