@@ -135,5 +135,14 @@ abstract final class AppKeys {
   static const popularRooms = Key('popular-rooms');
   static const popularSeeAll = Key('popular-see-all');
   static const groupResults = Key('group-results');
+  static const homeSurfaceToggle = Key('home-surface-toggle');
+  static const liveStrip = Key('live-strip');
+  static const liveJoin = Key('live-join');
+  static const mapAttribution = Key('map-attribution');
+  static const mapSheet = Key('map-sheet');
+  static const mapPinSelected = Key('map-pin-selected');
+  static Key mapPin(String houseId) => Key('map-pin-$houseId');
+  static Key mapFocus(String groupId) => Key('map-focus-$groupId');
+  static Key mapCluster(String id) => Key('map-cluster-$id');
   static Key accountDestination(String name) => Key('account-$name');
 }

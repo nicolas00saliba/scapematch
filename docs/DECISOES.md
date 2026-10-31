@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## Mapa ao vivo
+
+- **Data:** 2026-10-31
+- **Decisão:** a Home tem Lista e Mapa. A lista continua como estava. O mapa ocupa a tela da cidade, com uma gaveta de cartões por cima, no jeito de um app de reserva. Cada casa de exemplo é um pino. Pino com grupo se formando mostra a contagem e pulsa; os outros mostram o menor preço da casa, em reais, sem centavos. Tocar no pino destaca os cartões daquela casa e traz o primeiro para a vista. O ícone de localização no cartão faz o caminho de volta e destaca o pino. Tocar no cartão abre o grupo com o mesmo voo da capa da lista. A faixa diz quantos grupos estão se formando agora na cidade, e o número conta até o valor. A cada 5 segundos um convidado fictício senta num grupo da cidade, de preferência num que ainda está se formando. Isso só roda com o mapa aberto. Não há backend: `SampleLivePresence` escreve no banco em memória. O canal que substitui esse timer está em [SUPABASE_ESQUEMA.md](SUPABASE_ESQUEMA.md). Os tiles são do OpenStreetMap, sem chave. O claro fica levemente aquecido; o escuro escurece o mesmo tile para acompanhar o petróleo. A atribuição “© OpenStreetMap” fica visível e abre o crédito em outra aba na web. Pinos próximos demais na tela viram um cluster; tocar nele aproxima. Cada pino e o mapa ficam num `RepaintBoundary`. O pulso e a contagem param com reduzir movimento. A rotação do mapa fica desligada. A frase antiga que deixava o mapa para outro PR fica substituída por esta.
+- **Motivo:** a pessoa quer ver a cidade viva, no celular e na web, sem chave paga e sem trocar as regras dos grupos.
+- **Onde está no código:** `LiveMapView`, `HomeSurfaceToggle`, `SampleLivePresence`, `clusterHousePins` e `mapTileProvider`.
+- **Como trocar depois:** o provider `sampleLivePresenceProvider` sai, e o mapa passa a reagir ao insert em `group_members`. Outro tile entra em `liveMapTileUrl`, com a atribuição correspondente. O raster gratuito do CARTO passou a pedir chave, por isso esta versão usa o servidor do OpenStreetMap.
+
 ## Sensação das telas
 
 - **Data:** 2026-10-30

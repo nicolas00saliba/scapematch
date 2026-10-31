@@ -5,6 +5,8 @@ class EscapeHouse {
     required this.cityId,
     required this.name,
     required this.neighborhood,
+    required this.latitude,
+    required this.longitude,
     this.streetAddress = 'Rua de exemplo, 100',
   });
 
@@ -15,4 +17,8 @@ class EscapeHouse {
 
   /// Endereço fictício. O mapa usa isso junto com o bairro e a cidade.
   final String streetAddress;
+
+  /// Ponto fictício no bairro, para o mapa. Não é o endereço de uma casa real.
+  final double latitude;
+  final double longitude;
 }

@@ -864,13 +864,36 @@ City _city(String id, String name, String stateCode, String stateName) {
 }
 
 EscapeHouse _house(String id, City city, String name, String neighborhood) {
+  final point = _housePoints[id];
+  if (point == null) {
+    throw StateError('Casa $id sem ponto no mapa de exemplo.');
+  }
   return EscapeHouse(
     id: id,
     cityId: city.id,
     name: name,
     neighborhood: neighborhood,
+    latitude: point.$1,
+    longitude: point.$2,
   );
 }
+
+/// Pontos inventados dentro do bairro, só para o mapa de exemplo.
+///
+/// Não vêm de site de casa nenhuma. São coordenadas públicas de bairro,
+/// deslocadas, para o pino cair na região certa da cidade.
+const _housePoints = <String, (double, double)>{
+  'cwb-rua-xv': (-25.4296, -49.2712),
+  'cwb-batel': (-25.4422, -49.2904),
+  'sp-augusta': (-23.5556, -46.6584),
+  'sp-liberdade': (-23.5608, -46.6332),
+  'rj-copa': (-22.9718, -43.1854),
+  'rj-santa': (-22.9208, -43.1866),
+  'bh-savassi': (-19.9386, -43.9334),
+  'bh-mina': (-19.9172, -43.9348),
+  'poa-cais': (-30.0272, -51.2292),
+  'poa-redencao': (-30.0342, -51.2162),
+};
 
 EscapeRoom _room(
   String id,
