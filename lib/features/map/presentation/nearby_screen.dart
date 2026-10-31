@@ -418,20 +418,26 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
             for (final item in nearby)
               Marker(
                 point: LatLng(item.point.latitude, item.point.longitude),
-                width: 176,
-                height: 176,
+                width: 220,
+                height: 220,
                 alignment: Alignment.center,
                 child: _ClearOfUser(
                   point: LatLng(item.point.latitude, item.point.longitude),
                   user: center,
-                  child: RoomPhotoPin(
-                    markerId: item.group.id,
-                    roomName: item.group.roomName,
-                    coverAsset: item.group.coverAsset,
-                    filled: item.group.filledSpots,
-                    total: item.group.totalSpots,
-                    selected: _selectedGroupId == item.group.id,
-                    onTap: () => _openSheet(item),
+                  child: Align(
+                    alignment: Alignment.center,
+                    // O marcador é maior que a foto, para o selo e o
+                    // deslocamento não serem cortados. Sem o Align, a foto
+                    // estica até a caixa e o selo vai parar no canto dela.
+                    child: RoomPhotoPin(
+                      markerId: item.group.id,
+                      roomName: item.group.roomName,
+                      coverAsset: item.group.coverAsset,
+                      filled: item.group.filledSpots,
+                      total: item.group.totalSpots,
+                      selected: _selectedGroupId == item.group.id,
+                      onTap: () => _openSheet(item),
+                    ),
                   ),
                 ),
               ),

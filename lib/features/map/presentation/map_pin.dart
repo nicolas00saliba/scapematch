@@ -44,10 +44,9 @@ class RoomPhotoPin extends StatelessWidget {
         key: AppKeys.mapPin(markerId),
         onTap: onTap,
         child: SizedBox(
-          width: 96,
-          height: 96,
+          width: diameter + _badgeHang,
+          height: diameter + _badgeHang,
           child: Stack(
-            alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
               if (selected)
@@ -81,11 +80,9 @@ class RoomPhotoPin extends StatelessWidget {
                     ? ColoredBox(color: scheme.primaryContainer)
                     : ScapePhoto(asset: coverAsset, semanticLabel: roomName),
               ),
-              AnimatedPositioned(
-                duration: duration,
-                curve: Curves.easeOutCubic,
-                right: (96 - diameter) / 2 - 6,
-                bottom: (96 - diameter) / 2 - 4,
+              Positioned(
+                right: 0,
+                bottom: 0,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: scheme.primary,
@@ -116,6 +113,9 @@ class RoomPhotoPin extends StatelessWidget {
     );
   }
 }
+
+/// Quanto o selo passa da foto, para baixo e para a direita.
+const _badgeHang = 16.0;
 
 /// Pino da casa. Grupo se formando pulsa, salvo com reduzir movimento.
 class MapPinButton extends StatefulWidget {

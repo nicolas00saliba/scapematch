@@ -232,6 +232,11 @@ void main() {
     expect(find.text('1/8'), findsWidgets);
     expect(find.text('3/4'), findsWidgets);
     expect(find.text('8/10'), findsWidgets);
+    _expectBadgeOnPin(tester, 'grp-curitiba-near-0', '5/9');
+    _expectBadgeOnPin(tester, 'grp-curitiba-near-1', '1/8');
+    _expectBadgeOnPin(tester, 'grp-curitiba-near-2', '3/4');
+    _expectBadgeOnPin(tester, 'grp-curitiba-near-3', '8/10');
+    _expectBadgeOnPin(tester, 'grp-curitiba-near-4', '2/5');
     final circle = find.descendant(
       of: find.byKey(AppKeys.mapPin('grp-curitiba-near-0')),
       matching: find.byType(AnimatedContainer),
@@ -604,6 +609,18 @@ double _bandDeviation(Uint8List bytes, int width, int height, int y0) {
     sum += delta * delta;
   }
   return math.sqrt(sum / samples.length);
+}
+
+/// O selo fica no canto da foto, não solto no mapa.
+void _expectBadgeOnPin(WidgetTester tester, String groupId, String badge) {
+  final pin = tester.getRect(find.byKey(AppKeys.mapPin(groupId)));
+  final label = tester.getRect(find.text(badge));
+  expect(
+    (label.center - pin.bottomRight).distance,
+    lessThan(28),
+    reason: badge,
+  );
+  expect(pin.inflate(4).overlaps(label), isTrue, reason: badge);
 }
 
 Future<void> _openNear(
