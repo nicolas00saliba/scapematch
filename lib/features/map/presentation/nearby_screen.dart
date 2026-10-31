@@ -418,19 +418,27 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
             for (final item in nearby)
               Marker(
                 point: LatLng(item.point.latitude, item.point.longitude),
-                width: 96,
-                height: 96,
+                width: 176,
+                height: 176,
                 alignment: Alignment.center,
-                child: RoomPhotoPin(
-                  markerId: item.group.id,
-                  roomName: item.group.roomName,
-                  coverAsset: item.group.coverAsset,
-                  filled: item.group.filledSpots,
-                  total: item.group.totalSpots,
-                  selected: _selectedGroupId == item.group.id,
-                  onTap: () => _openSheet(item),
+                child: _ClearOfUser(
+                  point: LatLng(item.point.latitude, item.point.longitude),
+                  user: center,
+                  child: RoomPhotoPin(
+                    markerId: item.group.id,
+                    roomName: item.group.roomName,
+                    coverAsset: item.group.coverAsset,
+                    filled: item.group.filledSpots,
+                    total: item.group.totalSpots,
+                    selected: _selectedGroupId == item.group.id,
+                    onTap: () => _openSheet(item),
+                  ),
                 ),
               ),
+          ],
+        ),
+        MarkerLayer(
+          markers: [
             Marker(
               point: center,
               width: 132,
@@ -689,6 +697,40 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
       }
     }
     return '';
+  }
+}
+
+/// Afasta o desenho do pino quando ele cairia em cima do ponto azul.
+///
+/// O lugar da casa não muda. Só o círculo anda na tela, o bastante para
+/// o ponto e a foto aparecerem juntos. Com o zoom da ficha, 250 m já
+/// separam os dois e o pino volta para o ponto.
+class _ClearOfUser extends StatelessWidget {
+  const _ClearOfUser({
+    required this.point,
+    required this.user,
+    required this.child,
+  });
+
+  final LatLng point;
+  final LatLng user;
+  final Widget child;
+
+  static const _gap = 46.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final camera = MapCamera.of(context);
+    final delta =
+        camera.latLngToScreenOffset(point) - camera.latLngToScreenOffset(user);
+    final distance = delta.distance;
+    if (!distance.isFinite || distance >= _gap) {
+      return child;
+    }
+    final nudge = distance < 1
+        ? const Offset(0, -_gap)
+        : delta / distance * (_gap - distance);
+    return Transform.translate(offset: nudge, child: child);
   }
 }
 

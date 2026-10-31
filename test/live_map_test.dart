@@ -163,6 +163,12 @@ void main() {
     }
     expect(near.every((item) => item.distanceKm <= 5), isTrue);
     expect(wide.any((item) => item.distanceKm > 5), isTrue);
+    final badges = {
+      for (final item in near)
+        '${item.group.filledSpots}/${item.group.totalSpots}',
+    };
+    expect(badges, containsAll(['5/9', '1/8', '3/4', '8/10']));
+    expect(badges.length, greaterThan(3));
     expect(formatDistanceKm(1.2), '1,2 km');
     expect(formatDistanceKm(0.8), '800 m');
 
@@ -222,7 +228,10 @@ void main() {
     expect(find.text('Mapa'), findsNothing);
     expect(find.text('Lista'), findsNothing);
 
-    expect(find.text('5/6'), findsWidgets);
+    expect(find.text('5/9'), findsWidgets);
+    expect(find.text('1/8'), findsWidgets);
+    expect(find.text('3/4'), findsWidgets);
+    expect(find.text('8/10'), findsWidgets);
     final circle = find.descendant(
       of: find.byKey(AppKeys.mapPin('grp-curitiba-near-0')),
       matching: find.byType(AnimatedContainer),
@@ -300,10 +309,13 @@ void main() {
       ),
       isTrue,
     );
-    expect(find.byType(MarkerLayer), findsOneWidget);
+    expect(find.byType(MarkerLayer), findsNWidgets(2));
     expect(find.byKey(AppKeys.radiusCircle), findsOneWidget);
     expect(find.byType(CircleLayer), findsNothing);
-    expect(find.text('5/6'), findsWidgets);
+    expect(find.text('5/9'), findsWidgets);
+    expect(find.text('1/8'), findsWidgets);
+    expect(find.text('3/4'), findsWidgets);
+    expect(find.text('8/10'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

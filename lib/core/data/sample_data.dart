@@ -933,7 +933,21 @@ _nearbyPlaces({
     'O Sinal',
   ];
   const distancesKm = <double>[1.6, 2.4, 3.2, 4.4, 4.9, 6.2, 7.4, 8.8, 11, 14];
-  const guestNames = <String>['Ana', 'Beto', 'Cris', 'Duda', 'Eva'];
+  // Tamanhos de 4 a 10. Uns quase cheios, outros acabando de começar.
+  // O mínimo é o total, então o grupo segue se formando até encher.
+  const totals = <int>[9, 8, 4, 10, 5, 7, 9, 4, 10, 6];
+  const rosters = <List<String>>[
+    ['Ana', 'Beto', 'Cris', 'Duda', 'Eva'],
+    ['Lia'],
+    ['Otto', 'Nara', 'Caio'],
+    ['Ivo', 'Bia', 'Davi', 'Fran', 'Guto', 'Hugo', 'Iara', 'João'],
+    ['Kai', 'Léo'],
+    ['Mia', 'Nuno', 'Olga', 'Pietra', 'Quim', 'Rita'],
+    ['Sol', 'Téo', 'Uma'],
+    ['Vera'],
+    ['Will', 'Yara', 'Zeca', 'Ala'],
+    ['Breno', 'Cecília', 'Dora', 'Enzo', 'Fábio'],
+  ];
   final houses = <EscapeHouse>[];
   final rooms = <EscapeRoom>[];
   final slots = <TimeSlot>[];
@@ -958,16 +972,16 @@ _nearbyPlaces({
         latitude: point.latitude,
         longitude: point.longitude,
       );
+      final total = totals[index];
       final room = _room(
         'room-$id',
         house,
         labels[index],
         'Uma sala de exemplo nos arredores',
         RoomCategory.values[index % RoomCategory.values.length],
-        6,
+        10,
         60,
         Difficulty.medium,
-        minimumPlayers: 6,
       );
       final startsAt = now.add(Duration(hours: 36 + (index * 5)));
       final slot = schedule.at('slot-$id', room.id, startsAt);
@@ -978,9 +992,9 @@ _nearbyPlaces({
         house: house,
         room: room,
         slot: slot,
-        totalSpots: 6,
-        names: guestNames,
-        minimumSpots: 6,
+        totalSpots: total,
+        names: rosters[index],
+        minimumSpots: total,
       );
       houses.add(house);
       rooms.add(room);

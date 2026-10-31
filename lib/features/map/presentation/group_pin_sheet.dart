@@ -234,12 +234,15 @@ class _SheetAvatars extends StatelessWidget {
     final shown = people.take(5).toList();
     return Row(
       children: [
-        for (final person in shown)
+        for (var index = 0; index < shown.length; index++)
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: PersonAvatar(
-              name: person.displayName.isEmpty ? '?' : person.displayName,
+              name: shown[index].displayName.isEmpty
+                  ? '?'
+                  : shown[index].displayName,
               radius: 16,
+              portrait: index,
             ),
           ),
       ],

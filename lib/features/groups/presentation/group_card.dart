@@ -183,7 +183,10 @@ class _AvatarRow extends StatelessWidget {
                     left: index * 18,
                     child: StaggerIn(
                       index: index,
-                      child: _Avatar(name: shown[index].displayName),
+                      child: _Avatar(
+                        name: shown[index].displayName,
+                        portrait: index,
+                      ),
                     ),
                   ),
                 if (extra > 0)
@@ -217,13 +220,14 @@ class _AvatarRow extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.name});
+  const _Avatar({required this.name, required this.portrait});
 
   final String name;
+  final int portrait;
 
   @override
   Widget build(BuildContext context) {
-    return PersonAvatar(name: name, radius: 14);
+    return PersonAvatar(name: name, radius: 14, portrait: portrait);
   }
 }
 
