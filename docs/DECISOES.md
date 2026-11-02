@@ -1,9 +1,17 @@
 # Decisões provisórias
 
+## Porto Alegre é a Casa de Cultura Mario Quintana
+
+- **Data:** 2026-11-02
+- **Decisão:** Porto Alegre passa a ser a Casa de Cultura Mario Quintana, o prédio rosa do antigo Hotel Majestic, com a cúpula e as passarelas entre as torres. A foto é vertical, de dia, e cobre a tela inteira. A cúpula fica na metade de cima, acima do título. Belo Horizonte, Curitiba, Rio e São Paulo não mudam.
+- **Motivo:** o pôr do sol no rio não era um marco urbano da cidade. A chaminé do Gasômetro continua de fora.
+- **Onde está no código:** `cityLandmarks` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra foto entra em `assets/images/landmarks/porto-alegre.jpg`, já no formato alto da tela.
+
 ## A foto cobre a tela inteira
 
 - **Data:** 2026-11-02
-- **Decisão:** a foto de Belo Horizonte e a de Porto Alegre são retratos verticais do lugar, no mesmo formato da tela. O `BoxFit.cover` mostra a foto de ponta a ponta, atrás do título e do cartão. A igreja fica na metade de cima, com a calçada embaixo. O pôr do sol fica na metade de cima, com a orla embaixo. Curitiba, Rio e São Paulo já cobriam a área visível e continuam iguais.
+- **Decisão:** a foto de Belo Horizonte e a de Porto Alegre são retratos verticais do lugar, no mesmo formato da tela. O `BoxFit.cover` mostra a foto de ponta a ponta, atrás do título e do cartão. A igreja fica na metade de cima, com a calçada embaixo. Porto Alegre passou a ser a Casa de Cultura Mario Quintana na decisão acima. Curitiba, Rio e São Paulo já cobriam a área visível e continuam iguais.
 - **Motivo:** as fotos anteriores eram largas. O retrato montado deixava uma faixa preta entre a imagem e o título.
 - **Onde está no código:** `assets/images/landmarks/` e `docs/CREDITOS_IMAGENS.md`.
 - **Como trocar depois:** outra foto entra no mesmo arquivo, já no formato alto da tela, com o assunto na metade de cima.

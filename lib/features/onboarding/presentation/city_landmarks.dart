@@ -46,9 +46,9 @@ const cityLandmarks = <CityLandmark>[
   ),
   CityLandmark(
     cityId: SampleIds.portoAlegre,
-    name: 'Orla do Guaíba',
+    name: 'Casa de Cultura Mario Quintana',
     asset: 'assets/images/landmarks/porto-alegre.jpg',
-    alignment: Alignment(0.15, -1),
+    alignment: Alignment(0, -1),
   ),
 ];
 
