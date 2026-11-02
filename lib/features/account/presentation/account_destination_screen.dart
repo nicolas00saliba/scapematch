@@ -4,6 +4,7 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/theme/presentation/theme_choice_control.dart';
 import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
 
 /// Tela curta de um item da Conta. Tudo aqui é placeholder fictício.
@@ -95,6 +96,8 @@ class AccountDestinationScreen extends ConsumerWidget {
         ),
       ],
       AccountDestination.settings => [
+        const ThemeChoiceControl(),
+        const SizedBox(height: 16),
         const _InfoCard(
           title: 'Notificações',
           subtitle: 'Os lembretes ficam em Avisos, na Conta. O push do celular espera a conta de verdade.',
@@ -103,13 +106,6 @@ class AccountDestinationScreen extends ConsumerWidget {
         const _InfoCard(
           title: 'Cidade',
           subtitle: 'A escolha fica salva neste aparelho. Sem escolha, a Home abre em Curitiba.',
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Nada nesta tela altera o app de verdade.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
         ),
       ],
     };

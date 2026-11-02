@@ -163,10 +163,8 @@ void main() {
     await tester.tap(find.byKey(AppKeys.accountSettings));
     await tester.pumpAndSettle();
     expect(find.text('Configurações'), findsWidgets);
-    expect(
-      find.textContaining('Nada nesta tela altera o app de verdade.'),
-      findsOneWidget,
-    );
+    expect(find.text('Aparência'), findsOneWidget);
+    expect(find.text('Automático'), findsOneWidget);
   });
 
   testWidgets('the room carousel snaps one whole card at a time', (
