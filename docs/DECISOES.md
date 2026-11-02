@@ -1,9 +1,17 @@
 # Decisões provisórias
 
+## Belo Horizonte e Porto Alegre trocam de foto
+
+- **Data:** 2026-11-02
+- **Decisão:** Belo Horizonte passa a ser a Igreja São Francisco de Assis da Pampulha vista de fora, com as abóbadas onduladas e o campanário inteiros, sob o céu azul. A igreja fica na metade de cima, acima do título. Porto Alegre passa a ser o pôr do sol no Guaíba visto da orla, com céu laranja e pessoas na beira da água, também na metade de cima. O ponto focal de cada uma continua próprio, com y negativo. Curitiba, Rio e São Paulo não mudam.
+- **Motivo:** o close do painel de azulejos não se reconhece, e a Usina do Gasômetro à noite ficou escura. O pôr do sol na orla substitui a chaminé.
+- **Onde está no código:** `cityLandmarks` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra foto entra em `assets/images/landmarks/` e no crédito. O enquadramento entra no `alignment` da cidade.
+
 ## A foto da cidade fica na metade de cima
 
 - **Data:** 2026-11-02
-- **Decisão:** na introdução, a foto de “Perto de você” é um retrato já enquadrado para o celular. O ponto turístico ocupa a metade de cima, acima do título e do cartão. Cada cidade tem um `Alignment` próprio, com y negativo, para o recorte do `BoxFit.cover` não devolver o assunto para trás do cartão. Curitiba é a estufa do Jardim Botânico, centralizada. São Paulo é o MASP de frente. O Rio mostra o Cristo inteiro. Belo Horizonte é a fachada de azulejos da Igreja da Pampulha. Porto Alegre é a Usina do Gasômetro iluminada, não só a chaminé de dia. O crossfade continua.
+- **Decisão:** na introdução, a foto de “Perto de você” é um retrato já enquadrado para o celular. O ponto turístico ocupa a metade de cima, acima do título e do cartão. Cada cidade tem um `Alignment` próprio, com y negativo, para o recorte do `BoxFit.cover` não devolver o assunto para trás do cartão. Curitiba é a estufa do Jardim Botânico, centralizada. São Paulo é o MASP de frente. O Rio mostra o Cristo inteiro. Belo Horizonte e Porto Alegre foram trocadas na decisão acima: a igreja inteira da Pampulha e o pôr do sol na orla do Guaíba. O crossfade continua.
 - **Motivo:** no celular a estufa saía cortada, o Cristo ficava atrás do texto e em Belo Horizonte só aparecia o céu.
 - **Onde está no código:** `CityLandmark.alignment` e `_PagePhoto`.
 - **Como trocar depois:** outro enquadramento entra no `alignment` da cidade. Outra foto entra em `assets/images/landmarks/` e em `docs/CREDITOS_IMAGENS.md`.
@@ -27,7 +35,7 @@
 ## A introdução mostra a cidade, e a Conta cabe numa lista
 
 - **Data:** 2026-11-02
-- **Decisão:** a tela “Perto de você” da introdução usa a foto de um ponto turístico da cidade escolhida e troca com crossfade. Curitiba é o Jardim Botânico, São Paulo o MASP, Rio o Cristo Redentor, Belo Horizonte a Igreja da Pampulha e Porto Alegre a Usina do Gasômetro. Cidade desconhecida cai em Curitiba. “Dividir a reserva” usa uma foto de maquininha com mãos e cartão. Na Conta, Ajuda reúne a introdução e as perguntas, Termos e políticas reúne uso, privacidade e reembolso, Meus dados e privacidade reúne os dados e a exclusão, e Avisos fica em Configurações junto das notificações. Indique e ganhe, Cartões e Sair da conta continuam. As rotas antigas continuam abrindo a mesma tela.
+- **Decisão:** a tela “Perto de você” da introdução usa a foto de um ponto turístico da cidade escolhida e troca com crossfade. Curitiba é o Jardim Botânico, São Paulo o MASP, Rio o Cristo Redentor, Belo Horizonte a Igreja da Pampulha e Porto Alegre a orla do Guaíba. Cidade desconhecida cai em Curitiba. “Dividir a reserva” usa uma foto de maquininha com mãos e cartão. Na Conta, Ajuda reúne a introdução e as perguntas, Termos e políticas reúne uso, privacidade e reembolso, Meus dados e privacidade reúne os dados e a exclusão, e Avisos fica em Configurações junto das notificações. Indique e ganhe, Cartões e Sair da conta continuam. As rotas antigas continuam abrindo a mesma tela.
 - **Motivo:** a introdução mostrava uma pessoa no lugar da cidade, e a Conta empilhava pílulas para coisas que cabem em poucos itens.
 - **Onde está no código:** `cityLandmarks`, `OnboardingScreen`, `AccountScreen` e `AccountDestinationScreen`.
 - **Como trocar depois:** outra cidade entra em `cityLandmarks` e em `docs/CREDITOS_IMAGENS.md`. Outro agrupamento da Conta entra em `AccountDestination`.

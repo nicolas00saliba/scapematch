@@ -42,13 +42,13 @@ const cityLandmarks = <CityLandmark>[
     cityId: SampleIds.beloHorizonte,
     name: 'Igreja da Pampulha',
     asset: 'assets/images/landmarks/belo-horizonte.jpg',
-    alignment: Alignment(-0.05, -0.9),
+    alignment: Alignment(0, -1),
   ),
   CityLandmark(
     cityId: SampleIds.portoAlegre,
-    name: 'Usina do Gasômetro',
+    name: 'Orla do Guaíba',
     asset: 'assets/images/landmarks/porto-alegre.jpg',
-    alignment: Alignment(0.2, -0.8),
+    alignment: Alignment(0, -0.95),
   ),
 ];
 
