@@ -11,8 +11,8 @@ Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplas
 | `assets/images/landmarks/curitiba.jpg` | https://commons.wikimedia.org/wiki/File:Estufa_principal_do_Jardim_Bot%C3%A2nico_de_Curitiba_02.jpg — Rodrigo Argenton, CC BY-SA 4.0. Recorte com a estufa na metade de cima. |
 | `assets/images/landmarks/sao-paulo.jpg` | https://commons.wikimedia.org/wiki/File:MASP_Brazil.jpg — Wilfredor, CC0. Recorte com o volume suspenso na metade de cima. |
 | `assets/images/landmarks/rio.jpg` | https://commons.wikimedia.org/wiki/File:Christ_the_Redeemer_-_Cristo_Redentor.jpg — Arne Müseler, CC BY-SA 3.0 de. O monumento inteiro fica na metade de cima. |
-| `assets/images/landmarks/belo-horizonte.jpg` | https://commons.wikimedia.org/wiki/File:Igreja_de_Sao_Francisco_de_Assis_-_Fachada.jpg — Camilla Vitoria Machado, CC BY-SA 4.0. Igreja São Francisco de Assis da Pampulha vista de fora, com as abóbadas onduladas e o campanário inteiros sob o céu azul, na metade de cima. |
-| `assets/images/landmarks/porto-alegre.jpg` | https://commons.wikimedia.org/wiki/File:Porto_Alegre_por_Cristine_Huff_24.jpg — Cristine Denardi Huff, CC BY-SA 4.0. Pôr do sol no Guaíba, com pessoas na orla, na metade de cima. |
+| `assets/images/landmarks/belo-horizonte.jpg` | https://commons.wikimedia.org/wiki/File:Igreja_S%C3%A3o_Francisco_de_Assis_-_Belo_Horizonte_-_20240626144641.jpg — Rodrigo Rocatto, CC BY-SA 4.0. Igreja São Francisco de Assis da Pampulha vista de fora, abóbadas e campanário inteiros no alto, calçada até o fim da tela. |
+| `assets/images/landmarks/porto-alegre.jpg` | https://commons.wikimedia.org/wiki/File:Orla_do_Gua%C3%ADba_com_pr%C3%B3ximo_ao_Pontal.jpg — Dangrsan, CC BY-SA 4.0. Pôr do sol na orla do Guaíba, sol na metade de cima e pedras da orla até o fim da tela. |
 | `assets/images/rooms/gallery/terror.jpg` | https://unsplash.com/photos/1509248961158-e54f6934749c |
 | `assets/images/rooms/gallery/misterio.jpg` | https://unsplash.com/photos/1521587760476-6c12a4b040da |
 | `assets/images/rooms/gallery/aventura.jpg` | https://unsplash.com/photos/1441974231531-c6227db76b6e |

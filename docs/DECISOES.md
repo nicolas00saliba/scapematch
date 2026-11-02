@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## A foto cobre a tela inteira
+
+- **Data:** 2026-11-02
+- **Decisão:** a foto de Belo Horizonte e a de Porto Alegre são retratos verticais do lugar, no mesmo formato da tela. O `BoxFit.cover` mostra a foto de ponta a ponta, atrás do título e do cartão. A igreja fica na metade de cima, com a calçada embaixo. O pôr do sol fica na metade de cima, com a orla embaixo. Curitiba, Rio e São Paulo já cobriam a área visível e continuam iguais.
+- **Motivo:** as fotos anteriores eram largas. O retrato montado deixava uma faixa preta entre a imagem e o título.
+- **Onde está no código:** `assets/images/landmarks/` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra foto entra no mesmo arquivo, já no formato alto da tela, com o assunto na metade de cima.
+
 ## Belo Horizonte e Porto Alegre trocam de foto
 
 - **Data:** 2026-11-02

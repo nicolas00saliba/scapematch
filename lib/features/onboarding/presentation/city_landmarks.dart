@@ -48,7 +48,7 @@ const cityLandmarks = <CityLandmark>[
     cityId: SampleIds.portoAlegre,
     name: 'Orla do Guaíba',
     asset: 'assets/images/landmarks/porto-alegre.jpg',
-    alignment: Alignment(0, -0.95),
+    alignment: Alignment(0.15, -1),
   ),
 ];
 
