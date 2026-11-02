@@ -6,6 +6,7 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/presentation/room_catalog_view_model.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -103,7 +104,7 @@ class _RoomDetail extends StatelessWidget {
                 Text(room.theme, style: theme.textTheme.bodyLarge),
                 const SizedBox(height: 8),
                 Text(
-                  '${room.durationMinutes} min · até ${room.capacity} pessoas · ${formatPrice(room.priceCents)} por pessoa',
+                  '${room.durationMinutes} min · ${playerRangeLabel(minimum: room.minimumPlayers, maximum: room.capacity)} · ${formatPrice(room.priceCents)} por pessoa',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),

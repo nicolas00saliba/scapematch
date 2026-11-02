@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
+import 'package:scapematch/features/account/presentation/account_list_tile.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_control.dart';
 import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
 
@@ -22,6 +26,8 @@ class AccountDestinationScreen extends ConsumerWidget {
       AccountDestination.referral => 'Indique e ganhe',
       AccountDestination.cards => 'Cartões cadastrados',
       AccountDestination.help => 'Ajuda',
+      AccountDestination.policies => 'Termos e políticas',
+      AccountDestination.dataPrivacy => 'Meus dados e privacidade',
       AccountDestination.settings => 'Configurações',
       null => 'Conta',
     };
@@ -85,6 +91,14 @@ class AccountDestinationScreen extends ConsumerWidget {
       ],
       AccountDestination.cards => [const PaymentMethodsBody()],
       AccountDestination.help => [
+        _AccountLink(
+          tileKey: AppKeys.accountIntro,
+          icon: Icons.slideshow_outlined,
+          title: OnboardingMessages.replay,
+          subtitle: 'As quatro telas da primeira abertura.',
+          onTap: () => context.go('/introducao'),
+        ),
+        const SizedBox(height: 10),
         const _InfoCard(
           title: 'Como achar um grupo?',
           subtitle: 'Escolha a cidade, abra uma sala e toque em Achar grupo, ou use a busca da Home.',
@@ -95,20 +109,99 @@ class AccountDestinationScreen extends ConsumerWidget {
           subtitle: 'Casas, salas, notícias e a carteira foram inventados. Nada é cobrado.',
         ),
       ],
+      AccountDestination.policies => [
+        _AccountLink(
+          tileKey: AppKeys.accountLegal,
+          icon: Icons.description_outlined,
+          title: 'Termos de uso',
+          subtitle: 'O combinado desta versão de exemplo.',
+          onTap: () => context.push('/legal/termos'),
+        ),
+        const SizedBox(height: 10),
+        _AccountLink(
+          tileKey: AppKeys.accountPrivacy,
+          icon: Icons.policy_outlined,
+          title: 'Privacidade',
+          subtitle: 'O que o app guarda e o que não guarda.',
+          onTap: () => context.push('/legal/privacidade'),
+        ),
+        const SizedBox(height: 10),
+        _AccountLink(
+          tileKey: AppKeys.accountRefund,
+          icon: Icons.currency_exchange,
+          title: 'Reembolso',
+          subtitle: 'Quando o pagamento simulado volta.',
+          onTap: () => context.push('/legal/reembolso'),
+        ),
+      ],
+      AccountDestination.dataPrivacy => [
+        _AccountLink(
+          tileKey: AppKeys.accountData,
+          icon: Icons.folder_shared_outlined,
+          title: 'Meus dados',
+          subtitle: 'O que esta versão sabe de você.',
+          onTap: () => context.push('/account/data'),
+        ),
+        const SizedBox(height: 10),
+        _AccountLink(
+          tileKey: AppKeys.accountDelete,
+          icon: Icons.delete_outline,
+          title: 'Pedir exclusão da conta',
+          subtitle: 'O pedido fica registrado neste exemplo.',
+          onTap: () => context.push('/account/delete'),
+        ),
+      ],
       AccountDestination.settings => [
         const ThemeChoiceControl(),
         const SizedBox(height: 16),
         const _InfoCard(
           title: 'Notificações',
-          subtitle: 'Os lembretes ficam em Avisos, na Conta. O push do celular espera a conta de verdade.',
+          subtitle: 'Os lembretes ficam em Avisos, aqui embaixo. O push do celular espera a conta de verdade.',
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
+        _AccountLink(
+          tileKey: AppKeys.accountNotices,
+          icon: Icons.notifications_outlined,
+          title: 'Avisos',
+          subtitle: 'Lembretes desta conta de exemplo.',
+          onTap: () => context.push('/account/notices'),
+        ),
+        const SizedBox(height: 10),
         const _InfoCard(
           title: 'Cidade',
           subtitle: 'A escolha fica salva neste aparelho. Sem escolha, a Home abre em Curitiba.',
         ),
       ],
     };
+  }
+}
+
+class _AccountLink extends StatelessWidget {
+  const _AccountLink({
+    required this.tileKey,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final Key tileKey;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: tileKey,
+      child: AccountListTile(
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
+        onTap: onTap,
+      ),
+    );
   }
 }
 

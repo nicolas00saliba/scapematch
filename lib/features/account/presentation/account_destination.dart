@@ -1,5 +1,14 @@
 /// Destinos simples da aba Conta. O nome entra na rota.
-enum AccountDestination { profile, partners, referral, cards, help, settings }
+enum AccountDestination {
+  profile,
+  partners,
+  referral,
+  cards,
+  help,
+  policies,
+  dataPrivacy,
+  settings,
+}
 
 AccountDestination? accountDestinationByName(String raw) {
   for (final destination in AccountDestination.values) {

@@ -5,6 +5,8 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
+import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
+import 'package:scapematch/features/onboarding/presentation/city_landmarks.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
@@ -24,6 +26,7 @@ class _OnboardingPage {
     required this.title,
     required this.body,
     this.showPreferences = false,
+    this.landmark = false,
     this.alignment = Alignment.center,
   });
 
@@ -31,6 +34,9 @@ class _OnboardingPage {
   final String title;
   final String body;
   final bool showPreferences;
+
+  /// A foto troca com a cidade escolhida.
+  final bool landmark;
 
   /// Sobe um pouco o enquadramento quando a foto é alta, para os rostos
   /// não sumirem na faixa larga da web.
@@ -45,10 +51,11 @@ const _pages = <_OnboardingPage>[
     alignment: Alignment.center,
   ),
   _OnboardingPage(
-    asset: 'assets/images/onboarding/cidade.jpg',
+    asset: 'assets/images/landmarks/curitiba.jpg',
     title: OnboardingMessages.nearTitle,
     body: OnboardingMessages.nearBody,
     showPreferences: true,
+    landmark: true,
   ),
   _OnboardingPage(
     asset: 'assets/images/onboarding/convidar.jpg',
@@ -193,11 +200,7 @@ class _PageBody extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        ScapePhoto(
-          asset: page.asset,
-          semanticLabel: page.title,
-          alignment: page.alignment,
-        ),
+        _PagePhoto(page: page),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -258,6 +261,38 @@ class _PageBody extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PagePhoto extends ConsumerWidget {
+  const _PagePhoto({required this.page});
+
+  final _OnboardingPage page;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final landmark = page.landmark
+        ? landmarkFor(ref.watch(selectedCityIdProvider))
+        : null;
+    final asset = landmark?.asset ?? page.asset;
+    final label = landmark == null ? page.title : landmark.name;
+    return AnimatedSwitcher(
+      duration: scapeDuration(context, const Duration(milliseconds: 420)),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [...previousChildren, ?currentChild],
+        );
+      },
+      child: ScapePhoto(
+        key: ValueKey(asset),
+        asset: asset,
+        semanticLabel: label,
+        alignment: page.alignment,
+      ),
     );
   }
 }

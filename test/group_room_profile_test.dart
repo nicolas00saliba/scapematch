@@ -65,7 +65,7 @@ void main() {
     expect(find.text('Um café que fecha a porta sozinho'), findsOneWidget);
     expect(find.text('60 min'), findsOneWidget);
     expect(find.text('Médio'), findsOneWidget);
-    expect(find.text('Até 6 pessoas'), findsOneWidget);
+    expect(find.text('4–6 jogadores'), findsOneWidget);
     expect(find.textContaining('por pessoa'), findsWidgets);
     expect(find.text('Mistério da Rua XV'), findsOneWidget);
     expect(find.textContaining('Rua de exemplo'), findsOneWidget);

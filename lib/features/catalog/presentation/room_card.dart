@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
@@ -39,11 +40,17 @@ double roomCardHeight(
     scaler: scaler,
     maxWidth: contentWidth,
   );
+  final range = playerRangeLabel(
+    minimum: listing.room.minimumPlayers,
+    maximum: listing.room.capacity,
+  );
   return _photoHeight +
       _textTop +
       _textHeight(listing.room.name, titleStyle, scaler, contentWidth, 2) +
       2 +
       _textHeight(listing.houseName, houseStyle, scaler, contentWidth, 1) +
+      2 +
+      _textHeight(range, _rangeStyle(theme), scaler, contentWidth, 1) +
       8 +
       footer +
       _pad;
@@ -102,6 +109,16 @@ class RoomCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: _houseStyle(theme),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    playerRangeLabel(
+                      minimum: room.minimumPlayers,
+                      maximum: room.capacity,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _rangeStyle(theme),
                   ),
                   const SizedBox(height: 8),
                   _RoomFooter(listing: listing),
@@ -386,6 +403,13 @@ TextStyle _titleStyle(ThemeData theme) {
 TextStyle _houseStyle(ThemeData theme) {
   return theme.textTheme.bodySmall!.copyWith(
     color: theme.colorScheme.onSurfaceVariant,
+  );
+}
+
+TextStyle _rangeStyle(ThemeData theme) {
+  return theme.textTheme.labelLarge!.copyWith(
+    color: theme.colorScheme.onSurfaceVariant,
+    fontWeight: FontWeight.w700,
   );
 }
 

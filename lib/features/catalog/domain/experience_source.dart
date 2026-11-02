@@ -48,12 +48,16 @@ class SourcedRoom {
     required this.capacity,
     required this.durationMinutes,
     required this.difficulty,
+    this.minimumPlayers = 2,
   });
 
   final String id;
   final String name;
   final String theme;
   final int capacity;
+
+  /// Mínimo da sala. Sem o campo no JSON, o adaptador sugere um valor.
+  final int minimumPlayers;
   final int durationMinutes;
   final Difficulty difficulty;
 }

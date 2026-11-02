@@ -9,6 +9,7 @@ import 'package:scapematch/core/ui/option_sheet.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
@@ -90,7 +91,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             label: 'Sala',
             value: state.room == null
                 ? null
-                : '${state.room!.name} · até ${state.room!.capacity} pessoas',
+                : '${state.room!.name} · ${playerRangeLabel(minimum: state.room!.minimumPlayers, maximum: state.room!.capacity)}',
             hint: state.houseId == null
                 ? 'Escolha a casa primeiro'
                 : 'Escolha a sala',
@@ -263,7 +264,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       idOf: (room) => room.id,
       labelOf: (room) => room.name,
       subtitleOf: (room) =>
-          'Até ${room.capacity} pessoas · ${room.durationMinutes} min · ${room.difficulty.labelPt} · ${formatPrice(room.priceCents)}',
+          '${playerRangeLabel(minimum: room.minimumPlayers, maximum: room.capacity)} · ${room.durationMinutes} min · ${room.difficulty.labelPt} · ${formatPrice(room.priceCents)}',
     );
     if (room == null || !mounted) {
       return;

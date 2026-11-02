@@ -739,13 +739,16 @@ void main() {
     final router = GoRouter.of(tester.element(find.byType(Scaffold).first));
     router.go('/account');
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(AppKeys.accountPrivacy));
+    await tester.ensureVisible(
+      find.byKey(AppKeys.accountDestination('policies')),
+    );
+    await tester.tap(find.byKey(AppKeys.accountDestination('policies')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.accountPrivacy));
     await tester.pumpAndSettle();
     expect(find.text(LegalDocuments.privacyTitle), findsOneWidget);
-    router.go('/account');
+    router.go('/account/policies');
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(AppKeys.accountRefund));
     await tester.tap(find.byKey(AppKeys.accountRefund));
     await tester.pumpAndSettle();
     expect(find.text(LegalDocuments.refundTitle), findsOneWidget);

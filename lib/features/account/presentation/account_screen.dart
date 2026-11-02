@@ -6,10 +6,10 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
+import 'package:scapematch/features/account/presentation/account_list_tile.dart';
 import 'package:scapematch/features/account/presentation/account_messages.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
-import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Aba Conta. O desenho é do ScapeMatch: cartões claros, verde e cobre.
@@ -61,24 +61,11 @@ class AccountScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           const _WalletCard(),
           const SizedBox(height: 16),
-          for (final item in _items) ...[
+          for (final item in _signedInItems) ...[
             _AccountTile(item: item),
             const SizedBox(height: 10),
           ],
-          const _ReplayIntroButton(),
-          const SizedBox(height: 10),
-          const _AccountLinks(signedIn: true),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            key: AppKeys.accountSignOut,
-            onPressed: () => _signOut(context, ref),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: theme.colorScheme.error,
-              side: BorderSide(color: theme.colorScheme.error),
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: const Text(AccountMessages.signOut),
-          ),
+          _SignOutTile(onPressed: () => _signOut(context, ref)),
         ],
       ),
     );
@@ -155,80 +142,34 @@ class _SignedOutAccount extends StatelessWidget {
             onPressed: () => context.push(loginLocation('/account')),
             child: const Text(AccountMessages.signInAgain),
           ),
-          const SizedBox(height: 10),
-          const _ReplayIntroButton(),
-          const SizedBox(height: 10),
-          const _AccountLinks(signedIn: false),
+          const SizedBox(height: 16),
+          for (final item in _signedOutItems) ...[
+            _AccountTile(item: item),
+            const SizedBox(height: 10),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ReplayIntroButton extends StatelessWidget {
-  const _ReplayIntroButton();
+class _SignOutTile extends StatelessWidget {
+  const _SignOutTile({required this.onPressed});
+
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      key: AppKeys.accountIntro,
-      onPressed: () => context.go('/introducao'),
-      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-      icon: const Icon(Icons.slideshow_outlined),
-      label: const Text(OnboardingMessages.replay),
-    );
-  }
-}
-
-class _AccountLinks extends StatelessWidget {
-  const _AccountLinks({required this.signedIn});
-
-  final bool signedIn;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (signedIn)
-          OutlinedButton(
-            key: AppKeys.accountNotices,
-            onPressed: () => context.push('/account/notices'),
-            child: const Text('Avisos'),
-          ),
-        if (signedIn) const SizedBox(height: 8),
-        OutlinedButton(
-          key: AppKeys.accountLegal,
-          onPressed: () => context.push('/legal/termos'),
-          child: const Text('Termos de uso'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          key: AppKeys.accountPrivacy,
-          onPressed: () => context.push('/legal/privacidade'),
-          child: const Text('Privacidade'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          key: AppKeys.accountRefund,
-          onPressed: () => context.push('/legal/reembolso'),
-          child: const Text('Reembolso'),
-        ),
-        if (signedIn) ...[
-          const SizedBox(height: 8),
-          OutlinedButton(
-            key: AppKeys.accountData,
-            onPressed: () => context.push('/account/data'),
-            child: const Text('Meus dados'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton(
-            key: AppKeys.accountDelete,
-            onPressed: () => context.push('/account/delete'),
-            child: const Text('Pedir exclusão da conta'),
-          ),
-        ],
-      ],
+    final error = Theme.of(context).colorScheme.error;
+    return KeyedSubtree(
+      key: AppKeys.accountSignOut,
+      child: AccountListTile(
+        icon: Icons.logout,
+        title: AccountMessages.signOut,
+        subtitle: 'Encerra a sessão de exemplo neste aparelho.',
+        foreground: error,
+        onTap: onPressed,
+      ),
     );
   }
 }
@@ -309,7 +250,7 @@ class _AccountItem {
   final IconData icon;
 }
 
-const _items = <_AccountItem>[
+const _signedInItems = <_AccountItem>[
   _AccountItem(
     destination: AccountDestination.profile,
     title: 'Perfil',
@@ -337,8 +278,35 @@ const _items = <_AccountItem>[
   _AccountItem(
     destination: AccountDestination.help,
     title: 'Ajuda',
-    subtitle: 'Respostas curtas desta versão',
+    subtitle: 'Introdução e respostas curtas desta versão',
     icon: Icons.help_outline,
+  ),
+  _AccountItem(
+    destination: AccountDestination.policies,
+    title: 'Termos e políticas',
+    subtitle: 'Uso, privacidade e reembolso',
+    icon: Icons.gavel_outlined,
+  ),
+  _AccountItem(
+    destination: AccountDestination.dataPrivacy,
+    title: 'Meus dados e privacidade',
+    subtitle: 'O que esta versão guarda e como pedir exclusão',
+    icon: Icons.privacy_tip_outlined,
+  ),
+];
+
+const _signedOutItems = <_AccountItem>[
+  _AccountItem(
+    destination: AccountDestination.help,
+    title: 'Ajuda',
+    subtitle: 'Introdução e respostas curtas desta versão',
+    icon: Icons.help_outline,
+  ),
+  _AccountItem(
+    destination: AccountDestination.policies,
+    title: 'Termos e políticas',
+    subtitle: 'Uso, privacidade e reembolso',
+    icon: Icons.gavel_outlined,
   ),
 ];
 
@@ -349,47 +317,13 @@ class _AccountTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: scheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      child: InkWell(
-        key: AppKeys.accountDestination(item.destination.name),
-        borderRadius: BorderRadius.circular(18),
+    return KeyedSubtree(
+      key: AppKeys.accountDestination(item.destination.name),
+      child: AccountListTile(
+        icon: item.icon,
+        title: item.title,
+        subtitle: item.subtitle,
         onTap: () => context.push('/account/${item.destination.name}'),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Icon(item.icon, color: scheme.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      item.subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/catalog/domain/experience_source.dart';
 import 'package:scapematch/features/catalog/domain/schedule_availability.dart';
 
@@ -66,6 +67,14 @@ SourcedRoom _parseRoom(Object? raw) {
   final json = _asMap(raw, 'room');
   final capacity = _positiveInt(json, 'capacity');
   final duration = _positiveInt(json, 'durationMinutes');
+  final minimum = json['minimumPlayers'] == null
+      ? suggestedRoomMinimum(capacity)
+      : _positiveInt(json, 'minimumPlayers');
+  if (minimum < 2 || minimum > 6 || minimum > capacity) {
+    throw FormatException(
+      'minimumPlayers must be from 2 to 6 and no higher than capacity',
+    );
+  }
   return SourcedRoom(
     id: _string(json, 'id'),
     name: _string(json, 'name'),
@@ -73,6 +82,7 @@ SourcedRoom _parseRoom(Object? raw) {
     capacity: capacity,
     durationMinutes: duration,
     difficulty: _difficulty(_string(json, 'difficulty')),
+    minimumPlayers: minimum,
   );
 }
 

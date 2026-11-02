@@ -1,7 +1,7 @@
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Tiles do mapa. OpenStreetMap, sem chave.
+/// Tiles do mapa, sem chave.
 ///
 /// No celular o cache embutido guarda o tile. Na web esse cache não grava
 /// disco: o navegador já guarda a resposta, e um pedido antigo é cancelado
@@ -12,8 +12,12 @@ final mapTileProvider = Provider<TileProvider>((ref) {
   return tiles;
 });
 
-/// O mesmo desenho nos dois temas. [dark] não troca a URL:
-/// o filtro de cor em [LiveMapView] é que faz o tema escuro.
+/// Os dois temas usam o mesmo tile do OpenStreetMap, sem chave.
+///
+/// O claro não leva filtro: o desenho padrão já é claro. O CARTO Voyager
+/// público passou a exigir chave. O escuro continua com o filtro que já
+/// escurece este tile.
 String liveMapTileUrl({required bool dark}) {
-  return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const osm = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  return dark ? osm : osm;
 }

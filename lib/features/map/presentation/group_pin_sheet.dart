@@ -6,6 +6,7 @@ import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -119,6 +120,14 @@ class GroupPinSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
+                _SheetFact(
+                  icon: Icons.groups_outlined,
+                  label: 'Jogadores',
+                  value: playerRangeLabel(
+                    minimum: group.roomMinimum,
+                    maximum: group.roomCapacity,
+                  ),
+                ),
                 _SheetFact(
                   icon: Icons.timer_outlined,
                   label: 'Duração',

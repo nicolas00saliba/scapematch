@@ -8,6 +8,9 @@ import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:scapematch/features/theme/data/theme_choice_store.dart';
+import 'package:scapematch/features/theme/domain/theme_choice.dart';
+import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 
 import 'support/pump_app.dart';
 
@@ -62,9 +65,16 @@ void main() {
       showOnboarding: true,
       overrides: [
         onboardingStoreProvider.overrideWithValue(OnboardingStore(seen: false)),
+        themeChoiceStoreProvider.overrideWithValue(
+          ThemeChoiceStore()..remember(ThemeChoice.dark),
+        ),
       ],
     );
     expect(find.byType(OnboardingScreen), findsOneWidget);
+    expect(
+      Theme.of(tester.element(find.byType(OnboardingScreen))).brightness,
+      Brightness.dark,
+    );
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(AppKeys.onboardingSkip));

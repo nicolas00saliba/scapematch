@@ -180,7 +180,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.option(SampleIds.slotSpMetroSun)));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('até 6 pessoas'), findsOneWidget);
+    expect(find.textContaining('2–6 jogadores'), findsOneWidget);
     expect(_submitEnabled(tester), isTrue);
 
     final formScroll = find.descendant(

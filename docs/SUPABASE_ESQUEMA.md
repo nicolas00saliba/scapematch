@@ -8,7 +8,7 @@ O banco é PostgreSQL, como o Supabase entrega. `auth.users` é a tabela de cont
 
 - `cities` — cidade do seletor.
 - `venues` — casa de escape.
-- `rooms` — sala, com a capacidade física.
+- `rooms` — sala, com a capacidade física e o mínimo de jogadores.
 - `room_sessions` — horário oferecido pela casa, com o tipo de disponibilidade do `ExperienceSource`. Não é obrigatório para o grupo existir: um grupo “a combinar” pode nascer sem sessão.
 - `groups` — o grupo que as pessoas montam. `total_spots` é quantas pessoas o grupo quer, e pode ser menor que a capacidade da sala.
 - `group_members` — quem já sentou. A contagem de vagas preenchidas é `count(*)` aqui. Não há coluna `filled_spots` para o cliente atualizar.
@@ -39,6 +39,11 @@ create table public.rooms (
   name text not null,
   theme text not null,
   capacity integer not null check (capacity > 0),
+  minimum_players integer not null check (
+    minimum_players >= 2
+    and minimum_players <= 6
+    and minimum_players <= capacity
+  ),
   duration_minutes integer not null check (duration_minutes > 0),
   difficulty text not null check (difficulty in ('easy', 'medium', 'hard')),
   price_cents integer not null check (price_cents >= 0)
@@ -65,6 +70,10 @@ create table public.groups (
   session_id uuid references public.room_sessions (id),
   starts_at timestamptz not null,
   total_spots integer not null check (total_spots >= 2),
+  -- Fecha o grupo. Nasce igual a rooms.minimum_players e não fica abaixo disso
+  -- nem acima da capacidade. total_spots é o tamanho desejado, nunca menor.
+  minimum_spots integer not null check (minimum_spots >= 2),
+  check (total_spots >= minimum_spots),
   price_cents integer not null check (price_cents >= 0),
   note text not null default '' check (char_length(note) <= 280),
   created_by uuid not null references auth.users (id),
@@ -260,13 +269,13 @@ begin
   if v_user is null then
     raise exception 'not authenticated' using errcode = '28000';
   end if;
-  if p_total_spots < 2 then
-    raise exception 'group below minimum' using errcode = '22023';
-  end if;
 
   select * into v_room from public.rooms where id = p_room_id;
   if not found then
     raise exception 'unknown room' using errcode = 'P0002';
+  end if;
+  if p_total_spots < v_room.minimum_players then
+    raise exception 'group below room minimum' using errcode = '22023';
   end if;
   if p_total_spots > v_room.capacity then
     raise exception 'exceeds room capacity' using errcode = '22023';
@@ -280,9 +289,15 @@ begin
   end if;
 
   insert into public.groups (
-    city_id, venue_id, room_id, starts_at, total_spots, created_by
+    city_id, venue_id, room_id, starts_at, total_spots, minimum_spots, created_by
   ) values (
-    v_venue.city_id, v_venue.id, v_room.id, p_starts_at, p_total_spots, v_user
+    v_venue.city_id,
+    v_venue.id,
+    v_room.id,
+    p_starts_at,
+    p_total_spots,
+    v_room.minimum_players,
+    v_user
   )
   returning id into v_group_id;
 
@@ -314,7 +329,7 @@ Nada disso está ligado ao app. O desenho acompanha [DECISOES.md](DECISOES.md).
 - `delete_group` e `remove_member` gravam `refunded` com `organizer_cancelled_event` ou `organizer_removed_member`, mesmo dentro das 2 horas, e só enquanto `starts_at > now()`. No instante do início, ou depois, as duas funções recusam (`session_started`, ou `session_ended` se a sessão já terminou) e não mudam as cadeiras. Quem já tinha saído fica com o reembolso da própria saída.
 - `join_group` também recusa sessão já iniciada (`starts_at <= now()`), grupo cancelado, conta que já saiu daquele grupo, e conta com outra cadeira ativa cujo intervalo cruza `[starts_at, starts_at + duration)`.
 - `confirm_attendance` só muda `joined` para `confirmed` enquanto a sessão não terminou.
-- `edit_group` muda `total_spots` e `note`. O total não fica abaixo de quem ainda ocupa cadeira, nem abaixo de 2, nem acima da capacidade.
+- `edit_group` muda `total_spots`, `minimum_spots` e `note`. O mínimo do grupo nasce no mínimo da sala, não fica abaixo dele e não passa da capacidade. O total não fica abaixo de quem ainda ocupa cadeira, nem abaixo do mínimo do grupo, nem acima da capacidade. “Falta X para fechar” usa `minimum_spots`.
 
 As funções `confirm_attendance`, `leave_group`, `delete_group`, `remove_member` e `edit_group` seguem o mesmo desenho de `join_group`: `security definer`, `search_path = public`, `auth.uid()`, e `for update` na linha do grupo. O app não ganha `update` direto em `groups` nem em `group_members`. O corpo delas fica para a migração de verdade e tem de cumprir o contrato desta seção.
 

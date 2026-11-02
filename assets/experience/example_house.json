@@ -10,6 +10,7 @@
       "name": "A Galeria de Exemplo",
       "theme": "Sala inventada para o adaptador de JSON. Não vem de casa nenhuma.",
       "capacity": 6,
+      "minimumPlayers": 2,
       "durationMinutes": 60,
       "difficulty": "medium"
     }

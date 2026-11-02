@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// Aparência escolhida na Conta. Automático segue o aparelho.
+///
+/// Sem chave salva, o padrão é Claro. Um valor desconhecido continua
+/// Automático, para não apagar uma escolha que o app ainda não conhece.
 enum ThemeChoice {
   light,
   dark,
@@ -31,6 +34,9 @@ enum ThemeChoice {
   }
 
   static ThemeChoice parse(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return ThemeChoice.light;
+    }
     for (final choice in ThemeChoice.values) {
       if (choice.name == raw) {
         return choice;
