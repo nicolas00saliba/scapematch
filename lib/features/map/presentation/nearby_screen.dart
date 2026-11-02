@@ -12,6 +12,7 @@ import 'package:scapematch/core/sharing/external_url.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -413,15 +414,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
         },
       ),
       children: [
-        ColorFiltered(
-          colorFilter: dark ? _darkTiles : _warmTiles,
-          child: TileLayer(
-            urlTemplate: liveMapTileUrl(dark: dark),
-            userAgentPackageName: 'dev.scapematch.app',
-            tileProvider: ref.watch(mapTileProvider),
-            tileDisplay: const TileDisplay.fadeIn(reloadStartOpacity: 1),
-          ),
-        ),
+        _mapTiles(dark: dark, tiles: ref.watch(mapTileProvider)),
         Positioned.fill(
           child: RadiusCircleLayer(
             key: AppKeys.radiusCircle,
@@ -694,6 +687,12 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                       Text(
                         '${item.group.houseName} · ${formatSession(item.group.startsAt)}',
                       ),
+                      Text(
+                        playerRangeLabel(
+                          minimum: item.group.roomMinimum,
+                          maximum: item.group.roomCapacity,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -756,12 +755,26 @@ class _ClearOfUser extends StatelessWidget {
   }
 }
 
+Widget _mapTiles({required bool dark, required TileProvider tiles}) {
+  final layer = TileLayer(
+    urlTemplate: liveMapTileUrl(dark: dark),
+    userAgentPackageName: 'dev.scapematch.app',
+    tileProvider: tiles,
+    tileDisplay: const TileDisplay.fadeIn(reloadStartOpacity: 1),
+  );
+  if (!dark) {
+    return layer;
+  }
+  return ColorFiltered(colorFilter: _darkTiles, child: layer);
+}
+
 class _OsmCredit extends StatelessWidget {
   const _OsmCredit();
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       key: AppKeys.mapAttribution,
       color: scheme.surface.withValues(alpha: 0.92),
@@ -772,7 +785,7 @@ class _OsmCredit extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Text(
-            LiveMapMessages.attribution,
+            LiveMapMessages.attributionFor(dark: dark),
             style: Theme.of(context).textTheme.labelSmall
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
@@ -781,29 +794,6 @@ class _OsmCredit extends StatelessWidget {
     );
   }
 }
-
-const _warmTiles = ColorFilter.matrix(<double>[
-  1.02,
-  0,
-  0,
-  0,
-  6,
-  0,
-  1,
-  0,
-  0,
-  2,
-  0,
-  0,
-  0.96,
-  0,
-  0,
-  0,
-  0,
-  0,
-  1,
-  0,
-]);
 
 const _darkTiles = ColorFilter.matrix(<double>[
   -0.85,

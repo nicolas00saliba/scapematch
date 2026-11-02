@@ -21,6 +21,7 @@ class Group {
     required this.roomName,
     required this.roomTheme,
     required this.roomCapacity,
+    this.roomMinimum = 2,
     required this.durationMinutes,
     required this.difficulty,
     required this.slotId,
@@ -50,6 +51,9 @@ class Group {
   final String roomName;
   final String roomTheme;
   final int roomCapacity;
+
+  /// Mínimo da sala, copiado do catálogo. O grupo não fecha abaixo disso.
+  final int roomMinimum;
   final int durationMinutes;
   final Difficulty difficulty;
   final String slotId;
@@ -205,6 +209,7 @@ class Group {
       roomName: roomName,
       roomTheme: roomTheme,
       roomCapacity: roomCapacity,
+      roomMinimum: roomMinimum,
       durationMinutes: durationMinutes,
       difficulty: difficulty,
       slotId: slotId,

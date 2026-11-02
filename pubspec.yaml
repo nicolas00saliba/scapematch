@@ -74,6 +74,7 @@ flutter:
     - assets/images/rooms/
     - assets/images/rooms/gallery/
     - assets/images/onboarding/
+    - assets/images/landmarks/
     - assets/images/promos/
     - assets/images/people/
 

@@ -18,11 +18,11 @@ import 'support/memory_tiles.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  test('a missing theme follows the device', () async {
+  test('a missing theme opens in light', () async {
     SharedPreferences.setMockInitialValues({});
     final missing = ThemeChoiceStore();
     await missing.load();
-    expect(missing.choice, ThemeChoice.system);
+    expect(missing.choice, ThemeChoice.light);
 
     SharedPreferences.setMockInitialValues({
       ThemeChoiceStore.storageKey: 'noite',

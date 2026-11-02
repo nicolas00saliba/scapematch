@@ -10,7 +10,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scapematch/features/map/presentation/map_tiles.dart';
 import 'package:scapematch/features/map/presentation/nearby_screen.dart';
+import 'package:scapematch/features/theme/data/theme_choice_store.dart';
+import 'package:scapematch/features/theme/domain/theme_choice.dart';
+import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -28,7 +32,6 @@ import 'package:scapematch/features/map/domain/live_seat.dart';
 import 'package:scapematch/features/map/domain/nearby_group.dart';
 import 'package:scapematch/features/map/domain/pin_cluster.dart';
 import 'package:scapematch/features/map/presentation/live_map_messages.dart';
-import 'package:scapematch/features/map/presentation/map_tiles.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 import 'support/memory_tiles.dart';
@@ -331,7 +334,7 @@ void main() {
   ) async {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-    await _openNear(tester, const Size(390, 844));
+    await _openNear(tester, const Size(390, 844), theme: ThemeChoice.dark);
     expect(find.text(LiveMapMessages.loading), findsNothing);
     expect(find.byType(FlutterMap), findsOneWidget);
     expect(
@@ -449,6 +452,10 @@ Future<void> _saveMapShots(WidgetTester tester) async {
         userLocationSourceProvider.overrideWithValue(
           FixedUserLocation.device(cityCenters[SampleIds.curitiba]!),
         ),
+        if (tester.platformDispatcher.platformBrightness == Brightness.dark)
+          themeChoiceStoreProvider.overrideWithValue(
+            ThemeChoiceStore()..remember(ThemeChoice.dark),
+          ),
       ],
     );
     tester.view.devicePixelRatio = 1;
@@ -471,7 +478,12 @@ Future<void> _saveMapShots(WidgetTester tester) async {
       ];
       if (missing.isNotEmpty) {
         final fetched = await tester.runAsync(
-          () => _downloadTiles(client!, missing),
+          () => _downloadTiles(
+            client!,
+            missing,
+            dark:
+                tester.platformDispatcher.platformBrightness == Brightness.dark,
+          ),
         );
         cache.addAll(fetched ?? const {});
         continue;
@@ -505,6 +517,8 @@ Future<void> _saveMapShots(WidgetTester tester) async {
 
   tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
   addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+  cache.clear();
+  wanted.clear();
   await open(const Size(390, 844));
   await _captureFrame(tester, dir, 'map-dark-before.png', const Size(390, 844));
   await tester.dragFrom(
@@ -544,8 +558,9 @@ Future<void> _precacheMapPhotos(WidgetTester tester) async {
 
 Future<Map<String, Uint8List>> _downloadTiles(
   HttpClient client,
-  List<String> keys,
-) async {
+  List<String> keys, {
+  required bool dark,
+}) async {
   final images = <String, Uint8List>{};
   var index = 0;
   Future<void> worker() async {
@@ -555,7 +570,9 @@ Future<Map<String, Uint8List>> _downloadTiles(
       for (var attempt = 0; attempt < 2; attempt++) {
         try {
           final request = await client.getUrl(
-            Uri.parse('https://tile.openstreetmap.org/$key.png'),
+            Uri.parse(
+              liveMapTileUrl(dark: dark).replaceAll('{z}/{x}/{y}', key),
+            ),
           );
           request.headers.set(
             HttpHeaders.userAgentHeader,
@@ -684,6 +701,7 @@ Future<void> _openNear(
   WidgetTester tester,
   Size size, {
   UserLocationSource? location,
+  ThemeChoice? theme,
 }) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await pumpScapeMatch(
@@ -693,6 +711,10 @@ Future<void> _openNear(
       userLocationSourceProvider.overrideWithValue(
         location ?? FixedUserLocation.device(cityCenters[SampleIds.curitiba]!),
       ),
+      if (theme != null)
+        themeChoiceStoreProvider.overrideWithValue(
+          ThemeChoiceStore()..remember(theme),
+        ),
     ],
   );
   tester.view.physicalSize = size;

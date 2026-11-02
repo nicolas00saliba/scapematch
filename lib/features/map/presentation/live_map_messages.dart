@@ -12,6 +12,9 @@ abstract final class LiveMapMessages {
   static const emptySheet = 'Nenhum grupo nesta cidade.';
   static const showOnMap = 'Mostrar no mapa';
   static const attribution = '© OpenStreetMap';
+
+  static String attributionFor({required bool dark}) => attribution;
+
   static const loading = 'Carregando o mapa...';
   static const loadError = 'Não foi possível carregar o mapa.';
 

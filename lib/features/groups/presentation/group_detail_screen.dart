@@ -17,6 +17,7 @@ import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
@@ -1193,7 +1194,10 @@ class _RoomProfile extends StatelessWidget {
           _FactRow(
             icon: Icons.groups_outlined,
             label: 'Capacidade',
-            value: 'Até ${group.roomCapacity} pessoas',
+            value: playerRangeLabel(
+              minimum: group.roomMinimum,
+              maximum: group.roomCapacity,
+            ),
           ),
           _FactRow(
             icon: Icons.payments_outlined,

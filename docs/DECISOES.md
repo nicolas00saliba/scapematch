@@ -1,9 +1,33 @@
 # Decisões provisórias
 
+## O mínimo é da sala
+
+- **Data:** 2026-11-02
+- **Decisão:** cada sala do catálogo tem mínimo e máximo de jogadores. O mínimo fica entre 2 e 6, em faixas como 2–6, 3–8 e 4–10. O card, a ficha da sala e o mapa mostram “mín–máx jogadores”. O grupo nasce com esse mínimo e não pode fechar abaixo dele nem acima da capacidade. “Falta X para fechar” usa o mínimo do grupo. O rascunho do Supabase ganha `rooms.minimum_players` e `groups.minimum_spots`.
+- **Motivo:** a sala só anunciava o máximo, e o grupo podia parecer que fechava com menos gente do que a sala pede.
+- **Onde está no código:** `EscapeRoom.minimumPlayers`, `Group.roomMinimum`, `playerRangeLabel` e `docs/SUPABASE_ESQUEMA.md`.
+- **Como trocar depois:** outro par entra em `suggestedRoomMinimum` ou no dado da sala. O texto é `playerRangeLabel`.
+
+## Claro é o padrão, e o mapa claro é limpo
+
+- **Data:** 2026-11-02
+- **Decisão:** sem escolha salva, o app abre no tema Claro. Claro é a paleta Cofre de Cobre antiga, verde-petróleo `#0F4C4A` e cobre `#9A4F24` no fundo claro. Escuro continua exatamente o desenho que já está no ar. Automático segue como opção. No mapa, os dois temas usam o tile padrão do OpenStreetMap. O claro não aplica filtro. O escuro mantém o filtro que já escurece o tile. A atribuição continua “© OpenStreetMap”. O Voyager da CARTO ficou de fora porque o endereço público passou a pedir chave.
+- **Motivo:** o claro estava com um filtro que deixava o mapa rosado, e quem abre o app pela primeira vez deve ver o claro.
+- **Onde está no código:** `ThemeChoice.parse`, `buildAppTheme`, `liveMapTileUrl` e `NearbyScreen`.
+- **Como trocar depois:** outro provedor de tile entra em `liveMapTileUrl`. A chave salva continua `theme_choice`.
+
+## A introdução mostra a cidade, e a Conta cabe numa lista
+
+- **Data:** 2026-11-02
+- **Decisão:** a tela “Perto de você” da introdução usa a foto de um ponto turístico da cidade escolhida e troca com crossfade. Curitiba é o Jardim Botânico, São Paulo o MASP, Rio o Cristo Redentor, Belo Horizonte a Igreja da Pampulha e Porto Alegre a Usina do Gasômetro. Cidade desconhecida cai em Curitiba. “Dividir a reserva” usa uma foto de maquininha com mãos e cartão. Na Conta, Ajuda reúne a introdução e as perguntas, Termos e políticas reúne uso, privacidade e reembolso, Meus dados e privacidade reúne os dados e a exclusão, e Avisos fica em Configurações junto das notificações. Indique e ganhe, Cartões e Sair da conta continuam. As rotas antigas continuam abrindo a mesma tela.
+- **Motivo:** a introdução mostrava uma pessoa no lugar da cidade, e a Conta empilhava pílulas para coisas que cabem em poucos itens.
+- **Onde está no código:** `cityLandmarks`, `OnboardingScreen`, `AccountScreen` e `AccountDestinationScreen`.
+- **Como trocar depois:** outra cidade entra em `cityLandmarks` e em `docs/CREDITOS_IMAGENS.md`. Outro agrupamento da Conta entra em `AccountDestination`.
+
 ## O tema é uma escolha da pessoa
 
 - **Data:** 2026-11-02
-- **Decisão:** em Configurações, na aba Conta, a aparência é Claro, Escuro ou Automático. Automático segue o aparelho. A escolha fica em `shared_preferences` (na web, localStorage) e entra no primeiro frame, no mesmo jeito da cidade. A troca usa a animação do `MaterialApp`, sem recriar a rota. Os dois temas continuam na paleta Cofre de Cobre. O mapa de Perto de você lê o brilho já resolvido: escuro aplica o filtro dos tiles, claro o aquecido. Quem está deslogado abre a mesma engrenagem.
+- **Decisão:** em Configurações, na aba Conta, a aparência é Claro, Escuro ou Automático. Automático segue o aparelho. A escolha fica em `shared_preferences` (na web, localStorage) e entra no primeiro frame, no mesmo jeito da cidade. A troca usa a animação do `MaterialApp`, sem recriar a rota. Os dois temas continuam na paleta Cofre de Cobre. O padrão inicial e o tile claro foram revistos na decisão de 2026-11-02, acima. Quem está deslogado abre a mesma engrenagem.
 - **Motivo:** o app só seguia o sistema, e a pessoa quer escolher, inclusive no celular.
 - **Onde está no código:** `ThemeChoiceStore`, `ThemeChoiceController`, `ThemeChoiceControl` e `ScapeMatchApp`.
 - **Como trocar depois:** outro valor entra em `ThemeChoice`. A chave salva é `theme_choice`.

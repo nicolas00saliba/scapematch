@@ -138,6 +138,8 @@ void main() {
     await tester.tap(find.byKey(AppKeys.accountTab));
     await tester.pumpAndSettle();
     expect(find.byType(AccountScreen), findsOneWidget);
+    await tester.tap(find.byKey(AppKeys.accountDestination('help')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.accountIntro));
     await tester.pumpAndSettle();
 

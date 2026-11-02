@@ -293,6 +293,7 @@ class FakeGroupRepository implements GroupRepository {
       roomName: room.name,
       roomTheme: room.theme,
       roomCapacity: room.capacity,
+      roomMinimum: room.minimumPlayers,
       durationMinutes: room.durationMinutes,
       difficulty: room.difficulty,
       slotId: slot.id,

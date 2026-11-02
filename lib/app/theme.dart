@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Paleta Cofre de Cobre: verde-petróleo e cobre.
+/// O escuro é o desenho que já está no ar. O claro é a paleta Cofre de
+/// Cobre antiga: verde-petróleo `#0F4C4A` e cobre `#9A4F24` no fundo claro.
+/// Quem ainda não escolheu abre no claro.
 ///
 /// Os pares de texto estão no [ColorScheme] do Material 3. Sucesso e alerta
 /// ficam em [ScapeStatusColors], porque o esquema não tem esses papéis.

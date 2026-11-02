@@ -4,6 +4,7 @@ import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -105,7 +106,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     6,
     60,
     Difficulty.medium,
-    minimumPlayers: 6,
+    minimumPlayers: 4,
   );
   final laboratorio = _room(
     'room-cwb-lab',
@@ -556,6 +557,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slot: slotCofreSat,
       totalSpots: 6,
       names: ['Marina', 'Caio', 'Helena', 'Davi', 'Léo'],
+      minimumSpots: 6,
     ),
     _group(
       now: now,
@@ -973,15 +975,17 @@ _nearbyPlaces({
         longitude: point.longitude,
       );
       final total = totals[index];
+      final bounds = _boundsForTotal(total);
       final room = _room(
         'room-$id',
         house,
         labels[index],
         'Uma sala de exemplo nos arredores',
         RoomCategory.values[index % RoomCategory.values.length],
-        10,
+        bounds.$2,
         60,
         Difficulty.medium,
+        minimumPlayers: bounds.$1,
       );
       final startsAt = now.add(Duration(hours: 36 + (index * 5)));
       final slot = schedule.at('slot-$id', room.id, startsAt);
@@ -1015,9 +1019,11 @@ EscapeRoom _room(
   int durationMinutes,
   Difficulty difficulty, {
   String gameType = GameTypes.escapeRoom,
-  int minimumPlayers = 2,
+  int? minimumPlayers,
   Duration cancelWindow = const Duration(hours: 2),
 }) {
+  final minimum = minimumPlayers ?? suggestedRoomMinimum(capacity);
+  assert(minimum >= 2 && minimum <= 6 && minimum <= capacity, id);
   return EscapeRoom(
     id: id,
     houseId: house.id,
@@ -1029,9 +1035,19 @@ EscapeRoom _room(
     difficulty: difficulty,
     priceCents: _priceCents(capacity, difficulty),
     gameType: gameType,
-    minimumPlayers: minimumPlayers,
+    minimumPlayers: minimum,
     cancelWindow: cancelWindow,
   );
+}
+
+(int, int) _boundsForTotal(int total) {
+  if (total <= 6) {
+    return (2, 6);
+  }
+  if (total <= 8) {
+    return (3, 8);
+  }
+  return (4, 10);
 }
 
 int _priceCents(int capacity, Difficulty difficulty) {
@@ -1141,9 +1157,12 @@ Group _group({
   assert(house.cityId == city.id, id);
   assert(room.houseId == house.id, id);
   assert(slot.roomId == room.id, id);
+  final minimum = minimumSpots ?? room.minimumPlayers;
   assert(names.isNotEmpty, id);
   assert(names.length <= totalSpots, id);
   assert(totalSpots <= room.capacity, id);
+  assert(minimum >= room.minimumPlayers && minimum <= room.capacity, id);
+  assert(totalSpots >= minimum, id);
   return Group(
     id: id,
     cityId: city.id,
@@ -1155,6 +1174,7 @@ Group _group({
     roomName: roomName ?? room.name,
     roomTheme: room.theme,
     roomCapacity: room.capacity,
+    roomMinimum: room.minimumPlayers,
     durationMinutes: room.durationMinutes,
     difficulty: room.difficulty,
     slotId: slot.id,
@@ -1164,7 +1184,7 @@ Group _group({
     priceCents: room.priceCents,
     gameType: gameType,
     note: note,
-    minimumSpots: minimumSpots ?? room.minimumPlayers,
+    minimumSpots: minimum,
     closesAt:
         closesAt ?? GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
     cancelWindow: room.cancelWindow,
