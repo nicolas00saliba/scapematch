@@ -46,10 +46,30 @@ class PersonAvatar extends StatelessWidget {
     final asset = portrait == null
         ? PersonPortraits.forName(name)
         : PersonPortraits.at(portrait!);
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: scheme.primaryContainer,
-      backgroundImage: AssetImage(asset),
+    final size = radius * 2;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipOval(
+        child: Image.asset(
+          asset,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          semanticLabel: name,
+          errorBuilder: (context, error, stackTrace) {
+            return ColoredBox(
+              color: scheme.primaryContainer,
+              child: Icon(
+                Icons.person,
+                size: radius,
+                color: scheme.onPrimaryContainer,
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

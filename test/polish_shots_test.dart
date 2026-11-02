@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/features/map/data/user_location.dart';
 import 'package:scapematch/features/map/presentation/map_tiles.dart' as tiles;
 import 'package:scapematch/providers/repositories.dart';
@@ -48,6 +49,13 @@ void main() {
       ],
     );
     await _resize(tester, const Size(390, 844));
+    await tester.runAsync(() async {
+      final context = tester.element(find.text('ScapeMatch'));
+      for (final asset in PersonPortraits.assets) {
+        await precacheImage(AssetImage(asset), context);
+      }
+    });
+    await tester.pump();
     await _shot(
       tester,
       dir,

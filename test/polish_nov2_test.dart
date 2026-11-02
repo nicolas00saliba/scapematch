@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch/features/onboarding/presentation/city_landmarks.dart';
@@ -38,6 +39,21 @@ void main() {
       expect(group.minimumSpots, lessThanOrEqualTo(group.roomCapacity));
       expect(group.totalSpots, greaterThanOrEqualTo(group.minimumSpots));
     }
+  });
+
+  testWidgets('the light home card shows portrait photos', (tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    await pumpScapeMatch(tester);
+    await tester.pumpAndSettle();
+    final portraits = [
+      for (final image in tester.widgetList<Image>(find.byType(Image)))
+        if (image.image is AssetImage &&
+            (image.image as AssetImage).assetName.contains('/people/'))
+          (image.image as AssetImage).assetName,
+    ];
+    expect(portraits, isNotEmpty);
+    expect(portraits.toSet(), containsAll(PersonPortraits.assets.take(4)));
   });
 
   test('an unknown city falls back to the Curitiba landmark', () {
