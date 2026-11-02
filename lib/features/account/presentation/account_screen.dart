@@ -120,7 +120,17 @@ class _SignedOutAccount extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return AppScaffold(
-      appBar: AppBar(title: const Text('Conta')),
+      appBar: AppBar(
+        title: const Text('Conta'),
+        actions: [
+          IconButton(
+            key: AppKeys.accountSettings,
+            tooltip: 'Configurações',
+            onPressed: () => context.push('/account/settings'),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [

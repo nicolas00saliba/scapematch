@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## O tema é uma escolha da pessoa
+
+- **Data:** 2026-11-02
+- **Decisão:** em Configurações, na aba Conta, a aparência é Claro, Escuro ou Automático. Automático segue o aparelho. A escolha fica em `shared_preferences` (na web, localStorage) e entra no primeiro frame, no mesmo jeito da cidade. A troca usa a animação do `MaterialApp`, sem recriar a rota. Os dois temas continuam na paleta Cofre de Cobre. O mapa de Perto de você lê o brilho já resolvido: escuro aplica o filtro dos tiles, claro o aquecido. Quem está deslogado abre a mesma engrenagem.
+- **Motivo:** o app só seguia o sistema, e a pessoa quer escolher, inclusive no celular.
+- **Onde está no código:** `ThemeChoiceStore`, `ThemeChoiceController`, `ThemeChoiceControl` e `ScapeMatchApp`.
+- **Como trocar depois:** outro valor entra em `ThemeChoice`. A chave salva é `theme_choice`.
+
 ## O mapa não recarrega no gesto
 
 - **Data:** 2026-10-31

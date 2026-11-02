@@ -80,6 +80,7 @@ abstract final class AppKeys {
   static const radiusCircle = Key('radius-circle');
   static const accountTab = Key('account-tab');
   static const accountSettings = Key('account-settings');
+  static Key themeChoice(String name) => Key('theme-choice-$name');
   static const accountGreeting = Key('account-greeting');
   static const accountWallet = Key('account-wallet');
   static const accountSignOut = Key('account-sign-out');
