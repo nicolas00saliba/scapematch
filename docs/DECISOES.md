@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## A foto da cidade fica na metade de cima
+
+- **Data:** 2026-11-02
+- **Decisão:** na introdução, a foto de “Perto de você” é um retrato já enquadrado para o celular. O ponto turístico ocupa a metade de cima, acima do título e do cartão. Cada cidade tem um `Alignment` próprio, com y negativo, para o recorte do `BoxFit.cover` não devolver o assunto para trás do cartão. Curitiba é a estufa do Jardim Botânico, centralizada. São Paulo é o MASP de frente. O Rio mostra o Cristo inteiro. Belo Horizonte é a fachada de azulejos da Igreja da Pampulha. Porto Alegre é a Usina do Gasômetro iluminada, não só a chaminé de dia. O crossfade continua.
+- **Motivo:** no celular a estufa saía cortada, o Cristo ficava atrás do texto e em Belo Horizonte só aparecia o céu.
+- **Onde está no código:** `CityLandmark.alignment` e `_PagePhoto`.
+- **Como trocar depois:** outro enquadramento entra no `alignment` da cidade. Outra foto entra em `assets/images/landmarks/` e em `docs/CREDITOS_IMAGENS.md`.
+
 ## O mínimo é da sala
 
 - **Data:** 2026-11-02
