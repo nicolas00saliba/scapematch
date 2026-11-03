@@ -31,10 +31,20 @@ void main() {
 
     await tester.tap(find.byKey(AppKeys.accountDestination('cards')));
     await tester.pumpAndSettle();
-    await _capture(tester, find.text('Nenhum cartão cadastrado'), dir, 'cartoes-390');
+    await _capture(
+      tester,
+      find.text('Nenhum cartão cadastrado'),
+      dir,
+      'cartoes-390',
+    );
     await tester.tap(find.byKey(AppKeys.addCard));
     await tester.pumpAndSettle();
-    await _capture(tester, find.byKey(AppKeys.addCardNotice), dir, 'cartoes-390-aviso');
+    await _capture(
+      tester,
+      find.byKey(AppKeys.addCardNotice),
+      dir,
+      'cartoes-390-aviso',
+    );
 
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();

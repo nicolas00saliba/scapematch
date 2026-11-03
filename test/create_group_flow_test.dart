@@ -38,7 +38,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.createSubmit));
     await tester.pumpAndSettle();
 
-    expect(find.text('Ana Teste'), findsOneWidget);
+    expect(find.text('Ana Teste'), findsWidgets);
     expect(find.text('Você'), findsNothing);
     expect(find.text('Você está neste grupo'), findsOneWidget);
     expect(find.text('1/3'), findsOneWidget);

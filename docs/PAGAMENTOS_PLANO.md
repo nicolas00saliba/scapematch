@@ -26,9 +26,13 @@ A tela em que a equipe muda a taxa entra no app de manutenção, chamando `setPl
 - `PaymentMethodsRepository.list` devolve a lista. A fictícia devolve vazia.
 - A Conta lê esses dois repositórios pelos providers. Trocar a fonte é trocar o provider.
 
+## Fase 3, na tela do grupo
+
+Entrar deixa a parte pendente. O botão “Pagar minha parte” abre Pix ou cartão simulado e grava no `PaymentBook`. O jogador vê o preço por pessoa e quem já pagou. A comissão fica no livro, fora da tela. Quem não paga até o prazo de fechar perde a vaga. Tudo continua na memória do aparelho.
+
 ## Próxima fase
 
-A fase 3 liga a tela do grupo a este livro. Cada jogador paga a própria parte, por Pix ou cartão simulado, e o grupo mostra quem já pagou. Continua em memória. O Supabase, o app da casa e a tela de manutenção da taxa vêm nas fases seguintes.
+O próximo passo, para a apresentação de sexta, é o ScapeMatch Parceiro no mesmo site: login simulado de uma casa, saldo, extrato com bruto, comissão e líquido, reservas e grupos. O estado simulado precisa ser o mesmo no navegador, para o pagamento do jogador aparecer na casa. O Supabase real fica para depois dessa demo.
 
 ## O que falta
 

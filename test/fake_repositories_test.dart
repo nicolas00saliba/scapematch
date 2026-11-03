@@ -105,7 +105,10 @@ void main() {
     );
 
     expect(all.length, greaterThan(2));
-    expect(almost.map((group) => group.id), contains(SampleIds.groupSpMetroAlmost));
+    expect(
+      almost.map((group) => group.id),
+      contains(SampleIds.groupSpMetroAlmost),
+    );
     expect(
       almost
           .singleWhere((group) => group.id == SampleIds.groupSpMetroAlmost)

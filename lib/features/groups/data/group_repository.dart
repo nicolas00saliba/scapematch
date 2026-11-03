@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
@@ -35,6 +36,13 @@ abstract class GroupRepository {
   Future<void> declineWaitlist({
     required String groupId,
     required String userId,
+  });
+
+  /// Cobra a parte de quem já está na cadeira. Não cobra quem ainda não entrou.
+  Future<PayShareResult> payShare(
+    String groupId, {
+    required String userId,
+    required PaymentMethodKind kind,
   });
 
   Future<JoinResult> join(

@@ -8,6 +8,14 @@
 - **Onde está no código:** `assets/brand/`, `ScapeLogo` e os ícones em `web/`, `android/` e `ios/`. O letreiro é desenhado no widget com Poppins 500, porque o SVG aponta para a fonte e não traz as letras em traço.
 - **Como trocar depois:** outro desenho entra nos arquivos de `assets/brand/` e o widget só troca o arquivo. A landing e o login do Parceiro usam `ScapeLogo` completo. A barra larga do site também.
 
+## Quem não pagou até o prazo perde a vaga
+
+- **Data:** 2026-11-03
+- **Decisão:** entrar no grupo deixa a parte pendente. A pessoa paga a própria parte, no valor por pessoa, por Pix ou cartão simulado. A comissão não aparece para o jogador. Quem não pagou até o prazo de fechar do grupo perde a vaga, sem estorno, porque não houve cobrança. Se isso deixar o grupo abaixo do mínimo e o prazo já passou, vale a regra antiga: o grupo é cancelado e quem tinha pagado recebe o estorno da política que já existe. Sair, ser removido ou o organizador cancelar continua devolvendo só o que foi pago, dentro da janela de sempre. O livro fica na memória do aparelho.
+- **Motivo:** a apresentação de sexta precisa de um pagamento simulado completo, com uma regra simples para quem não paga a tempo.
+- **Onde está no código:** `PaymentStatus.pending`, `FakeGroupRepository.payShare`, `_releaseUnpaid` e `PayShareSheet`.
+- **Como trocar depois:** outro prazo entra em `_releaseUnpaid`. A frase da tela entra em `GroupMessages`.
+
 ## A comissão é uma configuração, com foto na reserva
 
 - **Data:** 2026-11-03

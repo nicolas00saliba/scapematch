@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
@@ -22,6 +23,24 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
       throw GroupNotFoundException(groupId);
     }
     return group;
+  }
+
+  /// Nulo quando a parte foi paga.
+  Future<PayShareFailureReason?> payShare(PaymentMethodKind kind) async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .payShare(groupId, userId: user.id, kind: kind);
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case PayShareSuccess(:final group):
+        _publish(group);
+        return null;
+      case PayShareFailure(:final reason):
+        return reason;
+    }
   }
 
   /// Returns null when the person entered the group.
