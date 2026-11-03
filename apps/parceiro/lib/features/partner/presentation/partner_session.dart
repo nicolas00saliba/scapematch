@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
-import 'package:scapematch/features/partner/data/partner_repository.dart';
-import 'package:scapematch/features/partner/domain/partner_account.dart';
-import 'package:scapematch/features/partner/domain/partner_snapshot.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 enum PartnerSection { balance, reservations, agenda, rooms }

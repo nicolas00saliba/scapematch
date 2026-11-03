@@ -1,12 +1,12 @@
 # Decisões provisórias
 
-## O Parceiro fica em /parceiro, no mesmo livro do jogador
+## O Parceiro é um app à parte
 
 - **Data:** 2026-11-03
-- **Decisão:** a casa entra em `/parceiro` com login simulado (`xv@scapematch.exemplo`, senha `demo`, casa Mistério da Rua XV). O painel mostra saldo, extrato (bruto, comissão e líquido), reservas e grupos, salas com preço e horários, e a marcação de falta. Tudo lê o `PaymentBook`, o catálogo e o `AbsenceBook` da mesma sessão do app do jogador. A Conta tem o atalho ScapeMatch Parceiro.
-- **Motivo:** a apresentação de sexta precisa da casa vendo o que o jogador reservou, sem um segundo aplicativo.
-- **Onde está no código:** `PartnerScreen`, `PartnerRepository` e o atalho na Conta. A Agenda, no mesmo painel, mostra a semana e a lista de sessões e grava no mesmo livro. Na lista de reservas, o grupo aberto mostra “N de Z reservaram” e o selo Aberto. Quando N chega em Z, o selo é Fechado, cada parte fica Paga e o líquido entra no saldo. Os horários de exemplo caem em 14:00, 16:30, 19:00 ou 21:00.
-- **Como trocar depois:** outra casa entra em `partnerDemoAccount`. O Supabase troca o miolo de `PartnerRepository`.
+- **Decisão:** o ScapeMatch Parceiro não fica dentro do app do jogador. É o app `apps/parceiro`, com nome, título, manifest e ícone próprios. O ícone é o símbolo aprovado, sem letreiro, com o selo “Parceiro”. O Pages publica os dois builds: o jogador em `/scapematch/` e a casa em `/scapematch/parceiro/`. O jogador não tem rota, botão nem texto que abra a casa. Login de exemplo `xv@scapematch.exemplo`, senha `demo`, casa Mistério da Rua XV. Cada app sobe o próprio livro de exemplo na memória. O `PartnerRepository` continua lendo o mesmo `PaymentBook` quando recebe o mesmo banco.
+- **Motivo:** o Nícolas rejeitou a mistura dos PRs #29 e #30. A casa e o jogador são produtos diferentes. A decisão anterior, de deixar a casa em `/parceiro` no mesmo app e com atalho na Conta, não vale mais.
+- **Onde está no código:** `apps/parceiro`. A Agenda continua no painel da casa: semana, lista Próximas/Realizadas/Canceladas, e grava no livro daquela sessão. Na lista de reservas, o grupo aberto mostra “N de Z reservaram” e o selo Aberto. Quando N chega em Z, o selo é Fechado, cada parte fica Paga e o líquido entra no saldo. Os horários de exemplo caem em 14:00, 16:30, 19:00 ou 21:00.
+- **Como trocar depois:** outra casa entra em `partnerDemoAccount`. O Supabase troca o miolo de `PartnerRepository` e passa a unir os dois apps.
 
 ## Só cobra se o grupo fechar
 
@@ -67,10 +67,10 @@
 ## O logo definitivo tem duas formas
 
 - **Data:** 2026-11-03
-- **Decisão:** o Nícolas aprovou o logo. O pin é verde-petróleo `#0F4C4A`, o círculo é branco, as três pessoas são cobre `#D2642A` e a fechadura é do mesmo petróleo do pin. O letreiro é Poppins 500: “Scape” em petróleo e “Match” em cobre. O logo completo (pin e letreiro) vai onde há espaço: topo do site largo, landing, introdução e o login do Parceiro. O símbolo, sem letreiro, vai nos lugares compactos: ícone do app, favicon, barra do celular, avatar e ícones PWA. No tema escuro, ou sobre foto escura, o pin e a palavra “Scape” ficam claros (`#F4F1EA`); as pessoas e “Match” continuam cobre. Os ícones do app são o símbolo com pin branco e pessoas cobre, centralizado em fundo `#0F4C4A`.
+- **Decisão:** o Nícolas aprovou o logo. O pin é verde-petróleo `#0F4C4A`, o círculo é branco, as três pessoas são cobre `#D2642A` e a fechadura é do mesmo petróleo do pin. O letreiro é Poppins 500: “Scape” em petróleo e “Match” em cobre. O logo completo (pin e letreiro) vai onde há espaço: topo do site largo, landing e introdução. O símbolo, sem letreiro, vai nos lugares compactos: ícone do app, favicon, barra do celular, avatar e ícones PWA. O app Parceiro usa esse símbolo com o selo “Parceiro”, sem o letreiro. No tema escuro, ou sobre foto escura, o pin e a palavra “Scape” ficam claros (`#F4F1EA`); as pessoas e “Match” continuam cobre. Os ícones do app são o símbolo com pin branco e pessoas cobre, centralizado em fundo `#0F4C4A`.
 - **Motivo:** a marca deixou de ser só o texto “ScapeMatch” e passou a ter um desenho único, com regra de onde entra cada versão.
 - **Onde está no código:** `assets/brand/`, `ScapeLogo` e os ícones em `web/`, `android/` e `ios/`. O letreiro é desenhado no widget com Poppins 500, porque o SVG aponta para a fonte e não traz as letras em traço. A barra do site usa a variante completa.
-- **Como trocar depois:** outro desenho entra nos arquivos de `assets/brand/` e o widget só troca o arquivo. A landing e o login do Parceiro usam `ScapeLogo` completo.
+- **Como trocar depois:** outro desenho entra nos arquivos de `assets/brand/` e o widget só troca o arquivo. A landing usa `ScapeLogo` completo. O app Parceiro usa só o símbolo, com o selo “Parceiro”.
 
 ## No computador o jogador usa um site
 

@@ -5,7 +5,7 @@ abstract final class PartnerMessages {
   static const title = 'Parceiro';
   static const loginTitle = 'Entrar como casa';
   static const loginBody =
-      'Conta de exemplo. O saldo é o mesmo livro do app do jogador, nesta sessão.';
+      'Conta de exemplo, separada do app do jogador. O saldo é o livro de exemplo desta casa.';
   static const emailHint =
       'Casa de exemplo: xv@scapematch.exemplo. Senha: demo.';
   static const badLogin = 'E-mail ou senha não conferem neste exemplo.';

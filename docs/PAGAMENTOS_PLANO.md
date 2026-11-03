@@ -32,7 +32,7 @@ Entrar deixa a parte pendente. O botão “Pagar minha parte” abre Pix ou cart
 
 ## Próxima fase
 
-O ScapeMatch Parceiro está em `/parceiro`, no mesmo site e no mesmo livro em memória: login simulado da casa, saldo, extrato com bruto, comissão e líquido, reservas, grupos, salas, horários, preços e falta. O pagamento do jogador aparece na casa porque os dois leem o mesmo `PaymentBook`. O Supabase real fica para depois dessa demo.
+O ScapeMatch Parceiro é um app à parte, em `apps/parceiro`, publicado em `/scapematch/parceiro/`. Login simulado da casa, saldo, extrato com bruto, comissão e líquido, reservas, grupos, salas, horários, preços e falta. O `PartnerRepository` lê o `PaymentBook` do banco que recebe. Cada app sobe o próprio livro de exemplo. O Supabase real fica para depois dessa demo e é o que vai unir jogador e casa.
 
 ## O que falta
 

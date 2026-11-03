@@ -90,13 +90,6 @@ class AccountScreen extends ConsumerWidget {
             ],
             _SignOutTile(onPressed: () => _signOut(context, ref)),
           ],
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            key: AppKeys.partnerEntry,
-            onPressed: () => context.go('/parceiro'),
-            icon: const Icon(Icons.storefront_outlined),
-            label: const Text('ScapeMatch Parceiro'),
-          ),
         ],
       ),
     );

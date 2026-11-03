@@ -1,18 +1,21 @@
 import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
-import 'package:scapematch/features/partner/data/partner_repository.dart';
-import 'package:scapematch/features/partner/domain/partner_account.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
-import 'package:scapematch/features/partner/presentation/partner_money.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
+import 'package:scapematch/features/groups/domain/group_outcomes.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
+import 'package:scapematch_parceiro/partner_keys.dart';
+import 'package:scapematch_parceiro/player_app_url.dart';
 
-import 'support/pump_app.dart';
+import 'support/pump_parceiro.dart';
 import 'support/sample_clock.dart';
 
 void main() {
@@ -88,60 +91,78 @@ void main() {
     expect(database.slotById(slot.id), isNotNull);
   });
 
-  testWidgets('the account shortcut opens the house login', (tester) async {
-    await pumpScapeMatch(tester);
-    await tester.tap(find.byKey(AppKeys.accountTab));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(AppKeys.partnerEntry),
-      400,
-      scrollable: verticalScrollable,
+  test('a player payment lands in the same house book', () async {
+    final database = loadSampleDatabase();
+    final clock = loadSampleClock();
+    final groups = FakeGroupRepository(
+      database,
+      clock: clock,
+      latency: Duration.zero,
     );
-    await tester.tap(find.byKey(AppKeys.partnerEntry));
-    await tester.pumpAndSettle();
+    final partner = PartnerRepository(
+      groups: groups,
+      catalog: FakeCatalogRepository(database, latency: Duration.zero),
+      database: database,
+      clock: clock,
+    );
+    const groupId = 'grp-cwb-lab-quase';
+    final joined = await groups.join(
+      groupId,
+      participantUserId: sampleCurrentUser.id,
+      participantName: sampleCurrentUser.displayName,
+    );
+    expect(joined, isA<JoinSuccess>());
+    final paid = await groups.payShare(
+      groupId,
+      userId: sampleCurrentUser.id,
+      kind: PaymentMethodKind.pix,
+    );
+    expect(paid, isA<PayShareSuccess>());
+
+    final snap = await partner.load(SampleIds.houseCwbRuaXv);
+    final group = snap.groups.firstWhere((item) => item.id == groupId);
+    final nicolas = group.participants.singleWhere(
+      (person) => person.displayName == sampleCurrentUser.displayName,
+    );
+    expect(nicolas.payment, PaymentStatus.paid);
+  });
+
+  test('the player app lives one level above the partner site', () {
+    expect(
+      playerAppUrl('https://nicolas00saliba.github.io/scapematch/parceiro/'),
+      'https://nicolas00saliba.github.io/scapematch/',
+    );
+    expect(
+      playerAppUrl('http://127.0.0.1:8080/parceiro/'),
+      'http://127.0.0.1:8080/',
+    );
+  });
+
+  testWidgets('bad credentials stay on the house login', (tester) async {
+    await pumpParceiro(tester);
     expect(find.text('ScapeMatch Parceiro'), findsOneWidget);
     expect(find.text(PartnerMessages.emailHint), findsOneWidget);
 
     await tester.enterText(
-      find.byKey(AppKeys.partnerEmail),
+      find.byKey(PartnerKeys.partnerEmail),
       partnerDemoAccount.email,
     );
-    await tester.enterText(find.byKey(AppKeys.partnerPassword), 'errada');
-    await tester.tap(find.byKey(AppKeys.partnerSubmit));
+    await tester.enterText(find.byKey(PartnerKeys.partnerPassword), 'errada');
+    await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.badLogin), findsOneWidget);
   });
 
-  testWidgets('a player reservation shows up for the house', (tester) async {
-    await pumpScapeMatch(tester);
-    await _openGroup(tester, 'grp-cwb-lab-quase');
-    await tester.tap(find.byKey(AppKeys.joinButton));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.payMyShare));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.paySimulate));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.payDone));
-    await tester.pumpAndSettle();
-
-    _go(tester, '/parceiro');
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(AppKeys.partnerEmail),
-      partnerDemoAccount.email,
-    );
-    await tester.enterText(
-      find.byKey(AppKeys.partnerPassword),
-      partnerDemoPassword,
-    );
-    await tester.tap(find.byKey(AppKeys.partnerSubmit));
-    await tester.pumpAndSettle();
+  testWidgets('the house desk shows balance, reservations and rooms', (
+    tester,
+  ) async {
+    await _signIn(tester);
 
     expect(find.text(partnerDemoAccount.houseName), findsOneWidget);
-    final net = tester.widget<Text>(find.byKey(AppKeys.partnerNet)).data;
+    final net = tester.widget<Text>(find.byKey(PartnerKeys.partnerNet)).data;
     expect(net, isNot(formatPrice(0)));
-    expect(find.byKey(AppKeys.partnerGross), findsOneWidget);
-    expect(find.byKey(AppKeys.partnerCommission), findsOneWidget);
+    expect(find.byKey(PartnerKeys.partnerGross), findsOneWidget);
+    expect(find.byKey(PartnerKeys.partnerCommission), findsOneWidget);
     expect(find.text(PartnerMessages.reservedBody), findsOneWidget);
     expect(find.text('Captura'), findsWidgets);
 
@@ -152,23 +173,16 @@ void main() {
     expect(find.text('5 de 6 reservaram'), findsWidgets);
     expect(find.textContaining('· Pago'), findsWidgets);
     expect(find.textContaining('· Reservado'), findsWidgets);
-    await tester.scrollUntilVisible(
-      find.textContaining('Nícolas'),
-      400,
-      scrollable: verticalScrollable,
-    );
-    expect(find.textContaining('Nícolas'), findsOneWidget);
-    final scroll = find.byWidgetPredicate(
-      (widget) => widget is Scrollable && widget.axis == Axis.vertical,
-    );
-    tester.state<ScrollableState>(scroll.first).position.jumpTo(0);
-    await tester.pumpAndSettle();
 
     final olga = '${SampleIds.groupCwbClosed}-p0';
     final absence = find.byKey(
-      AppKeys.partnerAbsence(SampleIds.groupCwbClosed, olga),
+      PartnerKeys.partnerAbsence(SampleIds.groupCwbClosed, olga),
     );
-    await tester.scrollUntilVisible(absence, 400, scrollable: scroll);
+    await tester.scrollUntilVisible(
+      absence,
+      400,
+      scrollable: verticalScrollable,
+    );
     await tester.ensureVisible(absence);
     await tester.pumpAndSettle();
     await tester.tap(absence);
@@ -178,9 +192,11 @@ void main() {
     await tester.ensureVisible(find.text(PartnerMessages.rooms));
     await tester.tap(find.text(PartnerMessages.rooms));
     await tester.pumpAndSettle();
-    final price = find.byKey(AppKeys.partnerPrice(SampleIds.roomCwbCaldeira));
+    final price = find.byKey(
+      PartnerKeys.partnerPrice(SampleIds.roomCwbCaldeira),
+    );
     final save = find.byKey(
-      AppKeys.partnerSavePrice(SampleIds.roomCwbCaldeira),
+      PartnerKeys.partnerSavePrice(SampleIds.roomCwbCaldeira),
     );
     await tester.scrollUntilVisible(save, 400, scrollable: verticalScrollable);
     await tester.ensureVisible(price);
@@ -190,18 +206,19 @@ void main() {
     await tester.tap(save);
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.priceSaved), findsOneWidget);
-
-    _go(tester, '/salas/${SampleIds.roomCwbCaldeira}');
-    await tester.pumpAndSettle();
-    expect(find.textContaining(formatPrice(8000)), findsWidgets);
   });
 }
 
-void _go(WidgetTester tester, String location) {
-  GoRouter.of(tester.element(find.byType(Scaffold).first)).go(location);
-}
-
-Future<void> _openGroup(WidgetTester tester, String id) async {
-  _go(tester, '/groups/$id');
+Future<void> _signIn(WidgetTester tester) async {
+  await pumpParceiro(tester);
+  await tester.enterText(
+    find.byKey(PartnerKeys.partnerEmail),
+    partnerDemoAccount.email,
+  );
+  await tester.enterText(
+    find.byKey(PartnerKeys.partnerPassword),
+    partnerDemoPassword,
+  );
+  await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
   await tester.pumpAndSettle();
 }

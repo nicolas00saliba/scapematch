@@ -5,15 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
-import 'package:scapematch/features/partner/domain/partner_account.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch/features/theme/data/theme_choice_store.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/partner_keys.dart';
 
-import 'support/pump_app.dart';
+import 'support/pump_parceiro.dart';
 
 void main() {
   testWidgets('saves the partner desk', (tester) async {
@@ -67,7 +66,7 @@ Future<void> _flow(
 
   final olga = '${SampleIds.groupCwbClosed}-p0';
   final absence = find.byKey(
-    AppKeys.partnerAbsence(SampleIds.groupCwbClosed, olga),
+    PartnerKeys.partnerAbsence(SampleIds.groupCwbClosed, olga),
   );
   await tester.scrollUntilVisible(absence, 300, scrollable: verticalScrollable);
   await tester.ensureVisible(absence);
@@ -76,7 +75,7 @@ Future<void> _flow(
   await tester.tap(absence);
   await tester.pumpAndSettle();
   final standing = find.byKey(
-    AppKeys.partnerAbsenceStanding(SampleIds.groupCwbClosed, olga),
+    PartnerKeys.partnerAbsenceStanding(SampleIds.groupCwbClosed, olga),
   );
   await tester.scrollUntilVisible(
     standing,
@@ -89,8 +88,8 @@ Future<void> _flow(
 
   await tester.tap(find.text(PartnerMessages.rooms));
   await tester.pumpAndSettle();
-  final price = find.byKey(AppKeys.partnerPrice(SampleIds.roomCwbCaldeira));
-  final save = find.byKey(AppKeys.partnerSavePrice(SampleIds.roomCwbCaldeira));
+  final price = find.byKey(PartnerKeys.partnerPrice(SampleIds.roomCwbCaldeira));
+  final save = find.byKey(PartnerKeys.partnerSavePrice(SampleIds.roomCwbCaldeira));
   await tester.scrollUntilVisible(save, 400, scrollable: verticalScrollable);
   await tester.ensureVisible(price);
   await tester.enterText(price, '80,00');
@@ -99,7 +98,7 @@ Future<void> _flow(
   await tester.pumpAndSettle();
   await tester.pump(const Duration(seconds: 5));
   await tester.pumpAndSettle();
-  final add = find.byKey(AppKeys.partnerAddSlot(SampleIds.roomCwbCaldeira));
+  final add = find.byKey(PartnerKeys.partnerAddSlot(SampleIds.roomCwbCaldeira));
   await tester.scrollUntilVisible(add, 300, scrollable: verticalScrollable);
   await tester.ensureVisible(add);
   await tester.tap(add);
@@ -113,7 +112,7 @@ Future<void> _flow(
 }
 
 Future<void> _open(WidgetTester tester, Size size, String theme) async {
-  await pumpScapeMatch(
+  await pumpParceiro(
     tester,
     overrides: [
       themeChoiceStoreProvider.overrideWithValue(
@@ -124,20 +123,18 @@ Future<void> _open(WidgetTester tester, Size size, String theme) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   await tester.pumpAndSettle();
-  GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/parceiro');
-  await tester.pumpAndSettle();
 }
 
 Future<void> _enter(WidgetTester tester) async {
   await tester.enterText(
-    find.byKey(AppKeys.partnerEmail),
+    find.byKey(PartnerKeys.partnerEmail),
     partnerDemoAccount.email,
   );
   await tester.enterText(
-    find.byKey(AppKeys.partnerPassword),
+    find.byKey(PartnerKeys.partnerPassword),
     partnerDemoPassword,
   );
-  await tester.tap(find.byKey(AppKeys.partnerSubmit));
+  await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
   await tester.pumpAndSettle();
   await tester.pump(const Duration(seconds: 5));
   await tester.pumpAndSettle();

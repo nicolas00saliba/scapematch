@@ -3,7 +3,7 @@ import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
-import 'package:scapematch/features/partner/domain/partner_statement.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 
 /// Bruto, comissão e líquido de um grupo. Reserva ainda não entrou no saldo.
 class GroupMoney {

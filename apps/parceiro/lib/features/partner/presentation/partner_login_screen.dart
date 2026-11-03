@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
-import 'package:scapematch/core/ui/scape_logo.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
-import 'package:scapematch/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/partner_keys.dart';
+import 'package:scapematch_parceiro/partner_mark.dart';
+import 'package:scapematch_parceiro/player_app_link.dart';
 
 class PartnerLoginScreen extends ConsumerStatefulWidget {
   const PartnerLoginScreen({super.key});
@@ -54,7 +54,7 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
         children: [
-          const Center(child: ScapeLogo(height: 52)),
+          const Center(child: PartnerMark(height: 52)),
           const SizedBox(height: 20),
           Text(
             'ScapeMatch Parceiro',
@@ -89,7 +89,7 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
           ),
           const SizedBox(height: 20),
           TextField(
-            key: AppKeys.partnerEmail,
+            key: PartnerKeys.partnerEmail,
             controller: _email,
             keyboardType: TextInputType.emailAddress,
             autofillHints: const [AutofillHints.username],
@@ -101,7 +101,7 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
           ),
           const SizedBox(height: 12),
           TextField(
-            key: AppKeys.partnerPassword,
+            key: PartnerKeys.partnerPassword,
             controller: _password,
             obscureText: true,
             autofillHints: const [AutofillHints.password],
@@ -115,20 +115,20 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
             const SizedBox(height: 12),
             Text(
               _error!,
-              key: AppKeys.partnerLoginError,
+              key: PartnerKeys.partnerLoginError,
               style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
             ),
           ],
           const SizedBox(height: 16),
           FilledButton(
-            key: AppKeys.partnerSubmit,
+            key: PartnerKeys.partnerSubmit,
             onPressed: _busy ? null : _submit,
             child: const Text('Entrar'),
           ),
           const SizedBox(height: 8),
           TextButton(
-            key: AppKeys.partnerPlayerApp,
-            onPressed: () => context.go('/'),
+            key: PartnerKeys.partnerPlayerApp,
+            onPressed: openPlayerApp,
             child: const Text(PartnerMessages.openPlayerApp),
           ),
         ],

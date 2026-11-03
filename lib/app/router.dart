@@ -19,7 +19,6 @@ import 'package:scapematch/features/groups/presentation/my_groups_screen.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'package:scapematch/features/map/presentation/nearby_screen.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
-import 'package:scapematch/features/partner/presentation/partner_screen.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:scapematch/features/news/presentation/news_browse_screen.dart';
 import 'package:scapematch/features/news/presentation/news_detail_screen.dart';
@@ -144,11 +143,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/parceiro',
-        name: 'partner',
-        builder: (context, state) => const PartnerScreen(),
       ),
       GoRoute(
         path: '/cadastro',
