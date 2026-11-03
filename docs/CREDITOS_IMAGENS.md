@@ -7,7 +7,7 @@ Fotos novas deste bloco vêm do Unsplash, na [licença Unsplash](https://unsplas
 | `assets/images/onboarding/encontrar.jpg` | https://www.pexels.com/photo/17368156/ |
 | `assets/images/onboarding/cidade.jpg` | https://unsplash.com/photos/1522202176988-66273c2fd55f |
 | `assets/images/onboarding/convidar.jpg` | https://www.pexels.com/photo/7149165/ |
-| `assets/images/onboarding/reservar.jpg` | https://www.pexels.com/photo/4968634/ — mãos e cartão numa maquininha |
+| `assets/images/onboarding/reservar.jpg` | imagem gerada por IA para o ScapeMatch — maquininha no centro e seis mãos com cartões |
 | `assets/images/landmarks/curitiba.jpg` | https://commons.wikimedia.org/wiki/File:Estufa_principal_do_Jardim_Bot%C3%A2nico_de_Curitiba_02.jpg — Rodrigo Argenton, CC BY-SA 4.0. Recorte com a estufa na metade de cima. |
 | `assets/images/landmarks/sao-paulo.jpg` | https://commons.wikimedia.org/wiki/File:MASP_Brazil.jpg — Wilfredor, CC0. Recorte com o volume suspenso na metade de cima. |
 | `assets/images/landmarks/rio.jpg` | https://commons.wikimedia.org/wiki/File:Christ_the_Redeemer_-_Cristo_Redentor.jpg — Arne Müseler, CC BY-SA 3.0 de. O monumento inteiro fica na metade de cima. |
