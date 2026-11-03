@@ -5,8 +5,10 @@ import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/features/groups/presentation/group_seat_facts.dart';
 
 /// Voo da capa: do cartão do grupo até a tela do grupo.
 ///
@@ -31,7 +33,7 @@ class GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final spots = '${group.filledSpots} de ${group.totalSpots} vagas';
+    final spots = GroupMessages.seatCount(group.filledSpots, group.totalSpots);
     final started = !now.isBefore(group.startsAt);
 
     final seated = [
@@ -109,27 +111,21 @@ class GroupCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            spots,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
+                          const SizedBox(height: 8),
+                          GroupSeatFacts(group: group, compact: true),
+                          if (started &&
+                              group.phaseAt(now) == GroupPhase.forming) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Sessão já começou',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.secondary,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 6),
                           _AvatarRow(people: seated, filled: group.filledSpots),
-                          const SizedBox(height: 2),
-                          Text(
-                            GroupMessages.phaseLabel(
-                              group.phaseAt(now),
-                              missing: group.spotsUntilClose,
-                              started: started,
-                            ),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.secondary,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
                           if (onInvite != null)
                             Align(
                               alignment: Alignment.centerLeft,
@@ -244,7 +240,7 @@ class _StatusPill extends StatelessWidget {
       group.isAlmostFull,
     )) {
       (true, _) => (
-        'Cheio',
+        'Fechado',
         scheme.surfaceContainerHighest,
         scheme.onSurfaceVariant,
         scheme.outline,

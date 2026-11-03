@@ -235,7 +235,32 @@ abstract final class GroupMessages {
   static const reportedSnack =
       'Denúncia registrada neste exemplo. Ninguém é punido de verdade.';
 
+  static String seatCount(int filled, int total) => '$filled/$total';
+
+  static String roomBounds({required int minimum, required int maximum}) {
+    return 'Sala: mín. $minimum · máx. $maximum';
+  }
+
+  static String hostTarget(int target) => 'Host quer $target para fechar';
+
+  static String roomAccepts({
+    required int minimum,
+    required int maximum,
+    required int target,
+  }) {
+    return 'A sala aceita de $minimum a $maximum pessoas. '
+        'O host quer $target; ao chegar em $target, o grupo fecha.';
+  }
+
+  static String allowedTarget({required int minimum, required int maximum}) {
+    return 'A sala aceita de $minimum a $maximum pessoas. '
+        'Escolha quantas fecham o grupo, contando você.';
+  }
+
   static String spotsUntilClose(int missing) {
+    if (missing <= 0) {
+      return 'Grupo fechado';
+    }
     if (missing == 1) {
       return 'Falta 1 para fechar';
     }
@@ -251,8 +276,8 @@ abstract final class GroupMessages {
       return 'Sessão já começou';
     }
     return switch (phase) {
-      GroupPhase.forming => spotsUntilClose(missing),
-      GroupPhase.readyToReserve => readyToReserve,
+      GroupPhase.forming ||
+      GroupPhase.readyToReserve => spotsUntilClose(missing),
       GroupPhase.awaitingHouse => 'Aguardando a casa',
       GroupPhase.confirmed => 'Reserva confirmada',
       GroupPhase.refused => 'A casa recusou',

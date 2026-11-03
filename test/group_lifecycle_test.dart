@@ -44,7 +44,7 @@ void main() {
         closesAt: now.add(const Duration(days: 1)),
       );
       expect(forming.phaseAt(now), GroupPhase.forming);
-      expect(forming.spotsUntilClose, 4);
+      expect(forming.spotsUntilClose, 6);
       expect(
         GroupMessages.phaseLabel(forming.phaseAt(now), missing: 4),
         'Faltam 4 para fechar',
@@ -56,6 +56,47 @@ void main() {
         closesAt: now.add(const Duration(days: 1)),
       );
       expect(ready.phaseAt(now), GroupPhase.readyToReserve);
+
+      final closed = _group(
+        filled: 8,
+        minimum: 4,
+        closesAt: now.add(const Duration(days: 1)),
+      );
+      expect(closed.filledSpots, 8);
+      expect(closed.spotsUntilClose, 0);
+      expect(closed.isFull, isTrue);
+      expect(
+        GroupRules.canJoin(filledSpots: closed.filledSpots, totalSpots: 8),
+        isFalse,
+      );
+      expect(
+        GroupMessages.phaseLabel(closed.phaseAt(now), missing: 0),
+        'Grupo fechado',
+      );
+      expect(
+        GroupRules.validateGroupSize(
+          extraSpots: 1,
+          roomCapacity: 8,
+          minimumPlayers: 4,
+        ),
+        GroupSizeValidation.belowRoomMinimum,
+      );
+      expect(
+        GroupRules.validateGroupSize(
+          extraSpots: 8,
+          roomCapacity: 8,
+          minimumPlayers: 4,
+        ),
+        GroupSizeValidation.exceedsRoomCapacity,
+      );
+      expect(
+        GroupRules.validateGroupSize(
+          extraSpots: 3,
+          roomCapacity: 8,
+          minimumPlayers: 4,
+        ),
+        GroupSizeValidation.valid,
+      );
 
       final waiting = ready.copyWith(phaseOverride: GroupPhase.awaitingHouse);
       expect(waiting.phaseAt(now), GroupPhase.awaitingHouse);

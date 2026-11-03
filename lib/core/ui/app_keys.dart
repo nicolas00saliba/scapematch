@@ -35,6 +35,7 @@ abstract final class AppKeys {
   static const extraSpotsIncrement = Key('extra-spots-increment');
   static const extraSpotsDecrement = Key('extra-spots-decrement');
   static const extraSpotsValue = Key('extra-spots-value');
+  static const targetRange = Key('target-range');
   static const createSubmit = Key('create-submit');
   static const capacityError = Key('capacity-error');
   static const createFailure = Key('create-failure');
