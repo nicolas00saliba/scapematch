@@ -10,6 +10,7 @@ import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/features/map/data/user_location.dart';
 import 'package:scapematch/features/map/presentation/map_tiles.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -39,7 +40,7 @@ void main() {
       ],
     );
     await _resize(tester, size);
-    await _shot(tester, dir, 'home-412.png', size, find.text('ScapeMatch'));
+    await _shot(tester, dir, 'home-412.png', size, find.byType(ScapeLogo));
 
     GoRouter.of(tester.element(find.byType(Scaffold).first))
         .go('/salas/${SampleIds.roomCwbCofre}');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/features/catalog/presentation/rooms_carousel.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
@@ -44,27 +45,34 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Flexible(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
+    final wide = MediaQuery.sizeOf(context).width >= scapeWideLogoWidth;
+    if (wide) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
             alignment: Alignment.centerLeft,
-            child: Text(
-              'ScapeMatch',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.4,
-              ),
-            ),
+            child: ScapeLogo(height: 44),
           ),
-        ),
-        const SizedBox(width: 8),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: CitySelector(compact: true)),
+              SizedBox(width: 8),
+              GameTypeSelector(),
+            ],
+          ),
+        ],
+      );
+    }
+    return const Row(
+      children: [
+        ScapeLogo(variant: ScapeLogoVariant.mark, height: 28),
+        SizedBox(width: 8),
         // A cidade encolhe com reticências. O jogo fica da largura do rótulo.
-        const Expanded(child: CitySelector(compact: true)),
-        const SizedBox(width: 8),
-        const GameTypeSelector(),
+        Expanded(child: CitySelector(compact: true)),
+        SizedBox(width: 8),
+        GameTypeSelector(),
       ],
     );
   }

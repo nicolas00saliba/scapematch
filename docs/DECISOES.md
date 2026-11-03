@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## O logo definitivo tem duas formas
+
+- **Data:** 2026-11-03
+- **Decisão:** o Nícolas aprovou o logo. O pin é verde-petróleo `#0F4C4A`, o círculo é branco, as três pessoas são cobre `#D2642A` e a fechadura é do mesmo petróleo do pin. O letreiro é Poppins 500: “Scape” em petróleo e “Match” em cobre. O logo completo (pin e letreiro) vai onde há espaço: topo do site largo, landing, introdução e o login do Parceiro. O símbolo, sem letreiro, vai nos lugares compactos: ícone do app, favicon, barra do celular, avatar e ícones PWA. No tema escuro, ou sobre foto escura, o pin e a palavra “Scape” ficam claros (`#F4F1EA`); as pessoas e “Match” continuam cobre. Os ícones do app são o símbolo com pin branco e pessoas cobre, centralizado em fundo `#0F4C4A`.
+- **Motivo:** a marca deixou de ser só o texto “ScapeMatch” e passou a ter um desenho único, com regra de onde entra cada versão.
+- **Onde está no código:** `assets/brand/`, `ScapeLogo` e os ícones em `web/`, `android/` e `ios/`. O letreiro é desenhado no widget com Poppins 500, porque o SVG aponta para a fonte e não traz as letras em traço.
+- **Como trocar depois:** outro desenho entra nos arquivos de `assets/brand/` e o widget só troca o arquivo. A landing e o login do Parceiro usam `ScapeLogo` completo. A barra larga do site também.
+
 ## A comissão é uma configuração, com foto na reserva
 
 - **Data:** 2026-11-03
