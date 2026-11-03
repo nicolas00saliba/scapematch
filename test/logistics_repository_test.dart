@@ -38,11 +38,11 @@ void main() {
         final soon = cityGroups.where(
           (group) =>
               group.startsAt.isAfter(sampleNow) &&
-              group.startsAt.difference(sampleNow) < GroupRules.refundDeadline,
+              group.startsAt.difference(sampleNow) <= GroupRules.refundDeadline,
         );
         final later = cityGroups.where(
           (group) =>
-              group.startsAt.difference(sampleNow) >= GroupRules.refundDeadline,
+              group.startsAt.difference(sampleNow) > GroupRules.refundDeadline,
         );
         expect(soon, hasLength(1), reason: cityId);
         expect(soon.single.isAlmostFull, isTrue, reason: cityId);
@@ -66,9 +66,10 @@ void main() {
   test('joining inside the window and then leaving does not refund', () async {
     final before = await groups.getById(SampleIds.groupSpMetroAlmost);
     expect(
-      before!.startsAt.difference(sampleNow) < GroupRules.refundDeadline,
+      before!.startsAt.difference(sampleNow) <= GroupRules.refundDeadline,
       isTrue,
     );
+    clock.instant = before.startsAt.subtract(const Duration(minutes: 90));
 
     final joined = await groups.join(
       SampleIds.groupSpMetroAlmost,

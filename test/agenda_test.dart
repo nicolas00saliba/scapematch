@@ -65,6 +65,54 @@ void main() {
     expect(database.rooms.any((item) => item.name == 'Sala da agenda'), isTrue);
   });
 
+  test('agenda, reservas and salas share the same round session times', () async {
+    final database = loadSampleDatabase();
+    final groups = FakeGroupRepository(
+      database,
+      clock: loadSampleClock(),
+      latency: Duration.zero,
+    );
+    final partner = PartnerRepository(
+      groups: groups,
+      catalog: FakeCatalogRepository(database, latency: Duration.zero),
+      database: database,
+      clock: loadSampleClock(),
+    );
+    final snap = await partner.load(SampleIds.houseCwbRuaXv);
+    expect(snap.groups, isNotEmpty);
+    for (final group in snap.groups) {
+      expect(
+        isHouseHour(group.startsAt),
+        isTrue,
+        reason: '${group.roomName} ${group.startsAt}',
+      );
+      final slots = snap.slotsByRoom[group.roomId] ?? const [];
+      expect(
+        slots.any((slot) => slot.startsAt == group.startsAt),
+        isTrue,
+        reason: group.id,
+      );
+    }
+    final byId = {for (final group in snap.groups) group.id: group.startsAt};
+    expect(byId.length, snap.groups.length);
+    expect(
+      snap.groups.where((group) => !group.isCancelled && group.startsAt.isAfter(sampleNow)).length,
+      greaterThan(2),
+    );
+    expect(
+      snap.groups.where((group) => group.isCancelled && group.cancelReason.isNotEmpty),
+      isNotEmpty,
+    );
+    final missed = snap.groups.firstWhere((group) => group.id == 'grp-cwb-cofre-missed');
+    expect(missed.cancelReason, 'O grupo não fechou a tempo');
+    final clockOf = <String, DateTime>{};
+    for (final group in snap.groups) {
+      final key = '${group.roomId}|${group.startsAt.toIso8601String()}';
+      expect(clockOf.containsKey(key), isFalse, reason: key);
+      clockOf[key] = group.startsAt;
+    }
+  });
+
   testWidgets('the agenda tab shows an open and a closed session', (tester) async {
     await pumpScapeMatch(tester);
     GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/parceiro');

@@ -70,45 +70,58 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
       for (var i = 0; i < widget.snapshot.rooms.length; i++)
         widget.snapshot.rooms[i].id: roomColor(widget.snapshot.rooms[i], i),
     };
-    return Column(
+    final body = _mode == _AgendaMode.list
+        ? _TicketList(
+            snapshot: widget.snapshot,
+            colors: colors,
+            bucket: _bucket,
+            onBucket: (bucket) => setState(() => _bucket = bucket),
+            onOpen: (group) => _showGroup(context, group),
+          )
+        : wide
+        ? _WeekBoard(
+            snapshot: widget.snapshot,
+            colors: colors,
+            weekStart: _weekStart,
+            onPrevious: () => setState(() {
+              _weekStart = _weekStart.subtract(const Duration(days: 7));
+            }),
+            onNext: () => setState(() {
+              _weekStart = _weekStart.add(const Duration(days: 7));
+            }),
+            onOpen: (item) => _openItem(context, item),
+          )
+        : _DayBoard(
+            snapshot: widget.snapshot,
+            colors: colors,
+            weekStart: _weekStart,
+            day: _day,
+            onDay: (day) => setState(() => _day = day),
+            onOpen: (item) => _openItem(context, item),
+          );
+    return Stack(
       children: [
-        _AgendaBar(
-          mode: _mode,
-          onMode: (mode) => setState(() => _mode = mode),
-          onAdd: () => _showAddSession(context),
-          onRooms: () => _showRooms(context),
+        Column(
+          children: [
+            _AgendaBar(
+              mode: _mode,
+              onMode: (mode) => setState(() => _mode = mode),
+              onAdd: () => _showAddSession(context),
+              onRooms: () => _showRooms(context),
+            ),
+            Expanded(child: body),
+          ],
         ),
-        Expanded(
-          child: _mode == _AgendaMode.list
-              ? _TicketList(
-                  snapshot: widget.snapshot,
-                  colors: colors,
-                  bucket: _bucket,
-                  onBucket: (bucket) => setState(() => _bucket = bucket),
-                  onOpen: (group) => _showGroup(context, group),
-                )
-              : wide
-              ? _WeekBoard(
-                  snapshot: widget.snapshot,
-                  colors: colors,
-                  weekStart: _weekStart,
-                  onPrevious: () => setState(() {
-                    _weekStart = _weekStart.subtract(const Duration(days: 7));
-                  }),
-                  onNext: () => setState(() {
-                    _weekStart = _weekStart.add(const Duration(days: 7));
-                  }),
-                  onOpen: (item) => _openItem(context, item),
-                )
-              : _DayBoard(
-                  snapshot: widget.snapshot,
-                  colors: colors,
-                  weekStart: _weekStart,
-                  day: _day,
-                  onDay: (day) => setState(() => _day = day),
-                  onOpen: (item) => _openItem(context, item),
-                ),
-        ),
+        if (!wide)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              key: AppKeys.agendaAdd,
+              onPressed: () => _showAddSession(context),
+              child: const Icon(Icons.add),
+            ),
+          ),
       ],
     );
   }
@@ -181,12 +194,10 @@ class _AgendaBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wide = isScapeDesktop(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Row(
         children: [
           SegmentedButton<_AgendaMode>(
             style: const ButtonStyle(
@@ -208,20 +219,34 @@ class _AgendaBar extends StatelessWidget {
               ),
             ],
           ),
-          FilledButton.tonalIcon(
-            key: AppKeys.agendaAdd,
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-            label: const Text(PartnerMessages.addSession),
-          ),
-          OutlinedButton.icon(
-            key: AppKeys.agendaRooms,
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: onRooms,
-            icon: const Icon(Icons.meeting_room_outlined),
-            label: const Text(PartnerMessages.manageRooms),
-          ),
+          const Spacer(),
+          if (wide) ...[
+            FilledButton.tonalIcon(
+              key: AppKeys.agendaAdd,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+              label: const Text(PartnerMessages.addSession),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              key: AppKeys.agendaRooms,
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
+              onPressed: onRooms,
+              icon: const Icon(Icons.meeting_room_outlined),
+              label: const Text(PartnerMessages.manageRooms),
+            ),
+          ] else
+            PopupMenuButton<String>(
+              key: AppKeys.agendaRooms,
+              onSelected: (_) => onRooms(),
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'rooms',
+                  child: Text(PartnerMessages.manageRooms),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -251,6 +276,15 @@ class _WeekBoard extends StatelessWidget {
     final end = days.last;
     final title =
         '${DateFormat('d MMM', 'pt_BR').format(weekStart)} – ${DateFormat('d MMM', 'pt_BR').format(end)}';
+    final rooms = [
+      for (final room in snapshot.rooms)
+        if (days.any(
+          (day) => _itemsOn(snapshot, colors, day).any(
+            (item) => item.room.id == room.id && item.group != null,
+          ),
+        ))
+          room,
+    ];
     return ListView(
       key: AppKeys.agendaCalendar,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
@@ -273,51 +307,64 @@ class _WeekBoard extends StatelessWidget {
             IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
           ],
         ),
-        const SizedBox(height: 8),
-        _Legend(snapshot: snapshot, colors: colors),
         const SizedBox(height: 12),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const SizedBox(width: 52),
+            const SizedBox(width: 132),
             for (final day in days)
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Center(
                   child: Text(
                     _dayHeading(day),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
                   ),
                 ),
               ),
           ],
         ),
         const SizedBox(height: 8),
-        for (final hour in agendaHours) ...[
+        for (final room in rooms) ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 52,
-                child: Text(
-                  _hm(hour.$1, hour.$2),
-                  style: Theme.of(context).textTheme.labelLarge,
+                width: 132,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, right: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: colors[room.id],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          room.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               for (final day in days)
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
-                    child: _SlotStack(
-                      items: _itemsAt(
-                        snapshot,
-                        colors,
-                        day,
-                        hour.$1,
-                        hour.$2,
-                      ),
+                    padding: const EdgeInsets.all(3),
+                    child: _DayCell(
+                      items: _itemsOn(snapshot, colors, day)
+                          .where((item) => item.room.id == room.id)
+                          .toList(),
                       onOpen: onOpen,
+                      showRoom: false,
                     ),
                   ),
                 ),
@@ -325,6 +372,71 @@ class _WeekBoard extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.items,
+    required this.onOpen,
+    this.showRoom = true,
+  });
+
+  final List<_AgendaItem> items;
+  final ValueChanged<_AgendaItem> onOpen;
+  final bool showRoom;
+
+  @override
+  Widget build(BuildContext context) {
+    final booked = [for (final item in items) if (item.group != null) item];
+    final free = items.length - booked.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in booked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: _BlockTile(
+              item: item,
+              showRoom: showRoom,
+              onTap: () => onOpen(item),
+            ),
+          ),
+        if (free > 0)
+          _FreeChip(
+            count: free,
+            onTap: () => onOpen(items.firstWhere((item) => item.group == null)),
+          ),
+      ],
+    );
+  }
+}
+
+class _FreeChip extends StatelessWidget {
+  const _FreeChip({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final label = count == 1 ? '+ livre' : '$count livres';
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: CustomPaint(
+        painter: _DashedRRectPainter(scheme.outlineVariant),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -356,7 +468,7 @@ class _DayBoard extends StatelessWidget {
     }
     return ListView(
       key: AppKeys.agendaCalendar,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
       children: [
         SizedBox(
           height: 64,
@@ -376,7 +488,14 @@ class _DayBoard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        _Legend(snapshot: snapshot, colors: colors),
+        _Legend(
+          snapshot: snapshot,
+          colors: colors,
+          onlyRoomIds: {
+            for (final item in items)
+              if (item.group != null) item.room.id,
+          },
+        ),
         const SizedBox(height: 12),
         if (byRoom.isEmpty)
           const Text(PartnerMessages.noSessions)
@@ -390,7 +509,7 @@ class _DayBoard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              _SlotStack(items: byRoom[room.id]!, onOpen: onOpen),
+              _DayCell(items: byRoom[room.id]!, onOpen: onOpen, showRoom: false),
               const SizedBox(height: 16),
             ],
       ],
@@ -398,72 +517,51 @@ class _DayBoard extends StatelessWidget {
   }
 }
 
-class _SlotStack extends StatelessWidget {
-  const _SlotStack({required this.items, required this.onOpen});
-
-  final List<_AgendaItem> items;
-  final ValueChanged<_AgendaItem> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const SizedBox(height: 28);
-    }
-    return Column(
-      children: [
-        for (final item in items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: _BlockTile(item: item, onTap: () => onOpen(item)),
-          ),
-      ],
-    );
-  }
-}
-
 class _BlockTile extends StatelessWidget {
-  const _BlockTile({required this.item, required this.onTap});
+  const _BlockTile({
+    required this.item,
+    required this.onTap,
+    this.showRoom = true,
+  });
 
   final _AgendaItem item;
   final VoidCallback onTap;
+  final bool showRoom;
 
   @override
   Widget build(BuildContext context) {
-    final free = item.group == null;
+    final tone = Colors.white;
     return Material(
       key: AppKeys.agendaBlock(item.id),
-      color: item.color.withValues(alpha: free ? 0.08 : 0.2),
+      color: item.color,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border(left: BorderSide(color: item.color, width: 4)),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                item.room.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
+              if (showRoom)
+                Text(
+                  item.room.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: tone,
+                  ),
                 ),
-              ),
               Text(
-                free
-                    ? '${_hm(item.startsAt.hour, item.startsAt.minute)} · ${PartnerMessages.free}'
-                    : '${_hm(item.startsAt.hour, item.startsAt.minute)} · ${item.group!.filledSpots}/${item.group!.totalSpots}',
-                style: const TextStyle(fontSize: 11),
+                '${_hm(item.startsAt.hour, item.startsAt.minute)} · ${item.group!.filledSpots}/${item.group!.totalSpots}',
+                style: TextStyle(fontSize: 11, color: tone, fontWeight: FontWeight.w700),
               ),
               Text(
                 item.status,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: tone),
               ),
             ],
           ),
@@ -474,18 +572,26 @@ class _BlockTile extends StatelessWidget {
 }
 
 class _Legend extends StatelessWidget {
-  const _Legend({required this.snapshot, required this.colors});
+  const _Legend({required this.snapshot, required this.colors, this.onlyRoomIds});
 
   final PartnerSnapshot snapshot;
   final Map<String, Color> colors;
+  final Set<String>? onlyRoomIds;
 
   @override
   Widget build(BuildContext context) {
+    final rooms = [
+      for (final room in snapshot.rooms)
+        if (onlyRoomIds == null || onlyRoomIds!.contains(room.id)) room,
+    ];
+    if (rooms.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Wrap(
       spacing: 10,
       runSpacing: 6,
       children: [
-        for (final room in snapshot.rooms)
+        for (final room in rooms)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -533,7 +639,7 @@ class _TicketList extends StatelessWidget {
     }).toList()..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     return ListView(
       key: AppKeys.agendaList,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
       children: [
         Wrap(
           spacing: 8,
@@ -589,20 +695,22 @@ class _Ticket extends StatelessWidget {
           person.displayName,
     ];
     return Material(
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: color, width: 6)),
-          ),
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
+        child: ClipPath(
+          clipper: const _TicketClipper(),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: color, width: 6)),
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -612,7 +720,7 @@ class _Ticket extends StatelessWidget {
                 ),
               ),
               Text(
-                formatSession(group.startsAt),
+                _dateLine(group.startsAt),
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 6),
@@ -634,7 +742,7 @@ class _Ticket extends StatelessWidget {
               Text(
                 '${group.filledSpots}/${group.totalSpots} · ${PartnerMessages.netLabel} ${formatPrice(money.netCents)}',
               ),
-              if (status == PartnerMessages.closedGroup && absences.isNotEmpty)
+              if (absences.isNotEmpty)
                 Text('${PartnerMessages.noShows}: ${absences.join(', ')}'),
               if (group.isCancelled)
                 Text(
@@ -643,6 +751,8 @@ class _Ticket extends StatelessWidget {
                       : group.cancelReason,
                 ),
             ],
+              ),
+            ),
           ),
         ),
       ),
@@ -1236,19 +1346,6 @@ class _AgendaItem {
   final Group? group;
 }
 
-List<_AgendaItem> _itemsAt(
-  PartnerSnapshot snapshot,
-  Map<String, Color> colors,
-  DateTime day,
-  int hour,
-  int minute,
-) {
-  return [
-    for (final item in _itemsOn(snapshot, colors, day))
-      if (_bucket(item.startsAt) == (hour, minute)) item,
-  ];
-}
-
 List<_AgendaItem> _itemsOn(
   PartnerSnapshot snapshot,
   Map<String, Color> colors,
@@ -1283,6 +1380,9 @@ List<_AgendaItem> _itemsOn(
       }
       final key = '${room.id}|${slot.startsAt.toIso8601String()}';
       if (taken.contains(key) || !slot.startsAt.isAfter(snapshot.now)) {
+        continue;
+      }
+      if (!_houseHour(slot.startsAt)) {
         continue;
       }
       items.add(
@@ -1327,20 +1427,6 @@ String _statusOf(Group group) {
   return PartnerMessages.openGroup;
 }
 
-(int, int) _bucket(DateTime time) {
-  final minutes = time.hour * 60 + time.minute;
-  var best = agendaHours.first;
-  var bestDelta = 1 << 30;
-  for (final hour in agendaHours) {
-    final delta = (hour.$1 * 60 + hour.$2 - minutes).abs();
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      best = hour;
-    }
-  }
-  return best;
-}
-
 DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
 
 DateTime _monday(DateTime day) {
@@ -1349,6 +1435,84 @@ DateTime _monday(DateTime day) {
 
 bool _sameDay(DateTime a, DateTime b) {
   return a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+String _dateLine(DateTime day) {
+  final raw = DateFormat("EEE, d 'de' MMM", 'pt_BR').format(day);
+  if (raw.isEmpty) {
+    return raw;
+  }
+  return raw[0].toUpperCase() + raw.substring(1);
+}
+
+bool _houseHour(DateTime time) {
+  for (final hour in agendaHours) {
+    if (time.hour == hour.$1 && time.minute == hour.$2) {
+      return true;
+    }
+  }
+  return false;
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  const _DashedRRectPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(8)),
+      );
+    final dashed = Path();
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + 4;
+        dashed.addPath(
+          metric.extractPath(distance, next.clamp(0, metric.length)),
+          Offset.zero,
+        );
+        distance = next + 3;
+      }
+    }
+    canvas.drawPath(dashed, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
+class _TicketClipper extends CustomClipper<Path> {
+  const _TicketClipper();
+
+  @override
+  Path getClip(Size size) {
+    const notch = 8.0;
+    const radius = 14.0;
+    final mid = size.height / 2;
+    final card = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          const Radius.circular(radius),
+        ),
+      );
+    final bites = Path()
+      ..addOval(Rect.fromCircle(center: Offset(0, mid), radius: notch))
+      ..addOval(Rect.fromCircle(center: Offset(size.width, mid), radius: notch));
+    return Path.combine(PathOperation.difference, card, bites);
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 String _hm(int hour, int minute) {

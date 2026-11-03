@@ -484,6 +484,11 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     caldeira.id,
     schedule.yesterdayEvening,
   );
+  final slotCofreMissed = schedule.at(
+    'slot-cwb-cofre-missed',
+    cofre.id,
+    schedule.opening(12),
+  );
   final slotSarcofago = schedule.free(
     'slot-cwb-sarcofago-free',
     sarcofago.id,
@@ -513,21 +518,22 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   final slotArena = schedule.free('slot-cwb-arena-free', arenaLaser.id, 4);
   final slotCamara = schedule.free('slot-cwb-camara-free', camara.id, 4);
   // Grupos extras de Curitiba, em horários redondos da casa.
-  final slotLabQuase = schedule.openingSlot('slot-cwb-lab-quase', laboratorio.id, 0);
-  final slotSotaoQuase = schedule.openingSlot('slot-cwb-sotao-quase', sotao.id, 1);
-  final slotNaveQuase = schedule.openingSlot('slot-cwb-nave-quase', nave.id, 2);
-  final slotEngrenagemQuase = schedule.openingSlot(
+  // Rua XV fica com sexta e sábado mais cheios; o Batel ocupa o meio da semana.
+  final slotLabQuase = schedule.spreadSlot('slot-cwb-lab-quase', laboratorio.id, 2);
+  final slotSotaoQuase = schedule.spreadSlot('slot-cwb-sotao-quase', sotao.id, 3);
+  final slotNaveQuase = schedule.spreadSlot('slot-cwb-nave-quase', nave.id, 4);
+  final slotEngrenagemQuase = schedule.spreadSlot(
     'slot-cwb-engrenagem-quase',
     engrenagem.id,
-    3,
+    1,
   );
-  final slotTumbaQuase = schedule.openingSlot('slot-cwb-tumba-quase', tumba.id, 4);
-  final slotTrilhaQuase = schedule.openingSlot('slot-cwb-trilha-quase', trilha.id, 5);
-  final slotPoraoQuase = schedule.openingSlot('slot-cwb-porao-quase', poraoXv.id, 6);
-  final slotSateliteQuase = schedule.openingSlot(
+  final slotTumbaQuase = schedule.spreadSlot('slot-cwb-tumba-quase', tumba.id, 0);
+  final slotTrilhaQuase = schedule.spreadSlot('slot-cwb-trilha-quase', trilha.id, 5);
+  final slotPoraoQuase = schedule.spreadSlot('slot-cwb-porao-quase', poraoXv.id, 7);
+  final slotSateliteQuase = schedule.spreadSlot(
     'slot-cwb-satelite-quase',
     satelite.id,
-    7,
+    6,
   );
 
   // Two groups per city. One is almost full (1 or 2 open seats). The other
@@ -730,15 +736,12 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       city: curitiba,
       house: ruaXv,
       room: cofre,
-      slot: schedule.at(
-        'slot-cwb-cofre-missed',
-        cofre.id,
-        schedule.opening(12),
-      ),
+      slot: slotCofreMissed,
       totalSpots: 6,
       names: ['Paula', 'Rui'],
       minimumSpots: 6,
       closesAt: now.subtract(const Duration(hours: 2)),
+      cancelReason: 'O grupo não fechou a tempo',
     ),
     // Sessão que já aconteceu e fechou. O extrato da casa nasce daqui.
     // Não entra na Home: a sessão já terminou.
@@ -845,6 +848,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotSatelite,
       slotCaldeira,
       slotCaldeiraFechado,
+      slotCofreMissed,
       slotSarcofago,
       slotAntena,
       slotEspelho,
@@ -1080,28 +1084,13 @@ class _SampleSchedule {
   /// 1 h 30 min à frente, no :00 ou :30, para o teste da janela continuar
   /// com uma única sessão por cidade.
   DateTime get soonAt {
-    // Mais de 1 h à frente, senão o prazo de fechar já passou e o grupo
-    // some da lista. Menos de 2 h, para continuar dentro da janela.
+    // Sempre 14:00, 16:30, 19:00 ou 21:00, e mais de 1 h à frente
+    // para o prazo de fechar ainda não ter passado.
     final earliest = now.add(const Duration(hours: 1));
-    final limit = now.add(const Duration(hours: 2));
-    for (final candidate in _walk(after: now)) {
-      if (!candidate.isBefore(limit)) {
-        break;
-      }
-      if (candidate.isAfter(earliest)) {
-        return candidate;
-      }
+    for (final candidate in _walk(after: earliest.subtract(const Duration(minutes: 1)))) {
+      return candidate;
     }
-    final raw = now.add(const Duration(minutes: 90));
-    final rounded = _halfHour(raw);
-    if (rounded.isAfter(now) && rounded.isBefore(limit)) {
-      return rounded;
-    }
-    final minute = _minute(raw);
-    if (minute.isAfter(now)) {
-      return minute;
-    }
-    return now.add(const Duration(minutes: 30));
+    return earliest;
   }
 
   /// Alguns dias à frente, de noite, fora da janela de 2 h.
@@ -1152,8 +1141,37 @@ class _SampleSchedule {
 
   TimeSlot laterSlot(String id, String roomId) => _take(id, roomId, laterAt);
 
-  TimeSlot openingSlot(String id, String roomId, int index) {
-    return _take(id, roomId, opening(index));
+  /// Espalha os grupos extras na semana, com mais movimento na sexta e no sábado.
+  DateTime spread(int index) {
+    const plan = <(int, int, int)>[
+      (DateTime.wednesday, 16, 30),
+      (DateTime.thursday, 14, 0),
+      (DateTime.friday, 16, 30),
+      (DateTime.friday, 19, 0),
+      (DateTime.friday, 21, 0),
+      (DateTime.saturday, 14, 0),
+      (DateTime.saturday, 16, 30),
+      (DateTime.saturday, 19, 0),
+      (DateTime.saturday, 21, 0),
+      (DateTime.sunday, 16, 30),
+    ];
+    final spec = plan[index % plan.length];
+    var day = DateTime(now.year, now.month, now.day);
+    while (day.weekday != spec.$1) {
+      day = day.add(const Duration(days: 1));
+    }
+    var candidate = DateTime(day.year, day.month, day.day, spec.$2, spec.$3);
+    final soonEnd = soonAt.add(const Duration(minutes: 100));
+    while (!candidate.isAfter(now.add(const Duration(hours: 1))) ||
+        (candidate.isBefore(soonEnd) &&
+            soonAt.isBefore(candidate.add(const Duration(minutes: 100))))) {
+      candidate = candidate.add(const Duration(days: 7));
+    }
+    return candidate;
+  }
+
+  TimeSlot spreadSlot(String id, String roomId, int index) {
+    return _take(id, roomId, spread(index));
   }
 
   TimeSlot free(String id, String roomId, int index) {
@@ -1180,18 +1198,6 @@ class _SampleSchedule {
   TimeSlot _take(String id, String roomId, DateTime startsAt) {
     return TimeSlot(id: id, roomId: roomId, startsAt: startsAt);
   }
-}
-
-DateTime _halfHour(DateTime value) {
-  if (value.minute >= 45) {
-    return DateTime(value.year, value.month, value.day, value.hour).add(
-      const Duration(hours: 1),
-    );
-  }
-  if (value.minute >= 15) {
-    return DateTime(value.year, value.month, value.day, value.hour, 30);
-  }
-  return DateTime(value.year, value.month, value.day, value.hour);
 }
 
 DateTime _minute(DateTime value) {
@@ -1250,6 +1256,7 @@ Group _group({
   String? roomName,
   int? minimumSpots,
   DateTime? closesAt,
+  String cancelReason = '',
   required DateTime now,
 }) {
   assert(house.cityId == city.id, id);
@@ -1285,6 +1292,7 @@ Group _group({
     minimumSpots: minimum,
     closesAt:
         closesAt ?? GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
+    cancelReason: cancelReason,
     cancelWindow: room.cancelWindow,
     streetAddress: house.streetAddress,
     coverAsset: roomCategoryImage(room.category),

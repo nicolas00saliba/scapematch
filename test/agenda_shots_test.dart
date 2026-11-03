@@ -96,6 +96,10 @@ Future<void> _forms(
 
   await tester.tap(find.byKey(AppKeys.agendaRooms));
   await tester.pumpAndSettle();
+  if (find.byKey(AppKeys.agendaAddRoom).evaluate().isEmpty) {
+    await tester.tap(find.text(PartnerMessages.manageRooms).last);
+    await tester.pumpAndSettle();
+  }
   await tester.tap(find.byKey(AppKeys.agendaAddRoom));
   await tester.pumpAndSettle();
   await _shot(tester, dir, 'nova-sala-$suffix.png', size, find.byKey(AppKeys.agendaRoomName));
@@ -110,6 +114,8 @@ Future<void> _lists(
   Size size,
 ) async {
   await tester.tap(find.text(PartnerMessages.agendaList));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(PartnerMessages.upcoming));
   await tester.pumpAndSettle();
   await _shot(tester, dir, 'lista-proximas-$suffix.png', size, find.text(PartnerMessages.upcoming));
   await tester.tap(find.text(PartnerMessages.done));

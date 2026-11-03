@@ -160,7 +160,7 @@ class PartnerRepository {
     if (priceCents < 100 || priceCents > 500000) {
       return 'Informe um preço entre R\$ 1,00 e R\$ 5.000,00.';
     }
-    if (!_isOpeningHour(startsAt)) {
+    if (!isHouseHour(startsAt)) {
       return 'Escolha 14:00, 16:30, 19:00 ou 21:00.';
     }
     final now = clock.now();
@@ -328,7 +328,7 @@ GroupMoney _moneyFor(String groupId, List<Reservation> reservations) {
   );
 }
 
-bool _isOpeningHour(DateTime startsAt) {
+bool isHouseHour(DateTime startsAt) {
   const hours = <(int, int)>[(14, 0), (16, 30), (19, 0), (21, 0)];
   for (final (hour, minute) in hours) {
     if (startsAt.hour == hour && startsAt.minute == minute) {
