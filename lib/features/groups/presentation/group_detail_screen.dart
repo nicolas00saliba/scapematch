@@ -426,7 +426,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       },
     );
     if (paid && mounted) {
-      _snack('Sua parte está paga.');
+      _snack(GroupMessages.yourShareReserved);
     }
   }
 
@@ -555,6 +555,25 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         );
       }
       if (me.isCreator) {
+        final seated = group.occupiedSpots;
+        if (!group.isFull && !started) {
+          final allowed = GroupRules.canCloseWithFewer(
+            seated: seated,
+            roomMinimum: group.minimumSpots,
+            planned: group.totalSpots,
+          );
+          buttons.add(
+            FilledButton(
+              key: AppKeys.closeWithFewer,
+              onPressed: !allowed || _busy ? null : () => _closeEarly(group),
+              child: Text(
+                allowed
+                    ? GroupMessages.closeWith(seated)
+                    : GroupMessages.roomMinimum(group.minimumSpots),
+              ),
+            ),
+          );
+        }
         if (started) {
           buttons.add(
             Text(
@@ -566,6 +585,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             ),
           );
         } else {
+          final canDelete = GroupRules.canDeleteGroup(
+            startsAt: group.startsAt,
+            now: now,
+          );
           buttons.add(
             FilledButton(
               key: AppKeys.deleteGroup,
@@ -573,8 +596,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 backgroundColor: Theme.of(context).colorScheme.error,
                 foregroundColor: Theme.of(context).colorScheme.onError,
               ),
-              onPressed: _busy ? null : _delete,
-              child: const Text('Excluir grupo'),
+              onPressed: _busy || !canDelete ? null : _delete,
+              child: Text(
+                canDelete ? 'Excluir grupo' : GroupMessages.cannotDeleteYet,
+              ),
             ),
           );
         }
@@ -806,11 +831,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     );
     final me = _local(group);
     final paid = me != null && me.payment == PaymentStatus.paid;
+    final reserved = me != null && me.payment == PaymentStatus.reserved;
     final expectsRefund = paid && previewRefunds;
     final accepted = await showLeaveDialog(
       context,
       refunds: expectsRefund,
       paid: paid,
+      reserved: reserved,
     );
     if (!accepted || !mounted) {
       return;
@@ -861,6 +888,29 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       return GroupMessages.leavePreviewChanged(refunded: refunded);
     }
     return refunded ? GroupMessages.leaveRefunded : GroupMessages.leaveDenied;
+  }
+
+  Future<void> _closeEarly(Group group) async {
+    final accepted = await showCloseDialog(
+      context,
+      seated: group.occupiedSpots,
+    );
+    if (!accepted || !mounted) {
+      return;
+    }
+    await _run(() async {
+      final reason = await ref
+          .read(groupDetailViewModelProvider(widget.groupId).notifier)
+          .closeWithFewer();
+      if (!mounted) {
+        return;
+      }
+      _snack(
+        reason == null
+            ? 'Grupo fechado. A reserva virou cobrança.'
+            : 'Não foi possível fechar o grupo.',
+      );
+    });
   }
 
   Future<void> _delete() async {
@@ -1347,7 +1397,7 @@ class _PaymentCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Por pessoa · ${GroupMessages.simulatedNotice}',
+          'Por pessoa · ${GroupMessages.chargeOnlyIfCloses}',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: scheme.onSurfaceVariant,
             height: 1.35,
@@ -1365,9 +1415,7 @@ class _PaymentCard extends StatelessWidget {
         if (mine != null && mine.occupiesSeat) ...[
           const SizedBox(height: 4),
           Text(
-            mine.payment == PaymentStatus.pending
-                ? GroupMessages.yourSharePending
-                : GroupMessages.yourSharePaid,
+            GroupMessages.yourShare(mine.payment),
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),

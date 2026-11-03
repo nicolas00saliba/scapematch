@@ -5,8 +5,9 @@
 /// organizer cancelled the group. A cancelled seat does not fill a spot.
 enum AttendanceStatus { joined, confirmed, cancelled }
 
-/// Pagamento simulado. Entrar deixa a parte pendente até a pessoa pagar.
-enum PaymentStatus { pending, paid }
+/// Pagamento simulado. Entrar deixa a parte pendente. Pagar reserva o valor.
+/// [paid] é a captura, só quando o grupo fecha. [released] não cobrou nada.
+enum PaymentStatus { pending, reserved, paid, released }
 
 /// What happened to the simulated payment after the person left the seat.
 enum RefundStatus { none, refunded, denied }
@@ -19,6 +20,7 @@ enum RefundReason {
   organizerCancelledEvent,
   organizerRemovedMember,
   groupDidNotClose,
+  holdReleased,
 }
 
 /// The refund a rule function returns. Screens translate it to Portuguese.

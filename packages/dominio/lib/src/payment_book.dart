@@ -1,3 +1,4 @@
+import 'package:dominio/src/closing.dart';
 import 'package:dominio/src/commission.dart';
 import 'package:dominio/src/ledger.dart';
 import 'package:dominio/src/payment_exception.dart';
@@ -24,7 +25,8 @@ class StoredCharge {
   final ChargeResult result;
 }
 
-/// Livro em memória: abre a reserva, cobra a parte e estorna com linhas novas.
+/// Livro em memória: reserva a parte, captura quando o grupo fecha e estorna
+/// com linhas novas só o que já foi capturado.
 ///
 /// A tela da fase 3 chama estes métodos. O banco, na fase 4, troca o miolo
 /// por funções com RLS sem mudar a conta.
@@ -73,7 +75,9 @@ class PaymentBook {
     }
     final open = current.shares.any(
       (share) =>
-          share.playerId == playerId && share.status != ShareStatus.refunded,
+          share.playerId == playerId &&
+          share.status != ShareStatus.refunded &&
+          share.status != ShareStatus.released,
     );
     if (open) {
       return current;
@@ -84,6 +88,8 @@ class PaymentBook {
       groupId: current.groupId,
       houseId: current.houseId,
       commissionBps: current.commissionBps,
+      totalCents: current.totalCents,
+      priceMode: current.priceMode,
       shares: [
         ...current.shares,
         ReservationShare(
@@ -119,6 +125,7 @@ class PaymentBook {
     required String houseId,
     required int totalCents,
     required List<String> playerIds,
+    PriceMode priceMode = PriceMode.perPerson,
   }) {
     if (_reservations.containsKey(id)) {
       throw PaymentException('Já existe uma reserva com esse id.');
@@ -146,6 +153,8 @@ class PaymentBook {
       groupId: groupId,
       houseId: houseId,
       commissionBps: bps,
+      totalCents: totalCents,
+      priceMode: priceMode,
       shares: [
         for (var i = 0; i < playerIds.length; i++)
           ReservationShare(
@@ -162,8 +171,7 @@ class PaymentBook {
     return reservation;
   }
 
-  /// O jogador paga a parte inteira. A casa recebe o líquido e a plataforma
-  /// a comissão, em duas linhas.
+  /// Separa o valor (pré-autorização). O extrato da casa só muda na captura.
   Future<Reservation> payShare({
     required String reservationId,
     required String shareId,
@@ -180,8 +188,9 @@ class PaymentBook {
     }
     final current = reservation(reservationId);
     final share = _share(current, shareId);
-    if (share.status == ShareStatus.paid) {
-      throw PaymentException('Essa parte já foi paga.');
+    if (share.status == ShareStatus.paid ||
+        share.status == ShareStatus.reserved) {
+      throw PaymentException('Essa parte já foi reservada.');
     }
     if (share.status != ShareStatus.pending &&
         share.status != ShareStatus.failed) {
@@ -207,9 +216,173 @@ class PaymentBook {
       return reservation(reservationId);
     }
     _paymentByShare[share.id] = charge;
-    _credit(current, share, charge.id);
-    _put(current.copyWithShare(share.copyWith(status: ShareStatus.paid)));
+    _put(current.copyWithShare(share.copyWith(status: ShareStatus.reserved)));
     return reservation(reservationId);
+  }
+
+  /// O grupo fechou. Cada parte reservada entra no extrato, com a comissão.
+  Future<Reservation> captureReservation({
+    required String reservationId,
+    required String idempotencyKey,
+    List<String>? onlyPlayerIds,
+  }) async {
+    _requireKey(idempotencyKey);
+    final current = reservation(reservationId);
+    final wanted = onlyPlayerIds?.toSet();
+    final pending = current.shares.any(
+      (share) =>
+          share.status == ShareStatus.awaitingConfirmation &&
+          (wanted == null || wanted.contains(share.playerId)),
+    );
+    if (pending) {
+      throw PaymentException(
+        'Quem já reservou precisa confirmar o novo valor.',
+      );
+    }
+    var updated = current;
+    for (final share in current.shares) {
+      if (share.status != ShareStatus.reserved) {
+        continue;
+      }
+      if (wanted != null && !wanted.contains(share.playerId)) {
+        continue;
+      }
+      final key = '$idempotencyKey-${share.id}';
+      if (_paymentsByKey.containsKey('capture-$key')) {
+        continue;
+      }
+      final charge = _paymentByShare[share.id];
+      if (charge == null) {
+        throw PaymentException('A reserva dessa parte não está no livro.');
+      }
+      _paymentsByKey['capture-$key'] = charge;
+      _credit(updated, share, charge.id);
+      updated = updated.copyWithShare(share.copyWith(status: ShareStatus.paid));
+      _put(updated);
+    }
+    return reservation(reservationId);
+  }
+
+  /// Solta as reservas ainda abertas. Não escreve extrato: nada foi capturado.
+  Future<Reservation> releaseReservation({
+    required String reservationId,
+    required String idempotencyKey,
+  }) async {
+    _requireKey(idempotencyKey);
+    final current = reservation(reservationId);
+    var updated = current;
+    for (final share in current.shares) {
+      if (share.status != ShareStatus.reserved &&
+          share.status != ShareStatus.awaitingConfirmation) {
+        continue;
+      }
+      updated = await _releaseOne(updated, share, '$idempotencyKey-${share.id}');
+    }
+    return updated;
+  }
+
+  Future<Reservation> releaseShare({
+    required String reservationId,
+    required String shareId,
+    required String idempotencyKey,
+  }) async {
+    _requireKey(idempotencyKey);
+    final current = reservation(reservationId);
+    final share = _share(current, shareId);
+    if (share.status == ShareStatus.released) {
+      return current;
+    }
+    if (share.status != ShareStatus.reserved &&
+        share.status != ShareStatus.awaitingConfirmation) {
+      throw PaymentException('Só uma reserva em aberto pode ser liberada.');
+    }
+    return _releaseOne(current, share, idempotencyKey);
+  }
+
+  /// Preço fixo do grupo: divide o total original entre quem ficou.
+  ///
+  /// Quem já reservou outro valor fica aguardando confirmação. Preço por
+  /// pessoa não muda as partes.
+  Reservation repriceFixedClose({
+    required String reservationId,
+    required List<String> playerIds,
+    required int roomMinimum,
+    required int planned,
+  }) {
+    requireCloseWithFewer(
+      seated: playerIds.length,
+      roomMinimum: roomMinimum,
+      planned: planned,
+    );
+    final current = reservation(reservationId);
+    if (current.priceMode != PriceMode.fixedGroup) {
+      return current;
+    }
+    if (playerIds.toSet().length != playerIds.length) {
+      throw PaymentException('Cada jogador entra uma vez na reserva.');
+    }
+    final quotes = quoteShares(
+      totalCents: current.totalCents,
+      playerCount: playerIds.length,
+      commissionBps: current.commissionBps,
+    );
+    final byPlayer = {
+      for (var i = 0; i < playerIds.length; i++) playerIds[i]: quotes[i],
+    };
+    final next = <ReservationShare>[];
+    for (final share in current.shares) {
+      final quote = byPlayer[share.playerId];
+      if (quote == null ||
+          share.status == ShareStatus.paid ||
+          share.status == ShareStatus.refunded ||
+          share.status == ShareStatus.released) {
+        next.add(share);
+        continue;
+      }
+      if (quote.amountCents == share.amountCents) {
+        next.add(share);
+        continue;
+      }
+      next.add(
+        share.copyWith(
+          status: ShareStatus.awaitingConfirmation,
+          proposedAmountCents: quote.amountCents,
+          proposedCommissionCents: quote.commissionCents,
+          proposedNetCents: quote.netCents,
+        ),
+      );
+    }
+    final updated = current.copyWithShares(next);
+    _put(updated);
+    return updated;
+  }
+
+  Reservation confirmAdjustedShare({
+    required String reservationId,
+    required String shareId,
+  }) {
+    final current = reservation(reservationId);
+    final share = _share(current, shareId);
+    if (share.status != ShareStatus.awaitingConfirmation) {
+      throw PaymentException('Essa parte não está aguardando confirmação.');
+    }
+    final amount = share.proposedAmountCents;
+    final commission = share.proposedCommissionCents;
+    final net = share.proposedNetCents;
+    if (amount == null || commission == null || net == null) {
+      throw PaymentException('O novo valor dessa parte não foi calculado.');
+    }
+    final updated = current.copyWithShare(
+      share.copyWith(
+        status: ShareStatus.reserved,
+        amountCents: amount,
+        commissionCents: commission,
+        netCents: net,
+        clearProposal: true,
+      ),
+    );
+    _put(updated);
+    return updated;
   }
 
   /// Devolve a parte. As linhas do pagamento ficam. O estorno entra por cima.
@@ -255,6 +428,41 @@ class PaymentBook {
     _debit(current, share, refund.id);
     _put(current.copyWithShare(share.copyWith(status: ShareStatus.refunded)));
     return reservation(reservationId);
+  }
+
+  Future<Reservation> _releaseOne(
+    Reservation current,
+    ReservationShare share,
+    String idempotencyKey,
+  ) async {
+    final prior = _refundsByKey[idempotencyKey];
+    if (prior != null) {
+      return reservation(current.id);
+    }
+    final payment = _paymentByShare[share.id];
+    if (payment != null) {
+      final result = await provider.refund(
+        chargeId: payment.id,
+        amountCents: share.amountCents,
+        idempotencyKey: idempotencyKey,
+      );
+      _refundsByKey[idempotencyKey] = StoredCharge(
+        id: _nextId('release'),
+        shareId: share.id,
+        idempotencyKey: idempotencyKey,
+        amountCents: share.amountCents,
+        kind: payment.kind,
+        result: result,
+      );
+      if (!result.succeeded) {
+        return current;
+      }
+    }
+    final updated = current.copyWithShare(
+      share.copyWith(status: ShareStatus.released, clearProposal: true),
+    );
+    _put(updated);
+    return updated;
   }
 
   void _credit(

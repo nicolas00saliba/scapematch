@@ -99,6 +99,23 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
     }
   }
 
+  Future<CloseGroupFailureReason?> closeWithFewer() async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .closeWithFewer(groupId, userId: user.id);
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case CloseGroupSuccess(:final group):
+        _publish(group);
+        return null;
+      case CloseGroupFailure(:final reason):
+        return reason;
+    }
+  }
+
   Future<DeleteGroupFailureReason?> deleteGroup() async {
     final user = ref.read(currentUserProvider);
     final result = await ref

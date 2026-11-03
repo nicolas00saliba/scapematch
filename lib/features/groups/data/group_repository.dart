@@ -66,6 +66,12 @@ abstract class GroupRepository {
   /// The creator cannot leave. They delete the group instead.
   Future<LeaveGroupResult> leave(String groupId, {required String userId});
 
+  /// Fecha o grupo com quem já está sentado, se chegou no mínimo da sala.
+  Future<CloseGroupResult> closeWithFewer(
+    String groupId, {
+    required String userId,
+  });
+
   /// Cancels the event for everyone and refunds every active seat in full.
   Future<DeleteGroupResult> deleteGroup(
     String groupId, {

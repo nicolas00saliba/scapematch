@@ -39,10 +39,16 @@ abstract final class GroupMessages {
 
   static const simulatedNotice = 'Pagamento simulado, nada é cobrado';
 
+  static const chargeOnlyIfCloses = 'Você só é cobrado se o grupo fechar.';
+
+  static const holdReleased = 'Valor liberado, nada foi cobrado';
+
   static String paymentStatus(PaymentStatus status) {
     return switch (status) {
       PaymentStatus.pending => 'Pendente',
+      PaymentStatus.reserved => 'Reservado',
       PaymentStatus.paid => 'Pago',
+      PaymentStatus.released => 'Liberado',
     };
   }
 
@@ -59,7 +65,29 @@ abstract final class GroupMessages {
   static String payMyShare(String price) => 'Pagar minha parte ($price)';
 
   static const yourSharePending = 'Sua parte está pendente';
+  static const yourShareReserved =
+      'Valor reservado. Você só é cobrado se o grupo fechar.';
   static const yourSharePaid = 'Sua parte está paga';
+  static const yourShareReleased = 'Valor liberado, nada foi cobrado';
+
+  static String yourShare(PaymentStatus status) {
+    return switch (status) {
+      PaymentStatus.pending => yourSharePending,
+      PaymentStatus.reserved => yourShareReserved,
+      PaymentStatus.paid => yourSharePaid,
+      PaymentStatus.released => yourShareReleased,
+    };
+  }
+
+  static String closeWith(int seated) => 'Fechar com $seated pessoas';
+
+  static String roomMinimum(int minimum) => 'Mínimo da sala: $minimum';
+
+  static const closeBody =
+      'Cada pessoa paga só a própria parte. O grupo fecha agora e a reserva vira cobrança.';
+
+  static const cannotDeleteYet =
+      'Não é mais possível excluir: falta menos de 2 h';
 
   static const leaveUnpaidBody =
       'Você ainda não pagou esta parte. Sair agora só libera a vaga. Não há valor para devolver.';
@@ -80,6 +108,7 @@ abstract final class GroupMessages {
             : 'Reembolsado · o organizador removeu esta pessoa',
       RefundReason.groupDidNotClose =>
         'Reembolsado · o grupo não fechou até o prazo',
+      RefundReason.holdReleased => holdReleased,
     };
   }
 
@@ -183,6 +212,7 @@ abstract final class GroupMessages {
         'Este grupo já foi cancelado.',
       DeleteGroupFailureReason.sessionStarted => sessionAlreadyStarted,
       DeleteGroupFailureReason.sessionEnded => 'Esta sessão já terminou.',
+      DeleteGroupFailureReason.tooCloseToDelete => cannotDeleteYet,
     };
   }
 

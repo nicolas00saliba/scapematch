@@ -85,14 +85,14 @@ void main() {
     await tester.tap(find.byKey(AppKeys.leaveGroup));
     await tester.pumpAndSettle();
 
-    expect(find.text(GroupMessages.leaveWithRefundBody), findsOneWidget);
+    expect(find.text(GroupMessages.holdReleased), findsOneWidget);
     expect(_spotSummary(tester), '2/4');
 
     await tester.tap(find.byKey(AppKeys.dialogConfirm));
     await tester.pumpAndSettle();
 
     expect(_spotSummary(tester), '1/4');
-    expect(find.textContaining('Reembolsado'), findsWidgets);
+    expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
     expect(find.byKey(AppKeys.joinButton), findsNothing);
 
     await _home(tester);
@@ -100,7 +100,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancelados'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Reembolsado'), findsWidgets);
+    expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsOneWidget,
@@ -203,7 +203,7 @@ void main() {
     await tester.tap(find.text('Cancelados'));
     await tester.pumpAndSettle();
     expect(find.text('A Estufa'), findsWidgets);
-    expect(find.textContaining('Reembolsado'), findsWidgets);
+    expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
     expect(find.text('Nenhum cancelamento'), findsNothing);
     await tester.tap(find.text('Passados'));
     await tester.pumpAndSettle();
@@ -286,7 +286,7 @@ void main() {
 
       await tester.tap(find.byKey(AppKeys.leaveGroup));
       await tester.pumpAndSettle();
-      expect(find.text(GroupMessages.leaveWithRefundBody), findsOneWidget);
+      expect(find.text(GroupMessages.holdReleased), findsOneWidget);
 
       final startsAt = sampleNow.add(const Duration(days: 3, hours: 6));
       clock.instant = startsAt.subtract(const Duration(hours: 1));
@@ -294,11 +294,8 @@ void main() {
       await tester.tap(find.byKey(AppKeys.dialogConfirm));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text(GroupMessages.leavePreviewChanged(refunded: false)),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Sem reembolso'), findsWidgets);
+      expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
+      expect(find.textContaining('Sem reembolso'), findsNothing);
       expect(_spotSummary(tester), '1/4');
     },
   );

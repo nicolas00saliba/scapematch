@@ -44,6 +44,7 @@ abstract final class AppKeys {
   static const confirmAttendance = Key('confirm-attendance');
   static const leaveGroup = Key('leave-group');
   static const deleteGroup = Key('delete-group');
+  static const closeWithFewer = Key('close-with-fewer');
   static const editGroup = Key('edit-group');
   static const shareGroup = Key('share-group');
   static const inviteGroup = Key('invite-group');

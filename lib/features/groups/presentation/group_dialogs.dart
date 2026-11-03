@@ -6,7 +6,17 @@ Future<bool> showLeaveDialog(
   BuildContext context, {
   required bool refunds,
   required bool paid,
+  bool reserved = false,
 }) {
+  if (reserved) {
+    return _showConfirmDialog(
+      context,
+      title: GroupMessages.leaveWithRefundTitle,
+      body: GroupMessages.holdReleased,
+      confirmLabel: 'Sair',
+      destructive: false,
+    );
+  }
   if (!paid) {
     return _showConfirmDialog(
       context,
@@ -28,6 +38,16 @@ Future<bool> showLeaveDialog(
         ? GroupMessages.leaveWithRefundAction
         : GroupMessages.leaveWithoutRefundAction,
     destructive: !refunds,
+  );
+}
+
+Future<bool> showCloseDialog(BuildContext context, {required int seated}) {
+  return _showConfirmDialog(
+    context,
+    title: GroupMessages.closeWith(seated),
+    body: GroupMessages.closeBody,
+    confirmLabel: 'Fechar grupo',
+    destructive: false,
   );
 }
 

@@ -1,5 +1,61 @@
 # Decisões provisórias
 
+## Só cobra se o grupo fechar
+
+- **Data:** 2026-11-03
+- **Decisão:** pagar a parte reserva o valor, numa pré-autorização simulada. A captura, com a comissão no extrato da casa, só acontece quando o grupo fecha. Se o prazo vence sem fechar, ou se o grupo é excluído, as reservas são liberadas e o jogador vê “Valor liberado, nada foi cobrado”. A tela diz “Você só é cobrado se o grupo fechar”.
+- **Motivo:** o Nícolas não quer cobrar quem entrou num grupo que não se formou.
+- **Onde está no código:** `PaymentBook.payShare`, `captureReservation`, `releaseReservation` e o cartão de pagamento do grupo.
+- **Como trocar depois:** o provedor real troca a pré-autorização simulada. A frase da tela fica em `GroupMessages.chargeOnlyIfCloses`.
+
+## O host pode fechar com menos gente
+
+- **Data:** 2026-11-03
+- **Decisão:** o host fecha o grupo com menos gente do que o Z planejado, desde que N seja pelo menos o mínimo X da sala. O botão é “Fechar com N pessoas”, com confirmação. No preço por pessoa, cada um paga só a própria parte. No preço fixo do grupo, o novo valor por pessoa aparece e quem já reservou confirma antes da captura. Abaixo de X o botão fica desabilitado, com “Mínimo da sala: X”.
+- **Motivo:** um grupo que já tem o mínimo da sala não precisa esperar o alvo do host.
+- **Onde está no código:** `canCloseWithFewer`, `repriceFixedClose` e o botão `closeWithFewer`.
+- **Como trocar depois:** outro mínimo entra em `roomMinimum`. O texto do botão entra em `GroupMessages.closeWith`.
+
+## Excluir o grupo só até 2 horas antes
+
+- **Data:** 2026-11-03
+- **Decisão:** o host exclui o grupo até 2 horas antes do início. No instante exato ainda pode. Depois disso o botão fica desabilitado com “Não é mais possível excluir: falta menos de 2 h”. A exclusão libera as reservas ou reembolsa o que já foi capturado, e os membros veem o aviso.
+- **Motivo:** perto da sessão a casa já se organizou.
+- **Onde está no código:** `canDeleteGroup` e o botão `deleteGroup`.
+- **Como trocar depois:** outro prazo entra em `deleteLead`.
+
+## Falta sem aviso avisa e depois bloqueia
+
+- **Data:** 2026-11-03
+- **Decisão:** a casa marca no Parceiro quem não compareceu. A falta entra no domínio. A primeira falta avisa. A terceira bloqueia por um tempo. Os dois números são configuração, não estão escritos na conta.
+- **Motivo:** o Nícolas quer uma trava simples contra falta repetida, ajustável depois.
+- **Onde está no código:** `AbsencePolicy` e `AbsenceBook`. O aviso padrão é 1 e o bloqueio é 3.
+- **Como trocar depois:** outra política entra no construtor de `AbsencePolicy`. A tela do Parceiro chama `markAbsent`.
+
+## O ScapeMatch começa em escape room e abre outras categorias
+
+- **Data:** 2026-11-03
+- **Decisão:** escape room continua a categoria principal e o destaque. Jogos de tabuleiro, laser tag e jogos de tiro com laser entram como categorias preparadas, com filtro e ícone. Os textos não dizem que o ScapeMatch é só escape room.
+- **Motivo:** o produto começa nas salas e já deixa o caminho para os outros jogos.
+- **Onde está no código:** esta decisão fica registrada agora. O filtro e os ícones entram no PR das categorias.
+- **Como trocar depois:** uma categoria nova entra na lista de tipos de jogo.
+
+## O site institucional fica separado do app
+
+- **Data:** 2026-11-03
+- **Decisão:** o GitHub Pages atual passa a ser o app, o link de celular. O site institucional é uma landing própria, em `apps/site`, com hero, como funciona, jogadores, casas, categorias e os badges das lojas. O deploy externo fica com o Nícolas.
+- **Motivo:** o app rodando no navegador não é a primeira impressão do produto.
+- **Onde está no código:** esta decisão fica registrada agora. A landing entra no PR do site.
+- **Como trocar depois:** outro host lê o `netlify.toml` da pasta `apps/site`.
+
+## Na web o app pede login e organiza a busca como um site
+
+- **Data:** 2026-11-03
+- **Decisão:** na web, login e cadastro simulados vêm antes da tela principal, com a sessão guardada. No celular a introdução continua. No desktop a busca ganha filtros à esquerda e mapa ao lado, e a sala e o grupo ganham um painel fixo de reserva. Meus grupos separa Próximos, Aguardando pagamento e Histórico.
+- **Motivo:** o uso no computador precisa parecer um produto de mercado, não o app esticado.
+- **Onde está no código:** esta decisão fica registrada agora. A tela entra no PR da web.
+- **Como trocar depois:** outro filtro entra na coluna da busca.
+
 ## O logo definitivo tem duas formas
 
 - **Data:** 2026-11-03

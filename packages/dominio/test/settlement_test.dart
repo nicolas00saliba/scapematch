@@ -27,6 +27,13 @@ void main() {
           idempotencyKey: 'pay-${share.id}',
         );
       }
+      expect(book.entries, isEmpty);
+      expect(book.reservation(reservation.id).status, ReservationStatus.held);
+
+      await book.captureReservation(
+        reservationId: reservation.id,
+        idempotencyKey: 'capture-${reservation.id}',
+      );
 
       final paid = book.reservation(reservation.id);
       expect(paid.status, ReservationStatus.paid);
@@ -64,6 +71,11 @@ void main() {
     );
 
     expect(seen, [200]);
+    expect(book.houseBalance('house-1'), 0);
+    await book.captureReservation(
+      reservationId: reservation.id,
+      idempotencyKey: 'capture-card',
+    );
     expect(book.houseBalance('house-1'), 180);
     expect(book.platformBalance, 20);
   });
@@ -85,6 +97,10 @@ void main() {
         idempotencyKey: 'pay-${share.id}',
       );
     }
+    await book.captureReservation(
+      reservationId: reservation.id,
+      idempotencyKey: 'capture-${reservation.id}',
+    );
     final beforeRefund = List<LedgerEntry>.of(book.entries);
     final firstShare = reservation.shares.first;
 
@@ -257,8 +273,11 @@ void main() {
       idempotencyKey: 'same-key',
     );
 
-    expect(book.entries.length, 2);
-    expect(book.houseBalance('house-1'), share.netCents);
+    expect(book.entries, isEmpty);
+    expect(
+      book.reservation(reservation.id).shares.first.status,
+      ShareStatus.reserved,
+    );
     expect(
       () => book.payShare(
         reservationId: reservation.id,
@@ -267,6 +286,10 @@ void main() {
         idempotencyKey: 'same-key',
       ),
       throwsA(isA<IdempotencyConflictException>()),
+    );
+    await book.captureReservation(
+      reservationId: reservation.id,
+      idempotencyKey: 'capture-key',
     );
     expect(book.houseBalance('house-1'), share.netCents);
   });
@@ -304,6 +327,15 @@ void main() {
         shareId: shareId,
         kind: PaymentMethodKind.card,
         idempotencyKey: 'try-2',
+      );
+      expect(
+        book.reservation(reservation.id).shares.single.status,
+        ShareStatus.reserved,
+      );
+      expect(book.houseBalance('house-1'), 0);
+      await book.captureReservation(
+        reservationId: reservation.id,
+        idempotencyKey: 'capture-fail',
       );
       expect(book.reservation(reservation.id).status, ReservationStatus.paid);
       expect(book.houseBalance('house-1'), 72);

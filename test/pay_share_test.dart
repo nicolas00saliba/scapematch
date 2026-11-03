@@ -22,7 +22,7 @@ void main() {
     expect(find.textContaining('de '), findsWidgets);
     expect(find.textContaining('comissão'), findsNothing);
     expect(find.textContaining('10%'), findsNothing);
-    expect(find.textContaining(GroupMessages.simulatedNotice), findsWidgets);
+    expect(find.textContaining(GroupMessages.chargeOnlyIfCloses), findsWidgets);
 
     await tester.tap(find.byKey(AppKeys.payMyShare));
     await tester.pumpAndSettle();
@@ -43,13 +43,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.paySimulate));
     await tester.pumpAndSettle();
-    expect(find.text('Pagamento confirmado'), findsOneWidget);
+    expect(find.text('Valor reservado'), findsOneWidget);
     expect(find.byKey(AppKeys.payConfirmed), findsOneWidget);
 
     await tester.tap(find.byKey(AppKeys.payDone));
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.payMyShare), findsNothing);
-    expect(find.text(GroupMessages.yourSharePaid), findsOneWidget);
+    expect(find.text(GroupMessages.yourShareReserved), findsOneWidget);
     expect(find.text('Pendente'), findsNothing);
   });
 
@@ -68,7 +68,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.paySimulate));
     await tester.pumpAndSettle();
-    expect(find.text('Pagamento confirmado'), findsOneWidget);
+    expect(find.text('Valor reservado'), findsOneWidget);
     expect(find.text(GroupMessages.simulatedNotice), findsOneWidget);
   });
 }

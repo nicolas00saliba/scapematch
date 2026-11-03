@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart' as dominio;
 import 'package:scapematch/features/groups/domain/attendance.dart';
 
 /// Product rules that do not depend on Flutter or on where data is stored.
@@ -27,6 +28,9 @@ class GroupRules {
   /// The organizer cancelling or removing someone always refunds, and that
   /// path does not read this constant.
   static const refundDeadline = Duration(hours: 2);
+
+  /// O host exclui o grupo até este prazo antes do início.
+  static const deleteLead = Duration(hours: 2);
 
   /// Creator note stored on the group. Longer text is rejected.
   static const maxNoteLength = 280;
@@ -133,6 +137,29 @@ class GroupRules {
   }
 
   /// True once [now] is the end instant or later.
+  static bool canDeleteGroup({
+    required DateTime startsAt,
+    required DateTime now,
+  }) {
+    return dominio.canDeleteGroup(
+      startsAt: startsAt,
+      now: now,
+      lead: deleteLead,
+    );
+  }
+
+  static bool canCloseWithFewer({
+    required int seated,
+    required int roomMinimum,
+    required int planned,
+  }) {
+    return dominio.canCloseWithFewer(
+      seated: seated,
+      roomMinimum: roomMinimum,
+      planned: planned,
+    );
+  }
+
   static bool hasEnded({required DateTime endsAt, required DateTime now}) {
     return !now.isBefore(endsAt);
   }

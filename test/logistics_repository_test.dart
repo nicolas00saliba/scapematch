@@ -132,8 +132,8 @@ void main() {
     );
     final group = (left as LeaveGroupSuccess).group;
     final me = group.participantForUser('user-local')!;
-    expect(me.refund, RefundStatus.refunded);
-    expect(me.refundReason, RefundReason.cancelledInTime);
+    expect(me.payment, PaymentStatus.released);
+    expect(me.refundReason, RefundReason.holdReleased);
     expect(group.filledSpots, before!.filledSpots);
     expect(group.openSeats, before.openSeats);
   });
@@ -143,22 +143,22 @@ void main() {
       groups,
       database,
       sampleNow.add(const Duration(hours: 2)),
-      RefundStatus.refunded,
-      RefundReason.cancelledInTime,
+      RefundStatus.none,
+      RefundReason.holdReleased,
     );
     await _expectRefund(
       groups,
       database,
       sampleNow.add(const Duration(hours: 2, minutes: 1)),
-      RefundStatus.refunded,
-      RefundReason.cancelledInTime,
+      RefundStatus.none,
+      RefundReason.holdReleased,
     );
     await _expectRefund(
       groups,
       database,
       sampleNow.add(const Duration(hours: 1, minutes: 59)),
-      RefundStatus.denied,
-      RefundReason.cancelledTooLate,
+      RefundStatus.none,
+      RefundReason.holdReleased,
     );
   });
 
@@ -176,7 +176,7 @@ void main() {
       database.groups[database.groups.indexWhere(
         (item) => item.id == group.id,
       )] = group.copyWith(
-        startsAt: sampleNow.add(const Duration(minutes: 30)),
+        startsAt: sampleNow.add(const Duration(hours: 3)),
       );
 
       final guest = await groups.join(
@@ -202,6 +202,10 @@ void main() {
       expect(cancelled.isCancelled, isTrue);
       expect(cancelled.filledSpots, 0);
       for (final person in cancelled.participants) {
+        if (person.payment == PaymentStatus.released) {
+          expect(person.refundReason, RefundReason.holdReleased);
+          continue;
+        }
         expect(person.refund, RefundStatus.refunded);
         expect(person.refundReason, RefundReason.organizerCancelledEvent);
       }
@@ -315,7 +319,7 @@ void main() {
     );
     final updated = (removed as RemoveMemberSuccess).group;
     final bia = updated.participantForUser('user-bia')!;
-    expect(bia.refundReason, RefundReason.organizerRemovedMember);
+    expect(bia.refundReason, RefundReason.holdReleased);
     expect(updated.filledSpots, 1);
 
     final replacement = await groups.join(
