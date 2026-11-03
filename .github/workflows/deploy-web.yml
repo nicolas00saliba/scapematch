@@ -2,6 +2,7 @@
 #
 # Player: https://nicolas00saliba.github.io/scapematch/
 # Partner: https://nicolas00saliba.github.io/scapematch/parceiro/
+# Landing preview: https://nicolas00saliba.github.io/scapematch/site/
 # --base-href must keep the leading and trailing slash.
 #
 # Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
@@ -23,6 +24,7 @@ on:
       - cursor/gh-pages-preview-23b9
       - cursor/two-sample-groups-per-city-7ef7
       - cursor/group-logistics-5b63
+      - cursor/landing-institucional-d3c3
       - main
 
 permissions:
@@ -78,6 +80,21 @@ jobs:
           cp build/web/index.html build/web/404.html
           touch build/web/.nojekyll
 
+      # Static landing, copied as-is. /site/ is a real directory, so the
+      # player 404 shell does not take this path. Player and partner stay
+      # at the same URLs.
+      - name: Add landing preview
+        run: |
+          test ! -e build/web/site
+          mkdir -p build/web/site
+          cp -a apps/landing/. build/web/site/
+          test -f build/web/site/index.html
+          test -f build/web/index.html
+          test -f build/web/parceiro/index.html
+          grep -F 'base href="/scapematch/"' build/web/index.html
+          grep -F 'base href="/scapematch/parceiro/"' build/web/parceiro/index.html
+          grep -F -q 'Quero jogar' build/web/site/index.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
@@ -129,22 +146,27 @@ jobs:
         run: |
           player="https://nicolas00saliba.github.io/scapematch/"
           partner="https://nicolas00saliba.github.io/scapematch/parceiro/"
+          site="https://nicolas00saliba.github.io/scapematch/site/"
           echo "### ScapeMatch web" >> "$GITHUB_STEP_SUMMARY"
           echo "$player" >> "$GITHUB_STEP_SUMMARY"
           echo "$partner" >> "$GITHUB_STEP_SUMMARY"
+          echo "$site" >> "$GITHUB_STEP_SUMMARY"
           # The first gh-pages publish stayed 404 for longer than four minutes.
           for attempt in $(seq 1 30); do
             pcode="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$player" || true)"
             hcode="$(curl -fsS -L -o /tmp/parceiro.html -w "%{http_code}" "$partner" || true)"
-            echo "attempt ${attempt}: player HTTP ${pcode}, partner HTTP ${hcode}"
+            scode="$(curl -fsS -L -o /tmp/site.html -w "%{http_code}" "$site" || true)"
+            echo "attempt ${attempt}: player HTTP ${pcode}, partner HTTP ${hcode}, site HTTP ${scode}"
             if [ "$pcode" = "200" ] && grep -Eq 'name="scapematch-release" content="[^"]+"' /tmp/scapematch.html \
               && [ "$hcode" = "200" ] && grep -q 'ScapeMatch Parceiro' /tmp/parceiro.html \
-              && grep -F -q 'base href="/scapematch/parceiro/"' /tmp/parceiro.html; then
-              echo "Public site returned the player app and the partner app."
+              && grep -F -q 'base href="/scapematch/parceiro/"' /tmp/parceiro.html \
+              && [ "$scode" = "200" ] && grep -F -q 'Quero jogar' /tmp/site.html \
+              && grep -F -q 'Tenho uma casa' /tmp/site.html; then
+              echo "Public site returned the player app, the partner app, and the landing."
               exit 0
             fi
             sleep 20
           done
-          echo "The public URL did not return both Flutter shells."
+          echo "The public URL did not return both Flutter shells and the landing."
           echo "An admin may still need to enable Pages. See the workflow log from the deploy job."
           exit 1
