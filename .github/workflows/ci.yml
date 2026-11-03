@@ -33,7 +33,9 @@ jobs:
 
       - name: Analyze domain package
         working-directory: packages/dominio
-        run: dart analyze
+        run: |
+          dart pub get
+          dart analyze
 
       - name: Test domain package
         working-directory: packages/dominio
