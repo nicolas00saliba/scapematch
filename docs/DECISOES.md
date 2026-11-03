@@ -27,7 +27,7 @@
 ## Excluir o grupo só até 2 horas antes
 
 - **Data:** 2026-11-03
-- **Decisão:** o host exclui o grupo até 2 horas antes do início. No instante exato ainda pode. Depois disso o botão fica desabilitado com “Não é mais possível excluir: falta menos de 2 h”. A exclusão libera as reservas ou reembolsa o que já foi capturado, e os membros veem o aviso.
+- **Decisão:** o host exclui o grupo até 2 horas antes do início. No instante exato ainda pode. Depois disso o botão fica desabilitado com “Exclusão bloqueada (menos de 2 h)”. A exclusão libera as reservas ou reembolsa o que já foi capturado, e os membros veem o aviso.
 - **Motivo:** perto da sessão a casa já se organizou.
 - **Onde está no código:** `canDeleteGroup` e o botão `deleteGroup`.
 - **Como trocar depois:** outro prazo entra em `deleteLead`.

@@ -113,8 +113,7 @@ abstract final class GroupMessages {
   static const closeBody =
       'Cada pessoa paga só a própria parte. O grupo fecha agora e a reserva vira cobrança.';
 
-  static const cannotDeleteYet =
-      'Não é mais possível excluir: falta menos de 2 h';
+  static const cannotDeleteYet = 'Exclusão bloqueada (menos de 2 h)';
 
   static const leaveUnpaidBody =
       'Você ainda não pagou esta parte. Sair agora só libera a vaga. Não há valor para devolver.';
