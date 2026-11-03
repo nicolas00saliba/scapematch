@@ -51,7 +51,12 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     'Rio Grande do Sul',
   );
 
-  final ruaXv = _house('cwb-rua-xv', curitiba, 'Mistério da Rua XV', 'Centro');
+  final ruaXv = _house(
+    SampleIds.houseCwbRuaXv,
+    curitiba,
+    'Mistério da Rua XV',
+    'Centro',
+  );
   final batel = _house('cwb-batel', curitiba, 'Portal do Batel', 'Batel');
   final augusta = _house(
     'sp-augusta',
@@ -290,7 +295,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     Difficulty.medium,
   );
   final caldeira = _room(
-    'room-cwb-caldeira',
+    SampleIds.roomCwbCaldeira,
     ruaXv,
     'A Caldeira da XV',
     'Vapor que marca as horas',
@@ -474,6 +479,11 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   final slotPoraoXv = schedule.free('slot-cwb-porao-free', poraoXv.id, 3);
   final slotSatelite = schedule.free('slot-cwb-satelite-free', satelite.id, 3);
   final slotCaldeira = schedule.free('slot-cwb-caldeira-free', caldeira.id, 3);
+  final slotCaldeiraFechado = schedule.at(
+    'slot-cwb-xv-fechado',
+    caldeira.id,
+    now.subtract(const Duration(days: 1)),
+  );
   final slotSarcofago = schedule.free(
     'slot-cwb-sarcofago-free',
     sarcofago.id,
@@ -754,6 +764,19 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       minimumSpots: 6,
       closesAt: now.subtract(const Duration(hours: 2)),
     ),
+    // Sessão que já aconteceu e fechou. O extrato da casa nasce daqui.
+    // Não entra na Home: a sessão já terminou.
+    _group(
+      now: now,
+      id: SampleIds.groupCwbClosed,
+      city: curitiba,
+      house: ruaXv,
+      room: caldeira,
+      slot: slotCaldeiraFechado,
+      totalSpots: 4,
+      names: ['Olga', 'Paulo', 'Rita', 'Sami'],
+      minimumSpots: 2,
+    ),
   ];
 
   final nearby = _nearbyPlaces(
@@ -845,6 +868,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotPoraoXv,
       slotSatelite,
       slotCaldeira,
+      slotCaldeiraFechado,
       slotSarcofago,
       slotAntena,
       slotEspelho,

@@ -46,6 +46,9 @@ class PaymentBook {
 
   List<LedgerEntry> get entries => List.unmodifiable(_entries);
 
+  List<Reservation> get reservations =>
+      List.unmodifiable(_reservations.values);
+
   List<AuditEntry> get audit => List.unmodifiable(settings.audit);
 
   Reservation? lookup(String id) => _reservations[id];

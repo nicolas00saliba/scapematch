@@ -22,6 +22,9 @@ abstract final class SampleIds {
 
   static const roomSpMetro = 'room-sp-metro';
   static const roomCwbCofre = 'room-cwb-cofre';
+  static const roomCwbCaldeira = 'room-cwb-caldeira';
+  static const houseCwbRuaXv = 'cwb-rua-xv';
+  static const groupCwbClosed = 'grp-cwb-xv-fechado';
 
   static const groupSpMetroAlmost = 'grp-sp-metro-almost';
   static const groupSpCoberturaOpen = 'grp-sp-cobertura-open';

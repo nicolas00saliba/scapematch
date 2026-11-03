@@ -49,6 +49,7 @@ cd build/web && python3 -m http.server 8080
 10. **Excluir grupo**, só para quem criou. Isso cancela o evento para todo mundo e reembolsa integralmente, mesmo em cima da hora. Quem não criou não vê o botão. O criador não sai: ele exclui.
 11. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
 12. **Meus grupos**, na aba do meio, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
+13. **ScapeMatch Parceiro**, em `/parceiro` (também pelo atalho na Conta). Login de exemplo `xv@scapematch.exemplo` / `demo`, da casa Mistério da Rua XV. Saldo, extrato (bruto, comissão, líquido), reservas, salas, horários e falta. É o mesmo estado da sessão do jogador.
 
 A aba Conta existe, mas ainda não há login. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo é “Nícolas”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois. A carteira lê `WalletRepository` (saldo de exemplo) e os cartões leem `PaymentMethodsRepository` (lista vazia). O plano do pagamento real está em [docs/PAGAMENTOS_PLANO.md](docs/PAGAMENTOS_PLANO.md).
 

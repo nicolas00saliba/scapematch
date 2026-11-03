@@ -43,4 +43,21 @@ class EscapeRoom {
 
   /// Mesmo id de [GameTypes]. Uma sala antiga sem o campo conta como escape.
   final String gameType;
+
+  EscapeRoom copyWith({int? priceCents}) {
+    return EscapeRoom(
+      id: id,
+      houseId: houseId,
+      name: name,
+      theme: theme,
+      category: category,
+      capacity: capacity,
+      durationMinutes: durationMinutes,
+      difficulty: difficulty,
+      priceCents: priceCents ?? this.priceCents,
+      gameType: gameType,
+      minimumPlayers: minimumPlayers,
+      cancelWindow: cancelWindow,
+    );
+  }
 }

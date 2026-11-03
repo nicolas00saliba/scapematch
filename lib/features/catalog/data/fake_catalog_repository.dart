@@ -69,6 +69,25 @@ class FakeCatalogRepository implements CatalogRepository {
     return null;
   }
 
+  /// Grava o preço por pessoa nesta sessão. A ficha da sala lê o mesmo objeto.
+  Future<void> updatePrice(String roomId, int priceCents) async {
+    await _pause();
+    final room = _database.roomById(roomId);
+    if (room == null) {
+      throw StateError('Sala não encontrada.');
+    }
+    _database.replaceRoom(room.copyWith(priceCents: priceCents));
+  }
+
+  /// Abre um horário nesta sessão. Criar grupo passa a oferecer esse horário.
+  Future<TimeSlot> addSlot(String roomId, DateTime startsAt) async {
+    await _pause();
+    if (_database.roomById(roomId) == null) {
+      throw StateError('Sala não encontrada.');
+    }
+    return _database.addSlot(roomId: roomId, startsAt: startsAt);
+  }
+
   RoomListing _listing(EscapeRoom room, EscapeHouse house) {
     var cityName = '';
     for (final city in _database.cities) {

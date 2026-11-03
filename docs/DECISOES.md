@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## O Parceiro fica em /parceiro, no mesmo livro do jogador
+
+- **Data:** 2026-11-03
+- **Decisão:** a casa entra em `/parceiro` com login simulado (`xv@scapematch.exemplo`, senha `demo`, casa Mistério da Rua XV). O painel mostra saldo, extrato (bruto, comissão e líquido), reservas e grupos, salas com preço e horários, e a marcação de falta. Tudo lê o `PaymentBook`, o catálogo e o `AbsenceBook` da mesma sessão do app do jogador. A Conta tem o atalho ScapeMatch Parceiro.
+- **Motivo:** a apresentação de sexta precisa da casa vendo o que o jogador reservou, sem um segundo aplicativo.
+- **Onde está no código:** `PartnerScreen`, `PartnerRepository` e o atalho na Conta.
+- **Como trocar depois:** outra casa entra em `partnerDemoAccount`. O Supabase troca o miolo de `PartnerRepository`.
+
 ## Só cobra se o grupo fechar
 
 - **Data:** 2026-11-03
@@ -29,7 +37,7 @@
 - **Data:** 2026-11-03
 - **Decisão:** a casa marca no Parceiro quem não compareceu. A falta entra no domínio. A primeira falta avisa. A terceira bloqueia por um tempo. Os dois números são configuração, não estão escritos na conta.
 - **Motivo:** o Nícolas quer uma trava simples contra falta repetida, ajustável depois.
-- **Onde está no código:** `AbsencePolicy` e `AbsenceBook`. O aviso padrão é 1 e o bloqueio é 3.
+- **Onde está no código:** `AbsencePolicy`, `AbsenceBook` e o botão Marcar falta no Parceiro. O aviso padrão é 1 e o bloqueio é 3.
 - **Como trocar depois:** outra política entra no construtor de `AbsencePolicy`. A tela do Parceiro chama `markAbsent`.
 
 ## O ScapeMatch começa em escape room e abre outras categorias

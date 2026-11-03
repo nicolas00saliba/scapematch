@@ -171,4 +171,24 @@ abstract final class AppKeys {
   static Key mapFocus(String groupId) => Key('map-focus-$groupId');
   static Key mapCluster(String id) => Key('map-cluster-$id');
   static Key accountDestination(String name) => Key('account-$name');
+  static const partnerEntry = Key('partner-entry');
+  static const partnerEmail = Key('partner-email');
+  static const partnerPassword = Key('partner-password');
+  static const partnerSubmit = Key('partner-submit');
+  static const partnerLoginError = Key('partner-login-error');
+  static const partnerPlayerApp = Key('partner-player-app');
+  static const partnerSignOut = Key('partner-sign-out');
+  static const partnerHouseName = Key('partner-house-name');
+  static const partnerNet = Key('partner-net');
+  static const partnerGross = Key('partner-gross');
+  static const partnerCommission = Key('partner-commission');
+  static const partnerReserved = Key('partner-reserved');
+  static Key partnerPrice(String roomId) => Key('partner-price-$roomId');
+  static Key partnerSavePrice(String roomId) =>
+      Key('partner-save-price-$roomId');
+  static Key partnerAddSlot(String roomId) => Key('partner-add-slot-$roomId');
+  static Key partnerAbsence(String groupId, String playerId) =>
+      Key('partner-absence-$groupId-$playerId');
+  static Key partnerAbsenceStanding(String groupId, String playerId) =>
+      Key('partner-absence-standing-$groupId-$playerId');
 }
