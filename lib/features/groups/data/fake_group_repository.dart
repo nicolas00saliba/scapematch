@@ -918,7 +918,9 @@ class FakeGroupRepository implements GroupRepository {
       return person.copyWith(
         attendance: AttendanceStatus.cancelled,
         payment: PaymentStatus.released,
-        refundReason: RefundReason.holdReleased,
+        refundReason: outcome.reason == RefundReason.groupDidNotClose
+            ? RefundReason.groupDidNotClose
+            : RefundReason.holdReleased,
       );
     }
     if (person.payment != PaymentStatus.paid ||

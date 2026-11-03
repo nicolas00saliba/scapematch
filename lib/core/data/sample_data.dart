@@ -1200,7 +1200,9 @@ Group _group({
           attendance: index == 0
               ? AttendanceStatus.confirmed
               : AttendanceStatus.joined,
-          payment: PaymentStatus.paid,
+          payment: names.length >= totalSpots
+              ? PaymentStatus.paid
+              : PaymentStatus.reserved,
         ),
     ],
   );

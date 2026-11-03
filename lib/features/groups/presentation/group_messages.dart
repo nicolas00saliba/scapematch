@@ -62,6 +62,33 @@ abstract final class GroupMessages {
     return '$paid de $seated pagaram';
   }
 
+  static String reservedProgress(int reserved, int seated) {
+    if (seated <= 0 || reserved <= 0) {
+      return 'Ninguém reservou ainda';
+    }
+    return '$reserved de $seated reservaram';
+  }
+
+  /// Aberto: quem separou o valor. Fechado: quem já foi cobrado.
+  static String shareProgress({
+    required bool closed,
+    required int paid,
+    required int reserved,
+    required int seated,
+  }) {
+    if (closed) {
+      return paidProgress(paid, seated);
+    }
+    return reservedProgress(reserved, seated);
+  }
+
+  static String paymentPolicy({required bool closed, required int hours}) {
+    if (!closed) {
+      return 'Se o grupo não fechar, o valor reservado é liberado automaticamente.';
+    }
+    return 'Cancelar com $hours h ou mais de antecedência devolve o pagamento.';
+  }
+
   static String payMyShare(String price) => 'Pagar minha parte ($price)';
 
   static const yourSharePending = 'Sua parte está pendente';
@@ -107,7 +134,9 @@ abstract final class GroupMessages {
             ? 'Reembolsado · o organizador removeu você do grupo'
             : 'Reembolsado · o organizador removeu esta pessoa',
       RefundReason.groupDidNotClose =>
-        'Reembolsado · o grupo não fechou até o prazo',
+        person.payment == PaymentStatus.released
+            ? holdReleased
+            : 'Reembolsado · o grupo não fechou até o prazo',
       RefundReason.holdReleased => holdReleased,
     };
   }

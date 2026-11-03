@@ -187,7 +187,12 @@ class _MyGroupCard extends StatelessWidget {
               Text('${formatPrice(group.priceCents)} por pessoa'),
               const SizedBox(height: 4),
               Text(
-                GroupMessages.paidProgress(group.paidSeats, group.seatedCount),
+                GroupMessages.shareProgress(
+                  closed: group.isFull && !group.isCancelled,
+                  paid: group.paidSeats,
+                  reserved: group.reservedSeats,
+                  seated: group.seatedCount,
+                ),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               if (member != null && member!.occupiesSeat) ...[

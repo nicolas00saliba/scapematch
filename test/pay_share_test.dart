@@ -18,7 +18,8 @@ void main() {
     expect(find.byKey(AppKeys.payMyShare), findsOneWidget);
     expect(find.textContaining('Pagar minha parte (R\$'), findsOneWidget);
     expect(find.text('Pendente'), findsWidgets);
-    expect(find.text('Pago'), findsWidgets);
+    expect(find.text('Reservado'), findsWidgets);
+    expect(find.text('Pago'), findsNothing);
     expect(find.textContaining('de '), findsWidgets);
     expect(find.textContaining('comissão'), findsNothing);
     expect(find.textContaining('10%'), findsNothing);

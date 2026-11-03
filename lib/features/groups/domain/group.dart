@@ -162,10 +162,18 @@ class Group {
   int get seatedCount =>
       participants.where((person) => person.occupiesSeat).length;
 
-  /// Cadeiras ocupadas que já pagaram a parte.
+  /// Cadeiras ocupadas que já pagaram a parte. Só depois que o grupo fecha.
   int get paidSeats => participants
       .where(
         (person) => person.occupiesSeat && person.payment == PaymentStatus.paid,
+      )
+      .length;
+
+  /// Cadeiras com valor separado, ainda sem captura.
+  int get reservedSeats => participants
+      .where(
+        (person) =>
+            person.occupiesSeat && person.payment == PaymentStatus.reserved,
       )
       .length;
 
