@@ -1,8 +1,23 @@
 # Plano de saldo e pagamentos
 
-O que a Conta já tem, e o que ainda não existe. Nada disto cobra, guarda número de cartão ou altera o saldo de exemplo.
+O que a Conta já tem, o que a fase 2 colocou no pacote de domínio, e o que ainda não existe. Nada disto cobra de verdade, guarda número de cartão ou altera o saldo de exemplo da carteira.
 
-## Já está no código
+## Fase 2, no pacote `dominio`
+
+O pacote `packages/dominio` guarda a conta, sem tela e sem Supabase. O app na raiz depende dele. O site continua saindo da raiz.
+
+- A taxa mora em `PlatformSettings`. A primeira linha é 1000 basis points, 10%. A fórmula `commissionCents` recebe a taxa por argumento.
+- `setPlatformCommission` e `setHouseCommission` só rodam para `platformAdmin` e gravam `AuditEntry`. O override por casa já tem lugar; ninguém é obrigado a usá-lo.
+- `createReservation` reparte o total entre os jogadores, calcula a comissão uma vez sobre o total e grava taxa, comissão e líquido em cada parte. Essa foto não muda se a configuração mudar depois.
+- O meio centavo de comissão sobe. As primeiras partes levam o centavo do resto. Comissão de cada parte + líquido = valor da parte. A soma das comissões fecha com a comissão do total.
+- `PaymentProvider` é a porta. `SimulatedPaymentProvider` confirma na hora e respeita a chave de idempotência.
+- `PaymentBook.payShare` cobra a parte inteira do jogador. O líquido vira crédito da casa e a comissão vira crédito da plataforma.
+- `refundShare` acrescenta débitos novos (`houseRefund` e `commissionRefund`). As linhas do pagamento ficam como estavam.
+- A carteira de R$ 40 da Conta é outra conta. Ela não lê este livro.
+
+A tela em que a equipe muda a taxa entra no app de manutenção, chamando `setPlatformCommission`. Ainda não há essa tela.
+
+## Já está no código da Conta
 
 - `Money` guarda centavos.
 - `WalletTransaction` é uma linha de crédito ou débito, sem dado de cartão.
@@ -11,7 +26,13 @@ O que a Conta já tem, e o que ainda não existe. Nada disto cobra, guarda núme
 - `PaymentMethodsRepository.list` devolve a lista. A fictícia devolve vazia.
 - A Conta lê esses dois repositórios pelos providers. Trocar a fonte é trocar o provider.
 
+## Próxima fase
+
+A fase 3 liga a tela do grupo a este livro. Cada jogador paga a própria parte, por Pix ou cartão simulado, e o grupo mostra quem já pagou. Continua em memória. O Supabase, o app da casa e a tela de manutenção da taxa vêm nas fases seguintes.
+
 ## O que falta
+
+Isto ainda vale para a carteira da Conta e para o provedor real. O livro da reserva, no pacote, já reparte, retém a comissão e estorna com linha nova, em memória.
 
 1. **Gateway.** Um provedor cobra o Pix ou o cartão. O app não fala com a bandeira direto.
 2. **PCI por tokenização.** O número do cartão é digitado no componente do provedor, ou nem chega ao nosso servidor. O app só guarda o token e os metadados seguros. Não há campo de número nesta versão de propósito.

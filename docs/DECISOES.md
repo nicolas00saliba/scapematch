@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## A comissão é uma configuração, com foto na reserva
+
+- **Data:** 2026-11-03
+- **Decisão:** a comissão começa em 10% (1000 basis points) como primeira linha de `platform_settings`. A conta da cobrança recebe a taxa de fora e não traz esse 10% escrito nela. Só `platform_admin` muda a taxa, pela função auditada `setPlatformCommission`. Uma casa pode ter override no futuro, pela função `setHouseCommission`, com a mesma trava. Cada reserva guarda a taxa vigente na hora em que abre, nas partes e em `commissionBps`. Mudar a taxa não reescreve reserva antiga. O estorno entra como lançamento novo. O app continua na raiz do repositório; o domínio mora em `packages/dominio`. A tela para mudar a taxa fica no app de manutenção, que chama essa função.
+- **Motivo:** o Nícolas aprovou a arquitetura e pediu a comissão configurável, com foto na reserva, para uma mudança de taxa não alterar o passado.
+- **Onde está no código:** `packages/dominio`. O app lê o pacote por dependência de caminho. O CI analisa e testa o pacote.
+- **Como trocar depois:** a tela de manutenção chama `setPlatformCommission`. O Supabase grava a mesma linha e a mesma auditoria. A fórmula de centavos continua em `commissionCents`.
+
 ## Voltar leva para a Home quando não há histórico
 
 - **Data:** 2026-11-03
