@@ -277,6 +277,7 @@ class _PagePhoto extends ConsumerWidget {
         : null;
     final asset = landmark?.asset ?? page.asset;
     final label = landmark == null ? page.title : landmark.name;
+    final alignment = landmark?.alignment ?? page.alignment;
     return AnimatedSwitcher(
       duration: scapeDuration(context, const Duration(milliseconds: 420)),
       switchInCurve: Curves.easeInOut,
@@ -291,7 +292,7 @@ class _PagePhoto extends ConsumerWidget {
         key: ValueKey(asset),
         asset: asset,
         semanticLabel: label,
-        alignment: page.alignment,
+        alignment: alignment,
       ),
     );
   }

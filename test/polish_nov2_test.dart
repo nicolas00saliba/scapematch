@@ -63,6 +63,11 @@ void main() {
       landmarkFor(SampleIds.curitiba).asset,
     );
     expect(cityLandmarks, hasLength(SampleIds.cities.length));
+    for (final city in SampleIds.cities) {
+      final landmark = landmarkFor(city);
+      expect(landmark.cityId, city);
+      expect(landmark.alignment.y, lessThan(0), reason: city);
+    }
   });
 
   testWidgets('the near intro crossfades to the selected city', (tester) async {
