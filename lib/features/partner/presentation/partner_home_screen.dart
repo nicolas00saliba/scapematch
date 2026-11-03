@@ -446,6 +446,41 @@ class _ReservationsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = isScapeDesktop(context);
+    final sorted = [...snapshot.groups]
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    final open = [
+      for (final group in sorted)
+        if (!group.isCancelled && !group.isFull) group,
+    ];
+    final closed = [
+      for (final group in sorted)
+        if (!group.isCancelled && group.isFull) group,
+    ];
+    final cancelled = [
+      for (final group in sorted)
+        if (group.isCancelled) group,
+    ];
+    final cards = wide
+        ? [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _cardColumn(open)),
+                const SizedBox(width: 16),
+                Expanded(child: _cardColumn([...closed, ...cancelled])),
+              ],
+            ),
+          ]
+        : [
+            for (final group in [
+              if (open.isNotEmpty) open.first,
+              if (closed.isNotEmpty) closed.first,
+              ...open.skip(open.isEmpty ? 0 : 1),
+              ...closed.skip(closed.isEmpty ? 0 : 1),
+              ...cancelled,
+            ])
+              _GroupCard(group: group, snapshot: snapshot),
+          ];
     return ListView(
       padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 20, wide ? 32 : 16, 32),
       children: [
@@ -456,7 +491,15 @@ class _ReservationsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        for (final group in snapshot.groups) ...[
+        ...cards,
+      ],
+    );
+  }
+
+  Widget _cardColumn(List<Group> groups) {
+    return Column(
+      children: [
+        for (final group in groups) ...[
           _GroupCard(group: group, snapshot: snapshot),
           const SizedBox(height: 12),
         ],
@@ -476,23 +519,40 @@ class _GroupCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final started = !snapshot.now.isBefore(group.startsAt);
-    final progress = GroupMessages.shareProgress(
-      closed: group.isFull && !group.isCancelled,
-      paid: group.paidSeats,
-      reserved: group.reservedSeats,
-      seated: group.seatedCount,
-    );
+    final closed = group.isFull && !group.isCancelled;
+    final badge = group.isCancelled
+        ? PartnerMessages.cancelled
+        : closed
+        ? PartnerMessages.closedGroup
+        : PartnerMessages.openGroup;
+    final progress = closed
+        ? PartnerMessages.paidOf(group.paidSeats, group.totalSpots)
+        : group.isCancelled
+        ? PartnerMessages.cancelled
+        : PartnerMessages.reservedOf(group.reservedSeats, group.totalSpots);
+    final money = snapshot.moneyFor(group.id);
+    final people = [
+      for (final person in group.participants)
+        if (person.occupiesSeat) person,
+    ];
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              group.roomName,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    group.roomName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                _StatusBadge(label: badge),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
@@ -502,19 +562,28 @@ class _GroupCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              group.isCancelled ? PartnerMessages.cancelled : progress,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            Text(progress, style: const TextStyle(fontWeight: FontWeight.w700)),
+            if (money.grossCents > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                '${PartnerMessages.grossLabel} ${formatPrice(money.grossCents)} · ${PartnerMessages.commissionLabel} ${formatPrice(money.commissionCents)} · ${PartnerMessages.netLabel} ${formatPrice(money.netCents)}',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final person in people)
+                  _PlayerChip(
+                    group: group,
+                    person: person,
+                    snapshot: snapshot,
+                    canMark: started && !group.isCancelled,
+                  ),
+              ],
             ),
-            const SizedBox(height: 8),
-            for (final person in group.participants)
-              if (person.occupiesSeat)
-                _PersonRow(
-                  group: group,
-                  person: person,
-                  snapshot: snapshot,
-                  canMark: started && !group.isCancelled,
-                ),
           ],
         ),
       ),
@@ -522,8 +591,44 @@ class _GroupCard extends StatelessWidget {
   }
 }
 
-class _PersonRow extends ConsumerWidget {
-  const _PersonRow({
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final closed = label == PartnerMessages.closedGroup;
+    final cancelled = label == PartnerMessages.cancelled;
+    final background = closed
+        ? scheme.primary
+        : cancelled
+        ? scheme.errorContainer
+        : scheme.surfaceContainerHighest;
+    final foreground = closed
+        ? scheme.onPrimary
+        : cancelled
+        ? scheme.onErrorContainer
+        : scheme.onSurface;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(
+          label,
+          style: TextStyle(color: foreground, fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerChip extends ConsumerWidget {
+  const _PlayerChip({
     required this.group,
     required this.person,
     required this.snapshot,
@@ -537,39 +642,51 @@ class _PersonRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     final playerId = playerIdOf(person);
     final marked = snapshot.markedAbsent(group.id, playerId);
     final count = snapshot.absenceCount(playerId);
     final standing = snapshot.standingOf(playerId);
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  person.displayName,
+    final status = GroupMessages.paymentStatus(person.payment);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 12, right: 4),
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                '${person.displayName} · $status',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (marked)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Text(
+                  PartnerMessages.absenceLine(count, standing),
+                  key: AppKeys.partnerAbsenceStanding(group.id, playerId),
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                Text(GroupMessages.paymentStatus(person.payment)),
-              ],
-            ),
-          ),
-          if (marked)
-            Text(
-              PartnerMessages.absenceLine(count, standing),
-              key: AppKeys.partnerAbsenceStanding(group.id, playerId),
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            )
-          else if (canMark)
-            OutlinedButton(
-              key: AppKeys.partnerAbsence(group.id, playerId),
-              onPressed: () => _mark(context, ref, playerId),
-              child: const Text(PartnerMessages.markAbsence),
-            ),
-        ],
+              )
+            else if (canMark)
+              TextButton(
+                key: AppKeys.partnerAbsence(group.id, playerId),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 32),
+                ),
+                onPressed: () => _mark(context, ref, playerId),
+                child: const Text(PartnerMessages.markAbsence),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -693,8 +810,7 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
   }
 
   Future<void> _addSlot() async {
-    final raw = widget.now.add(const Duration(hours: 30));
-    final startsAt = DateTime(raw.year, raw.month, raw.day, raw.hour);
+    final startsAt = _nextOpening(widget.now);
     await ref.read(partnerRepositoryProvider).addSlot(
       roomId: widget.room.id,
       startsAt: startsAt,
@@ -795,6 +911,22 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
       ),
     );
   }
+}
+
+DateTime _nextOpening(DateTime now) {
+  const hours = <(int, int)>[(14, 0), (16, 30), (19, 0), (21, 0)];
+  var day = DateTime(now.year, now.month, now.day);
+  final earliest = now.add(const Duration(hours: 2));
+  for (var i = 0; i < 14; i++) {
+    for (final (hour, minute) in hours) {
+      final candidate = DateTime(day.year, day.month, day.day, hour, minute);
+      if (candidate.isAfter(earliest)) {
+        return candidate;
+      }
+    }
+    day = day.add(const Duration(days: 1));
+  }
+  return earliest;
 }
 
 void _snack(BuildContext context, String message) {

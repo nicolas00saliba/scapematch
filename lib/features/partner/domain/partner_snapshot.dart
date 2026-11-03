@@ -5,6 +5,25 @@ import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/partner/domain/partner_statement.dart';
 
+/// Bruto, comissão e líquido de um grupo. Reserva ainda não entrou no saldo.
+class GroupMoney {
+  const GroupMoney({
+    required this.grossCents,
+    required this.commissionCents,
+    required this.netCents,
+  });
+
+  static const zero = GroupMoney(
+    grossCents: 0,
+    commissionCents: 0,
+    netCents: 0,
+  );
+
+  final int grossCents;
+  final int commissionCents;
+  final int netCents;
+}
+
 /// O que a casa vê numa abertura do Parceiro.
 class PartnerSnapshot {
   const PartnerSnapshot({
@@ -15,6 +34,7 @@ class PartnerSnapshot {
     required this.netCents,
     required this.reservedCents,
     required this.lines,
+    required this.moneyByGroup,
     required this.groups,
     required this.rooms,
     required this.slotsByRoom,
@@ -30,7 +50,10 @@ class PartnerSnapshot {
   final int netCents;
   final int reservedCents;
   final List<StatementLine> lines;
+  final Map<String, GroupMoney> moneyByGroup;
   final List<Group> groups;
+
+  GroupMoney moneyFor(String groupId) => moneyByGroup[groupId] ?? GroupMoney.zero;
   final List<EscapeRoom> rooms;
   final Map<String, List<TimeSlot>> slotsByRoom;
 

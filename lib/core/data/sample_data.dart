@@ -445,7 +445,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   final slotIzakayaOverlap = schedule.at(
     SampleIds.slotSpIzakayaOverlap,
     izakaya.id,
-    now.add(const Duration(minutes: 100)),
+    schedule.soonAt.add(const Duration(minutes: 10)),
   );
   final slotAptoSat = schedule.soonSlot('slot-rj-apto-sat', apartamento.id);
   final slotAptoFri = schedule.free('slot-rj-apto-fri', apartamento.id, 0);
@@ -482,7 +482,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   final slotCaldeiraFechado = schedule.at(
     'slot-cwb-xv-fechado',
     caldeira.id,
-    now.subtract(const Duration(days: 1)),
+    schedule.yesterdayEvening,
   );
   final slotSarcofago = schedule.free(
     'slot-cwb-sarcofago-free',
@@ -512,46 +512,22 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   );
   final slotArena = schedule.free('slot-cwb-arena-free', arenaLaser.id, 4);
   final slotCamara = schedule.free('slot-cwb-camara-free', camara.id, 4);
-  // Horários fora da grade livre, só para os grupos extras de Curitiba.
-  final slotLabQuase = schedule.at(
-    'slot-cwb-lab-quase',
-    laboratorio.id,
-    now.add(const Duration(hours: 6)),
-  );
-  final slotSotaoQuase = schedule.at(
-    'slot-cwb-sotao-quase',
-    sotao.id,
-    now.add(const Duration(hours: 9)),
-  );
-  final slotNaveQuase = schedule.at(
-    'slot-cwb-nave-quase',
-    nave.id,
-    now.add(const Duration(hours: 12)),
-  );
-  final slotEngrenagemQuase = schedule.at(
+  // Grupos extras de Curitiba, em horários redondos da casa.
+  final slotLabQuase = schedule.openingSlot('slot-cwb-lab-quase', laboratorio.id, 0);
+  final slotSotaoQuase = schedule.openingSlot('slot-cwb-sotao-quase', sotao.id, 1);
+  final slotNaveQuase = schedule.openingSlot('slot-cwb-nave-quase', nave.id, 2);
+  final slotEngrenagemQuase = schedule.openingSlot(
     'slot-cwb-engrenagem-quase',
     engrenagem.id,
-    now.add(const Duration(hours: 18)),
+    3,
   );
-  final slotTumbaQuase = schedule.at(
-    'slot-cwb-tumba-quase',
-    tumba.id,
-    now.add(const Duration(hours: 30)),
-  );
-  final slotTrilhaQuase = schedule.at(
-    'slot-cwb-trilha-quase',
-    trilha.id,
-    now.add(const Duration(hours: 40)),
-  );
-  final slotPoraoQuase = schedule.at(
-    'slot-cwb-porao-quase',
-    poraoXv.id,
-    now.add(const Duration(hours: 60)),
-  );
-  final slotSateliteQuase = schedule.at(
+  final slotTumbaQuase = schedule.openingSlot('slot-cwb-tumba-quase', tumba.id, 4);
+  final slotTrilhaQuase = schedule.openingSlot('slot-cwb-trilha-quase', trilha.id, 5);
+  final slotPoraoQuase = schedule.openingSlot('slot-cwb-porao-quase', poraoXv.id, 6);
+  final slotSateliteQuase = schedule.openingSlot(
     'slot-cwb-satelite-quase',
     satelite.id,
-    now.add(const Duration(hours: 66)),
+    7,
   );
 
   // Two groups per city. One is almost full (1 or 2 open seats). The other
@@ -757,7 +733,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slot: schedule.at(
         'slot-cwb-cofre-missed',
         cofre.id,
-        now.add(const Duration(days: 5)),
+        schedule.opening(12),
       ),
       totalSpots: 6,
       names: ['Paula', 'Rui'],
@@ -1011,7 +987,7 @@ _nearbyPlaces({
         Difficulty.medium,
         minimumPlayers: bounds.$1,
       );
-      final startsAt = now.add(Duration(hours: 36 + (index * 5)));
+      final startsAt = schedule.opening(20 + index);
       final slot = schedule.at('slot-$id', room.id, startsAt);
       final group = _group(
         now: now,
@@ -1095,19 +1071,85 @@ class _SampleSchedule {
 
   final DateTime now;
 
-  DateTime get soonAt => _minute(now.add(const Duration(minutes: 90)));
+  /// 14:00, 16:30, 19:00 e 21:00. Fora disso a grade não marca sessão.
+  static const _openings = <(int, int)>[(14, 0), (16, 30), (19, 0), (21, 0)];
 
-  DateTime get laterAt => _minute(now.add(const Duration(days: 3, hours: 6)));
+  /// A sessão de exemplo que ainda está na janela de 2 h.
+  ///
+  /// Se couber um horário da casa nessa janela, ele entra. Senão, fica
+  /// 1 h 30 min à frente, no :00 ou :30, para o teste da janela continuar
+  /// com uma única sessão por cidade.
+  DateTime get soonAt {
+    final limit = now.add(const Duration(hours: 2));
+    for (final candidate in _walk(after: now)) {
+      if (!candidate.isBefore(limit)) {
+        break;
+      }
+      return candidate;
+    }
+    final raw = now.add(const Duration(minutes: 90));
+    final rounded = _halfHour(raw);
+    if (rounded.isAfter(now) && rounded.isBefore(limit)) {
+      return rounded;
+    }
+    final minute = _minute(raw);
+    if (minute.isAfter(now)) {
+      return minute;
+    }
+    return now.add(const Duration(minutes: 30));
+  }
 
-  DateTime get past => _minute(now.subtract(const Duration(hours: 3)));
+  /// Alguns dias à frente, de noite, fora da janela de 2 h.
+  DateTime get laterAt {
+    final day = now.add(const Duration(days: 4));
+    return DateTime(day.year, day.month, day.day, 21, 0);
+  }
+
+  /// Ontem às 19:00. A casa já pode marcar falta nessa sessão.
+  DateTime get yesterdayEvening {
+    final day = now.subtract(const Duration(days: 1));
+    return DateTime(day.year, day.month, day.day, 19, 0);
+  }
+
+  DateTime get past {
+    var day = DateTime(now.year, now.month, now.day);
+    for (var i = 0; i < 4; i++) {
+      for (final (hour, minute) in _openings.reversed) {
+        final candidate = DateTime(day.year, day.month, day.day, hour, minute);
+        if (candidate.isBefore(now)) {
+          return candidate;
+        }
+      }
+      day = day.subtract(const Duration(days: 1));
+    }
+    return now.subtract(const Duration(hours: 3));
+  }
+
+  /// O [index]-ésimo horário da casa depois da sessão curta, com pelo
+  /// menos 2 h de folga para não virar uma segunda sessão “dentro da janela”.
+  DateTime opening(int index) {
+    final afterSoon = soonAt.add(const Duration(minutes: 100));
+    final afterWindow = now.add(const Duration(hours: 2));
+    final after = afterSoon.isAfter(afterWindow) ? afterSoon : afterWindow;
+    return _walk(after: after.subtract(const Duration(minutes: 1))).elementAt(
+      index,
+    );
+  }
 
   DateTime freeAt(int index) {
-    return _minute(now.add(Duration(hours: 26 + (index * 24))));
+    final after = now.add(const Duration(hours: 26));
+    return _walk(after: after.subtract(const Duration(minutes: 1))).elementAt(
+      index,
+    );
   }
 
   TimeSlot soonSlot(String id, String roomId) => _take(id, roomId, soonAt);
 
   TimeSlot laterSlot(String id, String roomId) => _take(id, roomId, laterAt);
+
+  TimeSlot openingSlot(String id, String roomId, int index) {
+    return _take(id, roomId, opening(index));
+  }
 
   TimeSlot free(String id, String roomId, int index) {
     return _take(id, roomId, freeAt(index));
@@ -1117,9 +1159,34 @@ class _SampleSchedule {
     return _take(id, roomId, _minute(startsAt));
   }
 
+  Iterable<DateTime> _walk({required DateTime after}) sync* {
+    var day = DateTime(after.year, after.month, after.day);
+    for (var i = 0; i < 40; i++) {
+      for (final (hour, minute) in _openings) {
+        final candidate = DateTime(day.year, day.month, day.day, hour, minute);
+        if (candidate.isAfter(after)) {
+          yield candidate;
+        }
+      }
+      day = day.add(const Duration(days: 1));
+    }
+  }
+
   TimeSlot _take(String id, String roomId, DateTime startsAt) {
     return TimeSlot(id: id, roomId: roomId, startsAt: startsAt);
   }
+}
+
+DateTime _halfHour(DateTime value) {
+  if (value.minute >= 45) {
+    return DateTime(value.year, value.month, value.day, value.hour).add(
+      const Duration(hours: 1),
+    );
+  }
+  if (value.minute >= 15) {
+    return DateTime(value.year, value.month, value.day, value.hour, 30);
+  }
+  return DateTime(value.year, value.month, value.day, value.hour);
 }
 
 DateTime _minute(DateTime value) {
@@ -1142,6 +1209,8 @@ List<TimeSlot> _padRoomSlots(_SampleSchedule schedule, List<TimeSlot> slots) {
     }
     var future = entry.value
         .where((slot) => slot.startsAt.isAfter(schedule.now))
+        .map((slot) => slot.startsAt)
+        .toSet()
         .length;
     var index = 0;
     while (future < _minimumFutureSlotsPerRoom && index < 24) {

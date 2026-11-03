@@ -147,21 +147,28 @@ void main() {
 
     await tester.tap(find.text(PartnerMessages.reservations));
     await tester.pumpAndSettle();
-    expect(find.text('Nícolas'), findsOneWidget);
-    expect(find.text('Reservado'), findsWidgets);
-    expect(find.text('Pago'), findsWidgets);
-    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('Aberto'), findsWidgets);
+    expect(find.text('Fechado'), findsWidgets);
+    expect(find.text('5 de 6 reservaram'), findsWidgets);
+    expect(find.textContaining('· Pago'), findsWidgets);
+    expect(find.textContaining('· Reservado'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.textContaining('Nícolas'),
+      400,
+      scrollable: verticalScrollable,
+    );
+    expect(find.textContaining('Nícolas'), findsOneWidget);
+    final scroll = find.byWidgetPredicate(
+      (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+    );
+    tester.state<ScrollableState>(scroll.first).position.jumpTo(0);
     await tester.pumpAndSettle();
 
     final olga = '${SampleIds.groupCwbClosed}-p0';
     final absence = find.byKey(
       AppKeys.partnerAbsence(SampleIds.groupCwbClosed, olga),
     );
-    await tester.scrollUntilVisible(
-      absence,
-      400,
-      scrollable: verticalScrollable,
-    );
+    await tester.scrollUntilVisible(absence, 400, scrollable: scroll);
     await tester.ensureVisible(absence);
     await tester.pumpAndSettle();
     await tester.tap(absence);

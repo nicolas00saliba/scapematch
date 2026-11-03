@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/partner/domain/partner_account.dart';
 import 'package:scapematch/features/partner/presentation/partner_messages.dart';
@@ -32,16 +33,6 @@ void main() {
       await tester.pump();
       await _flow(tester, dir, shot.size, shot.theme, shot.suffix);
     }
-
-    const balanceOnly = [
-      (size: Size(412, 915), theme: 'dark', suffix: '412-escuro'),
-      (size: Size(1280, 900), theme: 'light', suffix: '1280-claro'),
-    ];
-    for (final shot in balanceOnly) {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-      await _balance(tester, dir, shot.size, shot.theme, shot.suffix);
-    }
   });
 }
 
@@ -53,15 +44,17 @@ Future<void> _flow(
   String suffix,
 ) async {
   await _open(tester, size, theme);
-  await _shot(tester, dir, 'login-$suffix.png', size, find.byType(TextField));
   await _enter(tester);
+  await tester.ensureVisible(find.text(PartnerMessages.capture).first);
+  await tester.pumpAndSettle();
   await _shot(
     tester,
     dir,
-    'saldo-$suffix.png',
+    'extrato-$suffix.png',
     size,
-    find.byKey(AppKeys.partnerNet),
+    find.text(PartnerMessages.capture),
   );
+
   await tester.tap(find.text(PartnerMessages.reservations));
   await tester.pumpAndSettle();
   await _shot(
@@ -69,35 +62,54 @@ Future<void> _flow(
     dir,
     'reservas-$suffix.png',
     size,
-    find.text('Reservado'),
+    find.text(PartnerMessages.closedGroup),
   );
+
+  final olga = '${SampleIds.groupCwbClosed}-p0';
+  final absence = find.byKey(
+    AppKeys.partnerAbsence(SampleIds.groupCwbClosed, olga),
+  );
+  await tester.scrollUntilVisible(absence, 300, scrollable: verticalScrollable);
+  await tester.ensureVisible(absence);
+  await tester.pumpAndSettle();
+  await _shot(tester, dir, 'falta-antes-$suffix.png', size, absence);
+  await tester.tap(absence);
+  await tester.pumpAndSettle();
+  final standing = find.byKey(
+    AppKeys.partnerAbsenceStanding(SampleIds.groupCwbClosed, olga),
+  );
+  await tester.scrollUntilVisible(
+    standing,
+    300,
+    scrollable: verticalScrollable,
+  );
+  await tester.ensureVisible(standing);
+  await tester.pumpAndSettle();
+  await _shot(tester, dir, 'falta-depois-$suffix.png', size, standing);
+
   await tester.tap(find.text(PartnerMessages.rooms));
   await tester.pumpAndSettle();
-  await _shot(
-    tester,
-    dir,
-    'salas-$suffix.png',
-    size,
-    find.text(PartnerMessages.savePrice),
-  );
-}
-
-Future<void> _balance(
-  WidgetTester tester,
-  Directory dir,
-  Size size,
-  String theme,
-  String suffix,
-) async {
-  await _open(tester, size, theme);
-  await _enter(tester);
-  await _shot(
-    tester,
-    dir,
-    'saldo-$suffix.png',
-    size,
-    find.byKey(AppKeys.partnerNet),
-  );
+  final price = find.byKey(AppKeys.partnerPrice(SampleIds.roomCwbCaldeira));
+  final save = find.byKey(AppKeys.partnerSavePrice(SampleIds.roomCwbCaldeira));
+  await tester.scrollUntilVisible(save, 400, scrollable: verticalScrollable);
+  await tester.ensureVisible(price);
+  await tester.enterText(price, '80,00');
+  await tester.ensureVisible(save);
+  await tester.tap(save);
+  await tester.pumpAndSettle();
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+  final add = find.byKey(AppKeys.partnerAddSlot(SampleIds.roomCwbCaldeira));
+  await tester.scrollUntilVisible(add, 300, scrollable: verticalScrollable);
+  await tester.ensureVisible(add);
+  await tester.tap(add);
+  await tester.pumpAndSettle();
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+  final title = find.text('A Caldeira da XV');
+  await tester.ensureVisible(title);
+  await tester.pumpAndSettle();
+  await _shot(tester, dir, 'salas-editadas-$suffix.png', size, title);
 }
 
 Future<void> _open(WidgetTester tester, Size size, String theme) async {

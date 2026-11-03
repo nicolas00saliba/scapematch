@@ -52,6 +52,10 @@ class PartnerRepository {
     final reservations = groups.payments.reservations
         .where((reservation) => reservation.houseId == houseId)
         .toList();
+    final moneyByGroup = {
+      for (final group in houseGroups)
+        group.id: _moneyFor(group.id, reservations),
+    };
     final lines = buildStatement(
       entries: groups.payments.entries,
       reservations: reservations,
@@ -77,6 +81,7 @@ class PartnerRepository {
       netCents: groups.payments.houseBalance(houseId),
       reservedCents: reservedHoldCents(reservations, houseId),
       lines: lines,
+      moneyByGroup: moneyByGroup,
       groups: houseGroups,
       rooms: rooms,
       slotsByRoom: slotsByRoom,
@@ -142,6 +147,37 @@ class PartnerRepository {
     }
     return null;
   }
+}
+
+GroupMoney _moneyFor(String groupId, List<Reservation> reservations) {
+  Reservation? reservation;
+  for (final item in reservations) {
+    if (item.groupId == groupId || item.id == groupId) {
+      reservation = item;
+      break;
+    }
+  }
+  if (reservation == null) {
+    return GroupMoney.zero;
+  }
+  var gross = 0;
+  var commission = 0;
+  var net = 0;
+  for (final share in reservation.shares) {
+    if (share.status != ShareStatus.reserved &&
+        share.status != ShareStatus.awaitingConfirmation &&
+        share.status != ShareStatus.paid) {
+      continue;
+    }
+    gross += share.amountCents;
+    commission += share.commissionCents;
+    net += share.netCents;
+  }
+  return GroupMoney(
+    grossCents: gross,
+    commissionCents: commission,
+    netCents: net,
+  );
 }
 
 int _byWhen(Group a, Group b, DateTime now) {

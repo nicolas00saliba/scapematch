@@ -40,7 +40,26 @@ abstract final class PartnerMessages {
   static const markAbsence = 'Marcar falta';
   static const pastSlots = 'horários já encerrados';
   static const noFutureSlots = 'Nenhum horário futuro nesta sala.';
+  static const openGroup = 'Aberto';
+  static const closedGroup = 'Fechado';
   static const cancelled = 'Cancelado';
+
+  static String reservedOf(int reserved, int total) {
+    if (reserved <= 0) {
+      return 'Ninguém reservou ainda';
+    }
+    return '$reserved de $total reservaram';
+  }
+
+  static String paidOf(int paid, int total) {
+    if (paid <= 0) {
+      return 'Ninguém pagou ainda';
+    }
+    if (paid == 1) {
+      return '1 de $total pagou';
+    }
+    return '$paid de $total pagaram';
+  }
   static const couldNotOpen = 'Não foi possível abrir a casa.';
   static const retry = 'Tentar de novo';
 
