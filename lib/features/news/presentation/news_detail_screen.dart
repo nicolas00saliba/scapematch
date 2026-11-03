@@ -24,6 +24,7 @@ class NewsDetailScreen extends ConsumerWidget {
     final now = ref.watch(clockProvider).now();
 
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.readingMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Novidade')),
       body: detail.when(
         loading: () => const LoadingView(message: 'Carregando a novidade...'),

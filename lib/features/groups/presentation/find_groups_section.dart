@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_grid.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -241,12 +243,32 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             message: _emptyMessage(cityName, query, gameTypeId),
           );
         }
+        final now = ref.watch(clockProvider).now();
+        void open(Group group) => context.push('/groups/${group.id}');
+        void invite(Group group) => showInviteSheet(context, group);
+        if (isScapeDesktop(context)) {
+          return ScapeWrapGrid(
+            maxColumns: 3,
+            children: [
+              for (var index = 0; index < visible.length; index++)
+                StaggerIn(
+                  index: index,
+                  child: GroupCard(
+                    now: now,
+                    group: visible[index],
+                    onTap: () => open(visible[index]),
+                    onInvite: () => invite(visible[index]),
+                  ),
+                ),
+            ],
+          );
+        }
         return _GroupWindow(
           groups: visible,
-          now: ref.watch(clockProvider).now(),
+          now: now,
           maxHeight: groupWindowHeightFor(visible.length),
-          onOpen: (group) => context.push('/groups/${group.id}'),
-          onInvite: (group) => showInviteSheet(context, group),
+          onOpen: open,
+          onInvite: invite,
         );
       },
     );

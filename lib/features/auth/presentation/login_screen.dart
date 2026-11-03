@@ -68,6 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.formMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Entrar')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),

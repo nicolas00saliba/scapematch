@@ -53,6 +53,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     final tooClose = state.slotTooClose(now);
 
     return AppScaffold(
+      desktopMaxWidth: 720,
       appBar: AppBar(
         leading: const ScapeBackButton(),
         title: const Text('Criar grupo'),

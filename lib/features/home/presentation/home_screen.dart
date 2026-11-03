@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/presentation/rooms_carousel.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
@@ -9,29 +11,42 @@ import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
 /// Home: cidade e jogo, grupos, promoções, novidades e um carrossel de salas.
+/// No site, promoções e novidades ficam lado a lado e os grupos viram grade.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const AppScaffold(
+    final desktop = isScapeDesktop(context);
+    return AppScaffold(
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _HomeHeader(),
-            SizedBox(height: 6),
-            ExampleDataBanner(),
-            SizedBox(height: 6),
-            FindGroupsSection(),
-            SizedBox(height: 12),
-            PromoCarousel(),
-            SizedBox(height: 12),
-            NewsSection(),
-            SizedBox(height: 12),
-            RoomsCarousel(),
+            _HomeHeader(showWordmark: !desktop),
+            const SizedBox(height: 6),
+            const ExampleDataBanner(),
+            const SizedBox(height: 6),
+            const FindGroupsSection(),
+            const SizedBox(height: 12),
+            if (desktop)
+              const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: PromoCarousel()),
+                  SizedBox(width: 20),
+                  Expanded(child: NewsSection()),
+                ],
+              )
+            else ...const [
+              PromoCarousel(),
+              SizedBox(height: 12),
+              NewsSection(),
+            ],
+            const SizedBox(height: 12),
+            const RoomsCarousel(),
           ],
         ),
       ),
@@ -40,27 +55,24 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
+  const _HomeHeader({required this.showWordmark});
+
+  final bool showWordmark;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Row(
       children: [
-        Flexible(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'ScapeMatch',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.4,
-              ),
+        if (showWordmark) ...[
+          const Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: ScapeLogo(),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
+          const SizedBox(width: 8),
+        ],
         // A cidade encolhe com reticências. O jogo fica da largura do rótulo.
         const Expanded(child: CitySelector(compact: true)),
         const SizedBox(width: 8),
