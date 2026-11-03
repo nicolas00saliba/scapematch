@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 
 /// Valores sugeridos, em centavos. Nada disso é cobrado.
@@ -24,7 +25,10 @@ class _AddBalanceScreenState extends State<AddBalanceScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AppScaffold(
-      appBar: AppBar(title: const Text('Adicionar saldo')),
+      appBar: AppBar(
+        leading: ScapeBackButton(),
+        title: Text('Adicionar saldo'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [

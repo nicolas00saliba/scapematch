@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/presentation/room_card.dart';
@@ -20,7 +21,7 @@ class RoomCategoryScreen extends ConsumerWidget {
     final category = roomCategoryByName(categoryName);
     final title = category == null ? 'Salas' : roomCategoryLabel(category);
     return AppScaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(leading: const ScapeBackButton(), title: Text(title)),
       body: category == null
           ? const _Missing(message: 'Esse tema não existe.')
           : _CategoryList(category: category),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/domain/player_range.dart';
@@ -22,9 +23,15 @@ class RoomDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final rooms = ref.watch(roomCatalogViewModelProvider);
     return rooms.when(
-      loading: () =>
-          const AppScaffold(body: LoadingView(message: 'Carregando sala...')),
+      loading: () => AppScaffold(
+        appBar: AppBar(
+          leading: const ScapeBackButton(),
+          title: const Text('Sala'),
+        ),
+        body: const LoadingView(message: 'Carregando sala...'),
+      ),
       error: (error, stackTrace) => AppScaffold(
+        appBar: AppBar(leading: ScapeBackButton(), title: Text('Sala')),
         body: ErrorView(
           message: 'Não foi possível carregar esta sala.',
           onRetry: () => ref.invalidate(roomCatalogViewModelProvider),
@@ -39,8 +46,12 @@ class RoomDetailScreen extends ConsumerWidget {
           }
         }
         if (listing == null) {
-          return const AppScaffold(
-            body: EmptyView(
+          return AppScaffold(
+            appBar: AppBar(
+              leading: const ScapeBackButton(),
+              title: const Text('Sala'),
+            ),
+            body: const EmptyView(
               title: 'Sala não encontrada',
               message: 'Essa sala não está no catálogo desta cidade.',
               icon: Icons.meeting_room_outlined,
@@ -69,17 +80,27 @@ class _RoomDetail extends StatelessWidget {
         key: AppKeys.roomDetail(room.id),
         padding: EdgeInsets.zero,
         children: [
-          Hero(
-            tag: roomHeroTag(room.id),
-            child: Material(
-              type: MaterialType.transparency,
-              child: SizedBox(
-                height: 280,
-                child: ScapePhoto(
-                  asset: photos.first,
-                  semanticLabel: room.name,
+          SizedBox(
+            height: 280,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Hero(
+                  tag: roomHeroTag(room.id),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ScapePhoto(
+                      asset: photos.first,
+                      semanticLabel: room.name,
+                    ),
+                  ),
                 ),
-              ),
+                const Positioned(
+                  left: 0,
+                  top: 0,
+                  child: ScapeCoverBackButton(),
+                ),
+              ],
             ),
           ),
           Padding(

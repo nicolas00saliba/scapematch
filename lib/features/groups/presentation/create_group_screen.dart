@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/option_sheet.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
@@ -52,7 +53,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     final tooClose = state.slotTooClose(now);
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Criar grupo')),
+      appBar: AppBar(
+        leading: const ScapeBackButton(),
+        title: const Text('Criar grupo'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/account_list_tile.dart';
@@ -33,7 +34,7 @@ class AccountDestinationScreen extends ConsumerWidget {
     };
 
     return AppScaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(leading: const ScapeBackButton(), title: Text(title)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [

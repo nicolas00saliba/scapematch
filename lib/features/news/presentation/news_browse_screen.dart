@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -24,7 +25,7 @@ class NewsBrowseScreen extends ConsumerWidget {
     final cityName = _cityName(ref);
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Novidades')),
+      appBar: AppBar(leading: ScapeBackButton(), title: Text('Novidades')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [

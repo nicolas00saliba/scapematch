@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/relative_time.dart';
 import 'package:scapematch/core/sharing/external_url.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
@@ -25,12 +24,7 @@ class NewsDetailScreen extends ConsumerWidget {
     final now = ref.watch(clockProvider).now();
 
     return AppScaffold(
-      appBar: AppBar(
-        title: const Text('Novidade'),
-        // Deep link chega sem pilha. O voltar padrão não aparece, então
-        // o botão leva para a Home.
-        leading: context.canPop() ? null : const _HomeBackButton(),
-      ),
+      appBar: AppBar(leading: ScapeBackButton(), title: Text('Novidade')),
       body: detail.when(
         loading: () => const LoadingView(message: 'Carregando a novidade...'),
         error: (error, stackTrace) => ErrorView(
@@ -48,20 +42,6 @@ class NewsDetailScreen extends ConsumerWidget {
           return _Detail(item: item, now: now);
         },
       ),
-    );
-  }
-}
-
-class _HomeBackButton extends StatelessWidget {
-  const _HomeBackButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      key: AppKeys.newsBackHome,
-      tooltip: 'Voltar para a Home',
-      icon: const BackButtonIcon(),
-      onPressed: () => context.go('/'),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
@@ -27,7 +28,10 @@ class InviteScreen extends ConsumerWidget {
     final detail = ref.watch(groupDetailViewModelProvider(groupId));
     final now = ref.watch(clockProvider).now();
     return AppScaffold(
-      appBar: AppBar(title: const Text('Convite')),
+      appBar: AppBar(
+        leading: const ScapeBackButton(),
+        title: const Text('Convite'),
+      ),
       body: detail.when(
         loading: () => const LoadingView(message: 'Carregando o convite...'),
         error: (error, stackTrace) => EmptyView(

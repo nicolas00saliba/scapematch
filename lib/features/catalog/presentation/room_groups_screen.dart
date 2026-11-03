@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
@@ -26,7 +27,7 @@ class RoomGroupsScreen extends ConsumerWidget {
     final title = listing.asData?.value?.room.name ?? 'Grupos da sala';
 
     return AppScaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(leading: const ScapeBackButton(), title: Text(title)),
       body: groups.when(
         skipLoadingOnReload: true,
         loading: () =>

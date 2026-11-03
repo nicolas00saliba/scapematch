@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -43,7 +44,7 @@ class NoticeScreen extends ConsumerWidget {
     final notices = inbox.asData?.value ?? const <AppNotice>[];
     final theme = Theme.of(context);
     return AppScaffold(
-      appBar: AppBar(title: const Text('Avisos')),
+      appBar: AppBar(leading: ScapeBackButton(), title: Text('Avisos')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [

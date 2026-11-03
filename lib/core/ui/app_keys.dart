@@ -99,6 +99,7 @@ abstract final class AppKeys {
   static const newsCategoryAll = Key('news-category-all');
   static const newsRetry = Key('news-retry');
   static const newsBackHome = Key('news-back-home');
+  static const scapeBack = Key('scape-back');
   static const myGroupsSignIn = Key('my-groups-sign-in');
   static const myGroupsUpcoming = Key('my-groups-upcoming');
   static const myGroupsPast = Key('my-groups-past');

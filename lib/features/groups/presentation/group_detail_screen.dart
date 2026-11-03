@@ -10,6 +10,7 @@ import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
@@ -72,6 +73,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final userId = ref.watch(currentUserProvider).id;
     return AppScaffold(
       appBar: AppBar(
+        leading: const ScapeBackButton(),
         title: const Text('Grupo'),
         actions: detail.maybeWhen(
           data: (group) => [

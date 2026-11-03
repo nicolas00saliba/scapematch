@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 
 class LegalScreen extends StatelessWidget {
@@ -21,7 +22,7 @@ class LegalScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final status = ScapeStatusColors.of(context);
     return AppScaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(leading: const ScapeBackButton(), title: Text(title)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
