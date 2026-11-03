@@ -1,9 +1,8 @@
-import 'dart:math' as math;
-
 import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
@@ -30,6 +29,8 @@ Future<bool> showPayShareSheet({
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
+    barrierColor: Colors.black.withValues(alpha: 0.48),
+    backgroundColor: Theme.of(context).colorScheme.surface,
     builder: (context) {
       return PayShareSheet(
         amountCents: amountCents,
@@ -279,7 +280,28 @@ class _PixPanel extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Column(
       children: [
-        const _FakeQr(size: 168),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: QrImageView(
+              data: code,
+              size: 168,
+              backgroundColor: Colors.white,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: Colors.black,
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         Text(
           'Pix simulado. O código abaixo não cobra.',
@@ -419,11 +441,15 @@ class _Confirmed extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.6, end: 1),
+            tween: Tween(begin: 0, end: 1),
             duration: scapeDuration(context, const Duration(milliseconds: 420)),
             curve: Curves.easeOutBack,
             builder: (context, value, child) {
-              return Transform.scale(scale: value, child: child);
+              final scale = 0.72 + (0.28 * value);
+              return Opacity(
+                opacity: value.clamp(0, 1),
+                child: Transform.scale(scale: scale, child: child),
+              );
             },
             child: Container(
               width: 84,
@@ -467,86 +493,4 @@ class _Confirmed extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Grade fictícia no formato de um QR. Não é um código que um banco lê.
-class _FakeQr extends StatelessWidget {
-  const _FakeQr({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final ink = Theme.of(context).colorScheme.onSurface;
-    final paper = Theme.of(context).colorScheme.surface;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: paper,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: CustomPaint(
-          size: Size.square(size),
-          painter: _QrPainter(ink: ink, paper: paper),
-        ),
-      ),
-    );
-  }
-}
-
-class _QrPainter extends CustomPainter {
-  const _QrPainter({required this.ink, required this.paper});
-
-  final Color ink;
-  final Color paper;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const cells = 25;
-    final cell = size.width / cells;
-    final paint = Paint()..color = ink;
-    canvas.drawRect(Offset.zero & size, Paint()..color = paper);
-    for (var y = 0; y < cells; y++) {
-      for (var x = 0; x < cells; x++) {
-        if (_finder(x, y, cells) || _module(x, y)) {
-          canvas.drawRect(
-            Rect.fromLTWH(x * cell, y * cell, cell - 0.4, cell - 0.4),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  bool _finder(int x, int y, int cells) {
-    return _eye(x, y) || _eye(x - (cells - 7), y) || _eye(x, y - (cells - 7));
-  }
-
-  bool _eye(int x, int y) {
-    if (x < 0 || y < 0 || x > 6 || y > 6) {
-      return false;
-    }
-    final edge = x == 0 || y == 0 || x == 6 || y == 6;
-    final core = x >= 2 && x <= 4 && y >= 2 && y <= 4;
-    return edge || core;
-  }
-
-  bool _module(int x, int y) {
-    if (x < 8 && y < 8) {
-      return false;
-    }
-    if (x > 16 && y < 8) {
-      return false;
-    }
-    if (x < 8 && y > 16) {
-      return false;
-    }
-    return math.sin(x * 12.9898 + y * 78.233).abs() > 0.45;
-  }
-
-  @override
-  bool shouldRepaint(covariant _QrPainter oldDelegate) =>
-      oldDelegate.ink != ink || oldDelegate.paper != paper;
 }

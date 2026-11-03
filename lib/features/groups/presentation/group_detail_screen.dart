@@ -1413,7 +1413,13 @@ class _PayerRow extends StatelessWidget {
     final tone = paid ? scheme.primary : scheme.secondary;
     return Row(
       children: [
-        PersonAvatar(name: person.displayName, radius: 18, portrait: portrait),
+        person.isLocalUser
+            ? _AccountAvatar(name: person.displayName)
+            : PersonAvatar(
+                name: person.displayName,
+                radius: 18,
+                portrait: portrait,
+              ),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -1438,6 +1444,25 @@ class _PayerRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Quem está usando o app. Iniciais, para não herdar a foto de outra pessoa.
+class _AccountAvatar extends StatelessWidget {
+  const _AccountAvatar({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final letter = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: scheme.primaryContainer,
+      foregroundColor: scheme.onPrimaryContainer,
+      child: Text(letter, style: const TextStyle(fontWeight: FontWeight.w800)),
     );
   }
 }

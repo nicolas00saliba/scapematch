@@ -185,23 +185,19 @@ Future<void> _shot(
   Size expected,
   Finder anchor,
 ) async {
-  final visible = anchor.hitTestable();
-  final resolved = visible.evaluate().isNotEmpty ? visible.first : anchor.first;
-  RenderRepaintBoundary? boundary;
-  tester.element(resolved).visitAncestorElements((ancestor) {
-    final render = ancestor.renderObject;
-    if (render is RenderRepaintBoundary &&
-        render.size.width >= expected.width - 1 &&
-        render.size.height >= expected.height - 1) {
-      boundary = render;
-    }
-    return true;
-  });
-  final found = boundary;
-  expect(found, isNotNull, reason: name);
-  final image = await tester.runAsync(() => found!.toImage(pixelRatio: 1));
-  expect(image!.width, expected.width.round());
-  expect(image.height, expected.height.round());
+  expect(anchor, findsWidgets, reason: name);
+  await tester.pump();
+  final view = tester.binding.renderViews.first;
+  // O layer raiz compõe o grupo e o véu. O boundary do sheet não traz a tela de trás.
+  // ignore: invalid_use_of_protected_member
+  final layer = view.layer;
+  expect(layer, isA<OffsetLayer>(), reason: name);
+  final image = await tester.runAsync(
+    () =>
+        (layer! as OffsetLayer).toImage(Offset.zero & view.size, pixelRatio: 1),
+  );
+  expect(image!.width, expected.width.round(), reason: name);
+  expect(image.height, expected.height.round(), reason: name);
   final bytes = await tester.runAsync(
     () => image.toByteData(format: ui.ImageByteFormat.png),
   );
