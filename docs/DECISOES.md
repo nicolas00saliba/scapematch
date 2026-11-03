@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## Dividir a reserva mostra a maquininha e as mãos
+
+- **Data:** 2026-11-03
+- **Decisão:** a tela “Dividir a reserva” usa uma imagem gerada por IA para o ScapeMatch: uma maquininha no centro e seis mãos em volta, cada uma com um cartão. A foto cobre a tela inteira com `BoxFit.cover`. O alinhamento é `Alignment(0, -0.35)`, para a maquininha e as mãos ficarem acima do título.
+- **Motivo:** a foto anterior mostrava só uma mão inserindo o cartão.
+- **Onde está no código:** a página da reserva em `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
+- **Como trocar depois:** outra foto entra em `assets/images/onboarding/reservar.jpg`. O enquadramento entra no `alignment` dessa página.
+
 ## Porto Alegre é a Casa de Cultura Mario Quintana
 
 - **Data:** 2026-11-02

@@ -66,6 +66,9 @@ const _pages = <_OnboardingPage>[
     asset: 'assets/images/onboarding/reservar.jpg',
     title: OnboardingMessages.payTitle,
     body: OnboardingMessages.payBody,
+    // A maquininha fica no centro, um pouco acima. O y negativo segura
+    // ela e as mãos quando a tela é mais larga que a foto.
+    alignment: Alignment(0, -0.35),
   ),
 ];
 
