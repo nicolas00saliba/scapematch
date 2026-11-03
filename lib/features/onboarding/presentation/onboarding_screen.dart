@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -235,6 +236,13 @@ class _PageBody extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      ScapeLogo(
+                        height: constraints.maxWidth >= scapeWideLogoWidth
+                            ? 52
+                            : 40,
+                        onDark: true,
+                      ),
+                      const SizedBox(height: 16),
                       Text(
                         page.title,
                         style: theme.textTheme.headlineSmall?.copyWith(

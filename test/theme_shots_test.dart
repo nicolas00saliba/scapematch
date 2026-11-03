@@ -12,6 +12,7 @@ import 'package:scapematch/features/map/presentation/map_tiles.dart' as tiles;
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/features/map/data/user_location.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -85,7 +86,7 @@ void main() {
       dir,
       'home-390-dark.png',
       const Size(390, 844),
-      find.text('ScapeMatch'),
+      find.byType(ScapeLogo),
     );
     await _resize(tester, const Size(1280, 800));
     await _capture(
@@ -93,7 +94,7 @@ void main() {
       dir,
       'home-1280-dark.png',
       const Size(1280, 800),
-      find.text('ScapeMatch'),
+      find.byType(ScapeLogo),
     );
 
     await tester.tap(find.byKey(AppKeys.accountTab));
@@ -111,7 +112,7 @@ void main() {
       dir,
       'home-1280-light.png',
       const Size(1280, 800),
-      find.text('ScapeMatch'),
+      find.byType(ScapeLogo),
     );
     await _resize(tester, const Size(390, 844));
     await _capture(
@@ -119,7 +120,7 @@ void main() {
       dir,
       'home-390-light.png',
       const Size(390, 844),
-      find.text('ScapeMatch'),
+      find.byType(ScapeLogo),
     );
 
     await _openNear(tester);

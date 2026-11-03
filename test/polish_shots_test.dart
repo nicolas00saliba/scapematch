@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/features/map/data/user_location.dart';
 import 'package:scapematch/features/map/presentation/map_tiles.dart' as tiles;
@@ -50,7 +51,7 @@ void main() {
     );
     await _resize(tester, const Size(390, 844));
     await tester.runAsync(() async {
-      final context = tester.element(find.text('ScapeMatch'));
+      final context = tester.element(find.byType(ScapeLogo));
       for (final asset in PersonPortraits.assets) {
         await precacheImage(AssetImage(asset), context);
       }
@@ -61,7 +62,7 @@ void main() {
       dir,
       'home-390-light.png',
       const Size(390, 844),
-      find.text('ScapeMatch'),
+      find.byType(ScapeLogo),
     );
     await _resize(tester, const Size(1280, 800));
     await _shot(
@@ -69,7 +70,7 @@ void main() {
       dir,
       'home-1280-light.png',
       const Size(1280, 800),
-      find.text('ScapeMatch'),
+      find.byType(ScapeLogo),
     );
     await _resize(tester, const Size(390, 844));
 
@@ -164,7 +165,7 @@ void main() {
       dir,
       'home-390-dark.png',
       const Size(390, 844),
-      find.text('ScapeMatch'),
+      find.byType(ScapeLogo),
     );
 
     GoRouter.of(tester.element(find.byType(Scaffold).first))

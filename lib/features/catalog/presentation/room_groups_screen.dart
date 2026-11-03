@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_grid.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
@@ -66,14 +67,17 @@ class RoomGroupsScreen extends ConsumerWidget {
                       : 'Ainda não há grupo nesta sala. Crie um.',
                 )
               else
-                for (var index = 0; index < visible.length; index++) ...[
-                  if (index > 0) const SizedBox(height: 10),
-                  GroupCard(
-                    group: visible[index],
-                    now: ref.watch(clockProvider).now(),
-                    onTap: () => context.push('/groups/${visible[index].id}'),
-                  ),
-                ],
+                ScapeWrapGrid(
+                  maxColumns: 2,
+                  children: [
+                    for (final group in visible)
+                      GroupCard(
+                        group: group,
+                        now: ref.watch(clockProvider).now(),
+                        onTap: () => context.push('/groups/${group.id}'),
+                      ),
+                  ],
+                ),
               const SizedBox(height: 16),
               FilledButton.icon(
                 key: AppKeys.roomGroupsCreate(roomId),

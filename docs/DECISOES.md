@@ -1,5 +1,21 @@
 # Decisões provisórias
 
+## O logo definitivo tem duas formas
+
+- **Data:** 2026-11-03
+- **Decisão:** o Nícolas aprovou o logo. O pin é verde-petróleo `#0F4C4A`, o círculo é branco, as três pessoas são cobre `#D2642A` e a fechadura é do mesmo petróleo do pin. O letreiro é Poppins 500: “Scape” em petróleo e “Match” em cobre. O logo completo (pin e letreiro) vai onde há espaço: topo do site largo, landing, introdução e o login do Parceiro. O símbolo, sem letreiro, vai nos lugares compactos: ícone do app, favicon, barra do celular, avatar e ícones PWA. No tema escuro, ou sobre foto escura, o pin e a palavra “Scape” ficam claros (`#F4F1EA`); as pessoas e “Match” continuam cobre. Os ícones do app são o símbolo com pin branco e pessoas cobre, centralizado em fundo `#0F4C4A`.
+- **Motivo:** a marca deixou de ser só o texto “ScapeMatch” e passou a ter um desenho único, com regra de onde entra cada versão.
+- **Onde está no código:** `assets/brand/`, `ScapeLogo` e os ícones em `web/`, `android/` e `ios/`. O letreiro é desenhado no widget com Poppins 500, porque o SVG aponta para a fonte e não traz as letras em traço. A barra do site usa a variante completa.
+- **Como trocar depois:** outro desenho entra nos arquivos de `assets/brand/` e o widget só troca o arquivo. A landing e o login do Parceiro usam `ScapeLogo` completo.
+
+## No computador o jogador usa um site
+
+- **Data:** 2026-11-03
+- **Decisão:** a partir de 960px de largura o ScapeMatch deixa de ser uma coluna de celular no centro. A navegação (Home, Perto de você, Meus grupos, Conta) sobe para o topo, ao lado da marca. A Home mostra os grupos em grade, com promoções e novidades lado a lado. A sala abre a galeria à esquerda e os botões Achar grupo e Criar grupo numa coluna à direita. O mapa largo, que já tinha a lista ao lado, continua. Abaixo de 960px o app de celular não muda: barra embaixo e janela de grupos. A marca no topo largo é o logo completo.
+- **Motivo:** no computador a página era o app esticado. A demonstração de sexta precisa parecer um site, e a pessoa tem que conseguir fazer tudo por lá.
+- **Onde está no código:** `isScapeDesktop`, `AppShell`, `AppScaffold`, `ScapeWrapGrid`, `ScapeLogo` e a ficha da sala.
+- **Como trocar depois:** outro corte de largura entra em `scapeDesktopMinWidth`. O desenho da marca entra em `ScapeLogo`.
+
 ## Quem não pagou até o prazo perde a vaga
 
 - **Data:** 2026-11-03

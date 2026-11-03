@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
+import 'package:scapematch/core/ui/scape_grid.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/presentation/room_card.dart';
@@ -69,10 +70,12 @@ class _CategoryList extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            for (var index = 0; index < inCategory.length; index++) ...[
-              if (index > 0) const SizedBox(height: 12),
-              RoomCard(listing: inCategory[index]),
-            ],
+            ScapeWrapGrid(
+              maxColumns: 3,
+              children: [
+                for (final listing in inCategory) RoomCard(listing: listing),
+              ],
+            ),
           ],
         );
       },

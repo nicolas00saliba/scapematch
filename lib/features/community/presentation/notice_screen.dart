@@ -44,6 +44,7 @@ class NoticeScreen extends ConsumerWidget {
     final notices = inbox.asData?.value ?? const <AppNotice>[];
     final theme = Theme.of(context);
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.readingMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Avisos')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),

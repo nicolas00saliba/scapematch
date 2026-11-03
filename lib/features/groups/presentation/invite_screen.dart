@@ -28,6 +28,7 @@ class InviteScreen extends ConsumerWidget {
     final detail = ref.watch(groupDetailViewModelProvider(groupId));
     final now = ref.watch(clockProvider).now();
     return AppScaffold(
+      desktopMaxWidth: 720,
       appBar: AppBar(
         leading: const ScapeBackButton(),
         title: const Text('Convite'),
