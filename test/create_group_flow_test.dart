@@ -41,7 +41,7 @@ void main() {
     expect(find.text('Ana Teste'), findsOneWidget);
     expect(find.text('Você'), findsNothing);
     expect(find.text('Você está neste grupo'), findsOneWidget);
-    expect(find.text('1 de 3 vagas'), findsOneWidget);
+    expect(find.text('1/3'), findsOneWidget);
     expect(find.byType(CreateGroupScreen), findsNothing);
 
     await tester.tap(find.byType(BackButton));
@@ -53,11 +53,11 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('1 de 3 vagas'),
+      find.text('1/3'),
       300,
       scrollable: verticalScrollable,
     );
-    expect(find.text('1 de 3 vagas'), findsOneWidget);
+    expect(find.text('1/3'), findsOneWidget);
     expect(find.text('A Estufa'), findsWidgets);
   });
 

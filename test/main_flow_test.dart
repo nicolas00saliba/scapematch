@@ -63,12 +63,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Entrar no grupo'), findsOneWidget);
-    expect(_spotSummary(tester), '5 de 6 vagas');
+    expect(_spotSummary(tester), '5/6');
 
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
 
-    expect(_spotSummary(tester), '6 de 6 vagas');
+    expect(_spotSummary(tester), '6/6');
     expect(find.text('Você está neste grupo'), findsOneWidget);
     expect(find.text('Entrar no grupo'), findsNothing);
 
@@ -84,7 +84,7 @@ void main() {
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
     );
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '6 de 6 vagas');
+    expect(_spotSummary(tester), '6/6');
     expect(find.text('Entrar no grupo'), findsNothing);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
@@ -100,7 +100,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Entrar no grupo'), findsOneWidget);
-    expect(find.text('1 de 4 vagas'), findsOneWidget);
+    expect(find.text('1/4'), findsOneWidget);
     expect(_joinEnabled(tester), isTrue);
   });
 
@@ -130,8 +130,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Grupo cheio'), findsOneWidget);
-    expect(_spotSummary(tester), '6 de 6 vagas');
+    expect(find.text('Grupo fechado'), findsWidgets);
+    expect(_spotSummary(tester), '6/6');
     expect(_joinEnabled(tester), isFalse);
   });
 
@@ -198,7 +198,7 @@ void main() {
     }
 
     expect(find.byKey(AppKeys.extraSpotsValue), findsOneWidget);
-    expect(_extraSpots(tester), '5');
+    expect(_extraSpots(tester), '6');
     expect(
       tester
           .widget<IconButton>(find.byKey(AppKeys.extraSpotsIncrement))
@@ -227,7 +227,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.extraSpotsDecrement));
     await tester.pump();
 
-    expect(_extraSpots(tester), '3');
+    expect(_extraSpots(tester), '4');
     expect(find.byKey(AppKeys.capacityError), findsNothing);
 
     await tester.scrollUntilVisible(

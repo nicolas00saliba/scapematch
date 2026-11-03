@@ -59,7 +59,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           const ExampleDataBanner(),
           const SizedBox(height: 16),
           Text(
-            'Você entra como a primeira pessoa. As vagas abaixo são as pessoas que ainda faltam.',
+            'Você entra como a primeira pessoa. O número abaixo é quantas pessoas fecham o grupo, contando você.',
             style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
           ),
           const SizedBox(height: 16),
@@ -113,16 +113,23 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Vagas além de você',
+            'Pessoas para fechar',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Pessoas que ainda faltam, sem contar você.',
+            state.room == null
+                ? 'Escolha a sala para ver o mínimo e o máximo.'
+                : GroupMessages.allowedTarget(
+                    minimum: state.room!.minimumPlayers,
+                    maximum: state.room!.capacity,
+                  ),
+            key: AppKeys.targetRange,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              height: 1.35,
             ),
           ),
           const SizedBox(height: 8),
@@ -136,10 +143,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                           .setExtraSpots(state.extraSpots - 1)
                     : null,
                 icon: const Icon(Icons.remove),
-                tooltip: 'Diminuir vagas',
+                tooltip: 'Diminuir pessoas',
               ),
               Text(
-                '${state.extraSpots}',
+                '${state.groupSize}',
                 key: AppKeys.extraSpotsValue,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -153,14 +160,15 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                           .setExtraSpots(state.extraSpots + 1)
                     : null,
                 icon: const Icon(Icons.add),
-                tooltip: 'Aumentar vagas',
+                tooltip: 'Aumentar pessoas',
               ),
             ],
           ),
           if (state.room != null) ...[
             const SizedBox(height: 8),
             Text(
-              'O grupo ficaria com ${state.groupSize} pessoas. A sala ${state.room!.name} comporta ${state.room!.capacity}.',
+              'O host quer ${state.groupSize} para fechar. '
+              'A sala aceita de ${state.room!.minimumPlayers} a ${state.room!.capacity}.',
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
             ),
           ],
@@ -232,11 +240,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     return switch (state.sizeValidation) {
       GroupSizeValidation.valid => null,
       GroupSizeValidation.belowMinimum =>
-        'Informe pelo menos 1 vaga além de você.',
+        'O grupo precisa de pelo menos 2 pessoas, contando você.',
       GroupSizeValidation.belowRoomMinimum =>
         'Esta sala pede pelo menos ${state.room!.minimumPlayers} pessoas no grupo.',
       GroupSizeValidation.exceedsRoomCapacity =>
-        'Você + ${state.extraSpots} vagas ultrapassa a capacidade da sala (${state.room!.capacity}).',
+        '${state.groupSize} pessoas ultrapassa a capacidade da sala (${state.room!.capacity}).',
     };
   }
 

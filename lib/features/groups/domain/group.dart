@@ -80,7 +80,8 @@ class Group {
   /// deadline. Null while the group is active.
   final DateTime? cancelledAt;
 
-  /// Pessoas para o grupo ficar pronto para reservar. Vem da sala.
+  /// Mínimo da sala copiado no grupo. O prazo de fechar ainda usa este
+  /// número. O host fecha o grupo em [totalSpots], não aqui.
   final int minimumSpots;
 
   /// Prazo para atingir [minimumSpots]. Sem data, vale 1 h antes do início.
@@ -143,8 +144,11 @@ class Group {
     return GroupPhase.forming;
   }
 
+  /// Pessoas que ainda faltam para o número que o host escolheu.
+  ///
+  /// [filledSpots] já conta o host. O grupo fecha quando este valor chega a 0.
   int get spotsUntilClose {
-    final missing = minimumSpots - filledSpots;
+    final missing = totalSpots - filledSpots;
     return missing < 0 ? 0 : missing;
   }
 

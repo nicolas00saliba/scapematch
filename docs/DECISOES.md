@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## O host escolhe quantas pessoas fecham o grupo
+
+- **Data:** 2026-11-03
+- **Decisão:** cada sala tem mínimo X e máximo Y. O host escolhe Z, com X ≤ Z ≤ Y, na criação do grupo. N é quem está no grupo agora, contando o host. O contador é N/Z. “Faltam” conta Z − N. Quando N chega em Z, o grupo fecha: ninguém mais entra e o botão de entrar fica desabilitado. A lista de espera continua. O prazo antigo, de não atingir o mínimo da sala, continua valendo para cancelar o grupo que não formou.
+- **Motivo:** os cards só diziam “4 de 10 vagas” e “faltam” a partir do mínimo da sala, sem mostrar X, Y e o alvo do host.
+- **Onde está no código:** `Group.totalSpots`, `Group.spotsUntilClose`, `GroupSeatFacts` e a criação do grupo.
+- **Como trocar depois:** outro texto entra em `GroupMessages`. O intervalo de Z entra em `GroupRules.validateGroupSize`.
+
 ## Dividir a reserva mostra a maquininha e as mãos
 
 - **Data:** 2026-11-03

@@ -33,11 +33,16 @@ void main() {
     );
     expect(almost.roomMinimum, 4);
     expect(almost.minimumSpots, 6);
-    expect(almost.spotsUntilClose, 1);
+    expect(almost.filledSpots, 5);
+    expect(almost.participants.where((person) => person.isCreator).length, 1);
+    expect(almost.spotsUntilClose, almost.totalSpots - almost.filledSpots);
     for (final group in database.groups) {
       expect(group.minimumSpots, greaterThanOrEqualTo(group.roomMinimum));
       expect(group.minimumSpots, lessThanOrEqualTo(group.roomCapacity));
-      expect(group.totalSpots, greaterThanOrEqualTo(group.minimumSpots));
+      expect(group.totalSpots, greaterThanOrEqualTo(group.roomMinimum));
+      expect(group.totalSpots, lessThanOrEqualTo(group.roomCapacity));
+      expect(group.filledSpots, inInclusiveRange(1, group.totalSpots));
+      expect(group.participants.first.isCreator, isTrue);
     }
   });
 

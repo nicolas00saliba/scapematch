@@ -154,8 +154,24 @@ class GroupPinSheet extends StatelessWidget {
                 Text(formatSession(group.startsAt)),
                 const SizedBox(height: 6),
                 Text(
-                  '${group.filledSpots} de ${group.totalSpots} vagas',
+                  GroupMessages.seatCount(group.filledSpots, group.totalSpots),
                   style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  GroupMessages.roomBounds(
+                    minimum: group.roomMinimum,
+                    maximum: group.roomCapacity,
+                  ),
+                ),
+                Text(GroupMessages.hostTarget(group.totalSpots)),
+                const SizedBox(height: 4),
+                Text(
+                  GroupMessages.spotsUntilClose(group.spotsUntilClose),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.secondary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -164,7 +180,9 @@ class GroupPinSheet extends StatelessWidget {
                 if (group.showCloseDeadline(now)) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '${GroupMessages.spotsUntilClose(group.spotsUntilClose)} · até ${formatSession(group.closesAtResolved)}',
+                    GroupMessages.closesAtLabel(
+                      formatSession(group.closesAtResolved),
+                    ),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: scheme.secondary,
                       fontWeight: FontWeight.w700,

@@ -229,7 +229,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${group.filledSpots} de ${group.totalSpots} vagas',
+                      GroupMessages.seatCount(
+                        group.filledSpots,
+                        group.totalSpots,
+                      ),
                       key: AppKeys.spotSummary,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
@@ -272,8 +275,20 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                       ),
                     const SizedBox(height: 8),
                     Text(
-                      'O grupo quer ${group.totalSpots} pessoas. '
-                      'A sala comporta até ${group.roomCapacity}.',
+                      GroupMessages.roomBounds(
+                        minimum: group.roomMinimum,
+                        maximum: group.roomCapacity,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(GroupMessages.hostTarget(group.totalSpots)),
+                    const SizedBox(height: 8),
+                    Text(
+                      GroupMessages.roomAccepts(
+                        minimum: group.roomMinimum,
+                        maximum: group.roomCapacity,
+                        target: group.totalSpots,
+                      ),
                       style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
                     ),
                     if (me != null &&
@@ -627,7 +642,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           const FilledButton(
             key: AppKeys.joinButton,
             onPressed: null,
-            child: Text('Grupo cheio'),
+            child: Text('Grupo fechado'),
           ),
         );
         buttons.add(

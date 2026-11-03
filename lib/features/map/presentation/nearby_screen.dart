@@ -12,7 +12,7 @@ import 'package:scapematch/core/sharing/external_url.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
-import 'package:scapematch/features/catalog/domain/player_range.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -688,10 +688,9 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                         '${item.group.houseName} · ${formatSession(item.group.startsAt)}',
                       ),
                       Text(
-                        playerRangeLabel(
-                          minimum: item.group.roomMinimum,
-                          maximum: item.group.roomCapacity,
-                        ),
+                        '${GroupMessages.seatCount(item.group.filledSpots, item.group.totalSpots)} · ${GroupMessages.roomBounds(minimum: item.group.roomMinimum, maximum: item.group.roomCapacity)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),

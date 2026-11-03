@@ -10,6 +10,7 @@ import 'package:scapematch/features/catalog/domain/player_range.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/presentation/room_catalog_view_model.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 /// Sala aberta a partir do cartão. A capa continua o voo do Hero.
 class RoomDetailScreen extends ConsumerWidget {
@@ -91,6 +92,17 @@ class _RoomDetail extends StatelessWidget {
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  GroupMessages.roomBounds(
+                    minimum: room.minimumPlayers,
+                    maximum: room.capacity,
+                  ),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 4),

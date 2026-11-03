@@ -86,7 +86,7 @@ class _InviteBody extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '${group.filledSpots} de ${group.totalSpots} vagas · $spots',
+          '${GroupMessages.seatCount(group.filledSpots, group.totalSpots)} · $spots',
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w800,
           ),
@@ -135,7 +135,7 @@ class _InviteBody extends ConsumerWidget {
           const FilledButton(
             key: AppKeys.participate,
             onPressed: null,
-            child: Text('Grupo cheio'),
+            child: Text('Grupo fechado'),
           )
         else
           FilledButton(
