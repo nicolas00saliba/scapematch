@@ -117,7 +117,13 @@ void main() {
   testWidgets('leaving inside two hours warns that there is no refund', (
     tester,
   ) async {
-    await pumpScapeMatch(tester);
+    // 17:30 deixa a sessão das 19:00 dentro da janela, em qualquer hora do CI.
+    await pumpScapeMatch(
+      tester,
+      overrides: [
+        clockProvider.overrideWithValue(FixedClock(DateTime(2026, 11, 3, 17, 30))),
+      ],
+    );
     await _openGroup(tester, SampleIds.saoPaulo, SampleIds.groupSpMetroAlmost);
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();

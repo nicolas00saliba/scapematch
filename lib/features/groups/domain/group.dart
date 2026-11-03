@@ -34,6 +34,7 @@ class Group {
     this.gameType = GameTypes.escapeRoom,
     this.note = '',
     this.cancelledAt,
+    this.cancelReason = '',
     this.minimumSpots = 2,
     this.closesAt,
     this.cancelWindow = GroupRules.refundDeadline,
@@ -80,6 +81,9 @@ class Group {
   /// Set when the creator deletes the group, or when it misses the close
   /// deadline. Null while the group is active.
   final DateTime? cancelledAt;
+
+  /// Por que a casa ou a regra encerrou a sessão. Vazio enquanto está ativa.
+  final String cancelReason;
 
   /// Mínimo da sala copiado no grupo. O prazo de fechar ainda usa este
   /// número. O host fecha o grupo em [totalSpots], não aqui.
@@ -210,6 +214,7 @@ class Group {
     String? note,
     DateTime? startsAt,
     DateTime? cancelledAt,
+    String? cancelReason,
     String? gameType,
     int? minimumSpots,
     Object? closesAt = _absent,
@@ -241,6 +246,7 @@ class Group {
       gameType: gameType ?? this.gameType,
       note: note ?? this.note,
       cancelledAt: cancelledAt ?? this.cancelledAt,
+      cancelReason: cancelReason ?? this.cancelReason,
       minimumSpots: minimumSpots ?? this.minimumSpots,
       closesAt: identical(closesAt, _absent)
           ? this.closesAt

@@ -24,10 +24,14 @@ class FakeGroupRepository implements GroupRepository {
     this.failList = false,
     CommunityBoard? board,
   }) : board = board ?? CommunityBoard(),
-       payments = PaymentBook(provider: SimulatedPaymentProvider());
+       payments = PaymentBook(provider: SimulatedPaymentProvider()),
+       absences = AbsenceBook();
 
   /// Livro da sessão. A tela não soma comissão; ela só lê a cadeira.
   final PaymentBook payments;
+
+  /// Faltas marcadas pela casa. O mesmo livro vale para o app do jogador.
+  final AbsenceBook absences;
 
   final FakeDatabase _database;
   final Clock clock;
@@ -539,6 +543,44 @@ class FakeGroupRepository implements GroupRepository {
     return DeleteGroupSuccess(updated);
   }
 
+  /// A casa cancela a sessão. Vale a mesma janela de 2 h do host.
+  Future<String?> cancelForHouse({
+    required String houseId,
+    required String groupId,
+    required String reason,
+  }) async {
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return 'Sessão não encontrada.';
+    }
+    final current = _database.groups[index];
+    if (current.houseId != houseId) {
+      return 'Sessão não encontrada.';
+    }
+    if (current.isCancelled) {
+      return 'Essa sessão já está cancelada.';
+    }
+    final now = clock.now();
+    if (!now.isBefore(current.startsAt)) {
+      return 'A sessão já começou.';
+    }
+    if (!GroupRules.canDeleteGroup(startsAt: current.startsAt, now: now)) {
+      return 'Exclusão bloqueada (menos de 2 h)';
+    }
+    final outcome = GroupRules.refundForOrganizer(
+      RefundReason.organizerCancelledEvent,
+    );
+    final text = reason.trim().isEmpty ? 'Cancelada pela casa' : reason.trim();
+    _database.groups[index] = current.copyWith(
+      cancelledAt: now,
+      cancelReason: text,
+      filledSpots: 0,
+      participants: await _closeOccupants(current, outcome),
+    );
+    return null;
+  }
+
   @override
   Future<RemoveMemberResult> removeMember(
     String groupId, {
@@ -780,6 +822,44 @@ class FakeGroupRepository implements GroupRepository {
       _SeatKind.ended => LeaveGroupFailureReason.sessionEnded,
       _SeatKind.notMember => LeaveGroupFailureReason.notMember,
     };
+  }
+
+  /// Abre as reservas da casa no livro compartilhado.
+  ///
+  /// Quem a cadeira já marca como pago é capturado. Quem está reservado
+  /// ganha a pré-autorização, sem entrar no extrato.
+  Future<void> materializeHouse(String houseId) async {
+    await _sweep(clock.now());
+    await _pause();
+    for (final group in List<Group>.of(_database.groups)) {
+      if (group.houseId != houseId || group.isCancelled) {
+        continue;
+      }
+      final seated = [
+        for (final person in group.participants)
+          if (person.occupiesSeat) person,
+      ];
+      if (seated.isEmpty) {
+        continue;
+      }
+      var reservation = await _ensureReservation(group, seated);
+      for (final person in seated) {
+        if (person.payment != PaymentStatus.reserved) {
+          continue;
+        }
+        final share = _shareFor(reservation, person);
+        if (share.status != ShareStatus.pending &&
+            share.status != ShareStatus.failed) {
+          continue;
+        }
+        reservation = await payments.payShare(
+          reservationId: group.id,
+          shareId: share.id,
+          kind: PaymentMethodKind.pix,
+          idempotencyKey: 'seed-hold-${group.id}-${_payerId(person)}',
+        );
+      }
+    }
   }
 
   String _payerId(Participant person) {

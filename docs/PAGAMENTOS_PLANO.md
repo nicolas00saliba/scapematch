@@ -32,7 +32,7 @@ Entrar deixa a parte pendente. O botão “Pagar minha parte” abre Pix ou cart
 
 ## Próxima fase
 
-O próximo passo, para a apresentação de sexta, é o ScapeMatch Parceiro no mesmo site: login simulado de uma casa, saldo, extrato com bruto, comissão e líquido, reservas e grupos. O estado simulado precisa ser o mesmo no navegador, para o pagamento do jogador aparecer na casa. O Supabase real fica para depois dessa demo.
+O ScapeMatch Parceiro está em `/parceiro`, no mesmo site e no mesmo livro em memória: login simulado da casa, saldo, extrato com bruto, comissão e líquido, reservas, grupos, salas, horários, preços e falta. O pagamento do jogador aparece na casa porque os dois leem o mesmo `PaymentBook`. O Supabase real fica para depois dessa demo.
 
 ## O que falta
 

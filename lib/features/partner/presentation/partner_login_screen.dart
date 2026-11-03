@@ -1,0 +1,138 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
+import 'package:scapematch/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch/features/partner/presentation/partner_session.dart';
+
+class PartnerLoginScreen extends ConsumerStatefulWidget {
+  const PartnerLoginScreen({super.key});
+
+  @override
+  ConsumerState<PartnerLoginScreen> createState() => _PartnerLoginScreenState();
+}
+
+class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  String? _error;
+  var _busy = false;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = ref
+        .read(partnerSessionProvider.notifier)
+        .signIn(email: _email.text, password: _password.text);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _error = error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return AppScaffold(
+      desktopMaxWidth: 480,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
+        children: [
+          const Center(child: ScapeLogo(height: 52)),
+          const SizedBox(height: 20),
+          Text(
+            'ScapeMatch Parceiro',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            PartnerMessages.loginTitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const ExampleDataBanner(),
+          const SizedBox(height: 16),
+          Text(
+            PartnerMessages.loginBody,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            PartnerMessages.emailHint,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            key: AppKeys.partnerEmail,
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.username],
+            decoration: const InputDecoration(
+              labelText: 'E-mail',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: AppKeys.partnerPassword,
+            controller: _password,
+            obscureText: true,
+            autofillHints: const [AutofillHints.password],
+            decoration: const InputDecoration(
+              labelText: 'Senha',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              key: AppKeys.partnerLoginError,
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
+            ),
+          ],
+          const SizedBox(height: 16),
+          FilledButton(
+            key: AppKeys.partnerSubmit,
+            onPressed: _busy ? null : _submit,
+            child: const Text('Entrar'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            key: AppKeys.partnerPlayerApp,
+            onPressed: () => context.go('/'),
+            child: const Text(PartnerMessages.openPlayerApp),
+          ),
+        ],
+      ),
+    );
+  }
+}

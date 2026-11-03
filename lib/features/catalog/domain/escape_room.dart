@@ -17,6 +17,7 @@ class EscapeRoom {
     this.gameType = GameTypes.escapeRoom,
     this.minimumPlayers = 2,
     this.cancelWindow = const Duration(hours: 2),
+    this.accent = 0,
   });
 
   final String id;
@@ -43,4 +44,33 @@ class EscapeRoom {
 
   /// Mesmo id de [GameTypes]. Uma sala antiga sem o campo conta como escape.
   final String gameType;
+
+  /// Cor escolhida pela casa. Zero usa a cor da paleta da agenda.
+  final int accent;
+
+  EscapeRoom copyWith({
+    String? name,
+    int? capacity,
+    int? durationMinutes,
+    Difficulty? difficulty,
+    int? priceCents,
+    int? minimumPlayers,
+    int? accent,
+  }) {
+    return EscapeRoom(
+      id: id,
+      houseId: houseId,
+      name: name ?? this.name,
+      theme: theme,
+      category: category,
+      capacity: capacity ?? this.capacity,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      difficulty: difficulty ?? this.difficulty,
+      priceCents: priceCents ?? this.priceCents,
+      gameType: gameType,
+      minimumPlayers: minimumPlayers ?? this.minimumPlayers,
+      cancelWindow: cancelWindow,
+      accent: accent ?? this.accent,
+    );
+  }
 }

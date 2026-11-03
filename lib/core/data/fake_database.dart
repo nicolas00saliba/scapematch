@@ -6,9 +6,10 @@ import 'package:scapematch/features/groups/domain/group.dart';
 
 /// In-memory store for the sample version of the app.
 ///
-/// Cities, houses, rooms, and slots do not change. Groups do: joining or
-/// creating a group updates [groups] for this session only. Nothing is sent
-/// to a server. Closing the app forgets those changes.
+/// Cities and houses do not change. Groups change when someone joins.
+/// Rooms and slots change when the house edits price or opens a time,
+/// in this session only. Nothing is sent to a server. Closing the app
+/// forgets those changes.
 class FakeDatabase {
   FakeDatabase({
     required List<City> cities,
@@ -18,8 +19,8 @@ class FakeDatabase {
     required List<Group> groups,
   }) : cities = List.unmodifiable(cities),
        houses = List.unmodifiable(houses),
-       rooms = List.unmodifiable(rooms),
-       slots = List.unmodifiable(slots),
+       rooms = List.of(rooms),
+       slots = List.of(slots),
        groups = List.of(groups);
 
   final List<City> cities;
@@ -70,6 +71,28 @@ class FakeDatabase {
   EscapeRoom? roomById(String id) => _find(rooms, id, (room) => room.id);
 
   TimeSlot? slotById(String id) => _find(slots, id, (slot) => slot.id);
+
+  void addRoom(EscapeRoom room) {
+    rooms.add(room);
+  }
+
+  void replaceRoom(EscapeRoom room) {
+    final index = rooms.indexWhere((item) => item.id == room.id);
+    if (index < 0) {
+      throw StateError('Sala não encontrada.');
+    }
+    rooms[index] = room;
+  }
+
+  TimeSlot addSlot({required String roomId, required DateTime startsAt}) {
+    final slot = TimeSlot(
+      id: 'slot-local-${slots.length + 1}',
+      roomId: roomId,
+      startsAt: startsAt,
+    );
+    slots.add(slot);
+    return slot;
+  }
 }
 
 T? _find<T>(List<T> items, String id, String Function(T item) idOf) {
