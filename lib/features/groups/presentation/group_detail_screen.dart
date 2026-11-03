@@ -74,6 +74,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final now = ref.watch(clockProvider).now();
     final userId = ref.watch(currentUserProvider).id;
     return AppScaffold(
+      desktopMaxWidth: 1040,
       appBar: AppBar(
         leading: const ScapeBackButton(),
         title: const Text('Grupo'),

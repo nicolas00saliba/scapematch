@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
+import 'package:scapematch/core/ui/scape_grid.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/catalog/presentation/popular_rooms.dart';
 import 'package:scapematch/features/catalog/presentation/room_card.dart';
@@ -37,10 +38,12 @@ class PopularRoomsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              for (var index = 0; index < popular.length; index++) ...[
-                if (index > 0) const SizedBox(height: 12),
-                RoomCard(listing: popular[index]),
-              ],
+              ScapeWrapGrid(
+                maxColumns: 3,
+                children: [
+                  for (final listing in popular) RoomCard(listing: listing),
+                ],
+              ),
             ],
           );
         },

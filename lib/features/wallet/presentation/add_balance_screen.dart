@@ -25,6 +25,7 @@ class _AddBalanceScreenState extends State<AddBalanceScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.formMax,
       appBar: AppBar(
         leading: ScapeBackButton(),
         title: Text('Adicionar saldo'),
