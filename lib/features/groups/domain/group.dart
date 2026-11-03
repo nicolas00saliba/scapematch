@@ -1,4 +1,5 @@
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
@@ -160,6 +161,13 @@ class Group {
   /// People who still hold a seat. Cancelled seats are not counted.
   int get seatedCount =>
       participants.where((person) => person.occupiesSeat).length;
+
+  /// Cadeiras ocupadas que já pagaram a parte.
+  int get paidSeats => participants
+      .where(
+        (person) => person.occupiesSeat && person.payment == PaymentStatus.paid,
+      )
+      .length;
 
   /// Floor for the size the creator may save.
   ///

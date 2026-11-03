@@ -86,6 +86,12 @@ void main() {
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.payMyShare));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.paySimulate));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.payDone));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.leaveGroup));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.dialogConfirm));

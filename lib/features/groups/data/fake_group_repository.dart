@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -22,7 +23,11 @@ class FakeGroupRepository implements GroupRepository {
     this.latency = const Duration(milliseconds: 280),
     this.failList = false,
     CommunityBoard? board,
-  }) : board = board ?? CommunityBoard();
+  }) : board = board ?? CommunityBoard(),
+       payments = PaymentBook(provider: SimulatedPaymentProvider());
+
+  /// Livro da sessão. A tela não soma comissão; ela só lê a cadeira.
+  final PaymentBook payments;
 
   final FakeDatabase _database;
   final Clock clock;
@@ -35,7 +40,7 @@ class FakeGroupRepository implements GroupRepository {
     String cityId, {
     bool almostFullOnly = false,
   }) async {
-    _sweep(clock.now());
+    await _sweep(clock.now());
     await _pause();
     if (failList) {
       throw Exception('sample list failed');
@@ -55,7 +60,7 @@ class FakeGroupRepository implements GroupRepository {
 
   @override
   Future<List<Group>> listForUser(String userId) async {
-    _sweep(clock.now());
+    await _sweep(clock.now());
     await _pause();
     final groups =
         _database.groups
@@ -67,7 +72,7 @@ class FakeGroupRepository implements GroupRepository {
 
   @override
   Future<Group?> getById(String id) async {
-    _sweep(clock.now());
+    await _sweep(clock.now());
     await _pause();
     return _find(id);
   }
@@ -207,6 +212,60 @@ class FakeGroupRepository implements GroupRepository {
     _database.groups[index] = updated;
     board.removeWaitlist(groupId, participantUserId);
     return JoinSuccess(updated);
+  }
+
+  @override
+  Future<PayShareResult> payShare(
+    String groupId, {
+    required String userId,
+    required PaymentMethodKind kind,
+  }) async {
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return const PayShareFailure(PayShareFailureReason.notFound);
+    }
+    final current = _database.groups[index];
+    if (current.isCancelled) {
+      return const PayShareFailure(PayShareFailureReason.groupCancelled);
+    }
+    final member = current.participantForUser(userId);
+    if (member == null || !member.occupiesSeat) {
+      return const PayShareFailure(PayShareFailureReason.notSeated);
+    }
+    if (member.payment == PaymentStatus.paid) {
+      return const PayShareFailure(PayShareFailureReason.alreadyPaid);
+    }
+    final seated = [
+      for (final person in current.participants)
+        if (person.occupiesSeat) person,
+    ];
+    var reservation = await _ensureReservation(current, seated);
+    var share = _shareFor(reservation, member);
+    if (share.status == ShareStatus.refunded) {
+      reservation = payments.addShare(
+        reservationId: current.id,
+        playerId: _payerId(member),
+        amountCents: current.priceCents,
+      );
+      share = _shareFor(reservation, member);
+    }
+    final paid = await payments.payShare(
+      reservationId: current.id,
+      shareId: share.id,
+      kind: kind,
+      idempotencyKey: 'pay-${share.id}',
+    );
+    final settled = _shareFor(paid, member);
+    if (settled.status != ShareStatus.paid) {
+      return const PayShareFailure(PayShareFailureReason.notSeated);
+    }
+    final updated = _replaceMember(
+      current,
+      member.copyWith(payment: PaymentStatus.paid),
+    );
+    _database.groups[index] = updated;
+    return PayShareSuccess(updated);
   }
 
   @override
@@ -363,17 +422,20 @@ class FakeGroupRepository implements GroupRepository {
           now: clock.now(),
           window: current.cancelWindow,
         );
-        final updatedPeople = [
-          for (final person in current.participants)
-            if (person.id == member.id)
-              person.copyWith(
-                attendance: AttendanceStatus.cancelled,
-                refund: outcome.status,
-                refundReason: outcome.reason,
-              )
-            else
-              person,
-        ];
+        final updatedPeople = <Participant>[];
+        for (final person in current.participants) {
+          if (person.id == member.id) {
+            updatedPeople.add(
+              await _closeSeat(
+                group: current,
+                person: person,
+                outcome: outcome,
+              ),
+            );
+          } else {
+            updatedPeople.add(person);
+          }
+        }
         final updated = current.copyWith(
           participants: updatedPeople,
           filledSpots: _occupied(updatedPeople),
@@ -416,17 +478,7 @@ class FakeGroupRepository implements GroupRepository {
     final updated = current.copyWith(
       cancelledAt: now,
       filledSpots: 0,
-      participants: [
-        for (final person in current.participants)
-          if (person.occupiesSeat)
-            person.copyWith(
-              attendance: AttendanceStatus.cancelled,
-              refund: outcome.status,
-              refundReason: outcome.reason,
-            )
-          else
-            person,
-      ],
+      participants: await _closeOccupants(current, outcome),
     );
     _database.groups[index] = updated;
     return DeleteGroupSuccess(updated);
@@ -481,17 +533,16 @@ class FakeGroupRepository implements GroupRepository {
     final outcome = GroupRules.refundForOrganizer(
       RefundReason.organizerRemovedMember,
     );
-    final updatedPeople = [
-      for (final person in current.participants)
-        if (person.id == target.id)
-          person.copyWith(
-            attendance: AttendanceStatus.cancelled,
-            refund: outcome.status,
-            refundReason: outcome.reason,
-          )
-        else
-          person,
-    ];
+    final updatedPeople = <Participant>[];
+    for (final person in current.participants) {
+      if (person.id == target.id) {
+        updatedPeople.add(
+          await _closeSeat(group: current, person: person, outcome: outcome),
+        );
+      } else {
+        updatedPeople.add(person);
+      }
+    }
     final updated = current.copyWith(
       participants: updatedPeople,
       filledSpots: _occupied(updatedPeople),
@@ -568,9 +619,9 @@ class FakeGroupRepository implements GroupRepository {
     }
   }
 
-  void _sweep(DateTime now) {
+  Future<void> _sweep(DateTime now) async {
     for (var index = 0; index < _database.groups.length; index++) {
-      final group = _database.groups[index];
+      final group = await _releaseUnpaid(index, _database.groups[index], now);
       final portal =
           group.phaseOverride != null && isPortalPhase(group.phaseOverride!);
       if (GroupRules.missedMinimum(
@@ -588,17 +639,7 @@ class FakeGroupRepository implements GroupRepository {
         final closed = group.copyWith(
           cancelledAt: now,
           filledSpots: 0,
-          participants: [
-            for (final person in group.participants)
-              if (person.occupiesSeat)
-                person.copyWith(
-                  attendance: AttendanceStatus.cancelled,
-                  refund: outcome.status,
-                  refundReason: outcome.reason,
-                )
-              else
-                person,
-          ],
+          participants: await _closeOccupants(group, outcome),
         );
         _database.groups[index] = closed;
         board.recordClosedGroup(group, now);
@@ -684,6 +725,168 @@ class FakeGroupRepository implements GroupRepository {
       _SeatKind.ended => LeaveGroupFailureReason.sessionEnded,
       _SeatKind.notMember => LeaveGroupFailureReason.notMember,
     };
+  }
+
+  String _payerId(Participant person) {
+    final userId = person.userId;
+    if (userId != null && userId.isNotEmpty) {
+      return userId;
+    }
+    return person.id;
+  }
+
+  ReservationShare _shareFor(Reservation reservation, Participant person) {
+    final payerId = _payerId(person);
+    ReservationShare? refunded;
+    for (final share in reservation.shares) {
+      if (share.playerId != payerId) {
+        continue;
+      }
+      if (share.status != ShareStatus.refunded) {
+        return share;
+      }
+      refunded = share;
+    }
+    if (refunded != null) {
+      return refunded;
+    }
+    throw StateError('Parte ausente para ${person.displayName}.');
+  }
+
+  /// Abre a reserva do grupo e grava como pago quem a cadeira já marca pago.
+  Future<Reservation> _ensureReservation(
+    Group group,
+    List<Participant> seated,
+  ) async {
+    final ids = [for (final person in seated) _payerId(person)];
+    final existing = payments.lookup(group.id);
+    var reservation =
+        existing ??
+        payments.createReservation(
+          id: group.id,
+          groupId: group.id,
+          houseId: group.houseId,
+          totalCents: group.priceCents * ids.length,
+          playerIds: ids,
+        );
+    if (existing != null) {
+      for (final person in seated) {
+        final payerId = _payerId(person);
+        final known = reservation.shares.any(
+          (share) => share.playerId == payerId,
+        );
+        if (!known) {
+          reservation = payments.addShare(
+            reservationId: group.id,
+            playerId: payerId,
+            amountCents: group.priceCents,
+          );
+        }
+      }
+    }
+    for (final person in seated) {
+      if (person.payment != PaymentStatus.paid) {
+        continue;
+      }
+      final share = _shareFor(reservation, person);
+      if (share.status != ShareStatus.pending &&
+          share.status != ShareStatus.failed) {
+        continue;
+      }
+      reservation = await payments.payShare(
+        reservationId: group.id,
+        shareId: share.id,
+        kind: PaymentMethodKind.pix,
+        idempotencyKey: 'seed-${group.id}-${_payerId(person)}',
+      );
+    }
+    return reservation;
+  }
+
+  Future<Participant> _closeSeat({
+    required Group group,
+    required Participant person,
+    required RefundOutcome outcome,
+  }) async {
+    if (!person.occupiesSeat) {
+      return person;
+    }
+    if (person.payment != PaymentStatus.paid ||
+        outcome.status != RefundStatus.refunded) {
+      return person.copyWith(
+        attendance: AttendanceStatus.cancelled,
+        refund: person.payment == PaymentStatus.paid
+            ? outcome.status
+            : RefundStatus.none,
+        refundReason: person.payment == PaymentStatus.paid
+            ? outcome.reason
+            : RefundReason.none,
+      );
+    }
+    final seated = [
+      for (final member in group.participants)
+        if (member.occupiesSeat) member,
+    ];
+    final reservation = await _ensureReservation(group, seated);
+    final share = _shareFor(reservation, person);
+    if (share.status == ShareStatus.paid) {
+      await payments.refundShare(
+        reservationId: group.id,
+        shareId: share.id,
+        idempotencyKey: 'refund-${share.id}',
+      );
+    }
+    return person.copyWith(
+      attendance: AttendanceStatus.cancelled,
+      refund: outcome.status,
+      refundReason: outcome.reason,
+    );
+  }
+
+  Future<List<Participant>> _closeOccupants(
+    Group group,
+    RefundOutcome outcome,
+  ) async {
+    final next = <Participant>[];
+    for (final person in group.participants) {
+      if (!person.occupiesSeat) {
+        next.add(person);
+        continue;
+      }
+      next.add(
+        await _closeSeat(group: group, person: person, outcome: outcome),
+      );
+    }
+    return next;
+  }
+
+  /// Quem não pagou até o prazo de fechar perde a vaga. Não há o que estornar.
+  Future<Group> _releaseUnpaid(int index, Group group, DateTime now) async {
+    if (group.isCancelled || !now.isBefore(group.startsAt)) {
+      return group;
+    }
+    if (now.isBefore(group.closesAtResolved)) {
+      return group;
+    }
+    final next = <Participant>[];
+    var changed = false;
+    for (final person in group.participants) {
+      if (person.occupiesSeat && person.payment == PaymentStatus.pending) {
+        changed = true;
+        next.add(person.copyWith(attendance: AttendanceStatus.cancelled));
+      } else {
+        next.add(person);
+      }
+    }
+    if (!changed) {
+      return group;
+    }
+    final updated = group.copyWith(
+      participants: next,
+      filledSpots: _occupied(next),
+    );
+    _database.groups[index] = updated;
+    return updated;
   }
 
   Group _replaceMember(Group group, Participant member) {

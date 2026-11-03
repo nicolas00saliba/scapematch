@@ -2,7 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
-Future<bool> showLeaveDialog(BuildContext context, {required bool refunds}) {
+Future<bool> showLeaveDialog(
+  BuildContext context, {
+  required bool refunds,
+  required bool paid,
+}) {
+  if (!paid) {
+    return _showConfirmDialog(
+      context,
+      title: GroupMessages.leaveWithRefundTitle,
+      body: GroupMessages.leaveUnpaidBody,
+      confirmLabel: 'Sair',
+      destructive: false,
+    );
+  }
   return _showConfirmDialog(
     context,
     title: refunds

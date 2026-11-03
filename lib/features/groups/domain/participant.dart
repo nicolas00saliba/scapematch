@@ -8,7 +8,7 @@ class Participant {
     required this.isLocalUser,
     this.userId,
     this.attendance = AttendanceStatus.joined,
-    this.payment = PaymentStatus.paid,
+    this.payment = PaymentStatus.pending,
     this.refund = RefundStatus.none,
     this.refundReason = RefundReason.none,
   });

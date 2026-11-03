@@ -80,6 +80,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
     expect(_spotSummary(tester), '2/4');
+    await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
     await tester.pumpAndSettle();
@@ -121,6 +122,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
     expect(_spotSummary(tester), '6/6');
+    await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
     await tester.pumpAndSettle();
@@ -175,6 +177,7 @@ void main() {
     expect(_spotSummary(tester), '1/3');
     expect(find.byKey(AppKeys.deleteGroup), findsOneWidget);
     expect(find.byKey(AppKeys.leaveGroup), findsNothing);
+    await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.deleteGroup));
     await tester.pumpAndSettle();
@@ -279,6 +282,7 @@ void main() {
       );
       await tester.tap(find.byKey(AppKeys.joinButton));
       await tester.pumpAndSettle();
+      await _pay(tester);
 
       await tester.tap(find.byKey(AppKeys.leaveGroup));
       await tester.pumpAndSettle();
@@ -362,6 +366,15 @@ Future<void> _openGroup(
     scrollable: verticalScrollable,
   );
   await tester.tap(find.byKey(AppKeys.groupCard(groupId)));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pay(WidgetTester tester) async {
+  await tester.tap(find.byKey(AppKeys.payMyShare));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(AppKeys.paySimulate));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(AppKeys.payDone));
   await tester.pumpAndSettle();
 }
 

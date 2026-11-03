@@ -67,6 +67,16 @@ abstract final class AppKeys {
   static const confirmedCount = Key('confirmed-count');
   static const countdown = Key('countdown');
   static const priceLabel = Key('price-label');
+  static const payMyShare = Key('pay-my-share');
+  static const paySheet = Key('pay-sheet');
+  static const payMethodPix = Key('pay-method-pix');
+  static const payMethodCard = Key('pay-method-card');
+  static const paySimulate = Key('pay-simulate');
+  static const payCopyPix = Key('pay-copy-pix');
+  static const payTestCard = Key('pay-test-card');
+  static const payConfirmed = Key('pay-confirmed');
+  static const payDone = Key('pay-done');
+  static const paidProgress = Key('paid-progress');
   static const refundStatus = Key('refund-status');
   static const editSpotsIncrement = Key('edit-spots-increment');
   static const editSpotsDecrement = Key('edit-spots-decrement');

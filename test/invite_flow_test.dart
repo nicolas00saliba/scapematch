@@ -101,7 +101,7 @@ void main() {
     expect(find.text('Ana'), findsWidgets);
     expect(find.text(GroupMessages.joinedBanner), findsOneWidget);
     expect(
-      ProviderScope.containerOf(tester.element(find.text('Ana')))
+      ProviderScope.containerOf(tester.element(find.text('Ana').first))
           .read(pendingInviteStoreProvider)
           .groupId,
       isNull,

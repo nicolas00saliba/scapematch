@@ -13,6 +13,8 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/person_avatar.dart';
+import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -316,46 +318,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               _SectionCard(
                 icon: Icons.payments_outlined,
                 title: 'Pagamento',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      formatPrice(group.priceCents),
-                      key: AppKeys.priceLabel,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Por pessoa · pagamento simulado. Nada é cobrado de verdade.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                    if (me != null) ...[
-                      const SizedBox(height: 8),
-                      Text(GroupMessages.paymentLabel),
-                      if (GroupMessages.refundLabel(me) != null)
-                        Text(
-                          GroupMessages.refundLabel(me)!,
-                          key: AppKeys.refundStatus,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            height: 1.35,
-                          ),
-                        ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(
-                      GroupMessages.cancelWindowLabel(
-                        group.cancelWindow.inHours,
-                      ),
-                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
-                    ),
-                  ],
-                ),
+                child: _PaymentCard(group: group, me: me),
               ),
               if (group.note.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -440,10 +403,30 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
   String _personSubtitle(Participant person) {
     final refund = GroupMessages.refundLabel(person);
     final status = GroupMessages.participantSubtitle(person);
-    if (refund == null) {
-      return '$status · ${GroupMessages.paymentLabel}';
+    if (refund != null) {
+      return '$status · $refund';
     }
-    return '$status · $refund';
+    if (!person.occupiesSeat) {
+      return status;
+    }
+    return '$status · ${GroupMessages.paymentStatus(person.payment)}';
+  }
+
+  Future<void> _pay(Group group) async {
+    final paid = await showPayShareSheet(
+      context: context,
+      amountCents: group.priceCents,
+      reference: group.id,
+      onPay: (kind) async {
+        final reason = await ref
+            .read(groupDetailViewModelProvider(widget.groupId).notifier)
+            .payShare(kind);
+        return reason == null;
+      },
+    );
+    if (paid && mounted) {
+      _snack('Sua parte está paga.');
+    }
   }
 
   bool _visible(Participant person) {
@@ -550,6 +533,17 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final buttons = <Widget>[];
 
     if (me != null && me.occupiesSeat && !group.isCancelled && !ended) {
+      if (me.payment == PaymentStatus.pending) {
+        buttons.add(
+          FilledButton(
+            key: AppKeys.payMyShare,
+            onPressed: _busy ? null : () => _pay(group),
+            child: Text(
+              GroupMessages.payMyShare(formatPrice(group.priceCents)),
+            ),
+          ),
+        );
+      }
       if (me.attendance != AttendanceStatus.confirmed) {
         buttons.add(
           FilledButton(
@@ -809,11 +803,18 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       now: ref.read(clockProvider).now(),
       window: group.cancelWindow,
     );
-    final accepted = await showLeaveDialog(context, refunds: previewRefunds);
+    final me = _local(group);
+    final paid = me != null && me.payment == PaymentStatus.paid;
+    final expectsRefund = paid && previewRefunds;
+    final accepted = await showLeaveDialog(
+      context,
+      refunds: expectsRefund,
+      paid: paid,
+    );
     if (!accepted || !mounted) {
       return;
     }
-    setState(() => _leavePreview = previewRefunds);
+    setState(() => _leavePreview = expectsRefund);
     await _run(() async {
       final result = await ref
           .read(groupDetailViewModelProvider(widget.groupId).notifier)
@@ -824,7 +825,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       final message = switch (result) {
         LeaveGroupSuccess(:final group) => _leaveSnack(
           group,
-          previewRefunds: previewRefunds,
+          previewRefunds: expectsRefund,
         ),
         LeaveGroupFailure() => GroupMessages.actionFailed,
       };
@@ -1314,6 +1315,129 @@ class _FactRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PaymentCard extends StatelessWidget {
+  const _PaymentCard({required this.group, required this.me});
+
+  final Group group;
+  final Participant? me;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final seated = [
+      for (final person in group.participants)
+        if (person.occupiesSeat) person,
+    ];
+    final mine = me;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          formatPrice(group.priceCents),
+          key: AppKeys.priceLabel,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Por pessoa · ${GroupMessages.simulatedNotice}',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          GroupMessages.paidProgress(group.paidSeats, group.seatedCount),
+          key: AppKeys.paidProgress,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: scheme.primary,
+          ),
+        ),
+        if (mine != null && mine.occupiesSeat) ...[
+          const SizedBox(height: 4),
+          Text(
+            mine.payment == PaymentStatus.pending
+                ? GroupMessages.yourSharePending
+                : GroupMessages.yourSharePaid,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+        if (mine != null && GroupMessages.refundLabel(mine) != null) ...[
+          const SizedBox(height: 4),
+          if (GroupMessages.refundLabel(mine) != null)
+            Text(
+              GroupMessages.refundLabel(mine)!,
+              key: AppKeys.refundStatus,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+        ],
+        const SizedBox(height: 12),
+        for (var index = 0; index < seated.length; index++) ...[
+          if (index > 0) const SizedBox(height: 8),
+          _PayerRow(person: seated[index], portrait: index),
+        ],
+        const SizedBox(height: 10),
+        Text(
+          GroupMessages.cancelWindowLabel(group.cancelWindow.inHours),
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+        ),
+      ],
+    );
+  }
+}
+
+class _PayerRow extends StatelessWidget {
+  const _PayerRow({required this.person, required this.portrait});
+
+  final Participant person;
+  final int portrait;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final paid = person.payment == PaymentStatus.paid;
+    final tone = paid ? scheme.primary : scheme.secondary;
+    return Row(
+      children: [
+        PersonAvatar(name: person.displayName, radius: 18, portrait: portrait),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            person.displayName,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: tone.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Text(
+            GroupMessages.paymentStatus(person.payment),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: tone,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

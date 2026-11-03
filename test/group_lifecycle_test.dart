@@ -473,12 +473,10 @@ void main() {
       );
       final closed = await atDeadline.getById(group.id);
       expect(closed!.isCancelled, isTrue);
-      expect(
-        closed.participants.every(
-          (person) => person.refundReason == RefundReason.groupDidNotClose,
-        ),
-        isTrue,
-      );
+      final ana = closed.participantForUser('user-ana')!;
+      expect(ana.occupiesSeat, isFalse);
+      expect(ana.payment, PaymentStatus.pending);
+      expect(ana.refund, RefundStatus.none);
     },
   );
 
