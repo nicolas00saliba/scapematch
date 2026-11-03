@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "serena": {
+      "command": "serena",
+      "args": [
+        "start-mcp-server",
+        "--context",
+        "ide",
+        "--project",
+        "${workspaceFolder}"
+      ]
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:CONTEXT7_API_KEY}"
+      }
+    }
+  }
+}

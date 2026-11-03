@@ -1,0 +1,9 @@
+---
+description: Convenções para projetos Flutter/Dart (comandos baratos de análise e teste, arquivos gerados). Use ao editar código Dart, rodar testes Flutter ou mexer em pubspec.
+alwaysApply: false
+---
+# Flutter / Dart
+- Valide com `dart analyze <arquivo-ou-pasta>` e `flutter test <arquivo_test.dart>` antes de rodar a suíte inteira.
+- Não edite nem leia `*.g.dart` / `*.freezed.dart`: altere a fonte e rode `dart run build_runner build --delete-conflicting-outputs`.
+- Mudou `pubspec.yaml`? Rode `flutter pub get` e mostre só erros.
+- Evite `flutter build` completo só para checar tipos; `dart analyze` basta.

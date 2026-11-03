@@ -1,0 +1,20 @@
+---
+description: Quando e como usar os MCPs Serena (navegação semântica de código) e Context7 (docs atualizadas de bibliotecas), e quais ligar por tipo de tarefa.
+alwaysApply: false
+---
+# MCPs: ative só o que a tarefa usa
+
+| Tarefa | Ligar | Deixar desligado |
+| --- | --- | --- |
+| Refatorar / achar referências / entender código grande | Serena | Context7 (se não houver lib nova) |
+| Usar ou atualizar API de biblioteca/framework | Context7 | Serena (se o código for pequeno) |
+| Ajuste pontual em 1–2 arquivos conhecidos | nenhum | Serena e Context7 |
+
+## Serena
+- Ferramentas úteis: `get_symbols_overview`, `find_symbol`, `find_referencing_symbols`, `replace_symbol_body`, `insert_after_symbol`.
+- Use para localizar código por símbolo em vez de ler arquivos inteiros.
+- O servidor é iniciado com `--project ${workspaceFolder}`; não é preciso ativar projeto manualmente.
+
+## Context7
+- Fluxo: `resolve-library-id` (nome da lib) → `query-docs` (ID + pergunta objetiva). Se já souber o ID (`/org/projeto`), pule o primeiro passo.
+- Chave opcional via variável de ambiente `CONTEXT7_API_KEY` (nunca escreva a chave em arquivo).

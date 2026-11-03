@@ -1,0 +1,24 @@
+---
+description: Como economizar tokens ao ler código, rodar comandos e lidar com saídas longas. Use ao explorar o repositório, rodar testes/builds ou quando o contexto estiver crescendo.
+alwaysApply: false
+---
+# Economia de tokens
+
+## Leitura de código
+- Comece pelo mapa: estrutura de pastas, depois símbolos (Serena `get_symbols_overview` / `find_symbol`), só então o corpo da função.
+- Leia faixas de linhas, não arquivos inteiros. Evite reabrir o que já está no contexto.
+- Não leia arquivos gerados (`*.g.dart`, `dist/`, lockfiles) salvo se a tarefa for sobre eles.
+
+## Comandos de terminal (RTK)
+- Os comandos Shell passam pelo hook do RTK (`.cursor/hooks.json` → `rtk hook cursor`), que reescreve `git status` em `rtk git status` etc. e compacta a saída.
+- Se precisar da saída completa de um comando, rode-o de novo pedindo explicitamente (ex.: `rtk bypass <cmd>`), ou redirecione para arquivo e leia só o trecho útil.
+- Use filtros: `| tail -n 50`, `rg -n padrão`, `--quiet`, `-q`. Testes: rode só o arquivo/caso afetado primeiro.
+- `rtk gain` mostra quanto foi economizado.
+
+## Documentação de bibliotecas (Context7)
+- Antes de chutar API de biblioteca, use Context7: `resolve-library-id` → `query-docs` com uma pergunta específica.
+- Não cole documentação inteira no chat; traga só o trecho necessário.
+
+## Conversa
+- Respostas curtas: diga o que mudou e onde, sem repetir o código inteiro.
+- Perto de ~200k tokens: /summarize. Tarefa nova e sem relação: conversa nova.

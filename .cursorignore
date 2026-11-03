@@ -1,0 +1,94 @@
+# .cursorignore — template economia-tokens
+# Tira do índice e do contexto do agente o que é gerado, pesado ou dado bruto.
+# Seções marcadas com ">>> stack:" são filtradas pelo aplicar.sh conforme a stack.
+# Para liberar algo listado aqui, use uma linha com "!" (ex.: !data/exemplo.csv).
+#
+# Neste repo permanecem indexados: lib/, test/, packages/ (código e testes),
+# web/ de origem (index.html, manifest.json, icons), assets/experience/*.json,
+# SVG e licenças de fonte, docs/ e .github/workflows/.
+
+# >>> stack:geral
+# Dependências e builds genéricos
+node_modules/
+build/
+dist/
+out/
+coverage/
+.cache/
+tmp/
+*.log
+*.lock.bak
+
+# Dados e artefatos grandes.
+# Só a raiz: lib/**/data e packages/**/data são código-fonte, não dump de dados.
+/data/
+/datasets/
+*.csv
+*.parquet
+*.sqlite
+*.db
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.pdf
+*.mp4
+*.mov
+*.mp3
+*.wav
+*.psd
+*.ai
+*.min.js
+*.min.css
+*.map
+
+# Assets binários grandes (~4 MB de fotos, PNG e fonte).
+# JSON de experiência, SVG e OFL.txt continuam visíveis.
+assets/images/
+assets/**/*.jpg
+assets/**/*.jpeg
+assets/**/*.png
+assets/**/*.webp
+assets/**/*.gif
+assets/**/*.ttf
+assets/**/*.otf
+
+# Segredos (nunca devem entrar no contexto)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# <<< stack:geral
+
+# >>> stack:flutter
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+android/.gradle/
+android/app/build/
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# Saída de `flutter build web` (build/web). A pasta web/ versionada é o shell
+# de origem e não entra aqui. Os nomes abaixo cobrem artefatos copiados para web/.
+build/web/
+web/main.dart.js
+web/main.dart.js.map
+web/flutter.js
+web/flutter_bootstrap.js
+web/flutter_service_worker.js
+web/canvaskit/
+web/assets/
+web/version.json
+# <<< stack:flutter
