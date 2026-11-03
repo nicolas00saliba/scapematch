@@ -118,6 +118,13 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
             bottom: 16,
             child: FloatingActionButton(
               key: AppKeys.agendaAdd,
+              elevation: 0,
+              focusElevation: 0,
+              hoverElevation: 0,
+              highlightElevation: 0,
+              focusColor: Colors.transparent,
+              hoverColor: Colors.transparent,
+              shape: const CircleBorder(),
               onPressed: () => _showAddSession(context),
               child: const Icon(Icons.add),
             ),
@@ -728,7 +735,7 @@ class _Ticket extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      group.roomName,
+                      snapshot.roomNameFor(group),
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
@@ -786,7 +793,7 @@ class _SessionSheet extends ConsumerWidget {
         shrinkWrap: true,
         children: [
           Text(
-            group.roomName,
+            snapshot.roomNameFor(group),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),

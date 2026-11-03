@@ -87,6 +87,16 @@ ThemeData buildAppTheme(Brightness brightness) {
       }),
     ),
     dialogTheme: DialogThemeData(backgroundColor: scheme.surfaceContainerHigh),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      shape: CircleBorder(),
+      elevation: 0,
+      focusElevation: 0,
+      hoverElevation: 0,
+      highlightElevation: 0,
+      disabledElevation: 0,
+      focusColor: Colors.transparent,
+      hoverColor: Colors.transparent,
+    ),
   );
 }
 

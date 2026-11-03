@@ -54,6 +54,16 @@ class PartnerSnapshot {
   final List<Group> groups;
 
   GroupMoney moneyFor(String groupId) => moneyByGroup[groupId] ?? GroupMoney.zero;
+
+  /// Nome da sala no catálogo. O grupo pode ter um título só do app do jogador.
+  String roomNameFor(Group group) {
+    for (final room in rooms) {
+      if (room.id == group.roomId) {
+        return room.name;
+      }
+    }
+    return group.roomName;
+  }
   final List<EscapeRoom> rooms;
   final Map<String, List<TimeSlot>> slotsByRoom;
 

@@ -487,7 +487,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   final slotCofreMissed = schedule.at(
     'slot-cwb-cofre-missed',
     cofre.id,
-    schedule.opening(12),
+    schedule.yesterdayAt(14, 0),
   );
   final slotSarcofago = schedule.free(
     'slot-cwb-sarcofago-free',
@@ -740,7 +740,8 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       totalSpots: 6,
       names: ['Paula', 'Rui'],
       minimumSpots: 6,
-      closesAt: now.subtract(const Duration(hours: 2)),
+      closesAt: now.subtract(const Duration(hours: 26)),
+      cancelledAt: now.subtract(const Duration(hours: 20)),
       cancelReason: 'O grupo não fechou a tempo',
     ),
     // Sessão que já aconteceu e fechou. O extrato da casa nasce daqui.
@@ -1100,9 +1101,12 @@ class _SampleSchedule {
   }
 
   /// Ontem às 19:00. A casa já pode marcar falta nessa sessão.
-  DateTime get yesterdayEvening {
+  DateTime get yesterdayEvening => yesterdayAt(19, 0);
+
+  /// Um horário da casa no dia anterior.
+  DateTime yesterdayAt(int hour, int minute) {
     final day = now.subtract(const Duration(days: 1));
-    return DateTime(day.year, day.month, day.day, 19, 0);
+    return DateTime(day.year, day.month, day.day, hour, minute);
   }
 
   DateTime get past {
@@ -1256,6 +1260,7 @@ Group _group({
   String? roomName,
   int? minimumSpots,
   DateTime? closesAt,
+  DateTime? cancelledAt,
   String cancelReason = '',
   required DateTime now,
 }) {
@@ -1284,6 +1289,7 @@ Group _group({
     difficulty: room.difficulty,
     slotId: slot.id,
     startsAt: slot.startsAt,
+    cancelledAt: cancelledAt,
     filledSpots: names.length,
     totalSpots: totalSpots,
     priceCents: room.priceCents,
@@ -1303,12 +1309,19 @@ Group _group({
           displayName: names[index],
           isCreator: index == 0,
           isLocalUser: false,
-          attendance: index == 0
+          attendance: cancelledAt != null
+              ? AttendanceStatus.cancelled
+              : index == 0
               ? AttendanceStatus.confirmed
               : AttendanceStatus.joined,
-          payment: names.length >= totalSpots
+          payment: cancelledAt != null
+              ? PaymentStatus.released
+              : names.length >= totalSpots
               ? PaymentStatus.paid
               : PaymentStatus.reserved,
+          refundReason: cancelledAt != null
+              ? RefundReason.groupDidNotClose
+              : RefundReason.none,
         ),
     ],
   );

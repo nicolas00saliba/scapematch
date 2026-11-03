@@ -565,7 +565,7 @@ class _GroupCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    group.roomName,
+                    snapshot.roomNameFor(group),
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
