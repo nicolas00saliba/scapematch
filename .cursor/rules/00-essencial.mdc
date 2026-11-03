@@ -1,0 +1,8 @@
+---
+description: Regras essenciais sempre ativas (idioma, contexto, ferramentas)
+alwaysApply: true
+---
+- Responda sempre em português do Brasil.
+- Quando o contexto da conversa chegar perto de ~200k tokens, rode /summarize antes de continuar.
+- Ative só o que a tarefa usa: ligue apenas as ferramentas/MCPs necessários para esta tarefa e desligue o resto.
+- Prefira ler trechos (símbolos, linhas) a arquivos inteiros; não abra o que está no .cursorignore.
