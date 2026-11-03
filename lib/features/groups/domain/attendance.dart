@@ -5,8 +5,8 @@
 /// organizer cancelled the group. A cancelled seat does not fill a spot.
 enum AttendanceStatus { joined, confirmed, cancelled }
 
-/// Simulated payment. Nobody is charged. Joining marks the seat as paid.
-enum PaymentStatus { paid }
+/// Pagamento simulado. Entrar deixa a parte pendente até a pessoa pagar.
+enum PaymentStatus { pending, paid }
 
 /// What happened to the simulated payment after the person left the seat.
 enum RefundStatus { none, refunded, denied }

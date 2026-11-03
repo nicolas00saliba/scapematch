@@ -189,6 +189,24 @@ enum EditGroupFailureReason {
   sessionEnded,
 }
 
+sealed class PayShareResult {
+  const PayShareResult();
+}
+
+final class PayShareSuccess extends PayShareResult {
+  const PayShareSuccess(this.group);
+
+  final Group group;
+}
+
+final class PayShareFailure extends PayShareResult {
+  const PayShareFailure(this.reason);
+
+  final PayShareFailureReason reason;
+}
+
+enum PayShareFailureReason { notFound, notSeated, alreadyPaid, groupCancelled }
+
 class GroupNotFoundException implements Exception {
   GroupNotFoundException(this.groupId);
 

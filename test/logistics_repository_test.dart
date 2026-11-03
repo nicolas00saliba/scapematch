@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
@@ -74,8 +75,13 @@ void main() {
       participantUserId: 'user-local',
       participantName: 'Você',
     );
-    expect(joined, isA<JoinSuccess>());
-    expect((joined as JoinSuccess).group.filledSpots, before.filledSpots + 1);
+    final entered = joined as JoinSuccess;
+    expect(entered.group.filledSpots, before.filledSpots + 1);
+    expect(
+      entered.group.participantForUser('user-local')!.payment,
+      PaymentStatus.pending,
+    );
+    await _pay(groups, SampleIds.groupSpMetroAlmost, 'user-local');
 
     final left = await groups.leave(
       SampleIds.groupSpMetroAlmost,
@@ -118,6 +124,7 @@ void main() {
       participantName: 'Você',
     );
     expect(joined, isA<JoinSuccess>());
+    await _pay(groups, SampleIds.groupSpCoberturaOpen, 'user-local');
 
     final left = await groups.leave(
       SampleIds.groupSpCoberturaOpen,
@@ -179,6 +186,8 @@ void main() {
         markAsLocalUser: false,
       );
       expect(guest, isA<JoinSuccess>());
+      await _pay(groups, group.id, 'user-ana');
+      await _pay(groups, group.id, 'user-bia');
 
       final leave = await groups.leave(group.id, userId: 'user-ana');
       expect(leave, isA<LeaveGroupFailure>());
@@ -297,6 +306,7 @@ void main() {
     final memberId = (guest as JoinSuccess).group.participants
         .firstWhere((person) => person.userId == 'user-bia')
         .id;
+    await _pay(groups, group.id, 'user-bia');
 
     final removed = await groups.removeMember(
       group.id,
@@ -510,6 +520,28 @@ void main() {
       EditGroupFailureReason.belowOccupancy,
     );
   });
+
+  test(
+    'an unpaid seat is released at the close deadline without a refund',
+    () async {
+      final created = await groups.create(
+        _request(
+          extraSpots: 2,
+          creatorUserId: 'user-ana',
+          creatorDisplayName: 'Ana',
+        ),
+      );
+      final group = (created as CreateGroupSuccess).group;
+      expect(group.participants.single.payment, PaymentStatus.pending);
+
+      clock.instant = group.closesAt!.add(const Duration(minutes: 1));
+      final after = await groups.getById(group.id);
+      final ana = after!.participantForUser('user-ana')!;
+      expect(ana.occupiesSeat, isFalse);
+      expect(ana.refund, RefundStatus.none);
+      expect(after.isCancelled, isTrue);
+    },
+  );
 }
 
 Future<void> _expectRefund(
@@ -537,12 +569,39 @@ Future<void> _expectRefund(
     participantName: 'Você',
   );
   expect(joined, isA<JoinSuccess>(), reason: '$startsAt');
+  final seated = (joined as JoinSuccess).group.participantForUser('user-local');
+  expect(seated, isNotNull, reason: startsAt.toString());
+  final stored = database.groups
+      .firstWhere((group) => group.id == id)
+      .participantForUser('user-local');
+  expect(
+    stored?.occupiesSeat,
+    isTrue,
+    reason: 'stored ${stored?.userId} at $startsAt',
+  );
+  await _pay(groups, id, 'user-local');
   final left = await groups.leave(id, userId: 'user-local');
   final me = (left as LeaveGroupSuccess).group.participantForUser(
     'user-local',
   )!;
   expect(me.refund, status);
   expect(me.refundReason, reason);
+}
+
+Future<void> _pay(
+  FakeGroupRepository groups,
+  String groupId,
+  String userId,
+) async {
+  final result = await groups.payShare(
+    groupId,
+    userId: userId,
+    kind: PaymentMethodKind.pix,
+  );
+  if (result is PayShareFailure) {
+    fail(result.reason.name);
+  }
+  expect(result, isA<PayShareSuccess>());
 }
 
 void _shift(FakeDatabase database, String id, DateTime startsAt) {

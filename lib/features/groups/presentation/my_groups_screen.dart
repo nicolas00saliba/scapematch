@@ -9,6 +9,7 @@ import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -181,9 +182,20 @@ class _MyGroupCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(formatSession(group.startsAt)),
               const SizedBox(height: 8),
+              Text('${formatPrice(group.priceCents)} por pessoa'),
+              const SizedBox(height: 4),
               Text(
-                '${formatPrice(group.priceCents)} por pessoa · ${GroupMessages.paymentLabel}',
+                GroupMessages.paidProgress(group.paidSeats, group.seatedCount),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
+              if (member != null && member!.occupiesSeat) ...[
+                const SizedBox(height: 4),
+                Text(
+                  member!.payment == PaymentStatus.pending
+                      ? GroupMessages.yourSharePending
+                      : GroupMessages.yourSharePaid,
+                ),
+              ],
               if (attendance != null) ...[
                 const SizedBox(height: 4),
                 Text(

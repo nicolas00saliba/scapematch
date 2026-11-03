@@ -343,6 +343,43 @@ void main() {
     },
   );
 
+  test('a player who joins later gets a share at the snapshotted rate', () {
+    final book = _book();
+    final first = book.createReservation(
+      id: 'res-grow',
+      groupId: 'group-1',
+      houseId: 'house-1',
+      totalCents: 100,
+      playerIds: const ['ana'],
+    );
+    book.settings.setPlatformCommission(
+      actorId: 'nico',
+      role: PlatformRole.platformAdmin,
+      commissionBps: 5000,
+      at: DateTime.utc(2026, 11, 3),
+    );
+
+    final grown = book.addShare(
+      reservationId: first.id,
+      playerId: 'bia',
+      amountCents: 100,
+    );
+
+    expect(grown.shares.first.commissionCents, 10);
+    expect(grown.shares.last.playerId, 'bia');
+    expect(grown.shares.last.amountCents, 100);
+    expect(grown.shares.last.commissionCents, 10);
+    expect(grown.shares.last.netCents, 90);
+    expect(grown.commissionBps, 1000);
+    expect(
+      book
+          .addShare(reservationId: first.id, playerId: 'bia', amountCents: 100)
+          .shares
+          .length,
+      2,
+    );
+  });
+
   test('an unpaid share cannot be refunded', () async {
     final book = _book();
     final reservation = book.createReservation(

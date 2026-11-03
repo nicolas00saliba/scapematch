@@ -46,12 +46,58 @@ class PaymentBook {
 
   List<AuditEntry> get audit => List.unmodifiable(settings.audit);
 
+  Reservation? lookup(String id) => _reservations[id];
+
   Reservation reservation(String id) {
-    final found = _reservations[id];
+    final found = lookup(id);
     if (found == null) {
       throw PaymentException('Reserva não encontrada.');
     }
     return found;
+  }
+
+  /// Acrescenta um jogador que entrou depois, pelo preço da parte dele.
+  ///
+  /// A taxa é a foto da reserva. Quem já está na reserva não muda.
+  Reservation addShare({
+    required String reservationId,
+    required String playerId,
+    required int amountCents,
+  }) {
+    final current = reservation(reservationId);
+    if (playerId.trim().isEmpty) {
+      throw PaymentException('O jogador da parte não pode ficar vazio.');
+    }
+    if (amountCents < 0) {
+      throw PaymentException('O valor não pode ser negativo.');
+    }
+    final open = current.shares.any(
+      (share) =>
+          share.playerId == playerId && share.status != ShareStatus.refunded,
+    );
+    if (open) {
+      return current;
+    }
+    final commission = commissionCents(amountCents, current.commissionBps);
+    final updated = Reservation(
+      id: current.id,
+      groupId: current.groupId,
+      houseId: current.houseId,
+      commissionBps: current.commissionBps,
+      shares: [
+        ...current.shares,
+        ReservationShare(
+          id: '$reservationId-share-$playerId-${current.shares.length}',
+          playerId: playerId,
+          amountCents: amountCents,
+          commissionCents: commission,
+          netCents: amountCents - commission,
+          status: ShareStatus.pending,
+        ),
+      ],
+    );
+    _reservations[reservationId] = updated;
+    return updated;
   }
 
   int houseBalance(String houseId) {

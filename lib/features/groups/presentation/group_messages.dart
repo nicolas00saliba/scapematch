@@ -37,6 +37,33 @@ abstract final class GroupMessages {
 
   static const paymentLabel = 'Pago (simulado)';
 
+  static const simulatedNotice = 'Pagamento simulado, nada é cobrado';
+
+  static String paymentStatus(PaymentStatus status) {
+    return switch (status) {
+      PaymentStatus.pending => 'Pendente',
+      PaymentStatus.paid => 'Pago',
+    };
+  }
+
+  static String paidProgress(int paid, int seated) {
+    if (seated <= 0 || paid <= 0) {
+      return 'Ninguém pagou ainda';
+    }
+    if (paid == 1) {
+      return '1 de $seated pagou';
+    }
+    return '$paid de $seated pagaram';
+  }
+
+  static String payMyShare(String price) => 'Pagar minha parte ($price)';
+
+  static const yourSharePending = 'Sua parte está pendente';
+  static const yourSharePaid = 'Sua parte está paga';
+
+  static const leaveUnpaidBody =
+      'Você ainda não pagou esta parte. Sair agora só libera a vaga. Não há valor para devolver.';
+
   static String? refundLabel(Participant person) {
     final hours = _hours;
     return switch (person.refundReason) {
