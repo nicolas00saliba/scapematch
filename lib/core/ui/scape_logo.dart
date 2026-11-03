@@ -3,9 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 /// Marca aprovada em 2026-11-03.
 ///
-/// [ScapeLogoVariant.full] é o símbolo mais o letreiro. Cabe no topo largo,
-/// na introdução e no login do Parceiro. [ScapeLogoVariant.mark] é só o pin,
-/// para a barra do celular, o favicon e os ícones.
+/// [ScapeLogoVariant.full] é o símbolo mais o letreiro. Cabe no topo largo
+/// e na introdução. [ScapeLogoVariant.mark] é só o pin, para a barra do
+/// celular, o favicon e os ícones. O app da casa usa o pin com um selo.
 ///
 /// O SVG completo escreve o letreiro com a fonte Poppins. O widget desenha
 /// essas letras aqui, em Poppins 500, para o texto não depender da fonte

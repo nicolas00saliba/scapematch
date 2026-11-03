@@ -49,13 +49,14 @@ cd build/web && python3 -m http.server 8080
 10. **Excluir grupo**, só para quem criou. Isso cancela o evento para todo mundo e reembolsa integralmente, mesmo em cima da hora. Quem não criou não vê o botão. O criador não sai: ele exclui.
 11. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
 12. **Meus grupos**, na aba do meio, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
-13. **ScapeMatch Parceiro**, em `/parceiro` (também pelo atalho na Conta). Login de exemplo `xv@scapematch.exemplo` / `demo`, da casa Mistério da Rua XV. Saldo, extrato (bruto, comissão, líquido), reservas, salas, horários e falta. É o mesmo estado da sessão do jogador.
+13. **ScapeMatch Parceiro** é um app à parte, em `apps/parceiro`, publicado em `https://nicolas00saliba.github.io/scapematch/parceiro/`. O app do jogador não tem rota nem atalho para ele. Login de exemplo `xv@scapematch.exemplo` / `demo`, da casa Mistério da Rua XV. Saldo, extrato (bruto, comissão, líquido), reservas, salas, agenda e falta. Cada app carrega o próprio livro de exemplo.
 
 A aba Conta existe, mas ainda não há login. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo é “Nícolas”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois. A carteira lê `WalletRepository` (saldo de exemplo) e os cartões leem `PaymentMethodsRepository` (lista vazia). O plano do pagamento real está em [docs/PAGAMENTOS_PLANO.md](docs/PAGAMENTOS_PLANO.md).
 
 ## Estrutura de pastas
 
 ```text
+apps/parceiro/            # ScapeMatch Parceiro, build web próprio
 lib/
   main.dart                 # sobe o app
   app/                      # tema, rotas, retry do Riverpod
@@ -112,4 +113,4 @@ As salas dos carrosséis usam essas mesmas figuras, por tema. Aventura tem um ar
 3. Trocar o catálogo fictício por salas e agendas que cada casa entregar (arquivo, API ou parceria). O encaixe é o `ExperienceSource`. O feed troca o `NewsRepository` pelo mesmo tipo de cuidado: site só com permissão, Instagram pela API oficial ou curadoria manual, cache e atribuição da fonte. O que pode e o que não pode ser coletado está em [docs/DADOS_REAIS.md](docs/DADOS_REAIS.md).
 4. Publicar nas lojas quando o fluxo estiver estável com dados reais.
 
-O CI (`.github/workflows/ci.yml`) roda `flutter pub get`, `flutter analyze`, `flutter test` e `flutter build web` com o Flutter 3.47.8, que é o stable que traz o Dart 3.13.7 pedido no `pubspec.yaml`.
+O CI (`.github/workflows/ci.yml`) roda `flutter pub get`, `flutter analyze`, `flutter test` e `flutter build web` no app do jogador e no `apps/parceiro`, com o Flutter 3.47.8, que é o stable que traz o Dart 3.13.7 pedido no `pubspec.yaml`. O deploy publica os dois builds no mesmo GitHub Pages.

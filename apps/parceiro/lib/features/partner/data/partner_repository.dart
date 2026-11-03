@@ -11,8 +11,8 @@ import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
-import 'package:scapematch/features/partner/domain/partner_snapshot.dart';
-import 'package:scapematch/features/partner/domain/partner_statement.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 
 /// Leitura da casa. O livro e o catálogo são os mesmos do app do jogador.
 class PartnerRepository {

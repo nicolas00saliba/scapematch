@@ -1,16 +1,14 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
-import 'package:scapematch/features/partner/data/partner_repository.dart';
-import 'package:scapematch/features/partner/domain/partner_account.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/partner_keys.dart';
 
-import 'support/pump_app.dart';
+import 'support/pump_parceiro.dart';
 import 'support/sample_clock.dart';
 
 void main() {
@@ -114,12 +112,10 @@ void main() {
   });
 
   testWidgets('the agenda tab shows an open and a closed session', (tester) async {
-    await pumpScapeMatch(tester);
-    GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/parceiro');
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(AppKeys.partnerEmail), partnerDemoAccount.email);
-    await tester.enterText(find.byKey(AppKeys.partnerPassword), partnerDemoPassword);
-    await tester.tap(find.byKey(AppKeys.partnerSubmit));
+    await pumpParceiro(tester);
+    await tester.enterText(find.byKey(PartnerKeys.partnerEmail), partnerDemoAccount.email);
+    await tester.enterText(find.byKey(PartnerKeys.partnerPassword), partnerDemoPassword);
+    await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
     await tester.pumpAndSettle();
     await tester.tap(find.text(PartnerMessages.agenda).first);
     await tester.pumpAndSettle();

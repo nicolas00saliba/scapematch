@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
-import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
@@ -13,13 +10,15 @@ import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
-import 'package:scapematch/features/partner/data/partner_repository.dart';
-import 'package:scapematch/features/partner/domain/partner_snapshot.dart';
-import 'package:scapematch/features/partner/domain/partner_statement.dart';
-import 'package:scapematch/features/partner/presentation/partner_agenda_screen.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
-import 'package:scapematch/features/partner/presentation/partner_money.dart';
-import 'package:scapematch/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/partner_keys.dart';
+import 'package:scapematch_parceiro/partner_mark.dart';
 
 class PartnerHome extends ConsumerWidget {
   const PartnerHome({super.key, required this.snapshot});
@@ -85,12 +84,7 @@ class _PartnerBar extends ConsumerWidget {
               padding: EdgeInsets.symmetric(horizontal: wide ? 28 : 12),
               child: Row(
                 children: [
-                  ScapeLogo(
-                    height: wide ? 36 : 28,
-                    variant: wide
-                        ? ScapeLogoVariant.full
-                        : ScapeLogoVariant.mark,
-                  ),
+                  PartnerMark(height: wide ? 36 : 28),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -105,7 +99,7 @@ class _PartnerBar extends ConsumerWidget {
                           ),
                         Text(
                           houseName,
-                          key: AppKeys.partnerHouseName,
+                          key: PartnerKeys.partnerHouseName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: (wide
@@ -119,31 +113,19 @@ class _PartnerBar extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (wide) ...[
+                  if (wide)
                     TextButton(
-                      key: AppKeys.partnerPlayerApp,
-                      onPressed: () => context.go('/'),
-                      child: const Text(PartnerMessages.openPlayerApp),
-                    ),
-                    TextButton(
-                      key: AppKeys.partnerSignOut,
+                      key: PartnerKeys.partnerSignOut,
                       onPressed: () => _leave(ref),
                       child: const Text(PartnerMessages.signOut),
-                    ),
-                  ] else ...[
+                    )
+                  else
                     IconButton(
-                      key: AppKeys.partnerPlayerApp,
-                      tooltip: PartnerMessages.openPlayerApp,
-                      onPressed: () => context.go('/'),
-                      icon: const Icon(Icons.home_outlined),
-                    ),
-                    IconButton(
-                      key: AppKeys.partnerSignOut,
+                      key: PartnerKeys.partnerSignOut,
                       tooltip: PartnerMessages.signOut,
                       onPressed: () => _leave(ref),
                       icon: const Icon(Icons.logout),
                     ),
-                  ],
                 ],
               ),
             ),
@@ -305,23 +287,23 @@ class _MoneyGrid extends StatelessWidget {
       _MoneyCard(
         label: PartnerMessages.netLabel,
         amount: formatPrice(snapshot.netCents),
-        amountKey: AppKeys.partnerNet,
+        amountKey: PartnerKeys.partnerNet,
         emphasized: true,
       ),
       _MoneyCard(
         label: PartnerMessages.grossLabel,
         amount: formatPrice(snapshot.grossCents),
-        amountKey: AppKeys.partnerGross,
+        amountKey: PartnerKeys.partnerGross,
       ),
       _MoneyCard(
         label: PartnerMessages.commissionLabel,
         amount: formatPrice(snapshot.commissionCents),
-        amountKey: AppKeys.partnerCommission,
+        amountKey: PartnerKeys.partnerCommission,
       ),
       _MoneyCard(
         label: PartnerMessages.reservedLabel,
         amount: formatPrice(snapshot.reservedCents),
-        amountKey: AppKeys.partnerReserved,
+        amountKey: PartnerKeys.partnerReserved,
         caption: PartnerMessages.reservedBody,
       ),
     ];
@@ -690,13 +672,13 @@ class _PlayerChip extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Text(
                   PartnerMessages.absenceLine(count, standing),
-                  key: AppKeys.partnerAbsenceStanding(group.id, playerId),
+                  key: PartnerKeys.partnerAbsenceStanding(group.id, playerId),
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               )
             else if (canMark)
               TextButton(
-                key: AppKeys.partnerAbsence(group.id, playerId),
+                key: PartnerKeys.partnerAbsence(group.id, playerId),
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -879,7 +861,7 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
             ),
             const SizedBox(height: 12),
             TextField(
-              key: AppKeys.partnerPrice(widget.room.id),
+              key: PartnerKeys.partnerPrice(widget.room.id),
               controller: _price,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
@@ -892,7 +874,7 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton(
-                key: AppKeys.partnerSavePrice(widget.room.id),
+                key: PartnerKeys.partnerSavePrice(widget.room.id),
                 onPressed: _busy ? null : _save,
                 child: const Text(PartnerMessages.savePrice),
               ),
@@ -922,7 +904,7 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
             ],
             const SizedBox(height: 8),
             OutlinedButton(
-              key: AppKeys.partnerAddSlot(widget.room.id),
+              key: PartnerKeys.partnerAddSlot(widget.room.id),
               onPressed: _addSlot,
               child: const Text(PartnerMessages.addSlot),
             ),

@@ -41,6 +41,30 @@
   </style>
 </head>
 <body>
+  <script>
+    // Um service worker antigo do jogador cobria /scapematch/ inteiro.
+    // Se este shell abrir num caminho do Parceiro, solta esse worker e
+    // volta para o app da casa. Uma segunda passagem não recarrega.
+    (function () {
+      var path = location.pathname;
+      var marker = '/parceiro';
+      var at = path.indexOf(marker);
+      if (at < 0) return;
+      var tail = path.slice(at + marker.length);
+      if (tail !== '' && tail.charAt(0) !== '/') return;
+      if (!('serviceWorker' in navigator)) return;
+      if (sessionStorage.getItem('scape-partner-shell') === '1') return;
+      sessionStorage.setItem('scape-partner-shell', '1');
+      var home = path.slice(0, at + marker.length) + '/';
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (reg) {
+          if (reg.scope.indexOf(marker + '/') === -1) return reg.unregister();
+        }));
+      }).then(function () {
+        location.replace(home);
+      });
+    })();
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

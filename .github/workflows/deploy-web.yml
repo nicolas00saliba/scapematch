@@ -1,7 +1,8 @@
 # Publishes the Flutter web release on GitHub Pages.
 #
-# Public project URL: https://nicolas00saliba.github.io/scapematch/
-# --base-href must stay /scapematch/ (leading and trailing slash).
+# Player: https://nicolas00saliba.github.io/scapematch/
+# Partner: https://nicolas00saliba.github.io/scapematch/parceiro/
+# --base-href must keep the leading and trailing slash.
 #
 # Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
 # release that ships Dart 3.13.7.
@@ -49,14 +50,29 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build web
+      - name: Install partner dependencies
+        working-directory: apps/parceiro
+        run: flutter pub get
+
+      - name: Build player web
         run: flutter build web --release --base-href /scapematch/
 
-      - name: Check base href
-        run: grep -F 'base href="/scapematch/"' build/web/index.html
+      - name: Build partner web
+        working-directory: apps/parceiro
+        run: flutter build web --release --base-href /scapematch/parceiro/
+
+      - name: Assemble the two apps
+        run: |
+          test ! -e build/web/parceiro
+          mkdir -p build/web/parceiro
+          cp -a apps/parceiro/build/web/. build/web/parceiro/
+          test -f build/web/parceiro/index.html
+          grep -F 'base href="/scapematch/"' build/web/index.html
+          grep -F 'base href="/scapematch/parceiro/"' build/web/parceiro/index.html
 
       # Pages serves 404.html for paths the static host does not know.
-      # Copying the shell lets go_router open /groups and the other routes.
+      # Copying the player shell lets go_router open /groups and the other
+      # player routes. /parceiro/ is a real directory, so it is not the 404.
       - name: Add SPA fallback and disable Jekyll
         run: |
           cp build/web/index.html build/web/404.html
@@ -102,7 +118,7 @@ jobs:
           force_orphan: true
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
-          full_commit_message: Publish ScapeMatch web preview
+          full_commit_message: Publish ScapeMatch player and partner web
 
   check:
     name: Check public URL
@@ -111,19 +127,24 @@ jobs:
     steps:
       - name: Request the project site
         run: |
-          url="https://nicolas00saliba.github.io/scapematch/"
+          player="https://nicolas00saliba.github.io/scapematch/"
+          partner="https://nicolas00saliba.github.io/scapematch/parceiro/"
           echo "### ScapeMatch web" >> "$GITHUB_STEP_SUMMARY"
-          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+          echo "$player" >> "$GITHUB_STEP_SUMMARY"
+          echo "$partner" >> "$GITHUB_STEP_SUMMARY"
           # The first gh-pages publish stayed 404 for longer than four minutes.
           for attempt in $(seq 1 30); do
-            code="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$url" || true)"
-            echo "attempt ${attempt}: HTTP ${code}"
-            if [ "$code" = "200" ] && grep -Eq 'name="scapematch-release" content="[^"]+"' /tmp/scapematch.html; then
-              echo "Public site returned a ScapeMatch build."
+            pcode="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$player" || true)"
+            hcode="$(curl -fsS -L -o /tmp/parceiro.html -w "%{http_code}" "$partner" || true)"
+            echo "attempt ${attempt}: player HTTP ${pcode}, partner HTTP ${hcode}"
+            if [ "$pcode" = "200" ] && grep -Eq 'name="scapematch-release" content="[^"]+"' /tmp/scapematch.html \
+              && [ "$hcode" = "200" ] && grep -q 'ScapeMatch Parceiro' /tmp/parceiro.html \
+              && grep -F -q 'base href="/scapematch/parceiro/"' /tmp/parceiro.html; then
+              echo "Public site returned the player app and the partner app."
               exit 0
             fi
             sleep 20
           done
-          echo "The public URL did not return the Flutter shell."
+          echo "The public URL did not return both Flutter shells."
           echo "An admin may still need to enable Pages. See the workflow log from the deploy job."
           exit 1

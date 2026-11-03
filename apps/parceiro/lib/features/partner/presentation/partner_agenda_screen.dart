@@ -3,18 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
-import 'package:scapematch/features/partner/data/partner_repository.dart';
-import 'package:scapematch/features/partner/domain/partner_snapshot.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
-import 'package:scapematch/features/partner/presentation/partner_money.dart';
-import 'package:scapematch/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/partner_keys.dart';
 
 const agendaPalette = <int>[
   0xFF0F4C4A,
@@ -117,7 +117,7 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
             right: 16,
             bottom: 16,
             child: FloatingActionButton(
-              key: AppKeys.agendaAdd,
+              key: PartnerKeys.agendaAdd,
               elevation: 0,
               focusElevation: 0,
               hoverElevation: 0,
@@ -229,7 +229,7 @@ class _AgendaBar extends StatelessWidget {
           const Spacer(),
           if (wide) ...[
             FilledButton.tonalIcon(
-              key: AppKeys.agendaAdd,
+              key: PartnerKeys.agendaAdd,
               style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
               onPressed: onAdd,
               icon: const Icon(Icons.add),
@@ -237,7 +237,7 @@ class _AgendaBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
-              key: AppKeys.agendaRooms,
+              key: PartnerKeys.agendaRooms,
               style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
               onPressed: onRooms,
               icon: const Icon(Icons.meeting_room_outlined),
@@ -245,7 +245,7 @@ class _AgendaBar extends StatelessWidget {
             ),
           ] else
             PopupMenuButton<String>(
-              key: AppKeys.agendaRooms,
+              key: PartnerKeys.agendaRooms,
               onSelected: (_) => onRooms(),
               itemBuilder: (context) => const [
                 PopupMenuItem(
@@ -293,7 +293,7 @@ class _WeekBoard extends StatelessWidget {
           room,
     ];
     return ListView(
-      key: AppKeys.agendaCalendar,
+      key: PartnerKeys.agendaCalendar,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
         Row(
@@ -474,7 +474,7 @@ class _DayBoard extends StatelessWidget {
       byRoom.putIfAbsent(item.room.id, () => []).add(item);
     }
     return ListView(
-      key: AppKeys.agendaCalendar,
+      key: PartnerKeys.agendaCalendar,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
       children: [
         SizedBox(
@@ -539,7 +539,7 @@ class _BlockTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final tone = Colors.white;
     return Material(
-      key: AppKeys.agendaBlock(item.id),
+      key: PartnerKeys.agendaBlock(item.id),
       color: item.color,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
@@ -645,7 +645,7 @@ class _TicketList extends StatelessWidget {
       };
     }).toList()..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     return ListView(
-      key: AppKeys.agendaList,
+      key: PartnerKeys.agendaList,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
       children: [
         Wrap(
@@ -782,7 +782,7 @@ class _SessionSheet extends ConsumerWidget {
         if (person.occupiesSeat) person,
     ];
     return Padding(
-      key: AppKeys.agendaSheet,
+      key: PartnerKeys.agendaSheet,
       padding: EdgeInsets.fromLTRB(
         20,
         0,
@@ -821,7 +821,7 @@ class _SessionSheet extends ConsumerWidget {
           if (!group.isCancelled && snapshot.now.isBefore(group.startsAt)) ...[
             const SizedBox(height: 12),
             FilledButton(
-              key: AppKeys.agendaCancel,
+              key: PartnerKeys.agendaCancel,
               onPressed: () async {
                 final error = await ref.read(partnerRepositoryProvider).cancelSession(
                   houseId: snapshot.house.id,
@@ -875,12 +875,12 @@ class _SheetPerson extends ConsumerWidget {
                 snapshot.absenceCount(playerId),
                 snapshot.standingOf(playerId),
               ),
-              key: AppKeys.partnerAbsenceStanding(group.id, playerId),
+              key: PartnerKeys.partnerAbsenceStanding(group.id, playerId),
             )
           : null,
       trailing: !marked && canMark
           ? TextButton(
-              key: AppKeys.partnerAbsence(group.id, playerId),
+              key: PartnerKeys.partnerAbsence(group.id, playerId),
               onPressed: () {
                 final result = ref.read(partnerRepositoryProvider).markAbsence(
                   houseId: snapshot.house.id,
@@ -1035,7 +1035,7 @@ class _AddSessionSheetState extends ConsumerState<_AddSessionSheet> {
             children: [
               for (final hour in agendaHours)
                 ChoiceChip(
-                  key: AppKeys.agendaTime(_hm(hour.$1, hour.$2)),
+                  key: PartnerKeys.agendaTime(_hm(hour.$1, hour.$2)),
                   label: Text(_hm(hour.$1, hour.$2)),
                   selected: _hour == hour,
                   onSelected: (_) => setState(() => _hour = hour),
@@ -1057,7 +1057,7 @@ class _AddSessionSheetState extends ConsumerState<_AddSessionSheet> {
           ],
           const SizedBox(height: 12),
           FilledButton(
-            key: AppKeys.agendaSaveSession,
+            key: PartnerKeys.agendaSaveSession,
             onPressed: _busy ? null : _save,
             child: const Text(PartnerMessages.openSession),
           ),
@@ -1107,7 +1107,7 @@ class _RoomsSheetState extends ConsumerState<_RoomsSheet> {
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton.tonalIcon(
-              key: AppKeys.agendaAddRoom,
+              key: PartnerKeys.agendaAddRoom,
               style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
               onPressed: () => setState(() => _creating = true),
               icon: const Icon(Icons.add),
@@ -1231,7 +1231,7 @@ class _RoomFormState extends ConsumerState<_RoomForm> {
           ),
           const SizedBox(height: 12),
           TextField(
-            key: AppKeys.agendaRoomName,
+            key: PartnerKeys.agendaRoomName,
             controller: _name,
             decoration: const InputDecoration(
               labelText: 'Nome',
@@ -1324,7 +1324,7 @@ class _RoomFormState extends ConsumerState<_RoomForm> {
           ],
           const SizedBox(height: 12),
           FilledButton(
-            key: AppKeys.agendaSaveRoom,
+            key: PartnerKeys.agendaSaveRoom,
             onPressed: _save,
             child: const Text('Salvar sala'),
           ),

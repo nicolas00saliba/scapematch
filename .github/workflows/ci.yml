@@ -41,5 +41,32 @@ jobs:
         working-directory: packages/dominio
         run: dart test
 
+      - name: Install partner dependencies
+        working-directory: apps/parceiro
+        run: flutter pub get
+
+      - name: Analyze partner app
+        working-directory: apps/parceiro
+        run: flutter analyze
+
+      - name: Test partner app
+        working-directory: apps/parceiro
+        run: flutter test
+
       - name: Build web
-        run: flutter build web --release
+        run: flutter build web --release --base-href /scapematch/
+
+      - name: Player bundle excludes the partner app
+        run: |
+          if grep -R -F -q 'ScapeMatch Parceiro' build/web --include='*.js' --include='*.html'; then
+            echo 'O bundle do jogador ainda contém o Parceiro.'
+            exit 1
+          fi
+          if grep -R -F -q 'xv@scapematch.exemplo' build/web --include='*.js'; then
+            echo 'O bundle do jogador ainda contém o login da casa.'
+            exit 1
+          fi
+
+      - name: Build partner web
+        working-directory: apps/parceiro
+        run: flutter build web --release --base-href /scapematch/parceiro/

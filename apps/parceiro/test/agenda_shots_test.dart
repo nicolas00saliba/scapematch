@@ -5,14 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
-import 'package:scapematch/core/ui/app_keys.dart';
-import 'package:scapematch/features/partner/domain/partner_account.dart';
-import 'package:scapematch/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch/features/theme/data/theme_choice_store.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/partner_keys.dart';
 
-import 'support/pump_app.dart';
+import 'support/pump_parceiro.dart';
 
 void main() {
   testWidgets('saves the partner agenda', (tester) async {
@@ -24,11 +23,11 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     await _desk(tester, const Size(1280, 900), 'light');
-    await _shot(tester, dir, 'semana-1280-claro.png', const Size(1280, 900), find.byKey(AppKeys.agendaCalendar));
+    await _shot(tester, dir, 'semana-1280-claro.png', const Size(1280, 900), find.byKey(PartnerKeys.agendaCalendar));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await _desk(tester, const Size(1280, 900), 'dark');
-    await _shot(tester, dir, 'semana-1280-escuro.png', const Size(1280, 900), find.byKey(AppKeys.agendaCalendar));
+    await _shot(tester, dir, 'semana-1280-escuro.png', const Size(1280, 900), find.byKey(PartnerKeys.agendaCalendar));
     await _lists(tester, dir, '1280-escuro', const Size(1280, 900));
     await _forms(tester, dir, '1280-escuro', const Size(1280, 900));
 
@@ -42,7 +41,7 @@ void main() {
 }
 
 Future<void> _desk(WidgetTester tester, Size size, String theme) async {
-  await pumpScapeMatch(
+  await pumpParceiro(
     tester,
     overrides: [
       themeChoiceStoreProvider.overrideWithValue(ThemeChoiceStore(saved: theme)),
@@ -51,11 +50,9 @@ Future<void> _desk(WidgetTester tester, Size size, String theme) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   await tester.pumpAndSettle();
-  GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/parceiro');
-  await tester.pumpAndSettle();
-  await tester.enterText(find.byKey(AppKeys.partnerEmail), partnerDemoAccount.email);
-  await tester.enterText(find.byKey(AppKeys.partnerPassword), partnerDemoPassword);
-  await tester.tap(find.byKey(AppKeys.partnerSubmit));
+  await tester.enterText(find.byKey(PartnerKeys.partnerEmail), partnerDemoAccount.email);
+  await tester.enterText(find.byKey(PartnerKeys.partnerPassword), partnerDemoPassword);
+  await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
   await tester.pumpAndSettle();
   await tester.pump(const Duration(seconds: 4));
   await tester.pumpAndSettle();
@@ -77,8 +74,8 @@ Future<void> _sheet(
   await tester.ensureVisible(block.first);
   await tester.tap(block.first);
   await tester.pumpAndSettle();
-  await _shot(tester, dir, 'detalhe-$suffix.png', size, find.byKey(AppKeys.agendaSheet));
-  Navigator.of(tester.element(find.byKey(AppKeys.agendaSheet))).pop();
+  await _shot(tester, dir, 'detalhe-$suffix.png', size, find.byKey(PartnerKeys.agendaSheet));
+  Navigator.of(tester.element(find.byKey(PartnerKeys.agendaSheet))).pop();
   await tester.pumpAndSettle();
 }
 
@@ -88,22 +85,22 @@ Future<void> _forms(
   String suffix,
   Size size,
 ) async {
-  await tester.tap(find.byKey(AppKeys.agendaAdd));
+  await tester.tap(find.byKey(PartnerKeys.agendaAdd));
   await tester.pumpAndSettle();
   await _shot(tester, dir, 'nova-sessao-$suffix.png', size, find.text(PartnerMessages.addSession));
   Navigator.of(tester.element(find.text(PartnerMessages.openSession))).pop();
   await tester.pumpAndSettle();
 
-  await tester.tap(find.byKey(AppKeys.agendaRooms));
+  await tester.tap(find.byKey(PartnerKeys.agendaRooms));
   await tester.pumpAndSettle();
-  if (find.byKey(AppKeys.agendaAddRoom).evaluate().isEmpty) {
+  if (find.byKey(PartnerKeys.agendaAddRoom).evaluate().isEmpty) {
     await tester.tap(find.text(PartnerMessages.manageRooms).last);
     await tester.pumpAndSettle();
   }
-  await tester.tap(find.byKey(AppKeys.agendaAddRoom));
+  await tester.tap(find.byKey(PartnerKeys.agendaAddRoom));
   await tester.pumpAndSettle();
-  await _shot(tester, dir, 'nova-sala-$suffix.png', size, find.byKey(AppKeys.agendaRoomName));
-  Navigator.of(tester.element(find.byKey(AppKeys.agendaRoomName))).pop();
+  await _shot(tester, dir, 'nova-sala-$suffix.png', size, find.byKey(PartnerKeys.agendaRoomName));
+  Navigator.of(tester.element(find.byKey(PartnerKeys.agendaRoomName))).pop();
   await tester.pumpAndSettle();
 }
 
