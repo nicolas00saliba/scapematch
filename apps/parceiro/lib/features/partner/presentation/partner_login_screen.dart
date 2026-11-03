@@ -6,7 +6,6 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_messag
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
-import 'package:scapematch_parceiro/player_app_link.dart';
 
 class PartnerLoginScreen extends ConsumerStatefulWidget {
   const PartnerLoginScreen({super.key});
@@ -124,12 +123,6 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
             key: PartnerKeys.partnerSubmit,
             onPressed: _busy ? null : _submit,
             child: const Text('Entrar'),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            key: PartnerKeys.partnerPlayerApp,
-            onPressed: openPlayerApp,
-            child: const Text(PartnerMessages.openPlayerApp),
           ),
         ],
       ),

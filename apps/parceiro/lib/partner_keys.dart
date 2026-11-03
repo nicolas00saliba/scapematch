@@ -7,7 +7,6 @@ abstract final class PartnerKeys {
   static const partnerPassword = Key('partner-password');
   static const partnerSubmit = Key('partner-submit');
   static const partnerLoginError = Key('partner-login-error');
-  static const partnerPlayerApp = Key('partner-player-app');
   static const partnerSignOut = Key('partner-sign-out');
   static const partnerHouseName = Key('partner-house-name');
   static const partnerNet = Key('partner-net');

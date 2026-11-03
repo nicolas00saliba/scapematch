@@ -19,7 +19,6 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_money.
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
-import 'package:scapematch_parceiro/player_app_link.dart';
 
 class PartnerHome extends ConsumerWidget {
   const PartnerHome({super.key, required this.snapshot});
@@ -114,31 +113,19 @@ class _PartnerBar extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (wide) ...[
-                    TextButton(
-                      key: PartnerKeys.partnerPlayerApp,
-                      onPressed: openPlayerApp,
-                      child: const Text(PartnerMessages.openPlayerApp),
-                    ),
+                  if (wide)
                     TextButton(
                       key: PartnerKeys.partnerSignOut,
                       onPressed: () => _leave(ref),
                       child: const Text(PartnerMessages.signOut),
-                    ),
-                  ] else ...[
-                    IconButton(
-                      key: PartnerKeys.partnerPlayerApp,
-                      tooltip: PartnerMessages.openPlayerApp,
-                      onPressed: openPlayerApp,
-                      icon: const Icon(Icons.home_outlined),
-                    ),
+                    )
+                  else
                     IconButton(
                       key: PartnerKeys.partnerSignOut,
                       tooltip: PartnerMessages.signOut,
                       onPressed: () => _leave(ref),
                       icon: const Icon(Icons.logout),
                     ),
-                  ],
                 ],
               ),
             ),

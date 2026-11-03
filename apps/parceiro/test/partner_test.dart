@@ -13,7 +13,6 @@ import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
-import 'package:scapematch_parceiro/player_app_url.dart';
 
 import 'support/pump_parceiro.dart';
 import 'support/sample_clock.dart';
@@ -127,21 +126,11 @@ void main() {
     expect(nicolas.payment, PaymentStatus.paid);
   });
 
-  test('the player app lives one level above the partner site', () {
-    expect(
-      playerAppUrl('https://nicolas00saliba.github.io/scapematch/parceiro/'),
-      'https://nicolas00saliba.github.io/scapematch/',
-    );
-    expect(
-      playerAppUrl('http://127.0.0.1:8080/parceiro/'),
-      'http://127.0.0.1:8080/',
-    );
-  });
-
   testWidgets('bad credentials stay on the house login', (tester) async {
     await pumpParceiro(tester);
     expect(find.text('ScapeMatch Parceiro'), findsOneWidget);
     expect(find.text(PartnerMessages.emailHint), findsOneWidget);
+    expect(find.text('App do jogador'), findsNothing);
 
     await tester.enterText(
       find.byKey(PartnerKeys.partnerEmail),
@@ -159,6 +148,7 @@ void main() {
     await _signIn(tester);
 
     expect(find.text(partnerDemoAccount.houseName), findsOneWidget);
+    expect(find.text('App do jogador'), findsNothing);
     final net = tester.widget<Text>(find.byKey(PartnerKeys.partnerNet)).data;
     expect(net, isNot(formatPrice(0)));
     expect(find.byKey(PartnerKeys.partnerGross), findsOneWidget);

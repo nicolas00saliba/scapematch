@@ -9,7 +9,6 @@ abstract final class PartnerMessages {
   static const emailHint =
       'Casa de exemplo: xv@scapematch.exemplo. Senha: demo.';
   static const badLogin = 'E-mail ou senha não conferem neste exemplo.';
-  static const openPlayerApp = 'App do jogador';
   static const signOut = 'Sair';
   static const balance = 'Saldo';
   static const reservations = 'Reservas';
