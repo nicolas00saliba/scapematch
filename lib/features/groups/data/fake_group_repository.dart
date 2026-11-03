@@ -543,6 +543,44 @@ class FakeGroupRepository implements GroupRepository {
     return DeleteGroupSuccess(updated);
   }
 
+  /// A casa cancela a sessão. Vale a mesma janela de 2 h do host.
+  Future<String?> cancelForHouse({
+    required String houseId,
+    required String groupId,
+    required String reason,
+  }) async {
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return 'Sessão não encontrada.';
+    }
+    final current = _database.groups[index];
+    if (current.houseId != houseId) {
+      return 'Sessão não encontrada.';
+    }
+    if (current.isCancelled) {
+      return 'Essa sessão já está cancelada.';
+    }
+    final now = clock.now();
+    if (!now.isBefore(current.startsAt)) {
+      return 'A sessão já começou.';
+    }
+    if (!GroupRules.canDeleteGroup(startsAt: current.startsAt, now: now)) {
+      return 'Exclusão bloqueada (menos de 2 h)';
+    }
+    final outcome = GroupRules.refundForOrganizer(
+      RefundReason.organizerCancelledEvent,
+    );
+    final text = reason.trim().isEmpty ? 'Cancelada pela casa' : reason.trim();
+    _database.groups[index] = current.copyWith(
+      cancelledAt: now,
+      cancelReason: text,
+      filledSpots: 0,
+      participants: await _closeOccupants(current, outcome),
+    );
+    return null;
+  }
+
   @override
   Future<RemoveMemberResult> removeMember(
     String groupId, {

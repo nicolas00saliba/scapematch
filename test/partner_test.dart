@@ -175,6 +175,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1 falta · aviso'), findsOneWidget);
 
+    await tester.ensureVisible(find.text(PartnerMessages.rooms));
     await tester.tap(find.text(PartnerMessages.rooms));
     await tester.pumpAndSettle();
     final price = find.byKey(AppKeys.partnerPrice(SampleIds.roomCwbCaldeira));

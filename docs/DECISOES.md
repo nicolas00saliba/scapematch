@@ -5,7 +5,7 @@
 - **Data:** 2026-11-03
 - **Decisão:** a casa entra em `/parceiro` com login simulado (`xv@scapematch.exemplo`, senha `demo`, casa Mistério da Rua XV). O painel mostra saldo, extrato (bruto, comissão e líquido), reservas e grupos, salas com preço e horários, e a marcação de falta. Tudo lê o `PaymentBook`, o catálogo e o `AbsenceBook` da mesma sessão do app do jogador. A Conta tem o atalho ScapeMatch Parceiro.
 - **Motivo:** a apresentação de sexta precisa da casa vendo o que o jogador reservou, sem um segundo aplicativo.
-- **Onde está no código:** `PartnerScreen`, `PartnerRepository` e o atalho na Conta. Na lista, o grupo aberto mostra “N de Z reservaram” e o selo Aberto. Quando N chega em Z, o selo é Fechado, cada parte fica Paga e o líquido entra no saldo. Os horários de exemplo caem em 14:00, 16:30, 19:00 ou 21:00.
+- **Onde está no código:** `PartnerScreen`, `PartnerRepository` e o atalho na Conta. A Agenda, no mesmo painel, mostra a semana e a lista de sessões e grava no mesmo livro. Na lista de reservas, o grupo aberto mostra “N de Z reservaram” e o selo Aberto. Quando N chega em Z, o selo é Fechado, cada parte fica Paga e o líquido entra no saldo. Os horários de exemplo caem em 14:00, 16:30, 19:00 ou 21:00.
 - **Como trocar depois:** outra casa entra em `partnerDemoAccount`. O Supabase troca o miolo de `PartnerRepository`.
 
 ## Só cobra se o grupo fechar

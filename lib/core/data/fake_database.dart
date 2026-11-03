@@ -72,6 +72,10 @@ class FakeDatabase {
 
   TimeSlot? slotById(String id) => _find(slots, id, (slot) => slot.id);
 
+  void addRoom(EscapeRoom room) {
+    rooms.add(room);
+  }
+
   void replaceRoom(EscapeRoom room) {
     final index = rooms.indexWhere((item) => item.id == room.id);
     if (index < 0) {

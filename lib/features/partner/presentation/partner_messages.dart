@@ -14,6 +14,20 @@ abstract final class PartnerMessages {
   static const balance = 'Saldo';
   static const reservations = 'Reservas';
   static const rooms = 'Salas';
+  static const agenda = 'Agenda';
+  static const agendaList = 'Lista';
+  static const upcoming = 'Próximas';
+  static const done = 'Realizadas';
+  static const cancelledTab = 'Canceladas';
+  static const addSession = 'Nova sessão';
+  static const manageRooms = 'Gerir salas';
+  static const free = 'Livre';
+  static const openSession = 'Abrir sessão';
+  static const cancelSession = 'Cancelar sessão';
+  static const sessionSaved = 'Sessão aberta nesta sessão.';
+  static const roomSaved = 'Sala gravada nesta sessão.';
+  static const noSessions = 'Nada neste dia.';
+  static const noShows = 'Faltas';
   static const balanceTitle = 'Saldo da casa';
   static const balanceBody =
       'O líquido é o que fica com a casa depois da comissão. O valor reservado só entra quando o grupo fecha.';

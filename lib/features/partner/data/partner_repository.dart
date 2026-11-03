@@ -2,9 +2,14 @@ import 'package:dominio/dominio.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
+import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch/features/partner/domain/partner_statement.dart';
@@ -139,6 +144,149 @@ class PartnerRepository {
     return catalog.addSlot(roomId, startsAt);
   }
 
+  /// Abre uma sessão vazia. O jogador vê o grupo e o horário na sala.
+  Future<String?> openSession({
+    required String houseId,
+    required String roomId,
+    required DateTime startsAt,
+    required int priceCents,
+  }) async {
+    final house = database.houseById(houseId);
+    final room = database.roomById(roomId);
+    final city = house == null ? null : database.cityById(house.cityId);
+    if (house == null || city == null || room == null || room.houseId != house.id) {
+      return 'Sala não encontrada nesta casa.';
+    }
+    if (priceCents < 100 || priceCents > 500000) {
+      return 'Informe um preço entre R\$ 1,00 e R\$ 5.000,00.';
+    }
+    if (!_isOpeningHour(startsAt)) {
+      return 'Escolha 14:00, 16:30, 19:00 ou 21:00.';
+    }
+    final now = clock.now();
+    if (!startsAt.isAfter(now)) {
+      return 'Esse horário já passou.';
+    }
+    if (GroupRules.tooCloseToCreate(startsAt: startsAt, now: now)) {
+      return 'Falta menos de 1 h. Escolha outro horário.';
+    }
+    final taken = database.groups.any(
+      (group) =>
+          !group.isCancelled &&
+          group.roomId == room.id &&
+          group.startsAt == startsAt,
+    );
+    if (taken) {
+      return 'Essa sala já tem sessão nesse horário.';
+    }
+    final slot = database.addSlot(roomId: room.id, startsAt: startsAt);
+    database.groups.add(
+      Group(
+        id: database.nextGroupId(),
+        cityId: city.id,
+        cityName: city.name,
+        houseId: house.id,
+        houseName: house.name,
+        neighborhood: house.neighborhood,
+        roomId: room.id,
+        roomName: room.name,
+        roomTheme: room.theme,
+        roomCapacity: room.capacity,
+        roomMinimum: room.minimumPlayers,
+        durationMinutes: room.durationMinutes,
+        difficulty: room.difficulty,
+        slotId: slot.id,
+        startsAt: slot.startsAt,
+        filledSpots: 0,
+        totalSpots: room.capacity,
+        priceCents: priceCents,
+        minimumSpots: room.minimumPlayers,
+        closesAt: GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
+        cancelWindow: room.cancelWindow,
+        streetAddress: house.streetAddress,
+        coverAsset: roomCategoryImage(room.category),
+        participants: const [],
+      ),
+    );
+    return null;
+  }
+
+  Future<String?> cancelSession({
+    required String houseId,
+    required String groupId,
+    required String reason,
+  }) {
+    return groups.cancelForHouse(
+      houseId: houseId,
+      groupId: groupId,
+      reason: reason,
+    );
+  }
+
+  String? saveRoom({
+    required String houseId,
+    String? roomId,
+    required String name,
+    required Difficulty difficulty,
+    required int durationMinutes,
+    required int minimumPlayers,
+    required int capacity,
+    required int priceCents,
+    required int accent,
+  }) {
+    final trimmed = name.trim();
+    if (trimmed.length < 2) {
+      return 'Dê um nome para a sala.';
+    }
+    if (minimumPlayers < 2 || capacity < minimumPlayers || capacity > 12) {
+      return 'O mínimo e o máximo precisam caber na sala.';
+    }
+    if (durationMinutes < 30 || durationMinutes > 240) {
+      return 'A duração fica entre 30 e 240 minutos.';
+    }
+    if (priceCents < 100 || priceCents > 500000) {
+      return 'Informe um preço entre R\$ 1,00 e R\$ 5.000,00.';
+    }
+    if (roomId == null) {
+      final house = database.houseById(houseId);
+      if (house == null) {
+        return 'Casa não encontrada.';
+      }
+      database.addRoom(
+        EscapeRoom(
+          id: 'room-$houseId-${database.rooms.length + 1}',
+          houseId: houseId,
+          name: trimmed,
+          theme: 'Sala aberta pela casa',
+          category: RoomCategory.mystery,
+          capacity: capacity,
+          durationMinutes: durationMinutes,
+          difficulty: difficulty,
+          priceCents: priceCents,
+          minimumPlayers: minimumPlayers,
+          accent: accent,
+        ),
+      );
+      return null;
+    }
+    final room = database.roomById(roomId);
+    if (room == null || room.houseId != houseId) {
+      return 'Sala não encontrada nesta casa.';
+    }
+    database.replaceRoom(
+      room.copyWith(
+        name: trimmed,
+        difficulty: difficulty,
+        durationMinutes: durationMinutes,
+        minimumPlayers: minimumPlayers,
+        capacity: capacity,
+        priceCents: priceCents,
+        accent: accent,
+      ),
+    );
+    return null;
+  }
+
   Group? _group(String houseId, String groupId) {
     for (final group in database.groups) {
       if (group.id == groupId && group.houseId == houseId) {
@@ -178,6 +326,16 @@ GroupMoney _moneyFor(String groupId, List<Reservation> reservations) {
     commissionCents: commission,
     netCents: net,
   );
+}
+
+bool _isOpeningHour(DateTime startsAt) {
+  const hours = <(int, int)>[(14, 0), (16, 30), (19, 0), (21, 0)];
+  for (final (hour, minute) in hours) {
+    if (startsAt.hour == hour && startsAt.minute == minute) {
+      return true;
+    }
+  }
+  return false;
 }
 
 int _byWhen(Group a, Group b, DateTime now) {

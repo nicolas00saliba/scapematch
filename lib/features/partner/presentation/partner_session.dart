@@ -7,7 +7,7 @@ import 'package:scapematch/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
-enum PartnerSection { balance, reservations, rooms }
+enum PartnerSection { balance, reservations, agenda, rooms }
 
 class PartnerSessionController extends Notifier<PartnerAccount?> {
   @override

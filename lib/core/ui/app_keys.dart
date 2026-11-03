@@ -191,4 +191,19 @@ abstract final class AppKeys {
       Key('partner-absence-$groupId-$playerId');
   static Key partnerAbsenceStanding(String groupId, String playerId) =>
       Key('partner-absence-standing-$groupId-$playerId');
+  static const agendaCalendar = Key('agenda-calendar');
+  static const agendaList = Key('agenda-list');
+  static const agendaAdd = Key('agenda-add');
+  static const agendaRooms = Key('agenda-rooms');
+  static const agendaAddRoom = Key('agenda-add-room');
+  static const agendaSaveSession = Key('agenda-save-session');
+  static const agendaSaveRoom = Key('agenda-save-room');
+  static const agendaRoomName = Key('agenda-room-name');
+  static const agendaCancel = Key('agenda-cancel');
+  static const agendaSheet = Key('agenda-sheet');
+  static const agendaUpcoming = Key('agenda-upcoming');
+  static const agendaDone = Key('agenda-done');
+  static const agendaCancelled = Key('agenda-cancelled');
+  static Key agendaBlock(String id) => Key('agenda-block-$id');
+  static Key agendaTime(String label) => Key('agenda-time-$label');
 }

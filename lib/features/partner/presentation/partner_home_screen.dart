@@ -16,6 +16,7 @@ import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/partner/data/partner_repository.dart';
 import 'package:scapematch/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch/features/partner/domain/partner_statement.dart';
+import 'package:scapematch/features/partner/presentation/partner_agenda_screen.dart';
 import 'package:scapematch/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch/features/partner/presentation/partner_money.dart';
 import 'package:scapematch/features/partner/presentation/partner_session.dart';
@@ -32,6 +33,7 @@ class PartnerHome extends ConsumerWidget {
     final body = switch (section) {
       PartnerSection.balance => _BalanceSection(snapshot: snapshot),
       PartnerSection.reservations => _ReservationsSection(snapshot: snapshot),
+      PartnerSection.agenda => PartnerAgenda(snapshot: snapshot),
       PartnerSection.rooms => _RoomsSection(snapshot: snapshot),
     };
     return Scaffold(
@@ -152,6 +154,15 @@ class _PartnerBar extends ConsumerWidget {
   }
 }
 
+String _sectionLabel(PartnerSection section) {
+  return switch (section) {
+    PartnerSection.balance => PartnerMessages.balance,
+    PartnerSection.reservations => PartnerMessages.reservations,
+    PartnerSection.agenda => PartnerMessages.agenda,
+    PartnerSection.rooms => PartnerMessages.rooms,
+  };
+}
+
 void _leave(WidgetRef ref) {
   ref.read(partnerSectionProvider.notifier).select(PartnerSection.balance);
   ref.read(partnerSessionProvider.notifier).signOut();
@@ -186,6 +197,11 @@ class _PartnerRail extends ConsumerWidget {
           label: Text(PartnerMessages.reservations),
         ),
         NavigationRailDestination(
+          icon: Icon(Icons.calendar_month_outlined),
+          selectedIcon: Icon(Icons.calendar_month),
+          label: Text(PartnerMessages.agenda),
+        ),
+        NavigationRailDestination(
           icon: Icon(Icons.meeting_room_outlined),
           selectedIcon: Icon(Icons.meeting_room),
           label: Text(PartnerMessages.rooms),
@@ -204,25 +220,29 @@ class _PartnerTabs extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      child: SegmentedButton<PartnerSection>(
-        selected: {selected},
-        onSelectionChanged: (next) {
-          ref.read(partnerSectionProvider.notifier).select(next.first);
-        },
-        segments: const [
-          ButtonSegment(
-            value: PartnerSection.balance,
-            label: Text(PartnerMessages.balance),
-          ),
-          ButtonSegment(
-            value: PartnerSection.reservations,
-            label: Text(PartnerMessages.reservations),
-          ),
-          ButtonSegment(
-            value: PartnerSection.rooms,
-            label: Text(PartnerMessages.rooms),
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final section in PartnerSection.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  showCheckmark: false,
+                  visualDensity: VisualDensity.compact,
+                  labelStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  label: Text(_sectionLabel(section)),
+                  selected: section == selected,
+                  onSelected: (_) {
+                    ref.read(partnerSectionProvider.notifier).select(section);
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

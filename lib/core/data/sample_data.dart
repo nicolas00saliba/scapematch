@@ -1080,12 +1080,17 @@ class _SampleSchedule {
   /// 1 h 30 min à frente, no :00 ou :30, para o teste da janela continuar
   /// com uma única sessão por cidade.
   DateTime get soonAt {
+    // Mais de 1 h à frente, senão o prazo de fechar já passou e o grupo
+    // some da lista. Menos de 2 h, para continuar dentro da janela.
+    final earliest = now.add(const Duration(hours: 1));
     final limit = now.add(const Duration(hours: 2));
     for (final candidate in _walk(after: now)) {
       if (!candidate.isBefore(limit)) {
         break;
       }
-      return candidate;
+      if (candidate.isAfter(earliest)) {
+        return candidate;
+      }
     }
     final raw = now.add(const Duration(minutes: 90));
     final rounded = _halfHour(raw);
