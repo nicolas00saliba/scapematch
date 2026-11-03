@@ -1,6 +1,8 @@
 /// Regras de reserva, divisão, comissão e pagamento simulado.
 library;
 
+export 'src/absence.dart';
+export 'src/closing.dart';
 export 'src/commission.dart';
 export 'src/ledger.dart';
 export 'src/payment_book.dart';

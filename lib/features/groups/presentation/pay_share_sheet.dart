@@ -463,7 +463,7 @@ class _Confirmed extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Pagamento confirmado',
+            'Valor reservado',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),

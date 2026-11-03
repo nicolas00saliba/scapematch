@@ -39,10 +39,16 @@ abstract final class GroupMessages {
 
   static const simulatedNotice = 'Pagamento simulado, nada é cobrado';
 
+  static const chargeOnlyIfCloses = 'Você só é cobrado se o grupo fechar.';
+
+  static const holdReleased = 'Valor liberado, nada foi cobrado';
+
   static String paymentStatus(PaymentStatus status) {
     return switch (status) {
       PaymentStatus.pending => 'Pendente',
+      PaymentStatus.reserved => 'Reservado',
       PaymentStatus.paid => 'Pago',
+      PaymentStatus.released => 'Liberado',
     };
   }
 
@@ -56,10 +62,58 @@ abstract final class GroupMessages {
     return '$paid de $seated pagaram';
   }
 
+  static String reservedProgress(int reserved, int seated) {
+    if (seated <= 0 || reserved <= 0) {
+      return 'Ninguém reservou ainda';
+    }
+    return '$reserved de $seated reservaram';
+  }
+
+  /// Aberto: quem separou o valor. Fechado: quem já foi cobrado.
+  static String shareProgress({
+    required bool closed,
+    required int paid,
+    required int reserved,
+    required int seated,
+  }) {
+    if (closed) {
+      return paidProgress(paid, seated);
+    }
+    return reservedProgress(reserved, seated);
+  }
+
+  static String paymentPolicy({required bool closed, required int hours}) {
+    if (!closed) {
+      return 'Se o grupo não fechar, o valor reservado é liberado automaticamente.';
+    }
+    return 'Cancelar com $hours h ou mais de antecedência devolve o pagamento.';
+  }
+
   static String payMyShare(String price) => 'Pagar minha parte ($price)';
 
   static const yourSharePending = 'Sua parte está pendente';
+  static const yourShareReserved =
+      'Valor reservado. Você só é cobrado se o grupo fechar.';
   static const yourSharePaid = 'Sua parte está paga';
+  static const yourShareReleased = 'Valor liberado, nada foi cobrado';
+
+  static String yourShare(PaymentStatus status) {
+    return switch (status) {
+      PaymentStatus.pending => yourSharePending,
+      PaymentStatus.reserved => yourShareReserved,
+      PaymentStatus.paid => yourSharePaid,
+      PaymentStatus.released => yourShareReleased,
+    };
+  }
+
+  static String closeWith(int seated) => 'Fechar com $seated pessoas';
+
+  static String roomMinimum(int minimum) => 'Mínimo da sala: $minimum';
+
+  static const closeBody =
+      'Cada pessoa paga só a própria parte. O grupo fecha agora e a reserva vira cobrança.';
+
+  static const cannotDeleteYet = 'Exclusão bloqueada (menos de 2 h)';
 
   static const leaveUnpaidBody =
       'Você ainda não pagou esta parte. Sair agora só libera a vaga. Não há valor para devolver.';
@@ -79,7 +133,10 @@ abstract final class GroupMessages {
             ? 'Reembolsado · o organizador removeu você do grupo'
             : 'Reembolsado · o organizador removeu esta pessoa',
       RefundReason.groupDidNotClose =>
-        'Reembolsado · o grupo não fechou até o prazo',
+        person.payment == PaymentStatus.released
+            ? holdReleased
+            : 'Reembolsado · o grupo não fechou até o prazo',
+      RefundReason.holdReleased => holdReleased,
     };
   }
 
@@ -183,6 +240,7 @@ abstract final class GroupMessages {
         'Este grupo já foi cancelado.',
       DeleteGroupFailureReason.sessionStarted => sessionAlreadyStarted,
       DeleteGroupFailureReason.sessionEnded => 'Esta sessão já terminou.',
+      DeleteGroupFailureReason.tooCloseToDelete => cannotDeleteYet,
     };
   }
 

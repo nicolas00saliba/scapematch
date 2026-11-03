@@ -127,12 +127,38 @@ final class DeleteGroupFailure extends DeleteGroupResult {
   final DeleteGroupFailureReason reason;
 }
 
+sealed class CloseGroupResult {
+  const CloseGroupResult();
+}
+
+final class CloseGroupSuccess extends CloseGroupResult {
+  const CloseGroupSuccess(this.group);
+
+  final Group group;
+}
+
+final class CloseGroupFailure extends CloseGroupResult {
+  const CloseGroupFailure(this.reason);
+
+  final CloseGroupFailureReason reason;
+}
+
+enum CloseGroupFailureReason {
+  notFound,
+  notCreator,
+  alreadyCancelled,
+  sessionStarted,
+  belowRoomMinimum,
+  alreadyPlannedSize,
+}
+
 enum DeleteGroupFailureReason {
   notFound,
   notCreator,
   alreadyCancelled,
   sessionStarted,
   sessionEnded,
+  tooCloseToDelete,
 }
 
 sealed class RemoveMemberResult {

@@ -233,7 +233,8 @@ class FakeGroupRepository implements GroupRepository {
     if (member == null || !member.occupiesSeat) {
       return const PayShareFailure(PayShareFailureReason.notSeated);
     }
-    if (member.payment == PaymentStatus.paid) {
+    if (member.payment == PaymentStatus.paid ||
+        member.payment == PaymentStatus.reserved) {
       return const PayShareFailure(PayShareFailureReason.alreadyPaid);
     }
     final seated = [
@@ -242,7 +243,8 @@ class FakeGroupRepository implements GroupRepository {
     ];
     var reservation = await _ensureReservation(current, seated);
     var share = _shareFor(reservation, member);
-    if (share.status == ShareStatus.refunded) {
+    if (share.status == ShareStatus.refunded ||
+        share.status == ShareStatus.released) {
       reservation = payments.addShare(
         reservationId: current.id,
         playerId: _payerId(member),
@@ -257,15 +259,63 @@ class FakeGroupRepository implements GroupRepository {
       idempotencyKey: 'pay-${share.id}',
     );
     final settled = _shareFor(paid, member);
-    if (settled.status != ShareStatus.paid) {
+    if (settled.status != ShareStatus.reserved &&
+        settled.status != ShareStatus.paid) {
       return const PayShareFailure(PayShareFailureReason.notSeated);
     }
-    final updated = _replaceMember(
+    var updated = _replaceMember(
       current,
-      member.copyWith(payment: PaymentStatus.paid),
+      member.copyWith(
+        payment: settled.status == ShareStatus.paid
+            ? PaymentStatus.paid
+            : PaymentStatus.reserved,
+      ),
     );
+    if (updated.filledSpots >= updated.totalSpots) {
+      updated = await _captureClosed(updated);
+    }
     _database.groups[index] = updated;
     return PayShareSuccess(updated);
+  }
+
+  @override
+  Future<CloseGroupResult> closeWithFewer(
+    String groupId, {
+    required String userId,
+  }) async {
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return const CloseGroupFailure(CloseGroupFailureReason.notFound);
+    }
+    final current = _database.groups[index];
+    final now = clock.now();
+    if (!current.createdBy(userId)) {
+      return const CloseGroupFailure(CloseGroupFailureReason.notCreator);
+    }
+    if (current.isCancelled) {
+      return const CloseGroupFailure(CloseGroupFailureReason.alreadyCancelled);
+    }
+    if (GroupRules.hasStarted(startsAt: current.startsAt, now: now)) {
+      return const CloseGroupFailure(CloseGroupFailureReason.sessionStarted);
+    }
+    final seated = current.occupiedSpots;
+    if (seated >= current.totalSpots) {
+      return const CloseGroupFailure(
+        CloseGroupFailureReason.alreadyPlannedSize,
+      );
+    }
+    if (!GroupRules.canCloseWithFewer(
+      seated: seated,
+      roomMinimum: current.minimumSpots,
+      planned: current.totalSpots,
+    )) {
+      return const CloseGroupFailure(CloseGroupFailureReason.belowRoomMinimum);
+    }
+    final resized = current.copyWith(totalSpots: seated);
+    final closed = await _captureClosed(resized);
+    _database.groups[index] = closed;
+    return CloseGroupSuccess(closed);
   }
 
   @override
@@ -471,6 +521,11 @@ class FakeGroupRepository implements GroupRepository {
     }
     if (GroupRules.hasStarted(startsAt: current.startsAt, now: now)) {
       return const DeleteGroupFailure(DeleteGroupFailureReason.sessionStarted);
+    }
+    if (!GroupRules.canDeleteGroup(startsAt: current.startsAt, now: now)) {
+      return const DeleteGroupFailure(
+        DeleteGroupFailureReason.tooCloseToDelete,
+      );
     }
     final outcome = GroupRules.refundForOrganizer(
       RefundReason.organizerCancelledEvent,
@@ -742,7 +797,8 @@ class FakeGroupRepository implements GroupRepository {
       if (share.playerId != payerId) {
         continue;
       }
-      if (share.status != ShareStatus.refunded) {
+      if (share.status != ShareStatus.refunded &&
+          share.status != ShareStatus.released) {
         return share;
       }
       refunded = share;
@@ -799,8 +855,41 @@ class FakeGroupRepository implements GroupRepository {
         kind: PaymentMethodKind.pix,
         idempotencyKey: 'seed-${group.id}-${_payerId(person)}',
       );
+      reservation = await payments.captureReservation(
+        reservationId: group.id,
+        idempotencyKey: 'seed-capture-${group.id}-${_payerId(person)}',
+        onlyPlayerIds: [_payerId(person)],
+      );
     }
     return reservation;
+  }
+
+  Future<Group> _captureClosed(Group group) async {
+    final seated = [
+      for (final person in group.participants)
+        if (person.occupiesSeat) person,
+    ];
+    if (seated.isEmpty) {
+      return group;
+    }
+    final reservation = await _ensureReservation(group, seated);
+    if (reservation.shares.any(
+      (share) => share.status == ShareStatus.reserved,
+    )) {
+      await payments.captureReservation(
+        reservationId: group.id,
+        idempotencyKey: 'capture-${group.id}',
+      );
+    }
+    return group.copyWith(
+      participants: [
+        for (final person in group.participants)
+          if (person.occupiesSeat && person.payment == PaymentStatus.reserved)
+            person.copyWith(payment: PaymentStatus.paid)
+          else
+            person,
+      ],
+    );
   }
 
   Future<Participant> _closeSeat({
@@ -810,6 +899,29 @@ class FakeGroupRepository implements GroupRepository {
   }) async {
     if (!person.occupiesSeat) {
       return person;
+    }
+    if (person.payment == PaymentStatus.reserved) {
+      final seated = [
+        for (final member in group.participants)
+          if (member.occupiesSeat) member,
+      ];
+      final reservation = await _ensureReservation(group, seated);
+      final share = _shareFor(reservation, person);
+      if (share.status == ShareStatus.reserved ||
+          share.status == ShareStatus.awaitingConfirmation) {
+        await payments.releaseShare(
+          reservationId: group.id,
+          shareId: share.id,
+          idempotencyKey: 'release-${share.id}',
+        );
+      }
+      return person.copyWith(
+        attendance: AttendanceStatus.cancelled,
+        payment: PaymentStatus.released,
+        refundReason: outcome.reason == RefundReason.groupDidNotClose
+            ? RefundReason.groupDidNotClose
+            : RefundReason.holdReleased,
+      );
     }
     if (person.payment != PaymentStatus.paid ||
         outcome.status != RefundStatus.refunded) {

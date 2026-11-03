@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 import 'support/pump_app.dart';
 
@@ -96,7 +97,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.dialogConfirm));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Reembolsado'), findsWidgets);
+    expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     // A aba retoma a escuta ao voltar e espera o repositório (280 ms).
@@ -114,7 +115,7 @@ void main() {
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsOneWidget,
     );
-    expect(find.textContaining('Reembolsado'), findsWidgets);
+    expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
   });
 }
 
