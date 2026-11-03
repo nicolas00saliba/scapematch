@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
 
@@ -13,7 +14,7 @@ class AccountDataScreen extends ConsumerWidget {
     final user = ref.watch(authSessionProvider);
     final theme = Theme.of(context);
     return AppScaffold(
-      appBar: AppBar(title: const Text('Meus dados')),
+      appBar: AppBar(leading: ScapeBackButton(), title: Text('Meus dados')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
@@ -50,7 +51,7 @@ class AccountDeletionScreen extends ConsumerWidget {
     final board = ref.watch(communityBoardProvider);
     final requested = user != null && board.deletionRequested(user.id);
     return AppScaffold(
-      appBar: AppBar(title: const Text('Excluir conta')),
+      appBar: AppBar(leading: ScapeBackButton(), title: Text('Excluir conta')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [

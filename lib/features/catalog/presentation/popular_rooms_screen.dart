@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/catalog/presentation/popular_rooms.dart';
 import 'package:scapematch/features/catalog/presentation/room_card.dart';
@@ -14,7 +15,10 @@ class PopularRoomsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final rooms = ref.watch(roomCatalogViewModelProvider);
     return AppScaffold(
-      appBar: AppBar(title: const Text('Salas mais procuradas')),
+      appBar: AppBar(
+        leading: ScapeBackButton(),
+        title: Text('Salas mais procuradas'),
+      ),
       body: rooms.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) =>

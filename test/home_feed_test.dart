@@ -345,10 +345,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sala nova: A Biblioteca Proibida'), findsOneWidget);
-    expect(find.byType(BackButton), findsNothing);
-    expect(find.byKey(AppKeys.newsBackHome), findsOneWidget);
+    expect(find.byKey(AppKeys.scapeBack), findsOneWidget);
 
-    await tester.tap(find.byKey(AppKeys.newsBackHome));
+    await tester.tap(find.byKey(AppKeys.scapeBack));
     await tester.pumpAndSettle();
 
     expect(find.byType(HomeScreen), findsOneWidget);
@@ -380,9 +379,9 @@ void main() {
       find.text('Esse link não aponta para uma notícia de exemplo.'),
       findsOneWidget,
     );
-    expect(find.byKey(AppKeys.newsBackHome), findsOneWidget);
+    expect(find.byKey(AppKeys.scapeBack), findsOneWidget);
 
-    await tester.tap(find.byKey(AppKeys.newsBackHome));
+    await tester.tap(find.byKey(AppKeys.scapeBack));
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
   });

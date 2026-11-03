@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## Voltar leva para a Home quando não há histórico
+
+- **Data:** 2026-11-03
+- **Decisão:** toda tela empilhada mostra a seta de voltar, no app e na web. Se a pilha tem uma tela anterior, a seta volta para ela. Se a página abriu direto, por URL ou link, sem histórico, a seta vai para a Home. Na sala, a seta fica sobre a foto de capa, num círculo branco translúcido no canto superior esquerdo. Nas outras telas, a seta fica na barra. As abas Home, Perto de você, Meus grupos e Conta não têm seta.
+- **Motivo:** a sala aberta no navegador não tinha como voltar, e o voltar automático do Flutter some quando a rota não pode dar pop.
+- **Onde está no código:** `scapeBack`, `ScapeBackButton` e `ScapeCoverBackButton`.
+- **Como trocar depois:** outro destino sem histórico entra em `scapeBack`. O desenho do círculo entra em `ScapeCoverBackButton`.
+
 ## O host escolhe quantas pessoas fecham o grupo
 
 - **Data:** 2026-11-03
