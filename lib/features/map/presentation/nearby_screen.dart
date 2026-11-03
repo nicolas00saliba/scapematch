@@ -11,6 +11,7 @@ import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/sharing/external_url.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
@@ -31,7 +32,7 @@ import 'package:scapematch/providers/repositories.dart';
 const nearbyRadiiKm = <int>[2, 5, 10, 20];
 
 /// A partir daqui a lista vai para um painel à esquerda, no jeito de um mapa.
-const nearbyWideWidth = 960.0;
+const nearbyWideWidth = scapeDesktopMinWidth;
 
 const _panelWidth = 380.0;
 

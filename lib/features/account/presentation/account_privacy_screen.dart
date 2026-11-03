@@ -14,6 +14,7 @@ class AccountDataScreen extends ConsumerWidget {
     final user = ref.watch(authSessionProvider);
     final theme = Theme.of(context);
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.readingMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Meus dados')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
@@ -51,6 +52,7 @@ class AccountDeletionScreen extends ConsumerWidget {
     final board = ref.watch(communityBoardProvider);
     final requested = user != null && board.deletionRequested(user.id);
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.readingMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Excluir conta')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),

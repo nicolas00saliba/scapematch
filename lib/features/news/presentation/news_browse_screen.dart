@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/scape_grid.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
@@ -101,17 +102,14 @@ class NewsBrowseScreen extends ConsumerWidget {
               : 'Nenhuma novidade de ${newsCategoryLabel(category).toLowerCase()} em $place.';
           return InlineNotice(message: message);
         }
-        return Column(
-          mainAxisSize: MainAxisSize.min,
+        return ScapeWrapGrid(
           children: [
-            for (var index = 0; index < items.length; index++) ...[
-              if (index > 0) const SizedBox(height: 12),
+            for (final item in items)
               NewsCard(
-                item: items[index],
+                item: item,
                 now: now,
-                onTap: () => context.push('/news/${items[index].id}'),
+                onTap: () => context.push('/news/${item.id}'),
               ),
-            ],
           ],
         );
       },

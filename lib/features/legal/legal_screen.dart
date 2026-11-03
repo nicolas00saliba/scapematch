@@ -22,6 +22,7 @@ class LegalScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final status = ScapeStatusColors.of(context);
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.readingMax,
       appBar: AppBar(leading: const ScapeBackButton(), title: Text(title)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),

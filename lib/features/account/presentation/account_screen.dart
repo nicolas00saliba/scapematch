@@ -5,6 +5,8 @@ import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/scape_grid.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/account_list_tile.dart';
 import 'package:scapematch/features/account/presentation/account_messages.dart';
@@ -59,13 +61,35 @@ class AccountScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const _WalletCard(),
-          const SizedBox(height: 16),
-          for (final item in _signedInItems) ...[
-            _AccountTile(item: item),
-            const SizedBox(height: 10),
+          if (isScapeDesktop(context))
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Expanded(flex: 5, child: _WalletCard()),
+                const SizedBox(width: 20),
+                Expanded(
+                  flex: 7,
+                  child: ScapeWrapGrid(
+                    maxColumns: 2,
+                    gap: 10,
+                    children: [
+                      for (final item in _signedInItems)
+                        _AccountTile(item: item),
+                      _SignOutTile(onPressed: () => _signOut(context, ref)),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            const _WalletCard(),
+            const SizedBox(height: 16),
+            for (final item in _signedInItems) ...[
+              _AccountTile(item: item),
+              const SizedBox(height: 10),
+            ],
+            _SignOutTile(onPressed: () => _signOut(context, ref)),
           ],
-          _SignOutTile(onPressed: () => _signOut(context, ref)),
         ],
       ),
     );

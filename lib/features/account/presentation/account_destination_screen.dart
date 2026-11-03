@@ -34,6 +34,7 @@ class AccountDestinationScreen extends ConsumerWidget {
     };
 
     return AppScaffold(
+      desktopMaxWidth: AppScaffold.readingMax,
       appBar: AppBar(leading: const ScapeBackButton(), title: Text(title)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),

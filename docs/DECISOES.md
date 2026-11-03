@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## No computador o jogador usa um site
+
+- **Data:** 2026-11-03
+- **Decisão:** a partir de 960px de largura o ScapeMatch deixa de ser uma coluna de celular no centro. A navegação (Home, Perto de você, Meus grupos, Conta) sobe para o topo, ao lado da marca. A Home mostra os grupos em grade, com promoções e novidades lado a lado. A sala abre a galeria à esquerda e os botões Achar grupo e Criar grupo numa coluna à direita. O mapa largo, que já tinha a lista ao lado, continua. Abaixo de 960px o app de celular não muda: barra embaixo e janela de grupos. A marca é o widget `ScapeLogo`. Trocar o logo é mudar só esse arquivo.
+- **Motivo:** no computador a página era o app esticado. A demonstração de sexta precisa parecer um site, e a pessoa tem que conseguir fazer tudo por lá.
+- **Onde está no código:** `isScapeDesktop`, `AppShell`, `AppScaffold`, `ScapeWrapGrid`, `ScapeLogo` e a ficha da sala.
+- **Como trocar depois:** outro corte de largura entra em `scapeDesktopMinWidth`. O desenho da marca entra em `ScapeLogo`.
+
 ## Quem não pagou até o prazo perde a vaga
 
 - **Data:** 2026-11-03

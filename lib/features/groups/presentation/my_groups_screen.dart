@@ -6,6 +6,7 @@ import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/scape_grid.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
@@ -115,22 +116,24 @@ class _GroupList extends StatelessWidget {
     if (groups.isEmpty) {
       return EmptyView(title: emptyTitle, message: emptyMessage);
     }
-    return ListView.separated(
+    return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      itemCount: groups.length + 1,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return const ExampleDataBanner();
-        }
-        final group = groups[index - 1];
-        return _MyGroupCard(
-          group: group,
-          member: group.participantForUser(userId),
-          onTap: () => context.push('/groups/${group.id}'),
-          onInvite: () => showInviteSheet(context, group),
-        );
-      },
+      children: [
+        const ExampleDataBanner(),
+        const SizedBox(height: 12),
+        ScapeWrapGrid(
+          maxColumns: 2,
+          children: [
+            for (final group in groups)
+              _MyGroupCard(
+                group: group,
+                member: group.participantForUser(userId),
+                onTap: () => context.push('/groups/${group.id}'),
+                onInvite: () => showInviteSheet(context, group),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
