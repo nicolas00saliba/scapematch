@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -203,6 +204,8 @@ PartnerSnapshot _desk() {
     absenceCounts: const {},
     absenceMarks: const {},
     standings: const {},
+    invoices: const [],
+    fiscal: demoHouseFiscal,
   );
 }
 

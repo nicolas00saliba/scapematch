@@ -1330,12 +1330,11 @@ Group _group({
       for (var index = 0; index < names.length; index++)
         Participant(
           id: '$id-p$index',
-          userId: samplePlayerUserIds[names[index]],
-          displayName: names[index],
-          isCreator: index == 0,
           userId: localUserId != null && index == names.length - 1
               ? localUserId
-              : null,
+              : samplePlayerUserIds[names[index]],
+          displayName: names[index],
+          isCreator: index == 0,
           isLocalUser: localUserId != null && index == names.length - 1,
           attendance: cancelledAt != null
               ? AttendanceStatus.cancelled

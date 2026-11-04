@@ -96,7 +96,9 @@ void main() {
         .dy;
     final promosTop = tester.getTopLeft(find.text('Promoções')).dy;
     expect(promosTop, greaterThan(searchBottom));
-    expect(promosTop, lessThan(searchBottom + 80));
+    // A busca e as promoções ficam perto. O chip da turma cabe nesse vão.
+    // Uma janela de grupo passaria disso.
+    expect(promosTop, lessThan(searchBottom + 160));
   });
 
   testWidgets('phone shows one live group and no filler card', (tester) async {

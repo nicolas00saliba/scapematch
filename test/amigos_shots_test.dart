@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -140,9 +141,10 @@ Future<void> _filter(WidgetTester tester) async {
 }
 
 Future<void> _openParty(WidgetTester tester) async {
-  final card = find.byKey(AppKeys.groupCard('grp-cwb-opera-open'));
-  await tester.scrollUntilVisible(card, 400, scrollable: verticalScrollable);
-  await tester.tap(card);
+  // No celular a Home só lista grupo quase cheio. O grupo aberto continua
+  // na rota, e é nele que a folha de turma aparece.
+  GoRouter.of(tester.element(find.byType(Scaffold).first))
+      .go('/groups/grp-cwb-opera-open');
   await tester.pumpAndSettle();
   final button = find.byKey(AppKeys.joinWithCrew);
   await tester.ensureVisible(button);
@@ -185,7 +187,12 @@ Future<void> _loadFonts() async {
   final brand = FontLoader('Poppins')..addFont(Future.value(poppins));
   await brand.load();
 
-  const dirs = [
+  final sdkFonts = Directory(
+    '${File(Platform.resolvedExecutable).parent.parent.parent.path}/artifacts/material_fonts',
+  );
+  final dirs = [
+    sdkFonts.path,
+    '/home/ubuntu/flutter-sdk/flutter/bin/cache/artifacts/material_fonts',
     '/home/ubuntu/sdk/flutter/bin/cache/artifacts/material_fonts',
     '/home/ubuntu/flutter/bin/cache/artifacts/material_fonts',
     '/opt/flutter/bin/cache/artifacts/material_fonts',
