@@ -36,7 +36,7 @@ void main() {
     );
   });
 
-  testWidgets('arrows page every carousel kind and stop at the ends', (
+  testWidgets('arrows page rooms and news, and promos loop forward', (
     tester,
   ) async {
     await pumpScapeMatch(tester);
@@ -50,19 +50,25 @@ void main() {
         (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
       ),
     );
-    for (var step = 0; step < 6; step++) {
-      final next = find.byKey(AppKeys.carouselNext('promos'));
-      if (next.evaluate().isEmpty) {
-        break;
+    final position = tester.state<ScrollableState>(promoScroll).position;
+    for (var step = 0; step < promoFlyers.length; step++) {
+      expect(find.byKey(AppKeys.carouselNext('promos')), findsOneWidget);
+      final before = position.pixels;
+      var peak = before;
+      await tester.ensureVisible(find.byKey(AppKeys.carouselNext('promos')));
+      await tester.tap(find.byKey(AppKeys.carouselNext('promos')));
+      await tester.pump();
+      for (var frame = 0; frame < 12; frame++) {
+        await tester.pump(const Duration(milliseconds: 40));
+        if (position.pixels > peak) {
+          peak = position.pixels;
+        }
       }
-      await tester.ensureVisible(next);
-      await tester.tap(next);
       await tester.pumpAndSettle();
+      expect(peak, greaterThan(before + 8), reason: 'passo $step');
     }
-    expect(find.byKey(AppKeys.carouselNext('promos')), findsNothing);
-    expect(find.byKey(AppKeys.carouselPrevious('promos')), findsOneWidget);
-    final end = tester.state<ScrollableState>(promoScroll).position;
-    expect(end.pixels, greaterThan(0));
+    expect(find.byKey(AppKeys.carouselNext('promos')), findsOneWidget);
+    expect(_leadingPromoLabel(tester), promoFlyers.first.title);
   });
 
   testWidgets('the first screen reaches the promo carousel', (tester) async {
@@ -299,16 +305,14 @@ void main() {
       );
       expect(tester.getRect(second).left, closeTo(carousel.left, 2));
 
-      var taps = 1;
-      while (find.byKey(AppKeys.carouselNext('promos')).evaluate().isNotEmpty &&
-          taps < 8) {
+      expect(_activeDot(tester), 1);
+      for (var step = 1; step < promoFlyers.length; step++) {
         await _tapPromoNext(tester);
-        taps++;
       }
-      expect(find.byKey(AppKeys.carouselNext('promos')), findsNothing);
-      final dots = tester.widget<Row>(find.byKey(AppKeys.promoDots));
-      expect(dots.children.length, taps + 1);
-      expect(_activeDot(tester), dots.children.length - 1);
+      expect(find.byKey(AppKeys.carouselNext('promos')), findsOneWidget);
+      expect(_promoDotCount(tester), promoFlyers.length);
+      expect(_activeDot(tester), 0);
+      expect(_leadingPromoLabel(tester), promoFlyers.first.title);
     },
   );
 
@@ -323,22 +327,16 @@ void main() {
       tester.view.physicalSize = const Size(800, 900);
       await tester.pumpAndSettle();
 
-      for (var step = 0; step < 8; step++) {
-        final next = find.byKey(AppKeys.carouselNext('promos'));
-        if (next.evaluate().isEmpty) {
-          break;
-        }
-        await _tapPromoNext(tester);
-      }
-      expect(find.byKey(AppKeys.carouselNext('promos')), findsNothing);
-      final atEnd = tester.widget<Row>(find.byKey(AppKeys.promoDots));
-      expect(_activeDot(tester), atEnd.children.length - 1);
+      await _tapPromoNext(tester);
+      expect(_activeDot(tester), 1);
+      final kept = _leadingPromoLabel(tester);
 
       tester.view.physicalSize = const Size(390, 844);
       await tester.pumpAndSettle();
       expect(find.byKey(AppKeys.carouselNext('promos')), findsOneWidget);
-      final afterResize = tester.widget<Row>(find.byKey(AppKeys.promoDots));
-      expect(_activeDot(tester), lessThan(afterResize.children.length - 1));
+      expect(_activeDot(tester), 1);
+      expect(_leadingPromoLabel(tester), kept);
+      expect(_promoDotCount(tester), promoFlyers.length);
 
       tester.platformDispatcher.textScaleFactorTestValue = 1.3;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -756,6 +754,31 @@ int _reachablePromoStops(WidgetTester tester) {
     gap: PromoCarousel.gap,
     preferredItemWidth: PromoCarousel.preferredItemWidth,
   ).stops;
+}
+
+String _leadingPromoLabel(WidgetTester tester) {
+  final frame = tester.getRect(find.byKey(AppKeys.carouselFrame('promos')));
+  final images = find.descendant(
+    of: find.byKey(AppKeys.carouselFrame('promos')),
+    matching: find.byType(Image),
+  );
+  String? label;
+  var best = double.infinity;
+  for (final element in images.evaluate()) {
+    final image = element.widget;
+    if (image is! Image) {
+      continue;
+    }
+    final box = element.renderObject! as RenderBox;
+    final left = box.localToGlobal(Offset.zero).dx;
+    final delta = (left - frame.left).abs();
+    if (delta < best) {
+      best = delta;
+      label = image.semanticLabel;
+    }
+  }
+  expect(best, lessThan(8), reason: label);
+  return label!;
 }
 
 int _activeDot(WidgetTester tester) {

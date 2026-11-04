@@ -97,6 +97,8 @@ class PromoCarousel extends StatelessWidget {
               gap: gap,
               preferredItemWidth: preferredItemWidth,
               showDots: true,
+              loop: true,
+              autoAdvance: true,
               itemBuilder: (context, index) {
                 final flyer = promoFlyers[index];
                 return PressableScale(
