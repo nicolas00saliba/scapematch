@@ -75,6 +75,7 @@ class AccountScreen extends ConsumerWidget {
                     children: [
                       for (final item in _signedInItems)
                         _AccountTile(item: item),
+                      const _FriendsTile(),
                       _SignOutTile(onPressed: () => _signOut(context, ref)),
                     ],
                   ),
@@ -88,6 +89,8 @@ class AccountScreen extends ConsumerWidget {
               _AccountTile(item: item),
               const SizedBox(height: 10),
             ],
+            const _FriendsTile(),
+            const SizedBox(height: 10),
             _SignOutTile(onPressed: () => _signOut(context, ref)),
           ],
         ],
@@ -172,6 +175,23 @@ class _SignedOutAccount extends StatelessWidget {
             const SizedBox(height: 10),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _FriendsTile extends StatelessWidget {
+  const _FriendsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: AppKeys.accountFriends,
+      child: AccountListTile(
+        icon: Icons.diversity_3_outlined,
+        title: 'Amigos e turmas',
+        subtitle: 'Peça amizade, monte a turma e entre junto',
+        onTap: () => context.push('/account/friends'),
       ),
     );
   }

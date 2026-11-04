@@ -15,9 +15,12 @@ final class JoinSuccess extends JoinResult {
 }
 
 final class JoinFailure extends JoinResult {
-  const JoinFailure(this.reason);
+  const JoinFailure(this.reason, {this.detail});
 
   final JoinFailureReason reason;
+
+  /// Texto pronto, quando a falha nomeia quem impediu a turma de entrar.
+  final String? detail;
 }
 
 enum JoinFailureReason {
@@ -33,6 +36,15 @@ enum JoinFailureReason {
   restricted,
   seatReserved,
   offerExpired,
+
+  /// A turma inteira não cabe. Nenhuma cadeira foi ocupada.
+  partyDoesNotFit,
+
+  /// Alguém da turma não é amigo aceito de quem está entrando.
+  companionNotFriend,
+
+  /// Alguém da turma não pode sentar (horário, bloqueio ou cadeira antiga).
+  companionUnavailable,
 }
 
 sealed class CreateGroupResult {
@@ -62,6 +74,11 @@ enum CreateGroupFailureReason {
   alreadyStarted,
   tooCloseToStart,
   overlapsAnotherGroup,
+
+  /// A turma preencheria o grupo inteiro e não sobraria vaga aberta.
+  crewLeavesNoOpenSeat,
+  companionNotFriend,
+  companionUnavailable,
 }
 
 sealed class ConfirmAttendanceResult {

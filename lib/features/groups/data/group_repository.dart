@@ -2,6 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
+import 'package:scapematch/features/groups/domain/party_companion.dart';
 
 /// Reads and changes groups.
 ///
@@ -50,6 +51,18 @@ abstract class GroupRepository {
     required String participantUserId,
     required String participantName,
     bool markAsLocalUser = true,
+  });
+
+  /// Senta o líder e os amigos numa escrita só.
+  ///
+  /// Se faltar vaga, ou se alguém da turma não puder entrar, ninguém senta.
+  /// Cada pessoa paga a própria parte depois, pelo [payShare] que já existe.
+  /// No Supabase isto é `join_group_with_party`, que trava a linha do grupo.
+  Future<JoinResult> joinParty(
+    String groupId, {
+    required String leaderUserId,
+    required String leaderName,
+    required List<PartyCompanion> companions,
   });
 
   Future<CreateGroupResult> create(CreateGroupRequest request);

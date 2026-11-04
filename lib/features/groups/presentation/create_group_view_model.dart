@@ -6,6 +6,7 @@ import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
+import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
@@ -27,6 +28,8 @@ class CreateGroupState {
     this.slots = const [],
     this.slotId,
     this.extraSpots = 2,
+    this.crewId,
+    this.crewSeats = 0,
     this.loadingOptions = false,
     this.submitting = false,
     this.failure,
@@ -40,6 +43,12 @@ class CreateGroupState {
   final List<TimeSlot> slots;
   final String? slotId;
   final int extraSpots;
+
+  /// Turma que já senta na criação. Nulo quando a pessoa entra sozinha.
+  final String? crewId;
+
+  /// Pessoas aceitas na turma, contando quem cria. Zero sem turma.
+  final int crewSeats;
   final bool loadingOptions;
   final bool submitting;
   final CreateGroupFailureReason? failure;
@@ -94,11 +103,18 @@ class CreateGroupState {
     return GroupRules.hasStarted(startsAt: selected.startsAt, now: now);
   }
 
-  bool get canDecrementExtraSpots =>
-      extraSpots >
-      GroupRules.minimumExtraSpots(
-        minimumPlayers: room?.minimumPlayers ?? GroupRules.minGroupSize,
-      );
+  /// Piso do stepper. Com turma, sobra ao menos uma vaga para desconhecidos.
+  int get extraFloor {
+    final roomFloor = GroupRules.minimumExtraSpots(
+      minimumPlayers: room?.minimumPlayers ?? GroupRules.minGroupSize,
+    );
+    if (crewSeats <= 1) {
+      return roomFloor;
+    }
+    return crewSeats > roomFloor ? crewSeats : roomFloor;
+  }
+
+  bool get canDecrementExtraSpots => extraSpots > extraFloor;
 
   /// No fixed ceiling. The room capacity, via [GroupRules], is the limit
   /// once a room is selected. Before that, the stepper stays open.
@@ -125,6 +141,9 @@ class CreateGroupState {
     String? slotId,
     bool clearSlot = false,
     int? extraSpots,
+    String? crewId,
+    bool clearCrew = false,
+    int? crewSeats,
     bool? loadingOptions,
     bool? submitting,
     CreateGroupFailureReason? failure,
@@ -139,6 +158,8 @@ class CreateGroupState {
       slots: slots ?? this.slots,
       slotId: clearSlot ? null : (slotId ?? this.slotId),
       extraSpots: extraSpots ?? this.extraSpots,
+      crewId: clearCrew ? null : (crewId ?? this.crewId),
+      crewSeats: clearCrew ? 0 : (crewSeats ?? this.crewSeats),
       loadingOptions: loadingOptions ?? this.loadingOptions,
       submitting: submitting ?? this.submitting,
       failure: clearFailure ? null : (failure ?? this.failure),
@@ -259,9 +280,10 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
       return;
     }
     final selected = state.room;
-    final floor = GroupRules.minimumExtraSpots(
+    final roomFloor = GroupRules.minimumExtraSpots(
       minimumPlayers: selected?.minimumPlayers ?? GroupRules.minGroupSize,
     );
+    final floor = state.crewSeats > roomFloor ? state.crewSeats : roomFloor;
     final spots = state.extraSpots < floor ? floor : state.extraSpots;
     state = state.copyWith(
       slots: slots,
@@ -275,12 +297,28 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
   }
 
   void setExtraSpots(int value) {
-    final spots = GroupRules.clampExtraSpots(
+    var spots = GroupRules.clampExtraSpots(
       value,
       roomCapacity: state.room?.capacity,
       minimumPlayers: state.room?.minimumPlayers ?? GroupRules.minGroupSize,
     );
+    if (spots < state.extraFloor) {
+      spots = state.extraFloor;
+    }
     state = state.copyWith(extraSpots: spots, clearFailure: true);
+  }
+
+  /// [seats] conta quem cria. Nulo tira a turma e volta ao piso da sala.
+  void selectCrew({String? crewId, int seats = 0}) {
+    state = state.copyWith(
+      crewId: crewId,
+      clearCrew: crewId == null,
+      crewSeats: seats,
+      clearFailure: true,
+    );
+    if (state.extraSpots < state.extraFloor) {
+      state = state.copyWith(extraSpots: state.extraFloor);
+    }
   }
 
   /// Returns the created group, or null when the form is not valid.
@@ -294,6 +332,19 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
       return null;
     }
     state = state.copyWith(submitting: true, clearFailure: true);
+    final crewId = state.crewId;
+    final companions = crewId == null
+        ? const <PartyCompanion>[]
+        : ref
+              .read(socialRepositoryProvider)
+              .companionsForCrew(actorId: user.id, crewId: crewId);
+    if (crewId != null && companions.isEmpty) {
+      state = state.copyWith(
+        submitting: false,
+        failure: CreateGroupFailureReason.companionUnavailable,
+      );
+      return null;
+    }
     final result = await ref
         .read(groupRepositoryProvider)
         .create(
@@ -305,6 +356,7 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
             extraSpots: state.extraSpots,
             creatorUserId: user.id,
             creatorDisplayName: user.displayName,
+            companions: companions,
           ),
         );
     if (!ref.mounted) {

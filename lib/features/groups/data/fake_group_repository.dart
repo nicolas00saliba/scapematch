@@ -11,6 +11,8 @@ import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
+import 'package:scapematch/features/groups/domain/party_companion.dart';
+import 'package:scapematch/features/social/data/social_repository.dart';
 
 /// Sample implementation of [GroupRepository].
 ///
@@ -22,6 +24,7 @@ class FakeGroupRepository implements GroupRepository {
     this.clock = const SystemClock(),
     this.latency = const Duration(milliseconds: 280),
     this.failList = false,
+    this.friends,
     CommunityBoard? board,
   }) : board = board ?? CommunityBoard(),
        payments = PaymentBook(provider: SimulatedPaymentProvider()),
@@ -38,6 +41,9 @@ class FakeGroupRepository implements GroupRepository {
   final Duration latency;
   final bool failList;
   final CommunityBoard board;
+
+  /// Amizades da sessão. Sem isto, entrar com turma é recusado.
+  final FriendDirectory? friends;
 
   @override
   Future<List<Group>> listByCity(
@@ -219,6 +225,191 @@ class FakeGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<JoinResult> joinParty(
+    String groupId, {
+    required String leaderUserId,
+    required String leaderName,
+    required List<PartyCompanion> companions,
+  }) async {
+    if (companions.isEmpty) {
+      return join(
+        groupId,
+        participantUserId: leaderUserId,
+        participantName: leaderName,
+      );
+    }
+    await _pause();
+    final index = _indexOf(groupId);
+    if (index < 0) {
+      return const JoinFailure(JoinFailureReason.notFound);
+    }
+    final current = _database.groups[index];
+    final party = <({String id, String name})>[
+      (id: leaderUserId, name: leaderName),
+    ];
+    final seen = <String>{leaderUserId};
+    for (final companion in companions) {
+      if (companion.userId == leaderUserId) {
+        continue;
+      }
+      if (!seen.add(companion.userId)) {
+        return const JoinFailure(
+          JoinFailureReason.companionUnavailable,
+          detail: 'A turma tem uma pessoa repetida. Ninguém entrou.',
+        );
+      }
+      party.add((id: companion.userId, name: companion.displayName));
+    }
+    if (party.length < 2) {
+      return join(
+        groupId,
+        participantUserId: leaderUserId,
+        participantName: leaderName,
+      );
+    }
+
+    final blocked = _partyBlocked(
+      current,
+      party: party,
+      leaderUserId: leaderUserId,
+    );
+    if (blocked != null) {
+      return blocked;
+    }
+
+    final people = [...current.participants];
+    for (var indexInParty = 0; indexInParty < party.length; indexInParty++) {
+      final person = party[indexInParty];
+      people.add(
+        Participant(
+          id: _database.nextParticipantId(),
+          userId: person.id,
+          displayName: person.name,
+          isCreator: false,
+          isLocalUser: indexInParty == 0,
+        ),
+      );
+      board.removeWaitlist(groupId, person.id);
+      if (indexInParty > 0) {
+        board.postNotice(
+          userId: person.id,
+          kind: NoticeKind.partySeat,
+          title: 'Vaga reservada',
+          body:
+              '$leaderName reservou sua vaga em ${current.roomName}. Pague a sua parte para confirmar. Nada é cobrado se o grupo não fechar.',
+          at: clock.now(),
+          groupId: current.id,
+          scope: 'party-${current.id}-${person.id}',
+        );
+      }
+    }
+    final updated = current.copyWith(
+      participants: people,
+      filledSpots: _occupied(people),
+    );
+    _database.groups[index] = updated;
+    return JoinSuccess(updated);
+  }
+
+  /// Confere a turma inteira antes de escrever. Qualquer falha devolve
+  /// o grupo como estava.
+  JoinFailure? _partyBlocked(
+    Group current, {
+    required List<({String id, String name})> party,
+    required String leaderUserId,
+  }) {
+    final now = clock.now();
+    if (current.isCancelled) {
+      return const JoinFailure(JoinFailureReason.groupCancelled);
+    }
+    if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
+      return const JoinFailure(JoinFailureReason.sessionEnded);
+    }
+    if (GroupRules.hasStarted(startsAt: current.startsAt, now: now)) {
+      return const JoinFailure(JoinFailureReason.alreadyStarted);
+    }
+    final ids = {for (final person in party) person.id};
+    if (current.openSeats < party.length) {
+      return JoinFailure(
+        JoinFailureReason.partyDoesNotFit,
+        detail:
+            'Há ${current.openSeats} vaga(s) e a turma precisa de ${party.length}. Ninguém entrou.',
+      );
+    }
+    final held = board.openOfferCount(current.id, now);
+    var heldByOthers = held;
+    for (final id in ids) {
+      final entry = board.entryFor(current.id, id);
+      if (entry != null && board.offerStillOpen(entry, now)) {
+        heldByOthers -= 1;
+      }
+    }
+    if (heldByOthers < 0) {
+      heldByOthers = 0;
+    }
+    if (current.openSeats - heldByOthers < party.length) {
+      return const JoinFailure(JoinFailureReason.seatReserved);
+    }
+
+    for (final person in party) {
+      if (board.restricted(person.id, now)) {
+        return JoinFailure(
+          JoinFailureReason.companionUnavailable,
+          detail: '${person.name} está em pausa. Ninguém entrou.',
+        );
+      }
+      for (final seated in current.participants) {
+        final memberId = seated.userId;
+        if (!seated.occupiesSeat || memberId == null || memberId.isEmpty) {
+          continue;
+        }
+        if (board.isBlocked(memberId, person.id)) {
+          return JoinFailure(
+            JoinFailureReason.companionUnavailable,
+            detail: '${person.name} foi bloqueado neste grupo. Ninguém entrou.',
+          );
+        }
+      }
+      final mine = current.participantForUser(person.id);
+      if (mine != null && mine.occupiesSeat) {
+        return JoinFailure(
+          JoinFailureReason.companionUnavailable,
+          detail: '${person.name} já está neste grupo. Ninguém entrou.',
+        );
+      }
+      if (mine != null) {
+        return JoinFailure(
+          JoinFailureReason.companionUnavailable,
+          detail: '${person.name} já saiu deste grupo. Ninguém entrou.',
+        );
+      }
+      if (_overlaps(
+        userId: person.id,
+        startsAt: current.startsAt,
+        durationMinutes: current.durationMinutes,
+        ignoringGroupId: current.id,
+      )) {
+        return JoinFailure(
+          JoinFailureReason.companionUnavailable,
+          detail:
+              '${person.name} já está em outro grupo nesse horário. Ninguém entrou.',
+        );
+      }
+      if (person.id != leaderUserId) {
+        final directory = friends;
+        if (directory == null ||
+            !directory.areFriends(leaderUserId, person.id)) {
+          return JoinFailure(
+            JoinFailureReason.companionNotFriend,
+            detail: '${person.name} não é um amigo aceito. Ninguém entrou.',
+          );
+        }
+      }
+    }
+    return null;
+  }
+
+  @override
   Future<PayShareResult> payShare(
     String groupId, {
     required String userId,
@@ -394,7 +585,56 @@ class FakeGroupRepository implements GroupRepository {
       );
     }
 
+    final companions = <PartyCompanion>[];
+    final seen = <String>{request.creatorUserId};
+    for (final companion in request.companions) {
+      if (!seen.add(companion.userId)) {
+        return const CreateGroupFailure(
+          CreateGroupFailureReason.companionUnavailable,
+        );
+      }
+      final directory = friends;
+      if (directory == null ||
+          !directory.areFriends(request.creatorUserId, companion.userId)) {
+        return const CreateGroupFailure(
+          CreateGroupFailureReason.companionNotFriend,
+        );
+      }
+      if (_overlaps(
+        userId: companion.userId,
+        startsAt: slot.startsAt,
+        durationMinutes: room.durationMinutes,
+      )) {
+        return const CreateGroupFailure(
+          CreateGroupFailureReason.companionUnavailable,
+        );
+      }
+      companions.add(companion);
+    }
+    if (companions.isNotEmpty && companions.length >= request.extraSpots) {
+      return const CreateGroupFailure(
+        CreateGroupFailureReason.crewLeavesNoOpenSeat,
+      );
+    }
+
     final id = _database.nextGroupId();
+    final seated = [
+      Participant(
+        id: _database.nextParticipantId(),
+        userId: request.creatorUserId,
+        displayName: request.creatorDisplayName,
+        isCreator: true,
+        isLocalUser: true,
+      ),
+      for (final companion in companions)
+        Participant(
+          id: _database.nextParticipantId(),
+          userId: companion.userId,
+          displayName: companion.displayName,
+          isCreator: false,
+          isLocalUser: false,
+        ),
+    ];
     final group = Group(
       id: id,
       cityId: city.id,
@@ -411,7 +651,7 @@ class FakeGroupRepository implements GroupRepository {
       difficulty: room.difficulty,
       slotId: slot.id,
       startsAt: slot.startsAt,
-      filledSpots: 1,
+      filledSpots: seated.length,
       totalSpots: 1 + request.extraSpots,
       priceCents: room.priceCents,
       minimumSpots: room.minimumPlayers,
@@ -419,16 +659,20 @@ class FakeGroupRepository implements GroupRepository {
       streetAddress: house.streetAddress,
       coverAsset: roomCategoryImage(room.category),
       closesAt: GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
-      participants: [
-        Participant(
-          id: _database.nextParticipantId(),
-          userId: request.creatorUserId,
-          displayName: request.creatorDisplayName,
-          isCreator: true,
-          isLocalUser: true,
-        ),
-      ],
+      participants: seated,
     );
+    for (final companion in companions) {
+      board.postNotice(
+        userId: companion.userId,
+        kind: NoticeKind.partySeat,
+        title: 'Vaga reservada',
+        body:
+            '${request.creatorDisplayName} criou ${room.name} com você dentro. Pague a sua parte. As outras vagas ficam abertas.',
+        at: now,
+        groupId: id,
+        scope: 'create-$id-${companion.userId}',
+      );
+    }
     _database.groups.add(group);
     return CreateGroupSuccess(group);
   }

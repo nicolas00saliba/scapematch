@@ -16,7 +16,8 @@ supabase db push
 5. `migrations/20261104120400_asaas.sql` — cobranças Pix e cartão. O app não insere nelas.
 6. `migrations/20261104120500_privacy.sql` — anon sem documento, telefone e renda; bucket `room-photos` privado; falta só por `mark_absence`.
 7. `migrations/20261104120600_fiscal_terms.sql` — notas fiscais, dados fiscais da casa, chave da subconta fora do app, e o aceite dos termos.
-8. `migrations/20261104130000_venue_duplicates.sql` — documento normalizado com índice único, nome com `pg_trgm`, `check_venue_duplicates`, reivindicação e a fila de aprovar, recusar ou mesclar.
+8. `migrations/20261104120700_friends_crews.sql` — amigos, turmas, avisos no app e entrada em grupo com várias vagas. Vem depois de `20261104120600_fiscal_terms.sql` e não usa tabela de nota fiscal. Não foi aplicada no projeto.
+9. `migrations/20261104130000_venue_duplicates.sql` — documento normalizado com índice único, nome com `pg_trgm`, `check_venue_duplicates`, reivindicação e a fila de aprovar, recusar ou mesclar.
 
 `seed_demo.sql` fica **fora** dessa lista. É opcional e cria a casa real ScapeMatch Demo (Curitiba, três salas, horários e duas promoções). Não é dado de exemplo do app.
 
