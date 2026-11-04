@@ -10,6 +10,8 @@ import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
@@ -46,6 +48,45 @@ void main() {
       snap.netCents,
     );
     expect(groups.payments.platformBalance, snap.commissionCents);
+    final serviceNotes = snap.invoices.where(
+      (invoice) => invoice.kind == FiscalInvoiceKind.service,
+    );
+    final commissionNotes = snap.invoices.where(
+      (invoice) => invoice.kind == FiscalInvoiceKind.commission,
+    );
+    expect(serviceNotes, isNotEmpty);
+    expect(commissionNotes.length, serviceNotes.length);
+    expect(
+      serviceNotes.every(
+        (invoice) => invoice.status == FiscalInvoiceStatus.simulated,
+      ),
+      isTrue,
+    );
+    expect(
+      serviceNotes.map((invoice) => invoice.playerId),
+      contains('user-local'),
+    );
+
+    final cpf = await partner.load(
+      SampleIds.houseCwbRuaXv,
+      fiscal: const VenueFiscalProfile(documentKind: FiscalDocumentKind.cpf),
+    );
+    expect(
+      cpf.invoices
+          .where((invoice) => invoice.kind == FiscalInvoiceKind.service)
+          .every(
+            (invoice) => invoice.status == FiscalInvoiceStatus.semEmissao,
+          ),
+      isTrue,
+    );
+    expect(
+      cpf.invoices
+          .where((invoice) => invoice.kind == FiscalInvoiceKind.commission)
+          .every(
+            (invoice) => invoice.status == FiscalInvoiceStatus.simulated,
+          ),
+      isTrue,
+    );
 
     final olga = '${SampleIds.groupCwbClosed}-p0';
     final marked = partner.markAbsence(
@@ -231,6 +272,50 @@ void main() {
     await tester.tap(save);
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.priceSaved), findsOneWidget);
+
+    await tester.ensureVisible(find.text(PartnerMessages.invoices));
+    await tester.tap(find.text(PartnerMessages.invoices));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Nota de teste'), findsWidgets);
+    expect(find.text('Serviço da casa'), findsWidgets);
+    expect(find.text('Comissão da ScapeMatch'), findsWidgets);
+    expect(find.textContaining('Nícolas'), findsWidgets);
+  });
+
+  testWidgets('house signup requires the terms and records the version', (
+    tester,
+  ) async {
+    await pumpParceiro(tester);
+    await tester.tap(find.byKey(PartnerKeys.partnerSignup));
+    await tester.pumpAndSettle();
+    expect(find.text(LegalDocuments.reviewBanner), findsOneWidget);
+    await tester.enterText(find.byKey(PartnerKeys.partnerSignupName), 'Casa Nova');
+    await tester.enterText(
+      find.byKey(PartnerKeys.partnerSignupEmail),
+      'casa@exemplo.invalid',
+    );
+    await tester.enterText(
+      find.byKey(PartnerKeys.partnerSignupPassword),
+      'senha',
+    );
+    await tester.ensureVisible(find.byKey(PartnerKeys.partnerSignupSubmit));
+    await tester.tap(find.byKey(PartnerKeys.partnerSignupSubmit));
+    await tester.pumpAndSettle();
+    expect(find.text(PartnerLegal.termsRequired), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(PartnerKeys.partnerSignupTerms));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(PartnerKeys.partnerSignupTerms),
+        matching: find.byType(Checkbox),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(PartnerKeys.partnerSignupSubmit));
+    await tester.tap(find.byKey(PartnerKeys.partnerSignupSubmit));
+    await tester.pumpAndSettle();
+    expect(find.text('Aceite registrado'), findsOneWidget);
+    expect(find.textContaining(legalDocumentVersion), findsWidgets);
   });
 }
 

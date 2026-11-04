@@ -774,7 +774,8 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       room: caldeira,
       slot: slotCaldeiraFechado,
       totalSpots: 4,
-      names: ['Olga', 'Paulo', 'Rita', 'Sami'],
+      names: ['Olga', 'Paulo', 'Rita', 'Nícolas'],
+      localUserId: 'user-local',
       minimumSpots: 2,
     ),
   ];
@@ -1277,6 +1278,7 @@ Group _group({
   String note = '',
   String gameType = GameTypes.escapeRoom,
   String? roomName,
+  String? localUserId,
   int? minimumSpots,
   DateTime? closesAt,
   DateTime? cancelledAt,
@@ -1327,7 +1329,10 @@ Group _group({
           id: '$id-p$index',
           displayName: names[index],
           isCreator: index == 0,
-          isLocalUser: false,
+          userId: localUserId != null && index == names.length - 1
+              ? localUserId
+              : null,
+          isLocalUser: localUserId != null && index == names.length - 1,
           attendance: cancelledAt != null
               ? AttendanceStatus.cancelled
               : index == 0

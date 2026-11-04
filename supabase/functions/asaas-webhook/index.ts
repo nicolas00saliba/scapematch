@@ -1,6 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { tokensMatch } from "../_shared/asaas_provider.ts";
+import {
+  AsaasProvider,
+  isAsaasSandbox,
+  tokensMatch,
+} from "../_shared/asaas_provider.ts";
 import { json } from "../_shared/http.ts";
+import {
+  cancelInvoicesForCharge,
+  issuePaidInvoices,
+} from "../_shared/issue_invoices.ts";
 import { creditLedger, reverseLedger } from "../_shared/ledger.ts";
 
 Deno.serve(async (req) => {
@@ -60,14 +68,37 @@ Deno.serve(async (req) => {
     refund_reason: status === "refunded" ? "group_did_not_close" : "none",
   }).eq("group_id", charge.group_id).eq("user_id", charge.user_id);
 
+  const sandbox = isAsaasSandbox(
+    Deno.env.get("ASAAS_BASE_URL") ?? "https://api-sandbox.asaas.com/v3",
+  );
+  const asaas = sandbox ? undefined : safeAsaas();
   if (status === "paid") {
     await creditIfGroupClosed(admin, charge);
+    await issuePaidInvoices(admin, charge, { sandbox, asaas }).catch(
+      (error) => {
+        console.error(error);
+      },
+    );
   }
   if (status === "refunded") {
     await reverseLedger(admin, charge);
+    await cancelInvoicesForCharge(admin, charge.id, { sandbox, asaas }).catch(
+      (error) => {
+        console.error(error);
+      },
+    );
   }
   return json({ ok: true });
 });
+
+function safeAsaas(): AsaasProvider | undefined {
+  try {
+    return AsaasProvider.fromEnv(Deno.env);
+  } catch (error) {
+    console.error(error);
+    return undefined;
+  }
+}
 
 async function creditIfGroupClosed(
   admin: ReturnType<typeof createClient>,

@@ -107,6 +107,15 @@ jobs:
           grep -F -q 'Acessar o ScapeMatch Parceiro' apps/landing/index.html
           grep -F -q 'Placeholder' apps/landing/index.html
           grep -F -q 'og:image' apps/landing/index.html
+          test -f apps/landing/termos.html
+          test -f apps/landing/privacidade.html
+          test -f apps/landing/cancelamento.html
+          test -f apps/landing/termos-parceiro.html
+          grep -F -q 'href="termos.html"' apps/landing/index.html
+          grep -F -q 'A revisar juridicamente' apps/landing/termos.html
+          grep -F -q 'encarregado@exemplo.invalid' apps/landing/privacidade.html
+          grep -F -q 'intermediadora' apps/landing/termos-parceiro.html
+          grep -F -q 'não é capturada' apps/landing/cancelamento.html
           if grep -E -q '[0-9]+%' apps/landing/index.html; then
             echo 'A landing cita percentual de comissão.'
             exit 1

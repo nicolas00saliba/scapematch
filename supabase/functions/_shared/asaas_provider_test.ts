@@ -107,7 +107,7 @@ Deno.test("o cartão reserva com authorizeOnly e a captura usa o endpoint oficia
   assert(calls[2].url.endsWith("/payments/pay_card/refund"));
 });
 
-Deno.test("a subconta devolve só o walletId", async () => {
+Deno.test("a subconta devolve walletId e apiKey para a função gravar", async () => {
   const fetchFn = () =>
     Promise.resolve(
       new Response(
@@ -133,8 +133,115 @@ Deno.test("a subconta devolve só o walletId", async () => {
     province: "Centro",
     postalCode: "80020310",
   });
-  assertEquals(created, { walletId: "wal_demo" });
-  assertEquals(JSON.stringify(created).includes("sub-secret"), false);
+  assertEquals(created.walletId, "wal_demo");
+  assertEquals(created.apiKey, "sub-secret");
+  assertEquals(provider.sandbox, true);
+  assertEquals(
+    provider.withKey("sub-secret").sandbox,
+    true,
+  );
+});
+
+Deno.test("a nota usa /invoices e a chave só no header", async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    calls.push({ url, init: init ?? {} });
+    if (url.endsWith("/invoices")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: "inv_1", status: "SCHEDULED" }), {
+          status: 200,
+        }),
+      );
+    }
+    if (url.endsWith("/authorize")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: "inv_1" }), { status: 200 }),
+      );
+    }
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          id: "inv_1",
+          status: "AUTHORIZED",
+          number: "100",
+          pdfUrl: "https://asaas.example/n.pdf",
+          xmlUrl: "https://asaas.example/n.xml",
+        }),
+        { status: 200 },
+      ),
+    );
+  };
+  const provider = new AsaasProvider(
+    "root-key",
+    "https://api.asaas.com/v3",
+    fetchFn,
+  );
+  assertEquals(provider.sandbox, false);
+  const scheduled = await provider.scheduleInvoice({
+    customer: "cus_house",
+    serviceDescription: "Comissão de intermediação",
+    value: 12,
+    deductions: 0,
+    effectiveDate: "2026-11-06",
+    municipalServiceCode: "17.02",
+    municipalServiceName: "Intermediação de reservas",
+    externalReference: "commission:ch-1",
+    taxes: {
+      retainIss: false,
+      iss: 2,
+      cofins: 0,
+      csll: 0,
+      inss: 0,
+      ir: 0,
+      pis: 0,
+    },
+  });
+  assertEquals(scheduled.id, "inv_1");
+  const body = JSON.parse(String(calls[0].init.body));
+  assertEquals(body.customer, "cus_house");
+  assertEquals(body.municipalServiceCode, "17.02");
+  assertEquals(body.value, 12);
+  assertEquals(JSON.stringify(body).includes("root-key"), false);
+  assertEquals(
+    (calls[0].init.headers as Record<string, string>).access_token,
+    "root-key",
+  );
+  await provider.authorizeInvoice("inv_1");
+  assertEquals(calls[1].url.endsWith("/invoices/inv_1/authorize"), true);
+  const view = await provider.getInvoice("inv_1");
+  assertEquals(view.pdfUrl, "https://asaas.example/n.pdf");
+  assertEquals(view.xmlUrl, "https://asaas.example/n.xml");
+  assertEquals(view.number, "100");
+});
+
+Deno.test("fiscalInfo vai para /fiscalInfo sem a senha municipal no header", async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    calls.push({ url, init: init ?? {} });
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  };
+  const provider = new AsaasProvider(
+    "sub-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+  );
+  await provider.configureFiscalInfo({
+    email: "casa@example.com",
+    municipalInscription: "12345678",
+    simplesNacional: true,
+    cnae: "9329899",
+    serviceListItem: "12.08",
+    username: "prefeitura",
+    password: "segredo-municipal",
+  });
+  assertEquals(calls[0].url.endsWith("/fiscalInfo"), true);
+  const body = JSON.parse(String(calls[0].init.body));
+  assertEquals(body.municipalInscription, "12345678");
+  assertEquals(body.password, "segredo-municipal");
+  assertEquals(body.simplesNacional, true);
+  const headers = calls[0].init.headers as Record<string, string>;
+  assertEquals(headers.access_token, "sub-key");
+  assertEquals(JSON.stringify(headers).includes("segredo-municipal"), false);
 });
 
 Deno.test("webhook sem o token certo é recusado", () => {

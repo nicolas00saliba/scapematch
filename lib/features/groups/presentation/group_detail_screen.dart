@@ -16,6 +16,7 @@ import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
+import 'package:scapematch/features/fiscal/presentation/service_invoice_card.dart';
 import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
@@ -1470,6 +1471,10 @@ class _PaymentCard extends StatelessWidget {
           if (index > 0) const SizedBox(height: 8),
           _PayerRow(person: seated[index], portrait: index),
         ],
+        if (mine != null) ...[
+          const SizedBox(height: 12),
+          _InvoiceSlot(group: group, seat: mine),
+        ],
         const SizedBox(height: 10),
         Text(
           GroupMessages.paymentPolicy(
@@ -1479,6 +1484,28 @@ class _PaymentCard extends StatelessWidget {
           style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
         ),
       ],
+    );
+  }
+}
+
+class _InvoiceSlot extends StatelessWidget {
+  const _InvoiceSlot({required this.group, required this.seat});
+
+  final Group group;
+  final Participant seat;
+
+  @override
+  Widget build(BuildContext context) {
+    final invoice = serviceInvoiceFor(group: group, seat: seat);
+    if (invoice != null) {
+      return ServiceInvoiceCard(invoice: invoice);
+    }
+    if (!seat.occupiesSeat) {
+      return const SizedBox.shrink();
+    }
+    return Text(
+      'A nota fiscal do serviço aparece quando a cobrança for confirmada.',
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.35),
     );
   }
 }

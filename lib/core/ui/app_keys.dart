@@ -26,6 +26,11 @@ abstract final class AppKeys {
   static const signupBirthMonth = Key('signup-birth-month');
   static const signupBirthYear = Key('signup-birth-year');
   static const signupTerms = Key('signup-terms');
+  static const signupTermsBanner = Key('signup-terms-banner');
+  static const serviceInvoice = Key('service-invoice');
+  static const serviceInvoicePdf = Key('service-invoice-pdf');
+  static const serviceInvoiceXml = Key('service-invoice-xml');
+  static const serviceInvoiceShare = Key('service-invoice-share');
   static const accountNotices = Key('account-notices');
   static const accountLegal = Key('account-legal');
   static const accountPrivacy = Key('account-privacy');

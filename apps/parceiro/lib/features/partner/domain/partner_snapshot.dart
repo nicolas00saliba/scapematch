@@ -41,6 +41,8 @@ class PartnerSnapshot {
     required this.absenceCounts,
     required this.absenceMarks,
     required this.standings,
+    required this.invoices,
+    required this.fiscal,
   });
 
   final EscapeHouse house;
@@ -75,6 +77,12 @@ class PartnerSnapshot {
 
   /// Resultado da [AbsencePolicy] para cada pessoa que já tem falta.
   final Map<String, AbsenceStanding> standings;
+
+  /// Notas da casa: serviço para o jogador e comissão da ScapeMatch.
+  final List<FiscalInvoiceView> invoices;
+
+  /// Dados fiscais desta sessão. CPF fica sem emissão do serviço.
+  final VenueFiscalProfile fiscal;
 
   int absenceCount(String playerId) => absenceCounts[playerId] ?? 0;
 

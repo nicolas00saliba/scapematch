@@ -5,6 +5,7 @@ export 'src/absence.dart';
 export 'src/asaas_split.dart';
 export 'src/closing.dart';
 export 'src/commission.dart';
+export 'src/fiscal_invoice.dart';
 export 'src/ledger.dart';
 export 'src/payment_book.dart';
 export 'src/payment_exception.dart';

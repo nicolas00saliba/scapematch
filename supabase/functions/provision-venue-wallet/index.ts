@@ -85,6 +85,11 @@ Deno.serve(async (req) => {
         .update({ asaas_wallet_id: created.walletId })
         .eq("id", venue.id);
       if (updateError) return json({ error: updateError.message }, 400);
+      const { error: keyError } = await admin.from("venue_asaas_keys").upsert({
+        venue_id: venue.id,
+        api_key: created.apiKey,
+      });
+      if (keyError) return json({ error: keyError.message }, 400);
       provisioned.push({ venue_id: venue.id, wallet_id: created.walletId });
     }
     return json({ provisioned });

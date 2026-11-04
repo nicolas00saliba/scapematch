@@ -504,6 +504,25 @@ summary {
   }
 }
 
+.draft {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff4d6;
+  color: #8a5a00;
+  font-weight: 600;
+}
+
+.legal-body p {
+  margin: 0 0 14px;
+}
+
+.legal-body h1 {
+  margin: 8px 0 16px;
+  font-size: 2rem;
+  letter-spacing: -0.03em;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

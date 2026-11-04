@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_signup_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
@@ -132,6 +133,18 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
             key: PartnerKeys.partnerSubmit,
             onPressed: _busy ? null : _submit,
             child: const Text('Entrar'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            key: PartnerKeys.partnerSignup,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => const PartnerSignupScreen(),
+                ),
+              );
+            },
+            child: const Text('Cadastrar casa'),
           ),
         ],
       ),

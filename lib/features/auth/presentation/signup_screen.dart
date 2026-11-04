@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -116,12 +117,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return AppScaffold(
       desktopMaxWidth: AppScaffold.formMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Cadastro')),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-        children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           const ExampleDataBanner(),
           const SizedBox(height: 16),
-          const Text('Cadastro de exemplo, só neste aparelho. Sem servidor.'),
+          const Text(
+            'O cadastro só segue com o aceite. A versão do texto e a data ficam registradas.',
+          ),
           const SizedBox(height: 16),
           TextField(
             key: AppKeys.signupName,
@@ -193,32 +198,38 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          Text(
+            LegalDocuments.reviewBanner,
+            key: AppKeys.signupTermsBanner,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           CheckboxListTile(
             key: AppKeys.signupTerms,
             contentPadding: EdgeInsets.zero,
             value: _accepted,
             onChanged: (value) => setState(() => _accepted = value ?? false),
-            title: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text('Li e aceito os '),
-                TextButton(
-                  onPressed: () => context.push('/legal/termos'),
-                  child: const Text('termos'),
-                ),
-                const Text(', a '),
-                TextButton(
-                  onPressed: () => context.push('/legal/privacidade'),
-                  child: const Text('privacidade'),
-                ),
-                const Text(' e o '),
-                TextButton(
-                  onPressed: () => context.push('/legal/reembolso'),
-                  child: const Text('reembolso'),
-                ),
-                const Text('.'),
-              ],
+            title: Text(
+              'Li e aceito os termos, a privacidade e o cancelamento (versão $legalDocumentVersion).',
             ),
+          ),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => context.push('/legal/termos'),
+                child: const Text('Termos de uso'),
+              ),
+              TextButton(
+                onPressed: () => context.push('/legal/privacidade'),
+                child: const Text('Privacidade'),
+              ),
+              TextButton(
+                onPressed: () => context.push('/legal/reembolso'),
+                child: const Text('Cancelamento e reembolso'),
+              ),
+            ],
           ),
           if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
           const SizedBox(height: 16),
@@ -228,6 +239,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             child: const Text('Criar conta'),
           ),
         ],
+        ),
       ),
     );
   }
