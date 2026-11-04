@@ -70,3 +70,32 @@ jobs:
       - name: Build partner web
         working-directory: apps/parceiro
         run: flutter build web --release --base-href /scapematch/parceiro/
+
+  landing:
+    name: Static landing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check the landing files
+        run: |
+          test -f apps/landing/index.html
+          test -f apps/landing/styles.css
+          test -f apps/landing/assets/logo-simbolo.svg
+          test -f apps/landing/assets/og.png
+          test -f apps/landing/assets/favicon.svg
+          test -f netlify.toml
+          grep -F -q 'publish = "apps/landing"' netlify.toml
+          grep -F -q 'Quero jogar' apps/landing/index.html
+          grep -F -q 'Tenho uma casa' apps/landing/index.html
+          grep -F -q 'href="#casas"' apps/landing/index.html
+          grep -F -q 'href="https://nicolas00saliba.github.io/scapematch/"' apps/landing/index.html
+          grep -F -q 'href="https://nicolas00saliba.github.io/scapematch/parceiro/"' apps/landing/index.html
+          grep -F -q 'Acessar o ScapeMatch Parceiro' apps/landing/index.html
+          grep -F -q 'Placeholder' apps/landing/index.html
+          grep -F -q 'og:image' apps/landing/index.html
+          if grep -E -q '[0-9]+%' apps/landing/index.html; then
+            echo 'A landing cita percentual de comissão.'
+            exit 1
+          fi

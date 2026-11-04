@@ -1,0 +1,5 @@
+# Landing estática do ScapeMatch. Não roda o build do Flutter.
+# No painel da Netlify, deixe a base na raiz do repositório.
+[build]
+  publish = "apps/landing"
+  command = ""
