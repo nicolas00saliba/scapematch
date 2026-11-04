@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
-import 'package:scapematch/core/ui/scape_grid.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
@@ -17,6 +16,7 @@ import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
+import 'package:scapematch/features/groups/presentation/home_grid_slots.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -247,40 +247,57 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             if (viewer == null || !board.hiddenFromHome(viewer.id, group))
               group,
         ];
-        if (visible.isEmpty) {
+        final now = ref.watch(clockProvider).now();
+        final desktop = isScapeDesktop(context);
+        final text = query.trim();
+        // No celular, sem texto de busca, só quem ainda vai jogar e falta
+        // 1 ou 2 pessoas. Sem ninguém assim, a faixa some.
+        final shown = !desktop && text.isEmpty
+            ? filterGroupsHappeningAndClosing(visible, now)
+            : visible;
+        if (shown.isEmpty && (text.isNotEmpty || !desktop)) {
+          if (!desktop && text.isEmpty) {
+            return const SizedBox.shrink();
+          }
           return InlineNotice(
             message: _emptyMessage(cityName, query, gameTypeId),
           );
         }
-        final now = ref.watch(clockProvider).now();
         void open(Group group) => context.push('/groups/${group.id}');
         void invite(Group group) => showInviteSheet(context, group);
-        if (isScapeDesktop(context)) {
-          final fourColumns =
-              MediaQuery.sizeOf(context).width >= homeWebGridFourColumns;
-          return ScapeWrapGrid(
-            fixedColumns: fourColumns ? 4 : null,
-            maxColumns: 3,
+        if (desktop) {
+          return HomeGroupGrid(
             gap: 12,
+            placeholderBuilder: (index) => StaggerIn(
+              index: shown.length + index,
+              child: homeGridSlotIsMessage(index)
+                  ? HomeGridSlotCard(
+                      key: AppKeys.homeGridSlot(index),
+                      kind: homeGridSlotKind(index),
+                      cityName: cityName,
+                      gameTypeId: gameTypeId,
+                    )
+                  : HomeGridSkeletonCard(key: AppKeys.homeGridSlot(index)),
+            ),
             children: [
-              for (var index = 0; index < visible.length; index++)
+              for (var index = 0; index < shown.length; index++)
                 StaggerIn(
                   index: index,
                   child: GroupCard(
                     now: now,
-                    group: visible[index],
+                    group: shown[index],
                     dense: true,
-                    onTap: () => open(visible[index]),
-                    onInvite: () => invite(visible[index]),
+                    onTap: () => open(shown[index]),
+                    onInvite: () => invite(shown[index]),
                   ),
                 ),
             ],
           );
         }
         return _GroupWindow(
-          groups: visible,
+          groups: shown,
           now: now,
-          maxHeight: groupWindowHeightFor(visible.length),
+          maxHeight: groupWindowHeightFor(shown.length),
           onOpen: open,
           onInvite: invite,
         );
@@ -305,9 +322,10 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
 /// seguinte. A barra só entra quando o conteúdo passa desse teto.
 const groupWindowMaxHeight = 340.0;
 
-/// Um cartão visível encolhe a janela. Dois ou mais usam o teto.
+/// Até três cartões ficam inteiros. A partir daí a janela usa o teto
+/// e a barra aparece.
 double groupWindowHeightFor(int visibleCount) {
-  if (visibleCount <= 1) {
+  if (visibleCount <= 3) {
     return double.infinity;
   }
   return groupWindowMaxHeight;

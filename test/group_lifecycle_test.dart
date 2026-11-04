@@ -243,6 +243,7 @@ void main() {
       overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
     );
     expect(find.text('Falta 1 para fechar'), findsWidgets);
+    expect(find.text('Sessão já começou'), findsNothing);
     expect(find.text('Quase cheios'), findsNothing);
   });
 
@@ -293,6 +294,8 @@ void main() {
       tester,
       overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
     );
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
     );
@@ -331,7 +334,7 @@ void main() {
         missing: forming.spotsUntilClose,
         started: true,
       ),
-      'Sessão já começou',
+      GroupMessages.spotsUntilClose(forming.spotsUntilClose),
     );
     expect(forming.showCloseDeadline(now), isFalse);
   });
@@ -726,6 +729,8 @@ void main() {
         communityBoardProvider.overrideWithValue(board),
       ],
     );
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Rua');
+    await tester.pumpAndSettle();
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
       findsNothing,
@@ -760,6 +765,8 @@ void main() {
         groupRepositoryProvider.overrideWithValue(groups),
       ],
     );
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
     );
@@ -896,7 +903,8 @@ void main() {
 
   test('the home window height follows the cards still on screen', () {
     expect(groupWindowHeightFor(1), double.infinity);
-    expect(groupWindowHeightFor(2), groupWindowMaxHeight);
+    expect(groupWindowHeightFor(3), double.infinity);
+    expect(groupWindowHeightFor(4), groupWindowMaxHeight);
   });
 
   testWidgets('a reserved seat still offers the waitlist', (tester) async {
@@ -924,6 +932,8 @@ void main() {
         groupRepositoryProvider.overrideWithValue(groups),
       ],
     );
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
     );

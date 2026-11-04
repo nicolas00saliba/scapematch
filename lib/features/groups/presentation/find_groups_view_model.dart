@@ -75,6 +75,20 @@ List<Group> filterGroupsByGameType(List<Group> groups, String gameTypeId) {
   ];
 }
 
+/// Grupo se formando agora: sessão ainda futura, aberto e faltando 1 ou 2.
+///
+/// O celular usa isso no lugar da lista inteira quando a busca está vazia.
+/// Sessão que já começou não entra. Grupo fechado ou com 3+ vagas também não.
+List<Group> filterGroupsHappeningAndClosing(List<Group> groups, DateTime now) {
+  return [
+    for (final group in groups)
+      if (!group.isCancelled &&
+          now.isBefore(group.startsAt) &&
+          group.isAlmostFull)
+        group,
+  ];
+}
+
 /// Casa, sala ou bairro. Texto vazio devolve a mesma lista.
 List<Group> filterGroupsByText(List<Group> groups, String query) {
   final text = query.trim().toLowerCase();

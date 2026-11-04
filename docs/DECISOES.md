@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## A Home no site completa a grade, e o celular só mostra quem está jogando
+
+- **Data:** 2026-11-04
+- **Decisão:** no site (largura a partir de 960), a grade de grupos abaixo de Promoções e Novidades completa pelo menos 3 linhas. Cada frase entra uma vez: “Crie um grupo” (abre o formulário), “Novas salas chegando em breve…”, “Tem uma casa de jogos? Seja parceiro” (abre `/scapematch/parceiro/` em outra aba) e “Convide seus amigos” (compartilha ou copia o convite). As outras vagas são esqueleto tracejado, sem texto. Com zero grupos, as quatro frases ficam na primeira linha de quatro colunas. A busca sem resultado continua com o aviso. O filtro de tipo vale. A seção Salas segue carrossel. No celular, a janela do topo só lista grupo aberto, com sessão ainda futura, aceitando gente e faltando 1 ou 2 pessoas. Sessão que já começou não aparece, e o cartão não diz “Sessão já começou”. Se não houver nenhum, a janela some e Promoções sobe. A busca no celular continua achando qualquer grupo da cidade.
+- **Motivo:** com poucas salas a grade do site ficava furada, e repetir as quatro frases poluía. No celular, “acontecendo agora” é o grupo que ainda está se formando, não a sessão que já começou.
+- **Onde está no código:** `home_grid_slots.dart`, `filterGroupsHappeningAndClosing` e `FindGroupsSection`.
+- **Como trocar depois:** o mínimo de linhas é `minRows` em `HomeGroupGrid`. Incluir grupo já fechado é alargar `GroupRules.isAlmostFull`.
+
 ## O Parceiro é um app à parte
 
 - **Data:** 2026-11-03

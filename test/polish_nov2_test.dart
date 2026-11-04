@@ -50,6 +50,7 @@ void main() {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
     await pumpScapeMatch(tester);
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'a');
     await tester.pumpAndSettle();
     final portraits = [
       for (final image in tester.widgetList<Image>(find.byType(Image)))

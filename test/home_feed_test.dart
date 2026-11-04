@@ -47,6 +47,7 @@ void main() {
         findsNothing,
       );
       expect(find.text('Curitiba'), findsWidgets);
+      expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
       expect(
         find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
         findsOneWidget,
@@ -148,6 +149,8 @@ void main() {
     );
 
     expect(find.text('Rio de Janeiro'), findsWidgets);
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Apartamento');
+    await tester.pumpAndSettle();
     expect(find.text('O Apartamento da Avenida'), findsWidgets);
     expect(
       find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
@@ -559,9 +562,14 @@ void main() {
           .text,
       isEmpty,
     );
+    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
+      findsOneWidget,
+    );
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
-      findsOneWidget,
+      findsNothing,
     );
   });
 }
