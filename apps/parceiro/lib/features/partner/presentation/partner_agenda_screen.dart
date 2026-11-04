@@ -1609,12 +1609,13 @@ class _SheetPerson extends ConsumerWidget {
           : null,
       trailing: !marked && canMark
           ? TextButton(
-              onPressed: () {
-                final result = ref.read(partnerRepositoryProvider).markAbsence(
+              onPressed: () async {
+                final result = await ref.read(partnerRepositoryProvider).markAbsence(
                   houseId: snapshot.house.id,
                   groupId: group.id,
                   playerId: playerId,
                 );
+                if (!context.mounted) return;
                 if (result is AbsenceRejected) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(result.message)),

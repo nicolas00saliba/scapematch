@@ -1,23 +1,32 @@
+import 'package:flutter/foundation.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 
-/// Casa que entra no Parceiro desta versão. A senha não sai daqui.
+/// Casa que entrou no Parceiro.
 class PartnerAccount {
   const PartnerAccount({
     required this.email,
     required this.houseId,
     required this.houseName,
+    this.userId = '',
+    this.venueStatus = 'approved',
     this.isAdmin = false,
   });
 
   final String email;
   final String houseId;
   final String houseName;
+  final String userId;
+
+  /// `loading`, nulo (sem casa), `pending`, `approved` ou `rejected`.
+  final String? venueStatus;
   final bool isAdmin;
+
+  bool get hasApprovedHouse => houseId.isNotEmpty && venueStatus == 'approved';
 }
 
 const partnerDemoPassword = 'demo';
 
-/// Atalho da mesma casa de exemplo. Não é uma conta separada.
+/// Atalho da mesma casa de exemplo. Não entra no build de produção.
 const partnerQuickUser = 'a';
 const partnerQuickPassword = 'b';
 
@@ -27,6 +36,7 @@ const partnerDemoAccount = PartnerAccount(
   houseName: 'Mistério da Rua XV',
 );
 
+/// Senhas fixas só existem fora do release. O compilador de produção corta o resto.
 const partnerAdminAccount = PartnerAccount(
   email: 'admin@scapematch.exemplo',
   houseId: 'admin',
@@ -35,15 +45,24 @@ const partnerAdminAccount = PartnerAccount(
 );
 
 PartnerAccount? matchPartnerLogin(String email, String password) {
+  if (kReleaseMode) return null;
   final id = email.trim().toLowerCase();
   final quick = id == partnerQuickUser && password == partnerQuickPassword;
   final full =
       id == partnerDemoAccount.email && password == partnerDemoPassword;
-  if (quick || full) {
-    return partnerDemoAccount;
-  }
+  if (quick || full) return partnerDemoAccount;
   if (id == partnerAdminAccount.email && password == partnerDemoPassword) {
     return partnerAdminAccount;
   }
   return null;
+}
+
+String partnerDemoEmailHint() {
+  if (kReleaseMode) return '';
+  return 'Casa de exemplo: xv@scapematch.exemplo. Senha: demo.';
+}
+
+String partnerDemoQuickLabel() {
+  if (kReleaseMode) return '';
+  return 'Demo: a / b';
 }

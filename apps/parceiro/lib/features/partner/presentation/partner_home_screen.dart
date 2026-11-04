@@ -825,13 +825,14 @@ class _PlayerChip extends ConsumerWidget {
     );
   }
 
-  void _mark(BuildContext context, WidgetRef ref, String playerId) {
+  Future<void> _mark(BuildContext context, WidgetRef ref, String playerId) async {
     final houseId = snapshot.house.id;
-    final result = ref.read(partnerRepositoryProvider).markAbsence(
+    final result = await ref.read(partnerRepositoryProvider).markAbsence(
       houseId: houseId,
       groupId: group.id,
       playerId: playerId,
     );
+    if (!context.mounted) return;
     if (result is AbsenceRejected) {
       _snack(context, result.message);
       return;

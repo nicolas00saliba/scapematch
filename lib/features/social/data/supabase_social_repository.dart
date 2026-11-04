@@ -14,6 +14,7 @@ class SupabaseSocialRepository implements SocialRepository {
   SupabaseSocialRepository(this._rpc);
 
   final SocialRpc _rpc;
+  SocialView? _cached;
 
   @override
   bool areFriends(String a, String b) {
@@ -34,7 +35,7 @@ class SupabaseSocialRepository implements SocialRepository {
     final friends = await _rows('list_my_friends');
     final crews = await _rows('list_my_crews');
     final code = await _rpc('my_friend_invite', const {});
-    return _view(
+    final view = _view(
       userId: userId,
       displayName: displayName,
       username: username,
@@ -42,6 +43,8 @@ class SupabaseSocialRepository implements SocialRepository {
       friendRows: friends,
       crewRows: crews,
     );
+    _cached = view;
+    return view;
   }
 
   @override
@@ -150,6 +153,18 @@ class SupabaseSocialRepository implements SocialRepository {
     required String actorId,
     required String crewId,
   }) {
+    final view = _cached;
+    if (view == null) return const [];
+    for (final crew in view.crews) {
+      if (crew.id != crewId) continue;
+      return [
+        for (final person in crew.companionsOf(actorId))
+          PartyCompanion(
+            userId: person.userId,
+            displayName: person.displayName,
+          ),
+      ];
+    }
     return const [];
   }
 

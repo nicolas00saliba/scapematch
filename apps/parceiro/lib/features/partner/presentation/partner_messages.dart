@@ -6,10 +6,26 @@ abstract final class PartnerMessages {
   static const loginTitle = 'Entrar como casa';
   static const loginBody =
       'Conta de exemplo, separada do app do jogador. O saldo é o livro de exemplo desta casa.';
-  static const emailHint =
-      'Casa de exemplo: xv@scapematch.exemplo. Senha: demo.';
-  static const quickDemo = 'Demo: a / b';
+  static const loginBodyLive =
+      'Entre com a conta da casa. A senha é a do ScapeMatch, não um atalho fixo.';
+  static const signUp = 'Criar conta da casa';
   static const badLogin = 'E-mail ou senha não conferem neste exemplo.';
+  static const badLoginLive = 'E-mail ou senha não conferem.';
+  static const awaitingTitle = 'Aguardando aprovação';
+  static const awaitingBody =
+      'Recebemos o cadastro da casa. O painel abre quando um admin aprovar.';
+  static const rejectedTitle = 'Casa não aprovada';
+  static const rejectedBody =
+      'Este cadastro foi recusado. Você pode enviar outra casa.';
+  static const refresh = 'Atualizar';
+  static const sendVenue = 'Enviar casa';
+  static const anotherVenue = 'Enviar outra casa';
+  static const adminTitle = 'Casas para aprovar';
+  static const adminEmpty = 'Nenhuma casa pendente.';
+  static const approve = 'Aprovar';
+  static const reject = 'Recusar';
+  static const openHouse = 'Abrir minha casa';
+  static const backToAdmin = 'Voltar às aprovações';
   static const signOut = 'Sair';
   static const balance = 'Saldo';
   static const reservations = 'Reservas';

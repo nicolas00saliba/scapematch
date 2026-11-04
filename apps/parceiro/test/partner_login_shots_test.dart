@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
 
 import 'support/pump_parceiro.dart';
 
@@ -20,7 +20,7 @@ void main() {
     await tester.runAsync(_loadFonts);
     const size = Size(1280, 900);
     await pumpParceiro(tester, size: size);
-    expect(find.text(PartnerMessages.quickDemo), findsOneWidget);
+    expect(find.text(partnerDemoQuickLabel()), findsOneWidget);
     await _shot(tester, dir, 'parceiro-login-demo.png', size);
   });
 }

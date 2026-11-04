@@ -18,6 +18,7 @@ supabase db push
 7. `migrations/20261104120600_fiscal_terms.sql` — notas fiscais, dados fiscais da casa, chave da subconta fora do app, e o aceite dos termos.
 8. `migrations/20261104120700_friends_crews.sql` — amigos, turmas, avisos no app e entrada em grupo com várias vagas. Vem depois de `20261104120600_fiscal_terms.sql` e não usa tabela de nota fiscal. Não foi aplicada no projeto.
 9. `migrations/20261104130000_venue_duplicates.sql` — documento normalizado com índice único, nome com `pg_trgm`, `check_venue_duplicates`, reivindicação e a fila de aprovar, recusar ou mesclar.
+10. `migrations/20261104140000_house_cancel_group.sql` — a casa cancela o grupo dela. O dono do grupo continua com `delete_group`. Não foi aplicada no projeto.
 
 `seed_demo.sql` fica **fora** dessa lista. É opcional e cria a casa real ScapeMatch Demo (Curitiba, três salas, horários e duas promoções). Não é dado de exemplo do app.
 

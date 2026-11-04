@@ -89,7 +89,7 @@ void main() {
     );
 
     final olga = '${SampleIds.groupCwbClosed}-p0';
-    final marked = partner.markAbsence(
+    final marked = await partner.markAbsence(
       houseId: SampleIds.houseCwbRuaXv,
       groupId: SampleIds.groupCwbClosed,
       playerId: olga,
@@ -97,14 +97,14 @@ void main() {
     expect(marked, isA<AbsenceMarked>());
     expect((marked as AbsenceMarked).standing, AbsenceStanding.warned);
     expect(marked.count, 1);
-    final again = partner.markAbsence(
+    final again = await partner.markAbsence(
       houseId: SampleIds.houseCwbRuaXv,
       groupId: SampleIds.groupCwbClosed,
       playerId: olga,
     );
     expect((again as AbsenceMarked).count, 1);
 
-    final early = partner.markAbsence(
+    final early = await partner.markAbsence(
       houseId: SampleIds.houseCwbRuaXv,
       groupId: 'grp-cwb-lab-quase',
       playerId: 'grp-cwb-lab-quase-p0',
@@ -187,8 +187,8 @@ void main() {
   testWidgets('bad credentials stay on the house login', (tester) async {
     await pumpParceiro(tester);
     expect(find.text('ScapeMatch Parceiro'), findsOneWidget);
-    expect(find.text(PartnerMessages.emailHint), findsOneWidget);
-    expect(find.text(PartnerMessages.quickDemo), findsOneWidget);
+    expect(find.text(partnerDemoEmailHint()), findsOneWidget);
+    expect(find.text(partnerDemoQuickLabel()), findsOneWidget);
     expect(find.text('App do jogador'), findsNothing);
 
     await tester.enterText(

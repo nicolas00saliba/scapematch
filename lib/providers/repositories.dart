@@ -1,31 +1,39 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/data/sample_data.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
 import 'package:scapematch/features/auth/data/pending_invite_store.dart';
+import 'package:scapematch/features/auth/data/supabase_auth_repository.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/catalog/data/asset_experience_source.dart';
 import 'package:scapematch/features/catalog/data/catalog_repository.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
+import 'package:scapematch/features/catalog/data/supabase_catalog_repository.dart';
 import 'package:scapematch/features/catalog/domain/experience_source.dart';
 import 'package:scapematch/features/cities/data/city_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
+import 'package:scapematch/features/cities/data/supabase_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
+import 'package:scapematch/features/groups/data/supabase_group_repository.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
 import 'package:scapematch/features/social/data/memory_social_repository.dart';
 import 'package:scapematch/features/social/data/social_repository.dart';
+import 'package:scapematch/features/social/data/supabase_social_repository.dart';
 import 'package:scapematch/features/map/data/geolocator_user_location.dart';
 import 'package:scapematch/features/map/data/sample_live_presence.dart';
 import 'package:scapematch/features/map/data/user_location.dart';
 import 'package:scapematch/features/news/data/fake_news_repository.dart';
 import 'package:scapematch/features/news/data/news_repository.dart';
+import 'package:scapematch/features/news/data/supabase_news_repository.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/payments/data/fake_payment_methods_repository.dart';
 import 'package:scapematch/features/payments/data/payment_methods_repository.dart';
 import 'package:scapematch/features/wallet/data/fake_wallet_repository.dart';
 import 'package:scapematch/features/wallet/data/wallet_repository.dart';
+import 'package:scapematch/features/wallet/domain/wallet_transaction.dart';
 
 /// Wall clock for rules that compare a session with "now".
 ///
@@ -38,6 +46,9 @@ final clockProvider = Provider<Clock>((ref) => const SystemClock());
 /// `signOut` zera a sessão; um `FakeAuthRepository` novo não é criado,
 /// então o app continua deslogado até um login.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  if (scapeUsesLiveBackend) {
+    return SupabaseAuthRepository(scapeSupabase);
+  }
   return FakeAuthRepository();
 });
 
@@ -55,17 +66,27 @@ final fakeDatabaseProvider = Provider<FakeDatabase>((ref) {
 });
 
 final cityRepositoryProvider = Provider<CityRepository>((ref) {
+  if (scapeUsesLiveBackend) {
+    return SupabaseCityRepository(scapeSupabase);
+  }
   return FakeCityRepository(ref.watch(fakeDatabaseProvider));
 });
 
 final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
+  if (scapeUsesLiveBackend) {
+    return SupabaseCatalogRepository(scapeSupabase);
+  }
   return FakeCatalogRepository(ref.watch(fakeDatabaseProvider));
 });
 
-/// Amigos e turmas em memória. Para o Supabase, troque a classe por
-/// `SupabaseSocialRepository` e as funções da migração
-/// `20261104120700_friends_crews.sql`. O app não chama o banco sozinho.
+/// Amigos e turmas. Com sessão real, as funções de
+/// `20261104120700_friends_crews.sql`. Sem ela, a memória da demonstração.
 final socialRepositoryProvider = Provider<SocialRepository>((ref) {
+  if (scapeUsesLiveBackend) {
+    return SupabaseSocialRepository((function, args) {
+      return scapeSupabase.rpc(function, params: args);
+    });
+  }
   return MemorySocialRepository(
     board: ref.watch(communityBoardProvider),
     clock: ref.watch(clockProvider),
@@ -73,6 +94,12 @@ final socialRepositoryProvider = Provider<SocialRepository>((ref) {
 });
 
 final groupRepositoryProvider = Provider<GroupRepository>((ref) {
+  if (scapeUsesLiveBackend) {
+    return SupabaseGroupRepository(
+      client: scapeSupabase,
+      clock: ref.watch(clockProvider),
+    );
+  }
   return FakeGroupRepository(
     ref.watch(fakeDatabaseProvider),
     clock: ref.watch(clockProvider),
@@ -98,6 +125,9 @@ final sampleLivePresenceProvider = Provider<SampleLivePresence>((ref) {
 /// Saldo fictício da Conta. A tela lê este provider, não um número solto.
 /// Trocar pelo livro-razão real é apontar para outra classe.
 final walletRepositoryProvider = Provider<WalletRepository>((ref) {
+  if (scapeUsesLiveBackend) {
+    return FakeWalletRepository(transactions: const <WalletTransaction>[]);
+  }
   return FakeWalletRepository();
 });
 
@@ -110,6 +140,9 @@ final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((
 });
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {
+  if (scapeUsesLiveBackend) {
+    return SupabaseNewsRepository(scapeSupabase);
+  }
   final now = ref.watch(clockProvider).now();
   return FakeNewsRepository(items: buildSampleNews(now));
 });

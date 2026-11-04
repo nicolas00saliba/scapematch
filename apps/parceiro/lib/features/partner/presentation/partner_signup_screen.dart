@@ -1,12 +1,18 @@
 import 'package:dominio/dominio.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
+/// Conta real da casa. O aceite chama `accept_terms('partner')`.
 class PartnerSignupScreen extends ConsumerStatefulWidget {
   const PartnerSignupScreen({super.key});
 
@@ -19,24 +25,47 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  var _accepted = false;
+  late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
+  late final TapGestureRecognizer _refundTap;
   String? _error;
-  List<LegalAcceptance> _recorded = const [];
+  var _accepted = false;
+  var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsTap = TapGestureRecognizer()..onTap = () => _open(
+      PartnerLegal.termsTitle,
+      PartnerLegal.termsBody,
+    );
+    _privacyTap = TapGestureRecognizer()..onTap = () => _open(
+      LegalDocuments.privacyTitle,
+      LegalDocuments.privacyBody,
+    );
+    _refundTap = TapGestureRecognizer()..onTap = () => _open(
+      LegalDocuments.refundTitle,
+      LegalDocuments.refundBody,
+    );
+  }
 
   @override
   void dispose() {
     _name.dispose();
     _email.dispose();
     _password.dispose();
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    _refundTap.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final name = _name.text.trim();
     final email = _email.text.trim();
-    if (name.length < 2 || !email.contains('@') || _password.text.length < 4) {
+    if (name.length < 2 || !email.contains('@') || _password.text.length < 6) {
       setState(() {
-        _error = 'Preencha o nome da casa, um e-mail e uma senha de 4 caracteres.';
+        _error = 'Preencha nome, e-mail e uma senha de 6 caracteres.';
       });
       return;
     }
@@ -44,62 +73,72 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
       setState(() => _error = PartnerLegal.termsRequired);
       return;
     }
-    final when = DateTime.now();
-    ref.read(partnerAcceptanceProvider.notifier).record(
-      userId: email.toLowerCase(),
-      at: when,
-    );
     setState(() {
+      _busy = true;
       _error = null;
-      _recorded = [
-        for (final code in partnerAcceptanceCodes)
-          LegalAcceptance(
-            userId: email.toLowerCase(),
-            audience: 'partner',
-            documentCode: code,
-            documentVersion: legalDocumentVersion,
-            acceptedAt: when,
-          ),
-      ];
     });
+    try {
+      final response = await scapeSupabase.auth.signUp(
+        email: email,
+        password: _password.text,
+        data: {'display_name': name},
+      );
+      if (response.session == null) {
+        setState(() {
+          _busy = false;
+          _error = 'Abra o e-mail para confirmar a conta e depois entre.';
+        });
+        return;
+      }
+      await scapeSupabase.rpc('accept_terms', params: {'p_audience': 'partner'});
+      final account = await loadPartnerAccount();
+      if (!mounted) return;
+      if (account != null) {
+        ref.read(partnerSessionProvider.notifier).adopt(account);
+      }
+      Navigator.of(context).pop();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = authErrorMessage(
+          error,
+          fallback: 'Não foi possível criar a conta. Tente de novo.',
+        );
+      });
+    }
+  }
+
+  void _open(String title, String body) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => PartnerLegalScreen(title: title, body: body),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final body = theme.textTheme.bodyMedium?.copyWith(height: 1.35);
     return AppScaffold(
-      desktopMaxWidth: AppScaffold.formMax,
-      appBar: AppBar(
-        leading: const BackButton(),
-        title: const Text('Cadastro da casa'),
-      ),
+      desktopMaxWidth: 480,
+      appBar: AppBar(title: const Text(PartnerMessages.signUp)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
         children: [
-          Text(
-            LegalDocuments.reviewBanner,
-            key: PartnerKeys.partnerSignupBanner,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'O cadastro da casa só segue com o aceite. A versão e a data ficam registradas.',
-          ),
-          const SizedBox(height: 16),
           TextField(
-            key: PartnerKeys.partnerSignupName,
+            key: PartnerKeys.partnerEmail,
             controller: _name,
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-              labelText: 'Nome da casa',
+              labelText: 'Nome',
               border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
-            key: PartnerKeys.partnerSignupEmail,
             controller: _email,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
@@ -109,7 +148,6 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
           ),
           const SizedBox(height: 12),
           TextField(
-            key: PartnerKeys.partnerSignupPassword,
             controller: _password,
             obscureText: true,
             decoration: const InputDecoration(
@@ -121,87 +159,60 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
           CheckboxListTile(
             key: PartnerKeys.partnerSignupTerms,
             contentPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            controlAffinity: ListTileControlAffinity.leading,
             value: _accepted,
-            onChanged: (value) => setState(() => _accepted = value ?? false),
-            title: Text(
-              'Li e aceito os termos do Parceiro, a privacidade e o cancelamento (versão $legalDocumentVersion).',
+            onChanged: _busy
+                ? null
+                : (value) => setState(() => _accepted = value ?? false),
+            title: Text.rich(
+              TextSpan(
+                style: body,
+                children: [
+                  const TextSpan(text: 'Li e aceito os '),
+                  TextSpan(
+                    text: 'termos',
+                    style: TextStyle(
+                      color: scheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: _termsTap,
+                  ),
+                  const TextSpan(text: ', a '),
+                  TextSpan(
+                    text: 'privacidade',
+                    style: TextStyle(
+                      color: scheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: _privacyTap,
+                  ),
+                  const TextSpan(text: ' e o '),
+                  TextSpan(
+                    text: 'reembolso',
+                    style: TextStyle(
+                      color: scheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: _refundTap,
+                  ),
+                  TextSpan(text: ' (versão $legalDocumentVersion).'),
+                ],
+              ),
             ),
-          ),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              TextButton(
-                onPressed: () => _open(
-                  PartnerLegal.termsTitle,
-                  PartnerLegal.termsBody,
-                ),
-                child: const Text('Termos do Parceiro'),
-              ),
-              TextButton(
-                onPressed: () => _open(
-                  LegalDocuments.privacyTitle,
-                  LegalDocuments.privacyBody,
-                ),
-                child: const Text('Privacidade'),
-              ),
-              TextButton(
-                onPressed: () => _open(
-                  LegalDocuments.refundTitle,
-                  LegalDocuments.refundBody,
-                ),
-                child: const Text('Cancelamento e reembolso'),
-              ),
-            ],
           ),
           if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+            const SizedBox(height: 12),
+            Text(_error!, style: TextStyle(color: scheme.error)),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           FilledButton(
-            key: PartnerKeys.partnerSignupSubmit,
-            onPressed: _recorded.isEmpty ? _submit : null,
-            child: const Text('Cadastrar casa'),
+            key: PartnerKeys.partnerSubmit,
+            onPressed: _busy ? null : _submit,
+            child: const Text('Criar conta'),
           ),
-          if (_recorded.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Text(
-              'Aceite registrado',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final row in _recorded)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  '${row.documentCode} · versão ${row.documentVersion} · ${_stamp(row.acceptedAt)}',
-                ),
-              ),
-            const SizedBox(height: 8),
-            const Text(
-              'Nesta demonstração a casa de exemplo continua sendo a do login. No servidor, accept_terms grava a mesma versão e a data.',
-            ),
-          ],
         ],
       ),
     );
-  }
-
-  void _open(String title, String body) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => PartnerLegalScreen(title: title, body: body),
-      ),
-    );
-  }
-
-  String _stamp(DateTime value) {
-    final day = value.day.toString().padLeft(2, '0');
-    final month = value.month.toString().padLeft(2, '0');
-    final hour = value.hour.toString().padLeft(2, '0');
-    final minute = value.minute.toString().padLeft(2, '0');
-    return '$day/$month/${value.year} $hour:$minute';
   }
 }

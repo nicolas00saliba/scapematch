@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/sharing/external_url.dart';
 import 'package:scapematch/core/sharing/save_bytes.dart';
@@ -184,22 +185,58 @@ class _PartnerInvoicesState extends ConsumerState<PartnerInvoices> {
     });
   }
 
-  void _saveFiscal() {
+  Future<void> _saveFiscal() async {
     final iss = double.tryParse(_iss.text.trim().replaceAll(',', '.')) ?? 0;
-    ref.read(partnerFiscalProvider.notifier).save(
-      VenueFiscalProfile(
-        documentKind: _kind,
-        mei: _kind == FiscalDocumentKind.cnpj && _mei,
-        municipalInscription: _inscription.text.trim(),
-        serviceCode: _code.text.trim(),
-        serviceName: _name.text.trim(),
-        issPercent: iss,
-      ),
+    final profile = VenueFiscalProfile(
+      documentKind: _kind,
+      mei: _kind == FiscalDocumentKind.cnpj && _mei,
+      municipalInscription: _inscription.text.trim(),
+      serviceCode: _code.text.trim(),
+      serviceName: _name.text.trim(),
+      issPercent: iss,
     );
+    ref.read(partnerFiscalProvider.notifier).save(profile);
+    if (scapeUsesLiveBackend) {
+      try {
+        final response = await scapeSupabase.functions.invoke(
+          'configure-venue-fiscal',
+          body: {
+            'venue_id': widget.snapshot.house.id,
+            'municipal_inscription': profile.municipalInscription,
+            'service_code': profile.serviceCode,
+            'service_name': profile.serviceName,
+            'iss_rate': profile.issPercent,
+            'mei': profile.mei,
+            'simples_nacional': profile.mei,
+          },
+        );
+        if (!mounted) return;
+        if (response.status != 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Não foi possível gravar os dados fiscais.'),
+            ),
+          );
+          return;
+        }
+        ref.invalidate(partnerDeskProvider);
+      } on Object {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível gravar os dados fiscais.'),
+          ),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Dados fiscais salvos nesta sessão. No servidor, a função configura a subconta no Asaas.',
+          scapeUsesLiveBackend
+              ? 'Dados fiscais enviados. A função configura a subconta no Asaas.'
+              : 'Dados fiscais salvos nesta sessão. No servidor, a função configura a subconta no Asaas.',
         ),
       ),
     );

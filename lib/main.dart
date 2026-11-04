@@ -3,6 +3,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:scapematch/app/retry.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/app/scapematch_app.dart';
 import 'package:scapematch/app/url_strategy.dart';
 import 'package:scapematch/features/auth/data/pending_invite_store.dart';
@@ -18,6 +19,7 @@ import 'package:scapematch/providers/repositories.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await startScapeSupabase();
   configureUrlStrategy();
   // The handle is intentionally not disposed: semantics stay on so screen
   // readers and the web accessibility tree can see the controls.

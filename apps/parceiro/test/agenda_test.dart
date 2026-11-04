@@ -50,7 +50,7 @@ void main() {
       ),
       isTrue,
     );
-    final saved = partner.saveRoom(
+    final saved = await partner.saveRoom(
       houseId: SampleIds.houseCwbRuaXv,
       name: 'Sala da agenda',
       difficulty: Difficulty.easy,

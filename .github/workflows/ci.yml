@@ -82,6 +82,18 @@ jobs:
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
+          if grep -R -F -q 'xv@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
+            echo 'O bundle do Parceiro ainda tem o login de demonstração.'
+            exit 1
+          fi
+          if grep -R -F -q 'admin@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
+            echo 'O bundle do Parceiro ainda tem o admin de demonstração.'
+            exit 1
+          fi
+          if grep -R -F -q 'Demo: a / b' apps/parceiro/build/web --include='*.js'; then
+            echo 'O bundle do Parceiro ainda tem o atalho a/b.'
+            exit 1
+          fi
 
   duplicates-sql:
     name: Venue duplicate SQL

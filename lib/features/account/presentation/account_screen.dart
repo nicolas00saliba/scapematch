@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
@@ -104,7 +105,11 @@ class AccountScreen extends ConsumerWidget {
       builder: (context) {
         return AlertDialog(
           title: const Text(AccountMessages.signOutTitle),
-          content: const Text(AccountMessages.signOutBody),
+          content: Text(
+            scapeUsesLiveBackend
+                ? 'A sessão termina neste aparelho. Dá para entrar de novo com o mesmo e-mail.'
+                : AccountMessages.signOutBody,
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -158,7 +163,9 @@ class _SignedOutAccount extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            AccountMessages.signedOutBody,
+            scapeUsesLiveBackend
+                ? 'Entre de novo para ver a conta.'
+                : AccountMessages.signedOutBody,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
