@@ -21,22 +21,22 @@ const promoFlyers = <PromoFlyer>[
   PromoFlyer(
     id: 'promo-quarta',
     title: '2 por 1 às quartas',
-    asset: 'assets/images/promos/promo-quarta.jpg',
+    asset: 'assets/images/promos/promo-quarta.png',
   ),
   PromoFlyer(
     id: 'promo-dez',
     title: '10% off no primeiro jogo',
-    asset: 'assets/images/promos/promo-dez.jpg',
+    asset: 'assets/images/promos/promo-dez.png',
   ),
   PromoFlyer(
     id: 'promo-combo',
     title: 'Combo grupo de 6',
-    asset: 'assets/images/promos/promo-combo.jpg',
+    asset: 'assets/images/promos/promo-combo.png',
   ),
   PromoFlyer(
     id: 'promo-sexta',
     title: 'Sexta do terror',
-    asset: 'assets/images/promos/promo-sexta.jpg',
+    asset: 'assets/images/promos/promo-sexta.png',
   ),
 ];
 
@@ -107,6 +107,8 @@ class PromoCarousel extends StatelessWidget {
                     child: ScapePhoto(
                       asset: flyer.asset,
                       semanticLabel: flyer.title,
+                      // Mestre 1920×1080. Medium reduz o quadro sem borrar.
+                      filterQuality: FilterQuality.medium,
                     ),
                   ),
                 );
