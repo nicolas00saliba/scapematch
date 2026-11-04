@@ -20,7 +20,25 @@ abstract final class PartnerMessages {
   static const cancelledTab = 'Canceladas';
   static const addSession = 'Nova sessão';
   static const manageRooms = 'Gerir salas';
+  static const newRoom = 'Nova sala';
+  static const saveRoom = 'Salvar sala';
+  static const editRoom = 'Editar sala';
+  static const roomName = 'Nome';
+  static const roomDuration = 'Duração (minutos)';
+  static const roomMinimum = 'Mínimo de pessoas';
+  static const roomMaximum = 'Máximo de pessoas';
+  static const roomColor = 'Cor na agenda';
+  static const back = 'Voltar';
+  static const today = 'Hoje';
+  static const viewDay = 'Dia';
+  static const viewThreeDays = '3 dias';
+  static const viewWeek = 'Semana';
+  static const viewMonth = 'Mês';
+  static const agendaViews = 'Visão';
+  static const calendarRooms = 'Cores das salas';
   static const free = 'Livre';
+  static const noReservations = 'Nada nesta lista.';
+  static const nobodyYet = 'Ninguém entrou ainda.';
   static const openSession = 'Abrir sessão';
   static const cancelSession = 'Cancelar sessão';
   static const sessionSaved = 'Sessão aberta nesta sessão.';
@@ -44,7 +62,7 @@ abstract final class PartnerMessages {
   static const reservationsTitle = 'Reservas e grupos';
   static const roomsTitle = 'Salas, horários e preços';
   static const roomsBody =
-      'O preço e os horários novos valem nesta sessão, também no app do jogador.';
+      'Uma sala nova, o preço e os horários valem nesta sessão, também no app do jogador.';
   static const priceLabel = 'Preço por pessoa (R\$)';
   static const savePrice = 'Salvar preço';
   static const priceSaved = 'Preço atualizado nesta sessão.';

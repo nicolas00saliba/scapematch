@@ -56,6 +56,8 @@ Future<void> _flow(
 
   await tester.tap(find.text(PartnerMessages.reservations));
   await tester.pumpAndSettle();
+  await tester.tap(find.text(PartnerMessages.done));
+  await tester.pumpAndSettle();
   await _shot(
     tester,
     dir,

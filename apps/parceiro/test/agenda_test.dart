@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
@@ -61,6 +62,23 @@ void main() {
     );
     expect(saved, isNull);
     expect(database.rooms.any((item) => item.name == 'Sala da agenda'), isTrue);
+    final catalog = FakeCatalogRepository(database, latency: Duration.zero);
+    final forPlayer = await catalog.listRoomsByCity(snap.house.cityId);
+    final created = forPlayer.singleWhere(
+      (item) => item.room.name == 'Sala da agenda',
+    );
+    final slot = await partner.addSlot(
+      roomId: created.room.id,
+      startsAt: DateTime(sampleNow.year, sampleNow.month, sampleNow.day + 3, 19),
+    );
+    final slots = await catalog.listSlotsByRoom(created.room.id);
+    expect(slots.any((item) => item.id == slot.id), isTrue);
+    final again = await partner.load(SampleIds.houseCwbRuaXv);
+    expect(again.rooms.any((item) => item.name == 'Sala da agenda'), isTrue);
+    expect(
+      again.slotsByRoom[created.room.id]?.any((item) => item.id == slot.id),
+      isTrue,
+    );
   });
 
   test('agenda, reservas and salas share the same round session times', () async {
@@ -111,20 +129,113 @@ void main() {
     }
   });
 
-  testWidgets('the agenda tab shows an open and a closed session', (tester) async {
+  testWidgets('reservations keep the three lists and the agenda has day week and month', (
+    tester,
+  ) async {
     await pumpParceiro(tester);
     await tester.enterText(find.byKey(PartnerKeys.partnerEmail), partnerDemoAccount.email);
     await tester.enterText(find.byKey(PartnerKeys.partnerPassword), partnerDemoPassword);
     await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(PartnerMessages.agenda).first);
+
+    await tester.tap(find.text(PartnerMessages.reservations).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(PartnerMessages.agendaList));
-    await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.upcoming), findsWidgets);
     expect(find.text(PartnerMessages.openGroup), findsWidgets);
     await tester.tap(find.text(PartnerMessages.done));
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.closedGroup), findsWidgets);
+    await tester.tap(find.text(PartnerMessages.cancelledTab));
+    await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.cancelled), findsWidgets);
+
+    await tester.tap(find.text(PartnerMessages.agenda).first);
+    await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.agendaList), findsNothing);
+    expect(find.byKey(PartnerKeys.agendaCalendar), findsOneWidget);
+    await tester.tap(find.byKey(PartnerKeys.agendaMonthToggle));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PartnerKeys.agendaMiniCalendar), findsOneWidget);
+    expect(find.text('S'), findsWidgets);
+
+    await tester.tap(find.byKey(PartnerKeys.agendaViews));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(PartnerKeys.agendaViewWeek));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PartnerKeys.agendaCalendar), findsOneWidget);
+
+    await tester.tap(find.byKey(PartnerKeys.agendaViews));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(PartnerKeys.agendaViewMonth));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PartnerKeys.agendaMonthGrid), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the agenda fits a phone and a desktop window', (tester) async {
+    for (final size in const [Size(390, 844), Size(1440, 900)]) {
+      await pumpParceiro(tester, size: size);
+      await tester.enterText(
+        find.byKey(PartnerKeys.partnerEmail),
+        partnerDemoAccount.email,
+      );
+      await tester.enterText(
+        find.byKey(PartnerKeys.partnerPassword),
+        partnerDemoPassword,
+      );
+      await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
+      await tester.pumpAndSettle();
+      final agenda = find.text(PartnerMessages.agenda);
+      await tester.ensureVisible(agenda.first);
+      await tester.tap(agenda.first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(PartnerKeys.agendaMonthToggle));
+      await tester.pumpAndSettle();
+      expect(find.byKey(PartnerKeys.agendaMiniCalendar), findsOneWidget);
+      if (size.width >= 960) {
+        await tester.tap(find.byKey(PartnerKeys.agendaViewDay));
+      } else {
+        await tester.tap(find.byKey(PartnerKeys.agendaViews));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(PartnerKeys.agendaViewWeek));
+      }
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  });
+
+  testWidgets('the rooms tab creates a room and rejects an empty name', (
+    tester,
+  ) async {
+    await pumpParceiro(tester);
+    await tester.enterText(find.byKey(PartnerKeys.partnerEmail), partnerDemoAccount.email);
+    await tester.enterText(find.byKey(PartnerKeys.partnerPassword), partnerDemoPassword);
+    await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
+    await tester.pumpAndSettle();
+    final rooms = find.text(PartnerMessages.rooms);
+    await tester.ensureVisible(rooms.first);
+    await tester.pumpAndSettle();
+    await tester.tap(rooms.first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(PartnerKeys.agendaAddRoom));
+    await tester.tap(find.byKey(PartnerKeys.agendaAddRoom));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(PartnerKeys.agendaRoomName), 'A');
+    await tester.tap(find.byKey(PartnerKeys.agendaSaveRoom));
+    await tester.pumpAndSettle();
+    expect(find.text('Dê um nome para a sala.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(PartnerKeys.agendaRoomName), 'Sala Nova');
+    await tester.tap(find.byKey(PartnerKeys.agendaSaveRoom));
+    await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.roomSaved), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    final created = find.text('Sala Nova');
+    await tester.scrollUntilVisible(created, 400, scrollable: verticalScrollable);
+    expect(created, findsWidgets);
+    expect(find.text(PartnerMessages.addSlot), findsWidgets);
   });
 }

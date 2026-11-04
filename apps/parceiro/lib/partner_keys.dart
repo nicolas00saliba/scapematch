@@ -26,6 +26,17 @@ abstract final class PartnerKeys {
   static const agendaAdd = Key('agenda-add');
   static const agendaRooms = Key('agenda-rooms');
   static const agendaAddRoom = Key('agenda-add-room');
+  static const agendaViews = Key('agenda-views');
+  static const agendaViewDay = Key('agenda-view-day');
+  static const agendaViewThree = Key('agenda-view-three');
+  static const agendaViewWeek = Key('agenda-view-week');
+  static const agendaViewMonth = Key('agenda-view-month');
+  static const agendaMonthToggle = Key('agenda-month-toggle');
+  static const agendaMiniCalendar = Key('agenda-mini-calendar');
+  static const agendaToday = Key('agenda-today');
+  static const agendaMonthGrid = Key('agenda-month-grid');
+  static Key agendaMiniDay(int year, int month, int day) =>
+      Key('agenda-mini-$year-$month-$day');
   static const agendaSaveSession = Key('agenda-save-session');
   static const agendaSaveRoom = Key('agenda-save-room');
   static const agendaRoomName = Key('agenda-room-name');

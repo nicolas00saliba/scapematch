@@ -66,7 +66,7 @@ Future<void> _sheet(
   String suffix,
   Size size,
 ) async {
-  await tester.tap(find.text(PartnerMessages.agendaList));
+  await tester.tap(find.text(PartnerMessages.reservations).first);
   await tester.pumpAndSettle();
   await tester.tap(find.text(PartnerMessages.done));
   await tester.pumpAndSettle();
@@ -91,12 +91,8 @@ Future<void> _forms(
   Navigator.of(tester.element(find.text(PartnerMessages.openSession))).pop();
   await tester.pumpAndSettle();
 
-  await tester.tap(find.byKey(PartnerKeys.agendaRooms));
+  await tester.tap(find.text(PartnerMessages.rooms).first);
   await tester.pumpAndSettle();
-  if (find.byKey(PartnerKeys.agendaAddRoom).evaluate().isEmpty) {
-    await tester.tap(find.text(PartnerMessages.manageRooms).last);
-    await tester.pumpAndSettle();
-  }
   await tester.tap(find.byKey(PartnerKeys.agendaAddRoom));
   await tester.pumpAndSettle();
   await _shot(tester, dir, 'nova-sala-$suffix.png', size, find.byKey(PartnerKeys.agendaRoomName));
@@ -110,7 +106,7 @@ Future<void> _lists(
   String suffix,
   Size size,
 ) async {
-  await tester.tap(find.text(PartnerMessages.agendaList));
+  await tester.tap(find.text(PartnerMessages.reservations).first);
   await tester.pumpAndSettle();
   await tester.tap(find.text(PartnerMessages.upcoming));
   await tester.pumpAndSettle();
@@ -121,7 +117,7 @@ Future<void> _lists(
   await tester.tap(find.text(PartnerMessages.cancelledTab));
   await tester.pumpAndSettle();
   await _shot(tester, dir, 'lista-canceladas-$suffix.png', size, find.text(PartnerMessages.cancelledTab));
-  await tester.tap(find.text(PartnerMessages.agenda).last);
+  await tester.tap(find.text(PartnerMessages.agenda).first);
   await tester.pumpAndSettle();
 }
 
