@@ -13,7 +13,10 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
+import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
+import 'package:scapematch/features/groups/presentation/game_type_chips.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -314,8 +317,10 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
     required DateTime now,
   }) {
     final origin = _origin;
+    final gameTypeId = ref.watch(selectedGameTypeIdProvider);
+    final visibleGroups = filterGroupsByGameType(groups, gameTypeId);
     final nearby = formingWithinRadius(
-      groups: groups,
+      groups: visibleGroups,
       houses: houses,
       origin: origin,
       radiusKm: _radiusKm.toDouble(),
@@ -335,14 +340,24 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                 left: 12,
                 right: 12,
                 top: 0,
-                child: SafeArea(bottom: false, child: _top(context, cityName)),
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _GameTypeBar(),
+                      const SizedBox(height: 8),
+                      _top(context, cityName),
+                    ],
+                  ),
+                ),
               ),
               Positioned(
                 right: 10,
                 bottom: constraints.maxHeight * 0.34,
                 child: const _OsmCredit(),
               ),
-              _drawer(context, nearby, now),
+              _drawer(context, nearby, now, visibleGroups),
             ],
           );
         }
@@ -351,7 +366,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
           children: [
             SizedBox(
               width: _panelWidth,
-              child: _panel(context, nearby, now, cityName),
+              child: _panel(context, nearby, now, cityName, visibleGroups),
             ),
             VerticalDivider(
               width: 1,
@@ -362,6 +377,12 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
               child: Stack(
                 children: [
                   Positioned.fill(child: map),
+                  const Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 12,
+                    child: _GameTypeBar(),
+                  ),
                   const Positioned(right: 10, bottom: 12, child: _OsmCredit()),
                 ],
               ),
@@ -527,6 +548,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
     List<NearbyGroup> nearby,
     DateTime now,
     String cityName,
+    List<Group> visibleGroups,
   ) {
     final scheme = Theme.of(context).colorScheme;
     return Material(
@@ -550,7 +572,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                   const SizedBox(height: 10),
                   _top(context, cityName),
                   const SizedBox(height: 12),
-                  _heading(context, nearby, now),
+                  _heading(context, nearby, now, visibleGroups),
                 ],
               ),
             ),
@@ -570,12 +592,13 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
     BuildContext context,
     List<NearbyGroup> nearby,
     DateTime now,
+    List<Group> visibleGroups,
   ) {
     final cities = ref.watch(citiesProvider).asData?.value ?? const <City>[];
     final nearestId = nearestCityWithFormingGroups(
       origin: _origin,
       centers: cityCenters,
-      groups: ref.watch(nearbyCatalogProvider).asData?.value.groups ?? const [],
+      groups: visibleGroups,
       now: now,
     );
     final nearest = _cityName(cities, nearestId ?? '');
@@ -602,7 +625,12 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
     );
   }
 
-  Widget _drawer(BuildContext context, List<NearbyGroup> nearby, DateTime now) {
+  Widget _drawer(
+    BuildContext context,
+    List<NearbyGroup> nearby,
+    DateTime now,
+    List<Group> visibleGroups,
+  ) {
     final scheme = Theme.of(context).colorScheme;
     return DraggableScrollableSheet(
       initialChildSize: 0.32,
@@ -629,7 +657,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                 ),
               ),
               const SizedBox(height: 10),
-              _heading(context, nearby, now),
+              _heading(context, nearby, now, visibleGroups),
               for (final item in nearby) _row(context, item, now),
             ],
           ),
@@ -726,6 +754,27 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
 /// O lugar da casa não muda. Só o círculo anda na tela, o bastante para
 /// o ponto e a foto aparecerem juntos. Com o zoom da ficha, 250 m já
 /// separam os dois e o pino volta para o ponto.
+/// Faixa de tipos sobre o mapa. A escolha é a mesma da introdução e da Home.
+class _GameTypeBar extends StatelessWidget {
+  const _GameTypeBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      key: AppKeys.gameTypeChipBar,
+      color: scheme.surface.withValues(alpha: 0.94),
+      elevation: 3,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: GameTypeChips(scrollable: true),
+      ),
+    );
+  }
+}
+
 class _ClearOfUser extends StatelessWidget {
   const _ClearOfUser({
     required this.point,
