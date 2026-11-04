@@ -15,6 +15,7 @@ supabase db push
 4. `migrations/20261104120300_group_functions.sql` — criar, entrar, sair, excluir, fechar com menos gente, fila e falta.
 5. `migrations/20261104120400_asaas.sql` — cobranças Pix e cartão. O app não insere nelas.
 6. `migrations/20261104120500_privacy.sql` — anon sem documento, telefone e renda; bucket `room-photos` privado; falta só por `mark_absence`.
+7. `migrations/20261104130000_venue_duplicates.sql` — documento normalizado com índice único, nome com `pg_trgm`, `check_venue_duplicates`, reivindicação e a fila de aprovar, recusar ou mesclar.
 
 `seed_demo.sql` fica **fora** dessa lista. É opcional e cria a casa real ScapeMatch Demo (Curitiba, três salas, horários e duas promoções). Não é dado de exemplo do app.
 
@@ -36,6 +37,8 @@ insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000
 ## Regras que o banco segura
 
 - A casa só lê e escreve salas, fotos, horários, notícias e promoções dela. Falta não tem insert direto: entra por `mark_absence`. O gatilho `venues_guard` impede a casa de se aprovar.
+- Documento repetido (só os dígitos) não entra de novo enquanto a casa não foi recusada nem mesclada. `check_venue_duplicates` devolve o tipo do conflito e, se a casa já foi aprovada, o id e o nome público. Não devolve documento, telefone nem dados de casa pendente de outra pessoa. CEP + número, ou nome parecido na mesma cidade, não bloqueia: o cadastro segue com `possible_duplicate_of`.
+- "Esta casa é minha?" grava `venue_claims`. Anon não lê essa tabela. A pessoa vê o próprio pedido; o admin vê a fila, aprova, recusa ou mescla. Aprovar a reivindicação passa a casa aprovada para quem pediu.
 - O jogador anônimo lê cidade e o que é de casa aprovada. Em `venues`, não lê `document_number`, `phone`, `income_value`, `asaas_wallet_id`, `referred_by`, `reviewed_by`, `invite_id` nem `owner_id`. O catálogo usa a view `venues_vitrine` (o `select *` na tabela falha para o anon). Grupo, cadeira e falta não têm `insert` direto.
 - Quem está logado também não lê documento, telefone, renda, wallet nem quem indicou. O dono ou um admin lê isso em `venue_private`. A Edge Function lê a tabela com `service_role`. O logado continua vendo `owner_id`.
 - `delete_group` recusa quando falta menos de 2 horas para o início. No instante exato das 2 horas ainda exclui.

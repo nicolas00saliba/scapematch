@@ -6,11 +6,13 @@ class PartnerAccount {
     required this.email,
     required this.houseId,
     required this.houseName,
+    this.isAdmin = false,
   });
 
   final String email;
   final String houseId;
   final String houseName;
+  final bool isAdmin;
 }
 
 const partnerDemoPassword = 'demo';
@@ -25,6 +27,13 @@ const partnerDemoAccount = PartnerAccount(
   houseName: 'Mistério da Rua XV',
 );
 
+const partnerAdminAccount = PartnerAccount(
+  email: 'admin@scapematch.exemplo',
+  houseId: 'admin',
+  houseName: 'Admin',
+  isAdmin: true,
+);
+
 PartnerAccount? matchPartnerLogin(String email, String password) {
   final id = email.trim().toLowerCase();
   final quick = id == partnerQuickUser && password == partnerQuickPassword;
@@ -32,6 +41,9 @@ PartnerAccount? matchPartnerLogin(String email, String password) {
       id == partnerDemoAccount.email && password == partnerDemoPassword;
   if (quick || full) {
     return partnerDemoAccount;
+  }
+  if (id == partnerAdminAccount.email && password == partnerDemoPassword) {
+    return partnerAdminAccount;
   }
   return null;
 }

@@ -1,0 +1,29 @@
+#!/bin/bash
+# Aplica as migrations num Postgres local e roda o teste de duplicata.
+# Não fala com o projeto remoto.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+db="${PGDATABASE:-scapematch_duplicates}"
+
+run() {
+  if [[ -n "${DATABASE_URL:-}" ]]; then
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 "$@"
+  else
+    sudo -u postgres psql -d "$db" -v ON_ERROR_STOP=1 "$@"
+  fi
+}
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 \
+    -c "drop database if exists ${db} with (force);"
+  sudo -u postgres createdb "$db"
+fi
+
+run -f "$root/tests/local_harness.sql"
+for migration in "$root"/migrations/*.sql; do
+  echo "== $migration"
+  run -f "$migration"
+done
+run -f "$root/tests/venue_duplicates.sql"
+echo "duplicatas ok"

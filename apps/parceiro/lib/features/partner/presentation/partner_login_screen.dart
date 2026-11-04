@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_signup_screen.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
 
@@ -132,6 +134,30 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
             key: PartnerKeys.partnerSubmit,
             onPressed: _busy ? null : _submit,
             child: const Text('Entrar'),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            key: PartnerKeys.partnerSignup,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => const PartnerVenueSignupScreen(),
+                ),
+              );
+            },
+            child: const Text(PartnerMessages.signupVenue),
+          ),
+          TextButton(
+            key: PartnerKeys.partnerAdminDemo,
+            onPressed: () {
+              ref
+                  .read(partnerSessionProvider.notifier)
+                  .signIn(
+                    email: partnerAdminAccount.email,
+                    password: partnerDemoPassword,
+                  );
+            },
+            child: const Text(PartnerMessages.adminQueue),
           ),
         ],
       ),
