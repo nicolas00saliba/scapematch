@@ -5,7 +5,7 @@
 - **Data:** 2026-11-04
 - **Decisão:** ao entrar num grupo aberto, a pessoa escolhe “eu sozinho” ou “eu + turma/amigos”. As vagas saem de uma vez. Se não couber a turma inteira, ninguém senta. Quem entra com amigos já senta com `payment_status` pendente e paga a própria parte no fluxo que já existe (`payShare` / `create-charge`). O líder não paga pelas outras cadeiras. Criar grupo com a turma dentro deixa ao menos uma vaga aberta para quem não é da turma. Avisos ficam só no app, sem push e sem e-mail.
 - **Motivo:** o pagamento já é por cadeira e por pessoa. Cobrar várias partes na carteira do líder abriria outro caminho de cobrança e de reembolso quando alguém sai. A demo de sexta precisa do gesto, e o banco precisa impedir estourar vaga.
-- **Onde está no código:** `joinParty` no repositório em memória, a folha “Entrar com a turma” e a migração `20261104120600_friends_crews.sql` (`join_group_with_party`, `create_group_with_party`). A migração não foi aplicada no Supabase.
+- **Onde está no código:** `joinParty` no repositório em memória, a folha “Entrar com a turma” e a migração `20261104120700_friends_crews.sql` (`join_group_with_party`, `create_group_with_party`). A migração não foi aplicada no Supabase.
 - **Como trocar depois:** se o líder passar a pagar por todos, a função deixa de gravar `pending` nos companheiros e cria as cobranças na conta dele. A trava de vagas continua a mesma.
 
 ## O Parceiro é um app à parte

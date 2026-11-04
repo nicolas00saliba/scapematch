@@ -132,8 +132,11 @@ Future<void> _filter(WidgetTester tester) async {
   await tester.pumpAndSettle();
   final chip = find.byKey(AppKeys.crewVacancyFilter);
   await tester.ensureVisible(chip);
-  await tester.tap(chip);
-  await tester.pumpAndSettle();
+  final selected = tester.widget<FilterChip>(chip).selected;
+  if (!selected) {
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+  }
 }
 
 Future<void> _openParty(WidgetTester tester) async {
@@ -178,9 +181,23 @@ Future<void> _popToShell(WidgetTester tester) async {
 const sampleLuna = 'user-luna';
 
 Future<void> _loadFonts() async {
-  const dir = '/opt/flutter/bin/cache/artifacts/material_fonts';
-  if (!File('$dir/Roboto-Regular.ttf').existsSync()) {
-    return;
+  final poppins = await rootBundle.load('assets/fonts/Poppins-Medium.ttf');
+  final brand = FontLoader('Poppins')..addFont(Future.value(poppins));
+  await brand.load();
+
+  const dirs = [
+    '/home/ubuntu/sdk/flutter/bin/cache/artifacts/material_fonts',
+    '/home/ubuntu/flutter/bin/cache/artifacts/material_fonts',
+    '/opt/flutter/bin/cache/artifacts/material_fonts',
+  ];
+  final dir = dirs.cast<String?>().firstWhere(
+    (path) => File('$path/Roboto-Regular.ttf').existsSync(),
+    orElse: () => null,
+  );
+  if (dir == null) {
+    throw StateError(
+      'Roboto não encontrado. Sem a fonte real o print sai em Ahem.',
+    );
   }
   Future<ByteData> bytes(String name) async {
     final data = File('$dir/$name').readAsBytesSync();
@@ -191,7 +208,8 @@ Future<void> _loadFonts() async {
     ..addFont(bytes('Roboto-Regular.ttf'))
     ..addFont(bytes('Roboto-Medium.ttf'))
     ..addFont(bytes('Roboto-Bold.ttf'))
-    ..addFont(bytes('Roboto-Black.ttf'));
+    ..addFont(bytes('Roboto-Black.ttf'))
+    ..addFont(bytes('Roboto-Light.ttf'));
   final icons = FontLoader('MaterialIcons')
     ..addFont(bytes('MaterialIcons-Regular.otf'));
   await roboto.load();
@@ -210,32 +228,66 @@ Future<void> _capture(
   Directory dir,
   String name,
 ) async {
+  expect(anchor, findsWidgets, reason: name);
   await tester.ensureVisible(anchor);
   await tester.pumpAndSettle();
-  final boundary = _boundaryOf(tester.element(anchor));
-  final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 1));
-  if (image == null) {
-    return;
-  }
-  final bytes = await tester.runAsync(
-    () => image.toByteData(format: ui.ImageByteFormat.png),
+  final view = tester.binding.renderViews.first;
+  // ignore: invalid_use_of_protected_member
+  final layer = view.layer;
+  expect(layer, isA<OffsetLayer>(), reason: name);
+  final image = await tester.runAsync(
+    () =>
+        (layer! as OffsetLayer).toImage(Offset.zero & view.size, pixelRatio: 1),
   );
-  if (bytes == null) {
-    return;
-  }
-  File('${dir.path}/$name.png').writeAsBytesSync(bytes.buffer.asUint8List());
+  expect(image, isNotNull, reason: name);
+  await tester.runAsync(() => _expectReadable(image!, name));
+  final bytes = await tester.runAsync(
+    () => image!.toByteData(format: ui.ImageByteFormat.png),
+  );
+  expect(bytes, isNotNull, reason: name);
+  File('${dir.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+  image!.dispose();
 }
 
-RenderRepaintBoundary _boundaryOf(Element element) {
-  RenderRepaintBoundary? found;
-  element.visitAncestorElements((ancestor) {
-    final render = ancestor.renderObject;
-    if (render is RenderRepaintBoundary && render.size.height > 200) {
-      found = render;
-      return false;
+/// Ahem pinta cada letra como um retângulo sólido. Texto de verdade tem
+/// traço fino: a maior parte dos pixels escuros encosta no fundo.
+Future<void> _expectReadable(ui.Image image, String name) async {
+  final raw = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  expect(raw, isNotNull, reason: name);
+  final data = raw!.buffer.asUint8List();
+  final width = image.width;
+  final height = image.height;
+  var dark = 0;
+  var edge = 0;
+  bool isDark(int x, int y) {
+    final i = (y * width + x) * 4;
+    return data[i] < 55 && data[i + 1] < 80 && data[i + 2] < 80;
+  }
+
+  for (var y = 1; y < height - 1; y++) {
+    for (var x = 1; x < width - 1; x++) {
+      if (!isDark(x, y)) {
+        continue;
+      }
+      dark++;
+      final boxed =
+          isDark(x - 1, y) &&
+          isDark(x + 1, y) &&
+          isDark(x, y - 1) &&
+          isDark(x, y + 1);
+      if (!boxed) {
+        edge++;
+      }
     }
-    return true;
-  });
-  expect(found, isNotNull);
-  return found!;
+  }
+  expect(dark, greaterThan(400), reason: '$name não tem texto');
+  // Fotos e o fundo do modal são blocos escuros de verdade. O Ahem só
+  // aparece quando a tela é quase só texto e mesmo assim o traço some.
+  if (name.startsWith('amigos-lista')) {
+    expect(
+      edge / dark,
+      greaterThan(0.42),
+      reason: '$name ainda está com a fonte Ahem',
+    );
+  }
 }

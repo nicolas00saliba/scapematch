@@ -1,4 +1,5 @@
 -- Amigos, turmas e entrada em grupo com várias vagas.
+-- Aplica depois de 20261104120500_privacy.sql. Não lê tabela de nota fiscal.
 -- Não aplicar no projeto remoto até a revisão. O app de exemplo continua
 -- em memória; estas funções são a troca.
 --

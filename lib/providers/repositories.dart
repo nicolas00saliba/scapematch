@@ -64,7 +64,7 @@ final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
 
 /// Amigos e turmas em memória. Para o Supabase, troque a classe por
 /// `SupabaseSocialRepository` e as funções da migração
-/// `20261104120600_friends_crews.sql`. O app não chama o banco sozinho.
+/// `20261104120700_friends_crews.sql`. O app não chama o banco sozinho.
 final socialRepositoryProvider = Provider<SocialRepository>((ref) {
   return MemorySocialRepository(
     board: ref.watch(communityBoardProvider),
