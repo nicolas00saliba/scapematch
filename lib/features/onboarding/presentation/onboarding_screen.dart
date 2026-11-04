@@ -142,7 +142,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               return _PageBody(page: _pages[index]);
             },
           ),
-          if (_index > 0) _introBack(),
           Positioned(
             left: 0,
             right: 0,
@@ -151,48 +150,49 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: Row(
-                  children: [
-                    TextButton(
-                      key: AppKeys.onboardingSkip,
-                      onPressed: _finish,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
+                child: _IntroFooter(
+                  height: 48,
+                  page: _index,
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        key: AppKeys.onboardingSkip,
+                        onPressed: _finish,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text(OnboardingMessages.skip),
                       ),
-                      child: const Text(OnboardingMessages.skip),
+                      if (_index > 0)
+                        _IntroBackLink(
+                          onPressed: _back,
+                          foreground: Colors.white,
+                          minHeight: 48,
+                        ),
+                    ],
+                  ),
+                  dots: _dots(),
+                  trailing: FilledButton(
+                    key: _last
+                        ? AppKeys.onboardingStart
+                        : AppKeys.onboardingNext,
+                    onPressed: _next,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(132, 48),
                     ),
-                    const Spacer(),
-                    _dots(),
-                    const Spacer(),
-                    FilledButton(
-                      key: _last
-                          ? AppKeys.onboardingStart
-                          : AppKeys.onboardingNext,
-                      onPressed: _next,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(132, 48),
-                      ),
-                      child: Text(
-                        _last
-                            ? OnboardingMessages.start
-                            : OnboardingMessages.next,
-                      ),
+                    child: Text(
+                      _last
+                          ? OnboardingMessages.start
+                          : OnboardingMessages.next,
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _introBack() {
-    return Positioned(
-      left: 16,
-      top: 8,
-      child: SafeArea(bottom: false, child: _IntroBackButton(onPressed: _back)),
     );
   }
 
@@ -263,7 +263,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   );
                 },
               ),
-              if (_index > 0) _introBack(),
               Positioned(
                 right: 0,
                 bottom: 0,
@@ -296,32 +295,41 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(gutter, 28, gutter, 24),
-        child: Row(
-          children: [
-            TextButton(
-              key: AppKeys.onboardingSkip,
-              onPressed: _finish,
-              style: TextButton.styleFrom(
-                foregroundColor: scheme.onSurface,
-                minimumSize: const Size(64, 52),
+        child: _IntroFooter(
+          height: 52,
+          page: _index,
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                key: AppKeys.onboardingSkip,
+                onPressed: _finish,
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onSurface,
+                  minimumSize: const Size(64, 52),
+                ),
+                child: const Text(OnboardingMessages.skip),
               ),
-              child: const Text(OnboardingMessages.skip),
+              if (_index > 0)
+                _IntroBackLink(
+                  onPressed: _back,
+                  foreground: scheme.onSurface,
+                  minHeight: 52,
+                ),
+            ],
+          ),
+          dots: _dots(
+            active: scheme.primary,
+            inactive: scheme.primary.withValues(alpha: 0.35),
+          ),
+          trailing: FilledButton(
+            key: _last ? AppKeys.onboardingStart : AppKeys.onboardingNext,
+            onPressed: _next,
+            style: FilledButton.styleFrom(minimumSize: const Size(148, 52)),
+            child: Text(
+              _last ? OnboardingMessages.start : OnboardingMessages.next,
             ),
-            const Spacer(),
-            _dots(
-              active: scheme.primary,
-              inactive: scheme.primary.withValues(alpha: 0.35),
-            ),
-            const Spacer(),
-            FilledButton(
-              key: _last ? AppKeys.onboardingStart : AppKeys.onboardingNext,
-              onPressed: _next,
-              style: FilledButton.styleFrom(minimumSize: const Size(148, 52)),
-              child: Text(
-                _last ? OnboardingMessages.start : OnboardingMessages.next,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -560,39 +568,125 @@ Size fitOnboardingPhoto({
   return Size(width, height);
 }
 
-/// Seta da introdução. Some na primeira página.
-class _IntroBackButton extends StatelessWidget {
-  const _IntroBackButton({required this.onPressed});
+/// Pular e Voltar à esquerda, pontos no vão e Próximo à direita.
+/// Se a tela é estreita, o par da esquerda encolhe. Pontos e Próximo ficam.
+class _IntroFooter extends StatelessWidget {
+  const _IntroFooter({
+    required this.height,
+    required this.page,
+    required this.leading,
+    required this.dots,
+    required this.trailing,
+  });
 
-  final VoidCallback onPressed;
+  final double height;
+  final int page;
+  final Widget leading;
+  final Widget dots;
+  final Widget trailing;
 
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF1A1A1A);
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x4D000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+    return CustomMultiChildLayout(
+      delegate: _IntroFooterDelegate(height, page),
+      children: [
+        LayoutId(
+          id: _IntroSlot.leading,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: leading,
           ),
-        ],
-      ),
-      child: IconButton(
-        key: AppKeys.onboardingBack,
-        tooltip: OnboardingMessages.back,
-        onPressed: onPressed,
-        icon: const Icon(Icons.arrow_back),
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.white.withValues(alpha: 0.92),
-          foregroundColor: ink,
-          fixedSize: const Size(44, 44),
-          minimumSize: const Size(44, 44),
-          padding: EdgeInsets.zero,
-          shape: const CircleBorder(),
         ),
+        LayoutId(id: _IntroSlot.dots, child: dots),
+        LayoutId(id: _IntroSlot.trailing, child: trailing),
+      ],
+    );
+  }
+}
+
+enum _IntroSlot { leading, dots, trailing }
+
+class _IntroFooterDelegate extends MultiChildLayoutDelegate {
+  _IntroFooterDelegate(this.height, this.page);
+
+  final double height;
+  final int page;
+
+  @override
+  Size getSize(BoxConstraints constraints) {
+    final width = constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
+    return Size(width, height);
+  }
+
+  @override
+  void performLayout(Size size) {
+    final loose = BoxConstraints(maxHeight: size.height);
+    final trailing = layoutChild(_IntroSlot.trailing, loose);
+    final dots = layoutChild(_IntroSlot.dots, loose);
+    final leadingMax = math.max(0.0, size.width - trailing.width - dots.width);
+    final leading = layoutChild(
+      _IntroSlot.leading,
+      BoxConstraints(maxWidth: leadingMax, maxHeight: size.height),
+    );
+    final spare = math.max(
+      0.0,
+      size.width - leading.width - dots.width - trailing.width,
+    );
+    positionChild(
+      _IntroSlot.leading,
+      Offset(0, _y(size.height, leading.height)),
+    );
+    positionChild(
+      _IntroSlot.dots,
+      Offset(leading.width + spare / 2, _y(size.height, dots.height)),
+    );
+    positionChild(
+      _IntroSlot.trailing,
+      Offset(size.width - trailing.width, _y(size.height, trailing.height)),
+    );
+  }
+
+  double _y(double total, double child) => math.max(0, (total - child) / 2);
+
+  @override
+  bool shouldRelayout(covariant _IntroFooterDelegate oldDelegate) {
+    return oldDelegate.height != height || oldDelegate.page != page;
+  }
+}
+
+/// “← Voltar” na barra de baixo, ao lado de Pular. Só a partir da segunda tela.
+class _IntroBackLink extends StatelessWidget {
+  const _IntroBackLink({
+    required this.onPressed,
+    required this.foreground,
+    required this.minHeight,
+  });
+
+  final VoidCallback onPressed;
+  final Color foreground;
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      key: AppKeys.onboardingBack,
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: foreground,
+        minimumSize: Size(0, minHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ExcludeSemantics(
+            child: Text('←', style: TextStyle(fontSize: 13, height: 1)),
+          ),
+          SizedBox(width: 4),
+          Text(OnboardingMessages.back),
+        ],
       ),
     );
   }

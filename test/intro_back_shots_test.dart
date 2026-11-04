@@ -7,13 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('saves the first intro pages with the back arrow', (
-    tester,
-  ) async {
+  testWidgets('saves intro screen 2 with Voltar beside Pular', (tester) async {
     if (Platform.environment['SCAPEMATCH_INTRO_BACK_SHOTS'] != '1') {
       return;
     }
@@ -28,6 +27,10 @@ void main() {
     await tester.tap(find.byKey(AppKeys.onboardingNext));
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.onboardingBack), findsOneWidget);
+    expect(find.text(OnboardingMessages.back), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    final wideBack = tester.getRect(find.byKey(AppKeys.onboardingBack));
+    expect(wideBack.top, greaterThan(wide.height * 0.7));
     await _waitForPhotos(tester);
     await _shot(tester, dir, 'intro-1440-tela2-voltar.png', wide);
 
@@ -36,6 +39,10 @@ void main() {
     await tester.tap(find.byKey(AppKeys.onboardingNext));
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.onboardingBack), findsOneWidget);
+    expect(find.text(OnboardingMessages.back), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    final phoneBack = tester.getRect(find.byKey(AppKeys.onboardingBack));
+    expect(phoneBack.top, greaterThan(phone.height * 0.7));
     await _waitForPhotos(tester);
     await _shot(tester, dir, 'intro-390-tela2-voltar.png', phone);
   });
