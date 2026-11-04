@@ -1,6 +1,7 @@
 -- Privacidade e o que o advisor já tinha apontado.
--- O anon não lê documento, telefone nem renda. Foto de casa pendente
--- não abre por URL pública. Falta só entra por mark_absence.
+-- Anon e authenticated não leem documento, telefone nem renda.
+-- Wallet e indicação saem só em venue_private (dono ou admin) ou service_role.
+-- Foto de casa pendente não abre por URL pública. Falta só entra por mark_absence.
 -- Gatilhos e sessions_overlap repetem o que já foi aplicado no banco.
 
 revoke all on function public.handle_new_user() from public, anon, authenticated;
@@ -11,7 +12,26 @@ alter function public.sessions_overlap(timestamptz, integer, timestamptz, intege
   set search_path = public;
 
 -- Coluna a coluna: um revoke só na coluna não tira o grant da tabela.
-revoke select on table public.venues from anon;
+-- service_role fica com o select da tabela. A Edge Function lê por aí.
+revoke select on table public.venues from anon, authenticated;
+
+grant select (
+  id,
+  city_id,
+  name,
+  neighborhood,
+  street_address,
+  address_number,
+  postal_code,
+  latitude,
+  longitude,
+  document_kind,
+  category,
+  badge,
+  status,
+  reviewed_at,
+  created_at
+) on table public.venues to anon;
 
 grant select (
   id,
@@ -24,17 +44,15 @@ grant select (
   postal_code,
   latitude,
   longitude,
-  asaas_wallet_id,
   document_kind,
   category,
   badge,
   invite_id,
-  referred_by,
   status,
   reviewed_by,
   reviewed_at,
   created_at
-) on table public.venues to anon;
+) on table public.venues to authenticated;
 
 -- Vitrine para o select *. O anon não consegue select * na tabela.
 create or replace view public.venues_vitrine
@@ -57,10 +75,6 @@ from public.venues;
 
 revoke all on table public.venues_vitrine from public, anon, authenticated;
 grant select on table public.venues_vitrine to anon, authenticated, service_role;
-
--- O authenticated continua lendo documento, telefone e renda nas linhas
--- que o RLS já entrega (a própria casa, casa aprovada, ou todas se for admin).
--- A Edge Function lê a tabela com service_role.
 
 create or replace function public.is_admin()
 returns boolean
@@ -127,26 +141,41 @@ as $$
   );
 $$;
 
--- Dono do arquivo. `name` dentro de um EXISTS em venues amarra em
--- venues.name, não no caminho do storage. A política passa o caminho
--- por argumento, como room_photo_object_allowed.
-create or replace function public.room_photo_object_owned(object_name text)
-returns boolean
-language sql
+-- Documento, telefone, renda, wallet e quem indicou. Só o dono ou um admin.
+create or replace function public.venue_private(p_venue_id uuid)
+returns table (
+  document_number text,
+  phone text,
+  income_value numeric,
+  asaas_wallet_id text,
+  referred_by uuid
+)
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
-  select exists (
-    select 1
+begin
+  if (select auth.uid()) is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  if not (public.owns_venue(p_venue_id) or public.is_admin()) then
+    raise exception 'not owner' using errcode = '42501';
+  end if;
+  return query
+    select
+      v.document_number,
+      v.phone,
+      v.income_value,
+      v.asaas_wallet_id,
+      v.referred_by
     from public.venues v
-    where v.id::text = split_part(object_name, '/', 1)
-      and v.owner_id = (select auth.uid())
-  );
+    where v.id = p_venue_id;
+end;
 $$;
 
-revoke all on function public.room_photo_object_owned(text) from public, anon, authenticated;
-grant execute on function public.room_photo_object_owned(text) to authenticated, service_role;
+revoke all on function public.venue_private(uuid) from public, anon, authenticated;
+grant execute on function public.venue_private(uuid) to authenticated, service_role;
 
 update storage.buckets
 set public = false
@@ -157,7 +186,11 @@ create policy room_photos_storage_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'room-photos'
-    and public.room_photo_object_owned(name)
+    and exists (
+      select 1 from public.venues v
+      where v.id::text = split_part(name, '/', 1)
+        and v.owner_id = (select auth.uid())
+    )
   );
 
 drop policy if exists room_photos_storage_update on storage.objects;
@@ -165,11 +198,19 @@ create policy room_photos_storage_update on storage.objects
   for update to authenticated
   using (
     bucket_id = 'room-photos'
-    and public.room_photo_object_owned(name)
+    and exists (
+      select 1 from public.venues v
+      where v.id::text = split_part(name, '/', 1)
+        and v.owner_id = (select auth.uid())
+    )
   )
   with check (
     bucket_id = 'room-photos'
-    and public.room_photo_object_owned(name)
+    and exists (
+      select 1 from public.venues v
+      where v.id::text = split_part(name, '/', 1)
+        and v.owner_id = (select auth.uid())
+    )
   );
 
 drop policy if exists room_photos_storage_delete on storage.objects;
@@ -177,7 +218,11 @@ create policy room_photos_storage_delete on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'room-photos'
-    and public.room_photo_object_owned(name)
+    and exists (
+      select 1 from public.venues v
+      where v.id::text = split_part(name, '/', 1)
+        and v.owner_id = (select auth.uid())
+    )
   );
 
 -- A leitura continua em room_photo_object_allowed: casa aprovada, dono ou admin.
@@ -202,9 +247,16 @@ create policy admins_select_self on public.admins
   for select to authenticated
   using (user_id = (select auth.uid()));
 
+-- A expressão roda com o privilégio de quem consulta. O anon não tem
+-- select em owner_id. Sem usuário, auth.uid() é nulo e is_admin() é
+-- falso, então o resultado do anon continua sendo só status = 'approved'.
 drop policy if exists venues_select on public.venues;
+create policy venues_select_anon on public.venues
+  for select to anon
+  using (status = 'approved');
+
 create policy venues_select on public.venues
-  for select to anon, authenticated
+  for select to authenticated
   using (
     status = 'approved'
     or owner_id = (select auth.uid())

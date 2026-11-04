@@ -31,13 +31,13 @@ insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000
 ```
 
 4. No Parceiro, entre com essa conta. A fila **Aprovar casas** lista as venues `pending`. Aprovar grava `approved`. Só então o jogador vê a casa, as salas e as notícias.
-5. Storage: o bucket `room-photos` é privado. Não há URL pública. O caminho é `{venue_id}/{room_id}/{arquivo}`. O app pede uma signed URL (`createSignedUrl`). A leitura passa por `room_photo_object_allowed`: casa aprovada, o dono ou um admin. Foto de casa pendente não abre para anônimo. Quem envia, troca e apaga é o dono (`room_photo_object_owned`). Não coloque documento privado nesse bucket.
+5. Storage: o bucket `room-photos` é privado. Não há URL pública. O caminho é `{venue_id}/{room_id}/{arquivo}`. O app pede uma signed URL (`createSignedUrl`). A leitura passa por `room_photo_object_allowed`: casa aprovada, o dono ou um admin. Foto de casa pendente não abre para anônimo. Quem envia, troca e apaga é o dono da casa. Não coloque documento privado nesse bucket.
 
 ## Regras que o banco segura
 
 - A casa só lê e escreve salas, fotos, horários, notícias e promoções dela. Falta não tem insert direto: entra por `mark_absence`. O gatilho `venues_guard` impede a casa de se aprovar.
-- O jogador anônimo lê cidade e o que é de casa aprovada. Em `venues`, não lê `document_number`, `phone` nem `income_value`. O catálogo usa a view `venues_vitrine` (o `select *` na tabela falha para o anon). Grupo, cadeira e falta não têm `insert` direto.
-- Quem está logado ainda lê documento, telefone e renda nas casas que o RLS entrega, inclusive nas aprovadas. A Edge Function lê esses campos com `service_role`.
+- O jogador anônimo lê cidade e o que é de casa aprovada. Em `venues`, não lê `document_number`, `phone`, `income_value`, `asaas_wallet_id`, `referred_by`, `reviewed_by`, `invite_id` nem `owner_id`. O catálogo usa a view `venues_vitrine` (o `select *` na tabela falha para o anon). Grupo, cadeira e falta não têm `insert` direto.
+- Quem está logado também não lê documento, telefone, renda, wallet nem quem indicou. O dono ou um admin lê isso em `venue_private`. A Edge Function lê a tabela com `service_role`. O logado continua vendo `owner_id`.
 - `delete_group` recusa quando falta menos de 2 horas para o início. No instante exato das 2 horas ainda exclui.
 - `close_group_with_fewer` só fecha se N ≥ mínimo da sala e N < tamanho planejado.
 - O Pix é cobrado na hora (`billingType PIX`) e estornado se o grupo não fechar. O cartão nasce com `authorizeOnly` e só é capturado quando o grupo fecha; se não fechar, a reserva é estornada.
