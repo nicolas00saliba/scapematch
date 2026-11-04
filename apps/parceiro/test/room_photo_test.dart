@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -99,6 +100,32 @@ void main() {
     expect(room.pictures.single.bytesFor(RoomFrame.hero), isNotNull);
   });
 
+  testWidgets('a real portrait stays visible inside the card frame', (tester) async {
+    final source = File(
+      '../../assets/images/rooms/gallery/egito.jpg',
+    ).readAsBytesSync();
+    final image = (await tester.runAsync(() => decodePhoto(source)))!;
+    final png = (await tester.runAsync(
+      () => renderRoomFrame(
+        source: image,
+        frame: RoomFrame.card,
+        placement: const FramePlacement(),
+      ),
+    ))!;
+    final fitted = (await tester.runAsync(() => decodePhoto(png)))!;
+    final raw = (await tester.runAsync(() => fitted.toByteData()))!;
+    final pixels = raw.buffer.asUint8List();
+    final colors = <int>{};
+    for (var i = 0; i < pixels.length; i += 16) {
+      colors.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2]);
+    }
+    expect(fitted.width, RoomFrame.card.width);
+    expect(fitted.height, RoomFrame.card.height);
+    expect(colors.length, greaterThan(40));
+    image.dispose();
+    fitted.dispose();
+  });
+
   testWidgets('the room form edits the story and expands a photo', (tester) async {
     final portrait = (await tester.runAsync(_portrait))!;
     await pumpParceiro(
@@ -138,8 +165,14 @@ void main() {
 
     await _reveal(tester, find.byKey(PartnerKeys.roomExpand));
     await tester.tap(find.byKey(PartnerKeys.roomExpand));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      if (find.byKey(PartnerKeys.roomSimulated).evaluate().isNotEmpty) {
+        break;
+      }
+    }
     expect(find.byKey(PartnerKeys.roomSimulated), findsOneWidget);
   });
 }

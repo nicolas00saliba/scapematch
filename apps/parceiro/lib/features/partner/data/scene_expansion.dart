@@ -8,12 +8,15 @@ import 'package:scapematch/core/imaging/room_framer.dart';
 import 'package:scapematch/features/catalog/domain/room_frame.dart';
 
 /// Porta da expansão de cenário. A tela pede o preenchimento das faixas;
-/// quem pinta é um provedor. Sem chave, vale a simulação.
+/// quem pinta é um provedor.
 ///
-/// O provedor real recomendado é o outpaint da Stability AI:
-/// `POST https://api.stability.ai/v2beta/stable-image/edit/outpaint`.
-/// A chave vem de `SCAPEMATCH_SCENE_API_KEY` (dart-define) ou do campo
-/// desta sessão. Nenhuma chave fica no código.
+/// Sem [sceneServiceUrl], vale a simulação neste aparelho. O provedor real
+/// não recebe chave aqui: o Parceiro é um site público, e a chave ficaria
+/// no navegador. Quem chama a Stability é um serviço no servidor
+/// (por exemplo uma função do Supabase) apontado por `SCAPEMATCH_SCENE_URL`.
+/// Esse serviço guarda `STABILITY_API_KEY` e faz
+/// `POST https://api.stability.ai/v2beta/stable-image/edit/outpaint`
+/// com a imagem e as faixas `left`, `right`, `up` e `down`.
 abstract class SceneExpansionProvider {
   String get id;
   bool get isSimulation;
@@ -42,22 +45,18 @@ class SimulatedSceneExpansion implements SceneExpansionProvider {
   }
 }
 
-class StabilitySceneExpansion implements SceneExpansionProvider {
-  StabilitySceneExpansion({
-    required this.apiKey,
-    this.endpoint = defaultEndpoint,
+/// Chama o serviço de expansão. A URL não é segredo; a chave fica lá.
+class RemoteSceneExpansion implements SceneExpansionProvider {
+  RemoteSceneExpansion({
+    required this.endpoint,
     http.Client? client,
   }) : _client = client ?? http.Client();
 
-  static const defaultEndpoint =
-      'https://api.stability.ai/v2beta/stable-image/edit/outpaint';
-
-  final String apiKey;
   final String endpoint;
   final http.Client _client;
 
   @override
-  String get id => 'stability';
+  String get id => 'remote';
 
   @override
   bool get isSimulation => false;
@@ -92,13 +91,11 @@ class StabilitySceneExpansion implements SceneExpansionProvider {
       height: contentH,
     );
     final request = http.MultipartRequest('POST', Uri.parse(endpoint))
-      ..headers['authorization'] = 'Bearer $apiKey'
       ..headers['accept'] = 'image/*'
       ..fields['left'] = '$left'
       ..fields['right'] = '$right'
       ..fields['up'] = '$top'
       ..fields['down'] = '$bottom'
-      ..fields['output_format'] = 'png'
       ..files.add(
         http.MultipartFile.fromBytes('image', content, filename: 'sala.png'),
       );
@@ -123,21 +120,12 @@ class SceneExpansionException implements Exception {
   String toString() => message;
 }
 
-class SceneApiKey extends Notifier<String> {
-  @override
-  String build() => const String.fromEnvironment('SCAPEMATCH_SCENE_API_KEY');
-
-  void setKey(String value) => state = value.trim();
-}
-
-final sceneApiKeyProvider = NotifierProvider<SceneApiKey, String>(
-  SceneApiKey.new,
-);
+/// Endereço do serviço que guarda a chave. Vazio enquanto a simulação vale.
+const sceneServiceUrl = String.fromEnvironment('SCAPEMATCH_SCENE_URL');
 
 final sceneExpansionProvider = Provider<SceneExpansionProvider>((ref) {
-  final key = ref.watch(sceneApiKeyProvider);
-  if (key.isEmpty) {
+  if (sceneServiceUrl.isEmpty) {
     return const SimulatedSceneExpansion();
   }
-  return StabilitySceneExpansion(apiKey: key);
+  return RemoteSceneExpansion(endpoint: sceneServiceUrl);
 });

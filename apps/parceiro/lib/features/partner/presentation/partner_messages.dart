@@ -44,9 +44,6 @@ abstract final class PartnerMessages {
   static const roomExpand = 'Expandir cenário com IA';
   static const roomSimulated = 'Simulação';
   static const roomZoom = 'Zoom';
-  static const roomApiKey = 'Chave da API de expansão (opcional)';
-  static const roomApiHelp =
-      'Sem chave, a expansão é uma simulação nesta sessão. A chave não fica no código.';
   static const roomFrames = 'Molduras';
   static const roomPhotoUnread = 'Não foi possível ler essa foto.';
   static const back = 'Voltar';

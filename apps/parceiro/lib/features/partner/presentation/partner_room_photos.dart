@@ -28,14 +28,37 @@ class RoomPhotoDraft {
     for (final frame in RoomFrame.values) frame: const FramePlacement(),
   };
   final expanded = <RoomFrame, Uint8List>{};
+  final expandedImage = <RoomFrame, ui.Image>{};
   final simulated = <RoomFrame>{};
 
-  void dispose() => image.dispose();
+  void dispose() {
+    image.dispose();
+    for (final frame in expandedImage.values) {
+      frame.dispose();
+    }
+  }
 
   void place(RoomFrame frame, FramePlacement placement) {
     placements[frame] = placement;
     expanded.remove(frame);
+    expandedImage.remove(frame)?.dispose();
     simulated.remove(frame);
+  }
+
+  void rememberExpansion(
+    RoomFrame frame,
+    Uint8List bytes,
+    ui.Image painted, {
+    required bool simulatedFill,
+  }) {
+    expanded[frame] = bytes;
+    expandedImage.remove(frame)?.dispose();
+    expandedImage[frame] = painted;
+    if (simulatedFill) {
+      simulated.add(frame);
+    } else {
+      simulated.remove(frame);
+    }
   }
 
   Future<RoomPicture> toPicture() async {
@@ -63,9 +86,6 @@ class RoomPhotoStudio extends StatelessWidget {
     required this.selected,
     required this.frame,
     required this.expanding,
-    required this.simulatedProvider,
-    required this.apiKey,
-    required this.onApiKey,
     required this.onAdd,
     required this.onSelect,
     required this.onFrame,
@@ -81,9 +101,6 @@ class RoomPhotoStudio extends StatelessWidget {
   final int? selected;
   final RoomFrame frame;
   final bool expanding;
-  final bool simulatedProvider;
-  final TextEditingController apiKey;
-  final ValueChanged<String> onApiKey;
   final VoidCallback onAdd;
   final ValueChanged<int> onSelect;
   final ValueChanged<RoomFrame> onFrame;
@@ -99,8 +116,6 @@ class RoomPhotoStudio extends StatelessWidget {
     final theme = Theme.of(context);
     final draft = selected == null ? null : photos[selected!];
     final placement = draft?.placements[frame] ?? const FramePlacement();
-    final expandedBytes = draft?.expanded[frame];
-    final showSimulation = draft?.simulated.contains(frame) ?? false;
     final needsFill = draft == null
         ? false
         : frameNeedsExpansion(
@@ -225,15 +240,24 @@ class RoomPhotoStudio extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          _FramePreview(
-            draft: draft,
-            frame: frame,
-            placement: placement,
-            expandedBytes: expandedBytes,
-            simulated: showSimulation,
-            onPlace: (next) => onPlace(frame, next),
-          ),
-          const SizedBox(height: 8),
+          for (final item in RoomFrame.values) ...[
+            Text(
+              '${item.labelPt} · ${item.width}×${item.height}',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            _FramePreview(
+              draft: draft,
+              frame: item,
+              placement: draft.placements[item] ?? const FramePlacement(),
+              expandedImage: draft.expandedImage[item],
+              simulated: draft.simulated.contains(item),
+              selected: item == frame,
+              onTap: () => onFrame(item),
+              onPlace: (next) => onPlace(item, next),
+            ),
+            const SizedBox(height: 8),
+          ],
           Text(PartnerMessages.roomZoom),
           Slider(
             min: minScale.toDouble(),
@@ -254,19 +278,6 @@ class RoomPhotoStudio extends StatelessWidget {
                   : const Icon(Icons.auto_fix_high),
               label: const Text(PartnerMessages.roomExpand),
             ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: apiKey,
-            obscureText: true,
-            onChanged: onApiKey,
-            decoration: InputDecoration(
-              labelText: PartnerMessages.roomApiKey,
-              helperText: simulatedProvider
-                  ? PartnerMessages.roomApiHelp
-                  : 'A expansão desta sessão usa a chave informada.',
-              border: const OutlineInputBorder(),
-            ),
-          ),
         ],
         if (error != null) ...[
           const SizedBox(height: 8),
@@ -307,16 +318,20 @@ class _FramePreview extends StatelessWidget {
     required this.draft,
     required this.frame,
     required this.placement,
-    required this.expandedBytes,
+    required this.expandedImage,
     required this.simulated,
+    required this.selected,
+    required this.onTap,
     required this.onPlace,
   });
 
   final RoomPhotoDraft draft;
   final RoomFrame frame;
   final FramePlacement placement;
-  final Uint8List? expandedBytes;
+  final ui.Image? expandedImage;
   final bool simulated;
+  final bool selected;
+  final VoidCallback onTap;
   final ValueChanged<FramePlacement> onPlace;
 
   @override
@@ -326,8 +341,9 @@ class _FramePreview extends StatelessWidget {
       builder: (context, constraints) {
         var width = constraints.maxWidth;
         var height = width / frame.aspect;
-        if (height > 220) {
-          height = 220;
+        const maxHeight = 120.0;
+        if (height > maxHeight) {
+          height = maxHeight;
           width = height * frame.aspect;
         }
         final rect = placedRect(
@@ -341,42 +357,49 @@ class _FramePreview extends StatelessWidget {
         return Align(
           alignment: Alignment.centerLeft,
           child: GestureDetector(
-            onPanUpdate: (details) {
-              final slackX = frame.width - rect.width;
-              final slackY = frame.height - rect.height;
-              var panX = placement.panX;
-              var panY = placement.panY;
-              if (slackX.abs() > 1) {
-                panX = (panX + details.delta.dx / (slackX.abs() / 2 * pixel))
-                    .clamp(-1.0, 1.0);
-              }
-              if (slackY.abs() > 1) {
-                panY = (panY + details.delta.dy / (slackY.abs() / 2 * pixel))
-                    .clamp(-1.0, 1.0);
-              }
-              onPlace(placement.copyWith(panX: panX, panY: panY));
-            },
-            child: ClipRRect(
-              key: PartnerKeys.roomFramePreview,
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: width,
-                height: height,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(color: scheme.surfaceContainerHighest),
+            onTap: onTap,
+            onPanUpdate: selected
+                ? (details) {
+                    final slackX = frame.width - rect.width;
+                    final slackY = frame.height - rect.height;
+                    var panX = placement.panX;
+                    var panY = placement.panY;
+                    if (slackX.abs() > 1) {
+                      panX = (panX + details.delta.dx / (slackX.abs() / 2 * pixel))
+                          .clamp(-1.0, 1.0);
+                    }
+                    if (slackY.abs() > 1) {
+                      panY = (panY + details.delta.dy / (slackY.abs() / 2 * pixel))
+                          .clamp(-1.0, 1.0);
+                    }
+                    onPlace(placement.copyWith(panX: panX, panY: panY));
+                  }
+                : null,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: selected ? scheme.primary : scheme.outlineVariant,
+                  width: selected ? 3 : 1,
+                ),
+              ),
+              child: ClipRRect(
+                key: selected ? PartnerKeys.roomFramePreview : null,
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: width,
+                  height: height,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (expandedBytes != null)
-                        Image.memory(expandedBytes!, fit: BoxFit.fill)
-                      else
-                        Positioned(
-                          left: rect.left * pixel,
-                          top: rect.top * pixel,
-                          width: rect.width * pixel,
-                          height: rect.height * pixel,
-                          child: Image.memory(draft.source, fit: BoxFit.fill),
+                      CustomPaint(
+                        painter: _PhotoPainter(
+                          source: draft.image,
+                          expanded: expandedImage,
+                          rect: rect,
+                          pixel: pixel,
                         ),
+                      ),
                       if (simulated)
                         const Positioned(
                           left: 8,
@@ -392,6 +415,54 @@ class _FramePreview extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _PhotoPainter extends CustomPainter {
+  const _PhotoPainter({
+    required this.source,
+    required this.expanded,
+    required this.rect,
+    required this.pixel,
+  });
+
+  final ui.Image source;
+  final ui.Image? expanded;
+  final Rect rect;
+  final double pixel;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fill = expanded;
+    if (fill != null) {
+      canvas.drawImageRect(
+        fill,
+        Rect.fromLTWH(0, 0, fill.width.toDouble(), fill.height.toDouble()),
+        Offset.zero & size,
+        Paint(),
+      );
+      return;
+    }
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF1C1917));
+    canvas.drawImageRect(
+      source,
+      Rect.fromLTWH(0, 0, source.width.toDouble(), source.height.toDouble()),
+      Rect.fromLTWH(
+        rect.left * pixel,
+        rect.top * pixel,
+        rect.width * pixel,
+        rect.height * pixel,
+      ),
+      Paint(),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PhotoPainter oldDelegate) {
+    return oldDelegate.source != source ||
+        oldDelegate.expanded != expanded ||
+        oldDelegate.rect != rect ||
+        oldDelegate.pixel != pixel;
   }
 }
 

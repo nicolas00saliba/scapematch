@@ -73,7 +73,6 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
   late final TextEditingController _minimum;
   late final TextEditingController _maximum;
   late final TextEditingController _price;
-  late final TextEditingController _apiKey;
   late Difficulty _difficulty;
   late RoomCategory _category;
   late int _accent;
@@ -103,7 +102,6 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
     _accent = room == null || room.accent == 0
         ? agendaPalette[paletteIndex % agendaPalette.length]
         : room.accent;
-    _apiKey = TextEditingController(text: ref.read(sceneApiKeyProvider));
     _loadPictures();
   }
 
@@ -141,7 +139,6 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
     _minimum.dispose();
     _maximum.dispose();
     _price.dispose();
-    _apiKey.dispose();
     for (final photo in _photos) {
       photo.dispose();
     }
@@ -188,21 +185,23 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
       _error = null;
     });
     try {
-      final bytes = await ref.read(sceneExpansionProvider).expand(
+      final provider = ref.read(sceneExpansionProvider);
+      final bytes = await provider.expand(
         source: draft.image,
         frame: _frame,
       );
-      final simulated = ref.read(sceneExpansionProvider).isSimulation;
+      final painted = await decodePhoto(bytes);
       if (!mounted) {
+        painted.dispose();
         return;
       }
       setState(() {
-        draft.expanded[_frame] = bytes;
-        if (simulated) {
-          draft.simulated.add(_frame);
-        } else {
-          draft.simulated.remove(_frame);
-        }
+        draft.rememberExpansion(
+          _frame,
+          bytes,
+          painted,
+          simulatedFill: provider.isSimulation,
+        );
       });
     } on SceneExpansionException catch (error) {
       if (mounted) {
@@ -266,7 +265,6 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
   @override
   Widget build(BuildContext context) {
     final creating = widget.room == null;
-    final simulated = ref.watch(sceneApiKeyProvider).isEmpty;
     return SingleChildScrollView(
       key: PartnerKeys.roomForm,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -435,10 +433,7 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
           selected: _selectedPhoto,
           frame: _frame,
           expanding: _expanding,
-          simulatedProvider: simulated,
-          apiKey: _apiKey,
           error: null,
-          onApiKey: (value) => ref.read(sceneApiKeyProvider.notifier).setKey(value),
           onAdd: _addPhotos,
           onSelect: (index) => setState(() => _selectedPhoto = index),
           onFrame: (frame) => setState(() => _frame = frame),

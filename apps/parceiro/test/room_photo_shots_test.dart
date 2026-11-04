@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -14,6 +15,8 @@ import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/room_frame.dart';
 import 'package:scapematch/features/catalog/domain/room_picture.dart';
+import 'package:scapematch/features/catalog/domain/room_listing.dart';
+import 'package:scapematch/features/catalog/presentation/room_card.dart';
 import 'package:scapematch/features/catalog/presentation/room_detail_screen.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch_parceiro/features/partner/data/photo_picker.dart';
@@ -32,7 +35,9 @@ void main() {
     final dir = Directory('/opt/cursor/artifacts/parceiro-fotos')
       ..createSync(recursive: true);
     await tester.runAsync(_loadFonts);
-    final portrait = (await tester.runAsync(_portrait))!;
+    final portrait = File(
+      '../../assets/images/rooms/gallery/egito.jpg',
+    ).readAsBytesSync();
     await _parceiro(tester, dir, const Size(390, 844), '390', portrait);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -81,20 +86,26 @@ Future<void> _parceiro(
   await tester.tap(find.byKey(PartnerKeys.roomAddPhotos));
   await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.byKey(PartnerKeys.roomFramePreview));
+  await tester.ensureVisible(find.text('Card · 300×168'));
   await tester.pumpAndSettle();
   await _shot(
     tester,
     dir,
     'molduras-$suffix.png',
     size,
-    find.byKey(PartnerKeys.roomFramePreview),
+    find.text('Card · 300×168'),
   );
 
   await tester.ensureVisible(find.byKey(PartnerKeys.roomExpand));
   await tester.tap(find.byKey(PartnerKeys.roomExpand));
-  await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
-  await tester.pumpAndSettle();
+  await tester.pump();
+  for (var i = 0; i < 30; i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 80)));
+    await tester.pump();
+    if (find.byKey(PartnerKeys.roomSimulated).evaluate().isNotEmpty) {
+      break;
+    }
+  }
   await tester.ensureVisible(find.byKey(PartnerKeys.roomSimulated));
   await _shot(
     tester,
@@ -124,26 +135,43 @@ Future<void> _player(
     ))!;
   }
   image.dispose();
-  final database = loadSampleDatabase();
-  database.addRoom(
-    EscapeRoom(
-      id: 'room-foto-demo',
-      houseId: SampleIds.houseCwbRuaXv,
-      name: 'Sala com foto',
-      theme: 'Uma história curta da casa.',
-      category: RoomCategory.mystery,
-      capacity: 6,
-      durationMinutes: 60,
-      difficulty: Difficulty.medium,
-      priceCents: 9900,
-      minimumPlayers: 2,
-      pictures: [
-        RoomPicture(id: 'pic-demo', source: source, frames: frames),
-      ],
-    ),
-  );
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
+  await tester.pumpWidget(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(Brightness.light),
+      home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: roomCardWidth,
+              child: RoomCard(
+                listing: RoomListing(
+                  room: _room(source, frames),
+                  houseId: SampleIds.houseCwbRuaXv,
+                  houseName: 'Mistério da Rua XV',
+                  cityId: SampleIds.curitiba,
+                  cityName: 'Curitiba',
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  await _show(tester, [frames[RoomFrame.card]!]);
+  await _shot(
+    tester,
+    dir,
+    'jogador-card-$suffix.png',
+    size,
+    find.text('Sala com foto'),
+  );
+
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump();
+  final database = loadSampleDatabase();
+  database.addRoom(_room(source, frames));
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -151,19 +179,68 @@ Future<void> _player(
         clockProvider.overrideWithValue(loadSampleClock()),
       ],
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         theme: buildAppTheme(Brightness.light),
         home: const RoomDetailScreen(roomId: 'room-foto-demo'),
       ),
     ),
   );
   await tester.pumpAndSettle();
+  await _show(tester, [
+    frames[RoomFrame.hero]!,
+    frames[RoomFrame.heroWide]!,
+    frames[RoomFrame.gallery]!,
+    frames[RoomFrame.galleryWide]!,
+  ]);
   await _shot(
     tester,
     dir,
-    'jogador-$suffix.png',
+    'jogador-detalhe-$suffix.png',
     size,
-    find.text('Sala com foto'),
+    find.text('Uma história curta da casa.'),
   );
+}
+
+EscapeRoom _room(Uint8List source, Map<RoomFrame, Uint8List> frames) {
+  return EscapeRoom(
+    id: 'room-foto-demo',
+    houseId: SampleIds.houseCwbRuaXv,
+    name: 'Sala com foto',
+    theme: 'Uma história curta da casa.',
+    category: RoomCategory.egypt,
+    capacity: 6,
+    durationMinutes: 60,
+    difficulty: Difficulty.medium,
+    priceCents: 9900,
+    minimumPlayers: 2,
+    pictures: [
+      RoomPicture(id: 'pic-demo', source: source, frames: frames),
+    ],
+  );
+}
+
+Future<void> _show(WidgetTester tester, List<Uint8List> images) async {
+  await tester.runAsync(() async {
+    for (final bytes in images) {
+      final done = Completer<void>();
+      final stream = MemoryImage(bytes).resolve(const ImageConfiguration());
+      late ImageStreamListener listener;
+      listener = ImageStreamListener((info, _) {
+        stream.removeListener(listener);
+        if (!done.isCompleted) {
+          done.complete();
+        }
+      }, onError: (error, stack) {
+        stream.removeListener(listener);
+        if (!done.isCompleted) {
+          done.completeError(error, stack);
+        }
+      });
+      stream.addListener(listener);
+      await done.future;
+    }
+  });
+  await tester.pump();
 }
 
 class _BytesPicker implements PhotoPicker {
@@ -173,24 +250,6 @@ class _BytesPicker implements PhotoPicker {
 
   @override
   Future<List<Uint8List>> pick() async => photos;
-}
-
-Future<Uint8List> _portrait() async {
-  final recorder = ui.PictureRecorder();
-  final canvas = ui.Canvas(recorder);
-  canvas.drawRect(
-    const ui.Rect.fromLTWH(0, 0, 80, 180),
-    ui.Paint()..color = const ui.Color(0xFF1F6F8A),
-  );
-  canvas.drawCircle(
-    const ui.Offset(40, 90),
-    22,
-    ui.Paint()..color = const ui.Color(0xFFD2642A),
-  );
-  final image = await recorder.endRecording().toImage(80, 180);
-  final data = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
-  return data!.buffer.asUint8List();
 }
 
 Future<void> _loadFonts() async {
