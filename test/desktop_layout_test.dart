@@ -111,7 +111,7 @@ void main() {
     expect(map.right, closeTo(1280, 2));
   });
 
-  testWidgets('desktop news is one card with an arrow that hides at the ends', (
+  testWidgets('desktop news is one card and keeps moving forward', (
     tester,
   ) async {
     await pumpScapeMatch(tester);
@@ -139,16 +139,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.carouselPrevious('news')), findsOneWidget);
 
-    for (var step = 0; step < 24; step++) {
+    for (var step = 0; step < 16; step++) {
       final forward = find.byKey(AppKeys.carouselNext('news'));
-      if (forward.evaluate().isEmpty) {
-        break;
-      }
+      expect(forward, findsOneWidget, reason: 'passo $step');
       await tester.ensureVisible(forward);
       await tester.tap(forward);
       await tester.pumpAndSettle();
     }
-    expect(find.byKey(AppKeys.carouselNext('news')), findsNothing);
+    expect(find.byKey(AppKeys.carouselNext('news')), findsOneWidget);
+    final newsScroll = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(AppKeys.carouselFrame('news')),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
+        ),
+      ),
+    );
+    if (newsScroll.position.pixels <= 1) {
+      final forward = find.byKey(AppKeys.carouselNext('news'));
+      await tester.ensureVisible(forward);
+      await tester.tap(forward);
+      await tester.pumpAndSettle();
+    }
     expect(find.byKey(AppKeys.carouselPrevious('news')), findsOneWidget);
   });
 

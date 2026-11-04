@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
@@ -70,6 +72,12 @@ class CarouselLayout {
 /// A seta anda um quadro, com animação, e some na ponta. Soltar o dedo
 /// alinha no quadro mais próximo. Os pontos, quando aparecem, são essas
 /// paradas — contadas pela largura, não pela estimativa da lista.
+///
+/// Com [loop], o quadro depois do último segue em frente: a lista repete
+/// os primeiros itens e um salto invisível devolve o offset ao ciclo
+/// equivalente. Não há animação de volta para o início.
+/// [autoAdvance] espera [autoAdvanceInterval], pausa com o ponteiro em
+/// cima ou pressionado, e fica desligado nos testes de widget.
 class ArrowCarousel extends StatefulWidget {
   const ArrowCarousel({
     super.key,
@@ -80,7 +88,17 @@ class ArrowCarousel extends StatefulWidget {
     this.gap = 12,
     this.showDots = false,
     this.preferredItemWidth = carouselPreferredItemWidth,
+    this.loop = false,
+    this.autoAdvance = false,
   });
+
+  /// Espera entre um avanço automático e o seguinte.
+  static const autoAdvanceInterval = Duration(seconds: 5);
+
+  /// Permite o timer sob o binding de teste. O padrão é falso: um timer
+  /// periódico não deixa o `pumpAndSettle` terminar e fica pendente no fim.
+  @visibleForTesting
+  static bool debugAllowAutoAdvanceInTests = false;
 
   final String id;
   final double height;
@@ -89,6 +107,12 @@ class ArrowCarousel extends StatefulWidget {
   final double gap;
   final bool showDots;
   final double preferredItemWidth;
+
+  /// Repete os itens para a frente, sem rebobinar.
+  final bool loop;
+
+  /// Anda um quadro sozinho, sempre para a frente.
+  final bool autoAdvance;
 
   @override
   State<ArrowCarousel> createState() => _ArrowCarouselState();
@@ -102,16 +126,48 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
   CarouselLayout? _layout;
   int _index = 0;
   bool _holdIndex = false;
+  bool _closed = false;
+  bool _hovering = false;
+  bool _recenterQueued = false;
+  int _pointers = 0;
+  Timer? _autoTimer;
+
+  /// Cópias à frente. Uma basta para o ciclo; as outras seguram um
+  /// arrasto longo antes do salto que alinha de novo.
+  static const _loopCopies = 6;
+
+  bool _repeats(CarouselLayout layout) {
+    return widget.loop && widget.itemCount > layout.perView;
+  }
+
+  int _slotCount(CarouselLayout layout) {
+    if (!_repeats(layout)) {
+      return widget.itemCount;
+    }
+    return widget.itemCount * _loopCopies;
+  }
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {});
+      if (!mounted || _closed) {
+        return;
       }
+      _syncAuto();
+      setState(() {});
     });
+  }
+
+  @override
+  void didUpdateWidget(ArrowCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.autoAdvance != widget.autoAdvance ||
+        oldWidget.itemCount != widget.itemCount ||
+        oldWidget.loop != widget.loop) {
+      _syncAuto();
+    }
   }
 
   @override
@@ -144,9 +200,74 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
 
   @override
   void dispose() {
+    _closed = true;
+    _autoTimer?.cancel();
+    _autoTimer = null;
     _controller.removeListener(_onScroll);
     _controller.dispose();
     super.dispose();
+  }
+
+  bool get _autoEnabled {
+    if (!widget.autoAdvance || widget.itemCount <= 1 || _closed) {
+      return false;
+    }
+    final tests = WidgetsBinding.instance.runtimeType.toString().contains(
+      'Test',
+    );
+    if (tests && !ArrowCarousel.debugAllowAutoAdvanceInTests) {
+      return false;
+    }
+    final layout = _layout;
+    if (layout != null && layout.perView >= widget.itemCount) {
+      return false;
+    }
+    return true;
+  }
+
+  void _syncAuto() {
+    final run = _autoEnabled && !_hovering && _pointers == 0 && mounted;
+    if (!run) {
+      _autoTimer?.cancel();
+      _autoTimer = null;
+      return;
+    }
+    _autoTimer ??= Timer(ArrowCarousel.autoAdvanceInterval, () {
+      unawaited(_handleAuto());
+    });
+  }
+
+  Future<void> _handleAuto() async {
+    _autoTimer = null;
+    if (!mounted || _closed || !_autoEnabled || _hovering || _pointers > 0) {
+      return;
+    }
+    await _page(1);
+    if (!mounted || _closed) {
+      return;
+    }
+    _syncAuto();
+  }
+
+  void _onHover(bool hovering) {
+    if (_hovering == hovering) {
+      return;
+    }
+    _hovering = hovering;
+    _syncAuto();
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    _pointers += 1;
+    _syncAuto();
+  }
+
+  void _onPointerEnd(PointerEvent event) {
+    if (_pointers == 0) {
+      return;
+    }
+    _pointers -= 1;
+    _syncAuto();
   }
 
   void _onScroll() {
@@ -176,7 +297,27 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
   }
 
   bool _canGo(int direction, CarouselLayout layout) {
-    if (layout.stops <= 1 || widget.itemCount <= 1) {
+    if (widget.itemCount <= 1) {
+      return false;
+    }
+    if (widget.loop) {
+      if (layout.perView >= widget.itemCount) {
+        return false;
+      }
+      if (!_ready()) {
+        return direction > 0;
+      }
+      final max = _controller.position.maxScrollExtent;
+      if (max <= 1) {
+        return false;
+      }
+      final pixels = _controller.position.pixels;
+      if (direction < 0) {
+        return pixels > 1;
+      }
+      return pixels < max - 1;
+    }
+    if (layout.stops <= 1) {
       return false;
     }
     if (!_ready()) {
@@ -208,11 +349,79 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
     return (layout.stops - 1) * layout.stride;
   }
 
+  int _maxIndex(CarouselLayout layout) {
+    if (_repeats(layout)) {
+      return math.max(0, _slotCount(layout) - layout.perView);
+    }
+    return math.max(0, layout.stops - 1);
+  }
+
   int _indexFor(CarouselLayout layout, double pixels) {
-    if (layout.stride <= 1 || layout.stops <= 1) {
+    if (layout.stride <= 1) {
       return 0;
     }
-    return (pixels / layout.stride).round().clamp(0, layout.stops - 1);
+    if (!widget.loop && layout.stops <= 1) {
+      return 0;
+    }
+    return (pixels / layout.stride).round().clamp(0, _maxIndex(layout));
+  }
+
+  /// Quando a cópia seguinte já entrou, devolve o offset para o mesmo
+  /// quadro no primeiro ciclo. O que está na tela não muda.
+  void _queueRecenter() {
+    if (!widget.loop || _recenterQueued || _closed || !mounted) {
+      return;
+    }
+    final layout = _layout;
+    if (layout == null || !_ready() || widget.itemCount <= 1) {
+      return;
+    }
+    final stride = layout.stride;
+    if (stride <= 1) {
+      return;
+    }
+    final leading = (_controller.position.pixels / stride).round();
+    if (leading < widget.itemCount) {
+      return;
+    }
+    _recenterQueued = true;
+    // O quadro seguinte pinta a cópia. O salto fica para o frame de
+    // depois, senão a animação que chegou ali é cancelada no mesmo frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _closed) {
+        _recenterQueued = false;
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _recenterQueued = false;
+        if (!mounted || _closed || !_ready() || _layout == null) {
+          return;
+        }
+        final step = _layout!.stride;
+        if (step <= 1 || !_controller.hasClients) {
+          return;
+        }
+        final pixels = _controller.position.pixels;
+        final index = (pixels / step).round();
+        if (index < widget.itemCount) {
+          return;
+        }
+        final shifts = index ~/ widget.itemCount;
+        final target = pixels - shifts * widget.itemCount * step;
+        if ((pixels - target).abs() < 0.5 || target < -0.5) {
+          return;
+        }
+        _holdIndex = true;
+        _controller.jumpTo(
+          target.clamp(0.0, _controller.position.maxScrollExtent),
+        );
+        _index = _indexFor(_layout!, _controller.position.pixels);
+        _holdIndex = false;
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    });
   }
 
   void _realign() {
@@ -229,7 +438,7 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
       gap: widget.gap,
       preferredItemWidth: widget.preferredItemWidth,
     );
-    final index = _index.clamp(0, layout.stops - 1);
+    final index = _index.clamp(0, _maxIndex(layout));
     final target = (index * layout.stride).clamp(0.0, _travelLimit(layout));
     if ((_controller.position.pixels - target).abs() > 0.5) {
       _controller.jumpTo(target);
@@ -243,19 +452,28 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
 
   Future<void> _page(int direction) async {
     final layout = _layout;
-    if (layout == null || !_canGo(direction, layout) || !_ready()) {
+    if (layout == null || _closed || !_canGo(direction, layout) || !_ready()) {
       return;
     }
     final current = _indexFor(layout, _controller.position.pixels);
-    final target = ((current + direction) * layout.stride).clamp(
-      0.0,
-      _travelLimit(layout),
-    );
-    await _controller.animateTo(
-      target,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-    );
+    final targetIndex = (current + direction).clamp(0, _maxIndex(layout));
+    final limit = widget.loop
+        ? _controller.position.maxScrollExtent
+        : _travelLimit(layout);
+    final target = (targetIndex * layout.stride).clamp(0.0, limit);
+    try {
+      await _controller.animateTo(
+        target,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (_) {
+      return;
+    }
+    if (_closed || !mounted) {
+      return;
+    }
+    _queueRecenter();
   }
 
   @override
@@ -280,80 +498,108 @@ class _ArrowCarouselState extends State<ArrowCarousel> {
           key: AppKeys.carouselFrame(widget.id),
           child: SizedBox(
             height: widget.height,
-            child: Stack(
-              children: [
-                NotificationListener<ScrollMetricsNotification>(
-                  onNotification: (notification) {
-                    if (mounted && !_holdIndex) {
-                      setState(() {});
-                    }
-                    return false;
-                  },
-                  child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context)
-                        .copyWith(scrollbars: false),
-                    child: ListView.builder(
-                      controller: _controller,
-                      scrollDirection: Axis.horizontal,
-                      physics: _ItemSnapPhysics(
-                        stride: _stride,
-                        parent: const ClampingScrollPhysics(),
-                      ),
-                      padding: EdgeInsets.zero,
-                      scrollCacheExtent: const ScrollCacheExtent.pixels(800),
-                      itemExtent: layout.stride,
-                      itemCount: widget.itemCount,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: EdgeInsets.only(right: widget.gap),
-                          child: SizedBox(
-                            key: AppKeys.carouselItem(widget.id, index),
-                            width: layout.itemWidth,
-                            height: widget.height,
-                            child: widget.itemBuilder(context, index),
-                          ),
-                        );
+            child: MouseRegion(
+              onEnter: (_) => _onHover(true),
+              onExit: (_) => _onHover(false),
+              child: Listener(
+                onPointerDown: _onPointerDown,
+                onPointerUp: _onPointerEnd,
+                onPointerCancel: _onPointerEnd,
+                child: Stack(
+                  children: [
+                    NotificationListener<Notification>(
+                      onNotification: (notification) {
+                        if (notification is ScrollEndNotification) {
+                          _queueRecenter();
+                        }
+                        if (notification is ScrollMetricsNotification &&
+                            mounted &&
+                            !_holdIndex) {
+                          setState(() {});
+                        }
+                        return false;
                       },
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(
+                          scrollbars: false,
+                          dragDevices: {
+                            ...ScrollConfiguration.of(context).dragDevices,
+                            PointerDeviceKind.mouse,
+                          },
+                        ),
+                        child: ListView.builder(
+                          controller: _controller,
+                          scrollDirection: Axis.horizontal,
+                          physics: _ItemSnapPhysics(
+                            stride: _stride,
+                            parent: const ClampingScrollPhysics(),
+                          ),
+                          padding: EdgeInsets.zero,
+                          scrollCacheExtent: ScrollCacheExtent.pixels(
+                            _repeats(layout) ? layout.stride : 800,
+                          ),
+                          itemExtent: layout.stride,
+                          itemCount: _slotCount(layout),
+                          itemBuilder: (context, index) {
+                            final logical = _repeats(layout)
+                                ? index % widget.itemCount
+                                : index;
+                            return Padding(
+                              padding: EdgeInsets.only(right: widget.gap),
+                              child: SizedBox(
+                                key: AppKeys.carouselItem(widget.id, index),
+                                width: layout.itemWidth,
+                                height: widget.height,
+                                child: widget.itemBuilder(context, logical),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  ),
+                    if (canBack)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        height: _arrowBand(widget.height),
+                        child: Center(
+                          child: _CarouselArrow(
+                            carouselId: widget.id,
+                            forward: false,
+                            onPressed: () => _page(-1),
+                          ),
+                        ),
+                      ),
+                    if (canForward)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        height: _arrowBand(widget.height),
+                        child: Center(
+                          child: _CarouselArrow(
+                            carouselId: widget.id,
+                            forward: true,
+                            onPressed: () => _page(1),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                if (canBack)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    height: _arrowBand(widget.height),
-                    child: Center(
-                      child: _CarouselArrow(
-                        carouselId: widget.id,
-                        forward: false,
-                        onPressed: () => _page(-1),
-                      ),
-                    ),
-                  ),
-                if (canForward)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    height: _arrowBand(widget.height),
-                    child: Center(
-                      child: _CarouselArrow(
-                        carouselId: widget.id,
-                        forward: true,
-                        onPressed: () => _page(1),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
         );
         if (!widget.showDots) {
           return carousel;
         }
-        final pages = layout.stops;
-        final current = _ready()
+        final repeating = _repeats(layout);
+        final pages = repeating ? math.max(1, widget.itemCount) : layout.stops;
+        final leading = _ready()
             ? _indexFor(layout, _controller.position.pixels)
-            : _index.clamp(0, pages - 1);
+            : _index;
+        final current = repeating
+            ? leading % pages
+            : leading.clamp(0, pages - 1);
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [

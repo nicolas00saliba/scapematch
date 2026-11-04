@@ -122,9 +122,9 @@ TextStyle _chipStyle(ThemeData theme) {
   );
 }
 
-/// No site, um quadro ocupa a coluna. A seta de próximo aparece quando
-/// ainda há novidade, e some na ponta — o mesmo [ArrowCarousel] das outras
-/// faixas. No celular a largura preferida continua 250 px.
+/// No site, um quadro ocupa a coluna. A faixa segue para a frente em
+/// ciclo, com a mesma seta das outras. No celular a largura preferida
+/// continua 250 px.
 double newsCarouselPreferredWidth({
   required bool desktop,
   required double viewport,
@@ -213,6 +213,8 @@ class NewsSection extends ConsumerWidget {
                   height: height,
                   itemCount: items.length,
                   preferredItemWidth: preferred,
+                  loop: true,
+                  autoAdvance: true,
                   itemBuilder: (context, index) {
                     final item = items[index];
                     return _NewsStripCard(
