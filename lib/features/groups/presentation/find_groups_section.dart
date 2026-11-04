@@ -23,7 +23,10 @@ import 'package:scapematch/providers/repositories.dart';
 
 /// Busca de grupo comprimida, no topo da Home.
 class FindGroupsSection extends ConsumerStatefulWidget {
-  const FindGroupsSection({super.key});
+  const FindGroupsSection({super.key, this.belowSearch});
+
+  /// Entra entre a busca e os grupos. No site, promoções e novidades.
+  final Widget? belowSearch;
 
   @override
   ConsumerState<FindGroupsSection> createState() => _FindGroupsSectionState();
@@ -65,7 +68,13 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             return _searchBar(context, constraints.maxWidth);
           },
         ),
-        const SizedBox(height: 8),
+        if (widget.belowSearch == null)
+          const SizedBox(height: 8)
+        else ...[
+          const SizedBox(height: 12),
+          widget.belowSearch!,
+          const SizedBox(height: 12),
+        ],
         KeyedSubtree(
           key: AppKeys.groupResults,
           child: _list(context, ref, cityName, query, gameTypeId, groups),
@@ -247,7 +256,10 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         void open(Group group) => context.push('/groups/${group.id}');
         void invite(Group group) => showInviteSheet(context, group);
         if (isScapeDesktop(context)) {
+          final fourColumns =
+              MediaQuery.sizeOf(context).width >= homeWebGridFourColumns;
           return ScapeWrapGrid(
+            fixedColumns: fourColumns ? 4 : null,
             maxColumns: 3,
             gap: 12,
             children: [

@@ -29,6 +29,15 @@ final homeNewsProvider = FutureProvider.autoDispose<List<NewsItem>>((
 /// Foto do cartão. O texto embaixo é que precisa ser lido.
 const newsCarouselImageHeight = 112.0;
 
+/// Foto um pouco mais baixa no site, para a faixa caber acima da grade.
+const newsCarouselDesktopImageHeight = 96.0;
+
+double newsCarouselImageExtent(BuildContext context) {
+  return isScapeDesktop(context)
+      ? newsCarouselDesktopImageHeight
+      : newsCarouselImageHeight;
+}
+
 double newsCarouselCardHeight(BuildContext context, double cardWidth) {
   final theme = Theme.of(context);
   final scaler = MediaQuery.textScalerOf(context);
@@ -55,7 +64,7 @@ double newsCarouselCardHeight(BuildContext context, double cardWidth) {
     contentWidth,
     1,
   );
-  return (newsCarouselImageHeight +
+  return (newsCarouselImageExtent(context) +
           8 +
           chip +
           6 +
@@ -248,7 +257,7 @@ class _NewsStripCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              height: newsCarouselImageHeight,
+              height: newsCarouselImageExtent(context),
               width: double.infinity,
               child: Image(
                 image: _image(item),

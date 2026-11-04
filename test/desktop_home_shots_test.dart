@@ -23,7 +23,7 @@ void main() {
     await _shotHome(
       tester,
       dir,
-      const Size(1280, 900),
+      const Size(1280, 720),
       'home-1280.png',
       cityId: SampleIds.saoPaulo,
       showNews: true,
@@ -58,37 +58,42 @@ Future<void> _shotHome(
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
   await pumpScapeMatch(tester);
-  tester.view.physicalSize = size;
-  tester.view.devicePixelRatio = 1;
-  await tester.pumpAndSettle();
-
   await tester.tap(find.byKey(AppKeys.citySelector));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(AppKeys.cityOption(cityId)));
   await tester.pumpAndSettle();
+
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  await tester.pumpAndSettle();
   await _waitForPhotos(tester);
 
   if (showNews) {
-    final title = find.text('Novidades');
-    await tester.scrollUntilVisible(title, 400, scrollable: verticalScrollable);
-    await tester.pumpAndSettle();
     final position = tester.state<ScrollableState>(verticalScrollable).position;
-    final dy = tester.getTopLeft(title).dy;
-    final target = (position.pixels + dy - 340).clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    position.jumpTo(target);
-    await tester.pumpAndSettle();
-    await _waitForPhotos(tester);
-    await tester.pumpAndSettle();
-    // ignore: avoid_print
-    print(
-      'SHOT $name scroll=${position.pixels.round()} '
-      'max=${position.maxScrollExtent.round()}',
-    );
+    expect(position.pixels, 0, reason: name);
+    final viewportTop = tester.getTopLeft(verticalScrollable).dy;
+    final viewportBottom = viewportTop + position.viewportDimension;
+    final promos = tester.getRect(find.text('Promoções'));
+    final news = tester.getRect(find.text('Novidades'));
+    expect(promos.top, greaterThanOrEqualTo(viewportTop), reason: name);
+    expect(news.bottom, lessThanOrEqualTo(viewportBottom), reason: name);
     expect(find.byKey(AppKeys.carouselNext('news')), findsOneWidget);
     expect(find.byKey(AppKeys.carouselPrevious('news')), findsNothing);
+    final card = find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> && key.value.startsWith('group-card-');
+    });
+    expect(card, findsWidgets);
+    expect(
+      tester.getBottomLeft(card.first).dy,
+      lessThanOrEqualTo(viewportBottom + 1),
+      reason: name,
+    );
+    expect(
+      tester.getTopLeft(card.first).dy,
+      greaterThan(news.bottom - 1),
+      reason: name,
+    );
   } else {
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byKey(AppKeys.groupWindow), findsOneWidget);

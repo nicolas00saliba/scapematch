@@ -18,8 +18,8 @@ String groupHeroTag(String groupId) => 'group-cover-$groupId';
 /// Largura da capa no celular e nas listas.
 const groupCardCoverWidth = 112.0;
 
-/// Capa um pouco mais estreita na grade da Home no site.
-const groupCardDenseCoverWidth = 96.0;
+/// Capa da grade da Home no site: estreita, para quatro colunas.
+const groupCardDenseCoverWidth = 64.0;
 
 class GroupCard extends StatelessWidget {
   const GroupCard({
@@ -36,7 +36,8 @@ class GroupCard extends StatelessWidget {
   final DateTime now;
   final VoidCallback? onInvite;
 
-  /// Grade da Home no site: menos capa, respiro e altura, com o mesmo texto.
+  /// Grade da Home no site: capa menor e só nome, local, data,
+  /// vagas e Convidar.
   final bool dense;
 
   @override
@@ -52,10 +53,10 @@ class GroupCard extends StatelessWidget {
     ];
     final coverWidth = dense ? groupCardDenseCoverWidth : groupCardCoverWidth;
     final pad = dense
-        ? const EdgeInsets.fromLTRB(10, 8, 10, 8)
+        ? const EdgeInsets.fromLTRB(8, 6, 8, 4)
         : const EdgeInsets.fromLTRB(14, 14, 14, 16);
     final titleGap = dense ? 2.0 : 4.0;
-    final blockGap = dense ? 4.0 : 8.0;
+    final blockGap = dense ? 2.0 : 8.0;
 
     return PressableScale(
       child: Semantics(
@@ -98,7 +99,7 @@ class GroupCard extends StatelessWidget {
                         children: [
                           Text(
                             group.roomName,
-                            maxLines: 2,
+                            maxLines: dense ? 1 : 2,
                             overflow: TextOverflow.ellipsis,
                             style:
                                 (dense
@@ -106,20 +107,26 @@ class GroupCard extends StatelessWidget {
                                         : theme.textTheme.titleMedium)
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      height: dense ? 1.2 : null,
+                                      height: dense ? 1.15 : null,
                                     ),
                           ),
                           SizedBox(height: titleGap),
-                          _StatusPill(group: group, dense: dense),
-                          const SizedBox(height: 2),
+                          if (!dense) ...[
+                            _StatusPill(group: group, dense: dense),
+                            const SizedBox(height: 2),
+                          ],
                           Text(
                             '${group.houseName} · ${group.neighborhood}',
-                            maxLines: dense ? 2 : null,
+                            maxLines: dense ? 1 : null,
                             overflow: dense ? TextOverflow.ellipsis : null,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              height: dense ? 1.25 : null,
-                            ),
+                            style:
+                                (dense
+                                        ? theme.textTheme.bodySmall
+                                        : theme.textTheme.bodyMedium)
+                                    ?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                      height: dense ? 1.2 : null,
+                                    ),
                           ),
                           SizedBox(height: blockGap),
                           Row(
@@ -136,6 +143,9 @@ class GroupCard extends StatelessWidget {
                                   maxLines: dense ? 1 : null,
                                   overflow: dense
                                       ? TextOverflow.ellipsis
+                                      : null,
+                                  style: dense
+                                      ? theme.textTheme.bodySmall
                                       : null,
                                 ),
                               ),
@@ -158,12 +168,14 @@ class GroupCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          SizedBox(height: dense ? 2 : 6),
-                          _AvatarRow(
-                            people: seated,
-                            filled: group.filledSpots,
-                            dense: dense,
-                          ),
+                          if (!dense) ...[
+                            const SizedBox(height: 6),
+                            _AvatarRow(
+                              people: seated,
+                              filled: group.filledSpots,
+                              dense: dense,
+                            ),
+                          ],
                           if (onInvite != null)
                             Align(
                               alignment: Alignment.centerLeft,

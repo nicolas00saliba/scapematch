@@ -3,6 +3,9 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 /// Contador N/Z, faixa da sala e o que falta para o host fechar.
+///
+/// Na grade da Home no site ([dense]), ficam só o contador, a barra
+/// e o que falta para fechar.
 class GroupSeatFacts extends StatelessWidget {
   const GroupSeatFacts({
     super.key,
@@ -14,7 +17,7 @@ class GroupSeatFacts extends StatelessWidget {
   final Group group;
   final bool compact;
 
-  /// Menos vão na grade da Home no site. O texto continua o mesmo.
+  /// Grade da Home no site: só vagas e progresso, numa faixa curta.
   final bool dense;
 
   @override
@@ -25,14 +28,58 @@ class GroupSeatFacts extends StatelessWidget {
         ? 0.0
         : (group.filledSpots / group.totalSpots).clamp(0, 1).toDouble();
     final count = GroupMessages.seatCount(group.filledSpots, group.totalSpots);
+    final bar = ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: LinearProgressIndicator(
+        value: progress,
+        minHeight: dense ? 4 : (compact ? 6 : 8),
+        backgroundColor: scheme.primaryContainer,
+        color: group.isFull ? scheme.onSurfaceVariant : scheme.primary,
+      ),
+    );
+    if (dense) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                count,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  GroupMessages.spotsUntilClose(group.spotsUntilClose),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.secondary,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          bar,
+        ],
+      );
+    }
     final secondary = theme.textTheme.bodySmall?.copyWith(
       color: scheme.onSurfaceVariant,
       height: 1.3,
     );
-    final gap = dense ? 4.0 : 6.0;
-    final countStyle = dense
-        ? theme.textTheme.titleSmall
-        : (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge);
+    final gap = 6.0;
+    final countStyle = compact
+        ? theme.textTheme.titleMedium
+        : theme.textTheme.titleLarge;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -44,15 +91,7 @@ class GroupSeatFacts extends StatelessWidget {
           ),
         ),
         SizedBox(height: gap),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(99),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: dense ? 4 : (compact ? 6 : 8),
-            backgroundColor: scheme.primaryContainer,
-            color: group.isFull ? scheme.onSurfaceVariant : scheme.primary,
-          ),
-        ),
+        bar,
         SizedBox(height: gap),
         Text(
           GroupMessages.roomBounds(
