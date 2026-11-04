@@ -77,10 +77,7 @@ void main() {
       priceCents: 8000,
     );
     expect(saved, isNull);
-    expect(
-      database.roomById(SampleIds.roomCwbCaldeira)!.priceCents,
-      8000,
-    );
+    expect(database.roomById(SampleIds.roomCwbCaldeira)!.priceCents, 8000);
     final before = database.slots.length;
     final slot = await partner.addSlot(
       roomId: SampleIds.roomCwbCaldeira,
@@ -126,10 +123,31 @@ void main() {
     expect(nicolas.payment, PaymentStatus.paid);
   });
 
+  test('a and b sign in to the same example house', () {
+    expect(
+      matchPartnerLogin(partnerQuickUser, partnerQuickPassword)?.houseName,
+      partnerDemoAccount.houseName,
+    );
+    expect(
+      matchPartnerLogin(' A ', partnerQuickPassword)?.houseId,
+      partnerDemoAccount.houseId,
+    );
+    expect(
+      matchPartnerLogin(partnerDemoAccount.email, partnerDemoPassword)?.email,
+      partnerDemoAccount.email,
+    );
+    expect(matchPartnerLogin(partnerQuickUser, partnerDemoPassword), isNull);
+    expect(
+      matchPartnerLogin(partnerDemoAccount.email, partnerQuickPassword),
+      isNull,
+    );
+  });
+
   testWidgets('bad credentials stay on the house login', (tester) async {
     await pumpParceiro(tester);
     expect(find.text('ScapeMatch Parceiro'), findsOneWidget);
     expect(find.text(PartnerMessages.emailHint), findsOneWidget);
+    expect(find.text(PartnerMessages.quickDemo), findsOneWidget);
     expect(find.text('App do jogador'), findsNothing);
 
     await tester.enterText(
@@ -140,6 +158,16 @@ void main() {
     await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.badLogin), findsOneWidget);
+  });
+
+  testWidgets('a and b open the same example house', (tester) async {
+    await pumpParceiro(tester);
+    await tester.enterText(find.byKey(PartnerKeys.partnerEmail), 'a');
+    await tester.enterText(find.byKey(PartnerKeys.partnerPassword), 'b');
+    await tester.tap(find.byKey(PartnerKeys.partnerSubmit));
+    await tester.pumpAndSettle();
+    expect(find.text(partnerDemoAccount.houseName), findsOneWidget);
+    expect(find.text('App do jogador'), findsNothing);
   });
 
   testWidgets('the house desk shows balance, reservations and rooms', (

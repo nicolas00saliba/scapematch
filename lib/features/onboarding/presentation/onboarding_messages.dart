@@ -1,5 +1,6 @@
 /// Textos da introdução. A interface inteira fica em português.
 abstract final class OnboardingMessages {
+  static const back = 'Voltar';
   static const skip = 'Pular';
   static const next = 'Próximo';
   static const start = 'Começar';

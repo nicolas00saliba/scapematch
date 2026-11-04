@@ -8,6 +8,7 @@ abstract final class PartnerMessages {
       'Conta de exemplo, separada do app do jogador. O saldo é o livro de exemplo desta casa.';
   static const emailHint =
       'Casa de exemplo: xv@scapematch.exemplo. Senha: demo.';
+  static const quickDemo = 'Demo: a / b';
   static const badLogin = 'E-mail ou senha não conferem neste exemplo.';
   static const signOut = 'Sair';
   static const balance = 'Saldo';
@@ -110,6 +111,7 @@ abstract final class PartnerMessages {
     }
     return '$paid de $total pagaram';
   }
+
   static const couldNotOpen = 'Não foi possível abrir a casa.';
   static const retry = 'Tentar de novo';
 

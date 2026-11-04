@@ -90,6 +90,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   bool get _last => _index == _pages.length - 1;
 
+  Future<void> _back() async {
+    if (_index == 0) {
+      return;
+    }
+    await _page.previousPage(
+      duration: scapeDuration(context, _pageTurn),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   Future<void> _next() async {
     if (_last) {
       await _finish();
@@ -132,6 +142,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               return _PageBody(page: _pages[index]);
             },
           ),
+          if (_index > 0) _introBack(),
           Positioned(
             left: 0,
             right: 0,
@@ -174,6 +185,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _introBack() {
+    return Positioned(
+      left: 16,
+      top: 8,
+      child: SafeArea(bottom: false, child: _IntroBackButton(onPressed: _back)),
     );
   }
 
@@ -244,6 +263,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   );
                 },
               ),
+              if (_index > 0) _introBack(),
               Positioned(
                 right: 0,
                 bottom: 0,
@@ -486,7 +506,7 @@ class _PhotoPixels {
 }
 
 const _photoPixels = <String, _PhotoPixels>{
-  'assets/images/onboarding/encontrar.jpg': _PhotoPixels(2000, 1333),
+  'assets/images/onboarding/encontrar.jpg': _PhotoPixels(1152, 864),
   'assets/images/onboarding/convidar.jpg': _PhotoPixels(1200, 1598),
   'assets/images/onboarding/reservar.jpg': _PhotoPixels(720, 1280),
   'assets/images/landmarks/curitiba.jpg': _PhotoPixels(
@@ -538,6 +558,44 @@ Size fitOnboardingPhoto({
     width = height * aspect;
   }
   return Size(width, height);
+}
+
+/// Seta da introdução. Some na primeira página.
+class _IntroBackButton extends StatelessWidget {
+  const _IntroBackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    const ink = Color(0xFF1A1A1A);
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x4D000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IconButton(
+        key: AppKeys.onboardingBack,
+        tooltip: OnboardingMessages.back,
+        onPressed: onPressed,
+        icon: const Icon(Icons.arrow_back),
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.white.withValues(alpha: 0.92),
+          foregroundColor: ink,
+          fixedSize: const Size(44, 44),
+          minimumSize: const Size(44, 44),
+          padding: EdgeInsets.zero,
+          shape: const CircleBorder(),
+        ),
+      ),
+    );
+  }
 }
 
 class _DesktopCopy extends StatelessWidget {

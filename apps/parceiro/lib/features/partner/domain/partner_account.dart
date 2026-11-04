@@ -15,6 +15,10 @@ class PartnerAccount {
 
 const partnerDemoPassword = 'demo';
 
+/// Atalho da mesma casa de exemplo. Não é uma conta separada.
+const partnerQuickUser = 'a';
+const partnerQuickPassword = 'b';
+
 const partnerDemoAccount = PartnerAccount(
   email: 'xv@scapematch.exemplo',
   houseId: SampleIds.houseCwbRuaXv,
@@ -22,11 +26,12 @@ const partnerDemoAccount = PartnerAccount(
 );
 
 PartnerAccount? matchPartnerLogin(String email, String password) {
-  if (email.trim().toLowerCase() != partnerDemoAccount.email) {
-    return null;
+  final id = email.trim().toLowerCase();
+  final quick = id == partnerQuickUser && password == partnerQuickPassword;
+  final full =
+      id == partnerDemoAccount.email && password == partnerDemoPassword;
+  if (quick || full) {
+    return partnerDemoAccount;
   }
-  if (password != partnerDemoPassword) {
-    return null;
-  }
-  return partnerDemoAccount;
+  return null;
 }
