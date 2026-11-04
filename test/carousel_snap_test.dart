@@ -7,7 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
+import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
 import 'support/pump_app.dart';
@@ -93,11 +95,7 @@ Future<void> _show(WidgetTester tester, String id) async {
 void _expectWhole(WidgetTester tester, String id, String position) {
   final scrollable = _horizontal(id);
   final scroll = tester.state<ScrollableState>(scrollable).position;
-  final layout = CarouselLayout.fit(
-    viewport: scroll.viewportDimension,
-    itemCount: 12,
-    preferredItemWidth: carouselPreferredItemWidth,
-  );
+  final layout = _layout(tester, id, scroll.viewportDimension);
   final remainder = scroll.pixels % layout.stride;
   expect(
     remainder <= 1.5 || layout.stride - remainder <= 1.5,
@@ -141,11 +139,7 @@ void _expectWhole(WidgetTester tester, String id, String position) {
 Future<void> _expectDragSnaps(WidgetTester tester, String id) async {
   final scrollable = _horizontal(id);
   final scroll = tester.state<ScrollableState>(scrollable).position;
-  final layout = CarouselLayout.fit(
-    viewport: scroll.viewportDimension,
-    itemCount: 12,
-    preferredItemWidth: carouselPreferredItemWidth,
-  );
+  final layout = _layout(tester, id, scroll.viewportDimension);
   final origin = scroll.pixels;
   await tester.drag(scrollable, Offset(-layout.stride * 0.62, 0));
   await tester.pumpAndSettle();
@@ -154,6 +148,20 @@ Future<void> _expectDragSnaps(WidgetTester tester, String id) async {
   await tester.drag(scrollable, Offset(layout.stride * 0.2, 0));
   await tester.pumpAndSettle();
   expect(scroll.pixels, closeTo(origin + layout.stride, 2), reason: id);
+}
+
+CarouselLayout _layout(WidgetTester tester, String id, double viewport) {
+  final desktop =
+      tester.view.physicalSize.width / tester.view.devicePixelRatio >=
+      scapeDesktopMinWidth;
+  final preferred = id == 'news'
+      ? newsCarouselPreferredWidth(desktop: desktop, viewport: viewport)
+      : carouselPreferredItemWidth;
+  return CarouselLayout.fit(
+    viewport: viewport,
+    itemCount: 12,
+    preferredItemWidth: preferred,
+  );
 }
 
 Finder _horizontal(String id) {

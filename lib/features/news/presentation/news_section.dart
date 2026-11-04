@@ -7,6 +7,7 @@ import 'package:scapematch/core/formatting/relative_time.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
 import 'package:scapematch/core/ui/status_views.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
@@ -112,6 +113,19 @@ TextStyle _chipStyle(ThemeData theme) {
   );
 }
 
+/// No site, um quadro ocupa a coluna. A seta de próximo aparece quando
+/// ainda há novidade, e some na ponta — o mesmo [ArrowCarousel] das outras
+/// faixas. No celular a largura preferida continua 250 px.
+double newsCarouselPreferredWidth({
+  required bool desktop,
+  required double viewport,
+}) {
+  if (desktop && viewport > 1) {
+    return viewport;
+  }
+  return carouselPreferredItemWidth;
+}
+
 /// Carrossel de novidades da Home.
 class NewsSection extends ConsumerWidget {
   const NewsSection({super.key});
@@ -172,10 +186,14 @@ class NewsSection extends ConsumerWidget {
             }
             return LayoutBuilder(
               builder: (context, constraints) {
+                final preferred = newsCarouselPreferredWidth(
+                  desktop: isScapeDesktop(context),
+                  viewport: constraints.maxWidth,
+                );
                 final layout = CarouselLayout.fit(
                   viewport: constraints.maxWidth,
                   itemCount: items.length,
-                  preferredItemWidth: carouselPreferredItemWidth,
+                  preferredItemWidth: preferred,
                 );
                 final height = math.max(
                   160.0,
@@ -185,7 +203,7 @@ class NewsSection extends ConsumerWidget {
                   id: 'news',
                   height: height,
                   itemCount: items.length,
-                  preferredItemWidth: carouselPreferredItemWidth,
+                  preferredItemWidth: preferred,
                   itemBuilder: (context, index) {
                     final item = items[index];
                     return _NewsStripCard(

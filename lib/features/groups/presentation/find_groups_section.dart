@@ -249,6 +249,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         if (isScapeDesktop(context)) {
           return ScapeWrapGrid(
             maxColumns: 3,
+            gap: 12,
             children: [
               for (var index = 0; index < visible.length; index++)
                 StaggerIn(
@@ -256,6 +257,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
                   child: GroupCard(
                     now: now,
                     group: visible[index],
+                    dense: true,
                     onTap: () => open(visible[index]),
                     onInvite: () => invite(visible[index]),
                   ),

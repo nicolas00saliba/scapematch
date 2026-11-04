@@ -4,10 +4,18 @@ import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 /// Contador N/Z, faixa da sala e o que falta para o host fechar.
 class GroupSeatFacts extends StatelessWidget {
-  const GroupSeatFacts({super.key, required this.group, this.compact = false});
+  const GroupSeatFacts({
+    super.key,
+    required this.group,
+    this.compact = false,
+    this.dense = false,
+  });
 
   final Group group;
   final bool compact;
+
+  /// Menos vão na grade da Home no site. O texto continua o mesmo.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -21,28 +29,31 @@ class GroupSeatFacts extends StatelessWidget {
       color: scheme.onSurfaceVariant,
       height: 1.3,
     );
+    final gap = dense ? 4.0 : 6.0;
+    final countStyle = dense
+        ? theme.textTheme.titleSmall
+        : (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           count,
-          style:
-              (compact
-                      ? theme.textTheme.titleMedium
-                      : theme.textTheme.titleLarge)
-                  ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.3),
+          style: countStyle?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: gap),
         ClipRRect(
           borderRadius: BorderRadius.circular(99),
           child: LinearProgressIndicator(
             value: progress,
-            minHeight: compact ? 6 : 8,
+            minHeight: dense ? 4 : (compact ? 6 : 8),
             backgroundColor: scheme.primaryContainer,
             color: group.isFull ? scheme.onSurfaceVariant : scheme.primary,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: gap),
         Text(
           GroupMessages.roomBounds(
             minimum: group.roomMinimum,
