@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/catalog/domain/player_range.dart';
+import 'package:scapematch/features/catalog/domain/room_frame.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
@@ -13,7 +14,7 @@ import 'package:scapematch/features/catalog/presentation/scape_pin_icon.dart';
 /// Largura fixa do cartão no carrossel.
 const roomCardWidth = 300.0;
 
-const _photoHeight = 168.0;
+const _photoHeight = 168.0; // RoomFrame.card.height
 const _pad = 12.0;
 const _textTop = 10.0;
 const _pinSize = 16.0;
@@ -66,7 +67,7 @@ class RoomCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final room = listing.room;
-    final image = roomCategoryImage(room.category);
+    final image = room.pictureBytes(RoomFrame.card);
 
     return PressableScale(
       child: Card(
@@ -85,7 +86,10 @@ class RoomCard extends StatelessWidget {
                     height: _photoHeight,
                     child: ScapePhoto(
                       key: AppKeys.roomCard(room.id),
-                      asset: image,
+                      bytes: image,
+                      asset: image == null
+                          ? roomCategoryImage(room.category)
+                          : '',
                       semanticLabel: room.name,
                     ),
                   ),

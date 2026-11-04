@@ -8,7 +8,9 @@ import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/core/ui/window_class.dart';
+import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/player_range.dart';
+import 'package:scapematch/features/catalog/domain/room_frame.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/presentation/room_catalog_view_model.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -105,13 +107,16 @@ class _RoomDetail extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final room = listing.room;
-    final photos = roomGallery(room.category);
+    final heroFrame = wideGallery ? RoomFrame.heroWide : RoomFrame.hero;
+    final thumbFrame = wideGallery ? RoomFrame.galleryWide : RoomFrame.gallery;
+    final heroBytes = room.pictureBytes(heroFrame);
+    final shots = _gallery(room, thumbFrame);
     return ListView(
       key: AppKeys.roomDetail(room.id),
       padding: EdgeInsets.zero,
       children: [
         SizedBox(
-          height: wideGallery ? 380 : 280,
+          height: heroFrame.height.toDouble(),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -120,7 +125,8 @@ class _RoomDetail extends StatelessWidget {
                 child: Material(
                   type: MaterialType.transparency,
                   child: ScapePhoto(
-                    asset: photos.first,
+                    bytes: heroBytes,
+                    asset: heroBytes == null ? roomCategoryImage(room.category) : '',
                     semanticLabel: room.name,
                   ),
                 ),
@@ -186,16 +192,13 @@ class _RoomDetail extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    for (var index = 0; index < photos.length; index++)
+                    for (final shot in shots)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: SizedBox(
-                          width: 240,
-                          height: 156,
-                          child: ScapePhoto(
-                            asset: photos[index],
-                            semanticLabel: '${room.name}, foto ${index + 1}',
-                          ),
+                          width: thumbFrame.width.toDouble(),
+                          height: thumbFrame.height.toDouble(),
+                          child: shot,
                         ),
                       ),
                   ],
@@ -203,21 +206,18 @@ class _RoomDetail extends StatelessWidget {
               else
                 SizedBox(
                   key: AppKeys.roomGallery,
-                  height: 112,
+                  height: thumbFrame.height.toDouble(),
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: photos.length,
+                    itemCount: shots.length,
                     separatorBuilder: (context, index) =>
                         const SizedBox(width: 10),
                     itemBuilder: (context, index) {
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: SizedBox(
-                          width: 148,
-                          child: ScapePhoto(
-                            asset: photos[index],
-                            semanticLabel: '${room.name}, foto ${index + 1}',
-                          ),
+                          width: thumbFrame.width.toDouble(),
+                          child: shots[index],
                         ),
                       );
                     },
@@ -232,6 +232,27 @@ class _RoomDetail extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  List<Widget> _gallery(EscapeRoom room, RoomFrame frame) {
+    final pictures = room.pictures;
+    if (pictures.isEmpty) {
+      final assets = roomGallery(room.category);
+      return [
+        for (var index = 0; index < assets.length; index++)
+          ScapePhoto(
+            asset: assets[index],
+            semanticLabel: '${room.name}, foto ${index + 1}',
+          ),
+      ];
+    }
+    return [
+      for (var index = 0; index < pictures.length; index++)
+        ScapePhoto(
+          bytes: pictures[index].bytesFor(frame),
+          semanticLabel: '${room.name}, foto ${index + 1}',
+        ),
+    ];
   }
 
   Widget _actionCard(BuildContext context) {

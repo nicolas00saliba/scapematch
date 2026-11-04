@@ -158,11 +158,18 @@ void main() {
 
     await tester.tap(find.text(PartnerMessages.reservations));
     await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.upcoming), findsWidgets);
     expect(find.text('Aberto'), findsWidgets);
-    expect(find.text('Fechado'), findsWidgets);
     expect(find.text('5 de 6 reservaram'), findsWidgets);
-    expect(find.textContaining('· Pago'), findsWidgets);
     expect(find.textContaining('· Reservado'), findsWidgets);
+    expect(find.textContaining('Bruto'), findsWidgets);
+    expect(find.textContaining('Comissão'), findsWidgets);
+    expect(find.textContaining('Líquido'), findsWidgets);
+
+    await tester.tap(find.text(PartnerMessages.done));
+    await tester.pumpAndSettle();
+    expect(find.text('Fechado'), findsWidgets);
+    expect(find.textContaining('· Pago'), findsWidgets);
 
     final olga = '${SampleIds.groupCwbClosed}-p0';
     final absence = find.byKey(

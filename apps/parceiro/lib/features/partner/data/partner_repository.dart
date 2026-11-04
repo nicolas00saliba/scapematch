@@ -5,6 +5,7 @@ import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
+import 'package:scapematch/features/catalog/domain/room_picture.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
@@ -233,10 +234,17 @@ class PartnerRepository {
     required int capacity,
     required int priceCents,
     required int accent,
+    String theme = '',
+    RoomCategory? category,
+    List<RoomPicture>? pictures,
   }) {
     final trimmed = name.trim();
     if (trimmed.length < 2) {
       return 'Dê um nome para a sala.';
+    }
+    final story = theme.trim();
+    if (story.isNotEmpty && (story.length < 8 || story.length > 180)) {
+      return 'A história fica entre 8 e 180 caracteres.';
     }
     if (minimumPlayers < 2 || capacity < minimumPlayers || capacity > 12) {
       return 'O mínimo e o máximo precisam caber na sala.';
@@ -257,8 +265,9 @@ class PartnerRepository {
           id: 'room-$houseId-${database.rooms.length + 1}',
           houseId: houseId,
           name: trimmed,
-          theme: 'Sala aberta pela casa',
-          category: RoomCategory.mystery,
+          theme: story.isEmpty ? 'Sala aberta pela casa' : story,
+          category: category ?? RoomCategory.mystery,
+          pictures: pictures ?? const [],
           capacity: capacity,
           durationMinutes: durationMinutes,
           difficulty: difficulty,
@@ -276,12 +285,15 @@ class PartnerRepository {
     database.replaceRoom(
       room.copyWith(
         name: trimmed,
+        theme: story.isEmpty ? room.theme : story,
+        category: category ?? room.category,
         difficulty: difficulty,
         durationMinutes: durationMinutes,
         minimumPlayers: minimumPlayers,
         capacity: capacity,
         priceCents: priceCents,
         accent: accent,
+        pictures: pictures ?? room.pictures,
       ),
     );
     return null;

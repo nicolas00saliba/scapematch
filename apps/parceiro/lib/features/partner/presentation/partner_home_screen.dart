@@ -16,6 +16,8 @@ import 'package:scapematch_parceiro/features/partner/domain/partner_statement.da
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_room_form.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
@@ -440,81 +442,138 @@ class _StatementTile extends StatelessWidget {
   }
 }
 
-class _ReservationsSection extends StatelessWidget {
+enum _ReservationBucket { upcoming, done, cancelled }
+
+class _ReservationsSection extends StatefulWidget {
   const _ReservationsSection({required this.snapshot});
 
   final PartnerSnapshot snapshot;
 
   @override
+  State<_ReservationsSection> createState() => _ReservationsSectionState();
+}
+
+class _ReservationsSectionState extends State<_ReservationsSection> {
+  var _bucket = _ReservationBucket.upcoming;
+
+  @override
   Widget build(BuildContext context) {
+    final snapshot = widget.snapshot;
     final wide = isScapeDesktop(context);
-    final sorted = [...snapshot.groups]
-      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-    final open = [
-      for (final group in sorted)
-        if (!group.isCancelled && !group.isFull) group,
-    ];
-    final closed = [
-      for (final group in sorted)
-        if (!group.isCancelled && group.isFull) group,
-    ];
-    final cancelled = [
-      for (final group in sorted)
-        if (group.isCancelled) group,
-    ];
-    final cards = wide
-        ? [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _cardColumn(open)),
-                const SizedBox(width: 16),
-                Expanded(child: _cardColumn([...closed, ...cancelled])),
-              ],
-            ),
-          ]
-        : [
-            for (final group in [
-              if (open.isNotEmpty) open.first,
-              if (closed.isNotEmpty) closed.first,
-              ...open.skip(open.isEmpty ? 0 : 1),
-              ...closed.skip(closed.isEmpty ? 0 : 1),
-              ...cancelled,
-            ])
-              _GroupCard(group: group, snapshot: snapshot),
-          ];
-    return ListView(
-      padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 20, wide ? 32 : 16, 32),
+    final groups = snapshot.groups.where((group) {
+      final ended = !snapshot.now.isBefore(group.endsAt);
+      return switch (_bucket) {
+        _ReservationBucket.cancelled => group.isCancelled,
+        _ReservationBucket.done => !group.isCancelled && ended,
+        _ReservationBucket.upcoming => !group.isCancelled && !ended,
+      };
+    }).toList()..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          PartnerMessages.reservationsTitle,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
+        Padding(
+          padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 20, wide ? 32 : 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                PartnerMessages.reservationsTitle,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final bucket in _ReservationBucket.values)
+                    ChoiceChip(
+                      key: _bucketKey(bucket),
+                      label: Text(_bucketLabel(bucket)),
+                      selected: bucket == _bucket,
+                      onSelected: (_) => setState(() => _bucket = bucket),
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        ...cards,
+        Expanded(
+          child: groups.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(PartnerMessages.noReservations),
+                )
+              : ListView(
+                  key: PartnerKeys.agendaList,
+                  padding: EdgeInsets.fromLTRB(
+                    wide ? 32 : 16,
+                    12,
+                    wide ? 32 : 16,
+                    32,
+                  ),
+                  children: [
+                    for (var i = 0; i < groups.length; i += wide ? 2 : 1) ...[
+                      if (wide && i + 1 < groups.length)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: _card(snapshot, groups[i])),
+                            const SizedBox(width: 12),
+                            Expanded(child: _card(snapshot, groups[i + 1])),
+                          ],
+                        )
+                      else
+                        _card(snapshot, groups[i]),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
+        ),
       ],
     );
   }
 
-  Widget _cardColumn(List<Group> groups) {
-    return Column(
-      children: [
-        for (final group in groups) ...[
-          _GroupCard(group: group, snapshot: snapshot),
-          const SizedBox(height: 12),
-        ],
-      ],
+  Widget _card(PartnerSnapshot snapshot, Group group) {
+    return _GroupCard(
+      group: group,
+      snapshot: snapshot,
+      onOpen: () => showPartnerGroupSheet(
+        context,
+        snapshot: snapshot,
+        group: group,
+      ),
     );
   }
 }
 
+Key _bucketKey(_ReservationBucket bucket) {
+  return switch (bucket) {
+    _ReservationBucket.upcoming => PartnerKeys.agendaUpcoming,
+    _ReservationBucket.done => PartnerKeys.agendaDone,
+    _ReservationBucket.cancelled => PartnerKeys.agendaCancelled,
+  };
+}
+
+String _bucketLabel(_ReservationBucket bucket) {
+  return switch (bucket) {
+    _ReservationBucket.upcoming => PartnerMessages.upcoming,
+    _ReservationBucket.done => PartnerMessages.done,
+    _ReservationBucket.cancelled => PartnerMessages.cancelledTab,
+  };
+}
+
 class _GroupCard extends StatelessWidget {
-  const _GroupCard({required this.group, required this.snapshot});
+  const _GroupCard({
+    required this.group,
+    required this.snapshot,
+    required this.onOpen,
+  });
 
   final Group group;
   final PartnerSnapshot snapshot;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -537,60 +596,125 @@ class _GroupCard extends StatelessWidget {
       for (final person in group.participants)
         if (person.occupiesSeat) person,
     ];
+    final absences = [
+      for (final person in people)
+        if (snapshot.markedAbsent(group.id, playerIdOf(person)))
+          person.displayName,
+    ];
+    final roomIndex = snapshot.rooms.indexWhere((room) => room.id == group.roomId);
+    final accent = roomIndex < 0
+        ? scheme.primary
+        : roomColor(snapshot.rooms[roomIndex], roomIndex);
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    snapshot.roomNameFor(group),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ColoredBox(color: accent, child: const SizedBox(width: 6)),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            _hm(group.startsAt),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const Spacer(),
+                          _StatusBadge(label: badge),
+                        ],
+                      ),
+                      Text(
+                        formatSession(group.startsAt),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        snapshot.roomNameFor(group),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        progress,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        PartnerMessages.perPerson(formatPrice(group.priceCents)),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 2,
+                        children: [
+                          Text(
+                            '${PartnerMessages.grossLabel} ${formatPrice(money.grossCents)}',
+                          ),
+                          Text(
+                            '${PartnerMessages.commissionLabel} ${formatPrice(money.commissionCents)}',
+                          ),
+                          Text(
+                            '${PartnerMessages.netLabel} ${formatPrice(money.netCents)}',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                      if (group.isCancelled && group.cancelReason.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(group.cancelReason),
+                      ],
+                      if (absences.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text('${PartnerMessages.noShows}: ${absences.join(', ')}'),
+                      ],
+                      const SizedBox(height: 10),
+                      if (people.isEmpty && !group.isCancelled)
+                        const Text(PartnerMessages.nobodyYet)
+                      else if (people.isNotEmpty)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final person in people)
+                              _PlayerChip(
+                                group: group,
+                                person: person,
+                                snapshot: snapshot,
+                                canMark: started && !group.isCancelled,
+                              ),
+                          ],
+                        ),
+                    ],
                   ),
                 ),
-                _StatusBadge(label: badge),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${formatSession(group.startsAt)} · ${PartnerMessages.perPerson(formatPrice(group.priceCents))}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(progress, style: const TextStyle(fontWeight: FontWeight.w700)),
-            if (money.grossCents > 0) ...[
-              const SizedBox(height: 4),
-              Text(
-                '${PartnerMessages.grossLabel} ${formatPrice(money.grossCents)} · ${PartnerMessages.commissionLabel} ${formatPrice(money.commissionCents)} · ${PartnerMessages.netLabel} ${formatPrice(money.netCents)}',
-                style: theme.textTheme.bodyMedium,
               ),
             ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final person in people)
-                  _PlayerChip(
-                    group: group,
-                    person: person,
-                    snapshot: snapshot,
-                    canMark: started && !group.isCancelled,
-                  ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+String _hm(DateTime time) {
+  final hour = time.hour.toString().padLeft(2, '0');
+  final minute = time.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -731,8 +855,27 @@ class _RoomsSection extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.35),
         ),
         const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            key: PartnerKeys.agendaAddRoom,
+            onPressed: () async {
+              final saved = await showPartnerRoomForm(
+                context,
+                snapshot: snapshot,
+              );
+              if (saved == true && context.mounted) {
+                _snack(context, PartnerMessages.roomSaved);
+              }
+            },
+            icon: const Icon(Icons.add),
+            label: const Text(PartnerMessages.newRoom),
+          ),
+        ),
+        const SizedBox(height: 16),
         for (final room in snapshot.rooms) ...[
           _RoomEditor(
+            snapshot: snapshot,
             room: room,
             slots: snapshot.slotsByRoom[room.id] ?? const [],
             now: snapshot.now,
@@ -746,11 +889,13 @@ class _RoomsSection extends StatelessWidget {
 
 class _RoomEditor extends ConsumerStatefulWidget {
   const _RoomEditor({
+    required this.snapshot,
     required this.room,
     required this.slots,
     required this.now,
   });
 
+  final PartnerSnapshot snapshot;
   final EscapeRoom room;
   final List<TimeSlot> slots;
   final DateTime now;
@@ -846,11 +991,30 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.room.name,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.room.name,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final saved = await showPartnerRoomForm(
+                      context,
+                      snapshot: widget.snapshot,
+                      room: widget.room,
+                    );
+                    if (saved == true && context.mounted) {
+                      _snack(context, PartnerMessages.roomSaved);
+                    }
+                  },
+                  child: const Text(PartnerMessages.editRoom),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
