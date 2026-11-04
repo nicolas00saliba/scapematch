@@ -28,6 +28,27 @@ abstract final class PartnerMessages {
   static const roomMinimum = 'Mínimo de pessoas';
   static const roomMaximum = 'Máximo de pessoas';
   static const roomColor = 'Cor na agenda';
+  static const roomStory = 'História da sala';
+  static const roomStoryHint = 'Uma frase que o jogador lê na ficha.';
+  static const roomCategory = 'Tema';
+  static const roomPlayers = 'Faixa de jogadores';
+  static const roomPhotos = 'Fotos';
+  static const roomPhotosBody =
+      'A capa é a primeira foto. Cada moldura é a proporção real do card, da capa e da galeria.';
+  static const roomAddPhotos = 'Enviar fotos';
+  static const roomCover = 'Capa';
+  static const roomMakeCover = 'Usar como capa';
+  static const roomRemovePhoto = 'Remover';
+  static const roomMoveBack = 'Mover para trás';
+  static const roomMoveForward = 'Mover para frente';
+  static const roomExpand = 'Expandir cenário com IA';
+  static const roomSimulated = 'Simulação';
+  static const roomZoom = 'Zoom';
+  static const roomApiKey = 'Chave da API de expansão (opcional)';
+  static const roomApiHelp =
+      'Sem chave, a expansão é uma simulação nesta sessão. A chave não fica no código.';
+  static const roomFrames = 'Molduras';
+  static const roomPhotoUnread = 'Não foi possível ler essa foto.';
   static const back = 'Voltar';
   static const today = 'Hoje';
   static const viewDay = 'Dia';

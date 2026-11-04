@@ -40,6 +40,14 @@ abstract final class PartnerKeys {
   static const agendaSaveSession = Key('agenda-save-session');
   static const agendaSaveRoom = Key('agenda-save-room');
   static const agendaRoomName = Key('agenda-room-name');
+  static const roomForm = Key('room-form');
+  static const roomStory = Key('room-story');
+  static const roomAddPhotos = Key('room-add-photos');
+  static const roomExpand = Key('room-expand');
+  static const roomFramePreview = Key('room-frame-preview');
+  static const roomSimulated = Key('room-simulated');
+  static Key roomCategory(String name) => Key('room-category-$name');
+  static Key roomFrame(String name) => Key('room-frame-$name');
   static const agendaCancel = Key('agenda-cancel');
   static const agendaSheet = Key('agenda-sheet');
   static const agendaUpcoming = Key('agenda-upcoming');

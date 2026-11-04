@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
+import 'package:scapematch/features/catalog/domain/room_frame.dart';
+import 'package:scapematch/features/catalog/domain/room_picture.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 
 /// One playable room. [capacity] is the room limit, not the group size.
@@ -18,6 +22,7 @@ class EscapeRoom {
     this.minimumPlayers = 2,
     this.cancelWindow = const Duration(hours: 2),
     this.accent = 0,
+    this.pictures = const [],
   });
 
   final String id;
@@ -48,21 +53,31 @@ class EscapeRoom {
   /// Cor escolhida pela casa. Zero usa a cor da paleta da agenda.
   final int accent;
 
+  /// Fotos da casa, nesta sessão. A primeira é a capa. Vazio usa o tema.
+  final List<RoomPicture> pictures;
+
+  RoomPicture? get cover => pictures.isEmpty ? null : pictures.first;
+
+  Uint8List? pictureBytes(RoomFrame frame) => cover?.bytesFor(frame);
+
   EscapeRoom copyWith({
     String? name,
+    String? theme,
+    RoomCategory? category,
     int? capacity,
     int? durationMinutes,
     Difficulty? difficulty,
     int? priceCents,
     int? minimumPlayers,
     int? accent,
+    List<RoomPicture>? pictures,
   }) {
     return EscapeRoom(
       id: id,
       houseId: houseId,
       name: name ?? this.name,
-      theme: theme,
-      category: category,
+      theme: theme ?? this.theme,
+      category: category ?? this.category,
       capacity: capacity ?? this.capacity,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       difficulty: difficulty ?? this.difficulty,
@@ -71,6 +86,7 @@ class EscapeRoom {
       minimumPlayers: minimumPlayers ?? this.minimumPlayers,
       cancelWindow: cancelWindow,
       accent: accent ?? this.accent,
+      pictures: pictures ?? this.pictures,
     );
   }
 }

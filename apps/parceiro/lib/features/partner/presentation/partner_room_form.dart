@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/imaging/room_framer.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/room_category.dart';
+import 'package:scapematch/features/catalog/domain/room_frame.dart';
+import 'package:scapematch/features/catalog/presentation/room_labels.dart';
+import 'package:scapematch_parceiro/features/partner/data/photo_picker.dart';
+import 'package:scapematch_parceiro/features/partner/data/scene_expansion.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_room_photos.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
@@ -61,19 +68,29 @@ class PartnerRoomForm extends ConsumerStatefulWidget {
 
 class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
   late final TextEditingController _name;
+  late final TextEditingController _story;
   late final TextEditingController _duration;
   late final TextEditingController _minimum;
   late final TextEditingController _maximum;
   late final TextEditingController _price;
+  late final TextEditingController _apiKey;
   late Difficulty _difficulty;
+  late RoomCategory _category;
   late int _accent;
+  final List<RoomPhotoDraft> _photos = [];
+  int? _selectedPhoto;
+  var _frame = RoomFrame.card;
   String? _error;
+  var _busy = false;
+  var _expanding = false;
 
   @override
   void initState() {
     super.initState();
     final room = widget.room;
     _name = TextEditingController(text: room?.name ?? '');
+    _story = TextEditingController(text: room?.theme ?? '');
+    _category = room?.category ?? RoomCategory.mystery;
     _duration = TextEditingController(text: '${room?.durationMinutes ?? 60}');
     _minimum = TextEditingController(text: '${room?.minimumPlayers ?? 2}');
     _maximum = TextEditingController(text: '${room?.capacity ?? 6}');
@@ -86,37 +103,160 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
     _accent = room == null || room.accent == 0
         ? agendaPalette[paletteIndex % agendaPalette.length]
         : room.accent;
+    _apiKey = TextEditingController(text: ref.read(sceneApiKeyProvider));
+    _loadPictures();
+  }
+
+  Future<void> _loadPictures() async {
+    final pictures = widget.room?.pictures ?? const [];
+    for (final picture in pictures) {
+      try {
+        final image = await decodePhoto(picture.source);
+        if (!mounted) {
+          image.dispose();
+          return;
+        }
+        _photos.add(
+          RoomPhotoDraft(
+            id: picture.id,
+            source: picture.source,
+            image: image,
+            ready: picture.frames,
+          ),
+        );
+      } on Object {
+        // Foto antiga ilegível fica de fora. A casa pode enviar outra.
+      }
+    }
+    if (mounted && _photos.isNotEmpty) {
+      setState(() => _selectedPhoto = 0);
+    }
   }
 
   @override
   void dispose() {
     _name.dispose();
+    _story.dispose();
     _duration.dispose();
     _minimum.dispose();
     _maximum.dispose();
     _price.dispose();
+    _apiKey.dispose();
+    for (final photo in _photos) {
+      photo.dispose();
+    }
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _addPhotos() async {
+    final files = await ref.read(photoPickerProvider).pick();
+    if (!mounted || files.isEmpty) {
+      return;
+    }
+    for (var index = 0; index < files.length; index++) {
+      try {
+        final image = await decodePhoto(files[index]);
+        _photos.add(
+          RoomPhotoDraft(
+            id: 'pic-${DateTime.now().microsecondsSinceEpoch}-$index',
+            source: files[index],
+            image: image,
+          ),
+        );
+      } on Object {
+        if (mounted) {
+          setState(() => _error = PartnerMessages.roomPhotoUnread);
+        }
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedPhoto ??= _photos.isEmpty ? null : 0;
+    });
+  }
+
+  Future<void> _expand() async {
+    final index = _selectedPhoto;
+    if (index == null) {
+      return;
+    }
+    final draft = _photos[index];
+    setState(() {
+      _expanding = true;
+      _error = null;
+    });
+    try {
+      final bytes = await ref.read(sceneExpansionProvider).expand(
+        source: draft.image,
+        frame: _frame,
+      );
+      final simulated = ref.read(sceneExpansionProvider).isSimulation;
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        draft.expanded[_frame] = bytes;
+        if (simulated) {
+          draft.simulated.add(_frame);
+        } else {
+          draft.simulated.remove(_frame);
+        }
+      });
+    } on SceneExpansionException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } on Object {
+      if (mounted) {
+        setState(() => _error = 'Não foi possível expandir o cenário.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _expanding = false);
+      }
+    }
+  }
+
+  Future<void> _save() async {
     final price = parseReais(_price.text);
     if (price == null) {
       setState(() => _error = 'Informe o preço em reais.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final pictures = [
+      for (final photo in _photos) await photo.toPicture(),
+    ];
+    if (!mounted) {
       return;
     }
     final error = ref.read(partnerRepositoryProvider).saveRoom(
       houseId: widget.snapshot.house.id,
       roomId: widget.room?.id,
       name: _name.text,
+      theme: _story.text,
+      category: _category,
       difficulty: _difficulty,
       durationMinutes: int.tryParse(_duration.text.trim()) ?? 0,
       minimumPlayers: int.tryParse(_minimum.text.trim()) ?? 0,
       capacity: int.tryParse(_maximum.text.trim()) ?? 0,
       priceCents: price,
       accent: _accent,
+      pictures: pictures,
     );
+    if (!mounted) {
+      return;
+    }
     if (error != null) {
-      setState(() => _error = error);
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
       return;
     }
     ref.read(partnerRevisionProvider.notifier).bump();
@@ -126,9 +266,13 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
   @override
   Widget build(BuildContext context) {
     final creating = widget.room == null;
-    return ListView(
+    final simulated = ref.watch(sceneApiKeyProvider).isEmpty;
+    return SingleChildScrollView(
+      key: PartnerKeys.roomForm,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Text(
           creating ? PartnerMessages.newRoom : PartnerMessages.editRoom,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -144,6 +288,40 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
             labelText: PartnerMessages.roomName,
             border: OutlineInputBorder(),
           ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: PartnerKeys.roomStory,
+          controller: _story,
+          minLines: 2,
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: PartnerMessages.roomStory,
+            hintText: PartnerMessages.roomStoryHint,
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          PartnerMessages.roomCategory,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final category in RoomCategory.values)
+              ChoiceChip(
+                key: PartnerKeys.roomCategory(category.name),
+                label: Text(roomCategoryLabel(category)),
+                selected: _category == category,
+                onSelected: (_) => setState(() => _category = category),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
         Text(
@@ -173,7 +351,14 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
             border: OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        Text(
+          PartnerMessages.roomPlayers,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -244,6 +429,53 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
               ),
           ],
         ),
+        const SizedBox(height: 20),
+        RoomPhotoStudio(
+          photos: _photos,
+          selected: _selectedPhoto,
+          frame: _frame,
+          expanding: _expanding,
+          simulatedProvider: simulated,
+          apiKey: _apiKey,
+          error: null,
+          onApiKey: (value) => ref.read(sceneApiKeyProvider.notifier).setKey(value),
+          onAdd: _addPhotos,
+          onSelect: (index) => setState(() => _selectedPhoto = index),
+          onFrame: (frame) => setState(() => _frame = frame),
+          onExpand: _expand,
+          onRemove: (index) {
+            setState(() {
+              _photos.removeAt(index).dispose();
+              if (_photos.isEmpty) {
+                _selectedPhoto = null;
+              } else if (_selectedPhoto != null && _selectedPhoto! >= _photos.length) {
+                _selectedPhoto = _photos.length - 1;
+              }
+            });
+          },
+          onMove: (index, delta) {
+            setState(() {
+              final next = index + delta;
+              final photo = _photos.removeAt(index);
+              _photos.insert(next, photo);
+              _selectedPhoto = next;
+            });
+          },
+          onCover: (index) {
+            setState(() {
+              final photo = _photos.removeAt(index);
+              _photos.insert(0, photo);
+              _selectedPhoto = 0;
+            });
+          },
+          onPlace: (frame, placement) {
+            final index = _selectedPhoto;
+            if (index == null) {
+              return;
+            }
+            setState(() => _photos[index].place(frame, placement));
+          },
+        ),
         if (_error != null) ...[
           const SizedBox(height: 12),
           Text(
@@ -254,10 +486,11 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
         const SizedBox(height: 16),
         FilledButton(
           key: PartnerKeys.agendaSaveRoom,
-          onPressed: _save,
+          onPressed: _busy ? null : _save,
           child: const Text(PartnerMessages.saveRoom),
         ),
-      ],
+        ],
+      ),
     );
   }
 }
