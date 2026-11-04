@@ -52,6 +52,7 @@ abstract final class PartnerMessages {
   static const viewThreeDays = '3 dias';
   static const viewWeek = 'Semana';
   static const viewMonth = 'Mês';
+  static const viewYear = 'Ano';
   static const agendaViews = 'Visão';
   static const calendarRooms = 'Cores das salas';
   static const free = 'Livre';

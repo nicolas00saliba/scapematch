@@ -20,7 +20,7 @@ const _weekdayLetters = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
 const _gutterWidth = 56.0;
 const _nowColor = Color(0xFFE04F3A);
 
-enum _AgendaView { day, threeDays, week, month }
+enum _AgendaView { day, threeDays, week, month, year }
 
 Future<void> showPartnerGroupSheet(
   BuildContext context, {
@@ -98,6 +98,7 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
       _AgendaView.threeDays => _focus.add(Duration(days: 3 * direction)),
       _AgendaView.week => _focus.add(Duration(days: 7 * direction)),
       _AgendaView.month => _addMonths(_focus, direction),
+      _AgendaView.year => _addMonths(_focus, direction * 12),
     };
     setState(() {
       _focus = _dateOnly(next);
@@ -144,33 +145,40 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
           title: _titleFor(view),
           miniOpen: _miniOpen,
           showMenu: !wide,
-          showChevrons: wide,
+          showChevrons: wide || view == _AgendaView.year,
           onMenu: () => setState(() => _menuOpen = !_menuOpen),
           onTitle: () => setState(() => _miniOpen = !_miniOpen),
           onPrevious: () => _shift(-1),
           onNext: () => _shift(1),
           onToday: _goToday,
         ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: _miniOpen
-              ? _MiniMonth(
-                  month: _miniMonth,
-                  focus: _focus,
-                  today: widget.snapshot.now,
-                  marked: _markedDays(widget.snapshot),
-                  onPrevious: () => setState(() {
-                    _miniMonth = DateTime(_miniMonth.year, _miniMonth.month - 1);
-                  }),
-                  onNext: () => setState(() {
-                    _miniMonth = DateTime(_miniMonth.year, _miniMonth.month + 1);
-                  }),
-                  onDay: (day) => _focusDay(day),
-                )
-              : const SizedBox(width: double.infinity),
-        ),
+        if (!wide)
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _miniOpen
+                ? _MiniMonth(
+                    month: _miniMonth,
+                    focus: _focus,
+                    today: widget.snapshot.now,
+                    marked: _markedDays(widget.snapshot),
+                    onPrevious: () => setState(() {
+                      _miniMonth = DateTime(
+                        _miniMonth.year,
+                        _miniMonth.month - 1,
+                      );
+                    }),
+                    onNext: () => setState(() {
+                      _miniMonth = DateTime(
+                        _miniMonth.year,
+                        _miniMonth.month + 1,
+                      );
+                    }),
+                    onDay: (day) => _focusDay(day),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
         Expanded(
           child: Stack(
             children: [
@@ -179,12 +187,34 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
                 children: [
                   if (wide)
                     SizedBox(
-                      width: 232,
+                      width: 300,
                       child: _ViewDrawer(
                         view: view,
                         colors: colors,
                         snapshot: widget.snapshot,
                         onView: _selectView,
+                        calendar: _miniOpen
+                            ? _MiniMonth(
+                                compact: true,
+                                month: _miniMonth,
+                                focus: _focus,
+                                today: widget.snapshot.now,
+                                marked: _markedDays(widget.snapshot),
+                                onPrevious: () => setState(() {
+                                  _miniMonth = DateTime(
+                                    _miniMonth.year,
+                                    _miniMonth.month - 1,
+                                  );
+                                }),
+                                onNext: () => setState(() {
+                                  _miniMonth = DateTime(
+                                    _miniMonth.year,
+                                    _miniMonth.month + 1,
+                                  );
+                                }),
+                                onDay: (day) => _focusDay(day),
+                              )
+                            : null,
                       ),
                     ),
                   Expanded(
@@ -198,15 +228,22 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
                           _shift(1);
                         }
                       },
-                      child: view == _AgendaView.month
-                          ? _MonthBoard(
-                              focus: _focus,
-                              snapshot: widget.snapshot,
-                              colors: colors,
-                              onDay: (day) => _focusDay(day, asDay: true),
-                              onOpen: (group) => _showGroup(context, group),
-                            )
-                          : _TimeGrid(
+                      child: switch (view) {
+                        _AgendaView.month => _MonthBoard(
+                          focus: _focus,
+                          snapshot: widget.snapshot,
+                          colors: colors,
+                          onDay: (day) => _focusDay(day, asDay: true),
+                          onOpen: (group) => _showGroup(context, group),
+                        ),
+                        _AgendaView.year => _YearBoard(
+                          focus: _focus,
+                          marked: _markedDays(widget.snapshot),
+                          today: widget.snapshot.now,
+                          onDay: (day) => _focusDay(day, asDay: true),
+                          onMonth: _openMonth,
+                        ),
+                        _ => _TimeGrid(
                               days: days,
                               focus: _focus,
                               snapshot: widget.snapshot,
@@ -222,6 +259,7 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
                                 startsAt: startsAt,
                               ),
                             ),
+                      },
                     ),
                   ),
                 ],
@@ -273,10 +311,19 @@ class _PartnerAgendaState extends ConsumerState<PartnerAgenda> {
         return '$from – $to';
       }
     }
-    if (view == _AgendaView.month) {
-      return _cap(DateFormat('MMMM', 'pt_BR').format(_focus));
+    if (view == _AgendaView.year) {
+      return '${_focus.year}';
     }
     return _cap(DateFormat('MMMM', 'pt_BR').format(_focus));
+  }
+
+  void _openMonth(DateTime month) {
+    setState(() {
+      _focus = DateTime(month.year, month.month);
+      _miniMonth = DateTime(month.year, month.month);
+      _view = _AgendaView.month;
+      _menuOpen = false;
+    });
   }
 
   Future<void> _showGroup(BuildContext context, Group group) {
@@ -409,6 +456,7 @@ class _MiniMonth extends StatelessWidget {
     required this.onPrevious,
     required this.onNext,
     required this.onDay,
+    this.compact = false,
   });
 
   final DateTime month;
@@ -419,23 +467,35 @@ class _MiniMonth extends StatelessWidget {
   final VoidCallback onNext;
   final ValueChanged<DateTime> onDay;
 
+  /// Bloco curto do desktop, no estilo do calendário do Teams.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final first = DateTime(month.year, month.month);
     final start = first.subtract(Duration(days: first.weekday - DateTime.monday));
-    final title = _cap(DateFormat("MMMM 'de' y", 'pt_BR').format(month));
-    return Material(
+    final title = _cap(
+      DateFormat(compact ? 'MMMM y' : "MMMM 'de' y", 'pt_BR').format(month),
+    );
+    final calendar = Material(
       key: PartnerKeys.agendaMiniCalendar,
       color: scheme.surface,
+      shape: compact
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: scheme.outlineVariant),
+            )
+          : null,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+        padding: EdgeInsets.fromLTRB(compact ? 0 : 8, 4, compact ? 0 : 8, 8),
         child: Column(
           children: [
             Row(
               children: [
                 IconButton(
                   tooltip: 'Mês anterior',
+                  visualDensity: compact ? VisualDensity.compact : null,
                   onPressed: onPrevious,
                   icon: const Icon(Icons.chevron_left),
                 ),
@@ -448,6 +508,7 @@ class _MiniMonth extends StatelessWidget {
                 ),
                 IconButton(
                   tooltip: 'Próximo mês',
+                  visualDensity: compact ? VisualDensity.compact : null,
                   onPressed: onNext,
                   icon: const Icon(Icons.chevron_right),
                 ),
@@ -482,6 +543,7 @@ class _MiniMonth extends StatelessWidget {
                         today: today,
                         marked: marked,
                         onDay: onDay,
+                        dense: compact,
                       ),
                     ),
                 ],
@@ -490,6 +552,7 @@ class _MiniMonth extends StatelessWidget {
         ),
       ),
     );
+    return calendar;
   }
 }
 
@@ -501,6 +564,8 @@ class _MiniDay extends StatelessWidget {
     required this.today,
     required this.marked,
     required this.onDay,
+    this.dense = false,
+    this.keyed = true,
   });
 
   final DateTime day;
@@ -509,6 +574,8 @@ class _MiniDay extends StatelessWidget {
   final DateTime today;
   final Set<DateTime> marked;
   final ValueChanged<DateTime> onDay;
+  final bool dense;
+  final bool keyed;
 
   @override
   Widget build(BuildContext context) {
@@ -522,17 +589,18 @@ class _MiniDay extends StatelessWidget {
         : isToday
         ? scheme.onPrimary
         : scheme.onSurface;
+    final circle = dense ? 22.0 : 28.0;
     return InkWell(
-      key: PartnerKeys.agendaMiniDay(day.year, day.month, day.day),
+      key: keyed ? PartnerKeys.agendaMiniDay(day.year, day.month, day.day) : null,
       onTap: () => onDay(day),
       child: SizedBox(
-        height: 42,
+        height: dense ? 32 : 42,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: circle,
+              height: circle,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isToday
@@ -545,14 +613,15 @@ class _MiniDay extends StatelessWidget {
               child: Text(
                 '${day.day}',
                 style: TextStyle(
+                  fontSize: dense ? 11 : null,
                   fontWeight: FontWeight.w700,
                   color: numberColor,
                 ),
               ),
             ),
             Container(
-              width: 4,
-              height: 4,
+              width: dense ? 3 : 4,
+              height: dense ? 3 : 4,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: has ? scheme.primary : Colors.transparent,
@@ -571,12 +640,14 @@ class _ViewDrawer extends StatelessWidget {
     required this.colors,
     required this.snapshot,
     required this.onView,
+    this.calendar,
   });
 
   final _AgendaView view;
   final Map<String, Color> colors;
   final PartnerSnapshot snapshot;
   final ValueChanged<_AgendaView> onView;
+  final Widget? calendar;
 
   @override
   Widget build(BuildContext context) {
@@ -590,8 +661,12 @@ class _ViewDrawer extends StatelessWidget {
         ),
         child: ListView(
           primary: false,
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
           children: [
+            if (calendar != null) ...[
+              calendar!,
+              const SizedBox(height: 8),
+            ],
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
               child: Text(
@@ -685,6 +760,11 @@ class _ViewTile extends StatelessWidget {
         Icons.calendar_view_month_outlined,
         PartnerMessages.viewMonth,
         PartnerKeys.agendaViewMonth,
+      ),
+      _AgendaView.year => (
+        Icons.grid_view_outlined,
+        PartnerMessages.viewYear,
+        PartnerKeys.agendaViewYear,
       ),
     };
     return Padding(
@@ -1067,6 +1147,143 @@ class _EventBlock extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _YearBoard extends StatelessWidget {
+  const _YearBoard({
+    required this.focus,
+    required this.marked,
+    required this.today,
+    required this.onDay,
+    required this.onMonth,
+  });
+
+  final DateTime focus;
+  final Set<DateTime> marked;
+  final DateTime today;
+  final ValueChanged<DateTime> onDay;
+  final ValueChanged<DateTime> onMonth;
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = isScapeDesktop(context) ? 4 : 2;
+    return ListView(
+      key: PartnerKeys.agendaYearGrid,
+      primary: false,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+      children: [
+        for (var row = 0; row < 12; row += columns)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var column = 0; column < columns; column++)
+                  Expanded(
+                    child: row + column < 12
+                        ? _YearMonth(
+                            month: DateTime(focus.year, row + column + 1),
+                            focus: focus,
+                            today: today,
+                            marked: marked,
+                            onDay: onDay,
+                            onMonth: () => onMonth(
+                              DateTime(focus.year, row + column + 1),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _YearMonth extends StatelessWidget {
+  const _YearMonth({
+    required this.month,
+    required this.focus,
+    required this.today,
+    required this.marked,
+    required this.onDay,
+    required this.onMonth,
+  });
+
+  final DateTime month;
+  final DateTime focus;
+  final DateTime today;
+  final Set<DateTime> marked;
+  final ValueChanged<DateTime> onDay;
+  final VoidCallback onMonth;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final first = DateTime(month.year, month.month);
+    final start = first.subtract(
+      Duration(days: first.weekday - DateTime.monday),
+    );
+    final name = _cap(DateFormat('MMMM', 'pt_BR').format(month));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: onMonth,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text(
+                  name,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              for (final letter in _weekdayLetters)
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      letter,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          for (var week = 0; week < 6; week++)
+            Row(
+              children: [
+                for (var day = 0; day < 7; day++)
+                  Expanded(
+                    child: _MiniDay(
+                      day: start.add(Duration(days: week * 7 + day)),
+                      month: month,
+                      focus: focus,
+                      today: today,
+                      marked: marked,
+                      onDay: onDay,
+                      dense: true,
+                      keyed: false,
+                    ),
+                  ),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -1765,7 +1982,7 @@ List<DateTime> _daysOf(_AgendaView view, DateTime focus) {
     _AgendaView.week => [
       for (var i = 0; i < 7; i++) _monday(focus).add(Duration(days: i)),
     ],
-    _AgendaView.month => const [],
+    _AgendaView.month || _AgendaView.year => const [],
   };
 }
 
