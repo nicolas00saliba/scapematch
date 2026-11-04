@@ -519,17 +519,37 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   final slotCamara = schedule.free('slot-cwb-camara-free', camara.id, 4);
   // Grupos extras de Curitiba, em horários redondos da casa.
   // Rua XV fica com sexta e sábado mais cheios; o Batel ocupa o meio da semana.
-  final slotLabQuase = schedule.spreadSlot('slot-cwb-lab-quase', laboratorio.id, 2);
-  final slotSotaoQuase = schedule.spreadSlot('slot-cwb-sotao-quase', sotao.id, 3);
+  final slotLabQuase = schedule.spreadSlot(
+    'slot-cwb-lab-quase',
+    laboratorio.id,
+    2,
+  );
+  final slotSotaoQuase = schedule.spreadSlot(
+    'slot-cwb-sotao-quase',
+    sotao.id,
+    3,
+  );
   final slotNaveQuase = schedule.spreadSlot('slot-cwb-nave-quase', nave.id, 4);
   final slotEngrenagemQuase = schedule.spreadSlot(
     'slot-cwb-engrenagem-quase',
     engrenagem.id,
     1,
   );
-  final slotTumbaQuase = schedule.spreadSlot('slot-cwb-tumba-quase', tumba.id, 0);
-  final slotTrilhaQuase = schedule.spreadSlot('slot-cwb-trilha-quase', trilha.id, 5);
-  final slotPoraoQuase = schedule.spreadSlot('slot-cwb-porao-quase', poraoXv.id, 7);
+  final slotTumbaQuase = schedule.spreadSlot(
+    'slot-cwb-tumba-quase',
+    tumba.id,
+    0,
+  );
+  final slotTrilhaQuase = schedule.spreadSlot(
+    'slot-cwb-trilha-quase',
+    trilha.id,
+    5,
+  );
+  final slotPoraoQuase = schedule.spreadSlot(
+    'slot-cwb-porao-quase',
+    poraoXv.id,
+    7,
+  );
   final slotSateliteQuase = schedule.spreadSlot(
     'slot-cwb-satelite-quase',
     satelite.id,
@@ -1085,13 +1105,14 @@ class _SampleSchedule {
   /// 1 h 30 min à frente, no :00 ou :30, para o teste da janela continuar
   /// com uma única sessão por cidade.
   DateTime get soonAt {
-    // Sempre 14:00, 16:30, 19:00 ou 21:00, e mais de 1 h à frente
-    // para o prazo de fechar ainda não ter passado.
+    // Sempre 14:00, 16:30, 19:00 ou 21:00, e mais de 1 h à frente.
+    // No instante exato (13:00 para a sessão das 14:00) o prazo curto
+    // já passou e o grupo nasceria cancelado, sumindo das listas.
     final earliest = now.add(const Duration(hours: 1));
-    for (final candidate in _walk(after: earliest.subtract(const Duration(minutes: 1)))) {
+    for (final candidate in _walk(after: earliest)) {
       return candidate;
     }
-    return earliest;
+    return earliest.add(const Duration(minutes: 1));
   }
 
   /// Alguns dias à frente, de noite, fora da janela de 2 h.
@@ -1129,16 +1150,14 @@ class _SampleSchedule {
     final afterSoon = soonAt.add(const Duration(minutes: 100));
     final afterWindow = now.add(const Duration(hours: 2));
     final after = afterSoon.isAfter(afterWindow) ? afterSoon : afterWindow;
-    return _walk(after: after.subtract(const Duration(minutes: 1))).elementAt(
-      index,
-    );
+    return _walk(after: after.subtract(const Duration(minutes: 1)))
+        .elementAt(index);
   }
 
   DateTime freeAt(int index) {
     final after = now.add(const Duration(hours: 26));
-    return _walk(after: after.subtract(const Duration(minutes: 1))).elementAt(
-      index,
-    );
+    return _walk(after: after.subtract(const Duration(minutes: 1)))
+        .elementAt(index);
   }
 
   TimeSlot soonSlot(String id, String roomId) => _take(id, roomId, soonAt);

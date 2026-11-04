@@ -178,6 +178,25 @@ void main() {
     },
   );
 
+  test('the soon sample group survives the exact one-hour mark', () async {
+    final now = DateTime(2026, 11, 4, 13);
+    final database = buildSampleDatabase(now: now);
+    final groups = FakeGroupRepository(
+      database,
+      clock: FixedClock(now),
+      latency: Duration.zero,
+    );
+    final listed = await groups.listByCity(SampleIds.curitiba);
+    expect(
+      listed.any((group) => group.id == SampleIds.groupCwbCofreAlmost),
+      isTrue,
+    );
+    final almost = listed.firstWhere(
+      (group) => group.id == SampleIds.groupCwbCofreAlmost,
+    );
+    expect(almost.startsAt.isAfter(now.add(const Duration(hours: 1))), isTrue);
+  });
+
   test('the creator block stops a join', () async {
     final now = sampleNow;
     final database = buildSampleDatabase(now: now);
