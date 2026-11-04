@@ -86,6 +86,15 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
               height: 1.35,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            PartnerMessages.quickDemo,
+            key: PartnerKeys.partnerQuickDemo,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: scheme.primary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 20),
           TextField(
             key: PartnerKeys.partnerEmail,

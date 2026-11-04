@@ -230,6 +230,30 @@ void main() {
     }
   });
 
+  testWidgets('Voltar returns to the previous intro page', (tester) async {
+    await pumpScapeMatch(tester, showOnboarding: true);
+    expect(find.byKey(AppKeys.onboardingBack), findsNothing);
+
+    for (final size in const [Size(390, 844), Size(1440, 900)]) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      expect(find.byKey(AppKeys.onboardingBack), findsNothing, reason: '$size');
+      await tester.tap(find.byKey(AppKeys.onboardingNext));
+      await tester.pumpAndSettle();
+      expect(find.text(OnboardingMessages.nearTitle), findsOneWidget);
+      expect(
+        find.byKey(AppKeys.onboardingBack),
+        findsOneWidget,
+        reason: '$size',
+      );
+      await tester.tap(find.byKey(AppKeys.onboardingBack));
+      await tester.pumpAndSettle();
+      expect(find.text(OnboardingMessages.findTitle), findsOneWidget);
+      expect(find.byKey(AppKeys.onboardingBack), findsNothing, reason: '$size');
+    }
+  });
+
   testWidgets('a retina desktop does not upscale the intro photo', (
     tester,
   ) async {
@@ -242,10 +266,10 @@ void main() {
       isTrue,
     );
     final photo = tester.getSize(find.byType(ScapePhoto));
-    expect(photo.width, greaterThan(900));
-    expect(photo.width, lessThanOrEqualTo(2000 / 2 + 0.5));
-    expect(photo.height, lessThanOrEqualTo(1333 / 2 + 0.5));
-    expect(photo.width / photo.height, closeTo(2000 / 1333, 0.02));
+    expect(photo.width, greaterThan(500));
+    expect(photo.width, lessThanOrEqualTo(1152 / 2 + 0.5));
+    expect(photo.height, lessThanOrEqualTo(864 / 2 + 0.5));
+    expect(photo.width / photo.height, closeTo(4 / 3, 0.02));
   });
 }
 
@@ -253,11 +277,7 @@ void _expectDesktopIntro(WidgetTester tester, Size size) {
   final photo = tester.getSize(find.byType(ScapePhoto));
   expect(photo.width, lessThan(size.width * 0.7), reason: '$size');
   expect(photo.height, lessThan(size.height - 40), reason: '$size');
-  expect(
-    photo.width / photo.height,
-    closeTo(2000 / 1333, 0.02),
-    reason: '$size',
-  );
+  expect(photo.width / photo.height, closeTo(4 / 3, 0.02), reason: '$size');
   final title = tester.getTopLeft(find.text(OnboardingMessages.findTitle));
   expect(title.dx, greaterThan(size.width * 0.5), reason: '$size');
   final skip = tester.getCenter(find.byKey(AppKeys.onboardingSkip));
