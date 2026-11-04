@@ -20,6 +20,8 @@ void main() {
       tester,
       overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
     );
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
+    await tester.pumpAndSettle();
 
     expect(
       find.descendant(

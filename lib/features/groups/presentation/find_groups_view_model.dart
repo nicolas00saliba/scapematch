@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -72,6 +73,20 @@ List<Group> filterGroupsByGameType(List<Group> groups, String gameTypeId) {
   return [
     for (final group in groups)
       if (group.gameType == gameTypeId) group,
+  ];
+}
+
+/// Sessão em andamento e ainda faltam 1 ou 2 pessoas para fechar.
+///
+/// O celular usa isso no lugar da lista inteira quando a busca está vazia.
+/// Zero vagas não entra: o grupo já fechou. Três ou mais também não.
+List<Group> filterGroupsHappeningAndClosing(List<Group> groups, DateTime now) {
+  return [
+    for (final group in groups)
+      if (GroupRules.hasStarted(startsAt: group.startsAt, now: now) &&
+          !GroupRules.hasEnded(endsAt: group.endsAt, now: now) &&
+          group.isAlmostFull)
+        group,
   ];
 }
 

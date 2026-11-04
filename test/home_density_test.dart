@@ -11,6 +11,7 @@ import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
+import 'support/fixed_groups.dart';
 import 'support/pump_app.dart';
 
 void main() {
@@ -20,7 +21,7 @@ void main() {
     await pumpScapeMatch(tester);
 
     double top(Key key) => tester.getTopLeft(find.byKey(key)).dy;
-    expect(top(AppKeys.groupWindow), lessThan(top(AppKeys.promoCarousel)));
+    expect(find.byKey(AppKeys.groupWindow), findsNothing);
     expect(top(AppKeys.promoCarousel), lessThan(top(AppKeys.newsFeed)));
     expect(top(AppKeys.newsFeed), lessThan(top(AppKeys.roomsCarousel)));
     expect(find.text('Promoções'), findsOneWidget);
@@ -32,7 +33,7 @@ void main() {
     expect(find.byKey(AppKeys.promoDots), findsOneWidget);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
@@ -84,11 +85,10 @@ void main() {
     final scrollable = tester.state<ScrollableState>(verticalScrollable);
     final viewportTop = tester.getTopLeft(verticalScrollable).dy;
     final viewportBottom = viewportTop + scrollable.position.viewportDimension;
-    final groups = tester.getRect(find.byKey(AppKeys.groupWindow));
     final promos = tester.getRect(find.byKey(AppKeys.promoCarousel));
 
-    expect(groups.top, greaterThanOrEqualTo(viewportTop - 1));
-    expect(promos.top, greaterThan(groups.bottom - 1));
+    expect(find.byKey(AppKeys.groupWindow), findsNothing);
+    expect(promos.top, greaterThanOrEqualTo(viewportTop - 1));
     expect(promos.top, lessThan(viewportBottom));
     final visible = (viewportBottom - promos.top).clamp(0.0, promos.height);
     expect(
@@ -409,7 +409,13 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await pumpScapeMatch(tester);
+    final source = curitibaSampleGroups();
+    await pumpScapeMatch(
+      tester,
+      overrides: fixedGroups([
+        for (var index = 0; index < 4; index++) liveClosing(source[index]),
+      ]),
+    );
     tester.view.physicalSize = const Size(390, 844);
     await tester.pumpAndSettle();
 
@@ -466,7 +472,17 @@ void main() {
   testWidgets('the group window scrolls almost-full groups and obeys filters', (
     tester,
   ) async {
-    await pumpScapeMatch(tester);
+    final source = curitibaSampleGroups();
+    final porao = source.firstWhere((group) => group.id == 'grp-cwb-porao-rpg');
+    final rpg = liveClosing(porao, missing: 1);
+    await pumpScapeMatch(
+      tester,
+      overrides: fixedGroups([
+        rpg,
+        for (var index = 1; index < 5; index++) liveClosing(source[index]),
+        source[5],
+      ]),
+    );
     final scrollable = find.descendant(
       of: find.byKey(AppKeys.groupWindow),
       matching: find.byWidgetPredicate(

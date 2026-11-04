@@ -96,7 +96,7 @@ Future<void> _shotHome(
     );
   } else {
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
+    expect(find.byKey(AppKeys.groupWindow), findsNothing);
   }
 
   await _shot(tester, dir, name, size);
