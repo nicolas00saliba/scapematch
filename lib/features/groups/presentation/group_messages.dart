@@ -159,7 +159,7 @@ abstract final class GroupMessages {
       JoinFailureReason.partyDoesNotFit =>
         'Não há vagas para a turma inteira. Ninguém entrou.',
       JoinFailureReason.companionNotFriend =>
-        'Só dá para entrar com amigos que já aceitaram você.',
+        'Só dá para entrar com quem já aceitou a mesma turma.',
       JoinFailureReason.companionUnavailable =>
         'Alguém da turma não pode entrar nesse horário. Ninguém entrou.',
     };
@@ -184,7 +184,7 @@ abstract final class GroupMessages {
       CreateGroupFailureReason.crewLeavesNoOpenSeat =>
         'A turma ocuparia todas as vagas. Deixe ao menos uma aberta.',
       CreateGroupFailureReason.companionNotFriend =>
-        'Só dá para levar amigos que já aceitaram você.',
+        'Só dá para levar quem já aceitou a mesma turma.',
       CreateGroupFailureReason.companionUnavailable =>
         'Alguém da turma não pode nesse horário.',
     };

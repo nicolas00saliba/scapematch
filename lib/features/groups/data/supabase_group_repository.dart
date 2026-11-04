@@ -295,6 +295,14 @@ class SupabaseGroupRepository implements GroupRepository {
   }) async {
     try {
       await client.rpc('delete_group', params: {'p_group_id': groupId});
+      try {
+        await client.functions.invoke(
+          'cancel-house-group',
+          body: {'group_id': groupId, 'action': 'release'},
+        );
+      } on Object {
+        // O grupo já foi cancelado. A cobrança fica pending até o estorno.
+      }
     } on PostgrestException catch (error) {
       return DeleteGroupFailure(
         deleteFailure(rpcText(code: error.code, message: error.message)),

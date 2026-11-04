@@ -175,6 +175,7 @@ type PaymentProvider = {
   authorizeCard(input: CardInput): Promise<{ id: string; status: string }>;
   capture(paymentId: string): Promise<{ id: string; status: string }>;
   refund(paymentId: string): Promise<{ id: string; status: string }>;
+  cancelAuthorization(paymentId: string): Promise<{ id: string; status: string }>;
   getPayment(paymentId: string): Promise<PaymentView>;
 };
 
@@ -339,6 +340,22 @@ export class AsaasProvider implements PaymentProvider {
       id: stringField(body, "id"),
       status: stringField(body, "status"),
     }));
+  }
+
+  /// Cancela uma autorização de cartão que ainda não foi capturada.
+  cancelAuthorization(
+    paymentId: string,
+  ): Promise<{ id: string; status: string }> {
+    return this.#send(`/payments/${paymentId}`, undefined, "DELETE").then(
+      (body) => ({
+        id: typeof body.id === "string" && body.id.length > 0
+          ? body.id
+          : paymentId,
+        status: typeof body.status === "string" && body.status.length > 0
+          ? body.status
+          : "DELETED",
+      }),
+    );
   }
 
   getPayment(paymentId: string): Promise<PaymentView> {

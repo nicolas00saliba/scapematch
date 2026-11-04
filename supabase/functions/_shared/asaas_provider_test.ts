@@ -105,6 +105,9 @@ Deno.test("o cartão reserva com authorizeOnly e a captura usa o endpoint oficia
   );
   await provider.refund("pay_card");
   assert(calls[2].url.endsWith("/payments/pay_card/refund"));
+  await provider.cancelAuthorization("pay_card");
+  assertEquals(calls[3].init.method, "DELETE");
+  assert(calls[3].url.endsWith("/payments/pay_card"));
 });
 
 Deno.test("a subconta devolve walletId e apiKey para a função gravar", async () => {

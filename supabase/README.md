@@ -18,7 +18,8 @@ supabase db push
 7. `migrations/20261104120600_fiscal_terms.sql` — notas fiscais, dados fiscais da casa, chave da subconta fora do app, e o aceite dos termos.
 8. `migrations/20261104120700_friends_crews.sql` — amigos, turmas, avisos no app e entrada em grupo com várias vagas. Vem depois de `20261104120600_fiscal_terms.sql` e não usa tabela de nota fiscal. Não foi aplicada no projeto.
 9. `migrations/20261104130000_venue_duplicates.sql` — documento normalizado com índice único, nome com `pg_trgm`, `check_venue_duplicates`, reivindicação e a fila de aprovar, recusar ou mesclar.
-10. `migrations/20261104140000_house_cancel_group.sql` — a casa cancela o grupo dela. O dono do grupo continua com `delete_group`. Não foi aplicada no projeto.
+10. `migrations/20261104140000_house_cancel_group.sql` — a casa cancela o grupo dela e deixa o estorno `pending`. O botão chama `cancel-house-group`. Não foi aplicada no projeto.
+11. `migrations/20261104150000_refund_fix.sql` — `delete_group` também deixa `pending` em vez de `refunded`, avisa os jogadores e tira privilégios extras de `venues` e `profiles`. Não foi aplicada no projeto.
 
 `seed_demo.sql` fica **fora** dessa lista. É opcional e cria a casa real ScapeMatch Demo (Curitiba, três salas, horários e duas promoções). Não é dado de exemplo do app.
 
@@ -57,7 +58,8 @@ A implementação é `AsaasProvider` em `supabase/functions/_shared/asaas_provid
 | --- | --- | --- |
 | `provision-venue-wallet` | admin | Cria a subconta (`POST /v3/accounts`) e grava só o `walletId`. A `apiKey` da subconta não é salva. |
 | `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly`. O percentual do split sai da tabela de comissão, não do celular. |
-| `settle-charges` | host, casa ou admin | Grupo fechado: captura o cartão e lança o extrato. Grupo que não fechou: estorna Pix pago e a reserva do cartão. |
+| `settle-charges` | host, casa ou admin | Grupo fechado: captura o cartão e lança o extrato. Grupo que não fechou: estorna Pix pago e cancela a autorização do cartão. |
+| `cancel-house-group` | dono da casa ou admin | Cancela o grupo (`house_cancel_group`) e, com a service role, estorna o Pix ou cancela a autorização. `refunded` só depois da resposta da API ou do webhook. |
 | `asaas-webhook` | não | Exige o header `asaas-access-token` igual a `ASAAS_WEBHOOK_TOKEN`. Quando a cobrança fica paga e o grupo está fechado, emite as NFS-e. |
 | `configure-venue-fiscal` | dono ou admin | Grava inscrição municipal, código de serviço e alíquota. Casa com CPF fica `sem_emissao`. Com a chave da subconta, chama `POST /v3/fiscalInfo`. A senha da prefeitura não é gravada. |
 | `invoice-document` | dono, jogador ou admin | Baixa PDF ou XML da nota que o RLS deixa ver. No sandbox o arquivo é de teste. |
@@ -78,6 +80,7 @@ Deploy, na sua máquina, depois da revisão:
 supabase functions deploy provision-venue-wallet
 supabase functions deploy create-charge
 supabase functions deploy settle-charges
+supabase functions deploy cancel-house-group
 supabase functions deploy asaas-webhook --no-verify-jwt
 supabase functions deploy configure-venue-fiscal
 supabase functions deploy invoice-document

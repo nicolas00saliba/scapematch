@@ -62,7 +62,7 @@ create policy venue_fiscal_select on public.venue_fiscal
   for select to authenticated
   using (public.owns_venue(venue_id) or public.is_admin());
 
-revoke insert, update, delete on table public.venue_fiscal from public, anon, authenticated;
+revoke all on table public.venue_fiscal from public, anon, authenticated;
 grant select on table public.venue_fiscal to authenticated;
 
 -- Notas. Duas por cobrança paga: serviço (casa) e comissão (plataforma).
@@ -134,7 +134,7 @@ create policy fiscal_invoices_select on public.fiscal_invoices
     )
   );
 
-revoke insert, update, delete on table public.fiscal_invoices from public, anon, authenticated;
+revoke all on table public.fiscal_invoices from public, anon, authenticated;
 grant select on table public.fiscal_invoices to authenticated;
 
 -- Textos publicados. A versão do aceite aponta para esta linha.
@@ -160,7 +160,8 @@ create policy legal_documents_read on public.legal_documents
   for select to anon, authenticated
   using (true);
 
-revoke insert, update, delete on table public.legal_documents from public, anon, authenticated;
+revoke all on table public.legal_documents from public, anon, authenticated;
+grant select on table public.legal_documents to anon, authenticated;
 
 create table public.terms_acceptances (
   id uuid primary key default gen_random_uuid(),
@@ -209,7 +210,7 @@ create policy terms_acceptances_select on public.terms_acceptances
     or (venue_id is not null and public.owns_venue(venue_id))
   );
 
-revoke insert, update, delete on table public.terms_acceptances from public, anon, authenticated;
+revoke all on table public.terms_acceptances from public, anon, authenticated;
 grant select on table public.terms_acceptances to authenticated;
 
 -- O cliente não escolhe a data. A função grava now() e a versão publicada.

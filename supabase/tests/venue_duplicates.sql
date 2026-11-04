@@ -74,8 +74,10 @@ begin
     or has_column_privilege('anon', 'public.venues', 'phone', 'select')
     or has_column_privilege('anon', 'public.venues', 'name_normalized', 'select')
     or has_column_privilege('authenticated', 'public.venues', 'document_digits', 'select')
-    or has_column_privilege('authenticated', 'public.venues', 'phone', 'select') then
-    raise exception 'documento ou telefone ficou legível';
+    or has_column_privilege('authenticated', 'public.venues', 'phone', 'select')
+    or has_column_privilege('authenticated', 'public.venues', 'possible_duplicate_of', 'select')
+    or has_column_privilege('authenticated', 'public.venues', 'merged_into', 'select') then
+    raise exception 'documento, telefone ou vínculo de duplicata ficou legível';
   end if;
   if has_table_privilege('anon', 'public.venue_claims', 'select')
     or has_table_privilege('anon', 'public.venue_claims', 'insert') then
@@ -547,10 +549,8 @@ declare
 begin
   if not exists (
     select 1
-    from public.venues
-    where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
-      and status = 'pending'
-      and possible_duplicate_of = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    from public.venue_link_status('cccccccc-cccc-cccc-cccc-cccccccccccc')
+    where possible_duplicate_of = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
   ) then
     raise exception 'admin não vê a casa pendente marcada';
   end if;
@@ -568,7 +568,10 @@ begin
     from public.venues
     where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
       and status = 'merged'
-      and merged_into = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+  ) or not exists (
+    select 1
+    from public.venue_link_status('cccccccc-cccc-cccc-cccc-cccccccccccc')
+    where merged_into = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
   ) then
     raise exception 'mescla não gravou';
   end if;
@@ -628,6 +631,95 @@ begin
   end if;
 end $$;
 
+rollback;
+
+begin;
+select set_config('search_path', '', true);
+insert into public.venues (
+  owner_id, city_id, name, neighborhood, postal_code, latitude, longitude,
+  income_value, document_kind, document_number, phone
+) values (
+  '22222222-2222-2222-2222-222222222222',
+  'curitiba',
+  'Ação & Café Ltda.',
+  'Centro',
+  '80020000',
+  -25.43,
+  -49.27,
+  1000,
+  'cnpj',
+  '11222333000181',
+  '41910000000'
+);
+do $$
+declare
+  v_norm text;
+begin
+  select name_normalized
+    into v_norm
+  from public.venues
+  where document_digits = '11222333000181';
+  if v_norm is null or position('acao' in v_norm) = 0 or v_norm ~ '[áàãâéêíóôõúç]' then
+    raise exception 'unaccent falhou com search_path vazio: %', coalesce(v_norm, '(nulo)');
+  end if;
+end $$;
+rollback;
+
+begin;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+set local role authenticated;
+do $$
+begin
+  if exists (
+    select 1
+    from public.check_venue_duplicates(
+      '12.345.678/0001-95',
+      'Outra',
+      'curitiba',
+      '01310000',
+      '999'
+    )
+    where conflict_type = 'documento'
+  ) then
+    raise exception 'dono com casa ativa enumerou documento';
+  end if;
+end $$;
+rollback;
+
+begin;
+select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+set local role authenticated;
+do $$
+declare
+  i integer;
+begin
+  for i in 1..10 loop
+    perform 1
+    from public.check_venue_duplicates(
+      '00000000000',
+      'x',
+      'curitiba',
+      '00000000',
+      '1'
+    );
+  end loop;
+  begin
+    perform 1
+    from public.check_venue_duplicates(
+      '00000000000',
+      'x',
+      'curitiba',
+      '00000000',
+      '1'
+    );
+    raise exception 'a 11ª consulta de documento passou';
+  exception
+    when others then
+      if sqlerrm <> 'too many attempts' then
+        raise exception 'limite inesperado: %', sqlerrm;
+      end if;
+  end;
+end $$;
 rollback;
 
 begin;

@@ -62,7 +62,7 @@ as $$
       regexp_replace(
         regexp_replace(
           regexp_replace(
-            lower(extensions.unaccent(coalesce(p_name, ''))),
+            lower(extensions.unaccent('extensions.unaccent'::regdictionary, coalesce(p_name, ''))),
             '[^a-z0-9]+',
             ' ',
             'g'
@@ -245,8 +245,17 @@ revoke select (
   merged_into
 ) on table public.venues from anon, authenticated;
 
-grant select (possible_duplicate_of, merged_into)
-  on table public.venues to authenticated;
+-- Consulta de documento: quem já tem casa ativa não recebe resposta,
+-- e cada usuário sem casa só consulta 10 vezes por hora.
+create table private.venue_duplicate_attempts (
+  user_id uuid not null,
+  checked_at timestamptz not null default now()
+);
+
+create index venue_duplicate_attempts_by_user
+  on private.venue_duplicate_attempts (user_id, checked_at desc);
+
+revoke all on table private.venue_duplicate_attempts from public, anon, authenticated;
 
 create or replace function private.check_venue_duplicates(
   p_documento text,
@@ -262,7 +271,7 @@ returns table (
   venue_name text
 )
 language plpgsql
-stable
+volatile
 security definer
 set search_path = ''
 as $$
@@ -273,6 +282,8 @@ declare
   v_city text;
   v_cep text;
   v_number text;
+  v_has_house boolean;
+  v_attempts integer;
 begin
   if v_uid is null then
     raise exception 'not authenticated' using errcode = '28000';
@@ -287,8 +298,11 @@ begin
     into v_city
   from public.cities city
   where city.id = lower(btrim(coalesce(p_cidade, '')))
-     or lower(extensions.unaccent(city.name)) = lower(
-       extensions.unaccent(btrim(coalesce(p_cidade, '')))
+     or lower(extensions.unaccent('extensions.unaccent'::regdictionary, city.name)) = lower(
+       extensions.unaccent(
+         'extensions.unaccent'::regdictionary,
+         btrim(coalesce(p_cidade, ''))
+       )
      )
   order by case
     when city.id = lower(btrim(coalesce(p_cidade, ''))) then 0
@@ -296,18 +310,36 @@ begin
   end
   limit 1;
 
-  return query
-  select
-    true,
-    'documento'::text,
-    case when venue.status = 'approved' then venue.id else null end,
-    case when venue.status = 'approved' then venue.name else null end
-  from public.venues venue
-  where v_digits is not null
-    and venue.document_digits = v_digits
-    and venue.status in ('pending', 'approved')
-  order by case when venue.status = 'approved' then 0 else 1 end, venue.created_at
-  limit 1;
+  select exists (
+    select 1
+    from public.venues owned
+    where owned.owner_id = v_uid
+      and owned.status in ('pending', 'approved')
+  ) into v_has_house;
+
+  if v_digits is not null and not v_has_house then
+    select count(*)
+      into v_attempts
+    from private.venue_duplicate_attempts attempt
+    where attempt.user_id = v_uid
+      and attempt.checked_at > now() - interval '1 hour';
+    if v_attempts >= 10 then
+      raise exception 'too many attempts' using errcode = 'P0001';
+    end if;
+    insert into private.venue_duplicate_attempts (user_id) values (v_uid);
+
+    return query
+    select
+      true,
+      'documento'::text,
+      case when venue.status = 'approved' then venue.id else null end,
+      case when venue.status = 'approved' then venue.name else null end
+    from public.venues venue
+    where venue.document_digits = v_digits
+      and venue.status in ('pending', 'approved')
+    order by case when venue.status = 'approved' then 0 else 1 end, venue.created_at
+    limit 1;
+  end if;
 
   return query
   select
@@ -373,7 +405,7 @@ returns table (
   venue_name text
 )
 language sql
-stable
+volatile
 security invoker
 set search_path = ''
 as $$
@@ -396,6 +428,34 @@ grant execute on function private.check_venue_duplicates(text, text, text, text,
   to authenticated, service_role;
 grant execute on function public.check_venue_duplicates(text, text, text, text, text)
   to authenticated, service_role;
+
+-- O authenticated não lê as colunas. Dono e admin leem por aqui.
+create or replace function public.venue_link_status(p_venue_id uuid)
+returns table (
+  possible_duplicate_of uuid,
+  merged_into uuid
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  if not (public.owns_venue(p_venue_id) or public.is_admin()) then
+    raise exception 'not owner' using errcode = '42501';
+  end if;
+  return query
+  select venue.possible_duplicate_of, venue.merged_into
+  from public.venues venue
+  where venue.id = p_venue_id;
+end;
+$$;
+
+revoke all on function public.venue_link_status(uuid) from public, anon;
+grant execute on function public.venue_link_status(uuid) to authenticated, service_role;
 
 create table public.venue_claims (
   id uuid primary key default gen_random_uuid(),
@@ -519,15 +579,15 @@ create policy venue_claims_insert on public.venue_claims
     and exists (
       select 1
       from public.venues venue
-      where venue.id = venue_id
+      where venue.id = venue_claims.venue_id
         and venue.status = 'approved'
     )
     and (
-      pending_venue_id is null
+      venue_claims.pending_venue_id is null
       or exists (
         select 1
         from public.venues venue
-        where venue.id = pending_venue_id
+        where venue.id = venue_claims.pending_venue_id
           and venue.owner_id = (select auth.uid())
           and venue.status = 'pending'
       )

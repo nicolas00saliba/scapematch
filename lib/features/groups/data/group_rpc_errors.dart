@@ -30,10 +30,13 @@ JoinFailureReason partyFailure(String text) {
   if (text.contains('party does not fit') || text.contains('group full')) {
     return JoinFailureReason.partyDoesNotFit;
   }
-  if (text.contains('not friend')) return JoinFailureReason.companionNotFriend;
+  if (text.contains('not friend') || text.contains('not crew mate')) {
+    return JoinFailureReason.companionNotFriend;
+  }
   if (text.contains('companion unavailable') ||
       text.contains('invalid companion') ||
-      text.contains('party empty')) {
+      text.contains('party empty') ||
+      text.contains('party too large')) {
     return JoinFailureReason.companionUnavailable;
   }
   if (text.contains('blocked')) return JoinFailureReason.blocked;
@@ -45,12 +48,13 @@ CreateGroupFailureReason partyCreateFailure(String text) {
       text.contains('party does not fit')) {
     return CreateGroupFailureReason.crewLeavesNoOpenSeat;
   }
-  if (text.contains('not friend')) {
+  if (text.contains('not friend') || text.contains('not crew mate')) {
     return CreateGroupFailureReason.companionNotFriend;
   }
   if (text.contains('companion unavailable') ||
       text.contains('invalid companion') ||
-      text.contains('party empty')) {
+      text.contains('party empty') ||
+      text.contains('party too large')) {
     return CreateGroupFailureReason.companionUnavailable;
   }
   return createGroupFailure(text);

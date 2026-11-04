@@ -1,5 +1,27 @@
 -- A casa cancela o grupo dela. O dono do grupo continua com delete_group.
--- Não aplicada neste ambiente: rode no projeto quando for usar o botão.
+-- Não marca refunded: o dinheiro só muda depois do estorno no Asaas.
+-- O botão chama a Edge Function cancel-house-group, que usa esta função
+-- e então estorna o Pix ou cancela a autorização do cartão.
+-- Não aplicada neste ambiente.
+
+do $$
+declare
+  v_name text;
+begin
+  select con.conname
+    into v_name
+  from pg_constraint con
+  where con.conrelid = 'public.group_members'::regclass
+    and con.contype = 'c'
+    and pg_get_constraintdef(con.oid) ilike '%refund_status%';
+  if v_name is not null then
+    execute format('alter table public.group_members drop constraint %I', v_name);
+  end if;
+end $$;
+
+alter table public.group_members
+  add constraint group_members_refund_status_check
+  check (refund_status in ('none', 'pending', 'refunded', 'denied'));
 
 create or replace function public.house_cancel_group(
   p_group_id uuid,
@@ -14,6 +36,7 @@ declare
   v_user uuid := auth.uid();
   v_group public.groups%rowtype;
   v_reason text;
+  v_member record;
 begin
   if v_user is null then
     raise exception 'not authenticated' using errcode = '28000';
@@ -47,7 +70,7 @@ begin
   update public.group_members
     set attendance = 'cancelled',
         refund_status = case
-          when payment_status = 'paid' then 'refunded'
+          when payment_status = 'paid' then 'pending'
           else 'none'
         end,
         refund_reason = 'organizer_cancelled_event',
@@ -64,6 +87,23 @@ begin
       where id = v_group.session_id
         and cancelled_at is null;
   end if;
+
+  for v_member in
+    select user_id
+    from public.group_members
+    where group_id = p_group_id
+      and attendance = 'cancelled'
+      and refund_reason = 'organizer_cancelled_event'
+  loop
+    perform public.post_app_notice(
+      v_member.user_id,
+      'group_cancelled',
+      'Sessão cancelada',
+      'A casa cancelou a sessão. Se você pagou, o estorno está em andamento.',
+      p_group_id,
+      'house-cancel-' || p_group_id::text
+    );
+  end loop;
 end;
 $$;
 

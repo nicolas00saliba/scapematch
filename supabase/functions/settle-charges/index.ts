@@ -1,11 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
-import {
-  cancelInvoicesForCharge,
-  issuePaidInvoices,
-} from "../_shared/issue_invoices.ts";
-import { creditLedger, reverseLedger, type ChargeRow } from "../_shared/ledger.ts";
+import { issuePaidInvoices } from "../_shared/issue_invoices.ts";
+import { creditLedger, type ChargeRow } from "../_shared/ledger.ts";
+import { releaseCancelledCharges } from "../_shared/release_charges.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -107,6 +105,11 @@ async function settleOne(
     filled < group.minimum_spots;
   const release = Boolean(group.cancelled_at) || missed;
 
+  if (release) {
+    await releaseCancelledCharges(admin, asaas, groupId);
+    return;
+  }
+
   const { data: charges } = await admin
     .from("payment_charges")
     .select("id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type")
@@ -119,26 +122,6 @@ async function settleOne(
       billing_type: string;
     };
     if (!row.provider_ref) continue;
-    if (release && (row.status === "paid" || row.status === "authorized" || row.status === "pending")) {
-      if (row.status !== "pending") {
-        await asaas.refund(row.provider_ref);
-      }
-      await admin.from("payment_charges").update({
-        status: "refunded",
-        refunded_at: new Date().toISOString(),
-      }).eq("id", row.id);
-      await admin.from("group_members").update({
-        payment_status: "released",
-        refund_status: row.status === "paid" ? "refunded" : "none",
-        refund_reason: row.status === "paid" ? "group_did_not_close" : "hold_released",
-      }).eq("group_id", groupId).eq("user_id", row.user_id);
-      await reverseLedger(admin, row);
-      await cancelInvoicesForCharge(admin, row.id, {
-        sandbox: asaas.sandbox,
-        asaas,
-      });
-      continue;
-    }
     if (closed && row.status === "authorized" && row.billing_type === "CREDIT_CARD") {
       const captured = await asaas.capture(row.provider_ref);
       const paid = captured.status === "CONFIRMED" || captured.status === "RECEIVED";

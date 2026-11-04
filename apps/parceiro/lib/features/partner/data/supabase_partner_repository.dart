@@ -20,6 +20,21 @@ import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+String _cancelError(String text) {
+  final lower = text.toLowerCase();
+  if (lower.contains('pgrst202') || lower.contains('could not find')) {
+    return 'O cancelamento pela casa ainda não está aplicado no banco.';
+  }
+  if (lower.contains('too close')) {
+    return 'Exclusão bloqueada (menos de 2 h)';
+  }
+  if (lower.contains('already cancelled')) {
+    return 'Essa sessão já está cancelada.';
+  }
+  if (lower.contains('session started')) return 'A sessão já começou.';
+  return 'Não foi possível cancelar a sessão.';
+}
+
 /// Painel da casa lido do banco. Saldo sai de `ledger_entries` da conta house.
 class SupabasePartnerRepository implements PartnerDesk {
   SupabasePartnerRepository({required this.clock});
@@ -378,29 +393,24 @@ class SupabasePartnerRepository implements PartnerDesk {
     required String reason,
   }) async {
     try {
-      await scapeSupabase.rpc(
-        'house_cancel_group',
-        params: {
-          'p_group_id': groupId,
-          'p_reason': reason.trim().isEmpty
+      final response = await scapeSupabase.functions.invoke(
+        'cancel-house-group',
+        body: {
+          'group_id': groupId,
+          'reason': reason.trim().isEmpty
               ? 'Cancelada pela casa'
               : reason.trim(),
         },
       );
+      if (response.status != 200) {
+        return _cancelError('${response.data}');
+      }
       return null;
+    } on FunctionException catch (error) {
+      return _cancelError('${error.details ?? error.reasonPhrase ?? ''}');
     } on PostgrestException catch (error) {
       final text = '${error.code ?? ''} ${error.message}'.toLowerCase();
-      if (text.contains('pgrst202') || text.contains('could not find')) {
-        return 'O cancelamento pela casa ainda não está aplicado no banco.';
-      }
-      if (text.contains('too close')) {
-        return 'Exclusão bloqueada (menos de 2 h)';
-      }
-      if (text.contains('already cancelled')) {
-        return 'Essa sessão já está cancelada.';
-      }
-      if (text.contains('session started')) return 'A sessão já começou.';
-      return 'Não foi possível cancelar a sessão.';
+      return _cancelError(text);
     }
   }
 

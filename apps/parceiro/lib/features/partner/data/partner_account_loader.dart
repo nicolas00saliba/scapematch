@@ -132,7 +132,7 @@ Future<VenueSignupResult> submitVenue(
       'invite_id': ?inviteId,
       if (duplicates.duplicateOf != null)
         'possible_duplicate_of': duplicates.duplicateOf,
-    });
+    }).select('id');
     final userId = scapeSupabase.auth.currentUser?.id;
     if (userId != null) {
       final created = await scapeSupabase

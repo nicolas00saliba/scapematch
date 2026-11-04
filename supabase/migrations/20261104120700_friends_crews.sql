@@ -7,6 +7,9 @@
 -- O líder não é cobrado pelas outras cadeiras. A reserva das vagas é
 -- atômica: ou a turma inteira senta, ou ninguém senta.
 
+create schema if not exists private;
+grant usage on schema private to authenticated;
+
 alter table public.profiles
   add column username text;
 
@@ -80,7 +83,8 @@ create table public.app_notices (
     'friend_request',
     'friend_accepted',
     'crew_invite',
-    'party_seat'
+    'party_seat',
+    'group_cancelled'
   )),
   title text not null check (char_length(title) between 1 and 80),
   body text not null check (char_length(body) between 1 and 280),
@@ -110,42 +114,54 @@ grant select on table public.crews to authenticated;
 grant select on table public.crew_members to authenticated;
 grant select on table public.app_notices to authenticated;
 
--- Cada pessoa só lê o próprio vínculo. Anon não tem grant nem política.
+-- Quem foi bloqueado não lê a linha. Quem bloqueou continua vendo.
 create policy friendships_select on public.friendships
   for select to authenticated
   using (
-    requester_id = (select auth.uid())
-    or addressee_id = (select auth.uid())
+    (
+      requester_id = (select auth.uid())
+      or addressee_id = (select auth.uid())
+    )
+    and (
+      status <> 'blocked'
+      or blocked_by = (select auth.uid())
+    )
   );
 
 create policy friend_invites_select on public.friend_invites
   for select to authenticated
   using (owner_id = (select auth.uid()));
 
+-- security definer para a policy de crew_members não ler a própria tabela.
+create or replace function private.is_crew_member(p_crew_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.crew_members
+    where crew_id = p_crew_id
+      and user_id = (select auth.uid())
+      and status in ('invited', 'accepted')
+  );
+$$;
+
+revoke all on function private.is_crew_member(uuid) from public, anon;
+grant execute on function private.is_crew_member(uuid) to authenticated;
+
 create policy crews_select on public.crews
   for select to authenticated
   using (
     deleted_at is null
-    and exists (
-      select 1
-      from public.crew_members mine
-      where mine.crew_id = crews.id
-        and mine.user_id = (select auth.uid())
-        and mine.status in ('invited', 'accepted')
-    )
+    and private.is_crew_member(id)
   );
 
 create policy crew_members_select on public.crew_members
   for select to authenticated
-  using (
-    exists (
-      select 1
-      from public.crew_members mine
-      where mine.crew_id = crew_members.crew_id
-        and mine.user_id = (select auth.uid())
-        and mine.status in ('invited', 'accepted')
-    )
-  );
+  using (private.is_crew_member(crew_id));
 
 create policy app_notices_select on public.app_notices
   for select to authenticated
@@ -266,7 +282,7 @@ begin
 
   if found then
     if v_row.status = 'blocked' then
-      raise exception 'blocked' using errcode = '42501';
+      raise exception 'user not found' using errcode = 'P0002';
     end if;
     if v_row.status = 'accepted' then
       raise exception 'already friends' using errcode = '23505';
@@ -737,6 +753,9 @@ begin
   if p_companion_ids is null or cardinality(p_companion_ids) = 0 then
     raise exception 'party empty' using errcode = '22023';
   end if;
+  if cardinality(p_companion_ids) > 11 then
+    raise exception 'party too large' using errcode = '22023';
+  end if;
   select count(distinct id) into v_count from unnest(p_companion_ids) as t(id);
   if v_count <> cardinality(p_companion_ids)
     or v_user = any (p_companion_ids)
@@ -766,9 +785,31 @@ begin
 
   v_party := array[v_user] || p_companion_ids;
 
+  if exists (
+    select 1
+    from public.friendships blocked
+    where blocked.status = 'blocked'
+      and blocked.requester_id = any (v_party)
+      and blocked.addressee_id = any (v_party)
+  ) then
+    raise exception 'companion unavailable' using errcode = 'P0001';
+  end if;
+
   foreach v_person in array p_companion_ids loop
-    if not public.users_are_friends(v_user, v_person) then
-      raise exception 'not friend' using errcode = '42501';
+    if not exists (
+      select 1
+      from public.crew_members leader
+      join public.crews crew
+        on crew.id = leader.crew_id
+       and crew.deleted_at is null
+      join public.crew_members mate
+        on mate.crew_id = leader.crew_id
+       and mate.user_id = v_person
+       and mate.status = 'accepted'
+      where leader.user_id = v_user
+        and leader.status = 'accepted'
+    ) then
+      raise exception 'not crew mate' using errcode = '42501';
     end if;
   end loop;
 
@@ -796,7 +837,7 @@ begin
       where seated.group_id = p_group_id
         and seated.attendance <> 'cancelled'
     ) then
-      raise exception 'blocked' using errcode = '42501';
+      raise exception 'companion unavailable' using errcode = 'P0001';
     end if;
   end loop;
 
@@ -886,9 +927,21 @@ begin
   if p_companion_ids is null or cardinality(p_companion_ids) = 0 then
     raise exception 'party empty' using errcode = '22023';
   end if;
+  if cardinality(p_companion_ids) > 11 then
+    raise exception 'party too large' using errcode = '22023';
+  end if;
   select count(distinct id) into v_count from unnest(p_companion_ids) as t(id);
   if v_count <> cardinality(p_companion_ids) or v_user = any (p_companion_ids) then
     raise exception 'invalid companion' using errcode = '22023';
+  end if;
+  if exists (
+    select 1
+    from public.friendships blocked
+    where blocked.status = 'blocked'
+      and blocked.requester_id = any (array[v_user] || p_companion_ids)
+      and blocked.addressee_id = any (array[v_user] || p_companion_ids)
+  ) then
+    raise exception 'companion unavailable' using errcode = 'P0001';
   end if;
 
   select * into v_session from public.room_sessions where id = p_session_id;
@@ -898,8 +951,20 @@ begin
   select * into v_room from public.rooms where id = v_session.room_id;
 
   foreach v_person in array p_companion_ids loop
-    if not public.users_are_friends(v_user, v_person) then
-      raise exception 'not friend' using errcode = '42501';
+    if not exists (
+      select 1
+      from public.crew_members leader
+      join public.crews crew
+        on crew.id = leader.crew_id
+       and crew.deleted_at is null
+      join public.crew_members mate
+        on mate.crew_id = leader.crew_id
+       and mate.user_id = v_person
+       and mate.status = 'accepted'
+      where leader.user_id = v_user
+        and leader.status = 'accepted'
+    ) then
+      raise exception 'not crew mate' using errcode = '42501';
     end if;
     if public.user_has_overlap(
       v_person, v_session.starts_at, v_room.duration_minutes, null

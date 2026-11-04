@@ -62,10 +62,22 @@ Deno.serve(async (req) => {
     : status === "refunded"
     ? "released"
     : "pending";
+  const { data: member } = await admin
+    .from("group_members")
+    .select("refund_reason")
+    .eq("group_id", charge.group_id)
+    .eq("user_id", charge.user_id)
+    .maybeSingle();
+  const currentReason = member?.refund_reason as string | undefined;
+  const refundReason = status !== "refunded"
+    ? "none"
+    : currentReason && currentReason !== "none"
+    ? currentReason
+    : "group_did_not_close";
   await admin.from("group_members").update({
     payment_status: memberPayment,
     refund_status: status === "refunded" ? "refunded" : "none",
-    refund_reason: status === "refunded" ? "group_did_not_close" : "none",
+    refund_reason: refundReason,
   }).eq("group_id", charge.group_id).eq("user_id", charge.user_id);
 
   const sandbox = isAsaasSandbox(
