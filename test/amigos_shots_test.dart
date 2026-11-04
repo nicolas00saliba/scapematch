@@ -187,23 +187,11 @@ Future<void> _loadFonts() async {
   final brand = FontLoader('Poppins')..addFont(Future.value(poppins));
   await brand.load();
 
-  final sdkFonts = Directory(
-    '${File(Platform.resolvedExecutable).parent.parent.parent.path}/artifacts/material_fonts',
-  );
-  final dirs = [
-    sdkFonts.path,
-    '/home/ubuntu/flutter-sdk/flutter/bin/cache/artifacts/material_fonts',
-    '/home/ubuntu/sdk/flutter/bin/cache/artifacts/material_fonts',
-    '/home/ubuntu/flutter/bin/cache/artifacts/material_fonts',
-    '/opt/flutter/bin/cache/artifacts/material_fonts',
-  ];
-  final dir = dirs.cast<String?>().firstWhere(
-    (path) => File('$path/Roboto-Regular.ttf').existsSync(),
-    orElse: () => null,
-  );
+  final dir = _materialFontsDir();
   if (dir == null) {
     throw StateError(
-      'Roboto não encontrado. Sem a fonte real o print sai em Ahem.',
+      'Roboto não encontrado em ${Platform.resolvedExecutable}. '
+      'Sem a fonte real o print sai em Ahem.',
     );
   }
   Future<ByteData> bytes(String name) async {
@@ -221,6 +209,42 @@ Future<void> _loadFonts() async {
     ..addFont(bytes('MaterialIcons-Regular.otf'));
   await roboto.load();
   await icons.load();
+}
+
+/// A Roboto do Material fica em `bin/cache/artifacts/material_fonts`.
+/// No teste o executável pode ser o `dart` ou o `flutter_tester`, então
+/// a busca sobe a partir dele, do `FLUTTER_ROOT` e do `PATH`.
+String? _materialFontsDir() {
+  bool hasRoboto(String path) => File('$path/Roboto-Regular.ttf').existsSync();
+
+  final candidates = <String>[];
+  final root = Platform.environment['FLUTTER_ROOT'];
+  if (root != null && root.isNotEmpty) {
+    candidates.add('$root/bin/cache/artifacts/material_fonts');
+  }
+  final pathEnv = Platform.environment['PATH'] ?? '';
+  for (final entry in pathEnv.split(':')) {
+    if (entry.isEmpty) continue;
+    candidates.add('$entry/cache/artifacts/material_fonts');
+  }
+  var dir = File(Platform.resolvedExecutable).parent;
+  for (var hop = 0; hop < 10; hop++) {
+    candidates.add('${dir.path}/artifacts/material_fonts');
+    candidates.add('${dir.path}/cache/artifacts/material_fonts');
+    candidates.add('${dir.path}/bin/cache/artifacts/material_fonts');
+    if (dir.path == dir.parent.path) break;
+    dir = dir.parent;
+  }
+  candidates.addAll(const [
+    '/home/ubuntu/flutter-sdk/flutter/bin/cache/artifacts/material_fonts',
+    '/home/ubuntu/sdk/flutter/bin/cache/artifacts/material_fonts',
+    '/home/ubuntu/flutter/bin/cache/artifacts/material_fonts',
+    '/opt/flutter/bin/cache/artifacts/material_fonts',
+  ]);
+  for (final candidate in candidates) {
+    if (hasRoboto(candidate)) return candidate;
+  }
+  return null;
 }
 
 Directory _shotDir() {
