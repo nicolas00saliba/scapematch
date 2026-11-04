@@ -131,8 +131,8 @@ class AccountDestinationScreen extends ConsumerWidget {
         _AccountLink(
           tileKey: AppKeys.accountRefund,
           icon: Icons.currency_exchange,
-          title: 'Reembolso',
-          subtitle: 'Quando o pagamento simulado volta.',
+          title: 'Cancelamento e reembolso',
+          subtitle: 'Grupo que não fecha, janela da casa e arrependimento.',
           onTap: () => context.push('/legal/reembolso'),
         ),
       ],

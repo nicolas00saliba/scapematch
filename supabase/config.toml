@@ -1,0 +1,17 @@
+[functions.provision-venue-wallet]
+verify_jwt = true
+
+[functions.create-charge]
+verify_jwt = true
+
+[functions.settle-charges]
+verify_jwt = true
+
+[functions.asaas-webhook]
+verify_jwt = false
+
+[functions.configure-venue-fiscal]
+verify_jwt = true
+
+[functions.invoice-document]
+verify_jwt = true

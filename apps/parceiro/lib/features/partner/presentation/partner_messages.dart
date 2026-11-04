@@ -6,13 +6,30 @@ abstract final class PartnerMessages {
   static const loginTitle = 'Entrar como casa';
   static const loginBody =
       'Conta de exemplo, separada do app do jogador. O saldo é o livro de exemplo desta casa.';
-  static const emailHint =
-      'Casa de exemplo: xv@scapematch.exemplo. Senha: demo.';
-  static const quickDemo = 'Demo: a / b';
+  static const loginBodyLive =
+      'Entre com a conta da casa. A senha é a do ScapeMatch, não um atalho fixo.';
+  static const signUp = 'Criar conta da casa';
   static const badLogin = 'E-mail ou senha não conferem neste exemplo.';
+  static const badLoginLive = 'E-mail ou senha não conferem.';
+  static const awaitingTitle = 'Aguardando aprovação';
+  static const awaitingBody =
+      'Recebemos o cadastro da casa. O painel abre quando um admin aprovar.';
+  static const rejectedTitle = 'Casa não aprovada';
+  static const rejectedBody =
+      'Este cadastro foi recusado. Você pode enviar outra casa.';
+  static const refresh = 'Atualizar';
+  static const sendVenue = 'Enviar casa';
+  static const anotherVenue = 'Enviar outra casa';
+  static const adminTitle = 'Casas para aprovar';
+  static const adminEmpty = 'Nenhuma casa pendente.';
+  static const approve = 'Aprovar';
+  static const reject = 'Recusar';
+  static const openHouse = 'Abrir minha casa';
+  static const backToAdmin = 'Voltar às aprovações';
   static const signOut = 'Sair';
   static const balance = 'Saldo';
   static const reservations = 'Reservas';
+  static const invoices = 'Notas fiscais';
   static const rooms = 'Salas';
   static const agenda = 'Agenda';
   static const agendaList = 'Lista';
@@ -111,6 +128,61 @@ abstract final class PartnerMessages {
     }
     return '$paid de $total pagaram';
   }
+
+  static const signupVenue = 'Cadastrar casa';
+  static const signupTerms = 'Termos da casa';
+  static const adminQueue = 'Aprovar casas';
+  static const checkVenue = 'Verificar';
+  static const venueName = 'Nome da casa';
+  static const venueCity = 'Cidade';
+  static const venuePostalCode = 'CEP';
+  static const venueNumber = 'Número';
+  static const venueDocument = 'CPF ou CNPJ';
+  static const signupIntro =
+      'O documento repetido não entra. CEP e número iguais, ou nome parecido na mesma cidade, avisam e deixam enviar como possível duplicata.';
+  static const duplicateTitle = 'Possível duplicata';
+  static const documentBlockedTitle = 'Documento já cadastrado';
+  static const documentBlockedHidden =
+      'Este documento já está em análise. O cadastro não segue.';
+  static const duplicateHint =
+      'Você pode enviar assim mesmo, marcado como possível duplicata, ou dizer que esta casa é sua.';
+  static const submitAnyway = 'Enviar mesmo assim';
+  static const claimTitle = 'Esta casa é minha?';
+  static const claimBody =
+      'O pedido vai para o admin. Documento, telefone e casas pendentes de outras pessoas não aparecem aqui.';
+  static const claimNote = 'Por que a casa é sua?';
+  static const claimNoteHint = 'Sem documento e sem telefone.';
+  static const sendClaim = 'Pedir reivindicação';
+  static const claimSent =
+      'Pedido enviado. O admin decide se a casa passa para você.';
+  static const signupSent = 'Cadastro enviado para análise.';
+  static const signupMarked = 'Ele ficou marcado como possível duplicata.';
+  static const pendingVenue = 'Casa pendente';
+  static const similarVenues = 'Parecidas';
+  static const claimsTitle = 'Reivindicações';
+  static const noPendingVenues = 'Nenhuma casa pendente.';
+  static const noSimilarVenues = 'Nenhuma casa aprovada parecida.';
+  static const noClaims = 'Nenhuma reivindicação ligada a este cadastro.';
+  static const approveVenue = 'Aprovar';
+  static const rejectVenue = 'Recusar';
+  static const mergeVenue = 'Mesclar';
+  static const approveClaim = 'Aprovar reivindicação';
+  static const rejectClaim = 'Recusar reivindicação';
+  static const approvalIntro =
+      'A casa pendente fica ao lado das parecidas e das reivindicações. Aprovar, recusar ou mesclar.';
+  static const possibleDuplicateOf = 'Possível duplicata de';
+  static const documentLabel = 'Documento';
+  static const invalidVenue =
+      'Preencha nome, cidade, CEP com 8 dígitos, número e um CPF ou CNPJ.';
+
+  static String documentBlockedNamed(String name) =>
+      'Já existe uma casa aprovada com este documento: $name. O cadastro não segue.';
+
+  static String addressWarning(String name) =>
+      'O CEP e o número coincidem com $name.';
+
+  static String nameWarning(String name) =>
+      'O nome parece com $name nesta cidade.';
 
   static const couldNotOpen = 'Não foi possível abrir a casa.';
   static const retry = 'Tentar de novo';

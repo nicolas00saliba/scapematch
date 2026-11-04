@@ -28,6 +28,26 @@ class SimulatedPaymentProvider implements PaymentProvider {
   }
 
   @override
+  Future<PixCharge> createPix({
+    required String chargeId,
+    required int amountCents,
+    required String description,
+    required String payerEmail,
+    required String idempotencyKey,
+    MarketplaceSplit? split,
+  }) {
+    return Future.value(
+      PixCharge(
+        provider: name,
+        providerRef: 'sim_$idempotencyKey',
+        amountCents: amountCents,
+        qrCode: '00020126580014BR.GOV.BCB.PIX-SIM-$idempotencyKey',
+        status: 'pending',
+      ),
+    );
+  }
+
+  @override
   Future<ChargeResult> refund({
     required String chargeId,
     required int amountCents,

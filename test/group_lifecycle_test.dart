@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -260,6 +261,12 @@ void main() {
     GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/cadastro');
     await tester.pumpAndSettle();
     expect(find.byType(SignupScreen), findsOneWidget);
+    expect(
+      find.text(
+        'Li e aceito os termos, a privacidade e o reembolso (versão $legalDocumentVersion).',
+      ),
+      findsOneWidget,
+    );
 
     await tester.enterText(find.byKey(AppKeys.signupName), 'Teen');
     await tester.enterText(

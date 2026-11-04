@@ -75,7 +75,7 @@ void main() {
       ))!;
     }
     image.dispose();
-    final error = partner.saveRoom(
+    final error = await partner.saveRoom(
       houseId: SampleIds.houseCwbRuaXv,
       name: 'Sala com foto',
       theme: 'Uma história curta da casa.',

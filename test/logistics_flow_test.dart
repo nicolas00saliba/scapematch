@@ -107,7 +107,11 @@ void main() {
     );
     await tester.tap(find.text('Passados'));
     await tester.pumpAndSettle();
-    expect(find.text('Nenhuma sessão passada'), findsOneWidget);
+    expect(find.text('Nenhuma sessão passada'), findsNothing);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupCwbClosed)),
+      findsOneWidget,
+    );
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsNothing,
@@ -162,7 +166,11 @@ void main() {
       messenger.clearSnackBars();
     }
     await tester.pumpAndSettle();
-    expect(find.text('Nenhuma sessão passada'), findsOneWidget);
+    expect(find.text('Nenhuma sessão passada'), findsNothing);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupCwbClosed)),
+      findsOneWidget,
+    );
     expect(find.textContaining('Sem reembolso'), findsNothing);
   });
 
@@ -213,7 +221,11 @@ void main() {
     expect(find.text('Nenhum cancelamento'), findsNothing);
     await tester.tap(find.text('Passados'));
     await tester.pumpAndSettle();
-    expect(find.text('Nenhuma sessão passada'), findsOneWidget);
+    expect(find.text('Nenhuma sessão passada'), findsNothing);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupCwbClosed)),
+      findsOneWidget,
+    );
     expect(find.text('A Estufa'), findsNothing);
   });
 

@@ -1,14 +1,20 @@
+import 'package:dominio/dominio.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/cities/domain/city.dart';
+import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -27,6 +33,29 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   String? _error;
   var _busy = false;
   var _accepted = false;
+  List<City> _cities = knownCities;
+  String? _cityId;
+  late final TapGestureRecognizer _termsLink;
+  late final TapGestureRecognizer _privacyLink;
+  late final TapGestureRecognizer _refundLink;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsLink = TapGestureRecognizer()
+      ..onTap = () => context.push('/legal/termos');
+    _privacyLink = TapGestureRecognizer()
+      ..onTap = () => context.push('/legal/privacidade');
+    _refundLink = TapGestureRecognizer()
+      ..onTap = () => context.push('/legal/reembolso');
+    _cityId = ref.read(selectedCityIdProvider);
+    if (!scapeUsesLiveBackend) return;
+    Future<void>(() async {
+      final cities = await ref.read(cityRepositoryProvider).listCities();
+      if (!mounted || cities.isEmpty) return;
+      setState(() => _cities = cities);
+    });
+  }
 
   @override
   void dispose() {
@@ -36,6 +65,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _day.dispose();
     _month.dispose();
     _year.dispose();
+    _termsLink.dispose();
+    _privacyLink.dispose();
+    _refundLink.dispose();
     super.dispose();
   }
 
@@ -61,10 +93,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final email = _email.text.trim();
     final password = _password.text;
     final birthDate = _birthDate();
-    if (name.isEmpty || !email.contains('@') || password.length < 4) {
+    final minPassword = scapeUsesLiveBackend ? 6 : 4;
+    if (name.isEmpty || !email.contains('@') || password.length < minPassword) {
       setState(() {
-        _error = 'Preencha nome, um e-mail e uma senha de 4 caracteres.';
+        _error = minPassword == 6
+            ? 'Preencha nome, um e-mail e uma senha de 6 caracteres.'
+            : 'Preencha nome, um e-mail e uma senha de 4 caracteres.';
       });
+      return;
+    }
+    if (scapeUsesLiveBackend && (_cityId == null || _cityId!.isEmpty)) {
+      setState(() => _error = 'Escolha a cidade.');
       return;
     }
     if (birthDate == null) {
@@ -87,6 +126,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           password: password,
           birthDate: birthDate,
           acceptedTerms: _accepted,
+          cityId: _cityId,
         );
     if (!mounted) {
       return;
@@ -111,17 +151,52 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     context.go('/groups/$groupId', extra: pending.notice);
   }
 
+  Widget _termsSentence(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final style = theme.textTheme.bodyMedium?.copyWith(height: 1.35);
+    final link = TextStyle(
+      color: scheme.primary,
+      decoration: TextDecoration.underline,
+      height: 1.35,
+    );
+    return Text.rich(
+      TextSpan(
+        style: style,
+        children: [
+          const TextSpan(text: 'Li e aceito os '),
+          TextSpan(text: 'termos', style: link, recognizer: _termsLink),
+          const TextSpan(text: ', a '),
+          TextSpan(
+            text: 'privacidade',
+            style: link,
+            recognizer: _privacyLink,
+          ),
+          const TextSpan(text: ' e o '),
+          TextSpan(text: 'reembolso', style: link, recognizer: _refundLink),
+          TextSpan(text: ' (versão $legalDocumentVersion).'),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
       desktopMaxWidth: AppScaffold.formMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Cadastro')),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-        children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           const ExampleDataBanner(),
           const SizedBox(height: 16),
-          const Text('Cadastro de exemplo, só neste aparelho. Sem servidor.'),
+          Text(
+            scapeUsesLiveBackend
+                ? 'A conta fica no ScapeMatch. O perfil nasce com o seu nome. O cadastro só segue com o aceite.'
+                : 'O cadastro só segue com o aceite. A versão do texto e a data ficam registradas.',
+          ),
           const SizedBox(height: 16),
           TextField(
             key: AppKeys.signupName,
@@ -131,6 +206,24 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               labelText: 'Nome',
               border: OutlineInputBorder(),
             ),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: ValueKey('signup-city-${_cities.length}-$_cityId'),
+            initialValue: _cities.any((city) => city.id == _cityId)
+                ? _cityId
+                : null,
+            decoration: const InputDecoration(
+              labelText: 'Cidade',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (final city in _cities)
+                DropdownMenuItem(value: city.id, child: Text(city.name)),
+            ],
+            onChanged: _busy
+                ? null
+                : (value) => setState(() => _cityId = value),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -193,32 +286,29 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          CheckboxListTile(
-            key: AppKeys.signupTerms,
-            contentPadding: EdgeInsets.zero,
-            value: _accepted,
-            onChanged: (value) => setState(() => _accepted = value ?? false),
-            title: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text('Li e aceito os '),
-                TextButton(
-                  onPressed: () => context.push('/legal/termos'),
-                  child: const Text('termos'),
-                ),
-                const Text(', a '),
-                TextButton(
-                  onPressed: () => context.push('/legal/privacidade'),
-                  child: const Text('privacidade'),
-                ),
-                const Text(' e o '),
-                TextButton(
-                  onPressed: () => context.push('/legal/reembolso'),
-                  child: const Text('reembolso'),
-                ),
-                const Text('.'),
-              ],
+          Text(
+            LegalDocuments.reviewBanner,
+            key: AppKeys.signupTermsBanner,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                key: AppKeys.signupTerms,
+                value: _accepted,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onChanged: _busy
+                    ? null
+                    : (value) => setState(() => _accepted = value ?? false),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: _termsSentence(context)),
+            ],
           ),
           if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
           const SizedBox(height: 16),
@@ -228,6 +318,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             child: const Text('Criar conta'),
           ),
         ],
+        ),
       ),
     );
   }

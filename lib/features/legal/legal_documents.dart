@@ -1,41 +1,63 @@
 /// Rascunhos. O aviso no topo deixa claro que um advogado ainda não revisou.
 abstract final class LegalDocuments {
   static const reviewBanner =
-      'A revisar juridicamente. Este texto é um rascunho de exemplo, não um contrato.';
+      'A revisar juridicamente. Rascunho para revisão de advogado. Este texto ainda não é um contrato.';
 
   static const termsTitle = 'Termos de uso';
   static const privacyTitle = 'Política de privacidade';
-  static const refundTitle = 'Política de reembolso';
+  static const refundTitle = 'Política de cancelamento e reembolso';
 
   static const termsBody = '''
-O ScapeMatch ajuda a achar gente para completar um grupo de escape room. Nesta versão os dados são fictícios e nada é cobrado.
+O ScapeMatch ajuda você a achar pessoas para completar um grupo e dividir a reserva de uma sessão presencial, começando por escape room. A casa é quem realiza a sessão. O ScapeMatch intermedia a formação do grupo e a cobrança da sua parte.
 
-Ao criar uma conta de exemplo você confirma que leu este rascunho, a política de privacidade e a política de reembolso. A conta fica só neste aparelho.
+Ao criar a conta você confirma que leu este rascunho, a política de privacidade e a política de cancelamento e reembolso. O aceite fica registrado com a versão do texto e a data.
 
 Menores de 18 anos não criam conta. Menores só jogam acompanhados de um responsável, em regra provisória.
+
+Você paga só a sua parte. A cobrança é confirmada quando o grupo fecha. Enquanto o grupo está aberto, o Pix ainda não é liquidado como receita da sessão e o cartão fica só autorizado. Se o grupo não fechar, o Pix pago é estornado e a autorização do cartão não é capturada.
+
+A nota fiscal do serviço, quando a casa emite, é da casa para você. A comissão da intermediação é uma nota à parte, da ScapeMatch para a casa, e não aparece como nota sua.
+
+Nesta versão de demonstração os dados de exemplo continuam no aparelho até a conta real entrar no ar. As regras acima são o combinado que a versão ligada ao servidor vai aplicar.
 ''';
 
   static const privacyBody = '''
-Este rascunho descreve o que a versão de exemplo guarda: nome, e-mail, data de nascimento, cidade, tipo de jogo e se a introdução já foi vista. A senha não sai da memória do exemplo e não vai para o disco.
+Esta política descreve, em rascunho, o tratamento de dados pessoais pelo ScapeMatch, nos termos da Lei 13.709/2018 (LGPD).
 
-Não há servidor. Não vendemos dados. Não há cookie de rastreamento além do que o navegador usa para lembrar a cidade, o jogo e a introdução.
+Dados coletados. Do jogador: nome, e-mail, senha (guardada pelo provedor de conta, não em texto puro no app), data de nascimento, cidade, participação em grupos e o estado do pagamento da parte (sem número completo de cartão, validade ou código de segurança). Da casa: nome, documento (CPF ou CNPJ), telefone, endereço, renda informada para a subconta de pagamento e, quando houver, inscrição municipal, código de serviço e alíquota de ISS. Também ficam o aceite dos termos (versão e data) e os identificadores das notas fiscais emitidas.
 
-Você pode pedir a exclusão da conta na aba Conta. Nesta versão o pedido fica registrado e a conta de exemplo não é apagada de verdade.
+Finalidade. Criar e manter a conta, formar o grupo, cobrar só a parte de cada pessoa quando o grupo fecha, estornar o que a política de cancelamento manda devolver, emitir ou registrar a nota fiscal, avisar sobre a sessão e cumprir obrigação legal.
+
+Base. Execução do contrato de intermediação, obrigação legal (incluindo documento fiscal, quando couber) e, para avisos opcionais, o consentimento que você pode retirar.
+
+Compartilhamento. A casa da sessão vê o necessário para receber o grupo. O provedor de pagamento processa a cobrança. A nota do serviço, quando existe, é emitida pela casa. Não vendemos dados.
+
+Direitos. Você pode pedir confirmação do tratamento, acesso, correção, anonimização, portabilidade, informação sobre compartilhamento e eliminação dos dados desnecessários, além de revogar um consentimento. O pedido de exclusão da conta fica na aba Conta. Há casos em que a lei manda guardar o dado por um prazo, como o documento fiscal.
+
+Encarregado. O contato do encarregado pelo tratamento de dados é um placeholder: encarregado@exemplo.invalid. Troque este endereço antes de divulgar o produto.
+
+Nesta demonstração, parte dos dados ainda fica só no aparelho. Quando a conta real estiver ligada, vale o que estiver gravado no servidor, com as mesmas finalidades.
 ''';
 
   static const refundBody = '''
-Nada é cobrado. O reembolso é simulado.
+Você só é cobrado se o grupo fechar.
 
-Cada casa define a antecedência mínima para devolver o valor. Cancelar dentro dessa janela registra o reembolso. Cancelar depois não devolve.
+Pix. Se o grupo não atingir o mínimo até o prazo, ou se for cancelado antes de fechar, o Pix que já tiver sido pago é estornado. A tela avisa que o valor foi liberado.
 
-Se o grupo não atingir o mínimo até o prazo, ele é cancelado e todo mundo que estava na cadeira recebe reembolso integral simulado.
+Cartão. A autorização não é capturada enquanto o grupo está aberto. Se o grupo não fechar, a autorização é cancelada e nada é cobrado no cartão. Se o grupo fechar, a captura acontece e a parte entra no extrato da casa, já com a comissão da intermediação separada.
 
-Não confirmar presença não conta como falta. A falta sem aviso vai ser marcada pela casa no futuro; esta versão não marca sozinha. Se a casa marcar três faltas em 60 dias, novas entradas pausam por 30 dias. Esta conta é provisória.
+Cancelamento pelo jogador. Cada casa define a antecedência mínima. Sair dentro dessa janela, antes do início, devolve o que já tiver sido capturado. Sair depois da janela não devolve. O organizador pode excluir o grupo até 2 horas antes do início. No instante exato das 2 horas ainda pode. A exclusão libera a reserva ou reembolsa o que já foi capturado.
+
+Arrependimento. Nas compras feitas fora do estabelecimento, o Código de Defesa do Consumidor (art. 49) prevê o direito de arrependimento em 7 dias a contar da contratação, enquanto o serviço não tiver sido usufruído. Como a sessão tem data marcada, a aplicação desse prazo a um horário já reservado precisa da revisão do advogado. Até lá, a janela prática desta versão é a da casa e a regra de o grupo não fechar.
+
+Não confirmar presença não conta como falta. A falta sem aviso é marcada pela casa. A primeira falta avisa. A terceira pode bloquear novas entradas por um tempo. Os dois números são configuração, não estão escritos neste texto.
+
+Nada nesta tela autoriza a casa a ficar com um valor que a regra manda devolver.
 ''';
 
   static const under18 =
       'Menores de 18 anos não criam conta. Nesta versão, menores só jogam acompanhados de um responsável.';
 
   static const termsRequired =
-      'Aceite os termos, a privacidade e a política de reembolso para criar a conta.';
+      'Aceite os termos, a privacidade e a política de cancelamento e reembolso para criar a conta.';
 }

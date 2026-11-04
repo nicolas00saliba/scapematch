@@ -10,6 +10,10 @@ enum NoticeKind {
   waitlistOffer,
   groupClosed,
   noShowWarning,
+  friendRequest,
+  friendAccepted,
+  crewInvite,
+  partySeat,
 }
 
 enum ReportReason { harassment, spam, noShow, other }
@@ -128,6 +132,31 @@ class CommunityBoard {
 
   void block(String byUserId, String targetKey) {
     blocks.putIfAbsent(byUserId, () => {}).add(targetKey);
+  }
+
+  void unblock(String byUserId, String targetKey) {
+    blocks[byUserId]?.remove(targetKey);
+  }
+
+  /// Aviso que fica só neste aparelho. Sem push e sem e-mail.
+  void postNotice({
+    required String userId,
+    required NoticeKind kind,
+    required String title,
+    required String body,
+    required DateTime at,
+    String? groupId,
+    String? scope,
+  }) {
+    _putNotice(
+      userId: userId,
+      kind: kind,
+      title: title,
+      body: body,
+      at: at,
+      groupId: groupId,
+      scope: scope,
+    );
   }
 
   void report({
@@ -368,8 +397,9 @@ class CommunityBoard {
     required String body,
     required DateTime at,
     String? groupId,
+    String? scope,
   }) {
-    final id = '$kind-$userId-${groupId ?? 'conta'}';
+    final id = '$kind-$userId-${scope ?? groupId ?? 'conta'}';
     if (notices.any((notice) => notice.id == id)) {
       return;
     }

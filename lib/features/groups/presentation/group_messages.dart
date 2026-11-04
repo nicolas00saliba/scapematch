@@ -156,6 +156,12 @@ abstract final class GroupMessages {
       JoinFailureReason.restricted => 'A conta está em pausa por faltas sem aviso. Tente de novo quando a pausa acabar.',
       JoinFailureReason.seatReserved => seatReserved,
       JoinFailureReason.offerExpired => offerExpired,
+      JoinFailureReason.partyDoesNotFit =>
+        'Não há vagas para a turma inteira. Ninguém entrou.',
+      JoinFailureReason.companionNotFriend =>
+        'Só dá para entrar com quem já aceitou a mesma turma.',
+      JoinFailureReason.companionUnavailable =>
+        'Alguém da turma não pode entrar nesse horário. Ninguém entrou.',
     };
   }
 
@@ -175,6 +181,12 @@ abstract final class GroupMessages {
         'Esse horário já passou. Escolha um horário que ainda não começou.',
       CreateGroupFailureReason.tooCloseToStart => tooCloseToStart,
       CreateGroupFailureReason.overlapsAnotherGroup => 'Você já está em outro grupo nesse horário. Escolha um horário que não se sobreponha.',
+      CreateGroupFailureReason.crewLeavesNoOpenSeat =>
+        'A turma ocuparia todas as vagas. Deixe ao menos uma aberta.',
+      CreateGroupFailureReason.companionNotFriend =>
+        'Só dá para levar quem já aceitou a mesma turma.',
+      CreateGroupFailureReason.companionUnavailable =>
+        'Alguém da turma não pode nesse horário.',
     };
   }
 

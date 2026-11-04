@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/sharing/external_url.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/core/ui/window_class.dart';
@@ -152,6 +153,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
   }
 
   void _tick() {
+    if (scapeUsesLiveBackend) return;
     final cityId = ref.read(selectedCityIdProvider);
     final seat = ref.read(sampleLivePresenceProvider).takeSeat(cityId);
     if (!mounted || seat == null) {

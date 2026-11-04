@@ -19,6 +19,9 @@ import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/groups/presentation/home_grid_slots.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
+import 'package:scapematch/features/social/domain/social_models.dart';
+import 'package:scapematch/features/social/domain/social_rules.dart';
+import 'package:scapematch/features/social/presentation/social_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// Busca de grupo comprimida, no topo da Home.
@@ -68,6 +71,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             return _searchBar(context, constraints.maxWidth);
           },
         ),
+        const _CrewVacancyFilter(),
         if (widget.belowSearch == null)
           const SizedBox(height: 8)
         else ...[
@@ -242,10 +246,19 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         final viewer = ref.watch(authSessionProvider);
         ref.watch(communityTickProvider);
         final board = ref.watch(communityBoardProvider);
+        final social = ref.watch(socialViewProvider).asData?.value;
+        final friendIds = social?.friendIds ?? const <String>{};
+        final crewId = ref.watch(crewSpotFilterProvider);
+        final crewSeats = _crewSeats(social, crewId);
         final visible = [
           for (final group in items)
             if (viewer == null || !board.hiddenFromHome(viewer.id, group))
-              group,
+              if (crewSeats == null ||
+                  SocialRules.groupFitsCrew(
+                    openSeats: group.openSeats,
+                    crewSeats: crewSeats,
+                  ))
+                group,
         ];
         final now = ref.watch(clockProvider).now();
         final desktop = isScapeDesktop(context);
@@ -260,11 +273,15 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             return const SizedBox.shrink();
           }
           return InlineNotice(
-            message: _emptyMessage(cityName, query, gameTypeId),
+            message: crewSeats == null
+                ? _emptyMessage(cityName, query, gameTypeId)
+                : 'Nenhum grupo com vagas para a sua turma.',
           );
         }
         void open(Group group) => context.push('/groups/${group.id}');
         void invite(Group group) => showInviteSheet(context, group);
+        bool hasFriend(Group group) =>
+            SocialRules.groupHasFriend(group, friendIds);
         if (desktop) {
           return HomeGroupGrid(
             gap: 12,
@@ -287,6 +304,7 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
                     now: now,
                     group: shown[index],
                     dense: true,
+                    friendInside: hasFriend(shown[index]),
                     onTap: () => open(shown[index]),
                     onInvite: () => invite(shown[index]),
                   ),
@@ -300,9 +318,22 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
           maxHeight: groupWindowHeightFor(shown.length),
           onOpen: open,
           onInvite: invite,
+          hasFriend: hasFriend,
         );
       },
     );
+  }
+
+  int? _crewSeats(SocialView? social, String? crewId) {
+    if (crewId == null || social == null) {
+      return null;
+    }
+    for (final crew in social.readyCrews) {
+      if (crew.id == crewId) {
+        return crew.acceptedCount;
+      }
+    }
+    return null;
   }
 
   String _emptyMessage(String? cityName, String query, String gameTypeId) {
@@ -341,6 +372,7 @@ class _GroupWindow extends StatefulWidget {
     required this.maxHeight,
     required this.onOpen,
     required this.onInvite,
+    required this.hasFriend,
   });
 
   final List<Group> groups;
@@ -348,6 +380,7 @@ class _GroupWindow extends StatefulWidget {
   final double maxHeight;
   final ValueChanged<Group> onOpen;
   final ValueChanged<Group> onInvite;
+  final bool Function(Group group) hasFriend;
 
   @override
   State<_GroupWindow> createState() => _GroupWindowState();
@@ -412,6 +445,7 @@ class _GroupWindowState extends State<_GroupWindow> {
                     child: GroupCard(
                       now: widget.now,
                       group: widget.groups[index],
+                      friendInside: widget.hasFriend(widget.groups[index]),
                       onTap: () => widget.onOpen(widget.groups[index]),
                       onInvite: () => widget.onInvite(widget.groups[index]),
                     ),
@@ -464,6 +498,51 @@ class _CapHeight extends SingleChildRenderObjectWidget {
   @override
   void updateRenderObject(BuildContext context, _RenderCapHeight renderObject) {
     renderObject.maxHeight = maxHeight;
+  }
+}
+
+class _CrewVacancyFilter extends ConsumerWidget {
+  const _CrewVacancyFilter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final social = ref.watch(socialViewProvider).asData?.value;
+    final crews = social?.readyCrews ?? const <CrewView>[];
+    if (crews.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final selected = ref.watch(crewSpotFilterProvider);
+    CrewView? chosen;
+    for (final crew in crews) {
+      if (crew.id == selected) {
+        chosen = crew;
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: FilterChip(
+          key: AppKeys.crewVacancyFilter,
+          label: const Text('Vagas para minha turma'),
+          selected: chosen != null,
+          onSelected: (_) {
+            final notifier = ref.read(crewSpotFilterProvider.notifier);
+            if (chosen != null) {
+              notifier.select(null);
+              return;
+            }
+            var best = crews.first;
+            for (final crew in crews) {
+              if (crew.acceptedCount > best.acceptedCount) {
+                best = crew;
+              }
+            }
+            notifier.select(best.id);
+          },
+        ),
+      ),
+    );
   }
 }
 

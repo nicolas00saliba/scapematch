@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
@@ -75,6 +76,7 @@ class AccountScreen extends ConsumerWidget {
                     children: [
                       for (final item in _signedInItems)
                         _AccountTile(item: item),
+                      const _FriendsTile(),
                       _SignOutTile(onPressed: () => _signOut(context, ref)),
                     ],
                   ),
@@ -88,6 +90,8 @@ class AccountScreen extends ConsumerWidget {
               _AccountTile(item: item),
               const SizedBox(height: 10),
             ],
+            const _FriendsTile(),
+            const SizedBox(height: 10),
             _SignOutTile(onPressed: () => _signOut(context, ref)),
           ],
         ],
@@ -101,7 +105,11 @@ class AccountScreen extends ConsumerWidget {
       builder: (context) {
         return AlertDialog(
           title: const Text(AccountMessages.signOutTitle),
-          content: const Text(AccountMessages.signOutBody),
+          content: Text(
+            scapeUsesLiveBackend
+                ? 'A sessão termina neste aparelho. Dá para entrar de novo com o mesmo e-mail.'
+                : AccountMessages.signOutBody,
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -155,7 +163,9 @@ class _SignedOutAccount extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            AccountMessages.signedOutBody,
+            scapeUsesLiveBackend
+                ? 'Entre de novo para ver a conta.'
+                : AccountMessages.signedOutBody,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -172,6 +182,23 @@ class _SignedOutAccount extends StatelessWidget {
             const SizedBox(height: 10),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _FriendsTile extends StatelessWidget {
+  const _FriendsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: AppKeys.accountFriends,
+      child: AccountListTile(
+        icon: Icons.diversity_3_outlined,
+        title: 'Amigos e turmas',
+        subtitle: 'Peça amizade, monte a turma e entre junto',
+        onTap: () => context.push('/account/friends'),
       ),
     );
   }

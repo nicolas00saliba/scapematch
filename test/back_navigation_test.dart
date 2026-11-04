@@ -61,7 +61,7 @@ void main() {
       ('/account/delete', 'Excluir conta'),
       ('/legal/termos', 'Termos de uso'),
       ('/legal/privacidade', 'Política de privacidade'),
-      ('/legal/reembolso', 'Política de reembolso'),
+      ('/legal/reembolso', 'Política de cancelamento e reembolso'),
       ('/news', 'Novidades'),
       ('/news/${SampleNewsIds.cwbBiblioteca}', 'Novidade'),
       ('/convite/${SampleIds.groupCwbCofreAlmost}', 'Convite'),

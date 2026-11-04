@@ -14,6 +14,7 @@ import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
+import 'package:scapematch/features/social/data/sample_players.dart';
 
 /// Fictional catalog used until real venue data exists.
 ///
@@ -776,7 +777,8 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       room: caldeira,
       slot: slotCaldeiraFechado,
       totalSpots: 4,
-      names: ['Olga', 'Paulo', 'Rita', 'Sami'],
+      names: ['Olga', 'Paulo', 'Rita', 'Nícolas'],
+      localUserId: 'user-local',
       minimumSpots: 2,
     ),
   ];
@@ -1279,6 +1281,7 @@ Group _group({
   String note = '',
   String gameType = GameTypes.escapeRoom,
   String? roomName,
+  String? localUserId,
   int? minimumSpots,
   DateTime? closesAt,
   DateTime? cancelledAt,
@@ -1327,9 +1330,12 @@ Group _group({
       for (var index = 0; index < names.length; index++)
         Participant(
           id: '$id-p$index',
+          userId: localUserId != null && index == names.length - 1
+              ? localUserId
+              : samplePlayerUserIds[names[index]],
           displayName: names[index],
           isCreator: index == 0,
-          isLocalUser: false,
+          isLocalUser: localUserId != null && index == names.length - 1,
           attendance: cancelledAt != null
               ? AttendanceStatus.cancelled
               : index == 0

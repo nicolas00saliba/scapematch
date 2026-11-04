@@ -28,6 +28,7 @@ class GroupCard extends StatelessWidget {
     required this.now,
     this.onInvite,
     this.dense = false,
+    this.friendInside = false,
   });
 
   final Group group;
@@ -40,6 +41,9 @@ class GroupCard extends StatelessWidget {
   /// Grade da Home no site: capa menor e só nome, local, data,
   /// vagas e Convidar.
   final bool dense;
+
+  /// Verdadeiro quando alguém sentado é amigo de quem está olhando.
+  final bool friendInside;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +101,10 @@ class GroupCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (friendInside) ...[
+                            _FriendBadge(groupId: group.id, dense: dense),
+                            SizedBox(height: titleGap),
+                          ],
                           Text(
                             group.roomName,
                             maxLines: dense ? 1 : 2,
@@ -196,6 +204,40 @@ class GroupCard extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FriendBadge extends StatelessWidget {
+  const _FriendBadge({required this.groupId, required this.dense});
+
+  final String groupId;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        key: AppKeys.friendBadge(groupId),
+        padding: EdgeInsets.symmetric(
+          horizontal: dense ? 6 : 8,
+          vertical: dense ? 1 : 2,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          'Tem amigo',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: scheme.onSecondaryContainer,
+            fontWeight: FontWeight.w800,
+            fontSize: dense ? 10 : null,
           ),
         ),
       ),

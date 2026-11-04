@@ -471,6 +471,18 @@ class _RecordingProvider implements PaymentProvider {
       amountCents: amountCents,
     );
   }
+
+  @override
+  Future<PixCharge> createPix({
+    required String chargeId,
+    required int amountCents,
+    required String description,
+    required String payerEmail,
+    required String idempotencyKey,
+    MarketplaceSplit? split,
+  }) {
+    throw UnimplementedError();
+  }
 }
 
 class _FailingProvider implements PaymentProvider {
@@ -503,5 +515,17 @@ class _FailingProvider implements PaymentProvider {
       succeeded: true,
       amountCents: amountCents,
     );
+  }
+
+  @override
+  Future<PixCharge> createPix({
+    required String chargeId,
+    required int amountCents,
+    required String description,
+    required String payerEmail,
+    required String idempotencyKey,
+    MarketplaceSplit? split,
+  }) {
+    throw UnimplementedError();
   }
 }

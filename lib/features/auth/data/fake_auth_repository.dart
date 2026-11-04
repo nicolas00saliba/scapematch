@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
@@ -19,9 +20,13 @@ class FakeAuthRepository implements AuthRepository {
   CurrentUser? _user;
   var _nextId = 1;
   final _accounts = <String, ({CurrentUser user, String password})>{};
+  final List<LegalAcceptance> _acceptances = [];
 
   @override
   CurrentUser? get signedInUser => _user;
+
+  @override
+  List<LegalAcceptance> get acceptances => List.unmodifiable(_acceptances);
 
   @override
   Future<String?> signIn({
@@ -44,6 +49,7 @@ class FakeAuthRepository implements AuthRepository {
     required DateTime birthDate,
     required DateTime now,
     required bool acceptedTerms,
+    String? cityId,
   }) async {
     if (!acceptedTerms) {
       return LegalDocuments.termsRequired;
@@ -59,11 +65,33 @@ class FakeAuthRepository implements AuthRepository {
       id: 'user-signup-$_nextId',
       displayName: name.trim(),
       birthDate: birthDate,
+      cityId: cityId,
     );
     _nextId += 1;
     _accounts[key] = (user: user, password: password);
     _user = user;
+    final acceptedAt = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    for (final code in playerAcceptanceCodes) {
+      _acceptances.add(
+        LegalAcceptance(
+          userId: user.id,
+          audience: 'player',
+          documentCode: code,
+          documentVersion: legalDocumentVersion,
+          acceptedAt: acceptedAt,
+        ),
+      );
+    }
     return null;
+  }
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<String?> requestPasswordReset({required String email}) async {
+    if (!email.contains('@')) return 'Informe um e-mail válido.';
+    return 'Neste exemplo o link não é enviado.';
   }
 
   @override

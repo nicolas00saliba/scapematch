@@ -1,5 +1,29 @@
 # Decisões provisórias
 
+## A nota fiscal sai no servidor, em duas vias
+
+- **Data:** 2026-11-04
+- **Decisão:** cada parte paga, com o grupo fechado, gera duas NFS-e. A casa (subconta Asaas dela) emite a do serviço para o jogador. A ScapeMatch emite só a da comissão, contra a casa. Casa com CPF recebe o valor e a nota de serviço fica sem emissão. Casa com CNPJ ou MEI só emite com inscrição municipal, código de serviço e alíquota de ISS. No sandbox a emissão é de teste. Produção troca a chave e a base URL. O app não guarda chave e não escreve na tabela `fiscal_invoices`.
+- **Motivo:** a ScapeMatch é intermediadora. A nota do jogo é da casa. A nota da comissão é da plataforma.
+- **Onde está no código:** `supabase/migrations/20261104120600_fiscal_terms.sql`, `issue_invoices.ts`, a aba Notas fiscais do Parceiro e o cartão da nota na reserva do jogador.
+- **Como trocar depois:** outro código de serviço entra nos dados fiscais da casa ou nos segredos `ASAAS_FISCAL_*` da plataforma.
+
+## O aceite dos termos grava versão e data
+
+- **Data:** 2026-11-04
+- **Decisão:** jogador e casa só concluem o cadastro se aceitarem os termos da sua audiência, a privacidade e a política de cancelamento e reembolso. O registro leva a versão `2026-11-06` e a data. Os textos são rascunho para revisão de advogado e também estão na landing. O Pix estornado e o cartão não capturado, quando o grupo não fecha, estão na política de cancelamento. O arrependimento de sete dias do CDC fica marcado como ponto para o advogado.
+- **Motivo:** a demonstração precisa mostrar o aceite e o combinado, sem fingir que um advogado já revisou.
+- **Onde está no código:** `terms_acceptances`, `accept_terms`, o cadastro do jogador, o cadastro da casa e `apps/landing`.
+- **Como trocar depois:** uma versão nova entra em `legal_documents` e na constante `legalDocumentVersion`.
+
+## Entrar com a turma: cada um paga a própria parte
+
+- **Data:** 2026-11-04
+- **Decisão:** ao entrar num grupo aberto, a pessoa escolhe “eu sozinho” ou “eu + turma/amigos”. As vagas saem de uma vez. Se não couber a turma inteira, ninguém senta. Quem entra com amigos já senta com `payment_status` pendente e paga a própria parte no fluxo que já existe (`payShare` / `create-charge`). O líder não paga pelas outras cadeiras. Criar grupo com a turma dentro deixa ao menos uma vaga aberta para quem não é da turma. Avisos ficam só no app, sem push e sem e-mail.
+- **Motivo:** o pagamento já é por cadeira e por pessoa. Cobrar várias partes na carteira do líder abriria outro caminho de cobrança e de reembolso quando alguém sai. A demo de sexta precisa do gesto, e o banco precisa impedir estourar vaga.
+- **Onde está no código:** `joinParty` no repositório em memória, a folha “Entrar com a turma” e a migração `20261104120700_friends_crews.sql` (`join_group_with_party`, `create_group_with_party`). A migração não foi aplicada no Supabase.
+- **Como trocar depois:** se o líder passar a pagar por todos, a função deixa de gravar `pending` nos companheiros e cria as cobranças na conta dele. A trava de vagas continua a mesma.
+
 ## A Home no site completa a grade, e o celular só mostra quem está jogando
 
 - **Data:** 2026-11-04

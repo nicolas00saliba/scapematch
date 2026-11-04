@@ -82,6 +82,46 @@ jobs:
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
+          if grep -R -F -q 'xv@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
+            echo 'O bundle do Parceiro ainda tem o login de demonstração.'
+            exit 1
+          fi
+          if grep -R -F -q 'admin@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
+            echo 'O bundle do Parceiro ainda tem o admin de demonstração.'
+            exit 1
+          fi
+          if grep -R -F -q 'Demo: a / b' apps/parceiro/build/web --include='*.js'; then
+            echo 'O bundle do Parceiro ainda tem o atalho a/b.'
+            exit 1
+          fi
+
+  duplicates-sql:
+    name: Venue duplicate SQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scapematch_duplicates
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply migrations and test duplicates
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/scapematch_duplicates
+        run: bash supabase/tests/run_local.sh
 
   landing:
     name: Static landing
@@ -107,6 +147,15 @@ jobs:
           grep -F -q 'Acessar o ScapeMatch Parceiro' apps/landing/index.html
           grep -F -q 'Placeholder' apps/landing/index.html
           grep -F -q 'og:image' apps/landing/index.html
+          test -f apps/landing/termos.html
+          test -f apps/landing/privacidade.html
+          test -f apps/landing/cancelamento.html
+          test -f apps/landing/termos-parceiro.html
+          grep -F -q 'href="termos.html"' apps/landing/index.html
+          grep -F -q 'A revisar juridicamente' apps/landing/termos.html
+          grep -F -q 'encarregado@exemplo.invalid' apps/landing/privacidade.html
+          grep -F -q 'intermediadora' apps/landing/termos-parceiro.html
+          grep -F -q 'não é capturada' apps/landing/cancelamento.html
           if grep -E -q '[0-9]+%' apps/landing/index.html; then
             echo 'A landing cita percentual de comissão.'
             exit 1

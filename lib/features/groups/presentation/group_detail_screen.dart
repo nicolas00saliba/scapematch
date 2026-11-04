@@ -16,6 +16,7 @@ import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
+import 'package:scapematch/features/fiscal/presentation/service_invoice_card.dart';
 import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
@@ -36,6 +37,8 @@ import 'package:scapematch/features/groups/presentation/group_dialogs.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
+import 'package:scapematch/features/social/presentation/party_join_sheet.dart';
+import 'package:scapematch/features/social/presentation/social_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class GroupDetailScreen extends ConsumerStatefulWidget {
@@ -704,6 +707,19 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 : const Text('Entrar no grupo'),
           ),
         );
+        final friends = ref.watch(socialViewProvider).asData?.value?.friends;
+        if (friends != null && friends.isNotEmpty) {
+          buttons.add(
+            OutlinedButton(
+              key: AppKeys.joinWithCrew,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              onPressed: _busy ? null : () => _joinWithCrew(group),
+              child: const Text('Entrar com a turma'),
+            ),
+          );
+        }
       }
     }
 
@@ -806,6 +822,29 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       return;
     }
     _snack(message ?? GroupMessages.waitlistJoined);
+  }
+
+  Future<void> _joinWithCrew(Group group) async {
+    final request = await showPartyJoinSheet(context, group: group);
+    if (request == null || !mounted) {
+      return;
+    }
+    if (request.choice == PartyChoice.solo) {
+      await _join();
+      return;
+    }
+    await _run(() async {
+      final failure = await ref
+          .read(groupDetailViewModelProvider(widget.groupId).notifier)
+          .joinParty(request.companions);
+      if (!mounted) {
+        return;
+      }
+      final message = failure == null
+          ? 'Vagas reservadas. Cada pessoa paga a própria parte.'
+          : (failure.detail ?? GroupMessages.joinFailure(failure.reason));
+      _snack(message);
+    });
   }
 
   Future<void> _join() async {
@@ -1470,6 +1509,10 @@ class _PaymentCard extends StatelessWidget {
           if (index > 0) const SizedBox(height: 8),
           _PayerRow(person: seated[index], portrait: index),
         ],
+        if (mine != null) ...[
+          const SizedBox(height: 12),
+          _InvoiceSlot(group: group, seat: mine),
+        ],
         const SizedBox(height: 10),
         Text(
           GroupMessages.paymentPolicy(
@@ -1479,6 +1522,28 @@ class _PaymentCard extends StatelessWidget {
           style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
         ),
       ],
+    );
+  }
+}
+
+class _InvoiceSlot extends StatelessWidget {
+  const _InvoiceSlot({required this.group, required this.seat});
+
+  final Group group;
+  final Participant seat;
+
+  @override
+  Widget build(BuildContext context) {
+    final invoice = serviceInvoiceFor(group: group, seat: seat);
+    if (invoice != null) {
+      return ServiceInvoiceCard(invoice: invoice);
+    }
+    if (!seat.occupiesSeat) {
+      return const SizedBox.shrink();
+    }
+    return Text(
+      'A nota fiscal do serviço aparece quando a cobrança for confirmada.',
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.35),
     );
   }
 }

@@ -68,7 +68,7 @@ void main() {
       expect(group.totalSpots, lessThanOrEqualTo(group.roomCapacity));
       expect(group.participants, hasLength(group.filledSpots));
       expect(group.participants.first.isCreator, isTrue);
-      expect(group.joinedByMe, isFalse);
+      expect(group.joinedByMe, group.id == SampleIds.groupCwbClosed);
     }
   });
 

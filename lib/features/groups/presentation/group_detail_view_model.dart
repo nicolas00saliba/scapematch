@@ -2,6 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
@@ -40,6 +41,30 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
         return null;
       case PayShareFailure(:final reason):
         return reason;
+    }
+  }
+
+  /// Nulo quando a turma inteira sentou. A falha traz o motivo e, se houver,
+  /// quem impediu a entrada. Nenhuma cadeira muda quando falha.
+  Future<JoinFailure?> joinParty(List<PartyCompanion> companions) async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .joinParty(
+          groupId,
+          leaderUserId: user.id,
+          leaderName: user.displayName,
+          companions: companions,
+        );
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case JoinSuccess(:final group):
+        _publish(group);
+        return null;
+      case JoinFailure failure:
+        return failure;
     }
   }
 
