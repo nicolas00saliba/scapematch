@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
-import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
