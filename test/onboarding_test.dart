@@ -230,27 +230,54 @@ void main() {
     }
   });
 
-  testWidgets('Voltar returns to the previous intro page', (tester) async {
+  testWidgets('Voltar sits beside Pular and returns only one page', (
+    tester,
+  ) async {
     await pumpScapeMatch(tester, showOnboarding: true);
     expect(find.byKey(AppKeys.onboardingBack), findsNothing);
+    expect(find.text(OnboardingMessages.back), findsNothing);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
 
     for (final size in const [Size(390, 844), Size(1440, 900)]) {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = size;
       await tester.pumpAndSettle();
       expect(find.byKey(AppKeys.onboardingBack), findsNothing, reason: '$size');
-      await tester.tap(find.byKey(AppKeys.onboardingNext));
-      await tester.pumpAndSettle();
-      expect(find.text(OnboardingMessages.nearTitle), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_back), findsNothing, reason: '$size');
       expect(
-        find.byKey(AppKeys.onboardingBack),
+        find.byKey(AppKeys.onboardingSkip),
         findsOneWidget,
         reason: '$size',
       );
+      expect(
+        find.byKey(AppKeys.onboardingNext),
+        findsOneWidget,
+        reason: '$size',
+      );
+
+      await tester.tap(find.byKey(AppKeys.onboardingNext));
+      await tester.pumpAndSettle();
+      expect(find.text(OnboardingMessages.nearTitle), findsOneWidget);
+      _expectBackBesideSkip(tester, size);
+
+      await tester.tap(find.byKey(AppKeys.onboardingNext));
+      await tester.pumpAndSettle();
+      expect(find.text(OnboardingMessages.inviteTitle), findsOneWidget);
+      _expectBackBesideSkip(tester, size);
+
+      await tester.tap(find.byKey(AppKeys.onboardingBack));
+      await tester.pumpAndSettle();
+      expect(find.text(OnboardingMessages.nearTitle), findsOneWidget);
+      expect(find.text(OnboardingMessages.inviteTitle), findsNothing);
+      expect(find.byKey(AppKeys.onboardingNext), findsOneWidget);
+
       await tester.tap(find.byKey(AppKeys.onboardingBack));
       await tester.pumpAndSettle();
       expect(find.text(OnboardingMessages.findTitle), findsOneWidget);
       expect(find.byKey(AppKeys.onboardingBack), findsNothing, reason: '$size');
+      expect(find.text('←'), findsNothing, reason: '$size');
+      expect(find.byKey(AppKeys.onboardingSkip), findsOneWidget);
+      expect(find.byKey(AppKeys.onboardingNext), findsOneWidget);
     }
   });
 
@@ -271,6 +298,32 @@ void main() {
     expect(photo.height, lessThanOrEqualTo(864 / 2 + 0.5));
     expect(photo.width / photo.height, closeTo(4 / 3, 0.02));
   });
+}
+
+void _expectBackBesideSkip(WidgetTester tester, Size size) {
+  expect(find.byKey(AppKeys.onboardingBack), findsOneWidget, reason: '$size');
+  expect(tester.widget(find.byKey(AppKeys.onboardingBack)), isA<TextButton>());
+  expect(find.text(OnboardingMessages.back), findsOneWidget, reason: '$size');
+  expect(find.text('←'), findsOneWidget, reason: '$size');
+  expect(find.byIcon(Icons.arrow_back), findsNothing, reason: '$size');
+  expect(tester.takeException(), isNull, reason: '$size');
+
+  final skip = tester.getRect(find.byKey(AppKeys.onboardingSkip));
+  final back = tester.getRect(find.byKey(AppKeys.onboardingBack));
+  final next = tester.getRect(find.byKey(AppKeys.onboardingNext));
+  expect(back.left, closeTo(skip.right, 1), reason: '$size');
+  expect(
+    (back.center.dy - skip.center.dy).abs(),
+    lessThan(12),
+    reason: '$size',
+  );
+  expect(back.top, greaterThan(size.height * 0.7), reason: '$size');
+  expect(next.left, greaterThan(back.right), reason: '$size');
+  expect(
+    find.bySemanticsLabel(RegExp(r'Página \d de 4')),
+    findsOneWidget,
+    reason: '$size',
+  );
 }
 
 void _expectDesktopIntro(WidgetTester tester, Size size) {
