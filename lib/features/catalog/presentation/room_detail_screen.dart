@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -67,10 +69,27 @@ class RoomDetailScreen extends ConsumerWidget {
   }
 }
 
-class _RoomDetail extends StatelessWidget {
+class _RoomDetail extends StatefulWidget {
   const _RoomDetail({required this.listing});
 
   final RoomListing listing;
+
+  @override
+  State<_RoomDetail> createState() => _RoomDetailState();
+}
+
+class _RoomDetailState extends State<_RoomDetail> {
+  var _selected = 0;
+
+  RoomListing get listing => widget.listing;
+
+  @override
+  void didUpdateWidget(covariant _RoomDetail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.listing.room.id != widget.listing.room.id) {
+      _selected = 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,13 +128,22 @@ class _RoomDetail extends StatelessWidget {
     final room = listing.room;
     final heroFrame = wideGallery ? RoomFrame.heroWide : RoomFrame.hero;
     final thumbFrame = wideGallery ? RoomFrame.galleryWide : RoomFrame.gallery;
-    final heroBytes = room.pictureBytes(heroFrame);
-    final shots = _gallery(room, thumbFrame);
+    final shots = _shots(room, thumbFrame, heroFrame);
+    final last = shots.length - 1;
+    final shown = !wideGallery
+        ? 0
+        : _selected < 0
+        ? 0
+        : _selected > last
+        ? last
+        : _selected;
+    final hero = shots[shown];
     return ListView(
       key: AppKeys.roomDetail(room.id),
       padding: EdgeInsets.zero,
       children: [
         SizedBox(
+          key: AppKeys.roomHero,
           height: heroFrame.height.toDouble(),
           child: Stack(
             fit: StackFit.expand,
@@ -124,18 +152,14 @@ class _RoomDetail extends StatelessWidget {
                 tag: roomHeroTag(room.id),
                 child: Material(
                   type: MaterialType.transparency,
-                  child: ScapePhoto(
-                    bytes: heroBytes,
-                    asset: heroBytes == null ? roomCategoryImage(room.category) : '',
-                    semanticLabel: room.name,
+                  child: _shotPhoto(
+                    hero,
+                    heroFrame: true,
+                    label: wideGallery ? null : room.name,
                   ),
                 ),
               ),
-              const Positioned(
-                left: 0,
-                top: 0,
-                child: ScapeCoverBackButton(),
-              ),
+              const Positioned(left: 0, top: 0, child: ScapeCoverBackButton()),
             ],
           ),
         ),
@@ -192,14 +216,14 @@ class _RoomDetail extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    for (final shot in shots)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: SizedBox(
-                          width: thumbFrame.width.toDouble(),
-                          height: thumbFrame.height.toDouble(),
-                          child: shot,
-                        ),
+                    for (var index = 0; index < shots.length; index++)
+                      _desktopThumb(
+                        context,
+                        shot: shots[index],
+                        index: index,
+                        selected: index == shown,
+                        width: thumbFrame.width.toDouble(),
+                        height: thumbFrame.height.toDouble(),
                       ),
                   ],
                 )
@@ -217,16 +241,13 @@ class _RoomDetail extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                         child: SizedBox(
                           width: thumbFrame.width.toDouble(),
-                          child: shots[index],
+                          child: _shotPhoto(shots[index], heroFrame: false),
                         ),
                       );
                     },
                   ),
                 ),
-              if (actions) ...[
-                const SizedBox(height: 20),
-                _actions(context),
-              ],
+              if (actions) ...[const SizedBox(height: 20), _actions(context)],
             ],
           ),
         ),
@@ -234,25 +255,101 @@ class _RoomDetail extends StatelessWidget {
     );
   }
 
-  List<Widget> _gallery(EscapeRoom room, RoomFrame frame) {
+  List<_GalleryShot> _shots(
+    EscapeRoom room,
+    RoomFrame thumbFrame,
+    RoomFrame heroFrame,
+  ) {
     final pictures = room.pictures;
     if (pictures.isEmpty) {
       final assets = roomGallery(room.category);
       return [
         for (var index = 0; index < assets.length; index++)
-          ScapePhoto(
+          _GalleryShot(
             asset: assets[index],
-            semanticLabel: '${room.name}, foto ${index + 1}',
+            label: '${room.name}, foto ${index + 1}',
           ),
       ];
     }
     return [
       for (var index = 0; index < pictures.length; index++)
-        ScapePhoto(
-          bytes: pictures[index].bytesFor(frame),
-          semanticLabel: '${room.name}, foto ${index + 1}',
+        _GalleryShot(
+          heroBytes: pictures[index].bytesFor(heroFrame),
+          thumbBytes: pictures[index].bytesFor(thumbFrame),
+          asset: roomCategoryImage(room.category),
+          label: '${room.name}, foto ${index + 1}',
         ),
     ];
+  }
+
+  Widget _shotPhoto(
+    _GalleryShot shot, {
+    required bool heroFrame,
+    String? label,
+  }) {
+    final bytes = heroFrame ? shot.heroBytes : shot.thumbBytes;
+    final useBytes = bytes != null && bytes.isNotEmpty;
+    return ScapePhoto(
+      bytes: useBytes ? bytes : null,
+      asset: useBytes ? '' : shot.asset,
+      semanticLabel: label ?? shot.label,
+    );
+  }
+
+  /// No site, a miniatura troca a capa. O celular continua só a faixa.
+  Widget _desktopThumb(
+    BuildContext context, {
+    required _GalleryShot shot,
+    required int index,
+    required bool selected,
+    required double width,
+    required double height,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(16);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: shot.label,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: AppKeys.roomGalleryPhoto(index),
+          onTap: () => setState(() => _selected = index),
+          mouseCursor: SystemMouseCursors.click,
+          borderRadius: radius,
+          child: ExcludeSemantics(
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: radius,
+                    child: _shotPhoto(shot, heroFrame: false),
+                  ),
+                  if (selected)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        key: AppKeys.roomGallerySelected,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(16),
+                            ),
+                            border: Border.all(color: scheme.primary, width: 3),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _actionCard(BuildContext context) {
@@ -305,4 +402,19 @@ class _RoomDetail extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Uma foto da sala. Sem bytes, [asset] é a figura do tema.
+class _GalleryShot {
+  const _GalleryShot({
+    required this.label,
+    this.asset = '',
+    this.heroBytes,
+    this.thumbBytes,
+  });
+
+  final String label;
+  final String asset;
+  final Uint8List? heroBytes;
+  final Uint8List? thumbBytes;
 }
