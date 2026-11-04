@@ -83,6 +83,34 @@ jobs:
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
 
+  duplicates-sql:
+    name: Venue duplicate SQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scapematch_duplicates
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply migrations and test duplicates
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/scapematch_duplicates
+        run: bash supabase/tests/run_local.sh
+
   landing:
     name: Static landing
     runs-on: ubuntu-latest

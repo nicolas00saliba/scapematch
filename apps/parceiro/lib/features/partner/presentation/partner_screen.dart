@@ -5,6 +5,7 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_home_s
 import 'package:scapematch_parceiro/features/partner/presentation/partner_login_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_approval_screen.dart';
 
 /// Sem sessão, o login da casa. Com sessão, o painel.
 class PartnerScreen extends ConsumerWidget {
@@ -16,12 +17,14 @@ class PartnerScreen extends ConsumerWidget {
     if (session == null) {
       return const PartnerLoginScreen();
     }
+    if (session.isAdmin) {
+      return const PartnerVenueApprovalScreen();
+    }
     final desk = ref.watch(partnerDeskProvider);
     return desk.when(
       skipLoadingOnReload: true,
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, stack) => Scaffold(
         body: Center(
           child: Column(
