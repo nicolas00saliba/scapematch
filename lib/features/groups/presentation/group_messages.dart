@@ -358,7 +358,7 @@ abstract final class GroupMessages {
     bool started = false,
   }) {
     if (phase == GroupPhase.forming && started) {
-      return 'Sessão já começou';
+      return spotsUntilClose(missing);
     }
     return switch (phase) {
       GroupPhase.forming ||

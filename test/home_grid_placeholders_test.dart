@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/sharing/site_links.dart';
-import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
@@ -11,7 +9,6 @@ import 'package:scapematch/features/groups/presentation/create_group_screen.dart
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/home_grid_slots.dart';
-import 'package:scapematch/providers/repositories.dart';
 
 import 'support/fixed_groups.dart';
 import 'support/pump_app.dart';
@@ -37,10 +34,10 @@ void main() {
     final two = liveClosing(source, missing: 2);
     final closed = liveClosing(source, missing: 0);
     final loose = liveClosing(source, missing: 3);
-    final later = liveClosing(
+    final started = liveClosing(
       source,
       missing: 1,
-      startsAt: now.add(const Duration(hours: 3)),
+      startsAt: now.subtract(const Duration(minutes: 20)),
     );
     final ended = liveClosing(
       source,
@@ -49,13 +46,14 @@ void main() {
     );
 
     expect(open.isAlmostFull, isTrue);
+    expect(now.isBefore(open.startsAt), isTrue);
     expect(
       filterGroupsHappeningAndClosing([
         open,
         two,
         closed,
         loose,
-        later,
+        started,
         ended,
       ], now),
       [open, two],
@@ -70,12 +68,20 @@ void main() {
     expect(uri.toString(), 'https://exemplo.test/scapematch/parceiro/');
   });
 
-  testWidgets('phone with no live group drops the window and lifts promos', (
+  testWidgets('phone with no forming group drops the window and lifts promos', (
     tester,
   ) async {
+    final source = curitibaSampleGroups();
     await pumpScapeMatch(
       tester,
-      overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
+      overrides: fixedGroups([
+        liveClosing(source[0], missing: 4),
+        liveClosing(
+          source[1],
+          missing: 1,
+          startsAt: sampleNow.subtract(const Duration(minutes: 20)),
+        ),
+      ]),
     );
     await _phone(tester);
 
@@ -84,6 +90,7 @@ void main() {
     expect(find.textContaining('Ainda não há grupos'), findsNothing);
     expect(find.text('Promoções'), findsOneWidget);
     expect(find.text('Novidades'), findsOneWidget);
+    expect(find.text('Sessão já começou'), findsNothing);
     final searchBottom = tester
         .getBottomLeft(find.byKey(AppKeys.groupSearch))
         .dy;
@@ -106,6 +113,7 @@ void main() {
     expect(_cards, findsOneWidget);
     expect(find.byKey(AppKeys.groupCard(live.id)), findsOneWidget);
     expect(find.text('Falta 1 para fechar'), findsWidgets);
+    expect(find.text('Sessão já começou'), findsNothing);
     expect(find.byKey(AppKeys.groupCard(waiting.id)), findsNothing);
     expect(find.byKey(AppKeys.groupCard(crowded.id)), findsNothing);
     expect(_slots, findsNothing);
@@ -144,25 +152,26 @@ void main() {
     expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
   });
 
-  testWidgets('phone search still lists a group that has not started', (
+  testWidgets('phone search still lists a session that already started', (
     tester,
   ) async {
-    await pumpScapeMatch(
-      tester,
-      overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
+    final source = curitibaSampleGroups();
+    final forming = liveClosing(source[0], missing: 1);
+    final started = liveClosing(
+      source[1],
+      missing: 1,
+      startsAt: sampleNow.subtract(const Duration(minutes: 30)),
     );
+    await pumpScapeMatch(tester, overrides: fixedGroups([forming, started]));
     await _phone(tester);
-    expect(
-      find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsNothing,
-    );
+    expect(find.byKey(AppKeys.groupCard(forming.id)), findsOneWidget);
+    expect(find.byKey(AppKeys.groupCard(started.id)), findsNothing);
+    expect(find.text('Sessão já começou'), findsNothing);
 
-    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
+    await tester.enterText(find.byKey(AppKeys.groupSearch), started.roomName);
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsOneWidget,
-    );
+    expect(find.byKey(AppKeys.groupCard(started.id)), findsOneWidget);
+    expect(find.text('Sessão já começou'), findsNothing);
     expect(_slots, findsNothing);
   });
 
@@ -174,10 +183,13 @@ void main() {
 
     expect(_cards, findsNothing);
     expect(_slots, findsNWidgets(12));
-    expect(find.text(homeGridCreateMessage), findsWidgets);
-    expect(find.textContaining('Novas salas chegando em breve'), findsWidgets);
-    expect(find.text(homeGridPartnerMessage), findsWidgets);
-    expect(find.text(homeGridInviteMessage), findsWidgets);
+    expect(find.text(homeGridCreateMessage), findsOneWidget);
+    expect(
+      find.textContaining('Novas salas chegando em breve'),
+      findsOneWidget,
+    );
+    expect(find.text(homeGridPartnerMessage), findsOneWidget);
+    expect(find.text(homeGridInviteMessage), findsOneWidget);
     expect(find.textContaining('Ainda não há grupos'), findsNothing);
     _expectSameRow(tester, 0, 3);
     expect(
@@ -198,6 +210,8 @@ void main() {
 
     expect(_cards, findsNWidgets(3));
     expect(_slots, findsNWidgets(9));
+    expect(find.text(homeGridCreateMessage), findsOneWidget);
+    expect(find.text(homeGridInviteMessage), findsOneWidget);
     final card = tester.getSize(_cards.first);
     final slot = tester.getSize(find.byKey(AppKeys.homeGridSlot(0)));
     expect(slot.width, closeTo(card.width, 2));

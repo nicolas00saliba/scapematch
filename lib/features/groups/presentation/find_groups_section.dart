@@ -250,8 +250,8 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
         final now = ref.watch(clockProvider).now();
         final desktop = isScapeDesktop(context);
         final text = query.trim();
-        // No celular, sem texto de busca, só a sessão que já começou
-        // e ainda falta 1 ou 2 pessoas. Sem ninguém assim, a faixa some.
+        // No celular, sem texto de busca, só quem ainda vai jogar e falta
+        // 1 ou 2 pessoas. Sem ninguém assim, a faixa some.
         final shown = !desktop && text.isEmpty
             ? filterGroupsHappeningAndClosing(visible, now)
             : visible;
@@ -270,12 +270,14 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
             gap: 12,
             placeholderBuilder: (index) => StaggerIn(
               index: shown.length + index,
-              child: HomeGridSlotCard(
-                key: AppKeys.homeGridSlot(index),
-                kind: homeGridSlotKind(index),
-                cityName: cityName,
-                gameTypeId: gameTypeId,
-              ),
+              child: homeGridSlotIsMessage(index)
+                  ? HomeGridSlotCard(
+                      key: AppKeys.homeGridSlot(index),
+                      kind: homeGridSlotKind(index),
+                      cityName: cityName,
+                      gameTypeId: gameTypeId,
+                    )
+                  : HomeGridSkeletonCard(key: AppKeys.homeGridSlot(index)),
             ),
             children: [
               for (var index = 0; index < shown.length; index++)

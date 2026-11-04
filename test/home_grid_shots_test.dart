@@ -6,15 +6,12 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/groups/presentation/home_grid_slots.dart';
-import 'package:scapematch/providers/repositories.dart';
 
 import 'support/fixed_groups.dart';
 import 'support/pump_app.dart';
-import 'support/sample_clock.dart';
 
 void main() {
   testWidgets('saves home grids with holes and a phone highlight', (
@@ -62,7 +59,7 @@ void main() {
       dir,
       'home-390-0-grupos.png',
       const Size(390, 844),
-      overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
+      overrides: fixedGroups(const []),
       check: (tester) {
         expect(find.byKey(AppKeys.groupWindow), findsNothing);
         expect(find.text('Promoções'), findsOneWidget);
@@ -80,6 +77,7 @@ void main() {
       check: (tester) {
         expect(find.text('Falta 1 para fechar'), findsWidgets);
         expect(find.text('Faltam 2 para fechar'), findsWidgets);
+        expect(find.text('Sessão já começou'), findsNothing);
         expect(find.byKey(AppKeys.homeGridSlot(0)), findsNothing);
         final viewBottom = tester.view.physicalSize.height;
         expect(

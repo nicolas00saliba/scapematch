@@ -26,7 +26,7 @@ List<Group> curitibaSampleGroups() {
   ];
 }
 
-/// Sessão já começou e ainda falta [missing] gente para fechar.
+/// Sessão ainda futura e faltando [missing] gente para fechar.
 Group liveClosing(
   Group group, {
   int missing = 1,
@@ -34,7 +34,7 @@ Group liveClosing(
   DateTime? startsAt,
 }) {
   return group.copyWith(
-    startsAt: startsAt ?? sampleNow.subtract(const Duration(minutes: 20)),
+    startsAt: startsAt ?? sampleNow.add(const Duration(hours: 2)),
     filledSpots: group.totalSpots - missing,
     gameType: gameType ?? group.gameType,
   );

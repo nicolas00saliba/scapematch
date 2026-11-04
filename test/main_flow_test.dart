@@ -18,10 +18,10 @@ void main() {
 
     expect(find.text('Escolha uma cidade'), findsNothing);
     expect(find.text('Curitiba'), findsWidgets);
-    expect(find.byKey(AppKeys.groupWindow), findsNothing);
+    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsNothing,
+      findsOneWidget,
     );
     expect(find.byKey(AppKeys.groupSearch), findsOneWidget);
     expect(find.text('Criar grupo'), findsWidgets);
@@ -30,7 +30,6 @@ void main() {
 
     await _selectCity(tester, SampleIds.saoPaulo);
     expect(find.text('São Paulo'), findsWidgets);
-    expect(find.text('Metrô Perdido'), findsNothing);
 
     await tester.enterText(find.byKey(AppKeys.groupSearch), 'Augusta');
     await tester.pumpAndSettle();

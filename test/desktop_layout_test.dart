@@ -32,7 +32,7 @@ void main() {
     );
 
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byKey(AppKeys.groupWindow), findsNothing);
+    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
     expect(find.byType(ScapeLogo), findsOneWidget);
     expect(
       tester.getSize(find.byKey(AppKeys.groupSearch)).width,
@@ -170,8 +170,6 @@ void main() {
     await pumpScapeMatch(tester);
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
     await tester.pumpAndSettle();
 
     final phoneCard = find.byKey(

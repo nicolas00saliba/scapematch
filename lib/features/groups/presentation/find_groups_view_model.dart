@@ -76,15 +76,15 @@ List<Group> filterGroupsByGameType(List<Group> groups, String gameTypeId) {
   ];
 }
 
-/// Sessão em andamento e ainda faltam 1 ou 2 pessoas para fechar.
+/// Grupo se formando agora: sessão ainda futura, aberto e faltando 1 ou 2.
 ///
 /// O celular usa isso no lugar da lista inteira quando a busca está vazia.
-/// Zero vagas não entra: o grupo já fechou. Três ou mais também não.
+/// Sessão que já começou não entra. Grupo fechado ou com 3+ vagas também não.
 List<Group> filterGroupsHappeningAndClosing(List<Group> groups, DateTime now) {
   return [
     for (final group in groups)
-      if (GroupRules.hasStarted(startsAt: group.startsAt, now: now) &&
-          !GroupRules.hasEnded(endsAt: group.endsAt, now: now) &&
+      if (!group.isCancelled &&
+          now.isBefore(group.startsAt) &&
           group.isAlmostFull)
         group,
   ];

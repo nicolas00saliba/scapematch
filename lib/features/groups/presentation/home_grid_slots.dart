@@ -63,6 +63,11 @@ HomeGridSlotKind homeGridSlotKind(int index) {
   return _slotKinds[safe % _slotKinds.length];
 }
 
+/// Cada frase entra uma vez. O restante da grade é esqueleto.
+bool homeGridSlotIsMessage(int index) {
+  return index >= 0 && index < _slotKinds.length;
+}
+
 String homeGridSlotMessage(
   HomeGridSlotKind kind, {
   String? cityName,
@@ -362,6 +367,66 @@ class HomeGridSlotCard extends StatelessWidget {
   void _snack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// Vaga sem frase. O tracejado e as barras mantêm o tamanho do cartão.
+class HomeGridSkeletonCard extends StatelessWidget {
+  const HomeGridSkeletonCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final quiet = scheme.primary.withValues(alpha: 0.22);
+    return Material(
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      child: CustomPaint(
+        foregroundPainter: _DashedRRectPainter(
+          color: scheme.primary.withValues(alpha: 0.35),
+          radius: 24,
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: groupCardDenseCoverWidth,
+                child: ColoredBox(
+                  color: scheme.primaryContainer.withValues(alpha: 0.55),
+                  child: Icon(Icons.hourglass_empty, color: quiet, size: 22),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SoftBar(color: quiet, widthFactor: 0.72, height: 14),
+                      const SizedBox(height: 6),
+                      _SoftBar(color: quiet, widthFactor: 0.46, height: 14),
+                      const SizedBox(height: 8),
+                      _SoftBar(color: quiet, widthFactor: 0.62, height: 15),
+                      const SizedBox(height: 8),
+                      _SoftBar(color: quiet, widthFactor: 0.4, height: 15),
+                      const SizedBox(height: 8),
+                      _SoftBar(
+                        color: scheme.primary.withValues(alpha: 0.16),
+                        widthFactor: 1,
+                        height: 4,
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

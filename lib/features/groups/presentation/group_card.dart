@@ -5,7 +5,6 @@ import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
-import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/groups/presentation/group_seat_facts.dart';
@@ -33,6 +32,8 @@ class GroupCard extends StatelessWidget {
 
   final Group group;
   final VoidCallback onTap;
+
+  /// Relógio da tela. O cartão não muda o texto quando a sessão já começou.
   final DateTime now;
   final VoidCallback? onInvite;
 
@@ -42,11 +43,10 @@ class GroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(now.millisecondsSinceEpoch >= 0);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final spots = GroupMessages.seatCount(group.filledSpots, group.totalSpots);
-    final started = !now.isBefore(group.startsAt);
-
     final seated = [
       for (final person in group.participants)
         if (person.occupiesSeat) person,
@@ -157,17 +157,6 @@ class GroupCard extends StatelessWidget {
                             compact: true,
                             dense: dense,
                           ),
-                          if (started &&
-                              group.phaseAt(now) == GroupPhase.forming) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'Sessão já começou',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: scheme.secondary,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
                           if (!dense) ...[
                             const SizedBox(height: 6),
                             _AvatarRow(

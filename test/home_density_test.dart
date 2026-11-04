@@ -21,7 +21,7 @@ void main() {
     await pumpScapeMatch(tester);
 
     double top(Key key) => tester.getTopLeft(find.byKey(key)).dy;
-    expect(find.byKey(AppKeys.groupWindow), findsNothing);
+    expect(top(AppKeys.groupWindow), lessThan(top(AppKeys.promoCarousel)));
     expect(top(AppKeys.promoCarousel), lessThan(top(AppKeys.newsFeed)));
     expect(top(AppKeys.newsFeed), lessThan(top(AppKeys.roomsCarousel)));
     expect(find.text('Promoções'), findsOneWidget);
@@ -33,7 +33,7 @@ void main() {
     expect(find.byKey(AppKeys.promoDots), findsOneWidget);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-      findsNothing,
+      findsOneWidget,
     );
   });
 
@@ -85,10 +85,11 @@ void main() {
     final scrollable = tester.state<ScrollableState>(verticalScrollable);
     final viewportTop = tester.getTopLeft(verticalScrollable).dy;
     final viewportBottom = viewportTop + scrollable.position.viewportDimension;
+    final groups = tester.getRect(find.byKey(AppKeys.groupWindow));
     final promos = tester.getRect(find.byKey(AppKeys.promoCarousel));
 
-    expect(find.byKey(AppKeys.groupWindow), findsNothing);
-    expect(promos.top, greaterThanOrEqualTo(viewportTop - 1));
+    expect(groups.top, greaterThanOrEqualTo(viewportTop - 1));
+    expect(promos.top, greaterThan(groups.bottom - 1));
     expect(promos.top, lessThan(viewportBottom));
     final visible = (viewportBottom - promos.top).clamp(0.0, promos.height);
     expect(

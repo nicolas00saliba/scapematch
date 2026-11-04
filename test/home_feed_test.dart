@@ -47,10 +47,10 @@ void main() {
         findsNothing,
       );
       expect(find.text('Curitiba'), findsWidgets);
-      expect(find.byKey(AppKeys.groupWindow), findsNothing);
+      expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
       expect(
         find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
-        findsNothing,
+        findsOneWidget,
       );
       await revealCarouselItem(
         tester,
@@ -562,7 +562,11 @@ void main() {
           .text,
       isEmpty,
     );
-    expect(find.byKey(AppKeys.groupWindow), findsNothing);
+    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
+    expect(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
+      findsOneWidget,
+    );
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
       findsNothing,

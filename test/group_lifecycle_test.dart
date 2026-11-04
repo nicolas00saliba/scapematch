@@ -242,9 +242,8 @@ void main() {
       tester,
       overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
     );
-    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
-    await tester.pumpAndSettle();
     expect(find.text('Falta 1 para fechar'), findsWidgets);
+    expect(find.text('Sessão já começou'), findsNothing);
     expect(find.text('Quase cheios'), findsNothing);
   });
 
@@ -335,7 +334,7 @@ void main() {
         missing: forming.spotsUntilClose,
         started: true,
       ),
-      'Sessão já começou',
+      GroupMessages.spotsUntilClose(forming.spotsUntilClose),
     );
     expect(forming.showCloseDeadline(now), isFalse);
   });
