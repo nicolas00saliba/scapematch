@@ -11,6 +11,7 @@ import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
+import 'support/fixed_groups.dart';
 import 'support/pump_app.dart';
 
 void main() {
@@ -409,7 +410,13 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await pumpScapeMatch(tester);
+    final source = curitibaSampleGroups();
+    await pumpScapeMatch(
+      tester,
+      overrides: fixedGroups([
+        for (var index = 0; index < 4; index++) liveClosing(source[index]),
+      ]),
+    );
     tester.view.physicalSize = const Size(390, 844);
     await tester.pumpAndSettle();
 
@@ -466,7 +473,17 @@ void main() {
   testWidgets('the group window scrolls almost-full groups and obeys filters', (
     tester,
   ) async {
-    await pumpScapeMatch(tester);
+    final source = curitibaSampleGroups();
+    final porao = source.firstWhere((group) => group.id == 'grp-cwb-porao-rpg');
+    final rpg = liveClosing(porao, missing: 1);
+    await pumpScapeMatch(
+      tester,
+      overrides: fixedGroups([
+        rpg,
+        for (var index = 1; index < 5; index++) liveClosing(source[index]),
+        source[5],
+      ]),
+    );
     final scrollable = find.descendant(
       of: find.byKey(AppKeys.groupWindow),
       matching: find.byWidgetPredicate(

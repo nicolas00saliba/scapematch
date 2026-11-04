@@ -658,6 +658,8 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       names: ['Zeca', 'Aline', 'Bruno', 'Cris'],
       gameType: GameTypes.rpg,
       roomName: 'Mesa de RPG no porão',
+      // Igual ao total, para o grupo seguir se formando e o mapa ter pino de RPG.
+      minimumSpots: 5,
     ),
     _group(
       now: now,

@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 abstract final class AppKeys {
   static const citySelector = Key('city-selector');
   static const gameTypeSelector = Key('game-type-selector');
+  static const gameTypeChipBar = Key('game-type-chip-bar');
   static const groupWindow = Key('group-window');
   static const findGroup = Key('find-group');
   static const createGroup = Key('create-group');
@@ -166,6 +167,7 @@ abstract final class AppKeys {
   static const popularRooms = Key('popular-rooms');
   static const popularSeeAll = Key('popular-see-all');
   static const groupResults = Key('group-results');
+  static Key homeGridSlot(int index) => Key('home-grid-slot-$index');
   static const homeSurfaceToggle = Key('home-surface-toggle');
   static const liveStrip = Key('live-strip');
   static const liveJoin = Key('live-join');

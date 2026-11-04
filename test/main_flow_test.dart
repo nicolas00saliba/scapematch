@@ -18,6 +18,7 @@ void main() {
 
     expect(find.text('Escolha uma cidade'), findsNothing);
     expect(find.text('Curitiba'), findsWidgets);
+    expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
       findsOneWidget,
@@ -141,16 +142,20 @@ void main() {
     await pumpScapeMatch(tester);
 
     await _selectCity(tester, SampleIds.saoPaulo);
-    await tester.ensureVisible(find.byKey(AppKeys.groupSearch));
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Metrô');
     await tester.pumpAndSettle();
     expect(find.text('Metrô Perdido'), findsWidgets);
     expect(find.text('O Cofre do Café'), findsNothing);
 
     await _selectCity(tester, SampleIds.curitiba);
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cofre');
+    await tester.pumpAndSettle();
     expect(find.text('O Cofre do Café'), findsWidgets);
     expect(find.text('Metrô Perdido'), findsNothing);
 
     await _selectCity(tester, SampleIds.rioDeJaneiro);
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Apartamento');
+    await tester.pumpAndSettle();
     expect(find.text('O Apartamento da Avenida'), findsWidgets);
     expect(find.text('Metrô Perdido'), findsNothing);
     expect(find.text('O Cofre do Café'), findsNothing);

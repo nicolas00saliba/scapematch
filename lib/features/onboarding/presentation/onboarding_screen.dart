@@ -11,8 +11,7 @@ import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/city_landmarks.dart';
-import 'package:scapematch/features/groups/domain/game_type.dart';
-import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
+import 'package:scapematch/features/groups/presentation/game_type_chips.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 
@@ -452,14 +451,13 @@ class _PagePhoto extends ConsumerWidget {
   }
 }
 
-class _Preferences extends ConsumerWidget {
+class _Preferences extends StatelessWidget {
   const _Preferences();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final selected = ref.watch(selectedGameTypeIdProvider);
     final label = theme.textTheme.titleSmall?.copyWith(
       fontWeight: FontWeight.w800,
     );
@@ -477,23 +475,7 @@ class _Preferences extends ConsumerWidget {
             const SizedBox(height: 16),
             Text(OnboardingMessages.gameTypeHeading, style: label),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final choice in GameTypes.choices)
-                  ChoiceChip(
-                    key: AppKeys.gameTypeOption(choice.id),
-                    label: Text(choice.shortLabel),
-                    selected: selected == choice.id,
-                    onSelected: (_) {
-                      ref
-                          .read(selectedGameTypeIdProvider.notifier)
-                          .select(choice.id);
-                    },
-                  ),
-              ],
-            ),
+            const GameTypeChips(),
           ],
         ),
       ),
