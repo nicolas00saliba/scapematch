@@ -15,6 +15,12 @@ import 'package:scapematch/features/groups/presentation/group_seat_facts.dart';
 /// Não usa a tag da sala. As duas capas podem estar na mesma Home.
 String groupHeroTag(String groupId) => 'group-cover-$groupId';
 
+/// Largura da capa no celular e nas listas.
+const groupCardCoverWidth = 112.0;
+
+/// Capa um pouco mais estreita na grade da Home no site.
+const groupCardDenseCoverWidth = 96.0;
+
 class GroupCard extends StatelessWidget {
   const GroupCard({
     super.key,
@@ -22,12 +28,16 @@ class GroupCard extends StatelessWidget {
     required this.onTap,
     required this.now,
     this.onInvite,
+    this.dense = false,
   });
 
   final Group group;
   final VoidCallback onTap;
   final DateTime now;
   final VoidCallback? onInvite;
+
+  /// Grade da Home no site: menos capa, respiro e altura, com o mesmo texto.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +50,12 @@ class GroupCard extends StatelessWidget {
       for (final person in group.participants)
         if (person.occupiesSeat) person,
     ];
+    final coverWidth = dense ? groupCardDenseCoverWidth : groupCardCoverWidth;
+    final pad = dense
+        ? const EdgeInsets.fromLTRB(10, 8, 10, 8)
+        : const EdgeInsets.fromLTRB(14, 14, 14, 16);
+    final titleGap = dense ? 2.0 : 4.0;
+    final blockGap = dense ? 4.0 : 8.0;
 
     return PressableScale(
       child: Semantics(
@@ -65,7 +81,7 @@ class GroupCard extends StatelessWidget {
                         child: Material(
                           type: MaterialType.transparency,
                           child: SizedBox(
-                            width: 112,
+                            width: coverWidth,
                             child: ScapePhoto(
                               asset: group.coverAsset,
                               semanticLabel: group.roomName,
@@ -76,7 +92,7 @@ class GroupCard extends StatelessWidget {
                     ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+                      padding: pad,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -84,35 +100,53 @@ class GroupCard extends StatelessWidget {
                             group.roomName,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style:
+                                (dense
+                                        ? theme.textTheme.titleSmall
+                                        : theme.textTheme.titleMedium)
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      height: dense ? 1.2 : null,
+                                    ),
                           ),
-                          const SizedBox(height: 4),
-                          _StatusPill(group: group),
+                          SizedBox(height: titleGap),
+                          _StatusPill(group: group, dense: dense),
                           const SizedBox(height: 2),
                           Text(
                             '${group.houseName} · ${group.neighborhood}',
+                            maxLines: dense ? 2 : null,
+                            overflow: dense ? TextOverflow.ellipsis : null,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: scheme.onSurfaceVariant,
+                              height: dense ? 1.25 : null,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: blockGap),
                           Row(
                             children: [
                               Icon(
                                 Icons.schedule,
-                                size: 16,
+                                size: dense ? 15 : 16,
                                 color: scheme.primary,
                               ),
                               const SizedBox(width: 6),
                               Expanded(
-                                child: Text(formatSession(group.startsAt)),
+                                child: Text(
+                                  formatSession(group.startsAt),
+                                  maxLines: dense ? 1 : null,
+                                  overflow: dense
+                                      ? TextOverflow.ellipsis
+                                      : null,
+                                ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          GroupSeatFacts(group: group, compact: true),
+                          SizedBox(height: blockGap),
+                          GroupSeatFacts(
+                            group: group,
+                            compact: true,
+                            dense: dense,
+                          ),
                           if (started &&
                               group.phaseAt(now) == GroupPhase.forming) ...[
                             const SizedBox(height: 2),
@@ -124,8 +158,12 @@ class GroupCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 6),
-                          _AvatarRow(people: seated, filled: group.filledSpots),
+                          SizedBox(height: dense ? 2 : 6),
+                          _AvatarRow(
+                            people: seated,
+                            filled: group.filledSpots,
+                            dense: dense,
+                          ),
                           if (onInvite != null)
                             Align(
                               alignment: Alignment.centerLeft,
@@ -137,6 +175,15 @@ class GroupCard extends StatelessWidget {
                                   visualDensity: VisualDensity.compact,
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
+                                  minimumSize: dense
+                                      ? const Size(40, 32)
+                                      : null,
+                                  padding: dense
+                                      ? const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        )
+                                      : null,
                                 ),
                                 child: const Text('Convidar'),
                               ),
@@ -156,45 +203,54 @@ class GroupCard extends StatelessWidget {
 }
 
 class _AvatarRow extends StatelessWidget {
-  const _AvatarRow({required this.people, required this.filled});
+  const _AvatarRow({
+    required this.people,
+    required this.filled,
+    required this.dense,
+  });
 
   final List<Participant> people;
   final int filled;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final shown = people.take(4).toList();
     final extra = people.length - shown.length;
+    final radius = dense ? 12.0 : 14.0;
+    final step = dense ? 16.0 : 18.0;
+    final size = radius * 2;
     return Row(
       children: [
         if (shown.isNotEmpty)
           SizedBox(
-            width: 28 + (shown.length - 1) * 18.0 + (extra > 0 ? 18 : 0),
-            height: 28,
+            width: size + (shown.length - 1) * step + (extra > 0 ? step : 0),
+            height: size,
             child: Stack(
               children: [
                 for (var index = 0; index < shown.length; index++)
                   Positioned(
-                    left: index * 18,
+                    left: index * step,
                     child: StaggerIn(
                       index: index,
                       child: _Avatar(
                         name: shown[index].displayName,
                         portrait: index,
+                        radius: radius,
                       ),
                     ),
                   ),
                 if (extra > 0)
                   Positioned(
-                    left: shown.length * 18,
+                    left: shown.length * step,
                     child: CircleAvatar(
-                      radius: 14,
+                      radius: radius,
                       backgroundColor: scheme.secondaryContainer,
                       child: Text(
                         '+$extra',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: dense ? 9 : 10,
                           fontWeight: FontWeight.w800,
                           color: scheme.onSecondaryContainer,
                         ),
@@ -216,21 +272,27 @@ class _AvatarRow extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.name, required this.portrait});
+  const _Avatar({
+    required this.name,
+    required this.portrait,
+    required this.radius,
+  });
 
   final String name;
   final int portrait;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
-    return PersonAvatar(name: name, radius: 14, portrait: portrait);
+    return PersonAvatar(name: name, radius: radius, portrait: portrait);
   }
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.group});
+  const _StatusPill({required this.group, required this.dense});
 
   final Group group;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -260,7 +322,10 @@ class _StatusPill extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 8 : 10,
+        vertical: dense ? 2 : 4,
+      ),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(99),
