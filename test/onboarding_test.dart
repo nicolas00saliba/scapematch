@@ -11,6 +11,8 @@ import 'package:scapematch/features/home/presentation/home_screen.dart';
 import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
+import 'package:scapematch/core/ui/scape_photo.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -156,4 +158,111 @@ void main() {
       SampleIds.curitiba,
     );
   });
+
+  test('the desktop frame keeps the photo aspect and the source pixels', () {
+    final phone = fitOnboardingPhoto(
+      maxWidth: 1400,
+      maxHeight: 900,
+      pixelWidth: 720,
+      visibleHeight: 1280,
+      devicePixelRatio: 1,
+    );
+    expect(phone.width, lessThanOrEqualTo(720));
+    expect(phone.height, lessThanOrEqualTo(1280));
+    expect(phone.width / phone.height, closeTo(720 / 1280, 0.001));
+
+    final retina = fitOnboardingPhoto(
+      maxWidth: 1400,
+      maxHeight: 900,
+      pixelWidth: 2000,
+      visibleHeight: 1333,
+      devicePixelRatio: 2,
+    );
+    expect(retina.width, lessThanOrEqualTo(1000));
+    expect(retina.height, lessThanOrEqualTo(1333 / 2));
+    expect(retina.width / retina.height, closeTo(2000 / 1333, 0.001));
+  });
+
+  testWidgets('desktop intro is a split page and the phone stays full bleed', (
+    tester,
+  ) async {
+    await pumpScapeMatch(tester, showOnboarding: true);
+
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final phonePhoto = tester.getSize(find.byType(ScapePhoto));
+    expect(phonePhoto.width, closeTo(390, 1));
+    expect(phonePhoto.height, closeTo(844, 1));
+    expect(
+      tester.getTopLeft(find.text(OnboardingMessages.findTitle)).dx,
+      lessThan(40),
+    );
+    expect(
+      tester.getTopLeft(find.text(OnboardingMessages.findTitle)).dy,
+      greaterThan(390),
+    );
+
+    for (final size in const [Size(1280, 720), Size(1440, 900)]) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpScapeMatch(tester, showOnboarding: true);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: '$size');
+      _expectDesktopIntro(tester, size);
+      for (var step = 0; step < 3; step++) {
+        await tester.tap(find.byKey(AppKeys.onboardingNext));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: '$size page $step');
+      }
+      expect(find.byKey(AppKeys.onboardingStart), findsOneWidget);
+      expect(find.text(OnboardingMessages.payBody), findsOneWidget);
+      final payPhoto = tester.getSize(find.byType(ScapePhoto));
+      expect(payPhoto.width, lessThanOrEqualTo(720), reason: '$size');
+      expect(payPhoto.height, lessThanOrEqualTo(1280), reason: '$size');
+      expect(
+        payPhoto.width / payPhoto.height,
+        closeTo(720 / 1280, 0.02),
+        reason: '$size',
+      );
+    }
+  });
+
+  testWidgets('a retina desktop does not upscale the intro photo', (
+    tester,
+  ) async {
+    await pumpScapeMatch(tester, showOnboarding: true);
+    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = const Size(3600, 2400);
+    await tester.pumpAndSettle();
+    expect(
+      isScapeDesktop(tester.element(find.byType(OnboardingScreen))),
+      isTrue,
+    );
+    final photo = tester.getSize(find.byType(ScapePhoto));
+    expect(photo.width, greaterThan(900));
+    expect(photo.width, lessThanOrEqualTo(2000 / 2 + 0.5));
+    expect(photo.height, lessThanOrEqualTo(1333 / 2 + 0.5));
+    expect(photo.width / photo.height, closeTo(2000 / 1333, 0.02));
+  });
+}
+
+void _expectDesktopIntro(WidgetTester tester, Size size) {
+  final photo = tester.getSize(find.byType(ScapePhoto));
+  expect(photo.width, lessThan(size.width * 0.7), reason: '$size');
+  expect(photo.height, lessThan(size.height - 40), reason: '$size');
+  expect(
+    photo.width / photo.height,
+    closeTo(2000 / 1333, 0.02),
+    reason: '$size',
+  );
+  final title = tester.getTopLeft(find.text(OnboardingMessages.findTitle));
+  expect(title.dx, greaterThan(size.width * 0.5), reason: '$size');
+  final skip = tester.getCenter(find.byKey(AppKeys.onboardingSkip));
+  final next = tester.getCenter(find.byKey(AppKeys.onboardingNext));
+  expect(skip.dx, greaterThan(size.width * 0.5), reason: '$size');
+  expect(next.dx, greaterThan(skip.dx), reason: '$size');
+  expect(next.dy, greaterThan(title.dy), reason: '$size');
 }
