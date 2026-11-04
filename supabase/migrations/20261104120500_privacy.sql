@@ -181,6 +181,8 @@ update storage.buckets
 set public = false
 where id = 'room-photos';
 
+-- `name` sozinho, dentro do EXISTS em venues, vira venues.name.
+-- O caminho do arquivo é objects.name.
 drop policy if exists room_photos_storage_insert on storage.objects;
 create policy room_photos_storage_insert on storage.objects
   for insert to authenticated
@@ -188,7 +190,7 @@ create policy room_photos_storage_insert on storage.objects
     bucket_id = 'room-photos'
     and exists (
       select 1 from public.venues v
-      where v.id::text = split_part(name, '/', 1)
+      where v.id::text = split_part(objects.name, '/', 1)
         and v.owner_id = (select auth.uid())
     )
   );
@@ -200,7 +202,7 @@ create policy room_photos_storage_update on storage.objects
     bucket_id = 'room-photos'
     and exists (
       select 1 from public.venues v
-      where v.id::text = split_part(name, '/', 1)
+      where v.id::text = split_part(objects.name, '/', 1)
         and v.owner_id = (select auth.uid())
     )
   )
@@ -208,7 +210,7 @@ create policy room_photos_storage_update on storage.objects
     bucket_id = 'room-photos'
     and exists (
       select 1 from public.venues v
-      where v.id::text = split_part(name, '/', 1)
+      where v.id::text = split_part(objects.name, '/', 1)
         and v.owner_id = (select auth.uid())
     )
   );
@@ -220,13 +222,14 @@ create policy room_photos_storage_delete on storage.objects
     bucket_id = 'room-photos'
     and exists (
       select 1 from public.venues v
-      where v.id::text = split_part(name, '/', 1)
+      where v.id::text = split_part(objects.name, '/', 1)
         and v.owner_id = (select auth.uid())
     )
   );
 
--- A leitura continua em room_photo_object_allowed: casa aprovada, dono ou admin.
--- Signed URL só sai quando essa política passa. Casa pendente não tem URL pública.
+-- A leitura não é recriada. room_photos_storage_read chama
+-- room_photo_object_allowed(name) fora de qualquer EXISTS em venues,
+-- então name é objects.name. Dentro da função o argumento é object_name.
 
 drop policy if exists absences_insert on public.absences;
 revoke insert, update, delete on public.absences from anon, authenticated;
