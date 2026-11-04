@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 abstract final class AppKeys {
   static const citySelector = Key('city-selector');
   static const gameTypeSelector = Key('game-type-selector');
+  static const gameTypeChipBar = Key('game-type-chip-bar');
   static const groupWindow = Key('group-window');
   static const findGroup = Key('find-group');
   static const createGroup = Key('create-group');
