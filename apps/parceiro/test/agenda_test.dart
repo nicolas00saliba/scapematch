@@ -169,6 +169,13 @@ void main() {
     await tester.tap(find.byKey(PartnerKeys.agendaViewMonth));
     await tester.pumpAndSettle();
     expect(find.byKey(PartnerKeys.agendaMonthGrid), findsOneWidget);
+    await tester.tap(find.byKey(PartnerKeys.agendaViews));
+    await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.viewYear), findsOneWidget);
+    await tester.tap(find.byKey(PartnerKeys.agendaViewYear));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PartnerKeys.agendaYearGrid), findsOneWidget);
+    expect(find.text('Janeiro'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -193,6 +200,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(PartnerKeys.agendaMiniCalendar), findsOneWidget);
       if (size.width >= 960) {
+        final mini = tester.getSize(find.byKey(PartnerKeys.agendaMiniCalendar));
+        expect(mini.width, inInclusiveRange(250, 300));
+        await tester.tap(find.byKey(PartnerKeys.agendaViewYear));
+        await tester.pumpAndSettle();
+        expect(find.byKey(PartnerKeys.agendaYearGrid), findsOneWidget);
         await tester.tap(find.byKey(PartnerKeys.agendaViewDay));
       } else {
         await tester.tap(find.byKey(PartnerKeys.agendaViews));

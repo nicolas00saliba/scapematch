@@ -31,6 +31,8 @@ abstract final class PartnerKeys {
   static const agendaViewThree = Key('agenda-view-three');
   static const agendaViewWeek = Key('agenda-view-week');
   static const agendaViewMonth = Key('agenda-view-month');
+  static const agendaViewYear = Key('agenda-view-year');
+  static const agendaYearGrid = Key('agenda-year-grid');
   static const agendaMonthToggle = Key('agenda-month-toggle');
   static const agendaMiniCalendar = Key('agenda-mini-calendar');
   static const agendaToday = Key('agenda-today');
