@@ -13,6 +13,8 @@ import 'package:scapematch/features/cities/presentation/selected_city_controller
 import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
+import 'package:scapematch/features/social/domain/social_rules.dart';
+import 'package:scapematch/features/social/presentation/social_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// Grupos da cidade que jogam nesta sala.
@@ -42,6 +44,9 @@ class RoomGroupsScreen extends ConsumerWidget {
           final viewer = ref.watch(authSessionProvider);
           ref.watch(communityTickProvider);
           final board = ref.watch(communityBoardProvider);
+          final friendIds =
+              ref.watch(socialViewProvider).asData?.value?.friendIds ??
+              const <String>{};
           final visible = [
             for (final group in items)
               if (viewer == null || !board.hiddenFromHome(viewer.id, group))
@@ -74,6 +79,10 @@ class RoomGroupsScreen extends ConsumerWidget {
                       GroupCard(
                         group: group,
                         now: ref.watch(clockProvider).now(),
+                        friendInside: SocialRules.groupHasFriend(
+                          group,
+                          friendIds,
+                        ),
                         onTap: () => context.push('/groups/${group.id}'),
                       ),
                   ],

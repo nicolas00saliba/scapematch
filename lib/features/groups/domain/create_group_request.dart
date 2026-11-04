@@ -1,3 +1,5 @@
+import 'package:scapematch/features/groups/domain/party_companion.dart';
+
 class CreateGroupRequest {
   const CreateGroupRequest({
     required this.cityId,
@@ -7,6 +9,7 @@ class CreateGroupRequest {
     required this.extraSpots,
     required this.creatorUserId,
     required this.creatorDisplayName,
+    this.companions = const [],
   });
 
   final String cityId;
@@ -22,4 +25,8 @@ class CreateGroupRequest {
 
   /// Name shown on the creator's seat. Not hardcoded by the repository.
   final String creatorDisplayName;
+
+  /// Amigos que já sentam com quem cria. As vagas de [extraSpots] incluem
+  /// essas pessoas e ainda precisam sobrar ao menos uma para desconhecidos.
+  final List<PartyCompanion> companions;
 }

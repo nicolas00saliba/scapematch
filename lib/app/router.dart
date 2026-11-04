@@ -26,6 +26,9 @@ import 'package:scapematch/features/account/presentation/account_privacy_screen.
 import 'package:scapematch/features/community/presentation/notice_screen.dart';
 import 'package:scapematch/features/legal/legal_screen.dart';
 import 'package:scapematch/features/wallet/presentation/add_balance_screen.dart';
+import 'package:scapematch/features/social/presentation/create_crew_screen.dart';
+import 'package:scapematch/features/social/presentation/friend_invite_screen.dart';
+import 'package:scapematch/features/social/presentation/friends_screen.dart';
 
 /// Rotas do app.
 ///
@@ -154,6 +157,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'legal',
         builder: (context, state) {
           return LegalScreen(document: state.pathParameters['document'] ?? '');
+        },
+      ),
+      GoRoute(
+        path: '/account/friends',
+        name: 'friends',
+        builder: (context, state) => const FriendsScreen(),
+      ),
+      GoRoute(
+        path: '/account/crews/new',
+        name: 'create-crew',
+        builder: (context, state) => const CreateCrewScreen(),
+      ),
+      GoRoute(
+        path: '/amigos/c/:code',
+        name: 'friend-invite',
+        builder: (context, state) {
+          return FriendInviteScreen(code: state.pathParameters['code']!);
         },
       ),
       GoRoute(

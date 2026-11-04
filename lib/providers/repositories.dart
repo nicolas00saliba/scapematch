@@ -14,6 +14,8 @@ import 'package:scapematch/features/cities/data/city_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
+import 'package:scapematch/features/social/data/memory_social_repository.dart';
+import 'package:scapematch/features/social/data/social_repository.dart';
 import 'package:scapematch/features/map/data/geolocator_user_location.dart';
 import 'package:scapematch/features/map/data/sample_live_presence.dart';
 import 'package:scapematch/features/map/data/user_location.dart';
@@ -60,11 +62,22 @@ final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
   return FakeCatalogRepository(ref.watch(fakeDatabaseProvider));
 });
 
+/// Amigos e turmas em memória. Para o Supabase, troque a classe por
+/// `SupabaseSocialRepository` e as funções da migração
+/// `20261104120600_friends_crews.sql`. O app não chama o banco sozinho.
+final socialRepositoryProvider = Provider<SocialRepository>((ref) {
+  return MemorySocialRepository(
+    board: ref.watch(communityBoardProvider),
+    clock: ref.watch(clockProvider),
+  );
+});
+
 final groupRepositoryProvider = Provider<GroupRepository>((ref) {
   return FakeGroupRepository(
     ref.watch(fakeDatabaseProvider),
     clock: ref.watch(clockProvider),
     board: ref.watch(communityBoardProvider),
+    friends: ref.watch(socialRepositoryProvider),
   );
 });
 

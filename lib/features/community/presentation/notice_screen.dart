@@ -56,7 +56,7 @@ class NoticeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          for (final kind in NoticeKind.values) ...[
+          for (final kind in _accountPrefKinds) ...[
             SwitchListTile(
               key: AppKeys.noticePref(kind.name),
               contentPadding: EdgeInsets.zero,
@@ -88,6 +88,17 @@ class NoticeScreen extends ConsumerWidget {
   }
 }
 
+/// Preferências que já existiam na tela de avisos. Os avisos de amigos
+/// e turmas entram na lista, sem um interruptor novo para cada um.
+const _accountPrefKinds = <NoticeKind>[
+  NoticeKind.reminder24h,
+  NoticeKind.reminder2h,
+  NoticeKind.paymentDeadline,
+  NoticeKind.waitlistOffer,
+  NoticeKind.groupClosed,
+  NoticeKind.noShowWarning,
+];
+
 String _prefTitle(NoticeKind kind) {
   return switch (kind) {
     NoticeKind.reminder24h => 'Lembrete 24 h antes',
@@ -96,5 +107,9 @@ String _prefTitle(NoticeKind kind) {
     NoticeKind.waitlistOffer => 'Vaga na lista de espera',
     NoticeKind.groupClosed => 'Grupo que não fechou',
     NoticeKind.noShowWarning => 'Aviso de falta',
+    NoticeKind.friendRequest => 'Pedido de amizade',
+    NoticeKind.friendAccepted => 'Amizade aceita',
+    NoticeKind.crewInvite => 'Convite de turma',
+    NoticeKind.partySeat => 'Vaga reservada pela turma',
   };
 }

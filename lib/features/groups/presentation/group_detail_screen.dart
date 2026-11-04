@@ -36,6 +36,8 @@ import 'package:scapematch/features/groups/presentation/group_dialogs.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
+import 'package:scapematch/features/social/presentation/party_join_sheet.dart';
+import 'package:scapematch/features/social/presentation/social_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class GroupDetailScreen extends ConsumerStatefulWidget {
@@ -704,6 +706,19 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 : const Text('Entrar no grupo'),
           ),
         );
+        final friends = ref.watch(socialViewProvider).asData?.value?.friends;
+        if (friends != null && friends.isNotEmpty) {
+          buttons.add(
+            OutlinedButton(
+              key: AppKeys.joinWithCrew,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              onPressed: _busy ? null : () => _joinWithCrew(group),
+              child: const Text('Entrar com a turma'),
+            ),
+          );
+        }
       }
     }
 
@@ -806,6 +821,29 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       return;
     }
     _snack(message ?? GroupMessages.waitlistJoined);
+  }
+
+  Future<void> _joinWithCrew(Group group) async {
+    final request = await showPartyJoinSheet(context, group: group);
+    if (request == null || !mounted) {
+      return;
+    }
+    if (request.choice == PartyChoice.solo) {
+      await _join();
+      return;
+    }
+    await _run(() async {
+      final failure = await ref
+          .read(groupDetailViewModelProvider(widget.groupId).notifier)
+          .joinParty(request.companions);
+      if (!mounted) {
+        return;
+      }
+      final message = failure == null
+          ? 'Vagas reservadas. Cada pessoa paga a própria parte.'
+          : (failure.detail ?? GroupMessages.joinFailure(failure.reason));
+      _snack(message);
+    });
   }
 
   Future<void> _join() async {

@@ -17,6 +17,8 @@ import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/create_group_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/features/social/domain/social_models.dart';
+import 'package:scapematch/features/social/presentation/social_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
@@ -177,6 +179,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
             ),
           ],
+          const SizedBox(height: 16),
+          const _BringCrew(),
           if (capacityMessage != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -386,6 +390,85 @@ class _SelectionField extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Quem já aceitou a turma senta junto. As vagas que sobram ficam abertas.
+class _BringCrew extends ConsumerWidget {
+  const _BringCrew();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final view = ref.watch(socialViewProvider).asData?.value;
+    final crews = view?.readyCrews ?? const <CrewView>[];
+    if (crews.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final state = ref.watch(createGroupViewModelProvider);
+    final theme = Theme.of(context);
+    CrewView? selected;
+    for (final crew in crews) {
+      if (crew.id == state.crewId) {
+        selected = crew;
+      }
+    }
+    final names = selected == null || view == null
+        ? ''
+        : selected
+              .companionsOf(view.me.id)
+              .map((person) => person.displayName)
+              .join(', ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Levar uma turma',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Quem já aceitou entra com você e paga a própria parte. O resto das vagas fica aberto para outras pessoas.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilterChip(
+              label: const Text('Só eu'),
+              selected: state.crewId == null,
+              onSelected: (_) {
+                ref.read(createGroupViewModelProvider.notifier).selectCrew();
+              },
+            ),
+            for (final crew in crews)
+              FilterChip(
+                key: AppKeys.option('crew-${crew.id}'),
+                label: Text(crew.name),
+                selected: state.crewId == crew.id,
+                onSelected: (_) {
+                  ref
+                      .read(createGroupViewModelProvider.notifier)
+                      .selectCrew(crewId: crew.id, seats: crew.acceptedCount);
+                },
+              ),
+          ],
+        ),
+        if (selected != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            '$names entram com você. Cada um paga a própria parte.',
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+          ),
+        ],
+      ],
     );
   }
 }

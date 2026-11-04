@@ -15,6 +15,7 @@ supabase db push
 4. `migrations/20261104120300_group_functions.sql` — criar, entrar, sair, excluir, fechar com menos gente, fila e falta.
 5. `migrations/20261104120400_asaas.sql` — cobranças Pix e cartão. O app não insere nelas.
 6. `migrations/20261104120500_privacy.sql` — anon sem documento, telefone e renda; bucket `room-photos` privado; falta só por `mark_absence`.
+7. `migrations/20261104120600_friends_crews.sql` — amigos, turmas, avisos no app e entrada em grupo com várias vagas. Não rode esta ainda se estiver revisando o diff: ela não foi aplicada no projeto.
 
 `seed_demo.sql` fica **fora** dessa lista. É opcional e cria a casa real ScapeMatch Demo (Curitiba, três salas, horários e duas promoções). Não é dado de exemplo do app.
 
