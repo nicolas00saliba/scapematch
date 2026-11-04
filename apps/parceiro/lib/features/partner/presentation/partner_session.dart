@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
@@ -7,7 +8,45 @@ import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dar
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
-enum PartnerSection { balance, reservations, agenda, rooms }
+enum PartnerSection { balance, reservations, agenda, rooms, invoices }
+
+class PartnerFiscalController extends Notifier<VenueFiscalProfile> {
+  @override
+  VenueFiscalProfile build() => demoHouseFiscal;
+
+  void save(VenueFiscalProfile profile) => state = profile;
+}
+
+final partnerFiscalProvider =
+    NotifierProvider<PartnerFiscalController, VenueFiscalProfile>(
+      PartnerFiscalController.new,
+    );
+
+class PartnerAcceptanceController extends Notifier<List<LegalAcceptance>> {
+  @override
+  List<LegalAcceptance> build() => const [];
+
+  void record({required String userId, String? venueId, DateTime? at}) {
+    final when = at ?? DateTime.now();
+    state = [
+      ...state,
+      for (final code in partnerAcceptanceCodes)
+        LegalAcceptance(
+          userId: userId,
+          venueId: venueId,
+          audience: 'partner',
+          documentCode: code,
+          documentVersion: legalDocumentVersion,
+          acceptedAt: when,
+        ),
+    ];
+  }
+}
+
+final partnerAcceptanceProvider =
+    NotifierProvider<PartnerAcceptanceController, List<LegalAcceptance>>(
+      PartnerAcceptanceController.new,
+    );
 
 class PartnerSessionController extends Notifier<PartnerAccount?> {
   @override
@@ -74,5 +113,9 @@ final partnerDeskProvider = FutureProvider<PartnerSnapshot?>((ref) async {
   if (session == null) {
     return null;
   }
-  return ref.read(partnerRepositoryProvider).load(session.houseId);
+  final fiscal = ref.watch(partnerFiscalProvider);
+  return ref.read(partnerRepositoryProvider).load(
+    session.houseId,
+    fiscal: fiscal,
+  );
 });

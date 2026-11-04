@@ -1,6 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
+import {
+  cancelInvoicesForCharge,
+  issuePaidInvoices,
+} from "../_shared/issue_invoices.ts";
 import { creditLedger, reverseLedger, type ChargeRow } from "../_shared/ledger.ts";
 
 Deno.serve(async (req) => {
@@ -129,6 +133,10 @@ async function settleOne(
         refund_reason: row.status === "paid" ? "group_did_not_close" : "hold_released",
       }).eq("group_id", groupId).eq("user_id", row.user_id);
       await reverseLedger(admin, row);
+      await cancelInvoicesForCharge(admin, row.id, {
+        sandbox: asaas.sandbox,
+        asaas,
+      });
       continue;
     }
     if (closed && row.status === "authorized" && row.billing_type === "CREDIT_CARD") {
@@ -143,11 +151,19 @@ async function settleOne(
           .eq("group_id", groupId)
           .eq("user_id", row.user_id);
         await creditLedger(admin, row);
+        await issuePaidInvoices(admin, row, {
+          sandbox: asaas.sandbox,
+          asaas: asaas.sandbox ? undefined : asaas,
+        });
       }
       continue;
     }
     if (closed && row.status === "paid") {
       await creditLedger(admin, row);
+      await issuePaidInvoices(admin, row, {
+        sandbox: asaas.sandbox,
+        asaas: asaas.sandbox ? undefined : asaas,
+      });
     }
   }
 }

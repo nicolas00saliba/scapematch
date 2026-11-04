@@ -25,6 +25,18 @@ void main() {
     expect(text.contains('asaas-access-token'), isTrue);
     expect(text.contains('authorizeOnly'), isTrue);
     expect(text.contains('https://api-sandbox.asaas.com/v3'), isTrue);
+    expect(text.contains('/invoices'), isTrue);
+    expect(text.contains('/fiscalInfo'), isTrue);
+    expect(text.contains('fiscal_invoices'), isTrue);
+    expect(text.contains('terms_acceptances'), isTrue);
+    expect(text.contains('venue_asaas_keys'), isTrue);
+    expect(text.contains('accept_terms'), isTrue);
+    final provision = File(
+      'supabase/functions/provision-venue-wallet/index.ts',
+    ).readAsStringSync();
+    expect(provision.contains('api_key: created.apiKey'), isTrue);
+    expect(provision.contains('wallet_id: created.walletId'), isTrue);
+    expect(provision.contains('apiKey: created.apiKey'), isFalse);
     expect(RegExp(r'\$aact_[A-Za-z0-9_]{8,}').hasMatch(text), isFalse);
   });
 }

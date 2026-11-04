@@ -98,6 +98,61 @@ export function commissionCents(amountCents: number, commissionBps: number): num
   return Math.floor((amountCents * commissionBps + 5000) / 10000);
 }
 
+/// Sandbox e produção trocam só a base URL (e a chave). O caminho da nota lê isto.
+export function isAsaasSandbox(baseUrl: string): boolean {
+  return baseUrl.includes("://api-sandbox.asaas.com");
+}
+
+export function centsToReais(cents: number): number {
+  if (!Number.isInteger(cents) || cents < 0) {
+    throw new Error("invalid cents");
+  }
+  return cents / 100;
+}
+
+export type FiscalInfoInput = {
+  email: string;
+  municipalInscription: string;
+  simplesNacional: boolean;
+  cnae?: string;
+  rpsSerie?: string;
+  rpsNumber?: number;
+  serviceListItem?: string;
+  username?: string;
+  password?: string;
+};
+
+export type InvoiceTaxes = {
+  retainIss: boolean;
+  iss: number;
+  cofins: number;
+  csll: number;
+  inss: number;
+  ir: number;
+  pis: number;
+};
+
+export type ScheduleInvoiceInput = {
+  customer: string;
+  serviceDescription: string;
+  observations?: string;
+  value: number;
+  deductions: number;
+  effectiveDate: string;
+  municipalServiceCode: string;
+  municipalServiceName: string;
+  externalReference: string;
+  taxes: InvoiceTaxes;
+};
+
+export type InvoiceView = {
+  id: string;
+  status: string;
+  number: string;
+  pdfUrl: string;
+  xmlUrl: string;
+};
+
 export function tokensMatch(
   header: string | null,
   expected: string | undefined,
@@ -112,7 +167,9 @@ export function tokensMatch(
 }
 
 type PaymentProvider = {
-  createSubaccount(input: SubaccountInput): Promise<{ walletId: string }>;
+  createSubaccount(
+    input: SubaccountInput,
+  ): Promise<{ walletId: string; apiKey: string }>;
   createCustomer(input: CustomerInput): Promise<{ id: string }>;
   createPix(input: PixInput): Promise<PixCreated>;
   authorizeCard(input: CardInput): Promise<{ id: string; status: string }>;
@@ -142,11 +199,82 @@ export class AsaasProvider implements PaymentProvider {
     return new AsaasProvider(apiKey, baseUrl);
   }
 
-  createSubaccount(input: SubaccountInput): Promise<{ walletId: string }> {
+  get sandbox(): boolean {
+    return isAsaasSandbox(this.baseUrl);
+  }
+
+  /// Outra chave, a mesma base URL. A subconta emite com a apiKey dela.
+  withKey(apiKey: string): AsaasProvider {
+    return new AsaasProvider(apiKey, this.baseUrl, this.fetchFn);
+  }
+
+  createSubaccount(
+    input: SubaccountInput,
+  ): Promise<{ walletId: string; apiKey: string }> {
     return this.#send("/accounts", input).then((body) => {
       const walletId = stringField(body, "walletId");
-      return { walletId };
+      const apiKey = stringField(body, "apiKey");
+      return { walletId, apiKey };
     });
+  }
+
+  configureFiscalInfo(input: FiscalInfoInput): Promise<void> {
+    const body: Record<string, unknown> = {
+      email: input.email,
+      municipalInscription: input.municipalInscription,
+      simplesNacional: input.simplesNacional,
+    };
+    if (input.cnae) body.cnae = input.cnae;
+    if (input.rpsSerie) body.rpsSerie = input.rpsSerie;
+    if (input.rpsNumber != null) body.rpsNumber = input.rpsNumber;
+    if (input.serviceListItem) body.serviceListItem = input.serviceListItem;
+    if (input.username) body.username = input.username;
+    if (input.password) body.password = input.password;
+    return this.#send("/fiscalInfo", body).then(() => undefined);
+  }
+
+  scheduleInvoice(input: ScheduleInvoiceInput): Promise<{ id: string; status: string }> {
+    return this.#send("/invoices", {
+      customer: input.customer,
+      serviceDescription: input.serviceDescription,
+      observations: input.observations ?? "",
+      value: input.value,
+      deductions: input.deductions,
+      effectiveDate: input.effectiveDate,
+      municipalServiceCode: input.municipalServiceCode,
+      municipalServiceName: input.municipalServiceName,
+      externalReference: input.externalReference,
+      taxes: input.taxes,
+    }).then((body) => ({
+      id: stringField(body, "id"),
+      status: stringField(body, "status"),
+    }));
+  }
+
+  authorizeInvoice(invoiceId: string): Promise<{ id: string; status: string }> {
+    return this.#send(`/invoices/${invoiceId}/authorize`, {}).then((body) => ({
+      id: stringField(body, "id"),
+      status: optionalString(body, "status"),
+    }));
+  }
+
+  getInvoice(invoiceId: string): Promise<InvoiceView> {
+    return this.#send(`/invoices/${invoiceId}`, undefined, "GET").then(
+      (body) => ({
+        id: stringField(body, "id"),
+        status: stringField(body, "status"),
+        number: optionalString(body, "number"),
+        pdfUrl: optionalString(body, "pdfUrl"),
+        xmlUrl: optionalString(body, "xmlUrl"),
+      }),
+    );
+  }
+
+  cancelInvoice(invoiceId: string): Promise<{ id: string; status: string }> {
+    return this.#send(`/invoices/${invoiceId}/cancel`, {}).then((body) => ({
+      id: stringField(body, "id"),
+      status: optionalString(body, "status"),
+    }));
   }
 
   createCustomer(input: CustomerInput): Promise<{ id: string }> {
@@ -254,5 +382,12 @@ function stringField(body: Record<string, unknown>, key: string): string {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Resposta do Asaas sem ${key}`);
   }
+  return value;
+}
+
+function optionalString(body: Record<string, unknown>, key: string): string {
+  const value = body[key];
+  if (typeof value === "number") return String(value);
+  if (typeof value !== "string") return "";
   return value;
 }

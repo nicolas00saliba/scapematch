@@ -13,6 +13,7 @@ abstract final class PartnerMessages {
   static const signOut = 'Sair';
   static const balance = 'Saldo';
   static const reservations = 'Reservas';
+  static const invoices = 'Notas fiscais';
   static const rooms = 'Salas';
   static const agenda = 'Agenda';
   static const agendaList = 'Lista';
@@ -113,6 +114,7 @@ abstract final class PartnerMessages {
   }
 
   static const signupVenue = 'Cadastrar casa';
+  static const signupTerms = 'Termos da casa';
   static const adminQueue = 'Aprovar casas';
   static const checkVenue = 'Verificar';
   static const venueName = 'Nome da casa';

@@ -29,7 +29,10 @@ class PartnerRepository {
   final FakeDatabase database;
   final Clock clock;
 
-  Future<PartnerSnapshot> load(String houseId) async {
+  Future<PartnerSnapshot> load(
+    String houseId, {
+    VenueFiscalProfile fiscal = demoHouseFiscal,
+  }) async {
     final house = database.houseById(houseId);
     if (house == null) {
       throw StateError('Casa não encontrada.');
@@ -94,7 +97,80 @@ class PartnerRepository {
       absenceCounts: counts,
       absenceMarks: marks,
       standings: standings,
+      invoices: _invoices(
+        houseId: houseId,
+        houseName: house.name,
+        groups: houseGroups,
+        fiscal: fiscal,
+      ),
+      fiscal: fiscal,
     );
+  }
+
+  List<FiscalInvoiceView> _invoices({
+    required String houseId,
+    required String houseName,
+    required List<Group> groups,
+    required VenueFiscalProfile fiscal,
+  }) {
+    final notes = <FiscalInvoiceView>[];
+    for (final reservation in this.groups.payments.reservations) {
+      if (reservation.houseId != houseId) {
+        continue;
+      }
+      Group? group;
+      for (final candidate in groups) {
+        if (candidate.id == reservation.groupId) {
+          group = candidate;
+          break;
+        }
+      }
+      if (group == null) {
+        continue;
+      }
+      for (final share in reservation.shares) {
+        if (share.status != ShareStatus.paid) {
+          continue;
+        }
+        notes.addAll(
+          planChargeInvoices(
+            share: PaidShare(
+              chargeId: share.id,
+              groupId: group.id,
+              venueId: houseId,
+              venueName: houseName,
+              playerId: share.playerId,
+              playerName: _playerName(group, share.playerId),
+              amountCents: share.amountCents,
+              commissionCents: share.commissionCents,
+              paidAt: group.startsAt,
+            ),
+            venue: fiscal,
+          ),
+        );
+      }
+    }
+    notes.sort((a, b) {
+      final byTime = b.paidAt.compareTo(a.paidAt);
+      if (byTime != 0) {
+        return byTime;
+      }
+      final byPlayer = a.playerName.compareTo(b.playerName);
+      if (byPlayer != 0) {
+        return byPlayer;
+      }
+      return a.kind == FiscalInvoiceKind.service ? -1 : 1;
+    });
+    return notes;
+  }
+
+  String _playerName(Group group, String playerId) {
+    for (final person in group.participants) {
+      if (person.userId == playerId || person.id == playerId) {
+        return person.displayName;
+      }
+    }
+    return playerId;
   }
 
   /// Primeira falta avisa. A terceira bloqueia. Repetir o grupo não soma.

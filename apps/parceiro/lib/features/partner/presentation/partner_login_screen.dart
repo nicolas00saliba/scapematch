@@ -4,6 +4,7 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_signup_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_signup_screen.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
@@ -135,7 +136,7 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
             onPressed: _busy ? null : _submit,
             child: const Text('Entrar'),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           TextButton(
             key: PartnerKeys.partnerSignup,
             onPressed: () {
@@ -146,6 +147,17 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
               );
             },
             child: const Text(PartnerMessages.signupVenue),
+          ),
+          TextButton(
+            key: PartnerKeys.partnerTermsDemo,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => const PartnerSignupScreen(),
+                ),
+              );
+            },
+            child: const Text(PartnerMessages.signupTerms),
           ),
           TextButton(
             key: PartnerKeys.partnerAdminDemo,

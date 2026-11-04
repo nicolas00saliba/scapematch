@@ -1,5 +1,21 @@
 # Decisões provisórias
 
+## A nota fiscal sai no servidor, em duas vias
+
+- **Data:** 2026-11-04
+- **Decisão:** cada parte paga, com o grupo fechado, gera duas NFS-e. A casa (subconta Asaas dela) emite a do serviço para o jogador. A ScapeMatch emite só a da comissão, contra a casa. Casa com CPF recebe o valor e a nota de serviço fica sem emissão. Casa com CNPJ ou MEI só emite com inscrição municipal, código de serviço e alíquota de ISS. No sandbox a emissão é de teste. Produção troca a chave e a base URL. O app não guarda chave e não escreve na tabela `fiscal_invoices`.
+- **Motivo:** a ScapeMatch é intermediadora. A nota do jogo é da casa. A nota da comissão é da plataforma.
+- **Onde está no código:** `supabase/migrations/20261104120600_fiscal_terms.sql`, `issue_invoices.ts`, a aba Notas fiscais do Parceiro e o cartão da nota na reserva do jogador.
+- **Como trocar depois:** outro código de serviço entra nos dados fiscais da casa ou nos segredos `ASAAS_FISCAL_*` da plataforma.
+
+## O aceite dos termos grava versão e data
+
+- **Data:** 2026-11-04
+- **Decisão:** jogador e casa só concluem o cadastro se aceitarem os termos da sua audiência, a privacidade e a política de cancelamento e reembolso. O registro leva a versão `2026-11-06` e a data. Os textos são rascunho para revisão de advogado e também estão na landing. O Pix estornado e o cartão não capturado, quando o grupo não fecha, estão na política de cancelamento. O arrependimento de sete dias do CDC fica marcado como ponto para o advogado.
+- **Motivo:** a demonstração precisa mostrar o aceite e o combinado, sem fingir que um advogado já revisou.
+- **Onde está no código:** `terms_acceptances`, `accept_terms`, o cadastro do jogador, o cadastro da casa e `apps/landing`.
+- **Como trocar depois:** uma versão nova entra em `legal_documents` e na constante `legalDocumentVersion`.
+
 ## O Parceiro é um app à parte
 
 - **Data:** 2026-11-03

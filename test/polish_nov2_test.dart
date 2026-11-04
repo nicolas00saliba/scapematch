@@ -113,7 +113,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Termos de uso'), findsOneWidget);
     expect(find.text('Privacidade'), findsOneWidget);
-    expect(find.text('Reembolso'), findsOneWidget);
+    expect(find.text('Cancelamento e reembolso'), findsOneWidget);
     await tester.tap(find.byKey(AppKeys.accountLegal));
     await tester.pumpAndSettle();
     expect(find.text(LegalDocuments.termsTitle), findsOneWidget);

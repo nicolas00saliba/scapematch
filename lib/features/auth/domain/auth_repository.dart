@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
 
 /// Sessão local. O Supabase Auth entra no lugar desta interface.
@@ -18,4 +19,7 @@ abstract class AuthRepository {
   });
 
   Future<void> signOut();
+
+  /// Aceites desta sessão de exemplo. A conta real grava pela função accept_terms.
+  List<LegalAcceptance> get acceptances;
 }

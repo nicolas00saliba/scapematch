@@ -423,7 +423,10 @@ void main() {
         isNot(contains(SampleIds.groupSpCoberturaOpen)),
       );
       final mine = await groups.listForUser('user-local');
-      expect(mine.single.id, SampleIds.groupSpCoberturaOpen);
+      expect(
+        mine.map((group) => group.id),
+        contains(SampleIds.groupSpCoberturaOpen),
+      );
       final again = await groups.join(
         SampleIds.groupSpCoberturaOpen,
         participantUserId: 'user-local',

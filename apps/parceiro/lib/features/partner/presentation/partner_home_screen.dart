@@ -14,6 +14,7 @@ import 'package:scapematch_parceiro/features/partner/data/partner_repository.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_invoices_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
@@ -36,6 +37,7 @@ class PartnerHome extends ConsumerWidget {
       PartnerSection.reservations => _ReservationsSection(snapshot: snapshot),
       PartnerSection.agenda => PartnerAgenda(snapshot: snapshot),
       PartnerSection.rooms => _RoomsSection(snapshot: snapshot),
+      PartnerSection.invoices => PartnerInvoices(snapshot: snapshot),
     };
     return Scaffold(
       body: Column(
@@ -144,6 +146,7 @@ String _sectionLabel(PartnerSection section) {
     PartnerSection.reservations => PartnerMessages.reservations,
     PartnerSection.agenda => PartnerMessages.agenda,
     PartnerSection.rooms => PartnerMessages.rooms,
+    PartnerSection.invoices => PartnerMessages.invoices,
   };
 }
 
@@ -189,6 +192,11 @@ class _PartnerRail extends ConsumerWidget {
           icon: Icon(Icons.meeting_room_outlined),
           selectedIcon: Icon(Icons.meeting_room),
           label: Text(PartnerMessages.rooms),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.receipt_long_outlined),
+          selectedIcon: Icon(Icons.receipt_long),
+          label: Text(PartnerMessages.invoices),
         ),
       ],
     );
