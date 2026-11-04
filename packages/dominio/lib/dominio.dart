@@ -2,6 +2,7 @@
 library;
 
 export 'src/absence.dart';
+export 'src/asaas_split.dart';
 export 'src/closing.dart';
 export 'src/commission.dart';
 export 'src/ledger.dart';
