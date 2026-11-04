@@ -25,6 +25,16 @@
   </style>
 </head>
 <body>
+  <script>
+    // Não registra um worker novo. Se a casa ainda tiver o worker de
+    // cache, esta visita pede a versão que se desregistra e limpa o cache.
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.getRegistration().then(function (reg) {
+        if (reg) reg.update();
+      });
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

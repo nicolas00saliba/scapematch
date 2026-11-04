@@ -53,8 +53,14 @@ jobs:
         working-directory: apps/parceiro
         run: flutter test
 
+      # --pwa-strategy=none ainda é o interruptor no Flutter 3.47.8: o bootstrap
+      # não registra worker e o arquivo gerado sai vazio. O passo seguinte
+      # publica o script que desregistra o worker antigo e limpa o cache.
       - name: Build web
-        run: flutter build web --release --base-href /scapematch/
+        run: flutter build web --release --base-href /scapematch/ --pwa-strategy=none
+
+      - name: Install the cleanup service worker
+        run: bash tool/install_cleanup_service_worker.sh build/web
 
       - name: Player bundle excludes the partner app
         run: |
@@ -66,10 +72,16 @@ jobs:
             echo 'O bundle do jogador ainda contém o login da casa.'
             exit 1
           fi
+          bash tool/check_web_service_worker.sh build/web player
 
       - name: Build partner web
         working-directory: apps/parceiro
-        run: flutter build web --release --base-href /scapematch/parceiro/
+        run: flutter build web --release --base-href /scapematch/parceiro/ --pwa-strategy=none
+
+      - name: Install the partner cleanup service worker
+        run: |
+          bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
+          bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
 
   landing:
     name: Static landing

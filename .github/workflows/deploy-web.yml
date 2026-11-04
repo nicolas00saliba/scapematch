@@ -56,12 +56,21 @@ jobs:
         working-directory: apps/parceiro
         run: flutter pub get
 
+      # --pwa-strategy=none no Flutter 3.47.8 não registra worker de cache.
+      # O arquivo publicado no lugar se desregistra, apaga os caches e
+      # recarrega quem ainda está preso no build antigo.
       - name: Build player web
-        run: flutter build web --release --base-href /scapematch/
+        run: |
+          flutter build web --release --base-href /scapematch/ --pwa-strategy=none
+          bash tool/install_cleanup_service_worker.sh build/web
+          bash tool/check_web_service_worker.sh build/web player
 
       - name: Build partner web
         working-directory: apps/parceiro
-        run: flutter build web --release --base-href /scapematch/parceiro/
+        run: |
+          flutter build web --release --base-href /scapematch/parceiro/ --pwa-strategy=none
+          bash ../../tool/install_cleanup_service_worker.sh build/web
+          bash ../../tool/check_web_service_worker.sh build/web partner
 
       - name: Assemble the two apps
         run: |
