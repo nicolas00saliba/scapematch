@@ -234,7 +234,7 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
     if (!mounted) {
       return;
     }
-    final error = ref.read(partnerRepositoryProvider).saveRoom(
+    final error = await ref.read(partnerRepositoryProvider).saveRoom(
       houseId: widget.snapshot.house.id,
       roomId: widget.room?.id,
       name: _name.text,

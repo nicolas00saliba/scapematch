@@ -9,6 +9,7 @@ class CurrentUser {
     required this.id,
     required this.displayName,
     this.birthDate,
+    this.cityId,
   });
 
   /// Stable id for this person. Today it is local. Tomorrow it is the
@@ -20,6 +21,9 @@ class CurrentUser {
 
   /// Data informada no cadastro. O usuário de exemplo não tem uma.
   final DateTime? birthDate;
+
+  /// Cidade escolhida no cadastro. O seletor da Home usa este id.
+  final String? cityId;
 }
 
 /// Fictional signed-in user used until login replaces the provider.

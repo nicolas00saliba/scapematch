@@ -44,6 +44,7 @@ class FakeAuthRepository implements AuthRepository {
     required DateTime birthDate,
     required DateTime now,
     required bool acceptedTerms,
+    String? cityId,
   }) async {
     if (!acceptedTerms) {
       return LegalDocuments.termsRequired;
@@ -59,11 +60,21 @@ class FakeAuthRepository implements AuthRepository {
       id: 'user-signup-$_nextId',
       displayName: name.trim(),
       birthDate: birthDate,
+      cityId: cityId,
     );
     _nextId += 1;
     _accounts[key] = (user: user, password: password);
     _user = user;
     return null;
+  }
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<String?> requestPasswordReset({required String email}) async {
+    if (!email.contains('@')) return 'Informe um e-mail válido.';
+    return 'Neste exemplo o link não é enviado.';
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 
 /// Aviso curto. Aberto, explica que tudo nesta versão é inventado.
 class ExampleDataBanner extends StatefulWidget {
@@ -14,6 +15,7 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
 
   @override
   Widget build(BuildContext context) {
+    if (scapeUsesLiveBackend) return const SizedBox.shrink();
     final status = ScapeStatusColors.of(context);
     final textStyle = TextStyle(
       color: status.onAlertContainer,

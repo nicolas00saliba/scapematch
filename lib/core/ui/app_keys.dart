@@ -62,7 +62,11 @@ abstract final class AppKeys {
   static const signupName = Key('signup-name');
   static const signupEmail = Key('signup-email');
   static const signupPassword = Key('signup-password');
+  static const signupCity = Key('signup-city');
   static const signupSubmit = Key('signup-submit');
+  static const forgotPassword = Key('forgot-password');
+  static const resetEmail = Key('reset-email');
+  static const resetSubmit = Key('reset-submit');
   static Key inviteOnCard(String id) => Key('invite-card-$id');
   static const refundWarning = Key('refund-warning');
   static const dialogConfirm = Key('dialog-confirm');

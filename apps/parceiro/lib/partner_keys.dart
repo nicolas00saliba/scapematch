@@ -8,6 +8,13 @@ abstract final class PartnerKeys {
   static const partnerSubmit = Key('partner-submit');
   static const partnerLoginError = Key('partner-login-error');
   static const partnerQuickDemo = Key('partner-quick-demo');
+  static const partnerSignUp = Key('partner-sign-up');
+  static const partnerVenueName = Key('partner-venue-name');
+  static const partnerVenueDocument = Key('partner-venue-document');
+  static const partnerVenueSubmit = Key('partner-venue-submit');
+  static const partnerPending = Key('partner-pending');
+  static const partnerAdmin = Key('partner-admin');
+  static const partnerApprove = Key('partner-approve');
   static const partnerSignOut = Key('partner-sign-out');
   static const partnerHouseName = Key('partner-house-name');
   static const partnerNet = Key('partner-net');

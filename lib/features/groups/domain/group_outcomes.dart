@@ -231,7 +231,13 @@ final class PayShareFailure extends PayShareResult {
   final PayShareFailureReason reason;
 }
 
-enum PayShareFailureReason { notFound, notSeated, alreadyPaid, groupCancelled }
+enum PayShareFailureReason {
+  notFound,
+  notSeated,
+  alreadyPaid,
+  groupCancelled,
+  unavailable,
+}
 
 class GroupNotFoundException implements Exception {
   GroupNotFoundException(this.groupId);

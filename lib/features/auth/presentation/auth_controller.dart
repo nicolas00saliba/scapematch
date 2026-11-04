@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
+import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// Sessão atual. Nulo é visitante. O app de exemplo começa com Nícolas.
@@ -15,10 +16,11 @@ class AuthController extends Notifier<CurrentUser?> {
     required String email,
     required String password,
   }) async {
-    final error = await ref
-        .read(authRepositoryProvider)
-        .signIn(email: email, password: password);
-    state = ref.read(authRepositoryProvider).signedInUser;
+    final repo = ref.read(authRepositoryProvider);
+    final error = await repo.signIn(email: email, password: password);
+    await repo.refresh();
+    state = repo.signedInUser;
+    _rememberCity();
     return error;
   }
 
@@ -28,23 +30,37 @@ class AuthController extends Notifier<CurrentUser?> {
     required String password,
     required DateTime birthDate,
     required bool acceptedTerms,
+    String? cityId,
   }) async {
-    final error = await ref
-        .read(authRepositoryProvider)
-        .signUp(
-          name: name,
-          email: email,
-          password: password,
-          birthDate: birthDate,
-          now: ref.read(clockProvider).now(),
-          acceptedTerms: acceptedTerms,
-        );
-    state = ref.read(authRepositoryProvider).signedInUser;
+    final repo = ref.read(authRepositoryProvider);
+    final error = await repo.signUp(
+      name: name,
+      email: email,
+      password: password,
+      birthDate: birthDate,
+      now: ref.read(clockProvider).now(),
+      acceptedTerms: acceptedTerms,
+      cityId: cityId,
+    );
+    await repo.refresh();
+    state = repo.signedInUser;
+    _rememberCity();
     return error;
   }
 
+  Future<String?> requestPasswordReset({required String email}) {
+    return ref.read(authRepositoryProvider).requestPasswordReset(email: email);
+  }
+
   Future<void> signOut() async {
-    await ref.read(authRepositoryProvider).signOut();
-    state = ref.read(authRepositoryProvider).signedInUser;
+    final repo = ref.read(authRepositoryProvider);
+    await repo.signOut();
+    state = repo.signedInUser;
+  }
+
+  void _rememberCity() {
+    final cityId = state?.cityId;
+    if (cityId == null || cityId.isEmpty) return;
+    ref.read(selectedCityIdProvider.notifier).select(cityId);
   }
 }

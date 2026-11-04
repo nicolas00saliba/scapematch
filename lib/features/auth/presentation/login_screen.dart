@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
@@ -50,6 +51,82 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await _enterPendingGroup();
   }
 
+  Future<void> _forgot() async {
+    final email = TextEditingController(text: _email.text.trim());
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        var busy = false;
+        String? error;
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return AlertDialog(
+              title: const Text('Nova senha'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Enviamos um link se este e-mail tiver conta.'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: AppKeys.resetEmail,
+                    controller: email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'E-mail',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(error!),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: busy ? null : () => Navigator.pop(context, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  key: AppKeys.resetSubmit,
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          setLocal(() {
+                            busy = true;
+                            error = null;
+                          });
+                          final failure = await ref
+                              .read(authSessionProvider.notifier)
+                              .requestPasswordReset(email: email.text);
+                          if (!context.mounted) return;
+                          if (failure != null) {
+                            setLocal(() {
+                              busy = false;
+                              error = failure;
+                            });
+                            return;
+                          }
+                          Navigator.pop(context, true);
+                        },
+                  child: const Text('Enviar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    email.dispose();
+    if (sent == true && mounted) {
+      setState(() {
+        _error = scapeUsesLiveBackend
+            ? 'Se o e-mail tiver conta, o link já foi enviado.'
+            : 'Neste exemplo o link não é enviado.';
+      });
+    }
+  }
+
   Future<void> _enterPendingGroup() async {
     final pending = await consumePendingInvite(ref);
     if (!mounted) {
@@ -75,7 +152,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           const ExampleDataBanner(),
           const SizedBox(height: 16),
-          const Text('Conta de exemplo. Nada disso vai para um servidor.'),
+          Text(
+            scapeUsesLiveBackend
+                ? 'Entre com o e-mail e a senha da sua conta.'
+                : 'Conta de exemplo. Nada disso vai para um servidor.',
+          ),
           const SizedBox(height: 16),
           TextField(
             key: AppKeys.loginEmail,
@@ -104,6 +185,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: const Text('Entrar'),
           ),
           const SizedBox(height: 8),
+          TextButton(
+            key: AppKeys.forgotPassword,
+            onPressed: _busy ? null : _forgot,
+            child: const Text('Esqueci a senha'),
+          ),
           TextButton(
             key: AppKeys.goToSignup,
             onPressed: _busy

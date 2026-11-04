@@ -15,8 +15,57 @@ import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 
+/// O que a tela da casa chama. A memória e o Supabase implementam isto.
+abstract class PartnerDesk {
+  Future<PartnerSnapshot> load(String houseId);
+
+  Future<AbsenceMark> markAbsence({
+    required String houseId,
+    required String groupId,
+    required String playerId,
+  });
+
+  Future<String?> updatePrice({
+    required String roomId,
+    required int priceCents,
+  });
+
+  Future<TimeSlot> addSlot({
+    required String roomId,
+    required DateTime startsAt,
+  });
+
+  Future<String?> openSession({
+    required String houseId,
+    required String roomId,
+    required DateTime startsAt,
+    required int priceCents,
+  });
+
+  Future<String?> cancelSession({
+    required String houseId,
+    required String groupId,
+    required String reason,
+  });
+
+  Future<String?> saveRoom({
+    required String houseId,
+    String? roomId,
+    required String name,
+    required Difficulty difficulty,
+    required int durationMinutes,
+    required int minimumPlayers,
+    required int capacity,
+    required int priceCents,
+    required int accent,
+    String theme = '',
+    RoomCategory? category,
+    List<RoomPicture>? pictures,
+  });
+}
+
 /// Leitura da casa. O livro e o catálogo são os mesmos do app do jogador.
-class PartnerRepository {
+class PartnerRepository implements PartnerDesk {
   PartnerRepository({
     required this.groups,
     required this.catalog,
@@ -29,6 +78,7 @@ class PartnerRepository {
   final FakeDatabase database;
   final Clock clock;
 
+  @override
   Future<PartnerSnapshot> load(String houseId) async {
     final house = database.houseById(houseId);
     if (house == null) {
@@ -36,14 +86,12 @@ class PartnerRepository {
     }
     await groups.materializeHouse(houseId);
     final now = clock.now();
-    final houseGroups = database.groups
-        .where((group) => group.houseId == houseId)
-        .toList()
-      ..sort((a, b) => _byWhen(a, b, now));
-    final rooms = database.rooms
-        .where((room) => room.houseId == houseId)
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    final houseGroups =
+        database.groups.where((group) => group.houseId == houseId).toList()
+          ..sort((a, b) => _byWhen(a, b, now));
+    final rooms =
+        database.rooms.where((room) => room.houseId == houseId).toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
     final roomIds = rooms.map((room) => room.id).toSet();
     final slotsByRoom = <String, List<TimeSlot>>{};
     for (final slot in database.slots) {
@@ -98,11 +146,12 @@ class PartnerRepository {
   }
 
   /// Primeira falta avisa. A terceira bloqueia. Repetir o grupo não soma.
-  AbsenceMark markAbsence({
+  @override
+  Future<AbsenceMark> markAbsence({
     required String houseId,
     required String groupId,
     required String playerId,
-  }) {
+  }) async {
     final group = _group(houseId, groupId);
     if (group == null) {
       return const AbsenceRejected('Grupo não encontrado nesta casa.');
@@ -127,6 +176,7 @@ class PartnerRepository {
     return AbsenceMarked(standing, groups.absences.countOf(playerId));
   }
 
+  @override
   Future<String?> updatePrice({
     required String roomId,
     required int priceCents,
@@ -138,6 +188,7 @@ class PartnerRepository {
     return null;
   }
 
+  @override
   Future<TimeSlot> addSlot({
     required String roomId,
     required DateTime startsAt,
@@ -146,6 +197,7 @@ class PartnerRepository {
   }
 
   /// Abre uma sessão vazia. O jogador vê o grupo e o horário na sala.
+  @override
   Future<String?> openSession({
     required String houseId,
     required String roomId,
@@ -155,7 +207,10 @@ class PartnerRepository {
     final house = database.houseById(houseId);
     final room = database.roomById(roomId);
     final city = house == null ? null : database.cityById(house.cityId);
-    if (house == null || city == null || room == null || room.houseId != house.id) {
+    if (house == null ||
+        city == null ||
+        room == null ||
+        room.houseId != house.id) {
       return 'Sala não encontrada nesta casa.';
     }
     if (priceCents < 100 || priceCents > 500000) {
@@ -212,6 +267,7 @@ class PartnerRepository {
     return null;
   }
 
+  @override
   Future<String?> cancelSession({
     required String houseId,
     required String groupId,
@@ -224,7 +280,8 @@ class PartnerRepository {
     );
   }
 
-  String? saveRoom({
+  @override
+  Future<String?> saveRoom({
     required String houseId,
     String? roomId,
     required String name,
@@ -237,7 +294,7 @@ class PartnerRepository {
     String theme = '',
     RoomCategory? category,
     List<RoomPicture>? pictures,
-  }) {
+  }) async {
     final trimmed = name.trim();
     if (trimmed.length < 2) {
       return 'Dê um nome para a sala.';
