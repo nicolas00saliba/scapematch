@@ -11,6 +11,7 @@ class ScapePhoto extends StatelessWidget {
     this.semanticLabel,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
+    this.filterQuality = FilterQuality.low,
   });
 
   final String asset;
@@ -20,6 +21,10 @@ class ScapePhoto extends StatelessWidget {
   final String? semanticLabel;
   final BoxFit fit;
   final Alignment alignment;
+
+  /// [FilterQuality.low] é o padrão do [Image] e o que o celular já usa.
+  /// O site pede [FilterQuality.medium] ao reduzir uma foto grande.
+  final FilterQuality filterQuality;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +36,7 @@ class ScapePhoto extends StatelessWidget {
         memory,
         fit: fit,
         alignment: alignment,
+        filterQuality: filterQuality,
         gaplessPlayback: true,
         semanticLabel: semanticLabel,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
@@ -45,6 +51,7 @@ class ScapePhoto extends StatelessWidget {
         asset,
         fit: fit,
         alignment: alignment,
+        filterQuality: filterQuality,
         gaplessPlayback: true,
         semanticLabel: semanticLabel,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
