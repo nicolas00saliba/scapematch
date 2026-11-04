@@ -11,7 +11,8 @@ import 'package:scapematch/features/news/presentation/news_section.dart';
 import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 
 /// Home: cidade e jogo, grupos, promoções, novidades e um carrossel de salas.
-/// No site, promoções e novidades ficam lado a lado e os grupos viram grade.
+/// No site, promoções e novidades ficam lado a lado logo abaixo da busca,
+/// e os grupos viram uma grade compacta.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -29,18 +30,11 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 6),
             const ExampleDataBanner(),
             const SizedBox(height: 6),
-            const FindGroupsSection(),
-            const SizedBox(height: 12),
-            if (desktop)
-              const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: PromoCarousel()),
-                  SizedBox(width: 20),
-                  Expanded(child: NewsSection()),
-                ],
-              )
-            else ...const [
+            FindGroupsSection(
+              belowSearch: desktop ? const _DesktopHighlights() : null,
+            ),
+            if (!desktop) ...const [
+              SizedBox(height: 12),
               PromoCarousel(),
               SizedBox(height: 12),
               NewsSection(),
@@ -50,6 +44,23 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Promoções e novidades no topo do site, na mesma faixa.
+class _DesktopHighlights extends StatelessWidget {
+  const _DesktopHighlights();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: PromoCarousel()),
+        SizedBox(width: 20),
+        Expanded(child: NewsSection()),
+      ],
     );
   }
 }

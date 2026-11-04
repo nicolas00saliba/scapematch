@@ -6,6 +6,7 @@ import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/geo/geo_point.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
+import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/features/groups/presentation/group_card.dart';
 import 'package:scapematch/features/home/presentation/home_screen.dart';
@@ -170,6 +171,14 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Convidar'), findsWidgets);
     expect(find.textContaining('para fechar'), findsWidgets);
+    expect(
+      find.descendant(of: phoneCard, matching: find.textContaining('mín.')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: phoneCard, matching: find.byType(PersonAvatar)),
+      findsWidgets,
+    );
 
     tester.view.physicalSize = const Size(1280, 900);
     await tester.pumpAndSettle();
@@ -197,12 +206,104 @@ void main() {
     );
     expect(
       find.descendant(of: webCard, matching: find.textContaining('mín.')),
-      findsOneWidget,
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: webCard, matching: find.textContaining('Host quer')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: webCard, matching: find.byType(PersonAvatar)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: webCard, matching: find.text('Quase cheio')),
+      findsNothing,
     );
 
     final promos = tester.getTopLeft(find.byKey(AppKeys.promoCarousel)).dy;
     final news = tester.getTopLeft(find.byKey(AppKeys.newsFeed)).dy;
+    final searchBottom = tester
+        .getBottomLeft(find.byKey(AppKeys.groupSearch))
+        .dy;
     expect((promos - news).abs(), lessThan(8));
-    expect(promos, greaterThan(tester.getBottomLeft(webCard).dy));
+    expect(promos, greaterThan(searchBottom));
+    expect(tester.getTopLeft(webCard).dy, greaterThan(news));
   });
+
+  testWidgets(
+    'desktop home shows promos, news and the first row without scrolling',
+    (tester) async {
+      await pumpScapeMatch(tester);
+      for (final size in const [Size(1280, 720), Size(1440, 900)]) {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        await tester.pumpAndSettle();
+        _expectWebHomeAboveTheFold(tester, size);
+      }
+    },
+  );
+}
+
+Finder _homeGroupCards() {
+  return find.descendant(
+    of: find.byType(HomeScreen),
+    matching: find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> && key.value.startsWith('group-card-');
+    }),
+  );
+}
+
+void _expectWebHomeAboveTheFold(WidgetTester tester, Size size) {
+  final scroll = tester.state<ScrollableState>(verticalScrollable).position;
+  expect(scroll.pixels, 0, reason: '$size');
+  final viewportTop = tester.getTopLeft(verticalScrollable).dy;
+  final viewportBottom = viewportTop + scroll.viewportDimension;
+
+  final searchBottom = tester.getBottomLeft(find.byKey(AppKeys.groupSearch)).dy;
+  final promos = tester.getRect(find.byKey(AppKeys.promoCarousel));
+  final news = tester.getRect(find.byKey(AppKeys.newsFeed));
+  expect(promos.top, greaterThan(searchBottom), reason: '$size');
+  expect((promos.top - news.top).abs(), lessThan(8), reason: '$size');
+  expect(news.bottom, lessThanOrEqualTo(viewportBottom), reason: '$size');
+  expect(find.byKey(AppKeys.carouselNext('news')), findsOneWidget);
+  expect(
+    tester.getBottomLeft(find.byKey(AppKeys.carouselNext('news'))).dy,
+    lessThanOrEqualTo(viewportBottom + 1),
+    reason: '$size',
+  );
+
+  final cards = _homeGroupCards();
+  expect(cards, findsAtLeastNWidgets(4));
+  final firstTop = tester.getTopLeft(cards.at(0)).dy;
+  final firstBottom = tester.getBottomLeft(cards.at(0)).dy;
+  final highlightsBottom = promos.bottom > news.bottom
+      ? promos.bottom
+      : news.bottom;
+  expect(firstTop, greaterThan(highlightsBottom - 1));
+  expect(
+    firstBottom,
+    lessThanOrEqualTo(viewportBottom + 1),
+    reason:
+        '$size cardBottom=$firstBottom viewport=$viewportBottom '
+        'promo=${promos.height} news=${news.height}',
+  );
+  for (var index = 1; index < 4; index++) {
+    expect(
+      (tester.getTopLeft(cards.at(index)).dy - firstTop).abs(),
+      lessThan(2),
+      reason: '$size coluna $index',
+    );
+    expect(
+      tester.getBottomLeft(cards.at(index)).dy,
+      lessThanOrEqualTo(viewportBottom + 1),
+      reason: '$size coluna $index',
+    );
+  }
+  expect(
+    tester.getTopLeft(cards.at(4)).dy,
+    greaterThan(firstBottom - 1),
+    reason: '$size',
+  );
 }

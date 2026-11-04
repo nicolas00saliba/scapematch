@@ -22,20 +22,23 @@ class ScapeWrapGrid extends StatelessWidget {
     required this.children,
     this.gap = 16,
     this.maxColumns = 3,
+    this.fixedColumns,
   });
 
   final List<Widget> children;
   final double gap;
   final int maxColumns;
 
+  /// Quando definido, a grade usa este número em vez da largura útil.
+  final int? fixedColumns;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = scapeGridColumns(
-          constraints.maxWidth,
-          maxColumns: maxColumns,
-        );
+        final columns =
+            fixedColumns ??
+            scapeGridColumns(constraints.maxWidth, maxColumns: maxColumns);
         if (columns <= 1) {
           return Column(
             mainAxisSize: MainAxisSize.min,
