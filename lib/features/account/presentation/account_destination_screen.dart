@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
@@ -8,6 +9,8 @@ import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/account_list_tile.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
+import 'package:scapematch/features/auth/presentation/password_change_dialog.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_control.dart';
@@ -163,6 +166,25 @@ class AccountDestinationScreen extends ConsumerWidget {
         ),
       ],
       AccountDestination.settings => [
+        if (scapeUsesLiveBackend) ...[
+          _AccountLink(
+            tileKey: AppKeys.changePassword,
+            icon: Icons.password_outlined,
+            title: 'Trocar senha',
+            subtitle: 'Pelo menos 8 caracteres, com letras e números.',
+            onTap: () {
+              showPasswordChangeDialog(
+                context: context,
+                changePassword: (password) {
+                  return ref
+                      .read(authSessionProvider.notifier)
+                      .changePassword(password: password);
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+        ],
         const ThemeChoiceControl(),
         const SizedBox(height: 16),
         const _InfoCard(

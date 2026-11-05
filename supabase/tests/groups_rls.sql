@@ -13,18 +13,24 @@ begin
     into v_count
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public'
+  where n.nspname = 'private'
     and p.proname in ('is_group_member', 'group_is_readable')
     and p.prosecdef
-    and 'search_path=public' = any (p.proconfig);
+    and 'search_path=""' = any (p.proconfig);
   if v_count <> 2 then
     raise exception 'funções de grupo sem security definer ou search_path: %', v_count;
   end if;
 
-  if not has_function_privilege('anon', 'public.is_group_member(uuid)', 'execute')
-    or not has_function_privilege('authenticated', 'public.is_group_member(uuid)', 'execute')
-    or not has_function_privilege('anon', 'public.group_is_readable(uuid)', 'execute')
-    or not has_function_privilege('authenticated', 'public.group_is_readable(uuid)', 'execute')
+  if to_regprocedure('public.is_group_member(uuid)') is not null
+    or to_regprocedure('public.group_is_readable(uuid)') is not null
+  then
+    raise exception 'funções de grupo ainda estão em public';
+  end if;
+
+  if not has_function_privilege('anon', 'private.is_group_member(uuid)', 'execute')
+    or not has_function_privilege('authenticated', 'private.is_group_member(uuid)', 'execute')
+    or not has_function_privilege('anon', 'private.group_is_readable(uuid)', 'execute')
+    or not has_function_privilege('authenticated', 'private.group_is_readable(uuid)', 'execute')
   then
     raise exception 'anon ou authenticated não executa as funções de grupo';
   end if;

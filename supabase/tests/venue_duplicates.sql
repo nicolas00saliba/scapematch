@@ -541,11 +541,8 @@ select public.request_venue_claim(
 
 reset role;
 select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
-set local role authenticated;
 
 do $$
-declare
-  v_claim uuid;
 begin
   if not exists (
     select 1
@@ -554,6 +551,14 @@ begin
   ) then
     raise exception 'admin não vê a casa pendente marcada';
   end if;
+end $$;
+
+set local role authenticated;
+
+do $$
+declare
+  v_claim uuid;
+begin
   select id into v_claim from public.venue_claims where status = 'pending';
   if v_claim is null then
     raise exception 'admin não vê a reivindicação';
@@ -568,12 +573,21 @@ begin
     from public.venues
     where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
       and status = 'merged'
-  ) or not exists (
+  ) then
+    raise exception 'mescla não gravou';
+  end if;
+end $$;
+
+reset role;
+
+do $$
+begin
+  if not exists (
     select 1
     from public.venue_link_status('cccccccc-cccc-cccc-cccc-cccccccccccc')
     where merged_into = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
   ) then
-    raise exception 'mescla não gravou';
+    raise exception 'mescla não gravou o vínculo';
   end if;
 end $$;
 

@@ -41,6 +41,7 @@ abstract final class PartnerKeys {
   static const venueApproveClaim = Key('venue-approve-claim');
   static const venueRejectClaim = Key('venue-reject-claim');
   static const partnerSignOut = Key('partner-sign-out');
+  static const partnerChangePassword = Key('partner-change-password');
   static const partnerSignupName = Key('partner-signup-name');
   static const partnerSignupEmail = Key('partner-signup-email');
   static const partnerSignupPassword = Key('partner-signup-password');

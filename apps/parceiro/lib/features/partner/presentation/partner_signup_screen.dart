@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
+import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
@@ -35,18 +36,14 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
   @override
   void initState() {
     super.initState();
-    _termsTap = TapGestureRecognizer()..onTap = () => _open(
-      PartnerLegal.termsTitle,
-      PartnerLegal.termsBody,
-    );
-    _privacyTap = TapGestureRecognizer()..onTap = () => _open(
-      LegalDocuments.privacyTitle,
-      LegalDocuments.privacyBody,
-    );
-    _refundTap = TapGestureRecognizer()..onTap = () => _open(
-      LegalDocuments.refundTitle,
-      LegalDocuments.refundBody,
-    );
+    _termsTap = TapGestureRecognizer()
+      ..onTap = () => _open(PartnerLegal.termsTitle, PartnerLegal.termsBody);
+    _privacyTap = TapGestureRecognizer()
+      ..onTap = () =>
+          _open(LegalDocuments.privacyTitle, LegalDocuments.privacyBody);
+    _refundTap = TapGestureRecognizer()
+      ..onTap = () =>
+          _open(LegalDocuments.refundTitle, LegalDocuments.refundBody);
   }
 
   @override
@@ -63,10 +60,13 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
   Future<void> _submit() async {
     final name = _name.text.trim();
     final email = _email.text.trim();
-    if (name.length < 2 || !email.contains('@') || _password.text.length < 6) {
-      setState(() {
-        _error = 'Preencha nome, e-mail e uma senha de 6 caracteres.';
-      });
+    if (name.length < 2 || !email.contains('@')) {
+      setState(() => _error = 'Preencha nome e um e-mail válido.');
+      return;
+    }
+    final rule = passwordRuleError(_password.text);
+    if (rule != null) {
+      setState(() => _error = rule);
       return;
     }
     if (!_accepted) {
@@ -77,6 +77,15 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
       _busy = true;
       _error = null;
     });
+    final rejected = await rejectPassword(_password.text);
+    if (!mounted) return;
+    if (rejected != null) {
+      setState(() {
+        _busy = false;
+        _error = rejected;
+      });
+      return;
+    }
     try {
       final response = await scapeSupabase.auth.signUp(
         email: email,
@@ -90,7 +99,10 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
         });
         return;
       }
-      await scapeSupabase.rpc('accept_terms', params: {'p_audience': 'partner'});
+      await scapeSupabase.rpc(
+        'accept_terms',
+        params: {'p_audience': 'partner'},
+      );
       final account = await loadPartnerAccount();
       if (!mounted) return;
       if (account != null) {
@@ -148,10 +160,13 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
           ),
           const SizedBox(height: 12),
           TextField(
+            key: PartnerKeys.partnerSignupPassword,
             controller: _password,
             obscureText: true,
+            autofillHints: const [AutofillHints.newPassword],
             decoration: const InputDecoration(
               labelText: 'Senha',
+              helperText: 'Pelo menos 8 caracteres, com letras e números.',
               border: OutlineInputBorder(),
             ),
           ),

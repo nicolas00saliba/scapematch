@@ -2,6 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
+import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
@@ -95,9 +96,8 @@ class SupabaseAuthRepository implements AuthRepository {
     if (!GroupRules.isAdult(birthDate: birthDate, now: now)) {
       return LegalDocuments.under18;
     }
-    if (password.length < 6) {
-      return 'A senha precisa de pelo menos 6 caracteres.';
-    }
+    final rejected = await rejectPassword(password);
+    if (rejected != null) return rejected;
     final trimmed = name.trim();
     if (trimmed.isEmpty) return 'Informe o nome.';
     try {
@@ -120,6 +120,24 @@ class SupabaseAuthRepository implements AuthRepository {
       return authErrorMessage(
         error,
         fallback: 'Não foi possível criar a conta. Tente de novo.',
+      );
+    }
+  }
+
+  @override
+  Future<String?> changePassword({required String password}) async {
+    if (_client.auth.currentUser == null) {
+      return 'Entre para trocar a senha.';
+    }
+    final rejected = await rejectPassword(password);
+    if (rejected != null) return rejected;
+    try {
+      await _client.auth.updateUser(UserAttributes(password: password));
+      return null;
+    } on Object catch (error) {
+      return authErrorMessage(
+        error,
+        fallback: 'Não foi possível trocar a senha. Tente de novo.',
       );
     }
   }
