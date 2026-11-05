@@ -14,7 +14,6 @@ type OrphanRow = {
   charge_id: string | null;
   attempt_id: string | null;
   billing_type: string;
-  external_reference: string | null;
 };
 
 type RemotePayment = {
@@ -30,7 +29,7 @@ export async function reconcilePayments(
   admin: Admin,
   asaas: AsaasProvider,
 ): Promise<{ resolved: number; pending: number }> {
-  const { data, error } = await admin.rpc("list_payment_reconciliation");
+  const { data, error } = await admin.rpc("claim_payment_reconciliation");
   if (error) throw new Error("erro");
   const work = asWork(data);
   let resolved = 0;
@@ -55,11 +54,7 @@ async function reconcileCreating(
     ? await asaas.findByExternalReference(row.external_reference)
     : null;
   if (!remote) {
-    const { data, error } = await admin.rpc("release_expired_pix_reservation", {
-      p_charge_id: row.charge_id,
-      p_attempt_id: row.attempt_id,
-    });
-    return !error && data === true;
+    return await releaseClaim(admin, row);
   }
   const gone = await releaseRemote(
     asaas,
@@ -78,11 +73,7 @@ async function reconcileCreating(
     });
     return false;
   }
-  await admin.rpc("release_expired_pix_reservation", {
-    p_charge_id: row.charge_id,
-    p_attempt_id: row.attempt_id,
-  });
-  return true;
+  return await releaseClaim(admin, row);
 }
 
 async function reconcileOrphan(
@@ -90,46 +81,34 @@ async function reconcileOrphan(
   asaas: AsaasProvider,
   row: OrphanRow,
 ): Promise<boolean> {
+  if (!row.provider_ref) return false;
   let remote: RemotePayment | null = null;
-  if (row.external_reference) {
-    remote = await asaas.findByExternalReference(row.external_reference);
+  try {
+    remote = await asaas.getPayment(row.provider_ref);
+  } catch (error) {
+    if (!isMissing(error)) return false;
+    return await finishOrphan(admin, row, "cancelled");
   }
-  if (!remote && row.provider_ref) {
-    try {
-      remote = await asaas.getPayment(row.provider_ref);
-    } catch (error) {
-      if (!isMissing(error)) return false;
-      if (!(await settleStuckCharge(admin, row, "cancelled"))) return false;
-      return await markResolved(admin, row.id);
-    }
-  }
-  if (!remote) {
-    if (!(await settleStuckCharge(admin, row, "cancelled"))) return false;
-    return await markResolved(admin, row.id);
-  }
+  if (!remote || remote.id !== row.provider_ref) return false;
   const action = lostAttemptCompensation(remote.status);
   if (action === "none") {
     const next = remote.status.trim().toUpperCase() === "REFUNDED"
       ? "refunded"
       : "cancelled";
-    if (!(await settleStuckCharge(admin, row, next))) return false;
-    return await markResolved(admin, row.id);
+    return await finishOrphan(admin, row, next);
   }
   const gone = await releaseRemote(
     asaas,
-    remote.id,
+    row.provider_ref,
     remote.status,
     remote.billingType || row.billing_type,
   );
   if (!gone) return false;
-  if (row.charge_id) {
-    await admin.rpc("apply_payment_transition", {
-      p_charge_id: row.charge_id,
-      p_next_status: action === "refund" ? "refunded" : "cancelled",
-      p_credit: false,
-    });
-  }
-  return await markResolved(admin, row.id);
+  return await finishOrphan(
+    admin,
+    row,
+    action === "refund" ? "refunded" : "cancelled",
+  );
 }
 
 async function releaseRemote(
@@ -152,45 +131,53 @@ async function releaseRemote(
   }
 }
 
-/// Cobrança presa em creating/authorized, com o mesmo id do Asaas, sai
-/// para cancelled ou refunded antes de o órfão ser marcado. Outro
-/// provider_ref, ou status já terminal, não é mexido.
-async function settleStuckCharge(
+/// A transição só vale para este attempt e este provider_ref. Erro ou
+/// attempt divergente não marca o órfão. Cobrança de outro pagamento
+/// (skipped) pode ser encerrada.
+async function finishOrphan(
   admin: Admin,
   row: OrphanRow,
   nextStatus: "cancelled" | "refunded",
 ): Promise<boolean> {
-  if (!row.charge_id || !row.provider_ref) return true;
-  const { data, error } = await admin
-    .from("payment_charges")
-    .select("status, provider_ref")
-    .eq("id", row.charge_id)
-    .maybeSingle();
-  if (error) return false;
-  const charge = data as
-    | { status?: string; provider_ref?: string | null }
-    | null;
-  if (!charge) return true;
-  const stuck = charge.status === "creating" || charge.status === "authorized";
-  if (!stuck || charge.provider_ref !== row.provider_ref) return true;
-  const { data: transition, error: transitionError } = await admin.rpc(
-    "apply_payment_transition",
-    {
-      p_charge_id: row.charge_id,
-      p_next_status: nextStatus,
-      p_credit: false,
-    },
-  );
-  if (transitionError) return false;
-  const status = transition && typeof transition === "object"
-    ? String((transition as { status?: unknown }).status ?? "")
-    : "";
-  return status === nextStatus;
+  if (row.charge_id) {
+    const settled = await settleStuckCharge(admin, row, nextStatus);
+    if (settled !== "done") return false;
+  }
+  return await markResolved(admin, row.id);
+}
+
+async function settleStuckCharge(
+  admin: Admin,
+  row: OrphanRow,
+  nextStatus: "cancelled" | "refunded",
+): Promise<"done" | "blocked"> {
+  const { data, error } = await admin.rpc("settle_orphan_charge", {
+    p_charge_id: row.charge_id,
+    p_attempt_id: row.attempt_id,
+    p_provider_ref: row.provider_ref,
+    p_next_status: nextStatus,
+  });
+  if (error) return "blocked";
+  const record = data && typeof data === "object"
+    ? data as { skipped?: unknown; status?: unknown }
+    : {};
+  if (record.skipped === true) return "done";
+  return String(record.status ?? "") === nextStatus ? "done" : "blocked";
+}
+
+async function releaseClaim(admin: Admin, row: CreatingRow): Promise<boolean> {
+  const { data, error } = await admin.rpc("release_pix_reservation", {
+    p_charge_id: row.charge_id,
+    p_attempt_id: row.attempt_id,
+  });
+  return !error && data === true;
 }
 
 async function markResolved(admin: Admin, id: string): Promise<boolean> {
-  const { error } = await admin.rpc("mark_orphan_resolved", { p_id: id });
-  return !error;
+  const { data, error } = await admin.rpc("mark_orphan_resolved", {
+    p_id: id,
+  });
+  return !error && data === true;
 }
 
 function asWork(

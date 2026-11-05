@@ -165,6 +165,10 @@ declare
   v_work jsonb;
   v_orphan uuid;
   v_deleted boolean;
+  v_attempt uuid;
+  v_settle jsonb;
+  v_status text;
+  v_def text;
   v_member text;
   v_wallet text;
 begin
@@ -197,12 +201,42 @@ begin
     raise exception 'venue_private perdeu o documento';
   end if;
 
-  v_work := public.list_payment_reconciliation();
+  select pg_get_functiondef('private.claim_payment_reconciliation()'::regprocedure)
+    into v_def;
+  if v_def not ilike '%limit 50%'
+    or v_def not ilike '%skip locked%'
+    or v_def not ilike '%order by%' then
+    raise exception 'claim sem lote ordenado';
+  end if;
+
+  v_work := public.claim_payment_reconciliation();
   if v_work::text not like '%cc611111-1111-4111-8111-111111111111%' then
-    raise exception 'creating vencido fora da lista';
+    raise exception 'creating vencido fora do claim';
   end if;
   if v_work::text not like '%idem-follow-creating%' then
-    raise exception 'externalReference do cartão não entrou na lista';
+    raise exception 'externalReference do cartão não entrou no claim';
+  end if;
+  select elem->>'attempt_id' into v_attempt
+  from jsonb_array_elements(v_work->'creating') elem
+  where elem->>'charge_id' = 'cc611111-1111-4111-8111-111111111111';
+  if v_attempt is not distinct from 'cc711111-1111-4111-8111-111111111111'::uuid then
+    raise exception 'claim não renovou o attempt';
+  end if;
+
+  v_work := public.claim_payment_reconciliation();
+  if v_work::text like '%cc611111-1111-4111-8111-111111111111%' then
+    raise exception 'lease fresco foi reivindicado de novo';
+  end if;
+  if public.claim_expired_pix_reservation(
+    'cc611111-1111-4111-8111-111111111111'
+  ) is not null then
+    raise exception 'create-charge retomou a linha do reconciliador';
+  end if;
+  if public.release_pix_reservation(
+    'cc611111-1111-4111-8111-111111111111',
+    'cc711111-1111-4111-8111-111111111111'
+  ) then
+    raise exception 'attempt antigo soltou a reserva cercada';
   end if;
 
   perform public.apply_payment_transition(
@@ -210,10 +244,6 @@ begin
     'authorized',
     false
   );
-  v_work := public.list_payment_reconciliation();
-  if v_work::text like '%cc611111-1111-4111-8111-111111111111%' then
-    raise exception 'authorized ainda aparece como creating';
-  end if;
 
   if public.delete_compensated_charge(
     'cc611111-1111-4111-8111-111111111111',
@@ -223,6 +253,52 @@ begin
     raise exception 'apagar authorized não pode passar';
   end if;
 
+  begin
+    update public.payment_charges
+    set provider_ref = 'pay_orfao_cc'
+    where id = 'cc611111-1111-4111-8111-111111111111';
+    v_settle := public.settle_orphan_charge(
+      'cc611111-1111-4111-8111-111111111111',
+      'cc711111-1111-4111-8111-111111111111',
+      'pay_orfao_cc',
+      'cancelled'
+    );
+    if coalesce((v_settle->>'skipped')::boolean, false)
+      or v_settle->>'status' = 'cancelled' then
+      raise exception 'attempt divergente moveu a cobrança';
+    end if;
+    select status into v_status
+    from public.payment_charges
+    where id = 'cc611111-1111-4111-8111-111111111111';
+    if v_status is distinct from 'authorized' then
+      raise exception 'status mudou com attempt errado: %', v_status;
+    end if;
+    v_settle := public.settle_orphan_charge(
+      'cc611111-1111-4111-8111-111111111111',
+      v_attempt,
+      'pay_outro',
+      'cancelled'
+    );
+    if coalesce((v_settle->>'skipped')::boolean, false) is not true then
+      raise exception 'provider diferente não foi pulado';
+    end if;
+    v_settle := public.settle_orphan_charge(
+      'cc611111-1111-4111-8111-111111111111',
+      v_attempt,
+      'pay_orfao_cc',
+      'cancelled'
+    );
+    if v_settle->>'status' is distinct from 'cancelled' then
+      raise exception 'settle não cancelou: %', v_settle;
+    end if;
+    raise exception 'ok_settle';
+  exception
+    when others then
+      if sqlerrm is distinct from 'ok_settle' then
+        raise;
+      end if;
+  end;
+
   v_orphan := public.record_orphan_payment(
     'pay_orfao_cc',
     'cc611111-1111-4111-8111-111111111111',
@@ -230,9 +306,16 @@ begin
     'CREDIT_CARD',
     'refund_failed'
   );
-  v_work := public.list_payment_reconciliation();
+  v_work := public.claim_payment_reconciliation();
   if v_work::text not like '%pay_orfao_cc%' then
     raise exception 'órfão não entrou na reconciliação';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(v_work->'orphans') elem
+    where elem ? 'external_reference'
+  ) then
+    raise exception 'órfão levou externalReference da cobrança atual';
   end if;
   if not public.mark_orphan_resolved(v_orphan) then
     raise exception 'órfão não foi marcado';
@@ -240,7 +323,7 @@ begin
   if public.mark_orphan_resolved(v_orphan) then
     raise exception 'órfão resolvido foi marcado de novo';
   end if;
-  v_work := public.list_payment_reconciliation();
+  v_work := public.claim_payment_reconciliation();
   if v_work::text like '%pay_orfao_cc%' then
     raise exception 'órfão resolvido continua na lista';
   end if;
@@ -263,7 +346,7 @@ begin
   where id = 'cc611111-1111-4111-8111-111111111111';
   v_deleted := public.delete_compensated_charge(
     'cc611111-1111-4111-8111-111111111111',
-    'cc711111-1111-4111-8111-111111111111',
+    v_attempt,
     'pay_estornado'
   );
   if not v_deleted then

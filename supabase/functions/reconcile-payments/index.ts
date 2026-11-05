@@ -7,7 +7,7 @@ type Deps = {
   // deno-lint-ignore no-explicit-any
   admin?: any;
   asaas?: AsaasProvider;
-  serviceKey?: string;
+  reconcileSecret?: string;
 };
 
 export async function handleReconcile(
@@ -18,16 +18,16 @@ export async function handleReconcile(
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeadersFor(req, Deno.env) });
   }
-  const service = deps?.serviceKey ??
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const header = req.headers.get("Authorization") ?? "";
-  if (service.length === 0 || header !== `Bearer ${service}`) {
+  const secret = deps?.reconcileSecret ?? Deno.env.get("RECONCILE_SECRET") ??
+    "";
+  const header = req.headers.get("x-reconcile-secret") ?? "";
+  if (!(await secretMatches(header, secret))) {
     return json({ error: "not authenticated" }, 401);
   }
   try {
     const admin = deps?.admin ?? createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      service,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
     const asaas = deps?.asaas ?? AsaasProvider.fromEnv(Deno.env);
     return json(await reconcilePayments(admin, asaas));
@@ -38,4 +38,24 @@ export async function handleReconcile(
 
 if (import.meta.main) {
   Deno.serve((req) => handleReconcile(req));
+}
+
+/// Compara os dois digests. O tamanho do header não encurta a comparação.
+async function secretMatches(header: string, secret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [left, right] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(header)),
+    crypto.subtle.digest("SHA-256", encoder.encode(secret)),
+  ]);
+  return sameBytes(new Uint8Array(left), new Uint8Array(right)) &&
+    secret.length > 0;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  let diff = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index++) {
+    diff |= (left[index] ?? 0) ^ (right[index] ?? 0);
+  }
+  return diff === 0;
 }

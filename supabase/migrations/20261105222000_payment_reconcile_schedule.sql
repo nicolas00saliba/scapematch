@@ -2,7 +2,8 @@
 -- Sem pg_cron e pg_net (o Postgres do CI), a migração não agenda e não falha.
 -- No projeto, crie no vault, fora do git:
 --   reconcile_payments_url = https://<ref>.supabase.co/functions/v1/reconcile-payments
---   reconcile_payments_authorization = Bearer <service_role>
+--   reconcile_secret = o mesmo valor da env RECONCILE_SECRET da função
+-- O cron manda o segredo no header x-reconcile-secret. Não usa service_role.
 -- A função não faz nada enquanto um dos dois segredos estiver vazio.
 
 do $cron$
@@ -21,17 +22,17 @@ begin
       as $body$
       declare
         v_url text;
-        v_auth text;
+        v_secret text;
       begin
         select btrim(s.decrypted_secret) into v_url
         from vault.decrypted_secrets s
         where s.name = 'reconcile_payments_url'
         limit 1;
-        select btrim(s.decrypted_secret) into v_auth
+        select btrim(s.decrypted_secret) into v_secret
         from vault.decrypted_secrets s
-        where s.name = 'reconcile_payments_authorization'
+        where s.name = 'reconcile_secret'
         limit 1;
-        if v_url is null or v_url = '' or v_auth is null or v_auth = '' then
+        if v_url is null or v_url = '' or v_secret is null or v_secret = '' then
           return;
         end if;
         perform net.http_post(
@@ -39,7 +40,7 @@ begin
           body := '{}'::jsonb,
           headers := jsonb_build_object(
             'Content-Type', 'application/json',
-            'Authorization', v_auth
+            'x-reconcile-secret', v_secret
           ),
           timeout_milliseconds := 5000
         );
@@ -47,8 +48,7 @@ begin
       $body$;
     $fn$;
     revoke all on function private.invoke_reconcile_payments()
-      from public, anon, authenticated;
-    grant execute on function private.invoke_reconcile_payments() to service_role;
+      from public, anon, authenticated, service_role;
     if exists (
       select 1 from cron.job where jobname = 'reconcile-payments'
     ) then

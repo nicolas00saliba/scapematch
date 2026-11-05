@@ -19,8 +19,9 @@ verify_jwt = true
 [functions.invoice-document]
 verify_jwt = true
 
+# O cron manda x-reconcile-secret, não um JWT. A função confere o segredo.
 [functions.reconcile-payments]
-verify_jwt = true
+verify_jwt = false
 
 # E-mails do Auth, em pt-BR. O CLI local lê subject e content_path.
 # O projeto remoto não muda sozinho. Cole cada assunto e o HTML em

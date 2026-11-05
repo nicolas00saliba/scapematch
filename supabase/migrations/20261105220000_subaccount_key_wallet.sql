@@ -1,6 +1,6 @@
--- Cifra venue_asaas_keys.api_key em repouso. A chave nasce no vault e
--- não entra no repositório. A resposta ao cliente não leva wallet_id:
--- a coluna continua no banco para o split da Edge Function.
+-- Cifra venue_asaas_keys.api_key em repouso. O segredo
+-- asaas_subaccount_key tem de já existir no Vault. Esta migração não
+-- cria a chave e não cifra com null. A resposta ao cliente não leva wallet_id.
 
 create schema if not exists extensions;
 
@@ -12,15 +12,16 @@ begin
 end $$;
 
 do $$
+declare
+  v_key text;
 begin
-  if not exists (
-    select 1 from vault.decrypted_secrets where name = 'asaas_subaccount_key'
-  ) then
-    perform vault.create_secret(
-      encode(extensions.gen_random_bytes(32), 'hex'),
-      'asaas_subaccount_key',
-      'Chave da apiKey das subcontas. Fica no vault e não sai do banco.'
-    );
+  select btrim(s.decrypted_secret) into v_key
+  from vault.decrypted_secrets s
+  where s.name = 'asaas_subaccount_key'
+  limit 1;
+  if v_key is null or char_length(v_key) < 32 then
+    raise exception 'asaas_subaccount_key ausente no vault'
+      using errcode = 'P0001';
   end if;
 end $$;
 

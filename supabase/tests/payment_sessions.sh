@@ -150,5 +150,69 @@ if [[ -n "$attached" || -n "$provider" || "$attempt" != "dda11111-1111-4111-8111
   exit 1
 fi
 
+psqlq -f - <<'SQL'
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  'ee111111-1111-4111-8111-111111111111',
+  'sessao-reconcile@example.com',
+  '{"display_name":"Reconcile"}'
+);
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  provider_ref, idempotency_key, commission_bps, reserved_at, attempt_id
+) values (
+  'ee611111-1111-4111-8111-111111111111',
+  'dd511111-1111-4111-8111-111111111111',
+  'ee111111-1111-4111-8111-111111111111',
+  'dd211111-1111-4111-8111-111111111111',
+  10000,
+  'PIX',
+  'creating',
+  null,
+  'idem-sessao-reconcile',
+  1000,
+  now() - interval '5 minutes',
+  'ee711111-1111-4111-8111-111111111111'
+);
+
+select private.record_orphan_payment(
+  'pay_ee_orfao',
+  null,
+  'ee711111-1111-4111-8111-111111111111',
+  'PIX',
+  'refund_failed'
+);
+SQL
+
+psqlq -c "begin; select public.claim_payment_reconciliation(); select pg_sleep(2); commit;" > "$tmpdir/reconciler_a" &
+sleep 0.5
+psqlq -c "select public.claim_payment_reconciliation();" > "$tmpdir/reconciler_b" &
+psqlq -c "select coalesce(public.claim_expired_pix_reservation('ee611111-1111-4111-8111-111111111111')::text, '')" > "$tmpdir/resume" &
+wait
+
+if [[ "$(grep -c 'ee611111-1111-4111-8111-111111111111' "$tmpdir/reconciler_a" "$tmpdir/reconciler_b" | awk -F: '{s+=$2} END {print s}')" -ne 1 ]]; then
+  echo "dois reconciliadores não cercaram a cobrança uma vez" >&2
+  echo "a=$(cat "$tmpdir/reconciler_a")" >&2
+  echo "b=$(cat "$tmpdir/reconciler_b")" >&2
+  exit 1
+fi
+if [[ "$(grep -c 'pay_ee_orfao' "$tmpdir/reconciler_a" "$tmpdir/reconciler_b" | awk -F: '{s+=$2} END {print s}')" -ne 1 ]]; then
+  echo "dois reconciliadores não cercaram o órfão uma vez" >&2
+  echo "a=$(cat "$tmpdir/reconciler_a")" >&2
+  echo "b=$(cat "$tmpdir/reconciler_b")" >&2
+  exit 1
+fi
+if [[ -n "$(cat "$tmpdir/resume")" ]]; then
+  echo "retomada levou a reserva do reconciliador: $(cat "$tmpdir/resume")" >&2
+  exit 1
+fi
+released="$(psqlq -c "select public.release_pix_reservation('ee611111-1111-4111-8111-111111111111', 'ee711111-1111-4111-8111-111111111111')")"
+attempt="$(psqlq -c "select attempt_id::text from public.payment_charges where id = 'ee611111-1111-4111-8111-111111111111'")"
+if [[ "$released" != "f" || "$attempt" == "ee711111-1111-4111-8111-111111111111" ]]; then
+  echo "attempt antigo ainda solta a reserva release=${released} attempt=${attempt}" >&2
+  exit 1
+fi
+
 rm -rf "$tmpdir"
 echo "payment sessions ok"
