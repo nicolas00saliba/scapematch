@@ -9,18 +9,22 @@ export function pixExternalReference(groupId: string, userId: string): string {
   return `pix:${group}:${user}`;
 }
 
-export function chargeIsOpen(status: string): boolean {
-  return !["failed", "cancelled", "refunded"].includes(status);
+/// RECEIVED e CONFIRMED já foram pagos. O resto do Pix nasce pendente.
+export function localChargeStatus(asaasStatus: string): "pending" | "paid" {
+  const status = asaasStatus.trim().toUpperCase();
+  if (status === "RECEIVED" || status === "CONFIRMED") return "paid";
+  return "pending";
 }
 
-/// Pix já criado no provedor, ainda sem o copia-e-cola.
+/// Pix pendente já criado no provedor, ainda sem o copia-e-cola.
+/// Cobrança paga não fica presa à busca do QR.
 export function pixNeedsQr(charge: {
   status: string;
   billing_type: string;
   provider_ref: string | null;
   qr_code: string | null;
 }): boolean {
-  return chargeIsOpen(charge.status) &&
+  return charge.status === "pending" &&
     charge.billing_type === "PIX" &&
     Boolean(charge.provider_ref) &&
     !charge.qr_code;

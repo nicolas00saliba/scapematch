@@ -1,7 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider, houseSplitPercent } from "../_shared/asaas_provider.ts";
-import { pixExternalReference, pixNeedsQr } from "../_shared/pix_charge.ts";
+import {
+  localChargeStatus,
+  pixExternalReference,
+  pixNeedsQr,
+} from "../_shared/pix_charge.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
@@ -210,6 +214,7 @@ Deno.serve(async (req) => {
             venueId: venue.id as string,
             amountCents,
             providerRef: payment.id,
+            asaasStatus: payment.status,
             idempotencyKey,
             walletId: venue.asaas_wallet_id as string,
             commissionBps,
@@ -217,15 +222,16 @@ Deno.serve(async (req) => {
         },
       });
       providerRef = pix.id;
-      status = "pending";
-      qrCode = pix.payload;
-      qrImage = pix.encodedImage;
+      status = localChargeStatus(pix.status);
+      qrCode = pix.payload || null;
+      qrImage = pix.encodedImage || null;
       if (!savedId) throw new Error("erro");
       const qrSaved = await admin.from("payment_charges").update({
         qr_code: qrCode,
         qr_code_base64: qrImage,
         provider_ref: providerRef,
         status,
+        paid_at: status === "paid" ? new Date().toISOString() : null,
       }).eq("id", savedId);
       if (qrSaved.error) return json({ error: publicError("erro") }, 400);
     } else {
@@ -347,18 +353,20 @@ async function persistPixCharge(
     venueId: string;
     amountCents: number;
     providerRef: string;
+    asaasStatus: string;
     idempotencyKey: string;
     walletId: string;
     commissionBps: number;
   },
 ): Promise<string> {
+  const status = localChargeStatus(input.asaasStatus);
   const row = {
     group_id: input.groupId,
     user_id: input.userId,
     venue_id: input.venueId,
     amount_cents: input.amountCents,
     billing_type: "PIX",
-    status: "pending",
+    status,
     provider: "asaas",
     provider_ref: input.providerRef,
     qr_code: null,
@@ -366,7 +374,7 @@ async function persistPixCharge(
     idempotency_key: input.idempotencyKey,
     wallet_id: input.walletId,
     commission_bps: input.commissionBps,
-    paid_at: null,
+    paid_at: status === "paid" ? new Date().toISOString() : null,
     refunded_at: null,
   };
   if (input.existingId) {
@@ -389,11 +397,12 @@ async function persistPixCharge(
   const id = found.data.id as string;
   const updated = await admin.from("payment_charges").update({
     provider_ref: input.providerRef,
-    status: "pending",
+    status,
     billing_type: "PIX",
     provider: "asaas",
     qr_code: null,
     qr_code_base64: null,
+    paid_at: status === "paid" ? new Date().toISOString() : null,
     refunded_at: null,
   }).eq("id", id);
   if (updated.error) throw new Error("erro");

@@ -6,6 +6,7 @@
 // Não há SDK de navegador. O cartão só atravessa a chamada de tokenização;
 // a cobrança seguinte manda creditCardToken.
 
+import { localChargeStatus } from "./pix_charge.ts";
 import { redactSensitive } from "./redact.ts";
 
 export const asaasSandboxBaseUrl = "https://api-sandbox.asaas.com/v3";
@@ -243,17 +244,20 @@ const reusablePixStatus = new Set([
   "AUTHORIZED",
 ]);
 
-/// Pendente ganha de uma cobrança já paga com a mesma referência.
+/// Cobrança já paga ganha da pendente: reaproveitar a paga evita outro Pix.
 export function pickReusablePix(rows: unknown[]): PixPaymentRef | null {
   const pix = rows.filter((row): row is Record<string, unknown> => {
     if (!row || typeof row !== "object") return false;
     const record = row as Record<string, unknown>;
     return record.billingType === "PIX" && typeof record.id === "string";
   });
+  const settled = pix.find((row) =>
+    localChargeStatus(String(row.status ?? "")) === "paid"
+  );
   const pending = pix.find((row) =>
     row.status === "PENDING" || row.status === "OVERDUE"
   );
-  const chosen = pending ??
+  const chosen = settled ?? pending ??
     pix.find((row) => reusablePixStatus.has(String(row.status)));
   if (!chosen || typeof chosen.id !== "string") return null;
   return {
@@ -402,6 +406,14 @@ export class AsaasProvider implements PaymentProvider {
         encodedImage: qr.encodedImage,
       };
     } catch (error) {
+      if (localChargeStatus(payment.status) === "paid") {
+        return {
+          id: payment.id,
+          status: payment.status,
+          payload: "",
+          encodedImage: "",
+        };
+      }
       if (error instanceof PixQrUnavailableError) throw error;
       throw new PixQrUnavailableError(payment.id, payment.status);
     }

@@ -38,20 +38,34 @@ export function missingConflictTarget(error: LedgerWriteError): boolean {
   return message.includes("42p10") || message.includes("on conflict");
 }
 
-/// Uma linha por cobrança, kind e direção. Conflito não é erro.
+const sqlState = /^[0-9A-Z]{5}$/;
+
+/// Só o SQLSTATE. A mensagem do Postgres pode trazer id, e-mail ou valor.
+function logLedgerWriteFailure(error: { code?: string }): void {
+  const code = error.code && sqlState.test(error.code) ? error.code : "unknown";
+  console.error(JSON.stringify({ scope: "ledger", code }));
+}
+
+function rejectLedgerWrite(error: { code?: string }): never {
+  logLedgerWriteFailure(error);
+  throw new Error("ledger_write_failed");
+}
+
+/// Uma linha por cobrança, kind e direção. `23505` é sucesso idempotente.
+/// Qualquer outro erro de escrita é logado (só o código) e lançado.
 export async function insertLedgerLine(
   table: LedgerTable,
   row: LedgerLine,
-): Promise<"inserted" | "duplicate" | "failed"> {
+): Promise<"inserted" | "duplicate"> {
   const conflict = await table.upsert(row, {
     onConflict: ledgerConflictTarget,
     ignoreDuplicates: true,
   });
   if (!conflict.error) return "inserted";
   if (isUniqueViolation(conflict.error)) return "duplicate";
-  if (!missingConflictTarget(conflict.error)) return "failed";
+  if (!missingConflictTarget(conflict.error)) rejectLedgerWrite(conflict.error);
   const inserted = await table.insert(row);
   if (!inserted.error) return "inserted";
   if (isUniqueViolation(inserted.error)) return "duplicate";
-  return "failed";
+  rejectLedgerWrite(inserted.error ?? {});
 }

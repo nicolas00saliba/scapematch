@@ -251,7 +251,7 @@ Deno.test("QR esgotado não apaga a cobrança e o retry não cria outra", async 
   assertEquals(deletes, 0);
 });
 
-Deno.test("pickReusablePix ignora estorno e prefere o pendente", () => {
+Deno.test("pickReusablePix ignora estorno e prefere a cobrança já paga", () => {
   assertEquals(pickReusablePix([]), null);
   assertEquals(
     pickReusablePix([{
@@ -263,11 +263,59 @@ Deno.test("pickReusablePix ignora estorno e prefere o pendente", () => {
   );
   assertEquals(
     pickReusablePix([
-      { id: "pay_paid", status: "RECEIVED", billingType: "PIX" },
       { id: "pay_open", status: "PENDING", billingType: "PIX" },
+      { id: "pay_paid", status: "RECEIVED", billingType: "PIX" },
     ]),
+    { id: "pay_paid", status: "RECEIVED" },
+  );
+  assertEquals(
+    pickReusablePix([{
+      id: "pay_open",
+      status: "PENDING",
+      billingType: "PIX",
+    }]),
     { id: "pay_open", status: "PENDING" },
   );
+});
+
+Deno.test("Pix reaproveitado pago devolve o status do Asaas mesmo sem QR", async () => {
+  let posts = 0;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [{
+              id: "pay_paid",
+              status: "CONFIRMED",
+              billingType: "PIX",
+            }],
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (method === "POST") {
+      posts += 1;
+      return Promise.resolve(new Response("não", { status: 500 }));
+    }
+    if (url.includes("/pixQrCode")) {
+      return Promise.resolve(new Response("indisponível", { status: 503 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  const pix = await provider.createPix(pixInput);
+  assertEquals(pix.id, "pay_paid");
+  assertEquals(pix.status, "CONFIRMED");
+  assertEquals(pix.payload, "");
+  assertEquals(posts, 0);
 });
 
 const sampleCard = {
