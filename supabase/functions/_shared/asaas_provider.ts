@@ -308,13 +308,18 @@ export class AsaasProvider implements PaymentProvider {
     }
   }
 
-  static fromEnv(env: {
-    get(name: string): string | undefined;
-  }): AsaasProvider {
+  static fromEnv(
+    env: { get(name: string): string | undefined },
+    timeoutMs = 0,
+  ): AsaasProvider {
     const apiKey = env.get("ASAAS_API_KEY") ?? "";
     const baseUrl = (env.get("ASAAS_BASE_URL") ?? asaasSandboxBaseUrl)
       .replace(/\/$/, "");
-    return new AsaasProvider(apiKey, baseUrl);
+    const fetchFn: AsaasFetch = timeoutMs > 0
+      ? (input, init) =>
+        fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+      : fetch;
+    return new AsaasProvider(apiKey, baseUrl, fetchFn);
   }
 
   get sandbox(): boolean {

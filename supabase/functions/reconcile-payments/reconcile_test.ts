@@ -1,10 +1,14 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
-import { reconcilePayments } from "../_shared/reconcile_payments.ts";
+import {
+  reconcileAsaasTimeoutMs,
+  reconcilePayments,
+} from "../_shared/reconcile_payments.ts";
+import { pixLeaseMs } from "../_shared/pix_charge.ts";
 import { handleReconcile } from "./index.ts";
 
 type Call = { name: string; args: Record<string, unknown> };
-type SettleMode = "apply" | "skip" | "fail" | "attempt";
+type SettleMode = "apply" | "skip" | "fail" | "attempt" | "lost";
 
 function adminFor(
   work: unknown,
@@ -16,6 +20,11 @@ function adminFor(
       calls.push({ name, args });
       if (name === "claim_payment_reconciliation") {
         return Promise.resolve({ data: work, error: null });
+      }
+      if (
+        name === "confirm_reconcile_claim" || name === "confirm_orphan_claim"
+      ) {
+        return Promise.resolve({ data: settle !== "lost", error: null });
       }
       if (name === "settle_orphan_charge") {
         if (settle === "fail") {
@@ -160,6 +169,11 @@ Deno.test("pré-autorização vencida sai com refund, Pix pendente com DELETE", 
     ]),
   );
   assertEquals(result.resolved, 2);
+  assert(rpc.some((call) =>
+    call.name === "confirm_reconcile_claim" &&
+    call.args.p_attempt_id === attemptId &&
+    call.args.p_charge_id === creatingCard.charge_id
+  ));
   assert(
     http.some((call) =>
       call === "POST https://api-sandbox.asaas.com/v3/payments/pay_card/refund"
@@ -183,6 +197,7 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
     charge_id: "44444444-4444-4444-4444-444444444444",
     attempt_id: attemptId,
     billing_type: "CREDIT_CARD",
+    claimed_at: "2026-11-05T12:00:00.000Z",
   };
   const okCalls: Call[] = [];
   const okHttp: string[] = [];
@@ -223,6 +238,10 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
   assertEquals(transition?.args.p_provider_ref, "pay_orfao");
   assertEquals(transition?.args.p_attempt_id, attemptId);
   assertEquals(transition?.args.p_next_status, "refunded");
+  assert(okCalls.some((call) =>
+    call.name === "confirm_orphan_claim" &&
+    call.args.p_claimed_at === "2026-11-05T12:00:00.000Z"
+  ));
   assert(okCalls.some((call) => call.name === "mark_orphan_resolved"));
 
   const failCalls: Call[] = [];
@@ -240,6 +259,51 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
     failCalls.some((call) => call.name === "mark_orphan_resolved"),
     false,
   );
+});
+
+Deno.test("lease vencido depois da retomada não cancela no Asaas", async () => {
+  const rpc: Call[] = [];
+  const http: string[] = [];
+  const result = await reconcilePayments(
+    adminFor(
+      {
+        creating: [creatingCard],
+        orphans: [{
+          id: "88888888-8888-8888-8888-888888888888",
+          provider_ref: "pay_orfao",
+          charge_id: creatingCard.charge_id,
+          attempt_id: attemptId,
+          billing_type: "CREDIT_CARD",
+          claimed_at: "2026-11-05T12:00:00.000Z",
+        }],
+      },
+      rpc,
+      "lost",
+    ),
+    providerFor(http, [
+      {
+        id: "pay_card",
+        status: "AUTHORIZED",
+        billingType: "CREDIT_CARD",
+        externalReference: "idem-card-1",
+      },
+      {
+        id: "pay_orfao",
+        status: "CONFIRMED",
+        billingType: "CREDIT_CARD",
+      },
+    ]),
+  );
+  assertEquals(result, { resolved: 1, pending: 1 });
+  assertEquals(http.some((call) => call.includes("/refund")), false);
+  assertEquals(http.some((call) => call.includes("DELETE")), false);
+  assert(rpc.some((call) => call.name === "confirm_reconcile_claim"));
+  assert(rpc.some((call) => call.name === "confirm_orphan_claim"));
+  assertEquals(
+    rpc.some((call) => call.name === "record_orphan_payment"),
+    false,
+  );
+  assertEquals(rpc.some((call) => call.name === "mark_orphan_resolved"), false);
 });
 
 Deno.test("erro ou attempt divergente não marca o órfão como resolvido", async () => {
@@ -476,7 +540,11 @@ Deno.test("migrações cercam a chave, o lote e o cron sem service role", async 
   assert(wallet.includes("asaas_subaccount_key ausente no vault"));
   assertEquals(wallet.includes("vault.create_secret"), false);
   assert(claim.includes("for update skip locked"));
-  assert(claim.includes("limit 50"));
+  assert(claim.includes("limit 10"));
+  assertEquals(claim.includes("limit 50"), false);
+  assert(claim.includes("confirm_reconcile_claim"));
+  assert(claim.includes("confirm_orphan_claim"));
+  assert(reconcileAsaasTimeoutMs * 4 < pixLeaseMs);
   assert(claim.includes("order by"));
   assertEquals(claim.includes("left join"), false);
   assert(schedule.includes("x-reconcile-secret"));

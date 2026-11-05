@@ -1,7 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
-import { reconcilePayments } from "../_shared/reconcile_payments.ts";
+import {
+  reconcileAsaasTimeoutMs,
+  reconcilePayments,
+} from "../_shared/reconcile_payments.ts";
 
 type Deps = {
   // deno-lint-ignore no-explicit-any
@@ -29,7 +32,8 @@ export async function handleReconcile(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
-    const asaas = deps?.asaas ?? AsaasProvider.fromEnv(Deno.env);
+    const asaas = deps?.asaas ??
+      AsaasProvider.fromEnv(Deno.env, reconcileAsaasTimeoutMs);
     return json(await reconcilePayments(admin, asaas));
   } catch (_error) {
     return json({ error: "erro" }, 500);

@@ -169,6 +169,8 @@ declare
   v_settle jsonb;
   v_status text;
   v_def text;
+  v_claimed text;
+  v_debits integer;
   v_member text;
   v_wallet text;
 begin
@@ -203,7 +205,7 @@ begin
 
   select pg_get_functiondef('private.claim_payment_reconciliation()'::regprocedure)
     into v_def;
-  if v_def not ilike '%limit 50%'
+  if v_def not ilike '%limit 10%'
     or v_def not ilike '%skip locked%'
     or v_def not ilike '%order by%' then
     raise exception 'claim sem lote ordenado';
@@ -221,6 +223,18 @@ begin
   where elem->>'charge_id' = 'cc611111-1111-4111-8111-111111111111';
   if v_attempt is not distinct from 'cc711111-1111-4111-8111-111111111111'::uuid then
     raise exception 'claim não renovou o attempt';
+  end if;
+  if not public.confirm_reconcile_claim(
+    'cc611111-1111-4111-8111-111111111111',
+    v_attempt
+  ) then
+    raise exception 'confirm do attempt vigente falhou';
+  end if;
+  if public.confirm_reconcile_claim(
+    'cc611111-1111-4111-8111-111111111111',
+    'cc711111-1111-4111-8111-111111111111'
+  ) then
+    raise exception 'confirm do attempt antigo passou';
   end if;
 
   v_work := public.claim_payment_reconciliation();
@@ -252,6 +266,66 @@ begin
   ) then
     raise exception 'apagar authorized não pode passar';
   end if;
+
+  begin
+    update public.payment_charges
+    set provider_ref = 'pay_pago'
+    where id = 'cc611111-1111-4111-8111-111111111111';
+    perform public.apply_payment_transition(
+      'cc611111-1111-4111-8111-111111111111',
+      'paid',
+      true
+    );
+    v_settle := public.settle_orphan_charge(
+      'cc611111-1111-4111-8111-111111111111',
+      'cc711111-1111-4111-8111-111111111111',
+      'pay_pago',
+      'refunded'
+    );
+    if coalesce((v_settle->>'skipped')::boolean, false)
+      or v_settle->>'status' = 'refunded' then
+      raise exception 'paid com attempt errado foi encerrado';
+    end if;
+    v_settle := public.settle_orphan_charge(
+      'cc611111-1111-4111-8111-111111111111',
+      v_attempt,
+      'pay_outro',
+      'refunded'
+    );
+    if coalesce((v_settle->>'skipped')::boolean, false)
+      or v_settle->>'status' = 'refunded' then
+      raise exception 'paid com provider errado foi encerrado';
+    end if;
+    select status into v_status
+    from public.payment_charges
+    where id = 'cc611111-1111-4111-8111-111111111111';
+    if v_status is distinct from 'paid' then
+      raise exception 'paid mudou sem identidade: %', v_status;
+    end if;
+    v_settle := public.settle_orphan_charge(
+      'cc611111-1111-4111-8111-111111111111',
+      v_attempt,
+      'pay_pago',
+      'refunded'
+    );
+    if v_settle->>'status' is distinct from 'refunded' then
+      raise exception 'paid reembolsado no Asaas não virou refunded: %', v_settle;
+    end if;
+    select count(*) into v_debits
+    from public.ledger_entries
+    where payment_charge_id = 'cc611111-1111-4111-8111-111111111111'
+      and direction = 'debit'
+      and kind in ('house_refund', 'commission_refund');
+    if v_debits <> 2 then
+      raise exception 'ledger do pago não foi revertido: %', v_debits;
+    end if;
+    raise exception 'ok_paid';
+  exception
+    when others then
+      if sqlerrm is distinct from 'ok_paid' then
+        raise;
+      end if;
+  end;
 
   begin
     update public.payment_charges
@@ -316,6 +390,18 @@ begin
     where elem ? 'external_reference'
   ) then
     raise exception 'órfão levou externalReference da cobrança atual';
+  end if;
+  select elem->>'claimed_at' into v_claimed
+  from jsonb_array_elements(v_work->'orphans') elem
+  where elem->>'provider_ref' = 'pay_orfao_cc';
+  if v_claimed is null then
+    raise exception 'claim do órfão não devolveu claimed_at';
+  end if;
+  if not public.confirm_orphan_claim(v_orphan, v_claimed::timestamptz) then
+    raise exception 'confirm do órfão vigente falhou';
+  end if;
+  if public.confirm_orphan_claim(v_orphan, v_claimed::timestamptz) then
+    raise exception 'claimed_at antigo ainda confirma o órfão';
   end if;
   if not public.mark_orphan_resolved(v_orphan) then
     raise exception 'órfão não foi marcado';

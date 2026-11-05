@@ -1,5 +1,12 @@
 import { AsaasProvider } from "./asaas_provider.ts";
-import { lostAttemptCompensation } from "./pix_charge.ts";
+import { lostAttemptCompensation, pixLeaseMs } from "./pix_charge.ts";
+
+/// Cada chamada ao Asaas cabe várias vezes dentro do lease de 2 minutos.
+export const reconcileAsaasTimeoutMs = 8_000;
+
+if (reconcileAsaasTimeoutMs * 4 >= pixLeaseMs) {
+  throw new Error("timeout do Asaas perto do lease");
+}
 
 type CreatingRow = {
   charge_id: string;
@@ -14,7 +21,11 @@ type OrphanRow = {
   charge_id: string | null;
   attempt_id: string | null;
   billing_type: string;
+  claimed_at: string | null;
 };
+
+type Gate = "owned" | "lost" | "error";
+type RemoteOutcome = "gone" | "failed" | "lost";
 
 type RemotePayment = {
   id: string;
@@ -50,19 +61,26 @@ async function reconcileCreating(
   asaas: AsaasProvider,
   row: CreatingRow,
 ): Promise<boolean> {
-  const remote = row.external_reference
-    ? await asaas.findByExternalReference(row.external_reference)
-    : null;
+  let remote: RemotePayment | null = null;
+  try {
+    remote = row.external_reference
+      ? await asaas.findByExternalReference(row.external_reference)
+      : null;
+  } catch (_error) {
+    return false;
+  }
   if (!remote) {
     return await releaseClaim(admin, row);
   }
-  const gone = await releaseRemote(
+  const outcome = await releaseRemote(
     asaas,
     remote.id,
     remote.status,
     remote.billingType || row.billing_type,
+    () => confirmCreating(admin, row),
   );
-  if (!gone) {
+  if (outcome === "lost") return true;
+  if (outcome === "failed") {
     const action = lostAttemptCompensation(remote.status);
     await admin.rpc("record_orphan_payment", {
       p_provider_ref: remote.id,
@@ -97,13 +115,14 @@ async function reconcileOrphan(
       : "cancelled";
     return await finishOrphan(admin, row, next);
   }
-  const gone = await releaseRemote(
+  const outcome = await releaseRemote(
     asaas,
     row.provider_ref,
     remote.status,
     remote.billingType || row.billing_type,
+    () => confirmOrphan(admin, row),
   );
-  if (!gone) return false;
+  if (outcome !== "gone") return false;
   return await finishOrphan(
     admin,
     row,
@@ -116,19 +135,43 @@ async function releaseRemote(
   paymentId: string,
   status: string,
   billingType: string,
-): Promise<boolean> {
+  confirm: () => Promise<Gate>,
+): Promise<RemoteOutcome> {
   const action = lostAttemptCompensation(status);
-  if (action === "none") return true;
+  if (action === "none") return "gone";
+  const gate = await confirm();
+  if (gate !== "owned") return gate === "lost" ? "lost" : "failed";
   try {
     if (billingType === "PIX" && action === "cancel") {
-      return await asaas.cancelPaymentConfirmed(paymentId);
+      const gone = await asaas.cancelPaymentConfirmed(paymentId);
+      return gone ? "gone" : "failed";
     }
     if (action === "refund") await asaas.refund(paymentId);
     else await asaas.cancelAuthorization(paymentId);
-    return true;
+    return "gone";
   } catch (_error) {
-    return false;
+    return "failed";
   }
+}
+
+async function confirmCreating(admin: Admin, row: CreatingRow): Promise<Gate> {
+  if (!row.attempt_id) return "lost";
+  const { data, error } = await admin.rpc("confirm_reconcile_claim", {
+    p_charge_id: row.charge_id,
+    p_attempt_id: row.attempt_id,
+  });
+  if (error) return "error";
+  return data === true ? "owned" : "lost";
+}
+
+async function confirmOrphan(admin: Admin, row: OrphanRow): Promise<Gate> {
+  if (!row.claimed_at) return "lost";
+  const { data, error } = await admin.rpc("confirm_orphan_claim", {
+    p_id: row.id,
+    p_claimed_at: row.claimed_at,
+  });
+  if (error) return "error";
+  return data === true ? "owned" : "lost";
 }
 
 /// A transição só vale para este attempt e este provider_ref. Erro ou

@@ -33,7 +33,7 @@ begin
         or c.reserved_at < pg_catalog.now() - interval '2 minutes'
       )
     order by c.reserved_at nulls first, c.id
-    limit 50
+    limit 10
     for update skip locked
   ),
   updated as (
@@ -75,7 +75,7 @@ begin
         or o.claimed_at < pg_catalog.now() - interval '2 minutes'
       )
     order by o.created_at, o.id
-    limit 50
+    limit 10
     for update skip locked
   ),
   updated as (
@@ -88,14 +88,16 @@ begin
       orphan.provider_ref,
       orphan.charge_id,
       orphan.attempt_id,
-      orphan.billing_type
+      orphan.billing_type,
+      orphan.claimed_at
   )
   select coalesce(jsonb_agg(jsonb_build_object(
     'id', updated.id,
     'provider_ref', updated.provider_ref,
     'charge_id', updated.charge_id,
     'attempt_id', updated.attempt_id,
-    'billing_type', updated.billing_type
+    'billing_type', updated.billing_type,
+    'claimed_at', updated.claimed_at
   )), '[]'::jsonb)
   into v_orphans
   from updated;
@@ -128,8 +130,34 @@ begin
   from public.payment_charges
   where id = p_charge_id
   for update;
-  if v_charge.id is null
-    or v_charge.provider_ref is distinct from p_provider_ref
+  if v_charge.id is null then
+    return pg_catalog.jsonb_build_object('applied', false, 'skipped', true);
+  end if;
+  if v_charge.status = 'paid' then
+    if p_next_status = 'refunded'
+      and v_charge.provider_ref is not distinct from p_provider_ref
+      and v_charge.attempt_id is not distinct from p_attempt_id then
+      v_result := private.apply_payment_transition(
+        p_charge_id,
+        'refunded',
+        false
+      );
+      if coalesce(v_result ->> 'status', '') is distinct from 'refunded' then
+        return pg_catalog.jsonb_build_object(
+          'applied', false,
+          'skipped', false,
+          'status', v_result ->> 'status'
+        );
+      end if;
+      return v_result || pg_catalog.jsonb_build_object('skipped', false);
+    end if;
+    return pg_catalog.jsonb_build_object(
+      'applied', false,
+      'skipped', false,
+      'status', v_charge.status
+    );
+  end if;
+  if v_charge.provider_ref is distinct from p_provider_ref
     or v_charge.status not in ('creating', 'authorized') then
     return pg_catalog.jsonb_build_object('applied', false, 'skipped', true);
   end if;
@@ -153,6 +181,56 @@ begin
     );
   end if;
   return v_result || pg_catalog.jsonb_build_object('skipped', false);
+end;
+$$;
+
+-- Renova o lease só se este worker ainda for o dono do attempt.
+-- Sem linha, a ação no Asaas não acontece.
+create or replace function private.confirm_reconcile_claim(
+  p_charge_id uuid,
+  p_attempt_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  update public.payment_charges
+  set reserved_at = pg_catalog.now()
+  where id = p_charge_id
+    and attempt_id = p_attempt_id
+    and status = 'creating'
+    and provider_ref is null
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
+-- O claimed_at devolvido no claim é o token. Outro worker que já
+-- renovou não deixa este confirmar.
+create or replace function private.confirm_orphan_claim(
+  p_id uuid,
+  p_claimed_at timestamptz
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  -- now() não muda na transação; o token precisa avançar a cada confirm.
+  update private.orphan_payments
+  set claimed_at = pg_catalog.clock_timestamp()
+  where id = p_id
+    and claimed_at = p_claimed_at
+    and resolved_at is null
+  returning id into v_id;
+  return v_id is not null;
 end;
 $$;
 
@@ -203,6 +281,10 @@ $$;
 
 revoke all on function private.claim_payment_reconciliation()
   from public, anon, authenticated;
+revoke all on function private.confirm_reconcile_claim(uuid, uuid)
+  from public, anon, authenticated;
+revoke all on function private.confirm_orphan_claim(uuid, timestamptz)
+  from public, anon, authenticated;
 revoke all on function private.settle_orphan_charge(uuid, uuid, text, text)
   from public, anon, authenticated;
 revoke all on function private.mark_orphan_resolved(uuid)
@@ -210,6 +292,10 @@ revoke all on function private.mark_orphan_resolved(uuid)
 revoke all on function private.delete_compensated_charge(uuid, uuid, text)
   from public, anon, authenticated;
 grant execute on function private.claim_payment_reconciliation() to service_role;
+grant execute on function private.confirm_reconcile_claim(uuid, uuid)
+  to service_role;
+grant execute on function private.confirm_orphan_claim(uuid, timestamptz)
+  to service_role;
 grant execute on function private.settle_orphan_charge(uuid, uuid, text, text)
   to service_role;
 grant execute on function private.mark_orphan_resolved(uuid) to service_role;
@@ -224,6 +310,32 @@ security invoker
 set search_path = ''
 as $$
   select private.claim_payment_reconciliation();
+$$;
+
+create or replace function public.confirm_reconcile_claim(
+  p_charge_id uuid,
+  p_attempt_id uuid
+)
+returns boolean
+language sql
+volatile
+security invoker
+set search_path = ''
+as $$
+  select private.confirm_reconcile_claim(p_charge_id, p_attempt_id);
+$$;
+
+create or replace function public.confirm_orphan_claim(
+  p_id uuid,
+  p_claimed_at timestamptz
+)
+returns boolean
+language sql
+volatile
+security invoker
+set search_path = ''
+as $$
+  select private.confirm_orphan_claim(p_id, p_claimed_at);
 $$;
 
 create or replace function public.settle_orphan_charge(
@@ -269,6 +381,10 @@ $$;
 
 revoke all on function public.claim_payment_reconciliation()
   from public, anon, authenticated;
+revoke all on function public.confirm_reconcile_claim(uuid, uuid)
+  from public, anon, authenticated;
+revoke all on function public.confirm_orphan_claim(uuid, timestamptz)
+  from public, anon, authenticated;
 revoke all on function public.settle_orphan_charge(uuid, uuid, text, text)
   from public, anon, authenticated;
 revoke all on function public.mark_orphan_resolved(uuid)
@@ -276,6 +392,10 @@ revoke all on function public.mark_orphan_resolved(uuid)
 revoke all on function public.delete_compensated_charge(uuid, uuid, text)
   from public, anon, authenticated;
 grant execute on function public.claim_payment_reconciliation() to service_role;
+grant execute on function public.confirm_reconcile_claim(uuid, uuid)
+  to service_role;
+grant execute on function public.confirm_orphan_claim(uuid, timestamptz)
+  to service_role;
 grant execute on function public.settle_orphan_charge(uuid, uuid, text, text)
   to service_role;
 grant execute on function public.mark_orphan_resolved(uuid) to service_role;

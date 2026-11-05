@@ -214,5 +214,83 @@ if [[ "$released" != "f" || "$attempt" == "ee711111-1111-4111-8111-111111111111"
   exit 1
 fi
 
+psqlq -f - <<'SQL'
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  'ee121111-1111-4111-8111-111111111111',
+  'sessao-retomada@example.com',
+  '{"display_name":"Retomada"}'
+);
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  provider_ref, idempotency_key, commission_bps, reserved_at, attempt_id
+) values (
+  'ee811111-1111-4111-8111-111111111111',
+  'dd511111-1111-4111-8111-111111111111',
+  'ee121111-1111-4111-8111-111111111111',
+  'dd211111-1111-4111-8111-111111111111',
+  10000,
+  'PIX',
+  'creating',
+  null,
+  'idem-sessao-retomada',
+  1000,
+  now() - interval '5 minutes',
+  'ee911111-1111-4111-8111-111111111111'
+);
+SQL
+
+psqlq -f - <<'SQL'
+do $$
+declare
+  v_work jsonb;
+  v_owned uuid;
+  v_resumed uuid;
+  v_attached text;
+  v_provider text;
+begin
+  v_work := public.claim_payment_reconciliation();
+  select (elem->>'attempt_id')::uuid into v_owned
+  from jsonb_array_elements(v_work->'creating') elem
+  where elem->>'charge_id' = 'ee811111-1111-4111-8111-111111111111';
+  if v_owned is null then
+    raise exception 'claim não devolveu a reserva da retomada';
+  end if;
+
+  update public.payment_charges
+  set reserved_at = pg_catalog.now() - interval '5 minutes'
+  where id = 'ee811111-1111-4111-8111-111111111111'
+    and attempt_id = v_owned;
+
+  v_resumed := public.claim_expired_pix_reservation(
+    'ee811111-1111-4111-8111-111111111111'
+  );
+  if v_resumed is null or v_resumed = v_owned then
+    raise exception 'usuário não retomou a reserva vencida';
+  end if;
+  v_attached := public.attach_pix_provider(
+    'ee811111-1111-4111-8111-111111111111',
+    'pay_retomado',
+    v_resumed
+  );
+  if v_attached is distinct from 'pay_retomado' then
+    raise exception 'vínculo do usuário falhou: %', v_attached;
+  end if;
+  if public.confirm_reconcile_claim(
+    'ee811111-1111-4111-8111-111111111111',
+    v_owned
+  ) then
+    raise exception 'reconciliador vencido ainda confirmou o claim';
+  end if;
+  select provider_ref into v_provider
+  from public.payment_charges
+  where id = 'ee811111-1111-4111-8111-111111111111';
+  if v_provider is distinct from 'pay_retomado' then
+    raise exception 'confirm mexeu no pagamento do usuário: %', v_provider;
+  end if;
+end $$;
+SQL
+
 rm -rf "$tmpdir"
 echo "payment sessions ok"
