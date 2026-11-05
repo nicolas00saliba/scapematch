@@ -1,7 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { AsaasProvider } from "./asaas_provider.ts";
 import { cancelInvoicesForCharge } from "./issue_invoices.ts";
-import { reverseLedger, type ChargeRow } from "./ledger.ts";
+import {
+  applyPaymentTransition,
+  type ChargeRow,
+  reverseLedger,
+} from "./ledger.ts";
 
 type Admin = ReturnType<typeof createClient>;
 
@@ -29,19 +33,17 @@ export async function releaseCancelledCharges(
   for (const charge of charges ?? []) {
     const row = charge as Charge;
     if (!row.provider_ref) continue;
-    if (row.status === "refunded" || row.status === "cancelled" || row.status === "failed") {
+    if (
+      row.status === "refunded" || row.status === "cancelled" ||
+      row.status === "failed"
+    ) {
       continue;
     }
     try {
       if (row.status === "paid") {
         await asaas.refund(row.provider_ref);
-        const now = new Date().toISOString();
-        await admin.from("payment_charges").update({
-          status: "refunded",
-          refunded_at: now,
-        }).eq("id", row.id);
-        await markMember(admin, groupId, row.user_id, "refunded");
         await reverseLedger(admin, row);
+        await markMember(admin, groupId, row.user_id, "refunded");
         await cancelInvoicesForCharge(admin, row.id, {
           sandbox: asaas.sandbox,
           asaas,
@@ -49,9 +51,16 @@ export async function releaseCancelledCharges(
         continue;
       }
       await asaas.cancelAuthorization(row.provider_ref);
-      await admin.from("payment_charges").update({
-        status: "cancelled",
-      }).eq("id", row.id);
+      const cancelled = await applyPaymentTransition(
+        admin,
+        row.id,
+        "cancelled",
+        false,
+      );
+      if (cancelled.status !== "cancelled") {
+        stillPending.push(row.id);
+        continue;
+      }
       await markMember(admin, groupId, row.user_id, "none");
     } catch (_error) {
       stillPending.push(row.id);

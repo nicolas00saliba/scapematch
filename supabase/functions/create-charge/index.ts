@@ -1,10 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
-import { AsaasProvider, houseSplitPercent } from "../_shared/asaas_provider.ts";
+import {
+  AsaasProvider,
+  houseSplitPercent,
+  PixReservationLost,
+  PixReuseRejected,
+} from "../_shared/asaas_provider.ts";
+import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
+import { applyPaymentTransition } from "../_shared/ledger.ts";
 import {
   localChargeStatus,
   pixExternalReference,
-  pixNeedsQr,
+  pixMatchesCharge,
+  pixReservationAction,
 } from "../_shared/pix_charge.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
@@ -98,20 +106,11 @@ Deno.serve(async (req) => {
       .eq("group_id", groupId)
       .eq("user_id", user.id)
       .maybeSingle();
-    const refreshQr = Boolean(
-      existing && pixNeedsQr({
-        status: existing.status,
-        billing_type: existing.billing_type,
-        provider_ref: existing.provider_ref,
-        qr_code: existing.qr_code,
-      }),
-    );
     if (
       existing &&
-      !refreshQr &&
+      existing.billing_type !== "PIX" &&
       !["failed", "cancelled", "refunded"].includes(existing.status) &&
-      (existing.provider_ref || existing.qr_code ||
-        existing.billing_type !== "PIX")
+      existing.provider_ref
     ) {
       return json({
         charge_id: existing.id,
@@ -134,28 +133,6 @@ Deno.serve(async (req) => {
     }
 
     const asaas = AsaasProvider.fromEnv(Deno.env);
-    if (refreshQr && existing?.provider_ref) {
-      const qr = await asaas.getPixQrCode(existing.provider_ref);
-      const { error: qrError } = await admin.from("payment_charges").update({
-        qr_code: qr.payload,
-        qr_code_base64: qr.encodedImage,
-      }).eq("id", existing.id);
-      if (qrError) return json({ error: publicError("erro") }, 400);
-      if (existing.status === "pending") {
-        await admin.from("group_members").update({ payment_status: "pending" })
-          .eq("id", member.id);
-      }
-      return json({
-        charge_id: existing.id,
-        status: existing.status,
-        provider_ref: existing.provider_ref,
-        qr_code: qr.payload,
-        qr_code_base64: qr.encodedImage,
-        billing_type: existing.billing_type,
-        amount_cents: existing.amount_cents,
-      });
-    }
-
     const commissionBps = await commissionBpsForVenue(
       admin,
       venue.id as string,
@@ -198,42 +175,108 @@ Deno.serve(async (req) => {
     let savedId = "";
 
     if (billingType === "PIX") {
-      const pix = await asaas.createPix({
-        customer: customerId,
-        value: amountCents / 100,
-        dueDate,
-        description,
-        externalReference: pixExternalReference(groupId, user.id),
-        split,
-        onCreated: async (payment) => {
-          providerRef = payment.id;
-          savedId = await persistPixCharge(admin, {
-            existingId: existing?.id,
-            groupId,
-            userId: user.id,
-            venueId: venue.id as string,
-            amountCents,
-            providerRef: payment.id,
-            asaasStatus: payment.status,
-            idempotencyKey,
-            walletId: venue.asaas_wallet_id as string,
-            commissionBps,
-          });
-        },
+      const reserved = await reservePixCharge(admin, {
+        groupId,
+        userId: user.id,
+        venueId: venue.id as string,
+        amountCents,
+        idempotencyKey,
+        walletId: venue.asaas_wallet_id as string,
+        commissionBps,
       });
-      providerRef = pix.id;
-      status = localChargeStatus(pix.status);
-      qrCode = pix.payload || null;
-      qrImage = pix.encodedImage || null;
-      if (!savedId) throw new Error("erro");
-      const qrSaved = await admin.from("payment_charges").update({
-        qr_code: qrCode,
-        qr_code_base64: qrImage,
-        provider_ref: providerRef,
-        status,
-        paid_at: status === "paid" ? new Date().toISOString() : null,
-      }).eq("id", savedId);
-      if (qrSaved.error) return json({ error: publicError("erro") }, 400);
+      const action = pixReservationAction({
+        inserted: reserved.inserted,
+        providerRef: reserved.provider_ref,
+        billingType: reserved.billing_type,
+      });
+      if (action === "refuse") {
+        return json({ error: "pix_reuse_mismatch" }, 409);
+      }
+      if (action === "busy") {
+        return json({ error: "pagamento em andamento" }, 409);
+      }
+      savedId = reserved.id;
+      const mayCredit = await groupClosedForCredit(admin, group);
+      const expected = {
+        customer: customerId,
+        valueCents: amountCents,
+        walletId: split.walletId,
+        percentualValue: split.percentualValue,
+      };
+      if (action === "reuse" && reserved.provider_ref) {
+        const full = await asaas.readPayment(reserved.provider_ref);
+        if (!pixMatchesCharge(full, expected)) {
+          return json({ error: "pix_reuse_mismatch" }, 409);
+        }
+        const confirmed = confirmedChargeStatus(String(full.status ?? ""));
+        if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
+        const transition = await applyPaymentTransition(
+          admin,
+          reserved.id,
+          confirmed,
+          mayCredit && confirmed === "paid",
+        );
+        status = transition.status;
+        providerRef = reserved.provider_ref;
+        if (status === "pending" && !existing?.qr_code) {
+          const qr = await asaas.getPixQrCode(providerRef);
+          qrCode = qr.payload;
+          qrImage = qr.encodedImage;
+          const qrSaved = await admin.from("payment_charges").update({
+            qr_code: qrCode,
+            qr_code_base64: qrImage,
+          }).eq("id", savedId);
+          if (qrSaved.error) return json({ error: publicError("erro") }, 400);
+        } else {
+          qrCode = existing?.qr_code ?? null;
+          qrImage = existing?.qr_code_base64 ?? null;
+        }
+      } else {
+        try {
+          const pix = await asaas.createPix({
+            customer: customerId,
+            value: amountCents / 100,
+            dueDate,
+            description,
+            externalReference: pixExternalReference(groupId, user.id),
+            split,
+            onCreated: async (payment) => {
+              const stored = await attachPixProvider(
+                admin,
+                reserved.id,
+                payment.id,
+              );
+              if (!stored || stored !== payment.id) {
+                throw new PixReservationLost(payment.id);
+              }
+              const next = localChargeStatus(payment.status);
+              await applyPaymentTransition(
+                admin,
+                reserved.id,
+                next,
+                mayCredit && next === "paid",
+              );
+            },
+          });
+          providerRef = pix.id;
+          status = localChargeStatus(pix.status);
+          qrCode = pix.payload || null;
+          qrImage = pix.encodedImage || null;
+          const qrSaved = await admin.from("payment_charges").update({
+            qr_code: qrCode,
+            qr_code_base64: qrImage,
+          }).eq("id", savedId);
+          if (qrSaved.error) return json({ error: publicError("erro") }, 400);
+        } catch (error) {
+          if (error instanceof PixReservationLost) {
+            return json({ error: "pagamento em andamento" }, 409);
+          }
+          if (error instanceof PixReuseRejected) {
+            return json({ error: "pix_reuse_mismatch" }, 409);
+          }
+          throw error;
+        }
+      }
     } else {
       const remoteIp = clientIp(req) ?? undefined;
       const savedCardId = requestedSavedCardId(body);
@@ -332,7 +375,7 @@ type ChargeDb = {
   rpc(
     name: string,
     args: Record<string, unknown>,
-  ): PromiseLike<{ data: unknown; error: unknown }>;
+  ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
 };
 
 function findOwnedCard(
@@ -344,69 +387,79 @@ function findOwnedCard(
   return loadOwnedCard(admin, userId, customerId, cardId);
 }
 
-async function persistPixCharge(
+type ReservedPix = {
+  id: string;
+  status: string;
+  provider_ref: string | null;
+  billing_type: string;
+  amount_cents: number;
+  inserted: boolean;
+};
+
+async function reservePixCharge(
   admin: ChargeDb,
   input: {
-    existingId?: string;
     groupId: string;
     userId: string;
     venueId: string;
     amountCents: number;
-    providerRef: string;
-    asaasStatus: string;
     idempotencyKey: string;
     walletId: string;
     commissionBps: number;
   },
-): Promise<string> {
-  const status = localChargeStatus(input.asaasStatus);
-  const row = {
-    group_id: input.groupId,
-    user_id: input.userId,
-    venue_id: input.venueId,
-    amount_cents: input.amountCents,
-    billing_type: "PIX",
-    status,
-    provider: "asaas",
-    provider_ref: input.providerRef,
-    qr_code: null,
-    qr_code_base64: null,
-    idempotency_key: input.idempotencyKey,
-    wallet_id: input.walletId,
-    commission_bps: input.commissionBps,
-    paid_at: status === "paid" ? new Date().toISOString() : null,
-    refunded_at: null,
+): Promise<ReservedPix> {
+  const { data, error } = await admin.rpc("reserve_pix_charge", {
+    p_group_id: input.groupId,
+    p_user_id: input.userId,
+    p_venue_id: input.venueId,
+    p_amount_cents: input.amountCents,
+    p_idempotency_key: input.idempotencyKey,
+    p_wallet_id: input.walletId,
+    p_commission_bps: input.commissionBps,
+  });
+  if (error || !data || typeof data !== "object") throw new Error("erro");
+  const row = data as Record<string, unknown>;
+  const id = typeof row.id === "string" ? row.id : "";
+  if (!id) throw new Error("erro");
+  return {
+    id,
+    status: typeof row.status === "string" ? row.status : "",
+    provider_ref: typeof row.provider_ref === "string"
+      ? row.provider_ref
+      : null,
+    billing_type: typeof row.billing_type === "string" ? row.billing_type : "",
+    amount_cents: typeof row.amount_cents === "number" ? row.amount_cents : 0,
+    inserted: row.inserted === true,
   };
-  if (input.existingId) {
-    const updated = await admin.from("payment_charges").update(row).eq(
-      "id",
-      input.existingId,
-    );
-    if (updated.error) throw new Error("erro");
-    return input.existingId;
-  }
-  const inserted = await admin.from("payment_charges").insert(row).select("id")
-    .single();
-  if (!inserted.error && inserted.data?.id) return inserted.data.id as string;
-  if (inserted.error?.code !== "23505") throw new Error("erro");
-  const found = await admin.from("payment_charges").select("id").eq(
-    "group_id",
-    input.groupId,
-  ).eq("user_id", input.userId).maybeSingle();
-  if (!found.data?.id) throw new Error("erro");
-  const id = found.data.id as string;
-  const updated = await admin.from("payment_charges").update({
-    provider_ref: input.providerRef,
-    status,
-    billing_type: "PIX",
-    provider: "asaas",
-    qr_code: null,
-    qr_code_base64: null,
-    paid_at: status === "paid" ? new Date().toISOString() : null,
-    refunded_at: null,
-  }).eq("id", id);
-  if (updated.error) throw new Error("erro");
-  return id;
+}
+
+async function attachPixProvider(
+  admin: ChargeDb,
+  chargeId: string,
+  providerRef: string,
+): Promise<string | null> {
+  const { data, error } = await admin.rpc("attach_pix_provider", {
+    p_charge_id: chargeId,
+    p_provider_ref: providerRef,
+  });
+  if (error) throw new Error("erro");
+  return typeof data === "string" && data.length > 0 ? data : null;
+}
+
+async function groupClosedForCredit(
+  admin: ChargeDb,
+  group: {
+    id: string;
+    cancelled_at: string | null;
+    closed_at: string | null;
+    total_spots: number;
+    minimum_spots: number;
+  },
+): Promise<boolean> {
+  if (group.cancelled_at) return false;
+  const filled = await filledSpots(admin, group.id);
+  const closed = Boolean(group.closed_at) || filled >= group.total_spots;
+  return closed && filled >= group.minimum_spots;
 }
 
 async function filledSpots(

@@ -1,5 +1,5 @@
-import { assertEquals } from "jsr:@std/assert@1";
-import { reverseLedger } from "./ledger.ts";
+import { assertEquals, assertRejects } from "jsr:@std/assert@1";
+import { creditLedger, reverseLedger } from "./ledger.ts";
 
 const charge = {
   id: "ch-1",
@@ -10,114 +10,56 @@ const charge = {
   commission_bps: 1000,
 };
 
-Deno.test("reverseLedger emite um débito por crédito e segue após 23505", async () => {
-  const kinds: string[] = [];
-  let upserts = 0;
-  const admin = {
-    from() {
-      return {
-        select() {
-          const filters: Record<string, string> = {};
-          const builder = {
-            eq(column: string, value: string) {
-              filters[column] = value;
-              return builder;
-            },
-            limit() {
-              return builder;
-            },
-            maybeSingle() {
-              return Promise.resolve({ data: null });
-            },
-            then(
-              resolve: (value: unknown) => unknown,
-              reject?: (reason: unknown) => unknown,
-            ) {
-              const data = filters.direction === "credit"
-                ? [
-                  {
-                    account: "platform",
-                    kind: "commission",
-                    amount_cents: 100,
-                  },
-                  { account: "house", kind: "house_net", amount_cents: 900 },
-                ]
-                : [];
-              return Promise.resolve({ data }).then(resolve, reject);
-            },
-          };
-          return builder;
+Deno.test("reverseLedger pede refunded na mesma transação", async () => {
+  let name = "";
+  let args: unknown;
+  await reverseLedger({
+    rpc(fn, payload) {
+      name = fn;
+      args = payload;
+      return Promise.resolve({
+        data: {
+          applied: true,
+          status: "refunded",
+          paid_at: "2026-11-05T12:00:00.000Z",
+          refunded_at: "2026-11-05T18:00:00.000Z",
         },
-        upsert(
-          row: { kind: string; direction: string },
-          options: { onConflict: string; ignoreDuplicates: boolean },
-        ) {
-          upserts += 1;
-          kinds.push(row.kind);
-          assertEquals(row.direction, "debit");
-          assertEquals(options.ignoreDuplicates, true);
-          assertEquals(options.onConflict, "payment_charge_id,kind,direction");
-          const error = upserts === 1
-            ? { code: "23505", message: "duplicate key" }
-            : null;
-          return Promise.resolve({ error });
-        },
-        insert() {
-          throw new Error("insert direto");
-        },
-      };
+        error: null,
+      });
     },
-  };
-  await reverseLedger(admin, charge);
-  assertEquals(kinds, ["commission_refund", "house_refund"]);
+  }, charge);
+  assertEquals(name, "apply_payment_transition");
+  assertEquals(args, {
+    p_charge_id: "ch-1",
+    p_next_status: "refunded",
+    p_credit: false,
+  });
 });
 
-Deno.test("reverseLedger não relança estorno que já existe", async () => {
-  const kinds: string[] = [];
-  const admin = {
-    from() {
-      return {
-        select() {
-          const filters: Record<string, string> = {};
-          const builder = {
-            eq(column: string, value: string) {
-              filters[column] = value;
-              return builder;
-            },
-            limit() {
-              return builder;
-            },
-            maybeSingle() {
-              const exists = filters.kind === "commission_refund";
-              return Promise.resolve({
-                data: exists ? { id: "line-1" } : null,
-              });
-            },
-            then(
-              resolve: (value: unknown) => unknown,
-              reject?: (reason: unknown) => unknown,
-            ) {
-              return Promise.resolve({
-                data: [{
-                  account: "platform",
-                  kind: "commission",
-                  amount_cents: 100,
-                }],
-              }).then(resolve, reject);
-            },
-          };
-          return builder;
-        },
-        upsert(row: { kind: string }) {
-          kinds.push(row.kind);
-          return Promise.resolve({ error: null });
-        },
-        insert() {
-          throw new Error("insert direto");
-        },
-      };
-    },
+Deno.test("erro de escrita do ledger é lançado sem a mensagem do banco", async () => {
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
   };
-  await reverseLedger(admin, charge);
-  assertEquals(kinds, []);
+  const email = "dono@casa.com";
+  try {
+    await assertRejects(
+      () =>
+        creditLedger({
+          rpc() {
+            return Promise.resolve({
+              data: null,
+              error: { code: "23503", message: `fk ${email}` },
+            });
+          },
+        }, charge),
+      Error,
+      "ledger_write_failed",
+    );
+  } finally {
+    console.error = original;
+  }
+  assertEquals(JSON.parse(logs[0]), { scope: "ledger", code: "23503" });
+  assertEquals(logs[0].includes(email), false);
 });

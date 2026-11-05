@@ -32,7 +32,7 @@ Deno.test("falha do Asaas vira código estável e o log não leva o corpo", () =
   assert(joined.includes('"status":"400"'));
 });
 
-Deno.test("o log do Asaas leva code e description sem e-mail nem chave", () => {
+Deno.test("o log do Asaas leva só status e código da allowlist", () => {
   const logs: string[] = [];
   const original = console.error;
   console.error = (...args: unknown[]) => {
@@ -52,11 +52,35 @@ Deno.test("o log do Asaas leva code e description sem e-mail nem chave", () => {
     console.error = original;
   }
   const parsed = JSON.parse(logs[0]);
-  assertEquals(parsed.errors[0].code, "invalid_object");
-  assert(parsed.errors[0].description.includes("Já existe"));
-  assertEquals(parsed.errors[0].description.includes(email), false);
+  assertEquals(parsed.errors, [{ code: "invalid_object" }]);
+  assertEquals("description" in parsed.errors[0], false);
+  assertEquals(logs[0].includes("Já existe"), false);
   assertEquals(logs[0].includes(email), false);
   assertEquals(logs[0].includes(key), false);
+});
+
+Deno.test("código fora da allowlist não entra no log", () => {
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  const leaked = "dono@casa.com";
+  try {
+    logAsaasFailure(
+      "provision-venue-wallet",
+      new Error(`Asaas 400: ${
+        JSON.stringify({
+          errors: [{ code: leaked, description: "segredo livre" }],
+        })
+      }`),
+    );
+  } finally {
+    console.error = original;
+  }
+  assertEquals(JSON.parse(logs[0]).errors, [{ code: "unlisted" }]);
+  assertEquals(logs[0].includes(leaked), false);
+  assertEquals(logs[0].includes("segredo"), false);
 });
 
 Deno.test("as funções não devolvem error.message do Asaas", async () => {

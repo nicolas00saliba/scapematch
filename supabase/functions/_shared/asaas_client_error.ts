@@ -11,6 +11,20 @@ export function isAsaasFailure(error: unknown): boolean {
 }
 
 const asaasErrorCode = /^[A-Za-z0-9_.:-]{1,80}$/;
+
+/// Só estes códigos entram no log. O resto vira "unlisted".
+const asaasCodeAllowlist = new Set([
+  "invalid_action",
+  "invalid_billingType",
+  "invalid_cpfCnpj",
+  "invalid_creditCard",
+  "invalid_customer",
+  "invalid_dueDate",
+  "invalid_email",
+  "invalid_externalReference",
+  "invalid_object",
+  "invalid_value",
+]);
 const emailInText = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const asaasKeyInText = /\$?aact_[A-Za-z0-9_]+/g;
 
@@ -78,12 +92,11 @@ export function isDuplicateSubaccountEmail(error: unknown): boolean {
   });
 }
 
-/// Log com status e `errors[].code` / descrição já limpos. Sem corpo cru.
+/// Log só com status HTTP e código da allowlist. Sem description.
 export function logAsaasFailure(scope: string, error: unknown): void {
   const status = asaasStatus(error);
   const errors = asaasErrorItems(error).map((item) => ({
-    code: item.code,
-    description: item.description,
+    code: asaasCodeAllowlist.has(item.code) ? item.code : "unlisted",
   }));
   const line = JSON.stringify({
     scope,

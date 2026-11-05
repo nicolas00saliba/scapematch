@@ -1,29 +1,395 @@
--- Estorno duplicado: cancel-house-group e o webhook PAYMENT_REFUNDED
--- chamam reverseLedger ao mesmo tempo. O índice único de crédito
--- (payment_charge_id, kind) WHERE direction = 'credit' não cobre o débito.
---
--- Kinds permitidos: house_net e commission só entram como credit;
--- house_refund e commission_refund só entram como debit. Uma linha por
--- (payment_charge_id, kind, direction) vale para todos. Índice parcial só
--- nos estornos não serve de alvo do ON CONFLICT do PostgREST, que não
--- manda o predicado. payment_charge_id nulo não colide com outro nulo.
---
+-- Transição da cobrança e livro-razão na mesma transação, mais a reserva do Pix.
 -- Não aplicada no projeto remoto.
+--
+-- CREATE UNIQUE INDEX sem CONCURRENTLY (a migração roda dentro de uma
+-- transação, e CONCURRENTLY não pode) toma um lock que impede escritas em
+-- ledger_entries até o índice ficar pronto. No volume atual isso é aceitável.
+--
+-- Se já existir duplicata em (payment_charge_id, kind, direction), a migração
+-- falha de propósito. Não apaga linha nenhuma.
 
-with ranked as (
-  select
-    id,
-    row_number() over (
-      partition by payment_charge_id, kind, direction
-      order by created_at asc, id asc
-    ) as rn
-  from public.ledger_entries
-  where payment_charge_id is not null
-)
-delete from public.ledger_entries as entries
-using ranked
-where entries.id = ranked.id
-  and ranked.rn > 1;
+do $guard$
+declare
+  v_dup bigint;
+begin
+  select count(*) into v_dup
+  from (
+    select 1
+    from public.ledger_entries
+    where payment_charge_id is not null
+    group by payment_charge_id, kind, direction
+    having count(*) > 1
+  ) as dups;
+  if v_dup > 0 then
+    raise exception
+      'ledger_entries tem duplicatas em (payment_charge_id, kind, direction); resolva antes de criar o índice único'
+      using errcode = '23505';
+  end if;
+end
+$guard$;
 
 create unique index if not exists ledger_entries_charge_kind_direction_uidx
   on public.ledger_entries (payment_charge_id, kind, direction);
+
+alter table public.payment_charges
+  drop constraint if exists payment_charges_status_check;
+
+alter table public.payment_charges
+  add constraint payment_charges_status_check
+  check (
+    status in (
+      'creating',
+      'pending',
+      'authorized',
+      'paid',
+      'refunded',
+      'cancelled',
+      'failed'
+    )
+  );
+
+-- Mesma matriz de supabase/functions/_shared/charge_patch.ts.
+-- refunded, cancelled e failed não têm saída: são terminais.
+create or replace function private.payment_status_allowed(p_from text, p_to text)
+returns boolean
+language sql
+immutable
+security invoker
+set search_path = ''
+as $$
+  select p_from = p_to
+    or (
+      p_from = 'creating'
+      and p_to in (
+        'pending', 'authorized', 'paid', 'refunded', 'cancelled', 'failed'
+      )
+    )
+    or (
+      p_from = 'pending'
+      and p_to in ('authorized', 'paid', 'refunded', 'cancelled', 'failed')
+    )
+    or (
+      p_from = 'authorized'
+      and p_to in ('paid', 'refunded', 'cancelled', 'failed')
+    )
+    or (p_from = 'paid' and p_to = 'refunded');
+$$;
+
+create or replace function private.ledger_credit_charge(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_charge public.payment_charges%rowtype;
+  v_fee integer;
+  v_net integer;
+begin
+  select * into v_charge
+  from public.payment_charges
+  where id = p_charge_id;
+  if v_charge.id is null or v_charge.status <> 'paid' then
+    return;
+  end if;
+  v_fee := (v_charge.amount_cents * v_charge.commission_bps + 5000) / 10000;
+  v_net := v_charge.amount_cents - v_fee;
+  if v_net > 0 then
+    insert into public.ledger_entries (
+      venue_id, group_id, user_id, account, direction, kind,
+      amount_cents, payment_charge_id
+    ) values (
+      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+      'house', 'credit', 'house_net', v_net, v_charge.id
+    )
+    on conflict do nothing;
+  end if;
+  if v_fee > 0 then
+    insert into public.ledger_entries (
+      venue_id, group_id, user_id, account, direction, kind,
+      amount_cents, payment_charge_id
+    ) values (
+      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+      'platform', 'credit', 'commission', v_fee, v_charge.id
+    )
+    on conflict do nothing;
+  end if;
+end;
+$$;
+
+create or replace function private.ledger_reverse_charge(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id
+  )
+  select
+    credit.venue_id,
+    credit.group_id,
+    credit.user_id,
+    credit.account,
+    'debit',
+    case credit.kind
+      when 'commission' then 'commission_refund'
+      else 'house_refund'
+    end,
+    credit.amount_cents,
+    credit.payment_charge_id
+  from public.ledger_entries as credit
+  where credit.payment_charge_id = p_charge_id
+    and credit.direction = 'credit'
+  on conflict do nothing;
+end;
+$$;
+
+-- Trava a cobrança, aplica só a transição permitida e grava o livro
+-- na mesma transação. Replay de pago não reescreve paid_at (coalesce).
+-- refunded não volta para paid e não limpa refunded_at.
+create or replace function private.apply_payment_transition(
+  p_charge_id uuid,
+  p_next_status text,
+  p_credit boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_charge public.payment_charges%rowtype;
+  v_previous text;
+  v_applied boolean := false;
+begin
+  select * into v_charge
+  from public.payment_charges
+  where id = p_charge_id
+  for update;
+  if v_charge.id is null then
+    raise exception 'charge_not_found' using errcode = 'P0002';
+  end if;
+
+  v_previous := v_charge.status;
+
+  if v_previous = 'refunded' then
+    perform private.ledger_reverse_charge(v_charge.id);
+    return pg_catalog.jsonb_build_object(
+      'applied', false,
+      'status', v_charge.status,
+      'paid_at', v_charge.paid_at,
+      'refunded_at', v_charge.refunded_at
+    );
+  end if;
+
+  if not private.payment_status_allowed(v_previous, p_next_status) then
+    return pg_catalog.jsonb_build_object(
+      'applied', false,
+      'status', v_charge.status,
+      'paid_at', v_charge.paid_at,
+      'refunded_at', v_charge.refunded_at
+    );
+  end if;
+
+  if v_previous is distinct from p_next_status
+    or (p_next_status = 'paid' and v_charge.paid_at is null)
+    or (p_next_status = 'refunded' and v_charge.refunded_at is null)
+  then
+    update public.payment_charges
+    set
+      status = p_next_status,
+      paid_at = case
+        when p_next_status = 'paid' then coalesce(paid_at, pg_catalog.now())
+        else paid_at
+      end,
+      refunded_at = case
+        when p_next_status = 'refunded'
+          then coalesce(refunded_at, pg_catalog.now())
+        else refunded_at
+      end
+    where id = v_charge.id
+    returning * into v_charge;
+    v_applied := v_previous is distinct from v_charge.status;
+  end if;
+
+  if v_charge.status = 'paid' and p_credit then
+    perform private.ledger_credit_charge(v_charge.id);
+  end if;
+  if v_charge.status = 'refunded' then
+    perform private.ledger_reverse_charge(v_charge.id);
+  end if;
+
+  return pg_catalog.jsonb_build_object(
+    'applied', v_applied,
+    'status', v_charge.status,
+    'paid_at', v_charge.paid_at,
+    'refunded_at', v_charge.refunded_at
+  );
+end;
+$$;
+
+-- Reserva a linha do Pix antes do Asaas. Conflito não sobrescreve provider_ref.
+create or replace function private.reserve_pix_charge(
+  p_group_id uuid,
+  p_user_id uuid,
+  p_venue_id uuid,
+  p_amount_cents integer,
+  p_idempotency_key text,
+  p_wallet_id text,
+  p_commission_bps integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_inserted boolean := false;
+  v_charge public.payment_charges%rowtype;
+begin
+  insert into public.payment_charges (
+    group_id, user_id, venue_id, amount_cents, billing_type, status,
+    provider, provider_ref, idempotency_key, wallet_id, commission_bps
+  ) values (
+    p_group_id, p_user_id, p_venue_id, p_amount_cents, 'PIX', 'creating',
+    'asaas', null, p_idempotency_key, p_wallet_id, p_commission_bps
+  )
+  on conflict (group_id, user_id) do nothing
+  returning id into v_id;
+  v_inserted := v_id is not null;
+
+  select * into v_charge
+  from public.payment_charges
+  where group_id = p_group_id
+    and user_id = p_user_id
+  for update;
+
+  return pg_catalog.jsonb_build_object(
+    'id', v_charge.id,
+    'status', v_charge.status,
+    'provider_ref', v_charge.provider_ref,
+    'billing_type', v_charge.billing_type,
+    'amount_cents', v_charge.amount_cents,
+    'inserted', v_inserted
+  );
+end;
+$$;
+
+-- Grava o id do Asaas só enquanto a coluna está vazia.
+create or replace function private.attach_pix_provider(
+  p_charge_id uuid,
+  p_provider_ref text
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_ref text;
+begin
+  if p_provider_ref is null or length(pg_catalog.btrim(p_provider_ref)) = 0 then
+    raise exception 'provider_ref ausente' using errcode = '22023';
+  end if;
+
+  update public.payment_charges
+  set provider_ref = p_provider_ref
+  where id = p_charge_id
+    and provider_ref is null
+  returning provider_ref into v_ref;
+
+  if v_ref is not null then
+    return v_ref;
+  end if;
+
+  select provider_ref into v_ref
+  from public.payment_charges
+  where id = p_charge_id;
+  return v_ref;
+end;
+$$;
+
+revoke all on function private.payment_status_allowed(text, text)
+  from public, anon, authenticated;
+revoke all on function private.ledger_credit_charge(uuid)
+  from public, anon, authenticated;
+revoke all on function private.ledger_reverse_charge(uuid)
+  from public, anon, authenticated;
+revoke all on function private.apply_payment_transition(uuid, text, boolean)
+  from public, anon, authenticated;
+revoke all on function private.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
+  from public, anon, authenticated;
+revoke all on function private.attach_pix_provider(uuid, text)
+  from public, anon, authenticated;
+
+grant execute on function private.apply_payment_transition(uuid, text, boolean)
+  to service_role;
+grant execute on function private.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
+  to service_role;
+grant execute on function private.attach_pix_provider(uuid, text)
+  to service_role;
+
+-- O schema private não entra na API. Estes wrappers só existem para o
+-- PostgREST e só a service role executa.
+create or replace function public.apply_payment_transition(
+  p_charge_id uuid,
+  p_next_status text,
+  p_credit boolean
+)
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.apply_payment_transition(p_charge_id, p_next_status, p_credit);
+$$;
+
+create or replace function public.reserve_pix_charge(
+  p_group_id uuid,
+  p_user_id uuid,
+  p_venue_id uuid,
+  p_amount_cents integer,
+  p_idempotency_key text,
+  p_wallet_id text,
+  p_commission_bps integer
+)
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.reserve_pix_charge(
+    p_group_id, p_user_id, p_venue_id, p_amount_cents,
+    p_idempotency_key, p_wallet_id, p_commission_bps
+  );
+$$;
+
+create or replace function public.attach_pix_provider(
+  p_charge_id uuid,
+  p_provider_ref text
+)
+returns text
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.attach_pix_provider(p_charge_id, p_provider_ref);
+$$;
+
+revoke all on function public.apply_payment_transition(uuid, text, boolean)
+  from public, anon, authenticated;
+revoke all on function public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
+  from public, anon, authenticated;
+revoke all on function public.attach_pix_provider(uuid, text)
+  from public, anon, authenticated;
+
+grant execute on function public.apply_payment_transition(uuid, text, boolean)
+  to service_role;
+grant execute on function public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
+  to service_role;
+grant execute on function public.attach_pix_provider(uuid, text)
+  to service_role;

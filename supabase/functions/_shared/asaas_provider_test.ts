@@ -10,6 +10,7 @@ import {
   houseSplitPercent,
   pickReusablePix,
   PixQrUnavailableError,
+  PixReservationLost,
   tokensMatch,
 } from "./asaas_provider.ts";
 
@@ -89,6 +90,17 @@ const pixInput = {
   split: { walletId: "wal_house", percentualValue: 90 },
 };
 
+function pixDetail(id: string, status: string) {
+  return {
+    id,
+    status,
+    billingType: "PIX",
+    customer: "cus_1",
+    value: 120,
+    split: [{ walletId: "wal_house", percentualValue: 90 }],
+  };
+}
+
 Deno.test("createPix reaproveita Pix pendente e não cria outro", async () => {
   let posts = 0;
   const fetchFn = (url: string, init?: RequestInit) => {
@@ -106,6 +118,16 @@ Deno.test("createPix reaproveita Pix pendente e não cria outro", async () => {
           }),
           { status: 200 },
         ),
+      );
+    }
+    if (
+      method === "GET" && url.includes("/payments/pay_existing") &&
+      !url.includes("pixQrCode")
+    ) {
+      return Promise.resolve(
+        new Response(JSON.stringify(pixDetail("pay_existing", "PENDING")), {
+          status: 200,
+        }),
       );
     }
     if (method === "POST") {
@@ -206,6 +228,13 @@ Deno.test("QR esgotado não apaga a cobrança e o retry não cria outra", async 
         new Response(JSON.stringify({ data: payments }), { status: 200 }),
       );
     }
+    if (method === "GET" && url.endsWith("/payments/pay_orphan")) {
+      return Promise.resolve(
+        new Response(JSON.stringify(pixDetail("pay_orphan", "PENDING")), {
+          status: 200,
+        }),
+      );
+    }
     if (method === "POST" && url.endsWith("/payments")) {
       posts += 1;
       const created = {
@@ -296,6 +325,16 @@ Deno.test("Pix reaproveitado pago devolve o status do Asaas mesmo sem QR", async
         ),
       );
     }
+    if (
+      method === "GET" && url.includes("/payments/pay_paid") &&
+      !url.includes("pixQrCode")
+    ) {
+      return Promise.resolve(
+        new Response(JSON.stringify(pixDetail("pay_paid", "CONFIRMED")), {
+          status: 200,
+        }),
+      );
+    }
     if (method === "POST") {
       posts += 1;
       return Promise.resolve(new Response("não", { status: 500 }));
@@ -316,6 +355,94 @@ Deno.test("Pix reaproveitado pago devolve o status do Asaas mesmo sem QR", async
   assertEquals(pix.status, "CONFIRMED");
   assertEquals(pix.payload, "");
   assertEquals(posts, 0);
+});
+
+Deno.test("Pix com outro customer não é reaproveitado nem recriado", async () => {
+  let posts = 0;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [{ id: "pay_other", status: "PENDING", billingType: "PIX" }],
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (
+      method === "GET" && url.includes("/payments/pay_other") &&
+      !url.includes("pixQrCode")
+    ) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            ...pixDetail("pay_other", "PENDING"),
+            customer: "cus_outro",
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (method === "POST") {
+      posts += 1;
+      return Promise.resolve(new Response("não", { status: 500 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  await assertRejects(
+    () => provider.createPix(pixInput),
+    Error,
+    "pix_reuse_mismatch",
+  );
+  assertEquals(posts, 0);
+});
+
+Deno.test("perder a reserva apaga o Pix recém-criado e não o reaproveitado", async () => {
+  let deletes = 0;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "DELETE") {
+      deletes += 1;
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+    }
+    if (method === "POST" && url.endsWith("/payments")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: "pay_new", status: "PENDING" }), {
+          status: 200,
+        }),
+      );
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  await assertRejects(
+    () =>
+      provider.createPix({
+        ...pixInput,
+        onCreated: (payment) =>
+          Promise.reject(new PixReservationLost(payment.id)),
+      }),
+    PixReservationLost,
+  );
+  assertEquals(deletes, 1);
 });
 
 const sampleCard = {

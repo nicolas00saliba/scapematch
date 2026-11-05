@@ -6,7 +6,7 @@
 // Não há SDK de navegador. O cartão só atravessa a chamada de tokenização;
 // a cobrança seguinte manda creditCardToken.
 
-import { localChargeStatus } from "./pix_charge.ts";
+import { localChargeStatus, pixMatchesCharge } from "./pix_charge.ts";
 import { redactSensitive } from "./redact.ts";
 
 export const asaasSandboxBaseUrl = "https://api-sandbox.asaas.com/v3";
@@ -59,6 +59,25 @@ export type PixInput = {
   /// Chamado assim que o id da cobrança existe, antes do QR.
   onCreated?: (payment: PixPaymentRef) => Promise<void>;
 };
+
+/// A linha local já tem outro id. Não sobrescreve o provider_ref.
+export class PixReservationLost extends Error {
+  readonly paymentId: string;
+
+  constructor(paymentId: string) {
+    super("pix_reservation_lost");
+    this.name = "PixReservationLost";
+    this.paymentId = paymentId;
+  }
+}
+
+/// O Pix encontrado não confere com customer, valor, split ou status.
+export class PixReuseRejected extends Error {
+  constructor() {
+    super("pix_reuse_mismatch");
+    this.name = "PixReuseRejected";
+  }
+}
 
 /// O QR não veio. A cobrança fica no Asaas para o mesmo externalReference.
 export class PixQrUnavailableError extends Error {
@@ -396,7 +415,18 @@ export class AsaasProvider implements PaymentProvider {
 
   async createPix(input: PixInput): Promise<PixCreated> {
     const payment = await this.#resolvePixPayment(input);
-    if (input.onCreated) await input.onCreated(payment);
+    try {
+      if (input.onCreated) await input.onCreated(payment);
+    } catch (error) {
+      if (
+        payment.created &&
+        error instanceof PixReservationLost &&
+        localChargeStatus(payment.status) !== "paid"
+      ) {
+        await this.#deletePayment(payment.id).catch(() => undefined);
+      }
+      throw error;
+    }
     try {
       const qr = await this.#pixQrWithRetry(payment.id);
       return {
@@ -430,11 +460,34 @@ export class AsaasProvider implements PaymentProvider {
     }
   }
 
-  async #resolvePixPayment(input: PixInput): Promise<PixPaymentRef> {
+  async #resolvePixPayment(
+    input: PixInput,
+  ): Promise<PixPaymentRef & { created: boolean }> {
     const reference = input.externalReference.trim();
     if (!reference) throw new Error("externalReference ausente");
     const existing = await this.#findReusablePix(reference);
-    if (existing) return existing;
+    if (existing) {
+      const full = await this.#send(
+        `/payments/${existing.id}`,
+        undefined,
+        "GET",
+      );
+      if (
+        !pixMatchesCharge(full, {
+          customer: input.customer,
+          valueCents: Math.round(input.value * 100),
+          walletId: input.split.walletId,
+          percentualValue: input.split.percentualValue,
+        })
+      ) {
+        throw new PixReuseRejected();
+      }
+      return {
+        id: stringField(full, "id"),
+        status: stringField(full, "status"),
+        created: false,
+      };
+    }
     const body = await this.#send("/payments", {
       customer: input.customer,
       billingType: "PIX",
@@ -447,7 +500,14 @@ export class AsaasProvider implements PaymentProvider {
     return {
       id: stringField(body, "id"),
       status: stringField(body, "status"),
+      created: true,
     };
+  }
+
+  #deletePayment(paymentId: string): Promise<void> {
+    return this.#send(`/payments/${paymentId}`, undefined, "DELETE").then(
+      () => undefined,
+    );
   }
 
   async #findReusablePix(reference: string): Promise<PixPaymentRef | null> {
@@ -559,6 +619,10 @@ export class AsaasProvider implements PaymentProvider {
           : "DELETED",
       }),
     );
+  }
+
+  readPayment(paymentId: string): Promise<Record<string, unknown>> {
+    return this.#send(`/payments/${paymentId}`, undefined, "GET");
   }
 
   getPayment(paymentId: string): Promise<PaymentView> {

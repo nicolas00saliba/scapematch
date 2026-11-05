@@ -87,9 +87,9 @@ Deno.test("e-mail duplicado no Asaas pede o alias; outro 400 não", () => {
     console.error = original;
   }
   const parsed = JSON.parse(logs[0]);
-  assertEquals(parsed.errors[0].code, "invalid_object");
-  assertEquals(parsed.errors[0].description.includes("dono@casa.com"), false);
+  assertEquals(parsed.errors, [{ code: "invalid_object" }]);
   assertEquals(logs[0].includes("dono@casa.com"), false);
+  assertEquals(logs[0].includes("Já existe"), false);
 });
 
 Deno.test("provision-venue-wallet não usa o e-mail de login", async () => {
