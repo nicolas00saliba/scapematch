@@ -31,30 +31,38 @@ begin
     end if;
   end loop;
 
-  if has_function_privilege('anon', 'public.venue_link_status(uuid)', 'execute')
-    or has_function_privilege('authenticated', 'public.venue_link_status(uuid)', 'execute')
+  if to_regprocedure('public.venue_link_status(uuid)') is not null
+    or to_regprocedure('private.venue_link_status(uuid)') is null
+    or has_function_privilege('anon', 'private.venue_link_status(uuid)', 'execute')
+    or has_function_privilege(
+      'authenticated', 'private.venue_link_status(uuid)', 'execute'
+    )
   then
     raise exception 'venue_link_status ainda é executável pela API';
   end if;
 
   foreach v_helper in array array[
-    'public.handle_new_user()',
-    'public.profiles_guard()',
-    'public.venues_guard()',
-    'public.venues_normalize()',
-    'public.venue_claims_guard()',
-    'public.group_filled_spots(uuid)',
-    'public.profile_display_name(uuid)',
-    'public.user_has_overlap(uuid, timestamptz, integer, uuid)',
-    'public.users_are_friends(uuid, uuid)',
-    'public.post_app_notice(uuid, text, text, text, uuid, text)',
-    'public.offer_waitlist(uuid)'
+    'handle_new_user()',
+    'profiles_guard()',
+    'venues_guard()',
+    'venues_normalize()',
+    'venue_claims_guard()',
+    'group_filled_spots(uuid)',
+    'profile_display_name(uuid)',
+    'user_has_overlap(uuid, timestamptz, integer, uuid)',
+    'users_are_friends(uuid, uuid)',
+    'post_app_notice(uuid, text, text, text, uuid, text)',
+    'offer_waitlist(uuid)',
+    'saved_cards_guard()',
+    'saved_cards_limit()'
   ]
   loop
-    if has_function_privilege('anon', v_helper, 'execute')
-      or has_function_privilege('authenticated', v_helper, 'execute')
+    if to_regprocedure('public.' || v_helper) is not null
+      or to_regprocedure('private.' || v_helper) is null
+      or has_function_privilege('anon', 'private.' || v_helper, 'execute')
+      or has_function_privilege('authenticated', 'private.' || v_helper, 'execute')
     then
-      raise exception 'auxiliar ainda executável: %', v_helper;
+      raise exception 'auxiliar ainda exposta: %', v_helper;
     end if;
   end loop;
 
@@ -69,10 +77,10 @@ begin
   then
     raise exception 'anon ou public ainda tem usage no schema private';
   end if;
-  if not has_schema_privilege('authenticated', 'private', 'usage')
+  if has_schema_privilege('authenticated', 'private', 'usage')
     or not has_schema_privilege('service_role', 'private', 'usage')
   then
-    raise exception 'authenticated ou service_role perdeu usage no schema private';
+    raise exception 'usage de private não ficou só no service_role';
   end if;
 end $$;
 
