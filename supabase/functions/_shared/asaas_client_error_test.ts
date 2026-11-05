@@ -32,6 +32,33 @@ Deno.test("falha do Asaas vira código estável e o log não leva o corpo", () =
   assert(joined.includes('"status":"400"'));
 });
 
+Deno.test("o log do Asaas leva code e description sem e-mail nem chave", () => {
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  const email = "dono@casa.com";
+  const key = "aact_secreto_de_teste";
+  const body = JSON.stringify({
+    errors: [{
+      code: "invalid_object",
+      description: `Já existe uma conta com o e-mail ${email} chave ${key}`,
+    }],
+  });
+  try {
+    logAsaasFailure("provision-venue-wallet", new Error(`Asaas 400: ${body}`));
+  } finally {
+    console.error = original;
+  }
+  const parsed = JSON.parse(logs[0]);
+  assertEquals(parsed.errors[0].code, "invalid_object");
+  assert(parsed.errors[0].description.includes("Já existe"));
+  assertEquals(parsed.errors[0].description.includes(email), false);
+  assertEquals(logs[0].includes(email), false);
+  assertEquals(logs[0].includes(key), false);
+});
+
 Deno.test("as funções não devolvem error.message do Asaas", async () => {
   const files = [
     "../provision-venue-wallet/index.ts",
@@ -63,7 +90,8 @@ Deno.test("erro inesperado devolve internal_error e o log só tem tipo e ref", (
   };
   const secret = "4111111111111111";
   const email = "ana@example.com";
-  const raw = `cpf 04252011000110 ${email} token tok_segredo Authorization Bearer abc ${secret}`;
+  const raw =
+    `cpf 04252011000110 ${email} token tok_segredo Authorization Bearer abc ${secret}`;
   try {
     const error = new TypeError(raw);
     const failure = clientFailure(error, "create-charge");

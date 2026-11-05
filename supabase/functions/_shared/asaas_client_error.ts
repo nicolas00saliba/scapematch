@@ -10,14 +10,86 @@ export function isAsaasFailure(error: unknown): boolean {
   return error instanceof Error && asaasMessage.test(error.message);
 }
 
-/// Log só com o código e o status HTTP. O corpo do provedor fica de fora.
-export function logAsaasFailure(scope: string, error: unknown): void {
+const asaasErrorCode = /^[A-Za-z0-9_.:-]{1,80}$/;
+const emailInText = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const asaasKeyInText = /\$?aact_[A-Za-z0-9_]+/g;
+
+export type AsaasErrorItem = { code: string; description: string };
+
+export function asaasStatus(error: unknown): number | null {
   const raw = error instanceof Error ? error.message : "";
-  const status = /^Asaas (\d+)/.exec(raw)?.[1];
+  const match = /^Asaas (\d+)/.exec(raw);
+  if (!match) return null;
+  const status = Number(match[1]);
+  return Number.isInteger(status) ? status : null;
+}
+
+/// `errors[].code` e descrição, sem e-mail, documento nem chave.
+export function asaasErrorItems(error: unknown): AsaasErrorItem[] {
+  const raw = error instanceof Error ? error.message : "";
+  const jsonStart = raw.indexOf("{");
+  if (jsonStart < 0) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.slice(jsonStart));
+  } catch {
+    return [];
+  }
+  if (!parsed || typeof parsed !== "object") return [];
+  const errors = (parsed as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) return [];
+  const items: AsaasErrorItem[] = [];
+  for (const item of errors) {
+    if (!item || typeof item !== "object") continue;
+    const codeRaw = (item as { code?: unknown }).code;
+    const descriptionRaw = (item as { description?: unknown }).description;
+    const code = typeof codeRaw === "string" && asaasErrorCode.test(codeRaw)
+      ? codeRaw
+      : "unknown";
+    const description = sanitizeAsaasDescription(
+      typeof descriptionRaw === "string" ? descriptionRaw : "",
+    );
+    if (!description && code === "unknown") continue;
+    items.push({ code, description });
+  }
+  return items.slice(0, 5);
+}
+
+function sanitizeAsaasDescription(text: string): string {
+  const cleaned = redactSensitive(text)
+    .replace(emailInText, "[redacted]")
+    .replace(asaasKeyInText, "[redacted]")
+    .replace(/\b\d{11,14}\b/g, "[redacted]")
+    .replace(/access_token|api[_-]?key|bearer\s+\S+/gi, "[redacted]")
+    .slice(0, 180);
+  if (cleaned.includes("@")) return "[redacted]";
+  return cleaned;
+}
+
+/// 400 de e-mail já cadastrado na conta Asaas.
+export function isDuplicateSubaccountEmail(error: unknown): boolean {
+  return asaasErrorItems(error).some((item) => {
+    const blob = `${item.code} ${item.description}`.toLowerCase();
+    const mentionsEmail = blob.includes("email") || blob.includes("e-mail");
+    const mentionsDup = /j[aá]\s+est|em uso|exist|duplic|already|cadastr/.test(
+      blob,
+    );
+    return mentionsEmail && mentionsDup;
+  });
+}
+
+/// Log com status e `errors[].code` / descrição já limpos. Sem corpo cru.
+export function logAsaasFailure(scope: string, error: unknown): void {
+  const status = asaasStatus(error);
+  const errors = asaasErrorItems(error).map((item) => ({
+    code: item.code,
+    description: item.description,
+  }));
   const line = JSON.stringify({
     scope,
     code: asaasUnavailable,
-    status: status ?? null,
+    status: status == null ? null : String(status),
+    ...(errors.length > 0 ? { errors } : {}),
   });
   console.error(redactSensitive(line));
 }
