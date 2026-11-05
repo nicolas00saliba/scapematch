@@ -1,30 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { clientIp } from "../_shared/client_ip.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import {
-  assertOwnedCard,
   cardBrand,
   last4Digits,
-  type SavedCard,
+  storeSavedCard,
 } from "../_shared/saved_card.ts";
 import { readCard, tokenizePublicResponse } from "../_shared/tokenize_input.ts";
 import {
   gateTokenize,
   tokenizeLimitedMessage,
 } from "../_shared/tokenize_limit.ts";
-
-type SavedCardRow = {
-  id: string;
-  user_id: string;
-  asaas_customer_id: string;
-  credit_card_token: string;
-  last4: string;
-  brand: string;
-};
-
-type ChargeDb = {
-  from(...args: unknown[]): any;
-};
 
 const genericFailure = "Não foi possível guardar o cartão.";
 
@@ -46,10 +33,7 @@ Deno.serve(async (req) => {
     const user = userData.user;
     if (userError || !user) return json({ error: "not authenticated" }, 401);
 
-    const remoteIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      "127.0.0.1";
-    const card = readCard(await req.json(), remoteIp);
+    const card = readCard(await req.json());
     if (!card) return json({ error: "Dados do cartão incompletos." }, 400);
 
     const admin = createClient(url, service);
@@ -87,7 +71,7 @@ Deno.serve(async (req) => {
 
         const tokenized = await asaas.tokenizeCard({
           customer: customerId,
-          remoteIp: card.remoteIp,
+          remoteIp: clientIp(req),
           creditCard: {
             holderName: card.holderName,
             number: card.number,
@@ -104,29 +88,20 @@ Deno.serve(async (req) => {
             phone: card.holderPhone,
           },
         });
-        const inserted = await admin
-          .from("saved_cards")
-          .insert({
-            user_id: user.id,
-            asaas_customer_id: customerId,
-            credit_card_token: tokenized.creditCardToken,
-            last4: last4Digits(tokenized.creditCardNumber),
-            brand: cardBrand(tokenized.creditCardBrand),
-          })
-          .select(
-            "id, user_id, asaas_customer_id, credit_card_token, last4, brand",
-          )
-          .single();
-        if (inserted.error || !inserted.data) {
-          throw new Error(genericFailure);
-        }
-        const owned = assertOwnedCard(
-          toSavedCard(inserted.data as SavedCardRow),
-          user.id,
+        const last4 = last4Digits(tokenized.creditCardNumber);
+        const brand = cardBrand(tokenized.creditCardBrand);
+        const savedCardId = await storeSavedCard(admin, {
+          userId: user.id,
           customerId,
-          inserted.data.id as string,
-        );
-        responseBody = tokenizePublicResponse(owned);
+          token: tokenized.creditCardToken,
+          last4,
+          brand,
+        });
+        responseBody = tokenizePublicResponse({
+          id: savedCardId,
+          last4,
+          brand,
+        });
       },
     );
     if (decision === "limited" || !responseBody) {
@@ -137,14 +112,3 @@ Deno.serve(async (req) => {
     return json({ error: genericFailure }, 400);
   }
 });
-
-function toSavedCard(row: SavedCardRow): SavedCard {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    asaasCustomerId: row.asaas_customer_id,
-    creditCardToken: row.credit_card_token,
-    last4: row.last4,
-    brand: row.brand,
-  };
-}

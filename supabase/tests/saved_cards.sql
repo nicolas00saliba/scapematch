@@ -16,26 +16,23 @@ update public.profiles
 set asaas_customer_id = 'cus_bruno'
 where id = 'd2222222-2222-2222-2222-222222222222';
 
-insert into public.saved_cards (
-  id, user_id, asaas_customer_id, credit_card_token, last4, brand
-)
-values
-  (
-    'e1111111-1111-1111-1111-111111111111',
-    'd1111111-1111-1111-1111-111111111111',
-    'cus_ana',
-    'tok_ana_nao_vaza',
-    '1111',
-    'VISA'
-  ),
-  (
-    'e2222222-2222-2222-2222-222222222222',
-    'd2222222-2222-2222-2222-222222222222',
-    'cus_bruno',
-    'tok_bruno_nao_vaza',
-    '2222',
-    'MASTERCARD'
-  );
+select private.insert_saved_card(
+  'd1111111-1111-1111-1111-111111111111',
+  'cus_ana',
+  'tok_ana_nao_vaza',
+  '1111',
+  'VISA',
+  'e1111111-1111-1111-1111-111111111111'
+);
+
+select private.insert_saved_card(
+  'd2222222-2222-2222-2222-222222222222',
+  'cus_bruno',
+  'tok_bruno_nao_vaza',
+  '2222',
+  'MASTERCARD',
+  'e2222222-2222-2222-2222-222222222222'
+);
 
 do $$
 begin

@@ -8,10 +8,12 @@ import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
+import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
-/// Cartão de teste. Não pede número, validade nem CVV.
+/// Cartão de exemplo. O pagamento simulado não envia número.
 final payTestCard = PaymentMethod(
   id: 'card-test-visa',
   brand: CardBrand.visa,
@@ -26,6 +28,7 @@ Future<bool> showPayShareSheet({
   required String reference,
   required Future<bool> Function(PaymentMethodKind kind, {String? savedCardId})
   onPay,
+  Future<bool> Function(CardDraft card)? onPayNewCard,
 }) async {
   final paid = await showModalBottomSheet<bool>(
     context: context,
@@ -38,6 +41,7 @@ Future<bool> showPayShareSheet({
         amountCents: amountCents,
         reference: reference,
         onPay: onPay,
+        onPayNewCard: onPayNewCard,
       );
     },
   );
@@ -50,12 +54,14 @@ class PayShareSheet extends ConsumerStatefulWidget {
     required this.amountCents,
     required this.reference,
     required this.onPay,
+    this.onPayNewCard,
   });
 
   final int amountCents;
   final String reference;
   final Future<bool> Function(PaymentMethodKind kind, {String? savedCardId})
   onPay;
+  final Future<bool> Function(CardDraft card)? onPayNewCard;
 
   @override
   ConsumerState<PayShareSheet> createState() => _PayShareSheetState();
@@ -66,7 +72,15 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   var _busy = false;
   var _done = false;
   var _copied = false;
+  String? _error;
   String? _cardId = payTestCard.id;
+  final _entry = CardEntryControllers();
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    super.dispose();
+  }
 
   String get _pixCode {
     final cents = widget.amountCents.toString().padLeft(4, '0');
@@ -88,18 +102,30 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
 
   Future<void> _confirm() async {
     setState(() => _busy = true);
-    final savedCardId = _method == PaymentMethodKind.card &&
-            _cardId != null &&
-            _cardId != payTestCard.id
-        ? _cardId
+    final bool ok;
+    final draft = _method == PaymentMethodKind.card && _entry.started
+        ? _entry.draft
         : null;
-    final ok = await widget.onPay(_method, savedCardId: savedCardId);
+    if (_method == PaymentMethodKind.card && _entry.started && draft == null) {
+      ok = false;
+    } else if (draft != null) {
+      final payNew = widget.onPayNewCard;
+      ok = payNew == null ? false : await payNew(draft);
+    } else {
+      final savedCardId = _method == PaymentMethodKind.card &&
+              _cardId != null &&
+              _cardId != payTestCard.id
+          ? _cardId
+          : null;
+      ok = await widget.onPay(_method, savedCardId: savedCardId);
+    }
     if (!mounted) {
       return;
     }
     setState(() {
       _busy = false;
       _done = ok;
+      _error = ok ? null : 'Não foi possível pagar com este cartão.';
     });
   }
 
@@ -195,9 +221,19 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                               key: const Key('pay-card-panel'),
                               cards: cards,
                               selectedId: _cardId,
+                              entry: _entry,
                               onSelect: (id) => setState(() => _cardId = id),
                             ),
                     ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.error,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     FilledButton(
                       key: AppKeys.paySimulate,
@@ -350,11 +386,13 @@ class _CardPanel extends StatelessWidget {
     super.key,
     required this.cards,
     required this.selectedId,
+    required this.entry,
     required this.onSelect,
   });
 
   final List<PaymentMethod> cards;
   final String? selectedId;
+  final CardEntryControllers entry;
   final ValueChanged<String> onSelect;
 
   @override
@@ -364,7 +402,8 @@ class _CardPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Escolha um cartão. Esta tela não pede número nem código de segurança.',
+          'Escolha um cartão salvo ou preencha um novo. '
+          'A lista mostra a bandeira e os 4 últimos dígitos.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             height: 1.35,
@@ -381,6 +420,8 @@ class _CardPanel extends StatelessWidget {
               onTap: () => onSelect(card.id),
             ),
           ),
+        const SizedBox(height: 8),
+        CardEntryFields(controllers: entry),
       ],
     );
   }

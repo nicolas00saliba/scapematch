@@ -70,3 +70,41 @@ alter default privileges in schema public
   grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public
   grant all on functions to anon, authenticated, service_role;
+
+-- O Postgres do CI não traz a extensão vault. Este substituto só existe
+-- no teste. A migration chama vault.create_secret de verdade no Supabase.
+create schema if not exists vault;
+
+create table if not exists vault.secrets (
+  id uuid primary key default gen_random_uuid(),
+  name text unique,
+  secret text not null,
+  description text not null default ''
+);
+
+create or replace function vault.create_secret(
+  new_secret text,
+  new_name text default null,
+  new_description text default '',
+  new_key_id uuid default null
+) returns uuid
+language plpgsql
+as $$
+declare
+  v_id uuid := gen_random_uuid();
+begin
+  insert into vault.secrets (id, name, secret, description)
+  values (v_id, new_name, new_secret, coalesce(new_description, ''));
+  return v_id;
+end;
+$$;
+
+create or replace view vault.decrypted_secrets as
+  select id, name, description, secret as decrypted_secret
+  from vault.secrets;
+
+revoke all on schema vault from public, anon, authenticated, service_role;
+revoke all on table vault.secrets from public, anon, authenticated, service_role;
+revoke all on function vault.create_secret(text, text, text, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on vault.decrypted_secrets from public, anon, authenticated, service_role;

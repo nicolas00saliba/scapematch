@@ -9,6 +9,7 @@ void main() {
       if (name == 'tokenize-card') {
         expect(body['number'], '4111111111111111');
         expect(body['ccv'], '123');
+        expect(body.containsKey('remote_ip'), isFalse);
         return {
           'saved_card_id': 'card-1',
           'last4': '1111',
@@ -23,6 +24,7 @@ void main() {
       expect(body.containsKey('ccv'), isFalse);
       expect(body.containsKey('expiry_month'), isFalse);
       expect(body.containsKey('expiry_year'), isFalse);
+      expect(body.containsKey('remote_ip'), isFalse);
       return {'charge_id': 'ch-1', 'status': 'authorized'};
     });
 

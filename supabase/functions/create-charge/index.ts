@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { AsaasProvider, houseSplitPercent } from "../_shared/asaas_provider.ts";
+import { clientIp } from "../_shared/client_ip.ts";
 import {
   bindJson,
   corsHeadersFor,
@@ -9,6 +10,7 @@ import {
 import { hasRawCardData } from "../_shared/raw_card.ts";
 import {
   cardForCharge,
+  loadOwnedCard,
   requestedSavedCardId,
   type SavedCard,
   savedCardView,
@@ -18,17 +20,7 @@ type ChargeBody = {
   group_id?: string;
   billing_type?: string;
   idempotency_key?: string;
-  remote_ip?: string;
   saved_card_id?: string;
-};
-
-type SavedCardRow = {
-  id: string;
-  user_id: string;
-  asaas_customer_id: string;
-  credit_card_token: string;
-  last4: string;
-  brand: string;
 };
 
 Deno.serve(async (req) => {
@@ -175,9 +167,7 @@ Deno.serve(async (req) => {
       qrCode = pix.payload;
       qrImage = pix.encodedImage;
     } else {
-      const remoteIp = body.remote_ip ||
-        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        "127.0.0.1";
+      const remoteIp = clientIp(req);
       const savedCardId = requestedSavedCardId(body);
       if (!savedCardId) {
         return json({ error: "saved_card_id é obrigatório" }, 400);
@@ -266,35 +256,19 @@ Deno.serve(async (req) => {
 
 type ChargeDb = {
   from(...args: unknown[]): any;
+  rpc(
+    name: string,
+    args: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: unknown }>;
 };
 
-async function findOwnedCard(
+function findOwnedCard(
   admin: ChargeDb,
   userId: string,
   customerId: string,
   cardId: string,
 ): Promise<SavedCard | null> {
-  const { data, error } = await admin
-    .from("saved_cards")
-    .select("id, user_id, asaas_customer_id, credit_card_token, last4, brand")
-    .eq("id", cardId)
-    .eq("user_id", userId)
-    .eq("asaas_customer_id", customerId)
-    .maybeSingle();
-  if (error) throw new Error("cartão não encontrado");
-  if (!data) return null;
-  return toSavedCard(data as SavedCardRow);
-}
-
-function toSavedCard(row: SavedCardRow): SavedCard {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    asaasCustomerId: row.asaas_customer_id,
-    creditCardToken: row.credit_card_token,
-    last4: row.last4,
-    brand: row.brand,
-  };
+  return loadOwnedCard(admin, userId, customerId, cardId);
 }
 
 async function filledSpots(

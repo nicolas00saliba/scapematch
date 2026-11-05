@@ -16,15 +16,26 @@ update public.profiles
 set asaas_customer_id = 'cus_dora'
 where id = 'd4444444-4444-4444-4444-444444444444';
 
-insert into public.saved_cards (
-  id, user_id, asaas_customer_id, credit_card_token, last4, brand
-)
-values
-  ('f3333333-3333-3333-3333-333333333331', 'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_1', '3331', 'VISA'),
-  ('f3333333-3333-3333-3333-333333333332', 'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_2', '3332', 'VISA'),
-  ('f3333333-3333-3333-3333-333333333333', 'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_3', '3333', 'VISA'),
-  ('f3333333-3333-3333-3333-333333333334', 'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_4', '3334', 'VISA'),
-  ('f3333333-3333-3333-3333-333333333335', 'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_5', '3335', 'VISA');
+select private.insert_saved_card(
+  'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_1', '3331', 'VISA',
+  'f3333333-3333-3333-3333-333333333331'
+);
+select private.insert_saved_card(
+  'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_2', '3332', 'VISA',
+  'f3333333-3333-3333-3333-333333333332'
+);
+select private.insert_saved_card(
+  'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_3', '3333', 'VISA',
+  'f3333333-3333-3333-3333-333333333333'
+);
+select private.insert_saved_card(
+  'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_4', '3334', 'VISA',
+  'f3333333-3333-3333-3333-333333333334'
+);
+select private.insert_saved_card(
+  'd3333333-3333-3333-3333-333333333333', 'cus_carla', 'tok_carla_5', '3335', 'VISA',
+  'f3333333-3333-3333-3333-333333333335'
+);
 
 insert into public.card_tokenize_attempts (user_id, created_at)
 select 'd4444444-4444-4444-4444-444444444444', pg_catalog.now() - interval '2 hours'
@@ -59,16 +70,13 @@ end $$;
 do $$
 begin
   begin
-    insert into public.saved_cards (
-      id, user_id, asaas_customer_id, credit_card_token, last4, brand
-    )
-    values (
-      'f3333333-3333-3333-3333-333333333336',
+    perform private.insert_saved_card(
       'd3333333-3333-3333-3333-333333333333',
       'cus_carla',
       'tok_carla_6',
       '3336',
-      'VISA'
+      'VISA',
+      'f3333333-3333-3333-3333-333333333336'
     );
     raise exception 'o 6º cartão entrou';
   exception

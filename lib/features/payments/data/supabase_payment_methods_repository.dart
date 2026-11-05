@@ -1,3 +1,4 @@
+import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/features/payments/data/payment_methods_repository.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -34,6 +35,28 @@ class SupabasePaymentMethodsRepository implements PaymentMethodsRepository {
       );
     }
     return methods;
+  }
+
+  @override
+  Future<PaymentMethod> save(CardDraft card) async {
+    final flow = CardPaymentFlow((name, body) async {
+      final response = await client.functions.invoke(name, body: body);
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      return {};
+    });
+    final saved = await flow.tokenize(card);
+    return PaymentMethod(
+      id: saved.savedCardId,
+      brand: cardBrandFromAsaas(saved.brand),
+      last4: saved.last4,
+      nickname: card.holderName,
+    );
   }
 }
 

@@ -437,47 +437,6 @@ export class AsaasProvider implements PaymentProvider {
   }
 }
 
-/// O token usado aqui já foi lido no servidor. O body do cliente não entra.
-export async function authorizeStoredCard(
-  provider: AsaasProvider,
-  input: {
-    charge: Omit<CardChargeInput, "creditCardToken">;
-    creditCardToken?: string;
-    creditCard?: CardSecrets;
-    creditCardHolderInfo?: CardHolder;
-  },
-): Promise<{ id: string; status: string; creditCardToken: string }> {
-  const supplied = input.creditCardToken?.trim() ?? "";
-  const creditCardToken = supplied.length > 0
-    ? supplied
-    : (await provider.tokenizeCard({
-      customer: input.charge.customer,
-      remoteIp: input.charge.remoteIp,
-      creditCard: requireCard(input.creditCard),
-      creditCardHolderInfo: requireHolder(input.creditCardHolderInfo),
-    })).creditCardToken;
-  const authorized = await provider.authorizeCard({
-    ...input.charge,
-    creditCardToken,
-  });
-  return { ...authorized, creditCardToken };
-}
-
-function requireCard(card: CardSecrets | undefined): CardSecrets {
-  if (
-    !card?.number || !card.ccv || !card.holderName || !card.expiryMonth ||
-    !card.expiryYear
-  ) {
-    throw new Error("Dados do cartão incompletos.");
-  }
-  return card;
-}
-
-function requireHolder(holder: CardHolder | undefined): CardHolder {
-  if (!holder) throw new Error("Dados do cartão incompletos.");
-  return holder;
-}
-
 function redactOutbound(text: string, apiKey: string): string {
   const withoutKey = apiKey ? text.split(apiKey).join("[redacted]") : text;
   return redactSensitive(withoutKey);

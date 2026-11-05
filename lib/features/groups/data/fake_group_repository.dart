@@ -416,9 +416,12 @@ class FakeGroupRepository implements GroupRepository {
     required String userId,
     required CardDraft card,
   }) {
-    return Future.value(
-      const PayShareFailure(PayShareFailureReason.unavailable),
-    );
+    if (card.number.isEmpty) {
+      return Future.value(
+        const PayShareFailure(PayShareFailureReason.unavailable),
+      );
+    }
+    return payShare(groupId, userId: userId, kind: PaymentMethodKind.card);
   }
 
   @override

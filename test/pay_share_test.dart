@@ -38,7 +38,7 @@ void main() {
     expect(find.textContaining('Cartão de teste'), findsOneWidget);
     expect(find.textContaining('4242'), findsOneWidget);
     expect(find.textContaining('CVV'), findsNothing);
-    expect(find.textContaining('código de segurança'), findsOneWidget);
+    expect(find.textContaining('Código de segurança'), findsWidgets);
 
     await tester.tap(find.byKey(AppKeys.payMethodPix));
     await tester.pumpAndSettle();

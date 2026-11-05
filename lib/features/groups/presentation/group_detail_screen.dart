@@ -443,6 +443,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             .payShare(kind, savedCardId: savedCardId);
         return reason == null;
       },
+      onPayNewCard: (card) async {
+        final reason = await ref
+            .read(groupDetailViewModelProvider(widget.groupId).notifier)
+            .payWithNewCard(card);
+        return reason == null;
+      },
     );
     if (paid && mounted) {
       _snack(GroupMessages.yourShareReserved);

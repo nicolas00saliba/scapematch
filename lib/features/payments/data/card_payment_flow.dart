@@ -8,7 +8,6 @@ class CardDraft {
     required this.expiryMonth,
     required this.expiryYear,
     required this.ccv,
-    this.remoteIp,
     this.holderCpfCnpj = '',
     this.holderPostalCode = '',
     this.holderAddressNumber = '',
@@ -20,7 +19,6 @@ class CardDraft {
   final String expiryMonth;
   final String expiryYear;
   final String ccv;
-  final String? remoteIp;
   final String holderCpfCnpj;
   final String holderPostalCode;
   final String holderAddressNumber;
@@ -67,8 +65,6 @@ Map<String, dynamic> tokenizeCardBody(CardDraft card) {
     'expiry_month': card.expiryMonth,
     'expiry_year': card.expiryYear,
     'ccv': card.ccv,
-    if (card.remoteIp != null && card.remoteIp!.isNotEmpty)
-      'remote_ip': card.remoteIp,
     if (card.holderCpfCnpj.isNotEmpty) 'holder_cpf_cnpj': card.holderCpfCnpj,
     if (card.holderPostalCode.isNotEmpty)
       'holder_postal_code': card.holderPostalCode,
@@ -84,14 +80,12 @@ Map<String, dynamic> createChargeBody({
   required String idempotencyKey,
   required PaymentMethodKind kind,
   String? savedCardId,
-  String? remoteIp,
 }) {
   return {
     'group_id': groupId,
     'idempotency_key': idempotencyKey,
     'billing_type': kind == PaymentMethodKind.card ? 'CREDIT_CARD' : 'PIX',
     if (kind == PaymentMethodKind.card) 'saved_card_id': savedCardId,
-    if (remoteIp != null && remoteIp.isNotEmpty) 'remote_ip': remoteIp,
   };
 }
 
@@ -105,6 +99,8 @@ bool chargeBodyHasRawCard(Map<String, dynamic> body) {
     'expiry_year',
     'expiryMonth',
     'expiryYear',
+    'remote_ip',
+    'remoteIp',
   };
   return body.keys.any(raw.contains);
 }
@@ -125,14 +121,12 @@ class CardPaymentFlow {
     required String idempotencyKey,
     required PaymentMethodKind kind,
     String? savedCardId,
-    String? remoteIp,
   }) {
     final body = createChargeBody(
       groupId: groupId,
       idempotencyKey: idempotencyKey,
       kind: kind,
       savedCardId: savedCardId,
-      remoteIp: remoteIp,
     );
     if (chargeBodyHasRawCard(body)) {
       throw StateError('create-charge não recebe dados do cartão');
@@ -151,7 +145,6 @@ class CardPaymentFlow {
       idempotencyKey: idempotencyKey,
       kind: PaymentMethodKind.card,
       savedCardId: saved.savedCardId,
-      remoteIp: card.remoteIp,
     );
   }
 }

@@ -1,7 +1,6 @@
 import { assertEquals, assert } from "jsr:@std/assert@1";
 import {
   AsaasProvider,
-  authorizeStoredCard,
   commissionCents,
   houseSplitPercent,
   tokensMatch,
@@ -112,12 +111,17 @@ Deno.test("a primeira cobrança tokeniza e só então reserva com o token", asyn
     "https://api-sandbox.asaas.com/v3",
     fetchFn,
   );
-  const authorized = await authorizeStoredCard(provider, {
-    charge: sampleCharge,
+  const tokenized = await provider.tokenizeCard({
+    customer: sampleCharge.customer,
+    remoteIp: sampleCharge.remoteIp,
     creditCard: sampleCard,
     creditCardHolderInfo: sampleHolder,
   });
-  assertEquals(authorized.creditCardToken, "tok_card_1");
+  const authorized = await provider.authorizeCard({
+    ...sampleCharge,
+    creditCardToken: tokenized.creditCardToken,
+  });
+  assertEquals(tokenized.creditCardToken, "tok_card_1");
   assertEquals(authorized.id, "pay_card");
   assert(calls[0].url.endsWith("/creditCard/tokenizeCreditCard"));
   const tokenBody = JSON.parse(String(calls[0].init.body));
@@ -161,11 +165,9 @@ Deno.test("com token a cobrança não reenvia o cartão", async () => {
     "https://api-sandbox.asaas.com/v3",
     fetchFn,
   );
-  await authorizeStoredCard(provider, {
-    charge: sampleCharge,
+  await provider.authorizeCard({
+    ...sampleCharge,
     creditCardToken: "tok_card_1",
-    creditCard: sampleCard,
-    creditCardHolderInfo: sampleHolder,
   });
   assertEquals(calls.length, 1);
   assert(calls[0].url.endsWith("/payments"));
@@ -198,8 +200,9 @@ Deno.test("erro da tokenização não ecoa número, CVV, validade nem o body", a
   );
   let message = "";
   try {
-    await authorizeStoredCard(provider, {
-      charge: sampleCharge,
+    await provider.tokenizeCard({
+      customer: sampleCharge.customer,
+      remoteIp: sampleCharge.remoteIp,
       creditCard: sampleCard,
       creditCardHolderInfo: sampleHolder,
     });

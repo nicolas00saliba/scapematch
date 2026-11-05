@@ -78,8 +78,9 @@ void main() {
       await tester.tap(find.byKey(AppKeys.addCard));
       await tester.pumpAndSettle();
       expect(find.byKey(AppKeys.addCardNotice), findsOneWidget);
-      expect(find.textContaining('não pede número'), findsOneWidget);
-      expect(find.byType(TextField), findsNothing);
+      expect(find.textContaining('não pede número'), findsNothing);
+      expect(find.textContaining('Código de segurança'), findsWidgets);
+      expect(find.byType(TextField), findsWidgets);
       expect(tester.takeException(), isNull, reason: '$size cards');
 
       await tester.tap(find.byType(BackButton));
@@ -121,6 +122,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('40,00'), findsWidgets);
     }
+  });
+
+  testWidgets('a new card lists only the brand and last digits', (tester) async {
+    await _openAccount(tester, const Size(390, 844));
+    await tester.tap(find.byKey(AppKeys.accountDestination('cards')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.addCard));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(AppKeys.cardHolder), 'Ana');
+    await tester.enterText(find.byKey(AppKeys.cardNumber), '4111111111111111');
+    await tester.enterText(find.byKey(AppKeys.cardMonth), '12');
+    await tester.enterText(find.byKey(AppKeys.cardYear), '2028');
+    await tester.enterText(find.byKey(AppKeys.cardSecurity), '123');
+    await tester.ensureVisible(find.byKey(AppKeys.addCardSave));
+    await tester.tap(find.byKey(AppKeys.addCardSave));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Visa'), findsWidgets);
+    expect(find.textContaining('1111'), findsWidgets);
+    expect(find.textContaining('4111111111111111'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }
 

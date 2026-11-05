@@ -28,6 +28,9 @@ Deno.test("create-charge recusa número, CVV e validade", async () => {
   assertEquals(/console\s*\./.test(charge), false);
   assertEquals(charge.includes("ccv"), false);
   assertEquals(charge.includes("expiryMonth"), false);
+  assertEquals(charge.includes("remote_ip"), false);
+  assert(charge.includes("clientIp"));
+  assert(charge.includes("loadOwnedCard"));
 });
 
 Deno.test("tokenize-card não loga e a resposta não leva o token", async () => {
@@ -40,6 +43,9 @@ Deno.test("tokenize-card não loga e a resposta não leva o token", async () => 
   assert(source.includes("corsHeadersFor"));
   assert(source.includes("bindJson"));
   assertEquals(source.includes("error.message"), false);
+  assertEquals(source.includes("remote_ip"), false);
+  assert(source.includes("clientIp"));
+  assert(source.includes("storeSavedCard"));
   assertEquals(
     /JSON\.stringify\(\s*(body|req|text|response)/.test(source),
     false,
@@ -54,16 +60,17 @@ Deno.test("tokenize-card não loga e a resposta não leva o token", async () => 
   });
   assertEquals(Object.keys(body).sort(), ["brand", "last4", "saved_card_id"]);
   assertEquals(JSON.stringify(body).includes(token), false);
-  assertEquals(readCard({ holder_name: "Ana" }, "127.0.0.1"), null);
+  assertEquals(readCard({ holder_name: "Ana" }), null);
   const card = readCard({
     holder_name: "Ana",
     number: "4111111111111111",
     expiry_month: "12",
     expiry_year: "2028",
     ccv: "123",
-  }, "203.0.113.4");
+    remote_ip: "1.2.3.4",
+  });
   assertEquals(card?.holderName, "Ana");
-  assertEquals(card?.remoteIp, "203.0.113.4");
+  assertEquals(JSON.stringify(card).includes("1.2.3.4"), false);
   const claimAt = source.indexOf("claim_card_tokenize_attempt");
   const tokenizeAt = source.indexOf("tokenizeCard");
   const customerAt = source.indexOf("createCustomer");

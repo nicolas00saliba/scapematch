@@ -1,6 +1,6 @@
 import { redactSensitive } from "./redact.ts";
 
-/// Todas as versões publicadas (jogador, parceiro, demos e landing) ficam neste domínio.
+/// Origem usada quando `ALLOWED_ORIGINS` não está definida.
 export const productionWebOrigin = "https://nicolas00saliba.github.io";
 
 const allowedHeaders =
@@ -14,9 +14,19 @@ export function allowsLocalhostOrigins(env: EnvLike): boolean {
   return url.includes("localhost") || url.includes("127.0.0.1");
 }
 
+/// Origens exatas, separadas por vírgula. `*` não entra.
+/// Sem a variável, fica só `https://nicolas00saliba.github.io`.
+export function allowedOrigins(env: EnvLike): string[] {
+  const raw = env.get("ALLOWED_ORIGINS");
+  const source = raw?.trim() ? raw : productionWebOrigin;
+  return source.split(",").map((item) => item.trim()).filter((item) =>
+    item.length > 0 && item !== "*"
+  );
+}
+
 export function isAllowedOrigin(origin: string | null, env: EnvLike): boolean {
-  if (!origin) return false;
-  if (origin === productionWebOrigin) return true;
+  if (!origin || origin === "*") return false;
+  if (allowedOrigins(env).includes(origin)) return true;
   if (!allowsLocalhostOrigins(env)) return false;
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }

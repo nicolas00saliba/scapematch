@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
+import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
+import 'package:scapematch/providers/repositories.dart';
 
-/// Lista de cartões. Vazia nesta versão. O botão não abre formulário.
+/// Lista de cartões salvos e o formulário que chama `tokenize-card`.
 class PaymentMethodsBody extends ConsumerStatefulWidget {
   const PaymentMethodsBody({super.key});
 
@@ -13,7 +15,43 @@ class PaymentMethodsBody extends ConsumerStatefulWidget {
 }
 
 class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
-  bool _showNotice = false;
+  final _entry = CardEntryControllers();
+  var _showForm = false;
+  var _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final draft = _entry.draft;
+    if (draft == null) {
+      setState(() {
+        _error = 'Preencha nome, número, validade e o código de segurança.';
+      });
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(paymentMethodsRepositoryProvider).save(draft);
+      _entry.clear();
+      ref.invalidate(paymentMethodsProvider);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Não foi possível guardar o cartão.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,17 +91,29 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
         const SizedBox(height: 16),
         FilledButton(
           key: AppKeys.addCard,
-          onPressed: () => setState(() => _showNotice = true),
+          onPressed: () => setState(() => _showForm = true),
           child: const Text('Adicionar cartão'),
         ),
-        if (_showNotice) ...[
+        if (_showForm) ...[
           const SizedBox(height: 12),
           Text(
-            'O cadastro de cartão chega em breve. Esta versão não pede '
-            'número, validade nem código de segurança. Nada é cobrado.',
+            'A lista mostra a bandeira e os 4 últimos dígitos. '
+            'O número segue só para a tokenização.',
             key: AppKeys.addCardNotice,
             style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
           ),
+          const SizedBox(height: 12),
+          CardEntryFields(controllers: _entry),
+          const SizedBox(height: 12),
+          FilledButton(
+            key: AppKeys.addCardSave,
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? 'Guardando…' : 'Guardar cartão'),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+          ],
         ],
       ],
     );

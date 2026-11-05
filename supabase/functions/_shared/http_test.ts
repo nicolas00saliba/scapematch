@@ -7,8 +7,14 @@ import {
   productionWebOrigin,
 } from "./http.ts";
 
-const hosted = { get: () => "https://eujlhicairvksvmssruz.supabase.co" };
-const local = { get: () => "http://127.0.0.1:54321" };
+function envOf(values: Record<string, string>): { get(name: string): string | undefined } {
+  return { get: (name) => values[name] };
+}
+
+const hosted = envOf({
+  SUPABASE_URL: "https://eujlhicairvksvmssruz.supabase.co",
+});
+const local = envOf({ SUPABASE_URL: "http://127.0.0.1:54321" });
 
 function request(origin?: string): Request {
   const headers = new Headers();
@@ -59,4 +65,21 @@ Deno.test("pedido sem Origin ainda devolve JSON e não depende de CORS", async (
   );
   assertEquals(/origin/i.test(webhook), false);
   assert(webhook.includes("tokensMatch"));
+});
+
+Deno.test("ALLOWED_ORIGINS troca a lista e o curinga não passa", () => {
+  const custom = envOf({
+    SUPABASE_URL: "https://eujlhicairvksvmssruz.supabase.co",
+    ALLOWED_ORIGINS: "https://app.example, https://nicolas00saliba.github.io",
+  });
+  assertEquals(isAllowedOrigin("https://app.example", custom), true);
+  assertEquals(isAllowedOrigin(productionWebOrigin, custom), true);
+  assertEquals(isAllowedOrigin("https://evil.example", custom), false);
+  const star = envOf({
+    SUPABASE_URL: "https://eujlhicairvksvmssruz.supabase.co",
+    ALLOWED_ORIGINS: "*",
+  });
+  assertEquals(isAllowedOrigin("https://evil.example", star), false);
+  assertEquals(isAllowedOrigin(productionWebOrigin, star), false);
+  assertEquals(JSON.stringify(corsHeadersFor(request("https://evil.example"), star)).includes("*"), false);
 });

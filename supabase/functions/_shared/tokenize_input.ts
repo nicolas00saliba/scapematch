@@ -6,7 +6,6 @@ export type CardInput = {
   expiryMonth: string;
   expiryYear: string;
   ccv: string;
-  remoteIp: string;
   holderCpfCnpj: string;
   holderPostalCode: string;
   holderAddressNumber: string;
@@ -23,10 +22,7 @@ function text(body: Record<string, unknown>, keys: string[]): string {
 
 /// Lê o cartão do body. Nulo quando falta número, CVV, validade ou nome.
 /// O motivo não inclui o valor digitado.
-export function readCard(
-  body: unknown,
-  fallbackIp: string,
-): CardInput | null {
+export function readCard(body: unknown): CardInput | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const record = body as Record<string, unknown>;
   const card = text(record, ["holderName", "holder_name"]).length > 0 &&
@@ -40,7 +36,6 @@ export function readCard(
       expiryMonth: text(record, ["expiryMonth", "expiry_month"]),
       expiryYear: text(record, ["expiryYear", "expiry_year"]),
       ccv: text(record, ["ccv", "cvv"]),
-      remoteIp: text(record, ["remoteIp", "remote_ip"]) || fallbackIp,
       holderCpfCnpj: text(record, ["holderCpfCnpj", "holder_cpf_cnpj"]),
       holderPostalCode: text(record, [
         "holderPostalCode",

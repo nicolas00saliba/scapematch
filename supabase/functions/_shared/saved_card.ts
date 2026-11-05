@@ -75,6 +75,68 @@ export function assertOwnedCard(
   return card;
 }
 
+export type CardRpc = {
+  rpc(
+    name: string,
+    args: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: unknown }>;
+};
+
+/// Grava o token já cifrado. O retorno é só o id interno.
+export async function storeSavedCard(
+  db: CardRpc,
+  input: {
+    userId: string;
+    customerId: string;
+    token: string;
+    last4: string;
+    brand: string;
+  },
+): Promise<string> {
+  const { data, error } = await db.rpc("insert_saved_card", {
+    p_user_id: input.userId,
+    p_customer_id: input.customerId,
+    p_token: input.token,
+    p_last4: input.last4,
+    p_brand: input.brand,
+  });
+  if (error || typeof data !== "string" || data.length < 8) {
+    throw new Error("Não foi possível guardar o cartão.");
+  }
+  return data;
+}
+
+/// Lê o token cifrado do cartão deste jogador. Outro user_id não devolve linha.
+export async function loadOwnedCard(
+  db: CardRpc,
+  userId: string,
+  customerId: string,
+  cardId: string,
+): Promise<SavedCard | null> {
+  const { data, error } = await db.rpc("load_owned_card", {
+    p_user_id: userId,
+    p_customer_id: customerId,
+    p_card_id: cardId,
+  });
+  if (error) throw new Error("cartão não encontrado");
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id : "";
+  const token = typeof record.token === "string" ? record.token : "";
+  const last4 = typeof record.last4 === "string" ? record.last4 : "";
+  const brand = typeof record.brand === "string" ? record.brand : "";
+  if (!id || token.length < 8) return null;
+  return {
+    id,
+    userId,
+    asaasCustomerId: customerId,
+    creditCardToken: token,
+    last4,
+    brand,
+  };
+}
+
 export async function cardForCharge(
   store: CardStore,
   userId: string,
