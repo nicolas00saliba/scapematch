@@ -112,7 +112,7 @@ for name, (subject_key, content_key) in fields.items():
         raise SystemExit(f"{path.name} não pode ter script")
     if "<img" in lowered or "https://" in lowered or "http://" in lowered:
         raise SystemExit(f"{path.name} não pode carregar recurso remoto")
-    if "nicolas00saliba.github.io/scapematch" not in html:
+    if "app.scapematch.com.br" not in html:
         raise SystemExit(f"{path.name} não diz o destino do link")
     payload[subject_key] = subject
     payload[content_key] = html

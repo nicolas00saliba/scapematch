@@ -40,7 +40,7 @@ insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000
 
 ## E-mails de autenticação
 
-Os HTML ficam em `supabase/templates/` e os assuntos em `supabase/config.toml` (`[auth.email.template.*]`). São cinco: confirmação de cadastro, redefinição de senha, magic link, troca de e-mail e convite. O desenho usa a paleta do app (verde-petróleo `#0F4C4A`, cobre `#9A4F24`, fundo `#F5F1EA`), tabelas e CSS inline. A marca é texto, sem imagem nem outro recurso remoto. Cada mensagem tem um botão, o mesmo link em texto e a linha de que o link leva a `nicolas00saliba.github.io/scapematch`. As variáveis são as do Supabase (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}` e, na troca, `{{ .NewEmail }}`).
+Os HTML ficam em `supabase/templates/` e os assuntos em `supabase/config.toml` (`[auth.email.template.*]`). São cinco: confirmação de cadastro, redefinição de senha, magic link, troca de e-mail e convite. O desenho usa a paleta do app (verde-petróleo `#0F4C4A`, cobre `#9A4F24`, fundo `#F5F1EA`), tabelas e CSS inline. A marca é texto, sem imagem nem outro recurso remoto. Cada mensagem tem um botão, o mesmo link em texto e a linha de que o link leva a `app.scapematch.com.br`. As variáveis são as do Supabase (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}` e, na troca, `{{ .NewEmail }}`).
 
 Nada disso foi aplicado no projeto remoto por este repositório. Duas formas de publicar:
 
@@ -108,7 +108,7 @@ Segredos, no painel da função (nunca no repositório):
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` a plataforma já injeta na função.
 
-`ALLOWED_ORIGINS` é opcional. Lista de origens exatas separadas por vírgula; o espaço ao redor da vírgula é ignorado. Sem essa variável, o CORS reflete só `https://nicolas00saliba.github.io`. `*` não é aceito. `http://localhost` e `http://127.0.0.1` (com porta) só entram quando `SUPABASE_URL` aponta para o Supabase local. Pedido sem `Origin` (webhook e app nativo) continua recebendo JSON, sem `Access-Control-Allow-Origin`.
+`ALLOWED_ORIGINS` é opcional. Lista de origens exatas separadas por vírgula; o espaço ao redor da vírgula é ignorado. Sem essa variável, o CORS aceita `https://nicolas00saliba.github.io` e os subdomínios `app`, `parceiro`, `demo`, `www` e o apex de `scapematch.com.br`. `*` não é aceito. `http://localhost` e `http://127.0.0.1` (com porta) só entram quando `SUPABASE_URL` aponta para o Supabase local. Pedido sem `Origin` (webhook e app nativo) continua recebendo JSON, sem `Access-Control-Allow-Origin`.
 
 Deploy, na sua máquina, depois da revisão:
 

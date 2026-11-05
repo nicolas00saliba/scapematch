@@ -1,7 +1,18 @@
 import { redactSensitive } from "./redact.ts";
 
-/// Origem usada quando `ALLOWED_ORIGINS` não está definida.
+/// Origem legada (GitHub Pages do monorepo).
 export const productionWebOrigin = "https://nicolas00saliba.github.io";
+
+/// Origens aceitas quando `ALLOWED_ORIGINS` não está definida.
+/// Inclui o Pages antigo e os subdomínios próprios na transição.
+export const productionWebOrigins = [
+  productionWebOrigin,
+  "https://app.scapematch.com.br",
+  "https://parceiro.scapematch.com.br",
+  "https://demo.scapematch.com.br",
+  "https://scapematch.com.br",
+  "https://www.scapematch.com.br",
+];
 
 const allowedHeaders =
   "authorization, x-client-info, apikey, content-type, asaas-access-token";
@@ -15,10 +26,10 @@ export function allowsLocalhostOrigins(env: EnvLike): boolean {
 }
 
 /// Origens exatas, separadas por vírgula. `*` não entra.
-/// Sem a variável, fica só `https://nicolas00saliba.github.io`.
+/// Sem a variável, vale [productionWebOrigins].
 export function allowedOrigins(env: EnvLike): string[] {
   const raw = env.get("ALLOWED_ORIGINS");
-  const source = raw?.trim() ? raw : productionWebOrigin;
+  const source = raw?.trim() ? raw : productionWebOrigins.join(",");
   return source.split(",").map((item) => item.trim()).filter((item) =>
     item.length > 0 && item !== "*"
   );

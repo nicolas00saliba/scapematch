@@ -5,6 +5,7 @@ import {
   isAllowedOrigin,
   json,
   productionWebOrigin,
+  productionWebOrigins,
 } from "./http.ts";
 
 function envOf(values: Record<string, string>): { get(name: string): string | undefined } {
@@ -82,4 +83,15 @@ Deno.test("ALLOWED_ORIGINS troca a lista e o curinga não passa", () => {
   assertEquals(isAllowedOrigin("https://evil.example", star), false);
   assertEquals(isAllowedOrigin(productionWebOrigin, star), false);
   assertEquals(JSON.stringify(corsHeadersFor(request("https://evil.example"), star)).includes("*"), false);
+});
+
+Deno.test("os subdomínios próprios entram no padrão sem ALLOWED_ORIGINS", () => {
+  assertEquals(productionWebOrigins.includes(productionWebOrigin), true);
+  assertEquals(productionWebOrigins.includes("https://app.scapematch.com.br"), true);
+  assertEquals(productionWebOrigins.includes("https://parceiro.scapematch.com.br"), true);
+  assertEquals(productionWebOrigins.includes("https://demo.scapematch.com.br"), true);
+  assertEquals(isAllowedOrigin("https://app.scapematch.com.br", hosted), true);
+  assertEquals(isAllowedOrigin("https://parceiro.scapematch.com.br", hosted), true);
+  assertEquals(isAllowedOrigin("https://demo.scapematch.com.br", hosted), true);
+  assertEquals(isAllowedOrigin("https://scapematch.com.br", hosted), true);
 });

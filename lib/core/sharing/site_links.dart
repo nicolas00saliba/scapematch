@@ -1,22 +1,25 @@
+import 'package:scapematch/core/sharing/public_origins.dart';
 import 'package:scapematch/core/sharing/web_base.dart';
 
-/// App da casa, publicado ao lado do jogador.
+/// App da casa.
 ///
-/// No Pages o jogador fica em `/scapematch/` e a casa em
-/// `/scapematch/parceiro/`. O caminho é absoluto de propósito: o `<base href>`
-/// do jogador não pode puxar esse link para dentro do próprio app.
+/// Em produção o Parceiro mora em [partnerAppOrigin]. No GitHub Pages antigo
+/// ele ainda fica em [legacyPartnerPath] no mesmo host. Fora da web, o
+/// caminho relativo aponta o Pages antigo para quem cola o link à mão.
 Uri partnerAppUri({Uri? page}) {
   final current = page ?? Uri.base;
-  const path = '/scapematch/parceiro/';
-  if (current.host.isEmpty) {
-    return Uri(path: path);
+  if (current.host == legacyPagesHost) {
+    return Uri(
+      scheme: current.scheme.isEmpty ? 'https' : current.scheme,
+      host: current.host,
+      port: current.hasPort ? current.port : null,
+      path: legacyPartnerPath,
+    );
   }
-  return Uri(
-    scheme: current.scheme.isEmpty ? 'https' : current.scheme,
-    host: current.host,
-    port: current.hasPort ? current.port : null,
-    path: path,
-  );
+  if (current.host.isEmpty) {
+    return Uri(path: legacyPartnerPath);
+  }
+  return Uri.parse('$partnerAppOrigin/');
 }
 
 /// Página do jogador, para colar num convite.
@@ -24,15 +27,29 @@ String playerHomeLink({Uri? page, String? baseHref}) {
   final current = page ?? Uri.base;
   final prefix = _deploymentPrefix(baseHref ?? webBaseHref());
   final path = prefix.isEmpty ? '/' : '$prefix/';
+  if (current.host == legacyPagesHost) {
+    final legacyPath = prefix.isEmpty ? legacyPlayerPath : '$prefix/';
+    return Uri(
+      scheme: current.scheme.isEmpty ? 'https' : current.scheme,
+      host: current.host,
+      port: current.hasPort ? current.port : null,
+      path: legacyPath,
+    ).toString();
+  }
   if (current.host.isEmpty) {
     return path;
   }
-  return Uri(
-    scheme: current.scheme.isEmpty ? 'https' : current.scheme,
-    host: current.host,
-    port: current.hasPort ? current.port : null,
-    path: path,
-  ).toString();
+  // Nos hosts do produto (app/demo) usa o host atual + base do build.
+  if (current.host == 'app.scapematch.com.br' ||
+      current.host == 'demo.scapematch.com.br') {
+    return Uri(
+      scheme: current.scheme.isEmpty ? 'https' : current.scheme,
+      host: current.host,
+      port: current.hasPort ? current.port : null,
+      path: path,
+    ).toString();
+  }
+  return '$playerAppOrigin/';
 }
 
 /// Texto para mandar o ScapeMatch a alguém que ainda não tem o app.
