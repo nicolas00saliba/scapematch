@@ -1,3 +1,4 @@
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// URL e chave publicável do projeto ScapeMatch.
@@ -19,4 +20,27 @@ Future<void> startScapeSupabase() async {
     publishableKey: scapeSupabasePublishableKey,
   );
   scapeUsesLiveBackend = true;
+}
+
+/// Liga o backend deste binário. O release de demonstração não chega
+/// no [startScapeSupabase]: o `if` é constante e o compilador corta a chamada.
+Future<void> bootScapeBackend() async {
+  if (kAppMode == AppMode.demo) {
+    scapeUsesLiveBackend = false;
+    return;
+  }
+  await startScapeSupabase();
+}
+
+/// Mesma escolha, com o modo e o arranque injetados. Os testes usam isto
+/// para provar que a demonstração não chama o Supabase.
+Future<void> applyBackendPlan(
+  AppMode mode, {
+  Future<void> Function()? startSupabase,
+}) async {
+  if (mode == AppMode.demo) {
+    scapeUsesLiveBackend = false;
+    return;
+  }
+  await (startSupabase ?? startScapeSupabase)();
 }

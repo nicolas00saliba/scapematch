@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/data/sample_data.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/time/clock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
 import 'package:scapematch/features/auth/data/pending_invite_store.dart';
 import 'package:scapematch/features/auth/data/supabase_auth_repository.dart';
@@ -42,14 +44,28 @@ import 'package:scapematch/features/wallet/domain/wallet_transaction.dart';
 /// the refund window for the whole session.
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
 
+/// Plano deste processo. O [bootScapeBackend] liga o Supabase no modo real
+/// antes do primeiro frame. Testes não chamam o boot, então ficam na memória.
+/// Um teste troca o plano sem subir o cliente de verdade.
+final backendPlanProvider = Provider<BackendPlan>((ref) {
+  return planFor(scapeUsesLiveBackend ? AppMode.real : AppMode.demo);
+});
+
+/// Cliente do modo real. A demonstração não lê este provider.
+final supabaseClientProvider = Provider<SupabaseClient>((ref) {
+  return scapeSupabase;
+});
+
 /// Sessão fictícia. O app começa com Nícolas nesta mesma instância.
 /// `signOut` zera a sessão; um `FakeAuthRepository` novo não é criado,
 /// então o app continua deslogado até um login.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  if (scapeUsesLiveBackend) {
-    return SupabaseAuthRepository(scapeSupabase);
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return FakeAuthRepository();
+    }
   }
-  return FakeAuthRepository();
+  return SupabaseAuthRepository(ref.watch(supabaseClientProvider));
 });
 
 /// Grupo que a pessoa escolheu antes de entrar na conta.
@@ -66,45 +82,54 @@ final fakeDatabaseProvider = Provider<FakeDatabase>((ref) {
 });
 
 final cityRepositoryProvider = Provider<CityRepository>((ref) {
-  if (scapeUsesLiveBackend) {
-    return SupabaseCityRepository(scapeSupabase);
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return FakeCityRepository(ref.watch(fakeDatabaseProvider));
+    }
   }
-  return FakeCityRepository(ref.watch(fakeDatabaseProvider));
+  return SupabaseCityRepository(ref.watch(supabaseClientProvider));
 });
 
 final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
-  if (scapeUsesLiveBackend) {
-    return SupabaseCatalogRepository(scapeSupabase);
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return FakeCatalogRepository(ref.watch(fakeDatabaseProvider));
+    }
   }
-  return FakeCatalogRepository(ref.watch(fakeDatabaseProvider));
+  return SupabaseCatalogRepository(ref.watch(supabaseClientProvider));
 });
 
 /// Amigos e turmas. Com sessão real, as funções de
 /// `20261104120700_friends_crews.sql`. Sem ela, a memória da demonstração.
 final socialRepositoryProvider = Provider<SocialRepository>((ref) {
-  if (scapeUsesLiveBackend) {
-    return SupabaseSocialRepository((function, args) {
-      return scapeSupabase.rpc(function, params: args);
-    });
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return MemorySocialRepository(
+        board: ref.watch(communityBoardProvider),
+        clock: ref.watch(clockProvider),
+      );
+    }
   }
-  return MemorySocialRepository(
-    board: ref.watch(communityBoardProvider),
-    clock: ref.watch(clockProvider),
-  );
+  final client = ref.watch(supabaseClientProvider);
+  return SupabaseSocialRepository((function, args) {
+    return client.rpc(function, params: args);
+  });
 });
 
 final groupRepositoryProvider = Provider<GroupRepository>((ref) {
-  if (scapeUsesLiveBackend) {
-    return SupabaseGroupRepository(
-      client: scapeSupabase,
-      clock: ref.watch(clockProvider),
-    );
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return FakeGroupRepository(
+        ref.watch(fakeDatabaseProvider),
+        clock: ref.watch(clockProvider),
+        board: ref.watch(communityBoardProvider),
+        friends: ref.watch(socialRepositoryProvider),
+      );
+    }
   }
-  return FakeGroupRepository(
-    ref.watch(fakeDatabaseProvider),
+  return SupabaseGroupRepository(
+    client: ref.watch(supabaseClientProvider),
     clock: ref.watch(clockProvider),
-    board: ref.watch(communityBoardProvider),
-    friends: ref.watch(socialRepositoryProvider),
   );
 });
 
@@ -114,6 +139,9 @@ final userLocationSourceProvider = Provider<UserLocationSource>((ref) {
 });
 
 final sampleLivePresenceProvider = Provider<SampleLivePresence>((ref) {
+  if (!kAllowSampleData || ref.watch(backendPlanProvider).connectsSupabase) {
+    throw StateError('Presença de exemplo não existe no modo real.');
+  }
   return SampleLivePresence(
     database: ref.watch(fakeDatabaseProvider),
     clock: ref.watch(clockProvider),
@@ -125,10 +153,12 @@ final sampleLivePresenceProvider = Provider<SampleLivePresence>((ref) {
 /// Saldo fictício da Conta. A tela lê este provider, não um número solto.
 /// Trocar pelo livro-razão real é apontar para outra classe.
 final walletRepositoryProvider = Provider<WalletRepository>((ref) {
-  if (scapeUsesLiveBackend) {
-    return FakeWalletRepository(transactions: const <WalletTransaction>[]);
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return FakeWalletRepository();
+    }
   }
-  return FakeWalletRepository();
+  return FakeWalletRepository(transactions: const <WalletTransaction>[]);
 });
 
 /// Cartões cadastrados. Hoje a lista vem vazia. O cadastro real entra
@@ -140,11 +170,13 @@ final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((
 });
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {
-  if (scapeUsesLiveBackend) {
-    return SupabaseNewsRepository(scapeSupabase);
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      final now = ref.watch(clockProvider).now();
+      return FakeNewsRepository(items: buildSampleNews(now));
+    }
   }
-  final now = ref.watch(clockProvider).now();
-  return FakeNewsRepository(items: buildSampleNews(now));
+  return SupabaseNewsRepository(ref.watch(supabaseClientProvider));
 });
 
 /// Example house feed. The screens do not read this yet.

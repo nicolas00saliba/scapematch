@@ -11,6 +11,7 @@ import 'package:scapematch/features/catalog/presentation/room_card.dart';
 import 'package:scapematch/features/catalog/presentation/room_catalog_view_model.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 /// Salas da cidade que combinam com o tipo de jogo. [GameTypes.all] mostra todas.
 List<RoomListing> filterRoomsByGameType(
@@ -62,8 +63,12 @@ class RoomsCarousel extends ConsumerWidget {
               final kind = gameTypeId == GameTypes.all
                   ? ''
                   : ' de ${GameTypes.labelOf(gameTypeId)}';
+              final ofExample =
+                  ref.watch(backendPlanProvider).loadsSampleDatabase
+                  ? ' de exemplo'
+                  : '';
               return InlineNotice(
-                message: 'Ainda não há salas de exemplo$kind nesta cidade.',
+                message: 'Ainda não há salas$ofExample$kind nesta cidade.',
               );
             }
             return LayoutBuilder(

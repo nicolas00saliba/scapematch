@@ -19,7 +19,7 @@ import 'package:scapematch/providers/repositories.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await startScapeSupabase();
+  await bootScapeBackend();
   configureUrlStrategy();
   // The handle is intentionally not disposed: semantics stay on so screen
   // readers and the web accessibility tree can see the controls.

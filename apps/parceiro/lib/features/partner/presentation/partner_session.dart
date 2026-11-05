@@ -1,6 +1,6 @@
 import 'package:dominio/dominio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
@@ -90,7 +90,7 @@ class PartnerSessionController extends Notifier<PartnerAccount?> {
         return authErrorMessage(error, fallback: PartnerMessages.badLoginLive);
       }
     }
-    if (kReleaseMode) return PartnerMessages.badLoginLive;
+    if (!kAllowSampleLogin) return PartnerMessages.badLoginLive;
     final account = matchPartnerLogin(email, password);
     if (account == null) return PartnerMessages.badLogin;
     state = account;
@@ -154,20 +154,22 @@ final partnerRevisionProvider = NotifierProvider<PartnerRevision, int>(
 );
 
 final partnerRepositoryProvider = Provider<PartnerDesk>((ref) {
-  if (scapeUsesLiveBackend) {
-    return SupabasePartnerRepository(clock: ref.watch(clockProvider));
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      final groups = ref.watch(groupRepositoryProvider);
+      final catalog = ref.watch(catalogRepositoryProvider);
+      if (groups is! FakeGroupRepository || catalog is! FakeCatalogRepository) {
+        throw StateError('O Parceiro desta versão usa o livro em memória.');
+      }
+      return PartnerRepository(
+        groups: groups,
+        catalog: catalog,
+        database: ref.watch(fakeDatabaseProvider),
+        clock: ref.watch(clockProvider),
+      );
+    }
   }
-  final groups = ref.watch(groupRepositoryProvider);
-  final catalog = ref.watch(catalogRepositoryProvider);
-  if (groups is! FakeGroupRepository || catalog is! FakeCatalogRepository) {
-    throw StateError('O Parceiro desta versão usa o livro em memória.');
-  }
-  return PartnerRepository(
-    groups: groups,
-    catalog: catalog,
-    database: ref.watch(fakeDatabaseProvider),
-    clock: ref.watch(clockProvider),
-  );
+  return SupabasePartnerRepository(clock: ref.watch(clockProvider));
 });
 
 final partnerDeskProvider = FutureProvider<PartnerSnapshot?>((ref) async {
@@ -177,8 +179,7 @@ final partnerDeskProvider = FutureProvider<PartnerSnapshot?>((ref) async {
     return null;
   }
   final fiscal = ref.watch(partnerFiscalProvider);
-  return ref.read(partnerRepositoryProvider).load(
-    session.houseId,
-    fiscal: fiscal,
-  );
+  return ref
+      .read(partnerRepositoryProvider)
+      .load(session.houseId, fiscal: fiscal);
 });

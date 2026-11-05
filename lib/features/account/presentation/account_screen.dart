@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
@@ -56,7 +57,9 @@ class AccountScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Sua conta de exemplo nesta versão.',
+            ref.watch(backendPlanProvider).loadsSampleDatabase
+                ? 'Sua conta de exemplo nesta versão.'
+                : 'Sua conta no ScapeMatch.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),

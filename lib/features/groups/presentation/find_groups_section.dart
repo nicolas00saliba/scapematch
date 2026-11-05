@@ -345,7 +345,10 @@ class _FindGroupsSectionState extends ConsumerState<FindGroupsSection> {
     if (text.isNotEmpty) {
       return 'Nenhum grupo$kind com “$text” em $place.';
     }
-    return 'Ainda não há grupos de exemplo$kind em $place.';
+    final ofExample = ref.watch(backendPlanProvider).loadsSampleDatabase
+        ? ' de exemplo'
+        : '';
+    return 'Ainda não há grupos$ofExample$kind em $place.';
   }
 }
 

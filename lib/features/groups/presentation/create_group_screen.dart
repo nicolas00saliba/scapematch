@@ -17,9 +17,9 @@ import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/presentation/create_group_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/features/social/domain/social_models.dart';
 import 'package:scapematch/features/social/presentation/social_providers.dart';
-import 'package:scapematch/providers/repositories.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
   const CreateGroupScreen({super.key, this.prefilledRoomId});
@@ -265,7 +265,9 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       idOf: (house) => house.id,
       labelOf: (house) => house.name,
       subtitleOf: (house) => house.neighborhood,
-      emptyMessage: 'Não há casas de exemplo nesta cidade.',
+      emptyMessage: ref.read(backendPlanProvider).loadsSampleDatabase
+          ? 'Não há casas de exemplo nesta cidade.'
+          : 'Não há casas nesta cidade.',
     );
     if (house == null || !mounted) {
       return;

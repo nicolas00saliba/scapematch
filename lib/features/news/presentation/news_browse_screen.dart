@@ -97,8 +97,10 @@ class NewsBrowseScreen extends ConsumerWidget {
       data: (items) {
         if (items.isEmpty) {
           final place = cityName ?? 'esta cidade';
+          final sample = ref.watch(backendPlanProvider).loadsSampleDatabase;
+          final ofExample = sample ? ' de exemplo' : '';
           final message = category == null
-              ? 'Ainda não há novidades de exemplo em $place.'
+              ? 'Ainda não há novidades$ofExample em $place.'
               : 'Nenhuma novidade de ${newsCategoryLabel(category).toLowerCase()} em $place.';
           return InlineNotice(message: message);
         }

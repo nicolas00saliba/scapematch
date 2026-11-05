@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
@@ -13,12 +14,13 @@ import 'package:scapematch/features/promos/presentation/promo_carousel.dart';
 /// Home: cidade e jogo, grupos, promoções, novidades e um carrossel de salas.
 /// No site, promoções e novidades ficam lado a lado logo abaixo da busca,
 /// e os grupos viram uma grade compacta.
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final desktop = isScapeDesktop(context);
+    final showPromos = ref.watch(visiblePromoFlyersProvider).isNotEmpty;
     return AppScaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -33,12 +35,11 @@ class HomeScreen extends StatelessWidget {
             FindGroupsSection(
               belowSearch: desktop ? const _DesktopHighlights() : null,
             ),
-            if (!desktop) ...const [
+            if (!desktop && showPromos) ...const [
               SizedBox(height: 12),
               PromoCarousel(),
-              SizedBox(height: 12),
-              NewsSection(),
             ],
+            if (!desktop) ...const [SizedBox(height: 12), NewsSection()],
             const SizedBox(height: 12),
             const RoomsCarousel(),
           ],
@@ -49,11 +50,14 @@ class HomeScreen extends StatelessWidget {
 }
 
 /// Promoções e novidades no topo do site, na mesma faixa.
-class _DesktopHighlights extends StatelessWidget {
+class _DesktopHighlights extends ConsumerWidget {
   const _DesktopHighlights();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(visiblePromoFlyersProvider).isEmpty) {
+      return const NewsSection();
+    }
     return const Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

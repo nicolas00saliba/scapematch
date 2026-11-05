@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 
 /// Aviso curto. Aberto, explica que tudo nesta versão é inventado.
@@ -15,7 +16,9 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (scapeUsesLiveBackend) return const SizedBox.shrink();
+    if (!kShowDemoChrome || scapeUsesLiveBackend) {
+      return const SizedBox.shrink();
+    }
     final status = ScapeStatusColors.of(context);
     final textStyle = TextStyle(
       color: status.onAlertContainer,
@@ -28,8 +31,8 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
       child: Semantics(
         button: true,
         label: _open
-            ? 'Aviso: os dados desta versão são fictícios e servem só como exemplo. Toque para recolher.'
-            : 'Aviso: os dados desta versão são fictícios e servem só como exemplo. Toque para ler.',
+            ? 'Demonstração. Os dados desta versão são fictícios. Toque para recolher.'
+            : 'Demonstração. Toque para ler o aviso.',
         child: Material(
           color: status.alertContainer,
           borderRadius: BorderRadius.circular(20),
@@ -42,7 +45,7 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
                   ? ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 280),
                       child: Text(
-                        'Dados de exemplo. Casas, salas, horários, grupos e notícias são fictícios.',
+                        'Demonstração. Casas, salas, horários, grupos e notícias são fictícios.',
                         style: textStyle,
                       ),
                     )
@@ -59,7 +62,7 @@ class _ExampleDataBannerState extends State<ExampleDataBanner> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'Dados de exemplo',
+                            'Demonstração',
                             maxLines: 1,
                             style: textStyle.copyWith(
                               fontWeight: FontWeight.w700,

@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_board.dart';
 
 class VenueRegistry extends Notifier<VenueBoard> {
@@ -7,7 +9,13 @@ class VenueRegistry extends Notifier<VenueBoard> {
   final VenueBoard? _seed;
 
   @override
-  VenueBoard build() => _seed ?? VenueBoard.demo();
+  VenueBoard build() {
+    if (_seed != null) return _seed;
+    if (!kAllowSampleLogin || scapeUsesLiveBackend) {
+      return const VenueBoard(venues: [], claims: []);
+    }
+    return VenueBoard.demo();
+  }
 
   List<VenueConflict> check(VenueDraft draft, {String? exceptVenueId}) {
     return state.check(draft, exceptVenueId: exceptVenueId);
