@@ -99,11 +99,22 @@ async function reconcileOrphan(
       remote = await asaas.getPayment(row.provider_ref);
     } catch (error) {
       if (!isMissing(error)) return false;
+      if (!(await settleStuckCharge(admin, row, "cancelled"))) return false;
       return await markResolved(admin, row.id);
     }
   }
-  if (!remote) return await markResolved(admin, row.id);
+  if (!remote) {
+    if (!(await settleStuckCharge(admin, row, "cancelled"))) return false;
+    return await markResolved(admin, row.id);
+  }
   const action = lostAttemptCompensation(remote.status);
+  if (action === "none") {
+    const next = remote.status.trim().toUpperCase() === "REFUNDED"
+      ? "refunded"
+      : "cancelled";
+    if (!(await settleStuckCharge(admin, row, next))) return false;
+    return await markResolved(admin, row.id);
+  }
   const gone = await releaseRemote(
     asaas,
     remote.id,
@@ -111,7 +122,7 @@ async function reconcileOrphan(
     remote.billingType || row.billing_type,
   );
   if (!gone) return false;
-  if (row.charge_id && action !== "none") {
+  if (row.charge_id) {
     await admin.rpc("apply_payment_transition", {
       p_charge_id: row.charge_id,
       p_next_status: action === "refund" ? "refunded" : "cancelled",
@@ -139,6 +150,42 @@ async function releaseRemote(
   } catch (_error) {
     return false;
   }
+}
+
+/// Cobrança presa em creating/authorized, com o mesmo id do Asaas, sai
+/// para cancelled ou refunded antes de o órfão ser marcado. Outro
+/// provider_ref, ou status já terminal, não é mexido.
+async function settleStuckCharge(
+  admin: Admin,
+  row: OrphanRow,
+  nextStatus: "cancelled" | "refunded",
+): Promise<boolean> {
+  if (!row.charge_id || !row.provider_ref) return true;
+  const { data, error } = await admin
+    .from("payment_charges")
+    .select("status, provider_ref")
+    .eq("id", row.charge_id)
+    .maybeSingle();
+  if (error) return false;
+  const charge = data as
+    | { status?: string; provider_ref?: string | null }
+    | null;
+  if (!charge) return true;
+  const stuck = charge.status === "creating" || charge.status === "authorized";
+  if (!stuck || charge.provider_ref !== row.provider_ref) return true;
+  const { data: transition, error: transitionError } = await admin.rpc(
+    "apply_payment_transition",
+    {
+      p_charge_id: row.charge_id,
+      p_next_status: nextStatus,
+      p_credit: false,
+    },
+  );
+  if (transitionError) return false;
+  const status = transition && typeof transition === "object"
+    ? String((transition as { status?: unknown }).status ?? "")
+    : "";
+  return status === nextStatus;
 }
 
 async function markResolved(admin: Admin, id: string): Promise<boolean> {

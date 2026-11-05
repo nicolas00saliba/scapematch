@@ -5,12 +5,51 @@ import { handleReconcile } from "./index.ts";
 
 type Call = { name: string; args: Record<string, unknown> };
 
-function adminFor(work: unknown, calls: Call[]) {
+function adminFor(
+  work: unknown,
+  calls: Call[],
+  localCharge?: { id: string; status: string; provider_ref: string | null },
+) {
   return {
+    from(table: string) {
+      const filters: { col: string; value: unknown }[] = [];
+      const self = {
+        select() {
+          return self;
+        },
+        eq(col: string, value: unknown) {
+          filters.push({ col, value });
+          return self;
+        },
+        maybeSingle() {
+          if (table !== "payment_charges" || !localCharge) {
+            return Promise.resolve({ data: null, error: null });
+          }
+          const id = filters.find((filter) => filter.col === "id")?.value;
+          if (id !== localCharge.id) {
+            return Promise.resolve({ data: null, error: null });
+          }
+          return Promise.resolve({
+            data: {
+              status: localCharge.status,
+              provider_ref: localCharge.provider_ref,
+            },
+            error: null,
+          });
+        },
+      };
+      return self;
+    },
     rpc(name: string, args: Record<string, unknown> = {}) {
       calls.push({ name, args });
       if (name === "list_payment_reconciliation") {
         return Promise.resolve({ data: work, error: null });
+      }
+      if (name === "apply_payment_transition") {
+        return Promise.resolve({
+          data: { applied: true, status: args.p_next_status },
+          error: null,
+        });
       }
       if (name === "release_expired_pix_reservation") {
         return Promise.resolve({ data: true, error: null });
@@ -209,6 +248,115 @@ Deno.test("órfão já estornado no Asaas só marca resolvido", async () => {
   assert(http.some((call) => call.includes("/payments/pay_gone")));
   assertEquals(http.some((call) => call.includes("/refund")), false);
   assert(calls.some((call) => call.name === "mark_orphan_resolved"));
+});
+
+Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", async () => {
+  const chargeId = "44444444-4444-4444-4444-444444444444";
+  const refundedCalls: Call[] = [];
+  const refunded = await reconcilePayments(
+    adminFor(
+      {
+        creating: [],
+        orphans: [{
+          id: "99999999-9999-9999-9999-999999999999",
+          provider_ref: "pay_refunded",
+          charge_id: chargeId,
+          attempt_id: null,
+          billing_type: "CREDIT_CARD",
+          external_reference: "idem-card-1",
+        }],
+      },
+      refundedCalls,
+      {
+        id: chargeId,
+        status: "authorized",
+        provider_ref: "pay_refunded",
+      },
+    ),
+    providerFor([], [{
+      id: "pay_refunded",
+      status: "REFUNDED",
+      billingType: "CREDIT_CARD",
+      externalReference: "idem-card-1",
+    }]),
+  );
+  assertEquals(refunded, { resolved: 1, pending: 0 });
+  const refundedTransition = refundedCalls.findIndex((call) =>
+    call.name === "apply_payment_transition" &&
+    call.args.p_next_status === "refunded" &&
+    call.args.p_credit === false
+  );
+  const refundedMark = refundedCalls.findIndex((call) =>
+    call.name === "mark_orphan_resolved"
+  );
+  assert(refundedTransition >= 0 && refundedTransition < refundedMark);
+
+  const missingCalls: Call[] = [];
+  const missing = await reconcilePayments(
+    adminFor(
+      {
+        creating: [],
+        orphans: [{
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          provider_ref: "pay_deleted",
+          charge_id: chargeId,
+          attempt_id: null,
+          billing_type: "CREDIT_CARD",
+          external_reference: null,
+        }],
+      },
+      missingCalls,
+      {
+        id: chargeId,
+        status: "creating",
+        provider_ref: "pay_deleted",
+      },
+    ),
+    providerFor([], []),
+  );
+  assertEquals(missing, { resolved: 1, pending: 0 });
+  const missingTransition = missingCalls.findIndex((call) =>
+    call.name === "apply_payment_transition" &&
+    call.args.p_next_status === "cancelled"
+  );
+  const missingMark = missingCalls.findIndex((call) =>
+    call.name === "mark_orphan_resolved"
+  );
+  assert(missingTransition >= 0 && missingTransition < missingMark);
+
+  const otherCalls: Call[] = [];
+  const other = await reconcilePayments(
+    adminFor(
+      {
+        creating: [],
+        orphans: [{
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          provider_ref: "pay_refunded",
+          charge_id: chargeId,
+          attempt_id: null,
+          billing_type: "CREDIT_CARD",
+          external_reference: null,
+        }],
+      },
+      otherCalls,
+      {
+        id: chargeId,
+        status: "authorized",
+        provider_ref: "pay_outro",
+      },
+    ),
+    providerFor([], [{
+      id: "pay_refunded",
+      status: "REFUNDED",
+      billingType: "CREDIT_CARD",
+    }]),
+  );
+  assertEquals(other, { resolved: 1, pending: 0 });
+  assertEquals(
+    otherCalls.some((call) => call.name === "apply_payment_transition"),
+    false,
+  );
+  assert(otherCalls.some((call) => call.name === "mark_orphan_resolved"));
 });
 
 Deno.test("reconcile-payments recusa quem não é a service role", async () => {
