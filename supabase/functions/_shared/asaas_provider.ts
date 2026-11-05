@@ -71,13 +71,13 @@ export type CardHolder = {
 
 export type TokenizeInput = {
   customer: string;
-  remoteIp: string;
+  remoteIp?: string;
   creditCard: CardSecrets;
   creditCardHolderInfo: CardHolder;
 };
 
 export type CardChargeInput = PixInput & {
-  remoteIp: string;
+  remoteIp?: string;
   creditCardToken: string;
 };
 
@@ -334,12 +334,13 @@ export class AsaasProvider implements PaymentProvider {
     creditCardNumber: string;
     creditCardBrand: string;
   }> {
-    return this.#send("/creditCard/tokenizeCreditCard", {
+    const payload: Record<string, unknown> = {
       customer: input.customer,
       creditCard: input.creditCard,
       creditCardHolderInfo: input.creditCardHolderInfo,
-      remoteIp: input.remoteIp,
-    }).then((body) => ({
+    };
+    if (input.remoteIp) payload.remoteIp = input.remoteIp;
+    return this.#send("/creditCard/tokenizeCreditCard", payload).then((body) => ({
       creditCardToken: stringField(body, "creditCardToken"),
       creditCardNumber: optionalString(body, "creditCardNumber"),
       creditCardBrand: optionalString(body, "creditCardBrand"),
@@ -347,7 +348,7 @@ export class AsaasProvider implements PaymentProvider {
   }
 
   authorizeCard(input: CardChargeInput): Promise<{ id: string; status: string }> {
-    return this.#send("/payments", {
+    const payload: Record<string, unknown> = {
       customer: input.customer,
       billingType: "CREDIT_CARD",
       authorizeOnly: true,
@@ -355,10 +356,11 @@ export class AsaasProvider implements PaymentProvider {
       dueDate: input.dueDate,
       description: input.description,
       externalReference: input.externalReference,
-      remoteIp: input.remoteIp,
       split: [input.split],
       creditCardToken: input.creditCardToken,
-    }).then((body) => ({
+    };
+    if (input.remoteIp) payload.remoteIp = input.remoteIp;
+    return this.#send("/payments", payload).then((body) => ({
       id: stringField(body, "id"),
       status: stringField(body, "status"),
     }));

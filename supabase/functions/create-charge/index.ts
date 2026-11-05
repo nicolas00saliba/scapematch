@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
       qrCode = pix.payload;
       qrImage = pix.encodedImage;
     } else {
-      const remoteIp = clientIp(req);
+      const remoteIp = clientIp(req) ?? undefined;
       const savedCardId = requestedSavedCardId(body);
       if (!savedCardId) {
         return json({ error: "saved_card_id é obrigatório" }, 400);

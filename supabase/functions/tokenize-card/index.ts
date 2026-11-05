@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
 
         const tokenized = await asaas.tokenizeCard({
           customer: customerId,
-          remoteIp: clientIp(req),
+          remoteIp: clientIp(req) ?? undefined,
           creditCard: {
             holderName: card.holderName,
             number: card.number,
