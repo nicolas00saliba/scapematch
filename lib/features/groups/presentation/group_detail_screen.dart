@@ -437,10 +437,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       context: context,
       amountCents: group.priceCents,
       reference: group.id,
-      onPay: (kind) async {
+      onPay: (kind, {savedCardId}) async {
         final reason = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)
-            .payShare(kind);
+            .payShare(kind, savedCardId: savedCardId);
         return reason == null;
       },
     );

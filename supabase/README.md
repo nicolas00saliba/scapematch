@@ -57,7 +57,8 @@ A implementação é `AsaasProvider` em `supabase/functions/_shared/asaas_provid
 | Função | JWT | O que faz |
 | --- | --- | --- |
 | `provision-venue-wallet` | admin | Cria a subconta (`POST /v3/accounts`) e grava só o `walletId`. A `apiKey` da subconta não é salva. |
-| `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly`. O percentual do split sai da tabela de comissão, não do celular. |
+| `tokenize-card` | jogador autenticado | Única função que recebe número, CVV e validade. Chama `POST /v3/creditCard/tokenizeCreditCard`, grava em `saved_cards` e devolve só `saved_card_id`, `last4` e a bandeira. |
+| `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly` a partir de `saved_card_id`. Recusa número, CVV e validade. O percentual do split sai da tabela de comissão, não do celular. |
 | `settle-charges` | host, casa ou admin | Grupo fechado: captura o cartão e lança o extrato. Grupo que não fechou: estorna Pix pago e cancela a autorização do cartão. |
 | `cancel-house-group` | dono da casa ou admin | Cancela o grupo (`house_cancel_group`) e, com a service role, estorna o Pix ou cancela a autorização. `refunded` só depois da resposta da API ou do webhook. |
 | `asaas-webhook` | não | Exige o header `asaas-access-token` igual a `ASAAS_WEBHOOK_TOKEN`. Quando a cobrança fica paga e o grupo está fechado, emite as NFS-e. |
@@ -78,6 +79,7 @@ Deploy, na sua máquina, depois da revisão:
 
 ```bash
 supabase functions deploy provision-venue-wallet
+supabase functions deploy tokenize-card
 supabase functions deploy create-charge
 supabase functions deploy settle-charges
 supabase functions deploy cancel-house-group
@@ -91,7 +93,7 @@ No painel do Asaas sandbox, o webhook aponta para `https://eujlhicairvksvmssruz.
 
 A ScapeMatch Demo não recebe `walletId` no SQL. Com a chave já gravada, entre como admin e chame `provision-venue-wallet` sem `venue_id` (ou com o id da demo). Ela cria a subconta sandbox. O sandbox limita 20 subcontas por dia. Estornar um Pix logo depois de pago pode falhar se a taxa do Asaas deixar o saldo insuficiente: deixe saldo na conta raiz do sandbox.
 
-O Asaas não oferece SDK de navegador para tokenizar o cartão. `create-charge` recebe o cartão só na primeira chamada, troca por `creditCardToken` em `POST /v3/creditCard/tokenizeCreditCard` e grava o token em `saved_cards`, ligado ao `user_id` e ao customer Asaas dele. A cobrança (`authorizeOnly` e o split) usa só esse token salvo. Uma chamada seguinte manda `saved_card_id`. O token não volta para o app. `my_saved_cards()` devolve só o id interno, os 4 últimos dígitos e a bandeira. A chave da API também não volta na resposta.
+O Asaas não oferece SDK de navegador para tokenizar o cartão. Quem recebe número, CVV e validade é só `tokenize-card`: ela autentica o JWT, chama `POST /v3/creditCard/tokenizeCreditCard` e grava o token em `saved_cards`, ligado ao `user_id` e ao customer Asaas dele. A resposta leva só `saved_card_id`, `last4` e a bandeira. O app chama essa função primeiro e, em seguida, `create-charge` só com `saved_card_id`. A cobrança (`authorizeOnly` e o split) usa o token salvo dessa pessoa. Se o body da cobrança trouxer número, CVV ou validade, a função responde 400 e não chama o Asaas. O token não volta para o app. `my_saved_cards()` devolve só o id interno, os 4 últimos dígitos e a bandeira. A chave da API também não volta na resposta. Erro de tokenização volta genérico, sem o corpo do Asaas.
 
 ## NFS-e
 

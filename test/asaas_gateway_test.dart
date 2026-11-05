@@ -36,7 +36,18 @@ void main() {
     expect(charge.contains('cardForCharge'), isTrue);
     expect(charge.contains('savedCardView'), isTrue);
     expect(charge.contains('publicError'), isTrue);
+    expect(charge.contains('hasRawCardData'), isTrue);
+    expect(charge.contains('A cobrança não recebe dados do cartão.'), isTrue);
+    expect(charge.contains('tokenizeCreditCard'), isFalse);
+    expect(charge.contains('tokenizeCard'), isFalse);
     expect(charge.contains('console.'), isFalse);
+    final tokenize = File(
+      'supabase/functions/tokenize-card/index.ts',
+    ).readAsStringSync();
+    expect(tokenize.contains('tokenizeCard'), isTrue);
+    expect(tokenize.contains('tokenizePublicResponse'), isTrue);
+    expect(tokenize.contains('corsHeadersFor'), isTrue);
+    expect(tokenize.contains('console.'), isFalse);
     final responseAt = charge.indexOf('...(cardView ?? {})');
     final response = charge.substring(responseAt - 280, responseAt + 20);
     expect(response.contains('credit_card_token'), isFalse);

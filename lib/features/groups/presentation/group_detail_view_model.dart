@@ -6,6 +6,7 @@ import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_view_model.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
+import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// View model of one group.
@@ -27,11 +28,40 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
   }
 
   /// Nulo quando a parte foi paga.
-  Future<PayShareFailureReason?> payShare(PaymentMethodKind kind) async {
+  ///
+  /// [savedCardId] é o id interno de um cartão já tokenizado. Um cartão novo
+  /// passa por [payWithNewCard], que chama `tokenize-card` antes da cobrança.
+  Future<PayShareFailureReason?> payShare(
+    PaymentMethodKind kind, {
+    String? savedCardId,
+  }) async {
     final user = ref.read(currentUserProvider);
     final result = await ref
         .read(groupRepositoryProvider)
-        .payShare(groupId, userId: user.id, kind: kind);
+        .payShare(
+          groupId,
+          userId: user.id,
+          kind: kind,
+          savedCardId: savedCardId,
+        );
+    if (!ref.mounted) {
+      return null;
+    }
+    switch (result) {
+      case PayShareSuccess(:final group):
+        _publish(group);
+        return null;
+      case PayShareFailure(:final reason):
+        return reason;
+    }
+  }
+
+  /// Tokeniza o cartão e cobra a parte com o id devolvido.
+  Future<PayShareFailureReason?> payWithNewCard(CardDraft card) async {
+    final user = ref.read(currentUserProvider);
+    final result = await ref
+        .read(groupRepositoryProvider)
+        .payWithNewCard(groupId, userId: user.id, card: card);
     if (!ref.mounted) {
       return null;
     }

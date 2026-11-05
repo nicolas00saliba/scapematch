@@ -1,6 +1,9 @@
 [functions.provision-venue-wallet]
 verify_jwt = true
 
+[functions.tokenize-card]
+verify_jwt = true
+
 [functions.create-charge]
 verify_jwt = true
 

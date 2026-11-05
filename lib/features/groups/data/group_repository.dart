@@ -1,5 +1,6 @@
 import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
+import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
@@ -40,11 +41,27 @@ abstract class GroupRepository {
   });
 
   /// Cobra a parte de quem já está na cadeira. Não cobra quem ainda não entrou.
+  ///
+  /// Cartão já salvo entra só com [savedCardId]. Número, CVV e validade
+  /// não passam por aqui: um cartão novo usa [payWithNewCard].
   Future<PayShareResult> payShare(
     String groupId, {
     required String userId,
     required PaymentMethodKind kind,
+    String? savedCardId,
   });
+
+  /// Tokeniza em `tokenize-card` e cobra em `create-charge` com o id devolvido.
+  /// A demonstração não cobra.
+  Future<PayShareResult> payWithNewCard(
+    String groupId, {
+    required String userId,
+    required CardDraft card,
+  }) {
+    return Future.value(
+      const PayShareFailure(PayShareFailureReason.unavailable),
+    );
+  }
 
   Future<JoinResult> join(
     String groupId, {

@@ -13,8 +13,9 @@ import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
-import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
+import 'package:scapematch/features/groups/domain/party_companion.dart';
+import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const groupColumns =
@@ -181,8 +182,75 @@ class SupabaseGroupRepository implements GroupRepository {
     String groupId, {
     required String userId,
     required PaymentMethodKind kind,
+    String? savedCardId,
   }) async {
-    return const PayShareFailure(PayShareFailureReason.unavailable);
+    if (_userId == null || _userId != userId) {
+      return const PayShareFailure(PayShareFailureReason.unavailable);
+    }
+    if (kind == PaymentMethodKind.card &&
+        (savedCardId == null || savedCardId.isEmpty)) {
+      return const PayShareFailure(PayShareFailureReason.unavailable);
+    }
+    try {
+      await CardPaymentFlow(_invoke).charge(
+        groupId: groupId,
+        idempotencyKey: _chargeKey(groupId, userId),
+        kind: kind,
+        savedCardId: savedCardId,
+      );
+    } on Object {
+      return const PayShareFailure(PayShareFailureReason.unavailable);
+    }
+    final group = await getById(groupId);
+    if (group == null) {
+      return const PayShareFailure(PayShareFailureReason.notFound);
+    }
+    return PayShareSuccess(group);
+  }
+
+  @override
+  Future<PayShareResult> payWithNewCard(
+    String groupId, {
+    required String userId,
+    required CardDraft card,
+  }) async {
+    if (_userId == null || _userId != userId) {
+      return const PayShareFailure(PayShareFailureReason.unavailable);
+    }
+    try {
+      await CardPaymentFlow(_invoke).payWithNewCard(
+        card: card,
+        groupId: groupId,
+        idempotencyKey: _chargeKey(groupId, userId),
+      );
+    } on Object {
+      return const PayShareFailure(PayShareFailureReason.unavailable);
+    }
+    final group = await getById(groupId);
+    if (group == null) {
+      return const PayShareFailure(PayShareFailureReason.notFound);
+    }
+    return PayShareSuccess(group);
+  }
+
+  Future<Map<String, dynamic>> _invoke(
+    String name,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await client.functions.invoke(name, body: body);
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    return {};
+  }
+
+  String _chargeKey(String groupId, String userId) {
+    final stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
+    return 'pay-$groupId-$userId-$stamp';
   }
 
   @override

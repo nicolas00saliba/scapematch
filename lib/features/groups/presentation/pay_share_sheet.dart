@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -23,7 +24,8 @@ Future<bool> showPayShareSheet({
   required BuildContext context,
   required int amountCents,
   required String reference,
-  required Future<bool> Function(PaymentMethodKind kind) onPay,
+  required Future<bool> Function(PaymentMethodKind kind, {String? savedCardId})
+  onPay,
 }) async {
   final paid = await showModalBottomSheet<bool>(
     context: context,
@@ -52,7 +54,8 @@ class PayShareSheet extends ConsumerStatefulWidget {
 
   final int amountCents;
   final String reference;
-  final Future<bool> Function(PaymentMethodKind kind) onPay;
+  final Future<bool> Function(PaymentMethodKind kind, {String? savedCardId})
+  onPay;
 
   @override
   ConsumerState<PayShareSheet> createState() => _PayShareSheetState();
@@ -85,7 +88,12 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
 
   Future<void> _confirm() async {
     setState(() => _busy = true);
-    final ok = await widget.onPay(_method);
+    final savedCardId = _method == PaymentMethodKind.card &&
+            _cardId != null &&
+            _cardId != payTestCard.id
+        ? _cardId
+        : null;
+    final ok = await widget.onPay(_method, savedCardId: savedCardId);
     if (!mounted) {
       return;
     }
@@ -101,7 +109,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     final scheme = theme.colorScheme;
     final height = MediaQuery.sizeOf(context).height;
     final saved = ref.watch(paymentMethodsProvider).asData?.value ?? const [];
-    final cards = [payTestCard, ...saved];
+    final cards = scapeUsesLiveBackend ? saved : [payTestCard, ...saved];
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: ConstrainedBox(
