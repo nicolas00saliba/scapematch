@@ -1,4 +1,4 @@
-import { assertEquals, assert } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import {
   AsaasProvider,
   commissionCents,
@@ -10,7 +10,12 @@ Deno.test("10% de comissão deixa 90% com a casa", () => {
   assertEquals(houseSplitPercent(1000), 90);
   assertEquals(houseSplitPercent(0), 100);
   assertEquals(houseSplitPercent(1500), 85);
+  assertEquals(houseSplitPercent(3000), 70);
   assertEquals(commissionCents(12000, 1000), 1200);
+  assertEquals(commissionCents(10000, 3000), 3000);
+  assertThrows(() => houseSplitPercent(3001));
+  assertThrows(() => houseSplitPercent(10000));
+  assertThrows(() => commissionCents(10000, 3001));
 });
 
 Deno.test("o Pix manda o split para o walletId e a chave só no header", async () => {
