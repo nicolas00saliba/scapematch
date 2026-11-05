@@ -5,7 +5,9 @@ import 'package:scapematch/core/web/document_base.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/auth_return_url.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
+import 'package:scapematch/features/auth/data/signup_confirmation.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
+import 'package:scapematch/features/auth/domain/signup_result.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -114,7 +116,7 @@ class SupabaseAuthRepository implements AuthRepository {
         },
       );
       if (response.session == null) {
-        return 'Abra o e-mail para confirmar a conta e depois entre.';
+        return signupAwaitingEmailConfirmation;
       }
       await _client.rpc('accept_terms', params: {'p_audience': 'player'});
       await refresh();
@@ -125,6 +127,15 @@ class SupabaseAuthRepository implements AuthRepository {
         fallback: 'Não foi possível criar a conta. Tente de novo.',
       );
     }
+  }
+
+  @override
+  Future<String?> resendSignupEmail({required String email}) {
+    return resendSignupConfirmation(
+      client: _client,
+      email: email,
+      emailRedirectTo: kIsWeb ? _webRedirect() : null,
+    );
   }
 
   @override

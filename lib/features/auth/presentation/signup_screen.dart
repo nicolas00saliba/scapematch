@@ -9,8 +9,10 @@ import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
+import 'package:scapematch/features/auth/domain/signup_result.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/auth/presentation/signup_success_view.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
@@ -18,7 +20,10 @@ import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
-  const SignupScreen({super.key});
+  const SignupScreen({super.key, this.resendCooldown = signupResendCooldown});
+
+  /// Testes encurtam a espera. O app usa [signupResendCooldown].
+  final Duration resendCooldown;
 
   @override
   ConsumerState<SignupScreen> createState() => _SignupScreenState();
@@ -32,6 +37,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _month = TextEditingController();
   final _year = TextEditingController();
   String? _error;
+  String? _pendingEmail;
   var _busy = false;
   var _accepted = false;
   List<City> _cities = knownCities;
@@ -141,6 +147,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     if (!mounted) {
       return;
     }
+    if (error == signupAwaitingEmailConfirmation) {
+      setState(() {
+        _busy = false;
+        _error = null;
+        _pendingEmail = email;
+      });
+      return;
+    }
     if (error != null) {
       setState(() {
         _busy = false;
@@ -186,8 +200,34 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
+  void _openLogin() {
+    final next = GoRouterState.of(context).uri.queryParameters['next'];
+    if (next == null || next.isEmpty) {
+      context.go('/login');
+      return;
+    }
+    context.go(loginLocation(next));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pending = _pendingEmail;
+    if (pending != null) {
+      return AppScaffold(
+        desktopMaxWidth: AppScaffold.formMax,
+        appBar: AppBar(leading: ScapeBackButton(), title: Text('Conta criada')),
+        body: SignupSuccessView(
+          email: pending,
+          cooldown: widget.resendCooldown,
+          onLogin: _openLogin,
+          onResend: () {
+            return ref
+                .read(authSessionProvider.notifier)
+                .resendSignupEmail(email: pending);
+          },
+        ),
+      );
+    }
     return AppScaffold(
       desktopMaxWidth: AppScaffold.formMax,
       appBar: AppBar(leading: ScapeBackButton(), title: Text('Cadastro')),

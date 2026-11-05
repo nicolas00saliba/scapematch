@@ -1,16 +1,14 @@
 import 'package:dominio/dominio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:scapematch/core/supabase/scape_backend.dart';
-import 'package:scapematch/core/web/document_base.dart';
-import 'package:scapematch/features/auth/data/auth_return_url.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
-import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
+import 'package:scapematch/features/auth/domain/signup_result.dart';
+import 'package:scapematch/features/auth/presentation/signup_success_view.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_signup_gateway.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
@@ -18,7 +16,17 @@ import 'package:scapematch_parceiro/partner_keys.dart';
 
 /// Conta real da casa. O aceite chama `accept_terms('partner')`.
 class PartnerSignupScreen extends ConsumerStatefulWidget {
-  const PartnerSignupScreen({super.key});
+  const PartnerSignupScreen({
+    super.key,
+    this.gateway = const PartnerSignupGateway(),
+    this.resendCooldown = signupResendCooldown,
+  });
+
+  /// Teste injeta um gateway sem rede. O app usa o Auth de verdade.
+  final PartnerSignupGateway gateway;
+
+  /// Testes encurtam a espera. O app usa [signupResendCooldown].
+  final Duration resendCooldown;
 
   @override
   ConsumerState<PartnerSignupScreen> createState() =>
@@ -33,6 +41,7 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
   late final TapGestureRecognizer _privacyTap;
   late final TapGestureRecognizer _refundTap;
   String? _error;
+  String? _pendingEmail;
   var _accepted = false;
   var _busy = false;
 
@@ -80,49 +89,39 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
       _busy = true;
       _error = null;
     });
-    final rejected = await rejectPassword(_password.text);
+    final outcome = await widget.gateway.create(
+      name: name,
+      email: email,
+      password: _password.text,
+    );
     if (!mounted) return;
-    if (rejected != null) {
+    if (outcome.error != null) {
       setState(() {
         _busy = false;
-        _error = rejected;
+        _error = outcome.error;
+      });
+      return;
+    }
+    if (outcome.status == PartnerSignupStatus.confirmEmail) {
+      setState(() {
+        _busy = false;
+        _error = null;
+        _pendingEmail = email;
       });
       return;
     }
     try {
-      final response = await scapeSupabase.auth.signUp(
-        email: email,
-        password: _password.text,
-        emailRedirectTo: kIsWeb
-            ? authReturnUrl(Uri.base, documentBaseHref() ?? '')
-            : null,
-        data: {'display_name': name},
-      );
-      if (response.session == null) {
-        setState(() {
-          _busy = false;
-          _error = 'Abra o e-mail para confirmar a conta e depois entre.';
-        });
-        return;
-      }
-      await scapeSupabase.rpc(
-        'accept_terms',
-        params: {'p_audience': 'partner'},
-      );
       final account = await loadPartnerAccount();
       if (!mounted) return;
       if (account != null) {
         ref.read(partnerSessionProvider.notifier).adopt(account);
       }
       Navigator.of(context).pop();
-    } on Object catch (error) {
+    } on Object {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = authErrorMessage(
-          error,
-          fallback: 'Não foi possível criar a conta. Tente de novo.',
-        );
+        _error = 'Não foi possível abrir a conta. Tente entrar.';
       });
     }
   }
@@ -135,8 +134,29 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
     );
   }
 
+  void _openLogin() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pending = _pendingEmail;
+    if (pending != null) {
+      return AppScaffold(
+        desktopMaxWidth: 480,
+        appBar: AppBar(
+          leading: const BackButton(),
+          title: const Text('Conta criada'),
+        ),
+        body: SignupSuccessView(
+          email: pending,
+          cooldown: widget.resendCooldown,
+          onLogin: _openLogin,
+          onResend: () => widget.gateway.resend(pending),
+        ),
+      );
+    }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final body = theme.textTheme.bodyMedium?.copyWith(height: 1.35);
