@@ -70,6 +70,11 @@ abstract final class AppKeys {
   static const signupPassword = Key('signup-password');
   static const signupCity = Key('signup-city');
   static const signupSubmit = Key('signup-submit');
+  static const signupSuccess = Key('signup-success');
+  static const signupSuccessCheck = Key('signup-success-check');
+  static const signupGoToLogin = Key('signup-go-to-login');
+  static const signupResendEmail = Key('signup-resend-email');
+  static const signupResendStatus = Key('signup-resend-status');
   static const forgotPassword = Key('forgot-password');
   static const changePassword = Key('change-password');
   static const changePasswordField = Key('change-password-field');

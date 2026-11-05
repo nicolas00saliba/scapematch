@@ -27,7 +27,7 @@ Não há `service_role`, chave do Asaas nem chave da Stability nestes arquivos. 
 
 ## O que você faz depois de aplicar
 
-1. Authentication → Providers → Email. Deixe e-mail e senha ligados. Para a demonstração de sábado, desligue **Confirm email**. Com a confirmação ligada, o app avisa para abrir o e-mail e a casa só consegue gravar a venue depois que a sessão existe.
+1. Authentication → Providers → Email. Deixe e-mail e senha ligados. Para a demonstração de sábado, desligue **Confirm email**. Com a confirmação ligada, o cadastro do jogador e o da casa abrem a tela de sucesso (check verde, o e-mail e os botões de ir ao login ou reenviar). A casa só grava a venue depois que a sessão existe.
 2. Crie a sua conta de admin no app do jogador (ou no Parceiro) e pegue o UUID em Authentication → Users.
 3. Rode no SQL Editor, trocando o UUID:
 
@@ -37,6 +37,22 @@ insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000
 
 4. No Parceiro, entre com essa conta. A fila **Aprovar casas** lista as venues `pending`. Aprovar grava `approved`. Só então o jogador vê a casa, as salas e as notícias.
 5. Storage: o bucket `room-photos` é privado. Não há URL pública. O caminho é `{venue_id}/{room_id}/{arquivo}`. O app pede uma signed URL (`createSignedUrl`). A leitura passa por `room_photo_object_allowed`: casa aprovada, o dono ou um admin. Foto de casa pendente não abre para anônimo. Quem envia, troca e apaga é o dono da casa. Não coloque documento privado nesse bucket.
+
+## E-mails de autenticação
+
+Os HTML ficam em `supabase/templates/` e os assuntos em `supabase/config.toml` (`[auth.email.template.*]`). São cinco: confirmação de cadastro, redefinição de senha, magic link, troca de e-mail e convite. O desenho usa a paleta do app (verde-petróleo `#0F4C4A`, cobre `#9A4F24`, fundo `#F5F1EA`), tabelas e CSS inline. A marca é texto, sem imagem nem outro recurso remoto. Cada mensagem tem um botão, o mesmo link em texto e a linha de que o link leva a `nicolas00saliba.github.io/scapematch`. As variáveis são as do Supabase (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}` e, na troca, `{{ .NewEmail }}`).
+
+Nada disso foi aplicado no projeto remoto por este repositório. Duas formas de publicar:
+
+1. Painel: Authentication > Email Templates. Em cada tipo (Confirm signup, Reset password, Magic Link, Change Email, Invite user), cole o assunto do `config.toml` e o HTML do arquivo correspondente.
+2. API, na sua máquina, com um token seu (não grave o token no repositório):
+
+```bash
+export SUPABASE_ACCESS_TOKEN="..."
+tool/apply_auth_email_templates.sh
+```
+
+`tool/apply_auth_email_templates.sh --dry-run` só mostra os assuntos e o tamanho de cada HTML. O PATCH vai para `https://api.supabase.com/v1/projects/eujlhicairvksvmssruz/config/auth`, nos campos `mailer_subjects_*` e `mailer_templates_*_content`.
 
 ## Regras que o banco segura
 

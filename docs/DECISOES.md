@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## O cadastro real termina na confirmação do e-mail
+
+- **Data:** 2026-11-05
+- **Decisão:** no jogador real e no Parceiro real, o cadastro que o Auth aceita sem abrir sessão mostra uma tela de sucesso: check verde grande, “Conta criada. Confirme o e-mail que enviamos para o endereço e depois entre.”, “Ir para o login” e “Reenviar e-mail”. O reenvio chama `auth.resend` (`OtpType.signup`) e fica 60 segundos desligado, de novo depois de cada pedido. A frase é a mesma se o pedido saiu ou se a conta não existe: “Se houver um cadastro pendente para este e-mail, enviamos um novo link.” Só rede e limite de taxa têm texto próprio, sem dizer se o endereço está cadastrado. A demonstração continua entrando na hora. Os e-mails do Auth (confirmação, senha, magic link, troca e convite) estão em HTML pt-BR com a paleta do app, em `supabase/templates/`, apontados no `config.toml`. A marca é texto. Não há imagem remota. Cada um diz que o link leva a nicolas00saliba.github.io/scapematch. Publicar no projeto remoto é manual: colar em Authentication > Email Templates ou rodar `tool/apply_auth_email_templates.sh` com `SUPABASE_ACCESS_TOKEN`.
+- **Motivo:** com a confirmação ligada, a frase de erro no formulário não dizia que a conta já existia. O e-mail padrão do Supabase não parece o ScapeMatch.
+- **Onde está no código:** `SignupSuccessView`, o cadastro do jogador, o cadastro da casa, `resendSignupConfirmation` e `supabase/templates/`.
+- **Como trocar depois:** a espera do reenvio é `signupResendCooldown`. Outro desenho de e-mail entra no HTML e, para valer no remoto, precisa ser colado de novo ou reaplicado com o script.
+
 ## O app real instala na tela inicial sem religar o cache
 
 - **Data:** 2026-11-05

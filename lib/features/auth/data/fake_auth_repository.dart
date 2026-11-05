@@ -1,6 +1,7 @@
 import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
+import 'package:scapematch/features/auth/domain/signup_result.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 
@@ -9,8 +10,10 @@ import 'package:scapematch/features/legal/legal_documents.dart';
 /// Sem [signedIn], a sessão começa vazia. O app de exemplo passa o usuário
 /// Nícolas para a Home continuar aberta como hoje.
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({CurrentUser? signedIn = sampleCurrentUser})
-    : _user = signedIn {
+  FakeAuthRepository({
+    CurrentUser? signedIn = sampleCurrentUser,
+    this.awaitEmailConfirmation = false,
+  }) : _user = signedIn {
     _accounts['nicolas@exemplo.invalid'] = (
       user: sampleCurrentUser,
       password: 'senha-exemplo',
@@ -21,6 +24,15 @@ class FakeAuthRepository implements AuthRepository {
   var _nextId = 1;
   final _accounts = <String, ({CurrentUser user, String password})>{};
   final List<LegalAcceptance> _acceptances = [];
+
+  /// Cadastro real: a conta fica à espera do e-mail e a sessão não abre.
+  final bool awaitEmailConfirmation;
+
+  /// E-mails para os quais a tela pediu outro envio.
+  final List<String> resentSignupEmails = [];
+
+  /// Quando preenchido, [resendSignupEmail] devolve esta frase.
+  String? resendSignupError;
 
   @override
   CurrentUser? get signedInUser => _user;
@@ -69,6 +81,9 @@ class FakeAuthRepository implements AuthRepository {
     );
     _nextId += 1;
     _accounts[key] = (user: user, password: password);
+    if (awaitEmailConfirmation) {
+      return signupAwaitingEmailConfirmation;
+    }
     _user = user;
     final acceptedAt = DateTime(
       now.year,
@@ -89,6 +104,14 @@ class FakeAuthRepository implements AuthRepository {
       );
     }
     return null;
+  }
+
+  @override
+  Future<String?> resendSignupEmail({required String email}) async {
+    final trimmed = _normalize(email);
+    if (!trimmed.contains('@')) return 'Informe um e-mail válido.';
+    resentSignupEmails.add(trimmed);
+    return resendSignupError;
   }
 
   @override

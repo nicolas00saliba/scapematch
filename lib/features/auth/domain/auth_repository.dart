@@ -8,7 +8,9 @@ abstract class AuthRepository {
   /// Mensagem de erro, ou nulo quando entrou.
   Future<String?> signIn({required String email, required String password});
 
-  /// Cria a conta e já entra. Mensagem de erro, ou nulo.
+  /// Cria a conta. Nulo quando a sessão já existe.
+  /// `signupAwaitingEmailConfirmation` quando o e-mail ainda precisa
+  /// ser aberto. Qualquer outra string é erro.
   ///
   /// [cityId] vai no perfil via metadado do gatilho `handle_new_user`.
   Future<String?> signUp({
@@ -20,6 +22,9 @@ abstract class AuthRepository {
     required bool acceptedTerms,
     String? cityId,
   });
+
+  /// Reenvia o e-mail de confirmação do cadastro. Nulo quando saiu.
+  Future<String?> resendSignupEmail({required String email});
 
   /// Pede o e-mail de nova senha. Nulo quando o pedido foi aceito.
   Future<String?> requestPasswordReset({required String email});

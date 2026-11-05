@@ -48,6 +48,10 @@ class AuthController extends Notifier<CurrentUser?> {
     return error;
   }
 
+  Future<String?> resendSignupEmail({required String email}) {
+    return ref.read(authRepositoryProvider).resendSignupEmail(email: email);
+  }
+
   Future<String?> requestPasswordReset({required String email}) {
     return ref.read(authRepositoryProvider).requestPasswordReset(email: email);
   }
