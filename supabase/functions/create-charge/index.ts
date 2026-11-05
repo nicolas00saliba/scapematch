@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider, houseSplitPercent } from "../_shared/asaas_provider.ts";
+import { pixExternalReference, pixNeedsQr } from "../_shared/pix_charge.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
@@ -93,8 +94,20 @@ Deno.serve(async (req) => {
       .eq("group_id", groupId)
       .eq("user_id", user.id)
       .maybeSingle();
+    const refreshQr = Boolean(
+      existing && pixNeedsQr({
+        status: existing.status,
+        billing_type: existing.billing_type,
+        provider_ref: existing.provider_ref,
+        qr_code: existing.qr_code,
+      }),
+    );
     if (
-      existing && !["failed", "cancelled", "refunded"].includes(existing.status)
+      existing &&
+      !refreshQr &&
+      !["failed", "cancelled", "refunded"].includes(existing.status) &&
+      (existing.provider_ref || existing.qr_code ||
+        existing.billing_type !== "PIX")
     ) {
       return json({
         charge_id: existing.id,
@@ -116,7 +129,33 @@ Deno.serve(async (req) => {
       return json({ error: "A casa ainda não tem subconta Asaas." }, 409);
     }
 
-    const commissionBps = await commissionBpsForVenue(admin, venue.id as string);
+    const asaas = AsaasProvider.fromEnv(Deno.env);
+    if (refreshQr && existing?.provider_ref) {
+      const qr = await asaas.getPixQrCode(existing.provider_ref);
+      const { error: qrError } = await admin.from("payment_charges").update({
+        qr_code: qr.payload,
+        qr_code_base64: qr.encodedImage,
+      }).eq("id", existing.id);
+      if (qrError) return json({ error: publicError("erro") }, 400);
+      if (existing.status === "pending") {
+        await admin.from("group_members").update({ payment_status: "pending" })
+          .eq("id", member.id);
+      }
+      return json({
+        charge_id: existing.id,
+        status: existing.status,
+        provider_ref: existing.provider_ref,
+        qr_code: qr.payload,
+        qr_code_base64: qr.encodedImage,
+        billing_type: existing.billing_type,
+        amount_cents: existing.amount_cents,
+      });
+    }
+
+    const commissionBps = await commissionBpsForVenue(
+      admin,
+      venue.id as string,
+    );
     const split = {
       walletId: venue.asaas_wallet_id as string,
       percentualValue: houseSplitPercent(commissionBps),
@@ -129,7 +168,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const cpf = playerCpfDigits(profile?.cpf);
     if (!cpf) return json({ error: "cpf_required" }, 422);
-    const asaas = AsaasProvider.fromEnv(Deno.env);
     const previousCustomer = profile?.asaas_customer_id as string | null;
     const customerId = await customerWithCpf(asaas, {
       customerId: previousCustomer,
@@ -153,6 +191,7 @@ Deno.serve(async (req) => {
     let qrCode: string | null = null;
     let qrImage: string | null = null;
     let cardView: ReturnType<typeof savedCardView> | null = null;
+    let savedId = "";
 
     if (billingType === "PIX") {
       const pix = await asaas.createPix({
@@ -160,13 +199,35 @@ Deno.serve(async (req) => {
         value: amountCents / 100,
         dueDate,
         description,
-        externalReference: idempotencyKey,
+        externalReference: pixExternalReference(groupId, user.id),
         split,
+        onCreated: async (payment) => {
+          providerRef = payment.id;
+          savedId = await persistPixCharge(admin, {
+            existingId: existing?.id,
+            groupId,
+            userId: user.id,
+            venueId: venue.id as string,
+            amountCents,
+            providerRef: payment.id,
+            idempotencyKey,
+            walletId: venue.asaas_wallet_id as string,
+            commissionBps,
+          });
+        },
       });
       providerRef = pix.id;
       status = "pending";
       qrCode = pix.payload;
       qrImage = pix.encodedImage;
+      if (!savedId) throw new Error("erro");
+      const qrSaved = await admin.from("payment_charges").update({
+        qr_code: qrCode,
+        qr_code_base64: qrImage,
+        provider_ref: providerRef,
+        status,
+      }).eq("id", savedId);
+      if (qrSaved.error) return json({ error: publicError("erro") }, 400);
     } else {
       const remoteIp = clientIp(req) ?? undefined;
       const savedCardId = requestedSavedCardId(body);
@@ -206,28 +267,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    const row = {
-      group_id: groupId,
-      user_id: user.id,
-      venue_id: venue.id,
-      amount_cents: amountCents,
-      billing_type: billingType,
-      status,
-      provider: "asaas",
-      provider_ref: providerRef,
-      qr_code: qrCode,
-      qr_code_base64: qrImage,
-      idempotency_key: idempotencyKey,
-      wallet_id: venue.asaas_wallet_id,
-      commission_bps: commissionBps,
-      paid_at: status === "paid" ? new Date().toISOString() : null,
-    };
-    const saved = existing
-      ? await admin.from("payment_charges").update(row).eq("id", existing.id)
-        .select("id").single()
-      : await admin.from("payment_charges").insert(row).select("id").single();
-    if (saved.error) {
-      return json({ error: publicError("erro") }, 400);
+    if (billingType !== "PIX") {
+      const row = {
+        group_id: groupId,
+        user_id: user.id,
+        venue_id: venue.id,
+        amount_cents: amountCents,
+        billing_type: billingType,
+        status,
+        provider: "asaas",
+        provider_ref: providerRef,
+        qr_code: qrCode,
+        qr_code_base64: qrImage,
+        idempotency_key: idempotencyKey,
+        wallet_id: venue.asaas_wallet_id,
+        commission_bps: commissionBps,
+        paid_at: status === "paid" ? new Date().toISOString() : null,
+      };
+      const saved = existing
+        ? await admin.from("payment_charges").update(row).eq("id", existing.id)
+          .select("id").single()
+        : await admin.from("payment_charges").insert(row).select("id").single();
+      if (saved.error || !saved.data?.id) {
+        return json({ error: publicError("erro") }, 400);
+      }
+      savedId = saved.data.id as string;
     }
 
     const memberStatus = status === "paid"
@@ -239,7 +303,7 @@ Deno.serve(async (req) => {
       .eq("id", member.id);
 
     return json({
-      charge_id: saved.data.id,
+      charge_id: savedId,
       status,
       provider_ref: providerRef,
       qr_code: qrCode,
@@ -272,6 +336,68 @@ function findOwnedCard(
   cardId: string,
 ): Promise<SavedCard | null> {
   return loadOwnedCard(admin, userId, customerId, cardId);
+}
+
+async function persistPixCharge(
+  admin: ChargeDb,
+  input: {
+    existingId?: string;
+    groupId: string;
+    userId: string;
+    venueId: string;
+    amountCents: number;
+    providerRef: string;
+    idempotencyKey: string;
+    walletId: string;
+    commissionBps: number;
+  },
+): Promise<string> {
+  const row = {
+    group_id: input.groupId,
+    user_id: input.userId,
+    venue_id: input.venueId,
+    amount_cents: input.amountCents,
+    billing_type: "PIX",
+    status: "pending",
+    provider: "asaas",
+    provider_ref: input.providerRef,
+    qr_code: null,
+    qr_code_base64: null,
+    idempotency_key: input.idempotencyKey,
+    wallet_id: input.walletId,
+    commission_bps: input.commissionBps,
+    paid_at: null,
+    refunded_at: null,
+  };
+  if (input.existingId) {
+    const updated = await admin.from("payment_charges").update(row).eq(
+      "id",
+      input.existingId,
+    );
+    if (updated.error) throw new Error("erro");
+    return input.existingId;
+  }
+  const inserted = await admin.from("payment_charges").insert(row).select("id")
+    .single();
+  if (!inserted.error && inserted.data?.id) return inserted.data.id as string;
+  if (inserted.error?.code !== "23505") throw new Error("erro");
+  const found = await admin.from("payment_charges").select("id").eq(
+    "group_id",
+    input.groupId,
+  ).eq("user_id", input.userId).maybeSingle();
+  if (!found.data?.id) throw new Error("erro");
+  const id = found.data.id as string;
+  const updated = await admin.from("payment_charges").update({
+    provider_ref: input.providerRef,
+    status: "pending",
+    billing_type: "PIX",
+    provider: "asaas",
+    qr_code: null,
+    qr_code_base64: null,
+    refunded_at: null,
+  }).eq("id", id);
+  if (updated.error) throw new Error("erro");
+  return id;
 }
 
 async function filledSpots(

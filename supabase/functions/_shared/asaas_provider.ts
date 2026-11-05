@@ -43,6 +43,11 @@ export type ChargeSplit = {
   percentualValue: number;
 };
 
+export type PixPaymentRef = {
+  id: string;
+  status: string;
+};
+
 export type PixInput = {
   customer: string;
   value: number;
@@ -50,7 +55,22 @@ export type PixInput = {
   description: string;
   externalReference: string;
   split: ChargeSplit;
+  /// Chamado assim que o id da cobrança existe, antes do QR.
+  onCreated?: (payment: PixPaymentRef) => Promise<void>;
 };
+
+/// O QR não veio. A cobrança fica no Asaas para o mesmo externalReference.
+export class PixQrUnavailableError extends Error {
+  readonly paymentId: string;
+  readonly paymentStatus: string;
+
+  constructor(paymentId: string, paymentStatus: string) {
+    super("Asaas 502: pix_qr_unavailable");
+    this.name = "PixQrUnavailableError";
+    this.paymentId = paymentId;
+    this.paymentStatus = paymentStatus;
+  }
+}
 
 export type CardSecrets = {
   holderName: string;
@@ -110,7 +130,10 @@ export function houseSplitPercent(commissionBps: number): number {
 }
 
 /// Mesma conta de centavos do pacote dominio (meio centavo sobe).
-export function commissionCents(amountCents: number, commissionBps: number): number {
+export function commissionCents(
+  amountCents: number,
+  commissionBps: number,
+): number {
   if (
     amountCents < 0 || commissionBps < 0 ||
     commissionBps > maxConfigurableCommissionBps
@@ -201,18 +224,56 @@ type PaymentProvider = {
     creditCardNumber: string;
     creditCardBrand: string;
   }>;
-  authorizeCard(input: CardChargeInput): Promise<{ id: string; status: string }>;
+  authorizeCard(
+    input: CardChargeInput,
+  ): Promise<{ id: string; status: string }>;
   capture(paymentId: string): Promise<{ id: string; status: string }>;
   refund(paymentId: string): Promise<{ id: string; status: string }>;
-  cancelAuthorization(paymentId: string): Promise<{ id: string; status: string }>;
+  cancelAuthorization(
+    paymentId: string,
+  ): Promise<{ id: string; status: string }>;
   getPayment(paymentId: string): Promise<PaymentView>;
 };
+
+const reusablePixStatus = new Set([
+  "PENDING",
+  "OVERDUE",
+  "CONFIRMED",
+  "RECEIVED",
+  "AUTHORIZED",
+]);
+
+/// Pendente ganha de uma cobrança já paga com a mesma referência.
+export function pickReusablePix(rows: unknown[]): PixPaymentRef | null {
+  const pix = rows.filter((row): row is Record<string, unknown> => {
+    if (!row || typeof row !== "object") return false;
+    const record = row as Record<string, unknown>;
+    return record.billingType === "PIX" && typeof record.id === "string";
+  });
+  const pending = pix.find((row) =>
+    row.status === "PENDING" || row.status === "OVERDUE"
+  );
+  const chosen = pending ??
+    pix.find((row) => reusablePixStatus.has(String(row.status)));
+  if (!chosen || typeof chosen.id !== "string") return null;
+  return {
+    id: chosen.id,
+    status: typeof chosen.status === "string" ? chosen.status : "",
+  };
+}
+
+const pixQrAttempts = 3;
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export class AsaasProvider implements PaymentProvider {
   constructor(
     private readonly apiKey: string,
     private readonly baseUrl: string,
     private readonly fetchFn: AsaasFetch = fetch,
+    private readonly sleep: (ms: number) => Promise<void> = defaultSleep,
   ) {
     if (!apiKey) throw new Error("ASAAS_API_KEY ausente");
     if (!baseUrl.startsWith("https://")) {
@@ -235,7 +296,7 @@ export class AsaasProvider implements PaymentProvider {
 
   /// Outra chave, a mesma base URL. A subconta emite com a apiKey dela.
   withKey(apiKey: string): AsaasProvider {
-    return new AsaasProvider(apiKey, this.baseUrl, this.fetchFn);
+    return new AsaasProvider(apiKey, this.baseUrl, this.fetchFn, this.sleep);
   }
 
   createSubaccount(
@@ -263,7 +324,9 @@ export class AsaasProvider implements PaymentProvider {
     return this.#send("/fiscalInfo", body).then(() => undefined);
   }
 
-  scheduleInvoice(input: ScheduleInvoiceInput): Promise<{ id: string; status: string }> {
+  scheduleInvoice(
+    input: ScheduleInvoiceInput,
+  ): Promise<{ id: string; status: string }> {
     return this.#send("/invoices", {
       customer: input.customer,
       serviceDescription: input.serviceDescription,
@@ -327,26 +390,89 @@ export class AsaasProvider implements PaymentProvider {
     );
   }
 
-  createPix(input: PixInput): Promise<PixCreated> {
-    return this.#send("/payments", {
+  async createPix(input: PixInput): Promise<PixCreated> {
+    const payment = await this.#resolvePixPayment(input);
+    if (input.onCreated) await input.onCreated(payment);
+    try {
+      const qr = await this.#pixQrWithRetry(payment.id);
+      return {
+        id: payment.id,
+        status: payment.status,
+        payload: qr.payload,
+        encodedImage: qr.encodedImage,
+      };
+    } catch (error) {
+      if (error instanceof PixQrUnavailableError) throw error;
+      throw new PixQrUnavailableError(payment.id, payment.status);
+    }
+  }
+
+  async getPixQrCode(
+    paymentId: string,
+  ): Promise<{ payload: string; encodedImage: string }> {
+    try {
+      return await this.#pixQrWithRetry(paymentId);
+    } catch (error) {
+      if (error instanceof PixQrUnavailableError) throw error;
+      throw new PixQrUnavailableError(paymentId, "PENDING");
+    }
+  }
+
+  async #resolvePixPayment(input: PixInput): Promise<PixPaymentRef> {
+    const reference = input.externalReference.trim();
+    if (!reference) throw new Error("externalReference ausente");
+    const existing = await this.#findReusablePix(reference);
+    if (existing) return existing;
+    const body = await this.#send("/payments", {
       customer: input.customer,
       billingType: "PIX",
       value: input.value,
       dueDate: input.dueDate,
       description: input.description,
-      externalReference: input.externalReference,
+      externalReference: reference,
       split: [input.split],
-    }).then(async (body) => {
-      const id = stringField(body, "id");
-      const status = stringField(body, "status");
-      const qr = await this.#send(`/payments/${id}/pixQrCode`, undefined, "GET");
-      return {
-        id,
-        status,
+    });
+    return {
+      id: stringField(body, "id"),
+      status: stringField(body, "status"),
+    };
+  }
+
+  async #findReusablePix(reference: string): Promise<PixPaymentRef | null> {
+    const query = new URLSearchParams({
+      externalReference: reference,
+      limit: "20",
+    });
+    const body = await this.#send(`/payments?${query}`, undefined, "GET");
+    const rows = Array.isArray(body.data) ? body.data : [];
+    return pickReusablePix(rows);
+  }
+
+  async #pixQrWithRetry(
+    paymentId: string,
+  ): Promise<{ payload: string; encodedImage: string }> {
+    let last: unknown;
+    for (let attempt = 0; attempt < pixQrAttempts; attempt++) {
+      if (attempt > 0) await this.sleep(100 * attempt);
+      try {
+        return await this.#readPixQr(paymentId);
+      } catch (error) {
+        last = error;
+      }
+    }
+    throw last instanceof Error
+      ? last
+      : new PixQrUnavailableError(paymentId, "PENDING");
+  }
+
+  #readPixQr(
+    paymentId: string,
+  ): Promise<{ payload: string; encodedImage: string }> {
+    return this.#send(`/payments/${paymentId}/pixQrCode`, undefined, "GET")
+      .then((qr) => ({
         payload: stringField(qr, "payload"),
         encodedImage: stringField(qr, "encodedImage"),
-      };
-    });
+      }));
   }
 
   tokenizeCard(input: TokenizeInput): Promise<{
@@ -360,14 +486,18 @@ export class AsaasProvider implements PaymentProvider {
       creditCardHolderInfo: input.creditCardHolderInfo,
     };
     if (input.remoteIp) payload.remoteIp = input.remoteIp;
-    return this.#send("/creditCard/tokenizeCreditCard", payload).then((body) => ({
+    return this.#send("/creditCard/tokenizeCreditCard", payload).then((
+      body,
+    ) => ({
       creditCardToken: stringField(body, "creditCardToken"),
       creditCardNumber: optionalString(body, "creditCardNumber"),
       creditCardBrand: optionalString(body, "creditCardBrand"),
     }));
   }
 
-  authorizeCard(input: CardChargeInput): Promise<{ id: string; status: string }> {
+  authorizeCard(
+    input: CardChargeInput,
+  ): Promise<{ id: string; status: string }> {
     const payload: Record<string, unknown> = {
       customer: input.customer,
       billingType: "CREDIT_CARD",
