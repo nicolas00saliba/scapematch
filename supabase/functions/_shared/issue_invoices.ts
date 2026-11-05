@@ -3,6 +3,7 @@
 // Em produção usa a chave da subconta para o serviço e a chave raiz para a comissão.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { safeClientText } from "./asaas_client_error.ts";
 import {
   AsaasProvider,
   centsToReais,
@@ -109,7 +110,10 @@ export async function cancelInvoicesForCharge(
         if (client) await client.cancelInvoice(row.provider_invoice_id);
       } catch (error) {
         await admin.from("fiscal_invoices").update({
-          error_message: error instanceof Error ? error.message : "cancel",
+          error_message: safeClientText(
+            error instanceof Error ? error.message : "cancel",
+            "issue_invoices",
+          ),
         }).eq("id", row.id);
       }
     }
@@ -192,7 +196,10 @@ async function writeDraft(
     await insertInvoice(admin, {
       ...base,
       status: "error",
-      error_message: error instanceof Error ? error.message : "erro",
+      error_message: safeClientText(
+        error instanceof Error ? error.message : "erro",
+        "issue_invoices",
+      ),
     });
   }
 }
@@ -201,7 +208,7 @@ async function insertInvoice(admin: Admin, row: Record<string, unknown>) {
   const { error } = await admin.from("fiscal_invoices").insert(row);
   if (!error) return;
   if (error.code === "23505") return;
-  throw new Error(error.message);
+  throw new Error("erro");
 }
 
 async function emitOnAsaas(

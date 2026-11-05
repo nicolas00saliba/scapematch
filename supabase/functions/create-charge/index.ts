@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider, houseSplitPercent } from "../_shared/asaas_provider.ts";
 import { clientIp } from "../_shared/client_ip.ts";
+import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
 import {
   bindJson,
   corsHeadersFor,
@@ -113,12 +115,7 @@ Deno.serve(async (req) => {
       return json({ error: "A casa ainda não tem subconta Asaas." }, 409);
     }
 
-    const { data: settings } = await admin
-      .from("platform_settings")
-      .select("commission_bps")
-      .eq("id", 1)
-      .single();
-    const commissionBps = settings?.commission_bps ?? 1000;
+    const commissionBps = await commissionBpsForVenue(admin, venue.id as string);
     const split = {
       walletId: venue.asaas_wallet_id as string,
       percentualValue: houseSplitPercent(commissionBps),
@@ -226,7 +223,7 @@ Deno.serve(async (req) => {
         .select("id").single()
       : await admin.from("payment_charges").insert(row).select("id").single();
     if (saved.error) {
-      return json({ error: publicError(saved.error.message) }, 400);
+      return json({ error: publicError("erro") }, 400);
     }
 
     const memberStatus = status === "paid"
@@ -248,9 +245,8 @@ Deno.serve(async (req) => {
       ...(cardView ?? {}),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "erro";
-    const status = message === "cartão não encontrado" ? 403 : 500;
-    return json({ error: publicError(message) }, status);
+    const failure = clientFailure(error, "create-charge");
+    return json({ error: publicError(failure.error) }, failure.status);
   }
 });
 

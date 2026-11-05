@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { logAsaasFailure } from "../_shared/asaas_client_error.ts";
 import {
   AsaasProvider,
   isAsaasSandbox,
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
     await creditIfGroupClosed(admin, charge);
     await issuePaidInvoices(admin, charge, { sandbox, asaas }).catch(
       (error) => {
-        console.error(error);
+        logAsaasFailure("asaas-webhook", error);
       },
     );
   }
@@ -98,7 +99,7 @@ Deno.serve(async (req) => {
     await reverseLedger(admin, charge);
     await cancelInvoicesForCharge(admin, charge.id, { sandbox, asaas }).catch(
       (error) => {
-        console.error(error);
+        logAsaasFailure("asaas-webhook", error);
       },
     );
   }
@@ -109,7 +110,7 @@ function safeAsaas(): AsaasProvider | undefined {
   try {
     return AsaasProvider.fromEnv(Deno.env);
   } catch (error) {
-    console.error(error);
+    logAsaasFailure("asaas-webhook", error);
     return undefined;
   }
 }

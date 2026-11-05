@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import {
+  asaasUnavailable,
+  clientFailure,
+  logAsaasFailure,
+} from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 
@@ -76,7 +81,7 @@ Deno.serve(async (req) => {
         skip_reason: "cpf",
         updated_at: new Date().toISOString(),
       });
-      if (error) return json({ error: error.message }, 400);
+      if (error) return json({ error: "erro" }, 400);
       return json({
         venue_id: venueId,
         emission: "sem_emissao",
@@ -104,7 +109,7 @@ Deno.serve(async (req) => {
       skip_reason: null,
       updated_at: new Date().toISOString(),
     });
-    if (saveError) return json({ error: saveError.message }, 400);
+    if (saveError) return json({ error: "erro" }, 400);
 
     const { data: key } = await admin
       .from("venue_asaas_keys")
@@ -133,12 +138,12 @@ Deno.serve(async (req) => {
         password: body.municipal_password,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "erro";
+      logAsaasFailure("configure-venue-fiscal", error);
       return json({
         venue_id: venueId,
         emission: "habilitada",
         asaas: "erro",
-        error: message,
+        error: asaasUnavailable,
       }, 502);
     }
 
@@ -148,6 +153,7 @@ Deno.serve(async (req) => {
       asaas: "configured",
     });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "erro" }, 500);
+    const failure = clientFailure(error, "configure-venue-fiscal");
+    return json({ error: failure.error }, failure.status);
   }
 });

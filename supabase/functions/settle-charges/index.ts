@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { issuePaidInvoices } from "../_shared/issue_invoices.ts";
@@ -56,7 +57,8 @@ Deno.serve(async (req) => {
     }
     return json({ settled });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "erro" }, 500);
+    const failure = clientFailure(error, "settle-charges");
+    return json({ error: failure.error }, failure.status);
   }
 });
 
@@ -111,6 +113,7 @@ async function settleOne(
     return;
   }
 
+  // commission_bps é a taxa fotografada na cobrança por create-charge.
   const { data: charges } = await admin
     .from("payment_charges")
     .select("id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type")
