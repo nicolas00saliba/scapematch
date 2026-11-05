@@ -33,6 +33,7 @@ import 'package:scapematch/features/news/data/supabase_news_repository.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/payments/data/fake_payment_methods_repository.dart';
 import 'package:scapematch/features/payments/data/payment_methods_repository.dart';
+import 'package:scapematch/features/payments/data/player_payments_repository.dart';
 import 'package:scapematch/features/payments/data/supabase_payment_methods_repository.dart';
 import 'package:scapematch/features/wallet/data/fake_wallet_repository.dart';
 import 'package:scapematch/features/wallet/data/wallet_repository.dart';
@@ -173,6 +174,18 @@ final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((
     }
   }
   return SupabasePaymentMethodsRepository(ref.watch(supabaseClientProvider));
+});
+
+/// Pagamentos reais da conta. A demonstração não mostra esta lista.
+final playerPaymentsRepositoryProvider = Provider<PlayerPaymentsRepository>((
+  ref,
+) {
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return const EmptyPlayerPaymentsRepository();
+    }
+  }
+  return SupabasePlayerPaymentsRepository(ref.watch(supabaseClientProvider));
 });
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {

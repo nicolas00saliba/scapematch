@@ -26,6 +26,16 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
     super.dispose();
   }
 
+  Future<void> _remove(String id) async {
+    final removed = await ref.read(paymentMethodsRepositoryProvider).remove(id);
+    if (!mounted) return;
+    if (!removed) {
+      setState(() => _error = 'Não foi possível remover o cartão.');
+      return;
+    }
+    ref.invalidate(paymentMethodsProvider);
+  }
+
   Future<void> _save() async {
     final draft = _entry.draft;
     if (draft == null) {
@@ -77,12 +87,16 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
                 ),
               );
             }
+            final canRemove = ref.watch(backendPlanProvider).connectsSupabase;
             return Column(
               children: [
                 for (final method in items)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: _MethodTile(method: method),
+                    child: _MethodTile(
+                      method: method,
+                      onRemove: canRemove ? () => _remove(method.id) : null,
+                    ),
                   ),
               ],
             );
@@ -121,9 +135,10 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
 }
 
 class _MethodTile extends StatelessWidget {
-  const _MethodTile({required this.method});
+  const _MethodTile({required this.method, this.onRemove});
 
   final PaymentMethod method;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -137,11 +152,24 @@ class _MethodTile extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Text(
-          '${method.nickname} · ${cardBrandLabel(method.brand)} · ${method.last4}',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${method.nickname} · ${cardBrandLabel(method.brand)} · ${method.last4}',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (onRemove != null)
+              IconButton(
+                key: AppKeys.removeSavedCard(method.id),
+                tooltip: 'Remover cartão',
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline),
+              ),
+          ],
         ),
       ),
     );

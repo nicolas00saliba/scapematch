@@ -79,6 +79,9 @@ enum CreateGroupFailureReason {
   crewLeavesNoOpenSeat,
   companionNotFriend,
   companionUnavailable,
+
+  /// A casa aprovada ainda não tem conta de recebimento.
+  payoutPending,
 }
 
 sealed class ConfirmAttendanceResult {

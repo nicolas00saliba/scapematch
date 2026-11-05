@@ -5,6 +5,9 @@ String rpcText({String? code, required String message}) {
 }
 
 CreateGroupFailureReason createGroupFailure(String text) {
+  if (text.contains('conta de recebimento pendente')) {
+    return CreateGroupFailureReason.payoutPending;
+  }
   if (text.contains('below room minimum')) {
     return CreateGroupFailureReason.belowRoomMinimum;
   }

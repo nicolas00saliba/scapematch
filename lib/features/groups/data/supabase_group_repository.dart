@@ -48,7 +48,7 @@ class SupabaseGroupRepository implements GroupRepository {
         .eq('city_id', cityId)
         .isFilter('cancelled_at', null)
         .order('starts_at');
-    final groups = await _hydrate(rows);
+    final groups = await _hydrate(rows, hideWithoutPayout: true);
     final now = clock.now();
     return [
       for (final group in groups)
@@ -434,7 +434,10 @@ class SupabaseGroupRepository implements GroupRepository {
     return EditGroupSuccess(group);
   }
 
-  Future<List<Group>> _hydrate(List<dynamic> rawRows) async {
+  Future<List<Group>> _hydrate(
+    List<dynamic> rawRows, {
+    bool hideWithoutPayout = false,
+  }) async {
     final rows = [
       for (final row in rawRows) Map<String, dynamic>.from(row as Map),
     ];
@@ -459,8 +462,14 @@ class SupabaseGroupRepository implements GroupRepository {
         .from('group_members')
         .select(memberColumns)
         .inFilter('group_id', groupIds);
+    final blockedVenues = <String>{
+      for (final row in venues)
+        if (!venueReceivesGroups(row)) row['id'] as String,
+    };
     final houses = <String, EscapeHouse>{
-      for (final row in venues) row['id'] as String: houseFromRow(row),
+      for (final row in venues)
+        if (!hideWithoutPayout || venueReceivesGroups(row))
+          row['id'] as String: houseFromRow(row),
     };
     final roomById = <String, EscapeRoom>{
       for (final row in rooms) row['id'] as String: roomFromRow(row),
@@ -474,13 +483,15 @@ class SupabaseGroupRepository implements GroupRepository {
     }
     return [
       for (final row in rows)
-        _group(
-          row,
-          house: houses[textOf(row['venue_id'])],
-          room: roomById[textOf(row['room_id'])],
-          city: cityById[textOf(row['city_id'])],
-          members: byGroup[row['id'] as String] ?? const [],
-        ),
+        if (!hideWithoutPayout ||
+            !blockedVenues.contains(textOf(row['venue_id'])))
+          _group(
+            row,
+            house: houses[textOf(row['venue_id'])],
+            room: roomById[textOf(row['room_id'])],
+            city: cityById[textOf(row['city_id'])],
+            members: byGroup[row['id'] as String] ?? const [],
+          ),
     ];
   }
 

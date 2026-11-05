@@ -19,6 +19,7 @@ import 'package:scapematch_parceiro/features/partner/data/partner_repository.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_invoices_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
@@ -48,6 +49,7 @@ class PartnerHome extends ConsumerWidget {
       body: Column(
         children: [
           _PartnerBar(houseName: snapshot.house.name),
+          if (!snapshot.house.receivesPayments) const PayoutPendingBanner(),
           Expanded(
             child: wide
                 ? Row(

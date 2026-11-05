@@ -250,6 +250,36 @@ void main() {
     expect(book.audit, isEmpty);
   });
 
+  test('the admin setter accepts 0 and 30 percent and rejects 30.01', () {
+    final book = _book();
+    book.settings.setPlatformCommission(
+      actorId: 'nico',
+      role: PlatformRole.platformAdmin,
+      commissionBps: 0,
+      at: DateTime.utc(2026, 11, 5),
+    );
+    expect(book.settings.rateFor('house-1'), 0);
+    book.settings.setPlatformCommission(
+      actorId: 'nico',
+      role: PlatformRole.platformAdmin,
+      commissionBps: 3000,
+      at: DateTime.utc(2026, 11, 5),
+    );
+    expect(book.settings.rateFor('house-1'), 3000);
+    expect(parseCommissionPercent('30%'), 3000);
+    expect(parseCommissionPercent('30,01'), isNull);
+    expect(
+      () => book.settings.setHouseCommission(
+        actorId: 'nico',
+        role: PlatformRole.platformAdmin,
+        houseId: 'house-1',
+        commissionBps: 3001,
+        at: DateTime.utc(2026, 11, 5),
+      ),
+      throwsA(isA<PaymentException>()),
+    );
+  });
+
   test('the same payment key does not write the ledger twice', () async {
     final book = _book();
     final reservation = book.createReservation(
@@ -387,7 +417,7 @@ void main() {
     book.settings.setPlatformCommission(
       actorId: 'nico',
       role: PlatformRole.platformAdmin,
-      commissionBps: 5000,
+      commissionBps: 3000,
       at: DateTime.utc(2026, 11, 3),
     );
 

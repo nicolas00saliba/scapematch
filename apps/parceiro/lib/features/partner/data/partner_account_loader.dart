@@ -7,7 +7,8 @@ import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 const partnerVenueColumns =
     'id, owner_id, city_id, name, neighborhood, street_address, '
     'address_number, postal_code, latitude, longitude, document_kind, '
-    'category, badge, invite_id, status, reviewed_by, reviewed_at, created_at';
+    'category, badge, invite_id, status, reviewed_by, reviewed_at, created_at, '
+    'receives_payments';
 
 Future<PartnerAccount?> loadPartnerAccount() async {
   final user = scapeSupabase.auth.currentUser;
@@ -70,8 +71,7 @@ Future<VenueSignupResult> submitVenue(
 }) async {
   if (!acceptedTerms) {
     return const VenueSignupResult(
-      error:
-          'Aceite os termos do Parceiro, a privacidade e a política de cancelamento para cadastrar a casa.',
+      error: 'Aceite os termos do Parceiro, a privacidade e a política de cancelamento para cadastrar a casa.',
     );
   }
   final error = draft.validate();
@@ -113,26 +113,29 @@ Future<VenueSignupResult> submitVenue(
   }
   final income = double.parse(draft.incomeReais.trim().replaceAll(',', '.'));
   try {
-    await scapeSupabase.from('venues').insert({
-      'city_id': draft.cityId,
-      'name': draft.name.trim(),
-      'neighborhood': draft.neighborhood.trim(),
-      'street_address': draft.street.trim(),
-      'address_number': draft.number.trim().isEmpty
-          ? 'S/N'
-          : draft.number.trim(),
-      'postal_code': VenueDraft.digits(draft.postalCode),
-      'latitude': city['latitude'],
-      'longitude': city['longitude'],
-      'income_value': income,
-      'document_kind': draft.documentKind,
-      'document_number': VenueDraft.digits(draft.documentNumber),
-      'phone': VenueDraft.digits(draft.phone),
-      'category': draft.category,
-      'invite_id': ?inviteId,
-      if (duplicates.duplicateOf != null)
-        'possible_duplicate_of': duplicates.duplicateOf,
-    }).select('id');
+    await scapeSupabase
+        .from('venues')
+        .insert({
+          'city_id': draft.cityId,
+          'name': draft.name.trim(),
+          'neighborhood': draft.neighborhood.trim(),
+          'street_address': draft.street.trim(),
+          'address_number': draft.number.trim().isEmpty
+              ? 'S/N'
+              : draft.number.trim(),
+          'postal_code': VenueDraft.digits(draft.postalCode),
+          'latitude': city['latitude'],
+          'longitude': city['longitude'],
+          'income_value': income,
+          'document_kind': draft.documentKind,
+          'document_number': VenueDraft.digits(draft.documentNumber),
+          'phone': VenueDraft.digits(draft.phone),
+          'category': draft.category,
+          'invite_id': ?inviteId,
+          if (duplicates.duplicateOf != null)
+            'possible_duplicate_of': duplicates.duplicateOf,
+        })
+        .select('id');
     final userId = scapeSupabase.auth.currentUser?.id;
     if (userId != null) {
       final created = await scapeSupabase
@@ -144,10 +147,7 @@ Future<VenueSignupResult> submitVenue(
       if (created.isNotEmpty) {
         await scapeSupabase.rpc(
           'accept_terms',
-          params: {
-            'p_audience': 'partner',
-            'p_venue_id': created.first['id'],
-          },
+          params: {'p_audience': 'partner', 'p_venue_id': created.first['id']},
         );
       }
     }

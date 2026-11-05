@@ -112,6 +112,9 @@ abstract final class AppKeys {
   static const accountSignOut = Key('account-sign-out');
   static const accountSignIn = Key('account-sign-in');
   static const accountAddBalance = Key('account-add-balance');
+  static const myPayments = Key('my-payments');
+  static Key removeSavedCard(String id) => Key('remove-saved-card-$id');
+  static Key paymentRow(String id) => Key('payment-row-$id');
   static const addCard = Key('add-card');
   static const addCardNotice = Key('add-card-notice');
   static const addCardSave = Key('add-card-save');

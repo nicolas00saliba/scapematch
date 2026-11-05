@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
+import 'package:scapematch/features/payments/domain/player_charge.dart';
 import 'package:scapematch/features/wallet/domain/money.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -11,4 +12,8 @@ final walletBalanceProvider = FutureProvider<Money>((ref) {
 /// Cartões da conta. A lista de preparativos fica vazia nesta versão.
 final paymentMethodsProvider = FutureProvider<List<PaymentMethod>>((ref) {
   return ref.watch(paymentMethodsRepositoryProvider).list();
+});
+
+final playerPaymentsProvider = FutureProvider<List<PlayerCharge>>((ref) {
+  return ref.watch(playerPaymentsRepositoryProvider).list();
 });

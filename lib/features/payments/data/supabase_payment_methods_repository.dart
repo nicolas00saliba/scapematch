@@ -58,6 +58,15 @@ class SupabasePaymentMethodsRepository implements PaymentMethodsRepository {
       nickname: card.holderName,
     );
   }
+
+  @override
+  Future<bool> remove(String id) async {
+    final removed = await client.rpc(
+      'deactivate_my_saved_card',
+      params: {'p_card_id': id},
+    );
+    return removed == true;
+  }
 }
 
 CardBrand cardBrandFromAsaas(String value) {

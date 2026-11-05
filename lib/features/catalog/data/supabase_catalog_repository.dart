@@ -12,7 +12,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Colunas da vitrine. Documento, telefone e renda não entram.
 const venueVitrineColumns =
     'id, city_id, name, neighborhood, street_address, address_number, '
-    'postal_code, latitude, longitude, category, badge, status, created_at';
+    'postal_code, latitude, longitude, category, badge, status, created_at, '
+    'receives_payments';
 
 const roomColumns =
     'id, venue_id, name, theme, category, game_type, capacity, '
@@ -82,7 +83,13 @@ class SupabaseCatalogRepository implements CatalogRepository {
         .from('venues_vitrine')
         .select(venueVitrineColumns)
         .eq('status', 'approved');
-    final venueIds = <String>{for (final row in venues) row['id'] as String};
+    final openVenues = [
+      for (final row in venues)
+        if (venueReceivesGroups(row)) row,
+    ];
+    final venueIds = <String>{
+      for (final row in openVenues) row['id'] as String,
+    };
     final rooms = venueIds.isEmpty
         ? const <Map<String, dynamic>>[]
         : await _client
@@ -100,7 +107,7 @@ class SupabaseCatalogRepository implements CatalogRepository {
     return _CatalogSnap(
       cities: {for (final row in cities) row['id'] as String: cityFromRow(row)},
       houses: {
-        for (final row in venues) row['id'] as String: houseFromRow(row),
+        for (final row in openVenues) row['id'] as String: houseFromRow(row),
       },
       rooms: {for (final row in rooms) row['id'] as String: roomFromRow(row)},
       slots: [
@@ -166,6 +173,7 @@ EscapeHouse houseFromRow(Map<String, dynamic> row) {
       street: textOf(row['street_address']),
       number: textOf(row['address_number']),
     ),
+    receivesPayments: venueReceivesGroups(row),
   );
 }
 

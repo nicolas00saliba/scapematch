@@ -9,4 +9,7 @@ abstract class PaymentMethodsRepository {
   Future<List<PaymentMethod>> list();
 
   Future<PaymentMethod> save(CardDraft card);
+
+  /// Desativa o cartão da própria conta. Devolve falso se não era dela.
+  Future<bool> remove(String id);
 }
