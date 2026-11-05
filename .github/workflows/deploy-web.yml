@@ -11,27 +11,22 @@
 # Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
 # release that ships Dart 3.13.7.
 #
-# Triggers: manual run, pushes to the preview branches, and pushes to
-# main so a merge republishes the site. The Pages site is already served
-# from the gh-pages branch (root). Deploying with actions/deploy-pages
-# fails when the environment only accepts the default branch, and that
-# failed job turns the whole run red. This workflow only pushes the
-# built site to gh-pages. It does not push commits onto main.
+# Triggers: manual run from main, and pushes to main. Preview branches
+# do not publish. The Pages site is served from the gh-pages branch
+# (root). Switching to actions/deploy-pages would require changing the
+# repository Pages source from that branch to GitHub Actions. This
+# workflow keeps the branch publish and does not change that setting.
+# It does not push commits onto main.
 name: Deploy web
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - gh-pages-preview
-      - cursor/gh-pages-preview-23b9
-      - cursor/two-sample-groups-per-city-7ef7
-      - cursor/group-logistics-5b63
-      - cursor/landing-institucional-d3c3
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: scapematch-pages
@@ -41,12 +36,21 @@ jobs:
   build:
     name: Build web
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     steps:
+      - name: Publish only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::O site só é publicado a partir da main."
+          exit 1
+
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: "3.47.8"
@@ -135,13 +139,13 @@ jobs:
           grep -F -q 'Quero jogar' build/web/site/index.html
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: build/web
           include-hidden-files: "true"
 
       - name: Upload web site for the gh-pages fallback
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-site
           path: build/web
@@ -154,19 +158,26 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
     steps:
+      - name: Publish only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::O site só é publicado a partir da main."
+          exit 1
+
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download site
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: web-site
           path: _site
 
       - name: Publish the site on gh-pages
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./_site
@@ -180,6 +191,7 @@ jobs:
     name: Check public URL
     needs: publish-gh-pages
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Request the project site
         run: |
