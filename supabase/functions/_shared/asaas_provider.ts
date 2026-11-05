@@ -1,6 +1,12 @@
 // Gateway Asaas. A chave fica só em Deno.env na função que instancia isto.
 // Sandbox: https://api-sandbox.asaas.com/v3
 // Produção: https://api.asaas.com/v3
+//
+// Tokenização: POST /v3/creditCard/tokenizeCreditCard exige access_token.
+// Não há SDK de navegador. O cartão só atravessa a chamada de tokenização;
+// a cobrança seguinte manda creditCardToken.
+
+import { redactSensitive } from "./redact.ts";
 
 export const asaasSandboxBaseUrl = "https://api-sandbox.asaas.com/v3";
 export const asaasProductionBaseUrl = "https://api.asaas.com/v3";
@@ -46,23 +52,33 @@ export type PixInput = {
   split: ChargeSplit;
 };
 
-export type CardInput = PixInput & {
-  remoteIp: string;
-  creditCard: {
-    holderName: string;
-    number: string;
-    expiryMonth: string;
-    expiryYear: string;
-    ccv: string;
-  };
-  creditCardHolderInfo: {
-    name: string;
-    email: string;
-    cpfCnpj: string;
-    postalCode: string;
-    addressNumber: string;
-    phone: string;
-  };
+export type CardSecrets = {
+  holderName: string;
+  number: string;
+  expiryMonth: string;
+  expiryYear: string;
+  ccv: string;
+};
+
+export type CardHolder = {
+  name: string;
+  email: string;
+  cpfCnpj: string;
+  postalCode: string;
+  addressNumber: string;
+  phone: string;
+};
+
+export type TokenizeInput = {
+  customer: string;
+  remoteIp?: string;
+  creditCard: CardSecrets;
+  creditCardHolderInfo: CardHolder;
+};
+
+export type CardChargeInput = PixInput & {
+  remoteIp?: string;
+  creditCardToken: string;
 };
 
 export type PixCreated = {
@@ -172,7 +188,14 @@ type PaymentProvider = {
   ): Promise<{ walletId: string; apiKey: string }>;
   createCustomer(input: CustomerInput): Promise<{ id: string }>;
   createPix(input: PixInput): Promise<PixCreated>;
-  authorizeCard(input: CardInput): Promise<{ id: string; status: string }>;
+  tokenizeCard(
+    input: TokenizeInput,
+  ): Promise<{
+    creditCardToken: string;
+    creditCardNumber: string;
+    creditCardBrand: string;
+  }>;
+  authorizeCard(input: CardChargeInput): Promise<{ id: string; status: string }>;
   capture(paymentId: string): Promise<{ id: string; status: string }>;
   refund(paymentId: string): Promise<{ id: string; status: string }>;
   cancelAuthorization(paymentId: string): Promise<{ id: string; status: string }>;
@@ -306,8 +329,26 @@ export class AsaasProvider implements PaymentProvider {
     });
   }
 
-  authorizeCard(input: CardInput): Promise<{ id: string; status: string }> {
-    return this.#send("/payments", {
+  tokenizeCard(input: TokenizeInput): Promise<{
+    creditCardToken: string;
+    creditCardNumber: string;
+    creditCardBrand: string;
+  }> {
+    const payload: Record<string, unknown> = {
+      customer: input.customer,
+      creditCard: input.creditCard,
+      creditCardHolderInfo: input.creditCardHolderInfo,
+    };
+    if (input.remoteIp) payload.remoteIp = input.remoteIp;
+    return this.#send("/creditCard/tokenizeCreditCard", payload).then((body) => ({
+      creditCardToken: stringField(body, "creditCardToken"),
+      creditCardNumber: optionalString(body, "creditCardNumber"),
+      creditCardBrand: optionalString(body, "creditCardBrand"),
+    }));
+  }
+
+  authorizeCard(input: CardChargeInput): Promise<{ id: string; status: string }> {
+    const payload: Record<string, unknown> = {
       customer: input.customer,
       billingType: "CREDIT_CARD",
       authorizeOnly: true,
@@ -315,11 +356,11 @@ export class AsaasProvider implements PaymentProvider {
       dueDate: input.dueDate,
       description: input.description,
       externalReference: input.externalReference,
-      remoteIp: input.remoteIp,
       split: [input.split],
-      creditCard: input.creditCard,
-      creditCardHolderInfo: input.creditCardHolderInfo,
-    }).then((body) => ({
+      creditCardToken: input.creditCardToken,
+    };
+    if (input.remoteIp) payload.remoteIp = input.remoteIp;
+    return this.#send("/payments", payload).then((body) => ({
       id: stringField(body, "id"),
       status: stringField(body, "status"),
     }));
@@ -385,13 +426,22 @@ export class AsaasProvider implements PaymentProvider {
     }
     const response = await this.fetchFn(`${this.baseUrl}${path}`, init);
     const text = await response.text();
-    const safe = text.split(this.apiKey).join("[redacted]");
+    const safe = redactOutbound(text, this.apiKey);
     if (!response.ok) {
       throw new Error(`Asaas ${response.status}: ${safe.slice(0, 500)}`);
     }
     if (!text) return {};
-    return JSON.parse(text) as Record<string, unknown>;
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      throw new Error("Resposta do Asaas inválida");
+    }
   }
+}
+
+function redactOutbound(text: string, apiKey: string): string {
+  const withoutKey = apiKey ? text.split(apiKey).join("[redacted]") : text;
+  return redactSensitive(withoutKey);
 }
 
 function stringField(body: Record<string, unknown>, key: string): string {

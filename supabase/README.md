@@ -57,12 +57,29 @@ A implementação é `AsaasProvider` em `supabase/functions/_shared/asaas_provid
 | Função | JWT | O que faz |
 | --- | --- | --- |
 | `provision-venue-wallet` | admin | Cria a subconta (`POST /v3/accounts`) e grava só o `walletId`. A `apiKey` da subconta não é salva. |
-| `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly`. O percentual do split sai da tabela de comissão, não do celular. |
+| `tokenize-card` | jogador autenticado | Única função que recebe número, CVV e validade. O IP sai do header da borda, nunca do body. Antes do Asaas, `private.claim_card_tokenize_attempt` (só service role) registra a tentativa e recusa com 429 no 6º cartão ou na 6ª tentativa da hora. Grava o token cifrado por `insert_saved_card` e devolve só `saved_card_id`, `last4` e a bandeira. |
+| `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly` a partir de `saved_card_id`. O token é lido por `load_owned_card`. Recusa número, CVV e validade. O percentual do split sai da tabela de comissão, não do celular. |
 | `settle-charges` | host, casa ou admin | Grupo fechado: captura o cartão e lança o extrato. Grupo que não fechou: estorna Pix pago e cancela a autorização do cartão. |
 | `cancel-house-group` | dono da casa ou admin | Cancela o grupo (`house_cancel_group`) e, com a service role, estorna o Pix ou cancela a autorização. `refunded` só depois da resposta da API ou do webhook. |
 | `asaas-webhook` | não | Exige o header `asaas-access-token` igual a `ASAAS_WEBHOOK_TOKEN`. Quando a cobrança fica paga e o grupo está fechado, emite as NFS-e. |
 | `configure-venue-fiscal` | dono ou admin | Grava inscrição municipal, código de serviço e alíquota. Casa com CPF fica `sem_emissao`. Com a chave da subconta, chama `POST /v3/fiscalInfo`. A senha da prefeitura não é gravada. |
-| `invoice-document` | dono, jogador ou admin | Baixa PDF ou XML da nota que o RLS deixa ver. No sandbox o arquivo é de teste. |
+| `invoice-document` | dono, jogador ou admin | Baixa PDF ou XML da nota que o RLS deixa ver. No sandbox o arquivo é de teste. Não usa service role. |
+
+## service role
+
+A service role ignora o RLS. Cada função abaixo chama `getUser()` com a chave anônima e o JWT do pedido antes de abrir o cliente de service role, e só age para esse usuário.
+
+| Função | Por que a service role | O que confere antes |
+| --- | --- | --- |
+| `tokenize-card` | Grava o token cifrado e a tentativa. O jogador não tem grant na tabela nem nas funções de cifra. | JWT. O `user_id` gravado é o do `getUser()`. |
+| `create-charge` | Lê o token com `load_owned_card` e grava a cobrança. O jogador não lê a coluna. | JWT e, em seguida, a vaga dele em `group_members`. |
+| `settle-charges` | Captura, estorna e lança o extrato de grupos que o cliente não pode varrer. | JWT. `canSettle`: admin, quem criou o grupo ou o dono da casa. A varredura `sweep` exige admin. |
+| `cancel-house-group` | Estorna as cobranças depois do cancelamento. | JWT. O cancelamento passa por `house_cancel_group` no cliente do usuário. Liberar um grupo já cancelado exige admin, criador ou dono da casa. |
+| `provision-venue-wallet` | Cria a subconta e grava `walletId` e a chave da subconta, que o app não lê. | JWT e linha em `admins`. |
+| `configure-venue-fiscal` | Grava a configuração fiscal e chama o Asaas com a chave da subconta. | JWT e dono da casa ou admin. |
+| `asaas-webhook` | Atualiza cobrança, extrato e nota a partir do evento do Asaas. Não há JWT de usuário: é servidor a servidor, com `verify_jwt = false`. | Header `asaas-access-token` comparado com `ASAAS_WEBHOOK_TOKEN` (`tokensMatch`) antes de criar o cliente. |
+
+`invoice-document` fica de fora: usa só o cliente do usuário, e o RLS da nota decide o que ele baixa.
 
 Segredos, no painel da função (nunca no repositório):
 
@@ -74,10 +91,13 @@ Segredos, no painel da função (nunca no repositório):
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` a plataforma já injeta na função.
 
+`ALLOWED_ORIGINS` é opcional. Lista de origens exatas separadas por vírgula; o espaço ao redor da vírgula é ignorado. Sem essa variável, o CORS reflete só `https://nicolas00saliba.github.io`. `*` não é aceito. `http://localhost` e `http://127.0.0.1` (com porta) só entram quando `SUPABASE_URL` aponta para o Supabase local. Pedido sem `Origin` (webhook e app nativo) continua recebendo JSON, sem `Access-Control-Allow-Origin`.
+
 Deploy, na sua máquina, depois da revisão:
 
 ```bash
 supabase functions deploy provision-venue-wallet
+supabase functions deploy tokenize-card
 supabase functions deploy create-charge
 supabase functions deploy settle-charges
 supabase functions deploy cancel-house-group
@@ -91,7 +111,7 @@ No painel do Asaas sandbox, o webhook aponta para `https://eujlhicairvksvmssruz.
 
 A ScapeMatch Demo não recebe `walletId` no SQL. Com a chave já gravada, entre como admin e chame `provision-venue-wallet` sem `venue_id` (ou com o id da demo). Ela cria a subconta sandbox. O sandbox limita 20 subcontas por dia. Estornar um Pix logo depois de pago pode falhar se a taxa do Asaas deixar o saldo insuficiente: deixe saldo na conta raiz do sandbox.
 
-O número do cartão atravessa a função `create-charge` e segue para o Asaas. Ele não é gravado no banco. A chave da API também não volta na resposta.
+O Asaas não oferece SDK de navegador para tokenizar o cartão. Quem recebe número, CVV e validade é só `tokenize-card`: ela autentica o JWT, chama `POST /v3/creditCard/tokenizeCreditCard` e grava o token em `saved_cards`, ligado ao `user_id` e ao customer Asaas dele. O `remoteIp` que o Asaas pede sai de `x-real-ip`, depois de `cf-connecting-ip`, e só então do último endereço de `x-forwarded-for`. Endereço vazio ou inválido é descartado. Sem header válido, o pedido segue sem `remoteIp`. Um `remote_ip` no body é ignorado. A resposta leva só `saved_card_id`, `last4` e a bandeira. O app chama essa função primeiro e, em seguida, `create-charge` só com `saved_card_id`. A cobrança (`authorizeOnly` e o split) usa o token salvo dessa pessoa, lido por `load_owned_card`. Se o body da cobrança trouxer número, CVV ou validade, a função responde 400 e não chama o Asaas. O token não volta para o app. `my_saved_cards()` devolve só o id interno, os 4 últimos dígitos e a bandeira. Em repouso a coluna é `bytea` cifrada com `pgp_sym_encrypt`; a chave fica no vault (`card_token_key`) e as funções de gravar e ler estão em `private`, com `execute` só para a service role. A chave da API também não volta na resposta. Erro de tokenização volta genérico, sem o corpo do Asaas. O teto é 5 cartões por jogador e 5 tentativas por hora, contando as que falham. Estourar qualquer um responde 429 e não chama o Asaas.
 
 ## NFS-e
 

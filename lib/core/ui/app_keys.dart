@@ -114,6 +114,12 @@ abstract final class AppKeys {
   static const accountAddBalance = Key('account-add-balance');
   static const addCard = Key('add-card');
   static const addCardNotice = Key('add-card-notice');
+  static const addCardSave = Key('add-card-save');
+  static const cardHolder = Key('card-holder');
+  static const cardNumber = Key('card-number');
+  static const cardMonth = Key('card-month');
+  static const cardYear = Key('card-year');
+  static const cardSecurity = Key('card-security');
   static const addBalanceConfirm = Key('add-balance-confirm');
   static const topUpOtherAmount = Key('top-up-other-amount');
   static const payWithCard = Key('pay-with-card');

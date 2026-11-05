@@ -1,9 +1,12 @@
+import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 
 /// Cartões que a conta já cadastrou, só metadados.
 ///
-/// A lista de preparativos lê [list]. Cadastrar de verdade entra depois,
-/// com o token do provedor, não com o número digitado no app.
+/// [save] manda o número para `tokenize-card` e devolve o id, os 4 dígitos
+/// e a bandeira. A lista não guarda o número.
 abstract class PaymentMethodsRepository {
   Future<List<PaymentMethod>> list();
+
+  Future<PaymentMethod> save(CardDraft card);
 }

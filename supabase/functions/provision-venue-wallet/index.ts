@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
-import { corsHeaders, json } from "../_shared/http.ts";
+import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 
 type VenueRow = {
   id: string;
@@ -17,8 +17,9 @@ type VenueRow = {
 };
 
 Deno.serve(async (req) => {
+  const json = bindJson(req);
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(req, Deno.env) });
   }
   try {
     const authHeader = req.headers.get("Authorization") ?? "";

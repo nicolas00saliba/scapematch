@@ -57,7 +57,100 @@ Deno.test("o Pix manda o split para o walletId e a chave só no header", async (
   assertEquals(calls[1].init.body, undefined);
 });
 
-Deno.test("o cartão reserva com authorizeOnly e a captura usa o endpoint oficial", async () => {
+const sampleCard = {
+  holderName: "ANA",
+  number: "4111111111111111",
+  expiryMonth: "12",
+  expiryYear: "2028",
+  ccv: "999",
+};
+
+const sampleHolder = {
+  name: "ANA",
+  email: "ana@example.com",
+  cpfCnpj: "39053344705",
+  postalCode: "80020310",
+  addressNumber: "100",
+  phone: "41999990000",
+};
+
+const sampleCharge = {
+  customer: "cus_1",
+  value: 80,
+  dueDate: "2026-11-07",
+  description: "reserva",
+  externalReference: "charge-2",
+  split: { walletId: "wal_house", percentualValue: 90 },
+  remoteIp: "177.0.0.1",
+};
+
+Deno.test("a primeira cobrança tokeniza e só então reserva com o token", async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    calls.push({ url, init: init ?? {} });
+    if (url.endsWith("/creditCard/tokenizeCreditCard")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            creditCardToken: "tok_card_1",
+            creditCardNumber: "1111",
+            creditCardBrand: "VISA",
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ id: "pay_card", status: "AUTHORIZED" }), {
+        status: 200,
+      }),
+    );
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+  );
+  const tokenized = await provider.tokenizeCard({
+    customer: sampleCharge.customer,
+    remoteIp: sampleCharge.remoteIp,
+    creditCard: sampleCard,
+    creditCardHolderInfo: sampleHolder,
+  });
+  const authorized = await provider.authorizeCard({
+    ...sampleCharge,
+    creditCardToken: tokenized.creditCardToken,
+  });
+  assertEquals(tokenized.creditCardToken, "tok_card_1");
+  assertEquals(authorized.id, "pay_card");
+  assert(calls[0].url.endsWith("/creditCard/tokenizeCreditCard"));
+  const tokenBody = JSON.parse(String(calls[0].init.body));
+  assertEquals(tokenBody.creditCard.number, sampleCard.number);
+  const payment = JSON.parse(String(calls[1].init.body));
+  assertEquals(payment.authorizeOnly, true);
+  assertEquals(payment.billingType, "CREDIT_CARD");
+  assertEquals(payment.creditCardToken, "tok_card_1");
+  assertEquals(payment.split[0].walletId, "wal_house");
+  assertEquals(payment.split[0].percentualValue, 90);
+  assertEquals(payment.creditCard, undefined);
+  assertEquals(payment.creditCardHolderInfo, undefined);
+  const paymentText = JSON.stringify(payment);
+  assertEquals(paymentText.includes(sampleCard.number), false);
+  assertEquals(paymentText.includes(sampleCard.ccv), false);
+  assertEquals(paymentText.includes(sampleCard.expiryMonth), false);
+  assertEquals(paymentText.includes(sampleCard.expiryYear), false);
+  await provider.capture("pay_card");
+  assert(
+    calls[2].url.endsWith("/payments/pay_card/captureAuthorizedPayment"),
+  );
+  await provider.refund("pay_card");
+  assert(calls[3].url.endsWith("/payments/pay_card/refund"));
+  await provider.cancelAuthorization("pay_card");
+  assertEquals(calls[4].init.method, "DELETE");
+  assert(calls[4].url.endsWith("/payments/pay_card"));
+});
+
+Deno.test("com token a cobrança não reenvia o cartão", async () => {
   const calls: { url: string; init: RequestInit }[] = [];
   const fetchFn = (url: string, init?: RequestInit) => {
     calls.push({ url, init: init ?? {} });
@@ -73,41 +166,62 @@ Deno.test("o cartão reserva com authorizeOnly e a captura usa o endpoint oficia
     fetchFn,
   );
   await provider.authorizeCard({
-    customer: "cus_1",
-    value: 80,
-    dueDate: "2026-11-07",
-    description: "reserva",
-    externalReference: "charge-2",
-    split: { walletId: "wal_house", percentualValue: 90 },
-    remoteIp: "177.0.0.1",
-    creditCard: {
-      holderName: "ANA",
-      number: "4111111111111111",
-      expiryMonth: "12",
-      expiryYear: "2028",
-      ccv: "123",
-    },
-    creditCardHolderInfo: {
-      name: "ANA",
-      email: "ana@example.com",
-      cpfCnpj: "39053344705",
-      postalCode: "80020310",
-      addressNumber: "100",
-      phone: "41999990000",
-    },
+    ...sampleCharge,
+    creditCardToken: "tok_card_1",
   });
-  const body = JSON.parse(String(calls[0].init.body));
-  assertEquals(body.authorizeOnly, true);
-  assertEquals(body.billingType, "CREDIT_CARD");
-  await provider.capture("pay_card");
-  assert(
-    calls[1].url.endsWith("/payments/pay_card/captureAuthorizedPayment"),
+  assertEquals(calls.length, 1);
+  assert(calls[0].url.endsWith("/payments"));
+  const payment = JSON.parse(String(calls[0].init.body));
+  assertEquals(payment.creditCardToken, "tok_card_1");
+  assertEquals(payment.authorizeOnly, true);
+  assertEquals(JSON.stringify(payment).includes(sampleCard.number), false);
+  assertEquals(JSON.stringify(payment).includes(sampleCard.ccv), false);
+});
+
+Deno.test("erro da tokenização não ecoa número, CVV, validade nem o body", async () => {
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  const echoed = JSON.stringify({
+    errors: [{
+      description:
+        `cartão ${sampleCard.number} pedido 12 ref ${sampleCard.ccv} vence 2026-11-12`,
+    }],
+    creditCard: sampleCard,
+  });
+  const fetchFn = () =>
+    Promise.resolve(new Response(echoed, { status: 400 }));
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
   );
-  await provider.refund("pay_card");
-  assert(calls[2].url.endsWith("/payments/pay_card/refund"));
-  await provider.cancelAuthorization("pay_card");
-  assertEquals(calls[3].init.method, "DELETE");
-  assert(calls[3].url.endsWith("/payments/pay_card"));
+  let message = "";
+  try {
+    await provider.tokenizeCard({
+      customer: sampleCharge.customer,
+      remoteIp: sampleCharge.remoteIp,
+      creditCard: sampleCard,
+      creditCardHolderInfo: sampleHolder,
+    });
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  } finally {
+    console.error = original;
+  }
+  assert(message.length > 0);
+  assertEquals(message.includes(sampleCard.number), false);
+  assertEquals(message.includes("4111"), false);
+  assertEquals(message.includes(`"ccv":"${sampleCard.ccv}"`), false);
+  assertEquals(message.includes(`"expiryMonth":"${sampleCard.expiryMonth}"`), false);
+  assertEquals(message.includes(`"expiryYear":"${sampleCard.expiryYear}"`), false);
+  assertEquals(message.includes(`"number":"${sampleCard.number}"`), false);
+  assertEquals(message.includes("pedido 12"), true);
+  assertEquals(message.includes(`ref ${sampleCard.ccv}`), true);
+  assertEquals(message.includes("2026-11-12"), true);
+  assertEquals(logs.length, 0);
 });
 
 Deno.test("a subconta devolve walletId e apiKey para a função gravar", async () => {

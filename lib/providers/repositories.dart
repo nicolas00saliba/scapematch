@@ -33,6 +33,7 @@ import 'package:scapematch/features/news/data/supabase_news_repository.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/payments/data/fake_payment_methods_repository.dart';
 import 'package:scapematch/features/payments/data/payment_methods_repository.dart';
+import 'package:scapematch/features/payments/data/supabase_payment_methods_repository.dart';
 import 'package:scapematch/features/wallet/data/fake_wallet_repository.dart';
 import 'package:scapematch/features/wallet/data/wallet_repository.dart';
 import 'package:scapematch/features/wallet/domain/wallet_transaction.dart';
@@ -161,12 +162,17 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
   return FakeWalletRepository(transactions: const <WalletTransaction>[]);
 });
 
-/// Cartões cadastrados. Hoje a lista vem vazia. O cadastro real entra
-/// com token do provedor, sem número completo neste app.
+/// Cartões cadastrados. Na demonstração a lista vem vazia. No modo real,
+/// `my_saved_cards` devolve só id, final e bandeira.
 final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((
   ref,
 ) {
-  return FakePaymentMethodsRepository();
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return FakePaymentMethodsRepository();
+    }
+  }
+  return SupabasePaymentMethodsRepository(ref.watch(supabaseClientProvider));
 });
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {

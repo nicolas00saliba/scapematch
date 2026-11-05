@@ -12,6 +12,7 @@ import 'package:scapematch/features/groups/domain/group_phase.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
+import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/features/social/data/social_repository.dart';
 
 /// Sample implementation of [GroupRepository].
@@ -410,10 +411,25 @@ class FakeGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<PayShareResult> payWithNewCard(
+    String groupId, {
+    required String userId,
+    required CardDraft card,
+  }) {
+    if (card.number.isEmpty) {
+      return Future.value(
+        const PayShareFailure(PayShareFailureReason.unavailable),
+      );
+    }
+    return payShare(groupId, userId: userId, kind: PaymentMethodKind.card);
+  }
+
+  @override
   Future<PayShareResult> payShare(
     String groupId, {
     required String userId,
     required PaymentMethodKind kind,
+    String? savedCardId,
   }) async {
     await _pause();
     final index = _indexOf(groupId);
