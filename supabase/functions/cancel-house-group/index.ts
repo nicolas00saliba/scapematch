@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { clientDbError, clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { releaseCancelledCharges } from "../_shared/release_charges.ts";
@@ -45,7 +46,9 @@ Deno.serve(async (req) => {
         p_reason: body.reason ?? "Cancelada pela casa",
       });
       if (error) {
-        return json({ error: error.message }, 400);
+        return json({
+          error: clientDbError(error, "cancel-house-group"),
+        }, 400);
       }
     }
 
@@ -53,7 +56,8 @@ Deno.serve(async (req) => {
     const pending = await releaseCancelledCharges(admin, asaas, groupId);
     return json({ cancelled: true, pending });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "erro" }, 500);
+    const failure = clientFailure(error, "cancel-house-group");
+    return json(failure.body, failure.status);
   }
 });
 

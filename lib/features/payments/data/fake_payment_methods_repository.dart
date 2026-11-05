@@ -33,6 +33,13 @@ class FakePaymentMethodsRepository implements PaymentMethodsRepository {
     _methods.add(method);
     return method;
   }
+
+  @override
+  Future<bool> remove(String id) async {
+    final before = _methods.length;
+    _methods.removeWhere((method) => method.id == id);
+    return _methods.length < before;
+  }
 }
 
 CardBrand _brand(String digits) {

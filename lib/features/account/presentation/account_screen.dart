@@ -14,6 +14,7 @@ import 'package:scapematch/features/account/presentation/account_list_tile.dart'
 import 'package:scapematch/features/account/presentation/account_messages.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/wallet/presentation/real_account_wallet.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Aba Conta. O desenho é do ScapeMatch: cartões claros, verde e cobre.
@@ -69,7 +70,12 @@ class AccountScreen extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Expanded(flex: 5, child: _WalletCard()),
+                Expanded(
+                  flex: 5,
+                  child: ref.watch(backendPlanProvider).connectsSupabase
+                      ? const RealAccountWallet()
+                      : const _WalletCard(),
+                ),
                 const SizedBox(width: 20),
                 Expanded(
                   flex: 7,
@@ -87,7 +93,9 @@ class AccountScreen extends ConsumerWidget {
               ],
             )
           else ...[
-            const _WalletCard(),
+            ref.watch(backendPlanProvider).connectsSupabase
+                ? const RealAccountWallet()
+                : const _WalletCard(),
             const SizedBox(height: 16),
             for (final item in _signedInItems) ...[
               _AccountTile(item: item),

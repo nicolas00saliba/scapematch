@@ -187,6 +187,7 @@ abstract final class GroupMessages {
         'Só dá para levar quem já aceitou a mesma turma.',
       CreateGroupFailureReason.companionUnavailable =>
         'Alguém da turma não pode nesse horário.',
+      CreateGroupFailureReason.payoutPending => 'Conta de recebimento pendente',
     };
   }
 

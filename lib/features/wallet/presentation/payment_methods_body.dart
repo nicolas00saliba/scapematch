@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/account/presentation/cpf_screen.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
+import 'package:scapematch/features/payments/presentation/own_card_holder.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -26,14 +28,44 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
     super.dispose();
   }
 
+  Future<void> _remove(String id) async {
+    final removed = await ref.read(paymentMethodsRepositoryProvider).remove(id);
+    if (!mounted) return;
+    if (!removed) {
+      setState(() => _error = 'Não foi possível remover o cartão.');
+      return;
+    }
+    ref.invalidate(paymentMethodsProvider);
+  }
+
+  Future<void> _toggleOwn(bool checked) async {
+    setState(() => _entry.ownCard = checked);
+    if (!checked) return;
+    final ok = await fillOwnCardHolder(
+      context: context,
+      ref: ref,
+      entry: _entry,
+    );
+    if (!mounted) return;
+    setState(() {
+      _entry.ownCard = ok;
+      _error = ok ? null : 'Não foi possível usar os dados do perfil.';
+    });
+  }
+
   Future<void> _save() async {
+    final real = ref.read(backendPlanProvider).connectsSupabase;
+    _entry.requireHolderDocument = real;
     final draft = _entry.draft;
     if (draft == null) {
       setState(() {
-        _error = 'Preencha nome, número, validade e o código de segurança.';
+        _error =
+            _entry.holderDocumentProblem ??
+            'Preencha nome, número, validade e o código de segurança.';
       });
       return;
     }
+    if (!await ensurePlayerCpf(context, ref) || !mounted) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -57,7 +89,10 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final methods = ref.watch(paymentMethodsProvider);
+    final realHolder = ref.watch(backendPlanProvider).connectsSupabase;
+    _entry.requireHolderDocument = realHolder;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         methods.when(
@@ -77,12 +112,17 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
                 ),
               );
             }
+            final canRemove = ref.watch(backendPlanProvider).connectsSupabase;
             return Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 for (final method in items)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: _MethodTile(method: method),
+                    child: _MethodTile(
+                      method: method,
+                      onRemove: canRemove ? () => _remove(method.id) : null,
+                    ),
                   ),
               ],
             );
@@ -103,7 +143,13 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
             style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
           ),
           const SizedBox(height: 12),
-          CardEntryFields(controllers: _entry),
+          RepaintBoundary(
+            key: AppKeys.cardHolderForm,
+            child: CardEntryFields(
+              controllers: _entry..requireHolderDocument = realHolder,
+              onOwnCard: realHolder ? _toggleOwn : null,
+            ),
+          ),
           const SizedBox(height: 12),
           FilledButton(
             key: AppKeys.addCardSave,
@@ -121,9 +167,10 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
 }
 
 class _MethodTile extends StatelessWidget {
-  const _MethodTile({required this.method});
+  const _MethodTile({required this.method, this.onRemove});
 
   final PaymentMethod method;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -137,11 +184,24 @@ class _MethodTile extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Text(
-          '${method.nickname} · ${cardBrandLabel(method.brand)} · ${method.last4}',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${method.nickname} · ${cardBrandLabel(method.brand)} · ${method.last4}',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (onRemove != null)
+              IconButton(
+                key: AppKeys.removeSavedCard(method.id),
+                tooltip: 'Remover cartão',
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline),
+              ),
+          ],
         ),
       ),
     );

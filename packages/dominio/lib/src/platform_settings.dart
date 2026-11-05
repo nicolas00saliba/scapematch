@@ -1,4 +1,3 @@
-import 'package:dominio/src/commission.dart';
 import 'package:dominio/src/payment_exception.dart';
 
 /// Papel de quem chama uma função da plataforma.
@@ -14,6 +13,9 @@ class PlatformSettings {
 
   /// 10% na primeira configuração. Quem cobra lê [rateFor], não esta constante.
   static const openingCommissionBps = 1000;
+
+  /// Teto da tela de admin: 30%. A fórmula continua até 100%.
+  static const maxConfigurableCommissionBps = 3000;
 
   final int commissionBps;
 
@@ -152,10 +154,30 @@ class PlatformSettingsBook {
   }
 
   void _requireBps(int basisPoints) {
-    if (basisPoints < 0 || basisPoints > maxCommissionBps) {
-      throw PaymentException(
-        'A comissão fica entre 0 e $maxCommissionBps basis points.',
-      );
+    if (basisPoints < 0 ||
+        basisPoints > PlatformSettings.maxConfigurableCommissionBps) {
+      throw PaymentException('A comissão fica entre 0 e 30%.');
     }
   }
+}
+
+/// "15" e "15%" viram 1500. Fora de 0 a 30% devolve nulo.
+int? parseCommissionPercent(String raw) {
+  final text = raw.trim().replaceAll('%', '').replaceAll(',', '.');
+  if (text.isEmpty) return null;
+  final value = double.tryParse(text);
+  if (value == null) return null;
+  final bps = (value * 100).round();
+  if (bps < 0 || bps > PlatformSettings.maxConfigurableCommissionBps) {
+    return null;
+  }
+  return bps;
+}
+
+/// 1500 vira "15%" e 825 vira "8,25%".
+String formatCommissionPercent(int basisPoints) {
+  final whole = basisPoints ~/ 100;
+  final fraction = (basisPoints % 100).abs();
+  if (fraction == 0) return '$whole%';
+  return '$whole,${fraction.toString().padLeft(2, '0')}%';
 }

@@ -94,12 +94,15 @@ export type PaymentView = {
   billingType: string;
 };
 
+/// Teto da comissão configurável: 30%. A fórmula ainda usa 10000 como 100%.
+const maxConfigurableCommissionBps = 3000;
+
 /// Percentual do líquido que vai para a casa. A ScapeMatch fica com o resto,
 /// que é a comissão em basis points (1000 = 10% → a casa recebe 90).
 export function houseSplitPercent(commissionBps: number): number {
   if (
     !Number.isInteger(commissionBps) || commissionBps < 0 ||
-    commissionBps > 10000
+    commissionBps > maxConfigurableCommissionBps
   ) {
     throw new Error("invalid commission");
   }
@@ -108,7 +111,10 @@ export function houseSplitPercent(commissionBps: number): number {
 
 /// Mesma conta de centavos do pacote dominio (meio centavo sobe).
 export function commissionCents(amountCents: number, commissionBps: number): number {
-  if (amountCents < 0 || commissionBps < 0 || commissionBps > 10000) {
+  if (
+    amountCents < 0 || commissionBps < 0 ||
+    commissionBps > maxConfigurableCommissionBps
+  ) {
     throw new Error("invalid commission");
   }
   return Math.floor((amountCents * commissionBps + 5000) / 10000);
@@ -305,6 +311,20 @@ export class AsaasProvider implements PaymentProvider {
     return this.#send("/customers", input).then((body) => ({
       id: stringField(body, "id"),
     }));
+  }
+
+  getCustomer(id: string): Promise<{ id: string; cpfCnpj: string }> {
+    return this.#send(`/customers/${id}`, undefined, "GET").then((body) => ({
+      id: stringField(body, "id"),
+      cpfCnpj: optionalString(body, "cpfCnpj").replace(/\D/g, ""),
+    }));
+  }
+
+  /// Só o documento. Não manda nome, e-mail nem o corpo antigo.
+  updateCustomerCpf(id: string, cpfCnpj: string): Promise<void> {
+    return this.#send(`/customers/${id}`, { cpfCnpj }, "PUT").then(
+      () => undefined,
+    );
   }
 
   createPix(input: PixInput): Promise<PixCreated> {

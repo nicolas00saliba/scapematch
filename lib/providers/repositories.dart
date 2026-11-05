@@ -5,6 +5,7 @@ import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:scapematch/features/account/data/player_cpf_store.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
 import 'package:scapematch/features/auth/data/pending_invite_store.dart';
 import 'package:scapematch/features/auth/data/supabase_auth_repository.dart';
@@ -33,6 +34,7 @@ import 'package:scapematch/features/news/data/supabase_news_repository.dart';
 import 'package:scapematch/features/news/data/sample_news.dart';
 import 'package:scapematch/features/payments/data/fake_payment_methods_repository.dart';
 import 'package:scapematch/features/payments/data/payment_methods_repository.dart';
+import 'package:scapematch/features/payments/data/player_payments_repository.dart';
 import 'package:scapematch/features/payments/data/supabase_payment_methods_repository.dart';
 import 'package:scapematch/features/wallet/data/fake_wallet_repository.dart';
 import 'package:scapematch/features/wallet/data/wallet_repository.dart';
@@ -67,6 +69,14 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
     }
   }
   return SupabaseAuthRepository(ref.watch(supabaseClientProvider));
+});
+
+/// Demonstração não pergunta CPF. No modo real o número fica no perfil.
+final playerCpfStoreProvider = Provider<PlayerCpfStore>((ref) {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) {
+    return MemoryPlayerCpfStore(saved: true);
+  }
+  return SupabasePlayerCpfStore(ref.watch(supabaseClientProvider));
 });
 
 /// Grupo que a pessoa escolheu antes de entrar na conta.
@@ -173,6 +183,18 @@ final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((
     }
   }
   return SupabasePaymentMethodsRepository(ref.watch(supabaseClientProvider));
+});
+
+/// Pagamentos reais da conta. A demonstração não mostra esta lista.
+final playerPaymentsRepositoryProvider = Provider<PlayerPaymentsRepository>((
+  ref,
+) {
+  if (kAllowSampleData) {
+    if (!ref.watch(backendPlanProvider).connectsSupabase) {
+      return const EmptyPlayerPaymentsRepository();
+    }
+  }
+  return SupabasePlayerPaymentsRepository(ref.watch(supabaseClientProvider));
 });
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {

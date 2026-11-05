@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 
@@ -50,7 +51,7 @@ Deno.serve(async (req) => {
       .is("asaas_wallet_id", null);
     if (body.venue_id) query = query.eq("id", body.venue_id);
     const { data: venues, error } = await query;
-    if (error) return json({ error: error.message }, 400);
+    if (error) return json({ error: "erro" }, 400);
 
     const asaas = AsaasProvider.fromEnv(Deno.env);
     const provisioned: { venue_id: string; wallet_id: string }[] = [];
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
       const owner = await admin.auth.admin.getUserById(venue.owner_id);
       const email = owner.data.user?.email;
       if (!email) {
-        return json({ error: `Sem e-mail do dono da casa ${venue.id}` }, 422);
+        return json({ error: "owner_email_missing" }, 422);
       }
       const { data: profile } = await admin
         .from("profiles")
@@ -85,16 +86,17 @@ Deno.serve(async (req) => {
         .from("venues")
         .update({ asaas_wallet_id: created.walletId })
         .eq("id", venue.id);
-      if (updateError) return json({ error: updateError.message }, 400);
+      if (updateError) return json({ error: "erro" }, 400);
       const { error: keyError } = await admin.from("venue_asaas_keys").upsert({
         venue_id: venue.id,
         api_key: created.apiKey,
       });
-      if (keyError) return json({ error: keyError.message }, 400);
+      if (keyError) return json({ error: "erro" }, 400);
       provisioned.push({ venue_id: venue.id, wallet_id: created.walletId });
     }
     return json({ provisioned });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "erro" }, 500);
+    const failure = clientFailure(error, "provision-venue-wallet");
+    return json(failure.body, failure.status);
   }
 });
