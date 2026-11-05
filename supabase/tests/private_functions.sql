@@ -63,6 +63,17 @@ begin
   then
     raise exception 'o schema private entrou na API';
   end if;
+
+  if has_schema_privilege('anon', 'private', 'usage')
+    or has_schema_privilege('public', 'private', 'usage')
+  then
+    raise exception 'anon ou public ainda tem usage no schema private';
+  end if;
+  if not has_schema_privilege('authenticated', 'private', 'usage')
+    or not has_schema_privilege('service_role', 'private', 'usage')
+  then
+    raise exception 'authenticated ou service_role perdeu usage no schema private';
+  end if;
 end $$;
 
 insert into public.room_photos (room_id, storage_path)
@@ -129,9 +140,13 @@ begin
       null;
   end;
 
-  if private.is_admin() then
-    raise exception 'anon virou admin';
-  end if;
+  begin
+    perform private.is_admin();
+    raise exception 'anon chamou private.is_admin pelo nome';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
   if not exists (
     select 1 from public.venues
     where id = 'ca111111-1111-1111-1111-111111111111'

@@ -1,0 +1,34 @@
+-- Tira USAGE de anon e de PUBLIC no schema private.
+-- authenticated e service_role continuam com o grant de
+-- 20261105113000. Nada aqui é aplicado no banco remoto.
+
+-- Conferido nas migrations, nas policies, nas Edge Functions e no app:
+--
+-- Policies RLS citam private.* (is_admin, owns_venue, venue_is_visible,
+-- is_group_member, group_is_readable, room_photo_object_allowed,
+-- is_crew_member). A policy guarda o OID. No Postgres 16 a leitura
+-- exige EXECUTE, não USAGE. anon segue lendo casa, sala, grupo e foto.
+--
+-- Funções SECURITY DEFINER em public rodam como o dono. O chamador
+-- não precisa de USAGE para o corpo alcançar private.
+--
+-- Funções SECURITY INVOKER reescrevem o nome private.* com o papel
+-- de quem chama. authenticated executa estas quatro, usadas pelo
+-- Parceiro:
+--   public.check_venue_duplicates
+--   public.request_venue_claim
+--   public.review_venue
+--   public.review_venue_claim
+-- Sem USAGE elas falham com permission denied for schema private.
+--
+-- service_role executa os wrappers INVOKER de cartão
+-- (claim_card_tokenize_attempt, insert_saved_card, load_owned_card).
+-- Mantém USAGE.
+--
+-- O app e as Edge Functions não chamam private pelo nome. anon não
+-- tem EXECUTE nesses wrappers INVOKER.
+--
+-- PUBLIC já estava sem USAGE desde 20261104130000. O revoke abaixo
+-- deixa isso explícito.
+
+revoke usage on schema private from anon, public;
