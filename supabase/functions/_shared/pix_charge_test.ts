@@ -1,10 +1,13 @@
 import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import {
+  cardSwitchDecision,
   localChargeStatus,
   pixExternalReference,
+  pixLeaseExpired,
   pixMatchesCharge,
   pixNeedsQr,
   pixReservationAction,
+  releaseReservationOnError,
 } from "./pix_charge.ts";
 
 Deno.test("a referência do Pix não muda com a chave do cliente", () => {
@@ -72,6 +75,11 @@ Deno.test("create-charge reserva o Pix e não troca provider_ref", async () => {
   assert(source.includes("attach_pix_provider"));
   assert(source.includes("pixReservationAction"));
   assert(source.includes("pixMatchesCharge"));
+  assert(source.includes("claim_expired_pix_reservation"));
+  assert(source.includes("release_pix_reservation"));
+  assert(source.includes("cancelPaymentConfirmed"));
+  assert(source.includes("clear_pix_provider_ref"));
+  assertEquals(source.includes(".update(row)"), false);
   assertEquals(source.includes("persistPixCharge"), false);
   assertEquals(source.includes("error.message"), false);
   assertEquals(source.includes("console."), false);
@@ -119,6 +127,7 @@ Deno.test("reserva não cria de novo nem sobrescreve provider_ref", () => {
       inserted: false,
       providerRef: "pay_1",
       billingType: "PIX",
+      leaseExpired: true,
     }),
     "reuse",
   );
@@ -127,8 +136,18 @@ Deno.test("reserva não cria de novo nem sobrescreve provider_ref", () => {
       inserted: false,
       providerRef: null,
       billingType: "PIX",
+      leaseExpired: false,
     }),
     "busy",
+  );
+  assertEquals(
+    pixReservationAction({
+      inserted: false,
+      providerRef: null,
+      billingType: "PIX",
+      leaseExpired: true,
+    }),
+    "reclaim",
   );
   assertEquals(
     pixReservationAction({
@@ -138,4 +157,66 @@ Deno.test("reserva não cria de novo nem sobrescreve provider_ref", () => {
     }),
     "refuse",
   );
+});
+
+Deno.test("lease de 2 minutos e 4xx liberam a reserva presa", () => {
+  const now = Date.parse("2026-11-05T18:00:00.000Z");
+  assertEquals(
+    pixLeaseExpired("2026-11-05T17:57:00.000Z", now),
+    true,
+  );
+  assertEquals(
+    pixLeaseExpired("2026-11-05T17:59:30.000Z", now),
+    false,
+  );
+  assertEquals(pixLeaseExpired(null, now), true);
+  assertEquals(
+    releaseReservationOnError(new Error("Asaas 400: recusado")),
+    true,
+  );
+  assertEquals(releaseReservationOnError(new Error("Asaas 422: x")), true);
+  assertEquals(releaseReservationOnError(new Error("Asaas 500: fora")), false);
+  assertEquals(
+    releaseReservationOnError(new Error("Asaas 502: pix_qr_unavailable")),
+    false,
+  );
+  assertEquals(releaseReservationOnError(new TypeError("timeout")), false);
+});
+
+Deno.test("Pix pendente cancela antes do cartão; Pix pago recusa", () => {
+  assertEquals(
+    cardSwitchDecision({
+      billingType: "PIX",
+      status: "pending",
+      providerRef: "pay_1",
+    }),
+    "cancel_pix",
+  );
+  assertEquals(
+    cardSwitchDecision({
+      billingType: "PIX",
+      status: "paid",
+      providerRef: "pay_1",
+    }),
+    "refuse",
+  );
+  assertEquals(
+    cardSwitchDecision({
+      billingType: "PIX",
+      status: "creating",
+      providerRef: null,
+      leaseExpired: false,
+    }),
+    "refuse",
+  );
+  assertEquals(
+    cardSwitchDecision({
+      billingType: "PIX",
+      status: "creating",
+      providerRef: null,
+      leaseExpired: true,
+    }),
+    "drop_lease",
+  );
+  assertEquals(cardSwitchDecision(null), "proceed");
 });

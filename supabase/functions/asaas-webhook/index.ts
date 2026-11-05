@@ -13,6 +13,7 @@ import {
 import {
   confirmedChargeStatus,
   movesMoney,
+  paymentRefForRead,
   requestedChargeStatus,
 } from "../_shared/charge_patch.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
@@ -42,7 +43,7 @@ Deno.serve(async (req) => {
     const { data: charge } = await admin
       .from("payment_charges")
       .select(
-        "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type",
+        "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref",
       )
       .eq("provider_ref", paymentId)
       .maybeSingle();
@@ -56,8 +57,10 @@ Deno.serve(async (req) => {
 
     let next = requested;
     if (movesMoney(requested)) {
+      const providerRef = paymentRefForRead(charge.provider_ref, paymentId);
+      if (!providerRef) throw new Error("ledger_write_failed");
       const asaas = AsaasProvider.fromEnv(Deno.env);
-      const remote = await asaas.getPayment(paymentId);
+      const remote = await asaas.getPayment(providerRef);
       const confirmed = confirmedChargeStatus(remote.status);
       if (!confirmed) throw new Error("ledger_write_failed");
       next = confirmed;
@@ -67,31 +70,6 @@ Deno.serve(async (req) => {
       await groupIsClosed(admin, charge.group_id);
     const result = await applyPaymentTransition(admin, charge.id, next, credit);
     const status = result.status;
-
-    const memberPayment = status === "paid"
-      ? "paid"
-      : status === "authorized"
-      ? "reserved"
-      : status === "refunded"
-      ? "released"
-      : "pending";
-    const { data: member } = await admin
-      .from("group_members")
-      .select("refund_reason")
-      .eq("group_id", charge.group_id)
-      .eq("user_id", charge.user_id)
-      .maybeSingle();
-    const currentReason = member?.refund_reason as string | undefined;
-    const refundReason = status !== "refunded"
-      ? "none"
-      : currentReason && currentReason !== "none"
-      ? currentReason
-      : "group_did_not_close";
-    await admin.from("group_members").update({
-      payment_status: memberPayment,
-      refund_status: status === "refunded" ? "refunded" : "none",
-      refund_reason: refundReason,
-    }).eq("group_id", charge.group_id).eq("user_id", charge.user_id);
 
     const sandbox = isAsaasSandbox(
       Deno.env.get("ASAAS_BASE_URL") ?? "https://api-sandbox.asaas.com/v3",

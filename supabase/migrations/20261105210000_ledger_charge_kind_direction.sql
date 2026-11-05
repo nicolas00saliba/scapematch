@@ -31,6 +31,13 @@ $guard$;
 create unique index if not exists ledger_entries_charge_kind_direction_uidx
   on public.ledger_entries (payment_charge_id, kind, direction);
 
+-- O índice parcial de crédito atrapalha o ON CONFLICT no índice completo.
+-- O único novo já cobre crédito e débito.
+drop index if exists public.ledger_one_credit_per_charge_kind;
+
+alter table public.payment_charges
+  add column if not exists reserved_at timestamptz;
+
 alter table public.payment_charges
   drop constraint if exists payment_charges_status_check;
 
@@ -92,7 +99,9 @@ begin
   if v_charge.id is null or v_charge.status <> 'paid' then
     return;
   end if;
-  v_fee := (v_charge.amount_cents * v_charge.commission_bps + 5000) / 10000;
+  v_fee := (
+    (v_charge.amount_cents::bigint * v_charge.commission_bps + 5000) / 10000
+  )::integer;
   v_net := v_charge.amount_cents - v_fee;
   if v_net > 0 then
     insert into public.ledger_entries (
@@ -102,7 +111,7 @@ begin
       v_charge.venue_id, v_charge.group_id, v_charge.user_id,
       'house', 'credit', 'house_net', v_net, v_charge.id
     )
-    on conflict do nothing;
+    on conflict (payment_charge_id, kind, direction) do nothing;
   end if;
   if v_fee > 0 then
     insert into public.ledger_entries (
@@ -112,7 +121,7 @@ begin
       v_charge.venue_id, v_charge.group_id, v_charge.user_id,
       'platform', 'credit', 'commission', v_fee, v_charge.id
     )
-    on conflict do nothing;
+    on conflict (payment_charge_id, kind, direction) do nothing;
   end if;
 end;
 $$;
@@ -143,7 +152,68 @@ begin
   from public.ledger_entries as credit
   where credit.payment_charge_id = p_charge_id
     and credit.direction = 'credit'
-  on conflict do nothing;
+  on conflict (payment_charge_id, kind, direction) do nothing;
+end;
+$$;
+
+-- O membro acompanha o status que ficou, não o que o evento pediu.
+-- refunded terminal continua released/refunded.
+create or replace function private.sync_charge_member(
+  p_charge public.payment_charges
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_payment text;
+  v_refund text;
+  v_reason text;
+  v_updated integer;
+begin
+  v_payment := case p_charge.status
+    when 'paid' then 'paid'
+    when 'authorized' then 'reserved'
+    when 'refunded' then 'released'
+    when 'cancelled' then 'released'
+    when 'failed' then 'released'
+    else 'pending'
+  end;
+  v_refund := case
+    when p_charge.status = 'refunded' then 'refunded'
+    else 'none'
+  end;
+
+  select refund_reason into v_reason
+  from public.group_members
+  where group_id = p_charge.group_id
+    and user_id = p_charge.user_id
+  for update;
+
+  if p_charge.status = 'refunded' then
+    if v_reason is null or v_reason = 'none' then
+      v_reason := 'group_did_not_close';
+    end if;
+  elsif p_charge.status = 'cancelled' or p_charge.status = 'failed' then
+    if v_reason is null or v_reason = 'none' then
+      v_reason := 'hold_released';
+    end if;
+  else
+    v_reason := 'none';
+  end if;
+
+  update public.group_members
+  set
+    payment_status = v_payment,
+    refund_status = v_refund,
+    refund_reason = v_reason
+  where group_id = p_charge.group_id
+    and user_id = p_charge.user_id;
+  get diagnostics v_updated = row_count;
+  if v_updated = 0 then
+    raise exception 'member_missing' using errcode = 'P0002';
+  end if;
 end;
 $$;
 
@@ -177,6 +247,7 @@ begin
 
   if v_previous = 'refunded' then
     perform private.ledger_reverse_charge(v_charge.id);
+    perform private.sync_charge_member(v_charge);
     return pg_catalog.jsonb_build_object(
       'applied', false,
       'status', v_charge.status,
@@ -186,6 +257,7 @@ begin
   end if;
 
   if not private.payment_status_allowed(v_previous, p_next_status) then
+    perform private.sync_charge_member(v_charge);
     return pg_catalog.jsonb_build_object(
       'applied', false,
       'status', v_charge.status,
@@ -222,6 +294,7 @@ begin
     perform private.ledger_reverse_charge(v_charge.id);
   end if;
 
+  perform private.sync_charge_member(v_charge);
   return pg_catalog.jsonb_build_object(
     'applied', v_applied,
     'status', v_charge.status,
@@ -253,10 +326,12 @@ declare
 begin
   insert into public.payment_charges (
     group_id, user_id, venue_id, amount_cents, billing_type, status,
-    provider, provider_ref, idempotency_key, wallet_id, commission_bps
+    provider, provider_ref, idempotency_key, wallet_id, commission_bps,
+    reserved_at
   ) values (
     p_group_id, p_user_id, p_venue_id, p_amount_cents, 'PIX', 'creating',
-    'asaas', null, p_idempotency_key, p_wallet_id, p_commission_bps
+    'asaas', null, p_idempotency_key, p_wallet_id, p_commission_bps,
+    pg_catalog.now()
   )
   on conflict (group_id, user_id) do nothing
   returning id into v_id;
@@ -274,7 +349,15 @@ begin
     'provider_ref', v_charge.provider_ref,
     'billing_type', v_charge.billing_type,
     'amount_cents', v_charge.amount_cents,
-    'inserted', v_inserted
+    'inserted', v_inserted,
+    'reserved_at', v_charge.reserved_at,
+    'lease_expired', (not v_inserted)
+      and v_charge.provider_ref is null
+      and v_charge.status = 'creating'
+      and (
+        v_charge.reserved_at is null
+        or v_charge.reserved_at < pg_catalog.now() - interval '2 minutes'
+      )
   );
 end;
 $$;
@@ -313,6 +396,102 @@ begin
 end;
 $$;
 
+-- Assume uma reserva vencida. Reserva fresca não muda.
+create or replace function private.claim_expired_pix_reservation(p_charge_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  update public.payment_charges
+  set reserved_at = pg_catalog.now()
+  where id = p_charge_id
+    and status = 'creating'
+    and provider_ref is null
+    and (
+      reserved_at is null
+      or reserved_at < pg_catalog.now() - interval '2 minutes'
+    )
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
+-- Reserva vencida sem id no provedor. A fresca permanece.
+create or replace function private.release_expired_pix_reservation(p_charge_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  delete from public.payment_charges
+  where id = p_charge_id
+    and status = 'creating'
+    and provider_ref is null
+    and (
+      reserved_at is null
+      or reserved_at < pg_catalog.now() - interval '2 minutes'
+    )
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
+-- 4xx conhecido: a cobrança não nasceu no Asaas. Libera na hora.
+create or replace function private.release_pix_reservation(p_charge_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  delete from public.payment_charges
+  where id = p_charge_id
+    and status = 'creating'
+    and provider_ref is null
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
+-- Só limpa o id depois que o DELETE do Pix foi confirmado.
+create or replace function private.clear_pix_provider_ref(
+  p_charge_id uuid,
+  p_provider_ref text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  update public.payment_charges
+  set
+    provider_ref = null,
+    billing_type = 'CREDIT_CARD',
+    status = 'creating',
+    qr_code = null,
+    qr_code_base64 = null,
+    reserved_at = pg_catalog.now()
+  where id = p_charge_id
+    and provider_ref = p_provider_ref
+    and billing_type = 'PIX'
+    and status in ('pending', 'creating')
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
 revoke all on function private.payment_status_allowed(text, text)
   from public, anon, authenticated;
 revoke all on function private.ledger_credit_charge(uuid)
@@ -325,12 +504,30 @@ revoke all on function private.reserve_pix_charge(uuid, uuid, uuid, integer, tex
   from public, anon, authenticated;
 revoke all on function private.attach_pix_provider(uuid, text)
   from public, anon, authenticated;
+revoke all on function private.sync_charge_member(public.payment_charges)
+  from public, anon, authenticated;
+revoke all on function private.claim_expired_pix_reservation(uuid)
+  from public, anon, authenticated;
+revoke all on function private.release_pix_reservation(uuid)
+  from public, anon, authenticated;
+revoke all on function private.release_expired_pix_reservation(uuid)
+  from public, anon, authenticated;
+revoke all on function private.clear_pix_provider_ref(uuid, text)
+  from public, anon, authenticated;
 
 grant execute on function private.apply_payment_transition(uuid, text, boolean)
   to service_role;
 grant execute on function private.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
   to service_role;
 grant execute on function private.attach_pix_provider(uuid, text)
+  to service_role;
+grant execute on function private.claim_expired_pix_reservation(uuid)
+  to service_role;
+grant execute on function private.release_pix_reservation(uuid)
+  to service_role;
+grant execute on function private.release_expired_pix_reservation(uuid)
+  to service_role;
+grant execute on function private.clear_pix_provider_ref(uuid, text)
   to service_role;
 
 -- O schema private não entra na API. Estes wrappers só existem para o
@@ -384,7 +581,54 @@ revoke all on function public.apply_payment_transition(uuid, text, boolean)
   from public, anon, authenticated;
 revoke all on function public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
   from public, anon, authenticated;
+create or replace function public.claim_expired_pix_reservation(p_charge_id uuid)
+returns boolean
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.claim_expired_pix_reservation(p_charge_id);
+$$;
+
+create or replace function public.release_expired_pix_reservation(p_charge_id uuid)
+returns boolean
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.release_expired_pix_reservation(p_charge_id);
+$$;
+
+create or replace function public.release_pix_reservation(p_charge_id uuid)
+returns boolean
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.release_pix_reservation(p_charge_id);
+$$;
+
+create or replace function public.clear_pix_provider_ref(
+  p_charge_id uuid,
+  p_provider_ref text
+)
+returns boolean
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.clear_pix_provider_ref(p_charge_id, p_provider_ref);
+$$;
+
 revoke all on function public.attach_pix_provider(uuid, text)
+  from public, anon, authenticated;
+revoke all on function public.claim_expired_pix_reservation(uuid)
+  from public, anon, authenticated;
+revoke all on function public.release_pix_reservation(uuid)
+  from public, anon, authenticated;
+revoke all on function public.release_expired_pix_reservation(uuid)
+  from public, anon, authenticated;
+revoke all on function public.clear_pix_provider_ref(uuid, text)
   from public, anon, authenticated;
 
 grant execute on function public.apply_payment_transition(uuid, text, boolean)
@@ -392,4 +636,12 @@ grant execute on function public.apply_payment_transition(uuid, text, boolean)
 grant execute on function public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
   to service_role;
 grant execute on function public.attach_pix_provider(uuid, text)
+  to service_role;
+grant execute on function public.claim_expired_pix_reservation(uuid)
+  to service_role;
+grant execute on function public.release_pix_reservation(uuid)
+  to service_role;
+grant execute on function public.release_expired_pix_reservation(uuid)
+  to service_role;
+grant execute on function public.clear_pix_provider_ref(uuid, text)
   to service_role;

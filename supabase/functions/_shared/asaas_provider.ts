@@ -6,6 +6,7 @@
 // Não há SDK de navegador. O cartão só atravessa a chamada de tokenização;
 // a cobrança seguinte manda creditCardToken.
 
+import { asaasStatus } from "./asaas_client_error.ts";
 import { localChargeStatus, pixMatchesCharge } from "./pix_charge.ts";
 import { redactSensitive } from "./redact.ts";
 
@@ -508,6 +509,28 @@ export class AsaasProvider implements PaymentProvider {
     return this.#send(`/payments/${paymentId}`, undefined, "DELETE").then(
       () => undefined,
     );
+  }
+
+  findPix(reference: string): Promise<PixPaymentRef | null> {
+    return this.#findReusablePix(reference);
+  }
+
+  /// DELETE e confirma que o Pix não segue pendente nem pago.
+  async cancelPaymentConfirmed(paymentId: string): Promise<boolean> {
+    try {
+      await this.#send(`/payments/${paymentId}`, undefined, "DELETE");
+    } catch (error) {
+      if (asaasStatus(error) === 404) return true;
+      return false;
+    }
+    try {
+      const remote = await this.getPayment(paymentId);
+      const status = remote.status.trim().toUpperCase();
+      return status === "DELETED" || status === "REFUNDED" ||
+        status === "CANCELED" || status === "CANCELLED";
+    } catch (error) {
+      return asaasStatus(error) === 404;
+    }
   }
 
   async #findReusablePix(reference: string): Promise<PixPaymentRef | null> {

@@ -445,6 +445,39 @@ Deno.test("perder a reserva apaga o Pix recém-criado e não o reaproveitado", a
   assertEquals(deletes, 1);
 });
 
+Deno.test("cancelar Pix só confirma se o pagamento não segue aberto", async () => {
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "DELETE") {
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    if (method === "GET" && url.includes("/payments/pay_open")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            id: "pay_open",
+            status: "PENDING",
+            billingType: "PIX",
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (method === "GET" && url.includes("/payments/pay_gone")) {
+      return Promise.resolve(new Response("não", { status: 404 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  assertEquals(await provider.cancelPaymentConfirmed("pay_open"), false);
+  assertEquals(await provider.cancelPaymentConfirmed("pay_gone"), true);
+});
+
 const sampleCard = {
   holderName: "ANA",
   number: "4111111111111111",

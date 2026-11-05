@@ -16,19 +16,75 @@ export function localChargeStatus(asaasStatus: string): "pending" | "paid" {
   return "pending";
 }
 
-export type PixReservationAction = "create" | "reuse" | "busy" | "refuse";
+export type PixReservationAction =
+  | "create"
+  | "reuse"
+  | "reclaim"
+  | "busy"
+  | "refuse";
 
-/// Quem inseriu a linha cria o Pix. Quem acha provider_ref reaproveita
-/// e não troca o id. Linha alheia sem id ainda está em criação.
+export const pixLeaseMs = 2 * 60 * 1000;
+
+/// Sem data, ou com mais de 2 minutos, a reserva pode ser assumida.
+export function pixLeaseExpired(
+  reservedAt: string | null,
+  nowMs: number,
+): boolean {
+  if (!reservedAt) return true;
+  const at = Date.parse(reservedAt);
+  if (!Number.isFinite(at)) return true;
+  return nowMs - at >= pixLeaseMs;
+}
+
+/// Quem inseriu cria o Pix. provider_ref existente não é trocado.
+/// Reserva vencida pede busca no Asaas; reserva fresca fica busy.
 export function pixReservationAction(input: {
   inserted: boolean;
   providerRef: string | null;
   billingType: string;
+  leaseExpired?: boolean;
 }): PixReservationAction {
   if (input.billingType !== "PIX") return "refuse";
   if (input.providerRef) return "reuse";
   if (input.inserted) return "create";
+  if (input.leaseExpired) return "reclaim";
   return "busy";
+}
+
+export type CardSwitchDecision =
+  | "proceed"
+  | "cancel_pix"
+  | "drop_lease"
+  | "refuse";
+
+/// Pix pendente com id é cancelado e confirmado antes de virar cartão.
+/// Pix pago ou reserva fresca sem id recusa. Nunca troca o provider_ref no escuro.
+export function cardSwitchDecision(
+  input: {
+    billingType: string;
+    status: string;
+    providerRef: string | null;
+    leaseExpired?: boolean;
+  } | null,
+): CardSwitchDecision {
+  if (!input) return "proceed";
+  if (input.providerRef && input.billingType !== "PIX") return "refuse";
+  if (input.billingType !== "PIX") return "proceed";
+  if (input.status === "pending" || input.status === "creating") {
+    if (input.providerRef) return "cancel_pix";
+    if (input.leaseExpired) return "drop_lease";
+    return "refuse";
+  }
+  return "refuse";
+}
+
+/// 4xx do Asaas: a cobrança não foi criada. Timeout e 5xx ficam no lease.
+export function releaseReservationOnError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : "";
+  const match = /^Asaas (\d+)/.exec(raw);
+  if (!match) return false;
+  const status = Number(match[1]);
+  return status >= 400 && status < 500;
 }
 
 export type PixExpectation = {

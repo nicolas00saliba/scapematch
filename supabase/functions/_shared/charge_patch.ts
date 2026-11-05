@@ -90,3 +90,34 @@ export function confirmedChargeStatus(asaasStatus: string): string | null {
 export function movesMoney(status: string | null): boolean {
   return status === "paid" || status === "refunded";
 }
+
+/// O GET usa o id gravado na cobrança. O id do payload não entra nessa leitura.
+export function paymentRefForRead(
+  storedRef: string | null | undefined,
+  _payloadId?: string | null,
+): string | null {
+  const ref = (storedRef ?? "").trim();
+  return ref.length > 0 ? ref : null;
+}
+
+export type MemberPaymentSync = {
+  payment_status: "pending" | "reserved" | "paid" | "released";
+  refund_status: "none" | "refunded";
+};
+
+/// Mesma regra da função SQL. Estorno terminal deixa o membro released.
+export function memberPaymentForStatus(status: string): MemberPaymentSync {
+  if (status === "paid") {
+    return { payment_status: "paid", refund_status: "none" };
+  }
+  if (status === "authorized") {
+    return { payment_status: "reserved", refund_status: "none" };
+  }
+  if (status === "refunded") {
+    return { payment_status: "released", refund_status: "refunded" };
+  }
+  if (status === "cancelled" || status === "failed") {
+    return { payment_status: "released", refund_status: "none" };
+  }
+  return { payment_status: "pending", refund_status: "none" };
+}

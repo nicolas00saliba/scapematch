@@ -71,6 +71,18 @@ insert into public.groups (
   'aa111111-1111-1111-1111-111111111111'
 );
 
+insert into public.group_members (
+  group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+) values (
+  'aa511111-1111-1111-1111-111111111111',
+  'aa111111-1111-1111-1111-111111111111',
+  'Transição',
+  true,
+  'released',
+  'refunded',
+  'group_did_not_close'
+);
+
 insert into public.payment_charges (
   id, group_id, user_id, venue_id, amount_cents, billing_type, status,
   provider_ref, idempotency_key, commission_bps, paid_at, refunded_at
@@ -149,6 +161,18 @@ begin
   if v_credits <> 1 then
     raise exception 'cobrança estornada recebeu crédito: %', v_credits;
   end if;
+
+  if not exists (
+    select 1
+    from public.group_members
+    where group_id = 'aa511111-1111-1111-1111-111111111111'
+      and user_id = 'aa111111-1111-1111-1111-111111111111'
+      and payment_status = 'released'
+      and refund_status = 'refunded'
+      and refund_reason = 'group_did_not_close'
+  ) then
+    raise exception 'estorno marcou o membro como pago';
+  end if;
 end $$;
 
 insert into auth.users (id, email, raw_user_meta_data)
@@ -156,6 +180,15 @@ values (
   'aa711111-1111-1111-1111-111111111111',
   'pix-reserva@example.com',
   '{"display_name":"Pix"}'
+);
+
+insert into public.group_members (
+  group_id, user_id, display_name, payment_status
+) values (
+  'aa511111-1111-1111-1111-111111111111',
+  'aa711111-1111-1111-1111-111111111111',
+  'Pix',
+  'pending'
 );
 
 do $$
@@ -260,6 +293,118 @@ begin
     )
   then
     raise exception 'execute da transição não ficou só na service_role';
+  end if;
+end $$;
+
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  'aa811111-1111-1111-1111-111111111111',
+  'comissao-alta@example.com',
+  '{"display_name":"Alta"}'
+);
+
+insert into public.group_members (
+  group_id, user_id, display_name, payment_status
+) values (
+  'aa511111-1111-1111-1111-111111111111',
+  'aa811111-1111-1111-1111-111111111111',
+  'Alta',
+  'pending'
+);
+
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  'aa821111-1111-1111-1111-111111111111',
+  'lease@example.com',
+  '{"display_name":"Lease"}'
+);
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  idempotency_key, commission_bps
+) values (
+  'aa911111-1111-1111-1111-111111111111',
+  'aa511111-1111-1111-1111-111111111111',
+  'aa811111-1111-1111-1111-111111111111',
+  'aa211111-1111-1111-1111-111111111111',
+  800000,
+  'PIX',
+  'pending',
+  'idem-comissao-alta',
+  3000
+);
+
+do $$
+declare
+  v_fee integer;
+  v_net integer;
+  v_paid text;
+  v_fresh boolean;
+  v_stale boolean;
+begin
+  perform private.apply_payment_transition(
+    'aa911111-1111-1111-1111-111111111111',
+    'paid',
+    true
+  );
+  select amount_cents into v_fee
+  from public.ledger_entries
+  where payment_charge_id = 'aa911111-1111-1111-1111-111111111111'
+    and kind = 'commission'
+    and direction = 'credit';
+  select amount_cents into v_net
+  from public.ledger_entries
+  where payment_charge_id = 'aa911111-1111-1111-1111-111111111111'
+    and kind = 'house_net'
+    and direction = 'credit';
+  if v_fee <> 240000 or v_net <> 560000 then
+    raise exception 'comissão alta estourou ou saiu errada: fee % net %', v_fee, v_net;
+  end if;
+  select payment_status into v_paid
+  from public.group_members
+  where user_id = 'aa811111-1111-1111-1111-111111111111';
+  if v_paid <> 'paid' then
+    raise exception 'membro não ficou pago: %', v_paid;
+  end if;
+
+  update public.payment_charges
+  set reserved_at = pg_catalog.now()
+  where id = 'aa911111-1111-1111-1111-111111111111';
+  -- a cobrança paga não está creating; o teste do lease usa uma linha creating.
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, commission_bps, reserved_at
+  ) values (
+    'aaa11111-1111-1111-1111-111111111111',
+    'aa511111-1111-1111-1111-111111111111',
+    'aa821111-1111-1111-1111-111111111111',
+    'aa211111-1111-1111-1111-111111111111',
+    1000,
+    'PIX',
+    'creating',
+    'idem-lease-fresh',
+    1000,
+    pg_catalog.now()
+  );
+  v_fresh := private.claim_expired_pix_reservation(
+    'aaa11111-1111-1111-1111-111111111111'
+  );
+  if v_fresh then
+    raise exception 'reserva fresca foi assumida';
+  end if;
+  update public.payment_charges
+  set reserved_at = pg_catalog.now() - interval '3 minutes'
+  where id = 'aaa11111-1111-1111-1111-111111111111';
+  v_stale := private.claim_expired_pix_reservation(
+    'aaa11111-1111-1111-1111-111111111111'
+  );
+  if not v_stale then
+    raise exception 'reserva vencida não foi assumida';
+  end if;
+  if private.claim_expired_pix_reservation(
+    'aaa11111-1111-1111-1111-111111111111'
+  ) then
+    raise exception 'reserva recém-assumida foi tomada de novo';
   end if;
 end $$;
 

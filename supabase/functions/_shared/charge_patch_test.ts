@@ -2,7 +2,9 @@ import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   chargeTransitions,
   confirmedChargeStatus,
+  memberPaymentForStatus,
   paymentChargePatch,
+  paymentRefForRead,
   paymentTransition,
   requestedChargeStatus,
 } from "./charge_patch.ts";
@@ -67,6 +69,33 @@ Deno.test("pending pode ir para paid e cancelled não sai", () => {
   assertEquals(requestedChargeStatus("PAYMENT_RECEIVED", "RECEIVED"), "paid");
 });
 
+Deno.test("estorno deixa o membro released e o GET usa o id do banco", () => {
+  const status = paymentTransition("refunded", "paid");
+  assertEquals(memberPaymentForStatus(status), {
+    payment_status: "released",
+    refund_status: "refunded",
+  });
+  assertEquals(paymentRefForRead("pay_db", "pay_payload"), "pay_db");
+  assertEquals(paymentRefForRead(null, "pay_payload"), null);
+  assertEquals(paymentRefForRead("  ", "pay_payload"), null);
+});
+
+Deno.test("comissão alta cabe em bigint antes da divisão", async () => {
+  const amountCents = 800_000;
+  const bps = 3000;
+  assert(amountCents * bps > 2_147_483_647);
+  assertEquals(Math.floor((amountCents * bps + 5000) / 10000), 240_000);
+  const sql = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20261105210000_ledger_charge_kind_direction.sql",
+      import.meta.url,
+    ),
+  );
+  assert(sql.includes("amount_cents::bigint * v_charge.commission_bps"));
+  assert(sql.includes("on conflict (payment_charge_id, kind, direction)"));
+  assertEquals(sql.includes("on conflict do nothing"), false);
+});
+
 Deno.test("a migração trava a cobrança e falha se houver duplicata", async () => {
   const sql = await Deno.readTextFile(
     new URL(
@@ -96,8 +125,10 @@ Deno.test("o webhook confirma no Asaas e usa a transição", async () => {
     new URL("../asaas-webhook/index.ts", import.meta.url),
   );
   assert(source.includes("getPayment"));
+  assert(source.includes("paymentRefForRead"));
   assert(source.includes("applyPaymentTransition"));
   assert(source.includes("confirmedChargeStatus"));
   assertEquals(source.includes("paymentChargePatch"), false);
+  assertEquals(source.includes("payment_status"), false);
   assertEquals(source.includes("error.message"), false);
 });
