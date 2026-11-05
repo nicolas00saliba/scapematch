@@ -1,7 +1,35 @@
 # Revisão das funções SECURITY DEFINER em `public`
 
-Inventário do estado **depois** de aplicar as migrations, no Postgres 16 do CI.
-Nada aqui foi alterado: é a proposta para uma revisão seguinte.
+Inventário que guiou `20261105180000_definer_wrappers_and_inventory.sql`.
+O que a migration fez:
+
+- `public.check_venue_duplicates`, `public.request_venue_claim`,
+  `public.review_venue` e `public.review_venue_claim` são
+  `SECURITY DEFINER` com `search_path` vazio. `auth.uid()`, admin e dono
+  continuam checados no corpo em `private`.
+- `authenticated` não tem `USAGE` em `private`. Ficam o dono do schema e
+  `service_role`. `anon` e `PUBLIC` já estavam sem.
+- `accept_waitlist` e `set_my_username` viraram `INVOKER` e continuam
+  em `public`.
+- Foram para `private` e continuam `DEFINER`: `group_filled_spots`,
+  `handle_new_user`, `offer_waitlist`, `post_app_notice`,
+  `profile_display_name`, `saved_cards_guard`, `saved_cards_limit`,
+  `user_has_overlap`, `venue_link_status`, `venues_normalize`.
+- `profiles_guard` e `users_are_friends` foram para `private` e viraram
+  `INVOKER`.
+- `venue_claims_guard` e `venues_guard` foram para `private` e
+  continuam `DEFINER`. `INVOKER` fica para outro PR: sem `USAGE`, o
+  gatilho do `authenticated` não resolve `private.is_admin()` e a
+  gravação da casa falha com `42501`.
+- As `SECURITY DEFINER` que ainda usavam `search_path = public` passaram
+  a `search_path` vazio. `sessions_overlap` não é `DEFINER` e ficou como
+  estava.
+
+`anon` segue lendo casa aprovada, sala, grupo público e foto. A policy
+guarda o OID e exige `EXECUTE`, não `USAGE`.
+
+O restante deste arquivo é a análise feita antes da migration, quando
+`authenticated` ainda tinha `USAGE` e os quatro wrappers eram `INVOKER`.
 
 Saíram de `public` em `20261105113000_private_security_definer.sql` e não
 entram nesta lista: `is_admin`, `owns_venue`, `venue_is_visible`,
@@ -10,17 +38,6 @@ Elas estão em `private` e são o que as policies chamam.
 
 Nenhuma policy RLS cita função de `public`. O app Flutter e as Edge
 Functions também não chamam `private` pelo nome. Chamam RPC de `public`.
-
-`anon` e `PUBLIC` ficam sem `USAGE` em `private`
-(`20261105170000_revoke_private_schema_usage.sql`). `authenticated` e
-`service_role` mantêm o `USAGE`. O motivo está naquela migration: quatro
-wrappers `SECURITY INVOKER` (`check_venue_duplicates`,
-`request_venue_claim`, `review_venue`, `review_venue_claim`) resolvem
-`private.*` com o papel de quem chama. Eles não são `SECURITY DEFINER`
-e por isso não estão na tabela abaixo.
-
-Várias funções ainda usam `search_path = public`. Isso fica fora desta
-proposta.
 
 ## Manter DEFINER em `public`
 
