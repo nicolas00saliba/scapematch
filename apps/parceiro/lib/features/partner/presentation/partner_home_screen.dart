@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/features/auth/data/auth_messages.dart';
+import 'package:scapematch/features/auth/data/password_strength.dart';
+import 'package:scapematch/features/auth/presentation/password_change_dialog.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/window_class.dart';
@@ -106,17 +111,32 @@ class _PartnerBar extends ConsumerWidget {
                           key: PartnerKeys.partnerHouseName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: (wide
-                                  ? Theme.of(context).textTheme.bodySmall
-                                  : Theme.of(context).textTheme.titleMedium)
-                              ?.copyWith(
-                            color: wide ? scheme.onSurfaceVariant : null,
-                            fontWeight: wide ? null : FontWeight.w800,
-                          ),
+                          style:
+                              (wide
+                                      ? Theme.of(context).textTheme.bodySmall
+                                      : Theme.of(context).textTheme.titleMedium)
+                                  ?.copyWith(
+                                    color: wide
+                                        ? scheme.onSurfaceVariant
+                                        : null,
+                                    fontWeight: wide ? null : FontWeight.w800,
+                                  ),
                         ),
                       ],
                     ),
                   ),
+                  if (scapeUsesLiveBackend)
+                    IconButton(
+                      key: PartnerKeys.partnerChangePassword,
+                      tooltip: 'Trocar senha',
+                      onPressed: () {
+                        showPasswordChangeDialog(
+                          context: context,
+                          changePassword: _changePartnerPassword,
+                        );
+                      },
+                      icon: const Icon(Icons.password_outlined),
+                    ),
                   if (wide)
                     TextButton(
                       key: PartnerKeys.partnerSignOut,
@@ -155,6 +175,20 @@ void _leave(WidgetRef ref) {
   ref.read(partnerSessionProvider.notifier).signOut();
 }
 
+Future<String?> _changePartnerPassword(String password) async {
+  final rejected = await rejectPassword(password);
+  if (rejected != null) return rejected;
+  try {
+    await scapeSupabase.auth.updateUser(UserAttributes(password: password));
+    return null;
+  } on Object catch (error) {
+    return authErrorMessage(
+      error,
+      fallback: 'Não foi possível trocar a senha. Tente de novo.',
+    );
+  }
+}
+
 class _PartnerRail extends ConsumerWidget {
   const _PartnerRail({required this.selected});
 
@@ -166,9 +200,9 @@ class _PartnerRail extends ConsumerWidget {
     return NavigationRail(
       selectedIndex: selected.index,
       onDestinationSelected: (index) {
-        ref.read(partnerSectionProvider.notifier).select(
-          PartnerSection.values[index],
-        );
+        ref
+            .read(partnerSectionProvider.notifier)
+            .select(PartnerSection.values[index]);
       },
       labelType: NavigationRailLabelType.all,
       backgroundColor: scheme.surface,
@@ -255,9 +289,8 @@ class _BalanceSection extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           PartnerMessages.balanceTitle,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         Text(
@@ -269,9 +302,8 @@ class _BalanceSection extends StatelessWidget {
         const SizedBox(height: 24),
         Text(
           PartnerMessages.statement,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+          style: Theme.of(context).textTheme.titleLarge
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
         if (snapshot.lines.isEmpty)
@@ -486,9 +518,8 @@ class _ReservationsSectionState extends State<_ReservationsSection> {
             children: [
               Text(
                 PartnerMessages.reservationsTitle,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(context).textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -547,11 +578,8 @@ class _ReservationsSectionState extends State<_ReservationsSection> {
     return _GroupCard(
       group: group,
       snapshot: snapshot,
-      onOpen: () => showPartnerGroupSheet(
-        context,
-        snapshot: snapshot,
-        group: group,
-      ),
+      onOpen: () =>
+          showPartnerGroupSheet(context, snapshot: snapshot, group: group),
     );
   }
 }
@@ -609,7 +637,9 @@ class _GroupCard extends StatelessWidget {
         if (snapshot.markedAbsent(group.id, playerIdOf(person)))
           person.displayName,
     ];
-    final roomIndex = snapshot.rooms.indexWhere((room) => room.id == group.roomId);
+    final roomIndex = snapshot.rooms.indexWhere(
+      (room) => room.id == group.roomId,
+    );
     final accent = roomIndex < 0
         ? scheme.primary
         : roomColor(snapshot.rooms[roomIndex], roomIndex);
@@ -660,7 +690,9 @@ class _GroupCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        PartnerMessages.perPerson(formatPrice(group.priceCents)),
+                        PartnerMessages.perPerson(
+                          formatPrice(group.priceCents),
+                        ),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -682,13 +714,16 @@ class _GroupCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if (group.isCancelled && group.cancelReason.isNotEmpty) ...[
+                      if (group.isCancelled &&
+                          group.cancelReason.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(group.cancelReason),
                       ],
                       if (absences.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text('${PartnerMessages.noShows}: ${absences.join(', ')}'),
+                        Text(
+                          '${PartnerMessages.noShows}: ${absences.join(', ')}',
+                        ),
                       ],
                       const SizedBox(height: 10),
                       if (people.isEmpty && !group.isCancelled)
@@ -825,13 +860,15 @@ class _PlayerChip extends ConsumerWidget {
     );
   }
 
-  Future<void> _mark(BuildContext context, WidgetRef ref, String playerId) async {
+  Future<void> _mark(
+    BuildContext context,
+    WidgetRef ref,
+    String playerId,
+  ) async {
     final houseId = snapshot.house.id;
-    final result = await ref.read(partnerRepositoryProvider).markAbsence(
-      houseId: houseId,
-      groupId: group.id,
-      playerId: playerId,
-    );
+    final result = await ref
+        .read(partnerRepositoryProvider)
+        .markAbsence(houseId: houseId, groupId: group.id, playerId: playerId);
     if (!context.mounted) return;
     if (result is AbsenceRejected) {
       _snack(context, result.message);
@@ -854,9 +891,8 @@ class _RoomsSection extends StatelessWidget {
       children: [
         Text(
           PartnerMessages.roomsTitle,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         Text(
@@ -949,10 +985,9 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
       _busy = true;
       _error = null;
     });
-    final error = await ref.read(partnerRepositoryProvider).updatePrice(
-      roomId: widget.room.id,
-      priceCents: cents,
-    );
+    final error = await ref
+        .read(partnerRepositoryProvider)
+        .updatePrice(roomId: widget.room.id, priceCents: cents);
     if (!mounted) {
       return;
     }
@@ -967,10 +1002,9 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
 
   Future<void> _addSlot() async {
     final startsAt = _nextOpening(widget.now);
-    await ref.read(partnerRepositoryProvider).addSlot(
-      roomId: widget.room.id,
-      startsAt: startsAt,
-    );
+    await ref
+        .read(partnerRepositoryProvider)
+        .addSlot(roomId: widget.room.id, startsAt: startsAt);
     if (!mounted) {
       return;
     }
@@ -1064,7 +1098,9 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: [for (final label in future) Chip(label: Text(label))],
+                children: [
+                  for (final label in future) Chip(label: Text(label)),
+                ],
               ),
             if (past > 0) ...[
               const SizedBox(height: 8),

@@ -8,6 +8,7 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
@@ -93,14 +94,23 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final email = _email.text.trim();
     final password = _password.text;
     final birthDate = _birthDate();
-    final minPassword = scapeUsesLiveBackend ? 6 : 4;
-    if (name.isEmpty || !email.contains('@') || password.length < minPassword) {
-      setState(() {
-        _error = minPassword == 6
-            ? 'Preencha nome, um e-mail e uma senha de 6 caracteres.'
-            : 'Preencha nome, um e-mail e uma senha de 4 caracteres.';
-      });
-      return;
+    if (!scapeUsesLiveBackend) {
+      if (name.isEmpty || !email.contains('@') || password.length < 4) {
+        setState(() {
+          _error = 'Preencha nome, um e-mail e uma senha de 4 caracteres.';
+        });
+        return;
+      }
+    } else {
+      if (name.isEmpty || !email.contains('@')) {
+        setState(() => _error = 'Preencha nome e um e-mail válido.');
+        return;
+      }
+      final rule = passwordRuleError(password);
+      if (rule != null) {
+        setState(() => _error = rule);
+        return;
+      }
     }
     if (scapeUsesLiveBackend && (_cityId == null || _cityId!.isEmpty)) {
       setState(() => _error = 'Escolha a cidade.');
@@ -167,11 +177,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           const TextSpan(text: 'Li e aceito os '),
           TextSpan(text: 'termos', style: link, recognizer: _termsLink),
           const TextSpan(text: ', a '),
-          TextSpan(
-            text: 'privacidade',
-            style: link,
-            recognizer: _privacyLink,
-          ),
+          TextSpan(text: 'privacidade', style: link, recognizer: _privacyLink),
           const TextSpan(text: ' e o '),
           TextSpan(text: 'reembolso', style: link, recognizer: _refundLink),
           TextSpan(text: ' (versão $legalDocumentVersion).'),
@@ -190,134 +196,137 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          const ExampleDataBanner(),
-          const SizedBox(height: 16),
-          Text(
-            scapeUsesLiveBackend
-                ? 'A conta fica no ScapeMatch. O perfil nasce com o seu nome. O cadastro só segue com o aceite.'
-                : 'O cadastro só segue com o aceite. A versão do texto e a data ficam registradas.',
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            key: AppKeys.signupName,
-            controller: _name,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Nome',
-              border: OutlineInputBorder(),
+            const ExampleDataBanner(),
+            const SizedBox(height: 16),
+            Text(
+              scapeUsesLiveBackend
+                  ? 'A conta fica no ScapeMatch. O perfil nasce com o seu nome. O cadastro só segue com o aceite.'
+                  : 'O cadastro só segue com o aceite. A versão do texto e a data ficam registradas.',
             ),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            key: ValueKey('signup-city-${_cities.length}-$_cityId'),
-            initialValue: _cities.any((city) => city.id == _cityId)
-                ? _cityId
-                : null,
-            decoration: const InputDecoration(
-              labelText: 'Cidade',
-              border: OutlineInputBorder(),
+            const SizedBox(height: 16),
+            TextField(
+              key: AppKeys.signupName,
+              controller: _name,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nome',
+                border: OutlineInputBorder(),
+              ),
             ),
-            items: [
-              for (final city in _cities)
-                DropdownMenuItem(value: city.id, child: Text(city.name)),
-            ],
-            onChanged: _busy
-                ? null
-                : (value) => setState(() => _cityId = value),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: AppKeys.signupEmail,
-            controller: _email,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'E-mail',
-              border: OutlineInputBorder(),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: ValueKey('signup-city-${_cities.length}-$_cityId'),
+              initialValue: _cities.any((city) => city.id == _cityId)
+                  ? _cityId
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'Cidade',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                for (final city in _cities)
+                  DropdownMenuItem(value: city.id, child: Text(city.name)),
+              ],
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() => _cityId = value),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: AppKeys.signupBirthDay,
-                  controller: _day,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Dia',
-                    border: OutlineInputBorder(),
+            const SizedBox(height: 12),
+            TextField(
+              key: AppKeys.signupEmail,
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'E-mail',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: AppKeys.signupBirthDay,
+                    controller: _day,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Dia',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  key: AppKeys.signupBirthMonth,
-                  controller: _month,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Mês',
-                    border: OutlineInputBorder(),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    key: AppKeys.signupBirthMonth,
+                    controller: _month,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Mês',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  key: AppKeys.signupBirthYear,
-                  controller: _year,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Ano',
-                    border: OutlineInputBorder(),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    key: AppKeys.signupBirthYear,
+                    controller: _year,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Ano',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: AppKeys.signupPassword,
-            controller: _password,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Senha',
-              border: OutlineInputBorder(),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            LegalDocuments.reviewBanner,
-            key: AppKeys.signupTermsBanner,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Checkbox(
-                key: AppKeys.signupTerms,
-                value: _accepted,
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                onChanged: _busy
-                    ? null
-                    : (value) => setState(() => _accepted = value ?? false),
+            const SizedBox(height: 12),
+            TextField(
+              key: AppKeys.signupPassword,
+              controller: _password,
+              obscureText: true,
+              autofillHints: const [AutofillHints.newPassword],
+              decoration: InputDecoration(
+                labelText: 'Senha',
+                helperText: scapeUsesLiveBackend
+                    ? 'Pelo menos 8 caracteres, com letras e números.'
+                    : null,
+                border: const OutlineInputBorder(),
               ),
-              const SizedBox(width: 8),
-              Expanded(child: _termsSentence(context)),
-            ],
-          ),
-          if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
-          const SizedBox(height: 16),
-          FilledButton(
-            key: AppKeys.signupSubmit,
-            onPressed: _busy ? null : _submit,
-            child: const Text('Criar conta'),
-          ),
-        ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              LegalDocuments.reviewBanner,
+              key: AppKeys.signupTermsBanner,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  key: AppKeys.signupTerms,
+                  value: _accepted,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onChanged: _busy
+                      ? null
+                      : (value) => setState(() => _accepted = value ?? false),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: _termsSentence(context)),
+              ],
+            ),
+            if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
+            const SizedBox(height: 16),
+            FilledButton(
+              key: AppKeys.signupSubmit,
+              onPressed: _busy ? null : _submit,
+              child: const Text('Criar conta'),
+            ),
+          ],
         ),
       ),
     );

@@ -52,6 +52,10 @@ class AuthController extends Notifier<CurrentUser?> {
     return ref.read(authRepositoryProvider).requestPasswordReset(email: email);
   }
 
+  Future<String?> changePassword({required String password}) {
+    return ref.read(authRepositoryProvider).changePassword(password: password);
+  }
+
   Future<void> signOut() async {
     final repo = ref.read(authRepositoryProvider);
     await repo.signOut();
