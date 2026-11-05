@@ -27,3 +27,5 @@ for migration in "$root"/migrations/*.sql; do
 done
 run -f "$root/tests/venue_duplicates.sql"
 echo "duplicatas ok"
+run -f "$root/tests/groups_rls.sql"
+echo "groups rls ok"
