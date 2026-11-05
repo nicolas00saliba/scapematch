@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     if (error) return json({ error: "erro" }, 400);
 
     const asaas = AsaasProvider.fromEnv(Deno.env);
-    const provisioned: { venue_id: string; wallet_id: string }[] = [];
+    const provisioned: { venue_id: string }[] = [];
     for (const venue of (venues ?? []) as VenueRow[]) {
       const { data: profile } = await admin
         .from("profiles")
@@ -81,12 +81,12 @@ Deno.serve(async (req) => {
         .update({ asaas_wallet_id: created.walletId })
         .eq("id", venue.id);
       if (updateError) return json({ error: "erro" }, 400);
-      const { error: keyError } = await admin.from("venue_asaas_keys").upsert({
-        venue_id: venue.id,
-        api_key: created.apiKey,
+      const { error: keyError } = await admin.rpc("store_venue_asaas_key", {
+        p_venue_id: venue.id,
+        p_api_key: created.apiKey,
       });
       if (keyError) return json({ error: "erro" }, 400);
-      provisioned.push({ venue_id: venue.id, wallet_id: created.walletId });
+      provisioned.push({ venue_id: venue.id });
     }
     return json({ provisioned });
   } catch (error) {

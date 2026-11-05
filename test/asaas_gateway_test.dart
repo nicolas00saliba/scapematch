@@ -63,8 +63,9 @@ void main() {
     final provision = File(
       'supabase/functions/provision-venue-wallet/index.ts',
     ).readAsStringSync();
-    expect(provision.contains('api_key: created.apiKey'), isTrue);
-    expect(provision.contains('wallet_id: created.walletId'), isTrue);
+    expect(provision.contains('store_venue_asaas_key'), isTrue);
+    expect(provision.contains('api_key: created.apiKey'), isFalse);
+    expect(provision.contains('wallet_id: created.walletId'), isFalse);
     expect(provision.contains('apiKey: created.apiKey'), isFalse);
     expect(RegExp(r'\$aact_[A-Za-z0-9_]{8,}').hasMatch(text), isFalse);
   });

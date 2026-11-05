@@ -12,12 +12,12 @@ import {
 } from "./asaas_provider.ts";
 import { commissionCents } from "./asaas_provider.ts";
 import {
+  type InvoiceDraft,
   mapAsaasInvoiceStatus,
   planInvoices,
   testInvoiceNumber,
   testPdfUrl,
   testXmlUrl,
-  type InvoiceDraft,
   type VenueFiscal,
 } from "./fiscal_plan.ts";
 import { todayInSaoPaulo } from "./http.ts";
@@ -57,7 +57,11 @@ export async function issuePaidInvoices(
   const have = new Set(
     ((existing ?? []) as Array<{ kind: string }>).map((row) => row.kind),
   );
-  if (have.has("service") && (have.has("commission") || commissionCents(charge.amount_cents, charge.commission_bps) === 0)) {
+  if (
+    have.has("service") &&
+    (have.has("commission") ||
+      commissionCents(charge.amount_cents, charge.commission_bps) === 0)
+  ) {
     return;
   }
 
@@ -132,13 +136,9 @@ async function venueClient(
     .eq("id", invoiceId)
     .maybeSingle();
   if (!invoice) return null;
-  const { data: key } = await admin
-    .from("venue_asaas_keys")
-    .select("api_key")
-    .eq("venue_id", invoice.venue_id)
-    .maybeSingle();
-  if (!key?.api_key) return null;
-  return root.withKey(key.api_key as string);
+  const apiKey = await venueApiKey(admin, invoice.venue_id as string);
+  if (!apiKey) return null;
+  return root.withKey(apiKey);
 }
 
 async function writeDraft(
@@ -187,7 +187,9 @@ async function writeDraft(
       pdf_url: emitted.pdfUrl || null,
       xml_url: emitted.xmlUrl || null,
       provider_invoice_id: emitted.id,
-      issued_at: emitted.status === "authorized" ? new Date().toISOString() : null,
+      issued_at: emitted.status === "authorized"
+        ? new Date().toISOString()
+        : null,
       error_message: emitted.status === "error" ? "Asaas recusou a nota" : null,
     });
   } catch (error) {
@@ -211,7 +213,9 @@ async function emitOnAsaas(
   root: AsaasProvider,
   charge: ChargeRow,
   draft: InvoiceDraft,
-): Promise<{ id: string; status: string; number: string; pdfUrl: string; xmlUrl: string }> {
+): Promise<
+  { id: string; status: string; number: string; pdfUrl: string; xmlUrl: string }
+> {
   const client = draft.issuer === "venue"
     ? await subaccount(admin, root, charge.venue_id)
     : root;
@@ -255,15 +259,24 @@ async function subaccount(
   root: AsaasProvider,
   venueId: string,
 ): Promise<AsaasProvider> {
-  const { data: key } = await admin
-    .from("venue_asaas_keys")
-    .select("api_key")
-    .eq("venue_id", venueId)
-    .maybeSingle();
-  if (!key?.api_key) {
-    throw new Error("Subconta sem apiKey. Rode provision-venue-wallet de novo.");
+  const apiKey = await venueApiKey(admin, venueId);
+  if (!apiKey) {
+    throw new Error(
+      "Subconta sem apiKey. Rode provision-venue-wallet de novo.",
+    );
   }
-  return root.withKey(key.api_key as string);
+  return root.withKey(apiKey);
+}
+
+async function venueApiKey(
+  admin: Admin,
+  venueId: string,
+): Promise<string | null> {
+  const { data, error } = await admin.rpc("read_venue_asaas_key", {
+    p_venue_id: venueId,
+  });
+  if (error || typeof data !== "string" || data.length === 0) return null;
+  return data;
 }
 
 async function ensurePlayerCustomer(
@@ -353,12 +366,14 @@ async function groupIsClosed(admin: Admin, groupId: string): Promise<boolean> {
   return filled >= total && filled >= minimum;
 }
 
-async function loadVenue(admin: Admin, venueId: string): Promise<{
-  name: string;
-  ownerId: string;
-  documentNumber: string;
-  fiscal: VenueFiscal;
-} | null> {
+async function loadVenue(admin: Admin, venueId: string): Promise<
+  {
+    name: string;
+    ownerId: string;
+    documentNumber: string;
+    fiscal: VenueFiscal;
+  } | null
+> {
   const { data: venue } = await admin
     .from("venues")
     .select("name, owner_id, document_kind, document_number")

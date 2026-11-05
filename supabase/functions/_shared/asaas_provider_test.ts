@@ -567,8 +567,8 @@ Deno.test("a primeira cobrança tokeniza e só então reserva com o token", asyn
   await provider.refund("pay_card");
   assert(calls[3].url.endsWith("/payments/pay_card/refund"));
   await provider.cancelAuthorization("pay_card");
-  assertEquals(calls[4].init.method, "DELETE");
-  assert(calls[4].url.endsWith("/payments/pay_card"));
+  assertEquals(calls[4].init.method, "POST");
+  assert(calls[4].url.endsWith("/payments/pay_card/refund"));
 });
 
 Deno.test("com token a cobrança não reenvia o cartão", async () => {

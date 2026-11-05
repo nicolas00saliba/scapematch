@@ -42,6 +42,7 @@ type Store = {
   payments: Payment[];
   calls: string[];
   member: string;
+  closed: boolean;
 };
 
 function expiredAt(): string {
@@ -63,6 +64,7 @@ function makeStore(seed?: Partial<Charge>): Store {
     payments: [],
     calls: [],
     member: "pending",
+    closed: false,
   };
   if (seed) {
     store.charges.push({
@@ -157,10 +159,10 @@ function adminFor(store: Store) {
             venue_id: venueId,
             price_cents: 10000,
             cancelled_at: null,
-            closed_at: null,
+            closed_at: store.closed ? freshAt() : null,
             starts_at: new Date(Date.now() + 86_400_000).toISOString(),
             total_spots: 8,
-            minimum_spots: 4,
+            minimum_spots: store.closed ? 1 : 4,
           }];
         }
         if (table === "venues") {
@@ -328,11 +330,13 @@ function adminFor(store: Store) {
           const row = byId(String(args.p_charge_id));
           if (!row) return { data: null, error: { code: "P0002" } };
           row.status = String(args.p_next_status);
+          store.calls.push(`transition ${row.status}`);
           store.member = row.status === "paid"
             ? "paid"
             : row.status === "authorized"
             ? "reserved"
-            : row.status === "refunded"
+            : row.status === "refunded" || row.status === "cancelled" ||
+                row.status === "failed"
             ? "released"
             : "pending";
           return {
@@ -352,6 +356,18 @@ function adminFor(store: Store) {
           });
           return { data: crypto.randomUUID(), error: null };
         }
+        if (name === "delete_compensated_charge") {
+          const row = byId(String(args.p_charge_id));
+          if (
+            row && row.status === "cancelled" &&
+            row.provider_ref === args.p_provider_ref &&
+            row.attempt_id === args.p_attempt_id
+          ) {
+            store.charges = store.charges.filter((item) => item.id !== row.id);
+            return { data: true, error: null };
+          }
+          return { data: false, error: null };
+        }
         return { data: null, error: { code: "42883" } };
       });
     },
@@ -367,6 +383,8 @@ function providerFor(
   hooks: {
     onPixPost?: (payment: Payment) => Promise<Payment | Response>;
     onCardPost?: (payment: Payment) => Promise<Payment>;
+    onCapture?: () => Promise<Response | null>;
+    onRefund?: () => Promise<Response | null>;
   },
 ) {
   let seq = 0;
@@ -425,6 +443,10 @@ function providerFor(
       );
     }
     if (paymentMatch?.[2] === "refund" && method === "POST") {
+      if (hooks.onRefund) {
+        const custom = await hooks.onRefund();
+        if (custom) return custom;
+      }
       const payment = store.payments.find((item) =>
         item.id === paymentMatch[1]
       );
@@ -435,6 +457,10 @@ function providerFor(
       });
     }
     if (paymentMatch?.[2] === "captureAuthorizedPayment" && method === "POST") {
+      if (hooks.onCapture) {
+        const custom = await hooks.onCapture();
+        if (custom) return custom;
+      }
       const payment = store.payments.find((item) =>
         item.id === paymentMatch[1]
       );
@@ -704,4 +730,49 @@ Deno.test("release atrasado não apaga a reserva que o reclaim já assumiu", asy
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].provider_ref, body.provider_ref);
   assertEquals(body.status, "pending");
+});
+
+Deno.test("captura com erro estorna e não deixa a cobrança em creating", async () => {
+  const store = makeStore();
+  store.closed = true;
+  const asaas = providerFor(store, {
+    onCapture: () => Promise.resolve(new Response("falhou", { status: 500 })),
+  });
+  const response = await createCharge(
+    request("CREDIT_CARD", "idem-capture-fail"),
+    chargeRuntime(store, asaas),
+  );
+  const authorizedAt = store.calls.indexOf("transition authorized");
+  const captureAt = store.calls.findIndex((call) =>
+    call.includes("captureAuthorizedPayment")
+  );
+  const refundAt = store.calls.findIndex((call) => call.includes("/refund"));
+  assert(authorizedAt >= 0 && authorizedAt < captureAt);
+  assert(captureAt < refundAt);
+  assertEquals(response.status, 502);
+  assertEquals(store.charges.length, 0);
+  assertEquals(store.orphans.length, 0);
+  assertEquals(store.member, "released");
+  assert(store.calls.includes("transition cancelled"));
+});
+
+Deno.test("estorno da captura que falha registra o órfão e fica authorized", async () => {
+  const store = makeStore();
+  store.closed = true;
+  const asaas = providerFor(store, {
+    onCapture: () => Promise.resolve(new Response("falhou", { status: 500 })),
+    onRefund: () => Promise.resolve(new Response("falhou", { status: 500 })),
+  });
+  const response = await createCharge(
+    request("CREDIT_CARD", "idem-refund-fail"),
+    chargeRuntime(store, asaas),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "authorized");
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].status, "authorized");
+  assertEquals(store.orphans.length, 1);
+  assertEquals(store.orphans[0].reason, "refund_failed");
+  assertEquals(store.member, "reserved");
 });

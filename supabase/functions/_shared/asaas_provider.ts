@@ -688,20 +688,19 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
-  /// Cancela uma autorização de cartão que ainda não foi capturada.
+  /// Solta a pré-autorização do cartão com estorno, como a API do Asaas
+  /// documenta. Pix pendente continua no DELETE de cancelPaymentConfirmed.
   cancelAuthorization(
     paymentId: string,
   ): Promise<{ id: string; status: string }> {
-    return this.#send(`/payments/${paymentId}`, undefined, "DELETE").then(
-      (body) => ({
-        id: typeof body.id === "string" && body.id.length > 0
-          ? body.id
-          : paymentId,
-        status: typeof body.status === "string" && body.status.length > 0
-          ? body.status
-          : "DELETED",
-      }),
-    );
+    return this.#send(`/payments/${paymentId}/refund`, {}).then((body) => ({
+      id: typeof body.id === "string" && body.id.length > 0
+        ? body.id
+        : paymentId,
+      status: typeof body.status === "string" && body.status.length > 0
+        ? body.status
+        : "REFUNDED",
+    }));
   }
 
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
