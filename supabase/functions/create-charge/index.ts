@@ -1,9 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
   AsaasProvider,
+  authorizeStoredCard,
   houseSplitPercent,
 } from "../_shared/asaas_provider.ts";
-import { corsHeaders, json, todayInSaoPaulo } from "../_shared/http.ts";
+import {
+  bindJson,
+  corsHeadersFor,
+  publicError,
+  todayInSaoPaulo,
+} from "../_shared/http.ts";
 
 type CardBody = {
   holderName?: string;
@@ -17,9 +23,19 @@ type CardBody = {
   holderPhone?: string;
 };
 
+type ChargeBody = {
+  group_id?: string;
+  billing_type?: string;
+  idempotency_key?: string;
+  remote_ip?: string;
+  credit_card_token?: string;
+  card?: CardBody;
+};
+
 Deno.serve(async (req) => {
+  const json = bindJson(req);
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(req, Deno.env) });
   }
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -33,13 +49,7 @@ Deno.serve(async (req) => {
     const user = userData.user;
     if (userError || !user) return json({ error: "not authenticated" }, 401);
 
-    const body = await req.json() as {
-      group_id?: string;
-      billing_type?: string;
-      idempotency_key?: string;
-      remote_ip?: string;
-      card?: CardBody;
-    };
+    const body = await req.json() as ChargeBody;
     const groupId = body.group_id ?? "";
     const billingType = body.billing_type === "CREDIT_CARD" ? "CREDIT_CARD" : "PIX";
     const idempotencyKey = (body.idempotency_key ?? "").trim();
@@ -130,6 +140,7 @@ Deno.serve(async (req) => {
     let status = "pending";
     let qrCode: string | null = null;
     let qrImage: string | null = null;
+    let creditCardToken = "";
 
     if (billingType === "PIX") {
       const pix = await asaas.createPix({
@@ -145,39 +156,45 @@ Deno.serve(async (req) => {
       qrCode = pix.payload;
       qrImage = pix.encodedImage;
     } else {
-      const card = body.card ?? {};
-      if (!card.number || !card.ccv || !card.holderName) {
-        return json({ error: "Dados do cartão incompletos." }, 400);
-      }
+      const suppliedToken = (body.credit_card_token ?? "").trim();
+      const card = suppliedToken ? undefined : body.card;
       const remoteIp = body.remote_ip ||
         req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
         "127.0.0.1";
-      const authorized = await asaas.authorizeCard({
-        customer: customerId,
-        value: amountCents / 100,
-        dueDate,
-        description,
-        externalReference: idempotencyKey,
-        split,
-        remoteIp,
-        creditCard: {
-          holderName: card.holderName,
-          number: card.number,
-          expiryMonth: card.expiryMonth ?? "",
-          expiryYear: card.expiryYear ?? "",
-          ccv: card.ccv,
+      const authorized = await authorizeStoredCard(asaas, {
+        charge: {
+          customer: customerId,
+          value: amountCents / 100,
+          dueDate,
+          description,
+          externalReference: idempotencyKey,
+          split,
+          remoteIp,
         },
-        creditCardHolderInfo: {
-          name: card.holderName,
-          email: user.email ?? "",
-          cpfCnpj: card.holderCpfCnpj ?? "",
-          postalCode: card.holderPostalCode ?? "",
-          addressNumber: card.holderAddressNumber ?? "S/N",
-          phone: card.holderPhone ?? "",
-        },
+        creditCardToken: suppliedToken,
+        creditCard: card
+          ? {
+            holderName: card.holderName ?? "",
+            number: card.number ?? "",
+            expiryMonth: card.expiryMonth ?? "",
+            expiryYear: card.expiryYear ?? "",
+            ccv: card.ccv ?? "",
+          }
+          : undefined,
+        creditCardHolderInfo: card
+          ? {
+            name: card.holderName ?? "",
+            email: user.email ?? "",
+            cpfCnpj: card.holderCpfCnpj ?? "",
+            postalCode: card.holderPostalCode ?? "",
+            addressNumber: card.holderAddressNumber ?? "S/N",
+            phone: card.holderPhone ?? "",
+          }
+          : undefined,
       });
       providerRef = authorized.id;
       status = authorized.status === "AUTHORIZED" ? "authorized" : "pending";
+      creditCardToken = authorized.creditCardToken;
       const filled = await filledSpots(admin, groupId);
       const closed = Boolean(group.closed_at) || filled >= group.total_spots;
       if (closed && filled >= group.minimum_spots && status === "authorized") {
@@ -207,7 +224,7 @@ Deno.serve(async (req) => {
     const saved = existing
       ? await admin.from("payment_charges").update(row).eq("id", existing.id).select("id").single()
       : await admin.from("payment_charges").insert(row).select("id").single();
-    if (saved.error) return json({ error: saved.error.message }, 400);
+    if (saved.error) return json({ error: publicError(saved.error.message) }, 400);
 
     const memberStatus = status === "paid"
       ? "paid"
@@ -224,10 +241,11 @@ Deno.serve(async (req) => {
       qr_code_base64: qrImage,
       billing_type: billingType,
       amount_cents: amountCents,
+      ...(creditCardToken ? { credit_card_token: creditCardToken } : {}),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "erro";
-    return json({ error: message }, 500);
+    return json({ error: publicError(message) }, 500);
   }
 });
 

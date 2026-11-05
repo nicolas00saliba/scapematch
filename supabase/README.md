@@ -91,7 +91,7 @@ No painel do Asaas sandbox, o webhook aponta para `https://eujlhicairvksvmssruz.
 
 A ScapeMatch Demo não recebe `walletId` no SQL. Com a chave já gravada, entre como admin e chame `provision-venue-wallet` sem `venue_id` (ou com o id da demo). Ela cria a subconta sandbox. O sandbox limita 20 subcontas por dia. Estornar um Pix logo depois de pago pode falhar se a taxa do Asaas deixar o saldo insuficiente: deixe saldo na conta raiz do sandbox.
 
-O número do cartão atravessa a função `create-charge` e segue para o Asaas. Ele não é gravado no banco. A chave da API também não volta na resposta.
+O Asaas não oferece SDK de navegador para tokenizar o cartão. `create-charge` recebe o cartão só na primeira chamada, troca por `creditCardToken` em `POST /v3/creditCard/tokenizeCreditCard` e a cobrança (`authorizeOnly` e o split) segue só com esse token. O número, o CVV e a validade não são gravados, logados nem devolvidos. Uma cobrança seguinte pode mandar `credit_card_token` e dispensar o cartão. A chave da API também não volta na resposta.
 
 ## NFS-e
 

@@ -24,6 +24,18 @@ void main() {
     expect(text.contains('ASAAS_WEBHOOK_TOKEN'), isTrue);
     expect(text.contains('asaas-access-token'), isTrue);
     expect(text.contains('authorizeOnly'), isTrue);
+    expect(text.contains('/creditCard/tokenizeCreditCard'), isTrue);
+    expect(text.contains('creditCardToken'), isTrue);
+    final http = File('supabase/functions/_shared/http.ts').readAsStringSync();
+    expect(http.contains('https://nicolas00saliba.github.io'), isTrue);
+    expect(http.contains('Access-Control-Allow-Origin": "*"'), isFalse);
+    expect(http.contains("Access-Control-Allow-Origin': '*'"), isFalse);
+    final charge = File(
+      'supabase/functions/create-charge/index.ts',
+    ).readAsStringSync();
+    expect(charge.contains('authorizeStoredCard'), isTrue);
+    expect(charge.contains('publicError'), isTrue);
+    expect(charge.contains('console.'), isFalse);
     expect(text.contains('https://api-sandbox.asaas.com/v3'), isTrue);
     expect(text.contains('/invoices'), isTrue);
     expect(text.contains('/fiscalInfo'), isTrue);

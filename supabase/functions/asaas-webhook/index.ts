@@ -4,7 +4,7 @@ import {
   isAsaasSandbox,
   tokensMatch,
 } from "../_shared/asaas_provider.ts";
-import { json } from "../_shared/http.ts";
+import { bindJson } from "../_shared/http.ts";
 import {
   cancelInvoicesForCharge,
   issuePaidInvoices,
@@ -12,6 +12,8 @@ import {
 import { creditLedger, reverseLedger } from "../_shared/ledger.ts";
 
 Deno.serve(async (req) => {
+  // Servidor a servidor: a resposta segue mesmo sem o header de navegador.
+  const json = bindJson(req);
   if (req.method !== "POST") return json({ error: "method" }, 405);
   const expected = Deno.env.get("ASAAS_WEBHOOK_TOKEN");
   const header = req.headers.get("asaas-access-token");
