@@ -313,6 +313,20 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
+  getCustomer(id: string): Promise<{ id: string; cpfCnpj: string }> {
+    return this.#send(`/customers/${id}`, undefined, "GET").then((body) => ({
+      id: stringField(body, "id"),
+      cpfCnpj: optionalString(body, "cpfCnpj").replace(/\D/g, ""),
+    }));
+  }
+
+  /// Só o documento. Não manda nome, e-mail nem o corpo antigo.
+  updateCustomerCpf(id: string, cpfCnpj: string): Promise<void> {
+    return this.#send(`/customers/${id}`, { cpfCnpj }, "PUT").then(
+      () => undefined,
+    );
+  }
+
   createPix(input: PixInput): Promise<PixCreated> {
     return this.#send("/payments", {
       customer: input.customer,

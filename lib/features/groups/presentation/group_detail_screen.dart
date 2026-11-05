@@ -21,6 +21,7 @@ import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
+import 'package:scapematch/features/account/presentation/cpf_screen.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/player_range.dart';
@@ -433,6 +434,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
   }
 
   Future<void> _pay(Group group) async {
+    if (!await ensurePlayerCpf(context, ref) || !mounted) return;
     final paid = await showPayShareSheet(
       context: context,
       amountCents: group.priceCents,

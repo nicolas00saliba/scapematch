@@ -115,6 +115,10 @@ abstract final class AppKeys {
   static const myPayments = Key('my-payments');
   static Key removeSavedCard(String id) => Key('remove-saved-card-$id');
   static Key paymentRow(String id) => Key('payment-row-$id');
+  static const playerCpfScreen = Key('player-cpf-screen');
+  static const playerCpf = Key('player-cpf');
+  static const playerCpfSave = Key('player-cpf-save');
+  static const playerCpfError = Key('player-cpf-error');
   static const addCard = Key('add-card');
   static const addCardNotice = Key('add-card-notice');
   static const addCardSave = Key('add-card-save');

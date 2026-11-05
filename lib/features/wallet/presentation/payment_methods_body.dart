@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/account/presentation/cpf_screen.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
@@ -44,6 +45,7 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
       });
       return;
     }
+    if (!await ensurePlayerCpf(context, ref) || !mounted) return;
     setState(() {
       _saving = true;
       _error = null;

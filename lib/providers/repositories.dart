@@ -5,6 +5,7 @@ import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:scapematch/features/account/data/player_cpf_store.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
 import 'package:scapematch/features/auth/data/pending_invite_store.dart';
 import 'package:scapematch/features/auth/data/supabase_auth_repository.dart';
@@ -68,6 +69,14 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
     }
   }
   return SupabaseAuthRepository(ref.watch(supabaseClientProvider));
+});
+
+/// Demonstração não pergunta CPF. No modo real o número fica no perfil.
+final playerCpfStoreProvider = Provider<PlayerCpfStore>((ref) {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) {
+    return MemoryPlayerCpfStore(saved: true);
+  }
+  return SupabasePlayerCpfStore(ref.watch(supabaseClientProvider));
 });
 
 /// Grupo que a pessoa escolheu antes de entrar na conta.

@@ -4,6 +4,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { storedFailure } from "./asaas_client_error.ts";
+import { customerWithCpf, playerCpfDigits } from "./player_cpf.ts";
 import {
   AsaasProvider,
   centsToReais,
@@ -277,21 +278,30 @@ async function ensurePlayerCustomer(
     .eq("venue_id", charge.venue_id)
     .eq("user_id", charge.user_id)
     .maybeSingle();
-  if (found?.asaas_customer_id) return found.asaas_customer_id as string;
   const name = await playerNameOf(admin, charge.user_id);
   const email = await emailOf(admin, charge.user_id);
-  const created = await client.createCustomer({
+  const cpf = playerCpfDigits(await playerCpfOf(admin, charge.user_id));
+  if (!cpf) {
+    const error = new Error("cpf_required");
+    error.name = "CpfRequired";
+    throw error;
+  }
+  const customerId = await customerWithCpf(client, {
+    customerId: (found?.asaas_customer_id as string | null) ?? null,
     name,
     email: email ?? `jogador-${charge.user_id}@scapematch.invalid`,
     externalReference: `player:${charge.venue_id}:${charge.user_id}`,
+    cpf,
   });
-  await admin.from("asaas_customers").insert({
-    scope: "venue_player",
-    venue_id: charge.venue_id,
-    user_id: charge.user_id,
-    asaas_customer_id: created.id,
-  });
-  return created.id;
+  if (!found?.asaas_customer_id) {
+    await admin.from("asaas_customers").insert({
+      scope: "venue_player",
+      venue_id: charge.venue_id,
+      user_id: charge.user_id,
+      asaas_customer_id: customerId,
+    });
+  }
+  return customerId;
 }
 
 async function ensureHouseCustomer(
@@ -372,6 +382,15 @@ async function loadVenue(admin: Admin, venueId: string): Promise<{
       issRate: Number(fiscal?.iss_rate ?? 0),
     },
   };
+}
+
+async function playerCpfOf(admin: Admin, userId: string): Promise<unknown> {
+  const { data } = await admin
+    .from("profiles")
+    .select("cpf")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.cpf;
 }
 
 async function playerNameOf(admin: Admin, userId: string): Promise<string> {

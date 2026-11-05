@@ -73,9 +73,15 @@ Deno.test("tokenize-card não loga e a resposta não leva o token", async () => 
   assertEquals(JSON.stringify(card).includes("1.2.3.4"), false);
   const claimAt = source.indexOf("claim_card_tokenize_attempt");
   const tokenizeAt = source.indexOf("tokenizeCard");
-  const customerAt = source.indexOf("createCustomer");
+  const customerAt = source.indexOf("customerWithCpf(asaas");
   assert(claimAt > 0 && claimAt < tokenizeAt);
   assert(claimAt < customerAt);
+  const helper = await Deno.readTextFile(
+    new URL("./player_cpf.ts", import.meta.url),
+  );
+  assert(helper.includes("createCustomer"));
+  assert(helper.includes("updateCustomerCpf"));
+  assertEquals(/console\s*\./.test(helper), false);
   assert(source.includes("429"));
   assert(source.includes("tokenizeLimitedMessage"));
 });

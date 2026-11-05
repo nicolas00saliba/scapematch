@@ -1,0 +1,117 @@
+-- CPF do jogador: só o dono grava, e o número não volta no erro.
+
+\set ON_ERROR_STOP on
+
+insert into auth.users (id, email, raw_user_meta_data)
+values
+  ('a9111111-1111-1111-1111-111111111111', 'cpf-a@example.com', '{"display_name":"Ana Cpf"}'),
+  ('a9222222-2222-2222-2222-222222222222', 'cpf-b@example.com', '{"display_name":"Beto Cpf"}');
+
+do $$
+begin
+  if has_column_privilege('authenticated', 'public.profiles', 'cpf', 'select')
+    or has_column_privilege('authenticated', 'public.profiles', 'cpf', 'update')
+    or has_column_privilege('anon', 'public.profiles', 'cpf', 'select')
+    or not has_column_privilege('service_role', 'public.profiles', 'cpf', 'select')
+  then
+    raise exception 'coluna cpf ficou visível para o papel errado';
+  end if;
+  if not has_function_privilege('authenticated', 'public.set_my_cpf(text)', 'execute')
+    or not has_function_privilege('authenticated', 'public.my_cpf_status()', 'execute')
+    or has_function_privilege('anon', 'public.set_my_cpf(text)', 'execute')
+  then
+    raise exception 'execute do cpf saiu do combinado';
+  end if;
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('set_my_cpf', 'my_cpf_status')
+      and p.prosecdef
+      and 'search_path=""' = any (p.proconfig)
+    having count(*) = 2
+  ) then
+    raise exception 'funcao de cpf sem security definer ou search_path vazio';
+  end if;
+end $$;
+
+begin;
+select set_config('request.jwt.claim.sub', 'a9111111-1111-1111-1111-111111111111', true);
+set local role authenticated;
+
+do $$
+begin
+  if public.my_cpf_status() then
+    raise exception 'perfil nasceu com cpf';
+  end if;
+  begin
+    perform public.set_my_cpf('111.111.111-11');
+    raise exception 'aceitou cpf invalido';
+  exception
+    when invalid_parameter_value then
+      if sqlerrm ~ '[0-9]' then
+        raise exception 'mensagem do cpf levou digito';
+      end if;
+  end;
+  if not public.set_my_cpf('529.982.247-25') then
+    raise exception 'nao guardou o cpf';
+  end if;
+  if not public.my_cpf_status() then
+    raise exception 'status nao viu o cpf guardado';
+  end if;
+  begin
+    update public.profiles set cpf = '52998224725' where id = auth.uid();
+    raise exception 'update direto da coluna passou';
+  exception
+    when insufficient_privilege then
+      if sqlerrm ~ '[0-9]' then
+        raise exception 'erro de coluna levou digito';
+      end if;
+  end;
+end $$;
+
+reset role;
+select set_config('request.jwt.claim.sub', 'a9222222-2222-2222-2222-222222222222', true);
+set local role authenticated;
+
+do $$
+begin
+  if public.my_cpf_status() then
+    raise exception 'outro jogador viu o cpf';
+  end if;
+  begin
+    perform cpf from public.profiles
+      where id = 'a9111111-1111-1111-1111-111111111111';
+    raise exception 'select da coluna passou';
+  exception
+    when insufficient_privilege then
+      if sqlerrm ~ '[0-9]' then
+        raise exception 'erro de select levou digito';
+      end if;
+  end;
+  if not exists (
+    select 1 from public.profiles
+    where id = 'a9222222-2222-2222-2222-222222222222'
+      and display_name = 'Beto Cpf'
+  ) then
+    raise exception 'o restante do perfil deixou de ser legivel';
+  end if;
+end $$;
+
+reset role;
+set role service_role;
+
+do $$
+begin
+  if not exists (
+    select 1 from public.profiles
+    where id = 'a9111111-1111-1111-1111-111111111111'
+      and cpf = '52998224725'
+  ) then
+    raise exception 'service_role nao leu o cpf normalizado';
+  end if;
+end $$;
+
+reset role;
+commit;

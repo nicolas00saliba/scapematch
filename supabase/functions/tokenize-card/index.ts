@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import {
@@ -38,6 +39,13 @@ Deno.serve(async (req) => {
     if (!card) return json({ error: "Dados do cartão incompletos." }, 400);
 
     const admin = createClient(url, service);
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("display_name, asaas_customer_id, cpf")
+      .eq("id", user.id)
+      .maybeSingle();
+    const cpf = playerCpfDigits(profile?.cpf);
+    if (!cpf) return json({ error: "cpf_required" }, 422);
     let responseBody: ReturnType<typeof tokenizePublicResponse> | null = null;
     const decision = await gateTokenize(
       async () => {
@@ -48,26 +56,19 @@ Deno.serve(async (req) => {
         return claim.data === true;
       },
       async () => {
-        const { data: profile } = await admin
-          .from("profiles")
-          .select("display_name, asaas_customer_id")
-          .eq("id", user.id)
-          .maybeSingle();
         const asaas = AsaasProvider.fromEnv(Deno.env);
-        let customerId = profile?.asaas_customer_id as string | null;
-        if (!customerId) {
-          const created = await asaas.createCustomer({
-            name: profile?.display_name ?? "Jogador",
-            email: user.email ?? "",
-            externalReference: user.id,
-          });
-          customerId = created.id;
+        const previousCustomer = profile?.asaas_customer_id as string | null;
+        const customerId = await customerWithCpf(asaas, {
+          customerId: previousCustomer,
+          name: profile?.display_name ?? "Jogador",
+          email: user.email ?? "",
+          externalReference: user.id,
+          cpf,
+        });
+        if (customerId !== previousCustomer) {
           await admin.from("profiles").update({
             asaas_customer_id: customerId,
-          }).eq(
-            "id",
-            user.id,
-          );
+          }).eq("id", user.id);
         }
 
         const tokenized = await asaas.tokenizeCard({
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
           creditCardHolderInfo: {
             name: card.holderName,
             email: user.email ?? "",
-            cpfCnpj: card.holderCpfCnpj,
+            cpfCnpj: playerCpfDigits(card.holderCpfCnpj) ?? cpf,
             postalCode: card.holderPostalCode,
             addressNumber: card.holderAddressNumber,
             phone: card.holderPhone,

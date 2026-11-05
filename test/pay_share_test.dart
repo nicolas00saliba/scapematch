@@ -28,6 +28,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.payMyShare));
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.payMethodPix), findsOneWidget);
+    expect(find.byKey(AppKeys.playerCpf), findsNothing);
     expect(
       find.text('Pix simulado. O código abaixo não cobra.'),
       findsOneWidget,

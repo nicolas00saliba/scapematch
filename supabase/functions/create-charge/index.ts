@@ -3,6 +3,7 @@ import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider, houseSplitPercent } from "../_shared/asaas_provider.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
+import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import {
   bindJson,
   corsHeadersFor,
@@ -123,18 +124,21 @@ Deno.serve(async (req) => {
 
     const { data: profile } = await admin
       .from("profiles")
-      .select("display_name, asaas_customer_id")
+      .select("display_name, asaas_customer_id, cpf")
       .eq("id", user.id)
       .maybeSingle();
+    const cpf = playerCpfDigits(profile?.cpf);
+    if (!cpf) return json({ error: "cpf_required" }, 422);
     const asaas = AsaasProvider.fromEnv(Deno.env);
-    let customerId = profile?.asaas_customer_id as string | null;
-    if (!customerId) {
-      const created = await asaas.createCustomer({
-        name: profile?.display_name ?? "Jogador",
-        email: user.email ?? "",
-        externalReference: user.id,
-      });
-      customerId = created.id;
+    const previousCustomer = profile?.asaas_customer_id as string | null;
+    const customerId = await customerWithCpf(asaas, {
+      customerId: previousCustomer,
+      name: profile?.display_name ?? "Jogador",
+      email: user.email ?? "",
+      externalReference: user.id,
+      cpf,
+    });
+    if (customerId !== previousCustomer) {
       await admin.from("profiles").update({ asaas_customer_id: customerId }).eq(
         "id",
         user.id,
