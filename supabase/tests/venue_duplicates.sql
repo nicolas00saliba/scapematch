@@ -41,8 +41,8 @@ begin
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'private'
     and p.proname = 'check_venue_duplicates';
-  if v_public or not v_private then
-    raise exception 'check_venue_duplicates ficou definidor no schema exposto';
+  if not v_public or not v_private then
+    raise exception 'check_venue_duplicates precisa ser security definer nos dois schemas';
   end if;
 
   select pg_get_function_result(p.oid)

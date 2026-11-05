@@ -204,6 +204,11 @@ values (
   'partner_grid'
 );
 
+update public.venues
+set asaas_wallet_id = 'wal_teste_grupos'
+where id = 'ca111111-1111-1111-1111-111111111111'
+  and asaas_wallet_id is null;
+
 create temp table created_group (id uuid);
 grant all on created_group to authenticated;
 
