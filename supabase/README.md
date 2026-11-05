@@ -40,7 +40,7 @@ insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000
 
 ## E-mails de autenticação
 
-Os HTML ficam em `supabase/templates/` e os assuntos em `supabase/config.toml` (`[auth.email.template.*]`). São cinco: confirmação de cadastro, redefinição de senha, magic link, troca de e-mail e convite. O desenho usa a paleta do app (verde-petróleo `#0F4C4A`, cobre `#9A4F24`, fundo `#F5F1EA`), tabelas, CSS inline e o ícone já publicado em `https://nicolas00saliba.github.io/scapematch/icons/Icon-192.png`. Cada mensagem tem um botão e o mesmo link em texto. As variáveis são as do Supabase (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}` e, na troca, `{{ .NewEmail }}`).
+Os HTML ficam em `supabase/templates/` e os assuntos em `supabase/config.toml` (`[auth.email.template.*]`). São cinco: confirmação de cadastro, redefinição de senha, magic link, troca de e-mail e convite. O desenho usa a paleta do app (verde-petróleo `#0F4C4A`, cobre `#9A4F24`, fundo `#F5F1EA`), tabelas e CSS inline. A marca é texto, sem imagem nem outro recurso remoto. Cada mensagem tem um botão, o mesmo link em texto e a linha de que o link leva a `nicolas00saliba.github.io/scapematch`. As variáveis são as do Supabase (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}` e, na troca, `{{ .NewEmail }}`).
 
 Nada disso foi aplicado no projeto remoto por este repositório. Duas formas de publicar:
 

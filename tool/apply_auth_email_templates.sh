@@ -107,8 +107,13 @@ for name, (subject_key, content_key) in fields.items():
     for token in needed[name]:
         if token not in html:
             raise SystemExit(f"{path.name} não tem {token}")
-    if "<script" in html.lower() or "javascript:" in html.lower():
+    lowered = html.lower()
+    if "<script" in lowered or "javascript:" in lowered:
         raise SystemExit(f"{path.name} não pode ter script")
+    if "<img" in lowered or "https://" in lowered or "http://" in lowered:
+        raise SystemExit(f"{path.name} não pode carregar recurso remoto")
+    if "nicolas00saliba.github.io/scapematch" not in html:
+        raise SystemExit(f"{path.name} não diz o destino do link")
     payload[subject_key] = subject
     payload[content_key] = html
 
@@ -135,8 +140,18 @@ try:
     with urllib.request.urlopen(request, timeout=60) as response:
         print(f"Auth atualizado ({response.status}).")
 except urllib.error.HTTPError as error:
-    detail = error.read().decode("utf-8", "replace")
+    raw = error.read().decode("utf-8", "replace")
+    message = ""
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        field = parsed.get("message")
+        if isinstance(field, str):
+            message = field.strip()
     print(f"A API respondeu {error.code}.", file=sys.stderr)
-    print(detail, file=sys.stderr)
+    if message:
+        print(message, file=sys.stderr)
     raise SystemExit(1)
 PY

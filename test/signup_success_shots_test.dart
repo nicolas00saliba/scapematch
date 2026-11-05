@@ -61,7 +61,7 @@ void main() {
     final bytes = await tester.runAsync(
       () => image.toByteData(format: ui.ImageByteFormat.png),
     );
-    File('${dir.path}/cadastro-sucesso-390.png')
+    File('${dir.path}/cadastro-sucesso-revisao-390.png')
         .writeAsBytesSync(bytes!.buffer.asUint8List());
     image.dispose();
     await tester.pumpWidget(const SizedBox.shrink());

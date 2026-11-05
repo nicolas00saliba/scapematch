@@ -7,7 +7,9 @@ import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
+import 'package:scapematch/features/auth/data/signup_confirmation.dart';
 import 'package:scapematch/features/auth/domain/signup_result.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:scapematch/features/auth/presentation/login_screen.dart';
 import 'package:scapematch/features/auth/presentation/signup_screen.dart';
 import 'package:scapematch/features/auth/presentation/signup_success_view.dart';
@@ -56,10 +58,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.signupResendEmail));
     await tester.pump();
     expect(resent, 1);
-    expect(
-      find.textContaining('Enviamos de novo para ana@exemplo.com.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining(signupResendNeutralMessage), findsOneWidget);
     expect(_resend(tester).onPressed, isNull);
     expect(find.textContaining('Você pode reenviar em 2s.'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -149,10 +148,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.signupResendEmail));
     await tester.pump();
     expect(auth.resentSignupEmails, ['ana@exemplo.invalid']);
-    expect(
-      find.textContaining('Enviamos de novo para ana@exemplo.invalid.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining(signupResendNeutralMessage), findsOneWidget);
     expect(_resend(tester).onPressed, isNull);
 
     auth.resendSignupError =
@@ -161,6 +157,35 @@ void main() {
     await tester.tap(find.byKey(AppKeys.signupResendEmail));
     await tester.pump();
     expect(find.textContaining('Muitas tentativas'), findsOneWidget);
+  });
+
+  test('resend does not reveal whether the account exists', () {
+    expect(
+      resendFailureMessage(const AuthException('User already registered')),
+      isNull,
+    );
+    expect(resendFailureMessage(const AuthException('user not found')), isNull);
+    expect(
+      resendFailureMessage(Exception('signup failed for this address')),
+      isNull,
+    );
+    expect(
+      resendFailureMessage(const AuthException('email rate limit exceeded')),
+      signupResendRateLimitMessage,
+    );
+    expect(
+      resendFailureMessage(
+        const AuthException(
+          'For security purposes, you can only request this after 60 seconds',
+        ),
+      ),
+      signupResendRateLimitMessage,
+    );
+    expect(
+      resendFailureMessage(Exception('SocketException: failed host lookup')),
+      signupResendOfflineMessage,
+    );
+    expect(signupResendNeutralMessage, isNot(contains('@')));
   });
 
   test('the sentinel is not a signed-in account', () async {

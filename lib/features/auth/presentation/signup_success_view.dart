@@ -98,7 +98,7 @@ class _SignupSuccessViewState extends State<SignupSuccessView>
     setState(() {
       _busy = false;
       if (error == null) {
-        _notice = 'Enviamos de novo para ${widget.email}.';
+        _notice = signupResendNeutralMessage;
         _error = null;
         _armCooldown();
       } else {
