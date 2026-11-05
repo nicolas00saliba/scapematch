@@ -64,4 +64,11 @@ Deno.test("tokenize-card não loga e a resposta não leva o token", async () => 
   }, "203.0.113.4");
   assertEquals(card?.holderName, "Ana");
   assertEquals(card?.remoteIp, "203.0.113.4");
+  const claimAt = source.indexOf("claim_card_tokenize_attempt");
+  const tokenizeAt = source.indexOf("tokenizeCard");
+  const customerAt = source.indexOf("createCustomer");
+  assert(claimAt > 0 && claimAt < tokenizeAt);
+  assert(claimAt < customerAt);
+  assert(source.includes("429"));
+  assert(source.includes("tokenizeLimitedMessage"));
 });
