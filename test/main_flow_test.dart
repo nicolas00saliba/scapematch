@@ -26,7 +26,7 @@ void main() {
     expect(find.byKey(AppKeys.groupSearch), findsOneWidget);
     expect(find.text('Criar grupo'), findsWidgets);
     expect(find.text('Quase cheios'), findsNothing);
-    expect(find.textContaining('Dados de exemplo'), findsOneWidget);
+    expect(find.textContaining('Demonstração'), findsOneWidget);
 
     await _selectCity(tester, SampleIds.saoPaulo);
     expect(find.text('São Paulo'), findsWidgets);

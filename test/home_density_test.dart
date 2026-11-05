@@ -554,7 +554,7 @@ void main() {
 
   testWidgets('the example-data notice is a small chip', (tester) async {
     await pumpScapeMatch(tester);
-    final label = find.text('Dados de exemplo');
+    final label = find.text('Demonstração');
     expect(label, findsOneWidget);
     final chip = find
         .ancestor(of: label, matching: find.byType(Material))

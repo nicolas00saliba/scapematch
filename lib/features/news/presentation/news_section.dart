@@ -189,8 +189,10 @@ class NewsSection extends ConsumerWidget {
               final kind = gameTypeId == GameTypes.all
                   ? ''
                   : ' de ${GameTypes.labelOf(gameTypeId)}';
+              final sample = ref.watch(backendPlanProvider).loadsSampleDatabase;
+              final ofExample = sample ? ' de exemplo' : '';
               return InlineNotice(
-                message: 'Ainda não há novidades de exemplo$kind nesta cidade.',
+                message: 'Ainda não há novidades$ofExample$kind nesta cidade.',
               );
             }
             return LayoutBuilder(

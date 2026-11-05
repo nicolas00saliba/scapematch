@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
@@ -86,25 +86,7 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
                 : PartnerMessages.loginBody,
             style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
           ),
-          if (!kReleaseMode && !scapeUsesLiveBackend) ...[
-            const SizedBox(height: 8),
-            Text(
-              partnerDemoEmailHint(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              partnerDemoQuickLabel(),
-              key: PartnerKeys.partnerQuickDemo,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
+          if (kAllowSampleLogin) const _PartnerDemoHints(),
           const SizedBox(height: 20),
           TextField(
             key: PartnerKeys.partnerEmail,
@@ -159,43 +141,92 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
               child: const Text(PartnerMessages.signUp),
             ),
           ],
-          if (!kReleaseMode && !scapeUsesLiveBackend) ...[
-            const SizedBox(height: 8),
-            TextButton(
-              key: PartnerKeys.partnerSignup,
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const PartnerVenueSignupScreen(),
-                  ),
-                );
-              },
-              child: const Text(PartnerMessages.signupVenue),
-            ),
-            TextButton(
-              key: PartnerKeys.partnerTermsDemo,
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const PartnerTermsScreen(),
-                  ),
-                );
-              },
-              child: const Text(PartnerMessages.signupTerms),
-            ),
-            TextButton(
-              key: PartnerKeys.partnerAdminDemo,
-              onPressed: () {
-                ref.read(partnerSessionProvider.notifier).signIn(
+          if (kAllowSampleLogin) const _PartnerDemoActions(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Textos e atalhos da casa de exemplo. O release real não referencia esta classe.
+class _PartnerDemoHints extends StatelessWidget {
+  const _PartnerDemoHints();
+
+  @override
+  Widget build(BuildContext context) {
+    if (scapeUsesLiveBackend) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          partnerDemoEmailHint(),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          partnerDemoQuickLabel(),
+          key: PartnerKeys.partnerQuickDemo,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: scheme.primary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PartnerDemoActions extends ConsumerWidget {
+  const _PartnerDemoActions();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (scapeUsesLiveBackend) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        TextButton(
+          key: PartnerKeys.partnerSignup,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => const PartnerVenueSignupScreen(),
+              ),
+            );
+          },
+          child: const Text(PartnerMessages.signupVenue),
+        ),
+        TextButton(
+          key: PartnerKeys.partnerTermsDemo,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => const PartnerTermsScreen(),
+              ),
+            );
+          },
+          child: const Text(PartnerMessages.signupTerms),
+        ),
+        TextButton(
+          key: PartnerKeys.partnerAdminDemo,
+          onPressed: () {
+            ref
+                .read(partnerSessionProvider.notifier)
+                .signIn(
                   email: partnerAdminAccount.email,
                   password: partnerDemoPassword,
                 );
-              },
-              child: const Text(PartnerMessages.adminQueue),
-            ),
-          ],
-        ],
-      ),
+          },
+          child: const Text(PartnerMessages.adminQueue),
+        ),
+      ],
     );
   }
 }

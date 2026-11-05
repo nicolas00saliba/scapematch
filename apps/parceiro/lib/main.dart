@@ -11,7 +11,7 @@ import 'package:scapematch_parceiro/parceiro_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await startScapeSupabase();
+  await bootScapeBackend();
   configureUrlStrategy();
   SemanticsBinding.instance.ensureSemantics();
   await initializeDateFormatting('pt_BR');

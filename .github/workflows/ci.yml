@@ -56,11 +56,14 @@ jobs:
       # --pwa-strategy=none ainda é o interruptor no Flutter 3.47.8: o bootstrap
       # não registra worker e o arquivo gerado sai vazio. O passo seguinte
       # publica o script que desregistra o worker antigo e limpa o cache.
-      - name: Build web
-        run: flutter build web --release --base-href /scapematch/ --pwa-strategy=none
+      - name: Build player web (real)
+        run: flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none
 
       - name: Install the cleanup service worker
-        run: bash tool/install_cleanup_service_worker.sh build/web
+        run: |
+          bash tool/install_cleanup_service_worker.sh build/web
+          bash tool/mark_real_web_copy.sh build/web player
+          bash tool/check_web_service_worker.sh build/web player
 
       - name: Player bundle excludes the partner app
         run: |
@@ -72,15 +75,27 @@ jobs:
             echo 'O bundle do jogador ainda contém o login da casa.'
             exit 1
           fi
-          bash tool/check_web_service_worker.sh build/web player
+          if bash tool/js_contains.sh build/web 'Demonstração'; then
+            echo 'O bundle real do jogador ainda tem o selo de demonstração.'
+            exit 1
+          fi
+          if bash tool/js_contains.sh build/web 'O Cofre do Café'; then
+            echo 'O bundle real do jogador ainda tem sala de exemplo.'
+            exit 1
+          fi
+          if grep -R -F -q 'dados de exemplo' build/web/index.html; then
+            echo 'O index real do jogador ainda fala em dados de exemplo.'
+            exit 1
+          fi
 
-      - name: Build partner web
+      - name: Build partner web (real)
         working-directory: apps/parceiro
-        run: flutter build web --release --base-href /scapematch/parceiro/ --pwa-strategy=none
+        run: flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none
 
       - name: Install the partner cleanup service worker
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
+          bash tool/mark_real_web_copy.sh apps/parceiro/build/web partner
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
           if grep -R -F -q 'xv@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
             echo 'O bundle do Parceiro ainda tem o login de demonstração.'
@@ -92,6 +107,54 @@ jobs:
           fi
           if grep -R -F -q 'Demo: a / b' apps/parceiro/build/web --include='*.js'; then
             echo 'O bundle do Parceiro ainda tem o atalho a/b.'
+            exit 1
+          fi
+          if bash tool/js_contains.sh apps/parceiro/build/web 'Demonstração'; then
+            echo 'O bundle real do Parceiro ainda tem o selo de demonstração.'
+            exit 1
+          fi
+          if bash tool/js_contains.sh apps/parceiro/build/web 'O Cofre do Café'; then
+            echo 'O bundle real do Parceiro ainda tem sala de exemplo.'
+            exit 1
+          fi
+
+      - name: Build player web (demo)
+        run: flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/player-demo
+
+      - name: Check player demo
+        run: |
+          bash tool/install_cleanup_service_worker.sh build/player-demo
+          bash tool/check_web_service_worker.sh build/player-demo player
+          grep -F -q 'base href="/scapematch/demo/"' build/player-demo/index.html
+          bash tool/js_contains.sh build/player-demo 'Demonstração'
+          bash tool/js_contains.sh build/player-demo 'O Cofre do Café'
+          if bash tool/js_contains.sh build/player-demo 'supabase.co'; then
+            echo 'A demonstração do jogador ainda aponta para o Supabase.'
+            exit 1
+          fi
+          if grep -R -F -q 'ScapeMatch Parceiro' build/player-demo --include='*.js' --include='*.html'; then
+            echo 'A demonstração do jogador contém o Parceiro.'
+            exit 1
+          fi
+          if grep -R -F -q 'xv@scapematch.exemplo' build/player-demo --include='*.js'; then
+            echo 'A demonstração do jogador contém o login da casa.'
+            exit 1
+          fi
+
+      - name: Build partner web (demo)
+        working-directory: apps/parceiro
+        run: flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/partner-demo
+
+      - name: Check partner demo
+        run: |
+          bash tool/install_cleanup_service_worker.sh apps/parceiro/build/partner-demo
+          bash tool/check_web_service_worker.sh apps/parceiro/build/partner-demo partner
+          grep -F -q 'base href="/scapematch/parceiro/demo/"' apps/parceiro/build/partner-demo/index.html
+          bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demonstração'
+          bash tool/js_contains.sh apps/parceiro/build/partner-demo 'xv@scapematch.exemplo'
+          bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demo: a / b'
+          if bash tool/js_contains.sh apps/parceiro/build/partner-demo 'supabase.co'; then
+            echo 'A demonstração do Parceiro ainda aponta para o Supabase.'
             exit 1
           fi
 

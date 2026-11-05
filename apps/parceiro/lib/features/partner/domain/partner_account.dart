@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 
 /// Casa que entrou no Parceiro.
 class PartnerAccount {
@@ -45,7 +45,7 @@ const partnerAdminAccount = PartnerAccount(
 );
 
 PartnerAccount? matchPartnerLogin(String email, String password) {
-  if (kReleaseMode) return null;
+  if (!kAllowSampleLogin) return null;
   final id = email.trim().toLowerCase();
   final quick = id == partnerQuickUser && password == partnerQuickPassword;
   final full =
@@ -58,11 +58,11 @@ PartnerAccount? matchPartnerLogin(String email, String password) {
 }
 
 String partnerDemoEmailHint() {
-  if (kReleaseMode) return '';
+  if (!kAllowSampleLogin) return '';
   return 'Casa de exemplo: xv@scapematch.exemplo. Senha: demo.';
 }
 
 String partnerDemoQuickLabel() {
-  if (kReleaseMode) return '';
+  if (!kAllowSampleLogin) return '';
   return 'Demo: a / b';
 }

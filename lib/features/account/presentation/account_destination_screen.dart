@@ -11,6 +11,7 @@ import 'package:scapematch/features/account/presentation/current_user_provider.d
 import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_control.dart';
 import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
+import 'package:scapematch/providers/repositories.dart';
 
 /// Tela curta de um item da Conta. Tudo aqui é placeholder fictício.
 class AccountDestinationScreen extends ConsumerWidget {
@@ -57,6 +58,7 @@ class AccountDestinationScreen extends ConsumerWidget {
   ) {
     final name = ref.watch(currentUserProvider).displayName;
     final theme = Theme.of(context);
+    final sample = ref.watch(backendPlanProvider).loadsSampleDatabase;
     return switch (destination) {
       AccountDestination.profile => [
         Text(
@@ -70,25 +72,29 @@ class AccountDestinationScreen extends ConsumerWidget {
           'Sem login nesta versão. Este perfil é fictício e não sai deste aparelho.',
         ),
       ],
-      AccountDestination.partners => [
-        const Text(
-          'Ainda não há uma lista real de parceiros. Os nomes abaixo são de exemplo, das salas fictícias.',
-        ),
-        const SizedBox(height: 12),
-        for (final person in const ['Marina', 'Caio', 'Helena'])
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _InfoCard(
-              title: person,
-              subtitle: 'Jogou com você numa sala de exemplo.',
-            ),
-          ),
-      ],
+      AccountDestination.partners =>
+        sample
+            ? [
+                const Text(
+                  'Ainda não há uma lista real de parceiros. Os nomes abaixo são de exemplo, das salas fictícias.',
+                ),
+                const SizedBox(height: 12),
+                for (final person in const ['Marina', 'Caio', 'Helena'])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _InfoCard(
+                      title: person,
+                      subtitle: 'Jogou com você numa sala de exemplo.',
+                    ),
+                  ),
+              ]
+            : [const Text('Ainda não há parceiros de jogo nesta conta.')],
       AccountDestination.referral => [
-        const _InfoCard(
-          title: 'SCAPE-NICOLAS',
-          subtitle:
-              'Código fictício. Indique e ganhe não paga nada nesta versão.',
+        _InfoCard(
+          title: sample ? 'SCAPE-NICOLAS' : 'Em breve',
+          subtitle: sample
+              ? 'Código fictício. Indique e ganhe não paga nada nesta versão.'
+              : 'Indique e ganhe ainda não está disponível.',
         ),
       ],
       AccountDestination.cards => [const PaymentMethodsBody()],

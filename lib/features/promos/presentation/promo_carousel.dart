@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/core/ui/arrow_carousel.dart';
 import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
@@ -40,15 +43,25 @@ const promoFlyers = <PromoFlyer>[
   ),
 ];
 
+/// Flyers fictícios só na demonstração. O modo real não os carrega.
+final visiblePromoFlyersProvider = Provider<List<PromoFlyer>>((ref) {
+  if (kAllowSampleData && ref.watch(backendPlanProvider).loadsSampleDatabase) {
+    return promoFlyers;
+  }
+  return const [];
+});
+
 /// Promoções sem página própria: título curto, flyer, setas e pontos.
-class PromoCarousel extends StatelessWidget {
+class PromoCarousel extends ConsumerWidget {
   const PromoCarousel({super.key});
 
   static const gap = 12.0;
   static const preferredItemWidth = carouselPreferredItemWidth;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final flyers = ref.watch(visiblePromoFlyersProvider);
+    if (flyers.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     return Column(
       key: AppKeys.promoCarousel,
@@ -85,7 +98,7 @@ class PromoCarousel extends StatelessWidget {
           builder: (context, constraints) {
             final layout = CarouselLayout.fit(
               viewport: constraints.maxWidth,
-              itemCount: promoFlyers.length,
+              itemCount: flyers.length,
               gap: gap,
               preferredItemWidth: preferredItemWidth,
             );
@@ -93,14 +106,14 @@ class PromoCarousel extends StatelessWidget {
             return ArrowCarousel(
               id: 'promos',
               height: height,
-              itemCount: promoFlyers.length,
+              itemCount: flyers.length,
               gap: gap,
               preferredItemWidth: preferredItemWidth,
               showDots: true,
               loop: true,
               autoAdvance: true,
               itemBuilder: (context, index) {
-                final flyer = promoFlyers[index];
+                final flyer = flyers[index];
                 return PressableScale(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
