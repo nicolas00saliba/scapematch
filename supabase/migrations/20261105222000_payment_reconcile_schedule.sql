@@ -42,7 +42,7 @@ begin
             'Content-Type', 'application/json',
             'x-reconcile-secret', v_secret
           ),
-          timeout_milliseconds := 5000
+          timeout_milliseconds := 90000
         );
       end;
       $body$;
