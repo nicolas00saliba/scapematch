@@ -525,11 +525,58 @@ export async function createCharge(
         return json({ error: "pix_em_aberto" }, 409);
       }
       if (!capturedAlready && mayCredit && status === "authorized") {
-        const captured = await asaas.capture(stored);
-        status =
-          captured.status === "CONFIRMED" || captured.status === "RECEIVED"
+        const held = await applyPaymentTransition(
+          admin,
+          cardChargeId,
+          "authorized",
+          false,
+        );
+        if (held.status !== "authorized") {
+          await compensateLostPayment(asaas, admin, {
+            providerRef: stored,
+            status: "AUTHORIZED",
+            chargeId: cardChargeId,
+            attemptId,
+            billingType: "CREDIT_CARD",
+          });
+          return json({ error: "pagamento em andamento" }, 409);
+        }
+        try {
+          const captured = await asaas.capture(stored);
+          status = captured.status === "CONFIRMED" ||
+              captured.status === "RECEIVED"
             ? "paid"
             : "authorized";
+        } catch (_captureError) {
+          let refunded = false;
+          try {
+            await asaas.refund(stored);
+            refunded = true;
+          } catch (_refundError) {
+            await recordOrphanPayment(admin, {
+              providerRef: stored,
+              chargeId: cardChargeId,
+              attemptId,
+              billingType: "CREDIT_CARD",
+              reason: "refund_failed",
+            });
+            status = "authorized";
+          }
+          if (refunded) {
+            await applyPaymentTransition(
+              admin,
+              cardChargeId,
+              "cancelled",
+              false,
+            );
+            await deleteCompensatedCharge(admin, {
+              chargeId: cardChargeId,
+              attemptId,
+              providerRef: stored,
+            });
+            return json({ error: "erro" }, 502);
+          }
+        }
       }
       const transition = await applyPaymentTransition(
         admin,
@@ -726,6 +773,18 @@ async function clearPixProviderRef(
   });
   if (error) throw new Error("erro");
   return typeof data === "string" && data.length > 0 ? data : null;
+}
+
+async function deleteCompensatedCharge(
+  admin: ChargeDb,
+  input: { chargeId: string; attemptId: string | null; providerRef: string },
+): Promise<void> {
+  const { error } = await admin.rpc("delete_compensated_charge", {
+    p_charge_id: input.chargeId,
+    p_attempt_id: input.attemptId,
+    p_provider_ref: input.providerRef,
+  });
+  if (error) throw new Error("erro");
 }
 
 async function recordOrphanPayment(

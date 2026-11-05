@@ -88,7 +88,8 @@ Deno.serve(async (req) => {
 
     if (!inscription || !serviceCode || !(iss > 0) || iss > 100) {
       return json({
-        error: "Informe inscrição municipal, código de serviço e alíquota de ISS.",
+        error:
+          "Informe inscrição municipal, código de serviço e alíquota de ISS.",
       }, 422);
     }
 
@@ -107,12 +108,11 @@ Deno.serve(async (req) => {
     });
     if (saveError) return json({ error: "erro" }, 400);
 
-    const { data: key } = await admin
-      .from("venue_asaas_keys")
-      .select("api_key")
-      .eq("venue_id", venueId)
-      .maybeSingle();
-    if (!key?.api_key) {
+    const { data: apiKey, error: keyError } = await admin.rpc(
+      "read_venue_asaas_key",
+      { p_venue_id: venueId },
+    );
+    if (keyError || typeof apiKey !== "string" || apiKey.length === 0) {
       return json({
         venue_id: venueId,
         emission: "habilitada",
@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     }
 
     try {
-      const asaas = AsaasProvider.fromEnv(Deno.env).withKey(key.api_key as string);
+      const asaas = AsaasProvider.fromEnv(Deno.env).withKey(apiKey);
       await asaas.configureFiscalInfo({
         email,
         municipalInscription: inscription,

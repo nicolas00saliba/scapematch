@@ -15,8 +15,8 @@ type Charge = ChargeRow & {
   billing_type: string;
 };
 
-/// Estorna Pix pago e cancela autorização de cartão. `refunded` só entra
-/// depois que a API do Asaas responde com sucesso.
+/// Estorna o que já foi pago. Pix pendente sai com DELETE. A pré-autorização
+/// do cartão sai com refund. O status local só muda depois da API.
 export async function releaseCancelledCharges(
   admin: Admin,
   asaas: AsaasProvider,
@@ -49,7 +49,12 @@ export async function releaseCancelledCharges(
         });
         continue;
       }
-      await asaas.cancelAuthorization(row.provider_ref);
+      if (row.billing_type === "PIX") {
+        const gone = await asaas.cancelPaymentConfirmed(row.provider_ref);
+        if (!gone) throw new Error("erro");
+      } else {
+        await asaas.cancelAuthorization(row.provider_ref);
+      }
       const cancelled = await applyPaymentTransition(
         admin,
         row.id,

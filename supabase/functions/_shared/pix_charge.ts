@@ -84,7 +84,7 @@ export function cardSwitchDecision(
 }
 
 /// CONFIRMED e RECEIVED já capturaram. A compensação é estorno.
-/// AUTHORIZED ainda é pré-autorização e sai com DELETE.
+/// AUTHORIZED ainda é pré-autorização e também sai com refund.
 export function lostAttemptCompensation(
   status: string,
 ): "refund" | "cancel" | "none" {

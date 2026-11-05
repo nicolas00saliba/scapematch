@@ -308,13 +308,18 @@ export class AsaasProvider implements PaymentProvider {
     }
   }
 
-  static fromEnv(env: {
-    get(name: string): string | undefined;
-  }): AsaasProvider {
+  static fromEnv(
+    env: { get(name: string): string | undefined },
+    timeoutMs = 0,
+  ): AsaasProvider {
     const apiKey = env.get("ASAAS_API_KEY") ?? "";
     const baseUrl = (env.get("ASAAS_BASE_URL") ?? asaasSandboxBaseUrl)
       .replace(/\/$/, "");
-    return new AsaasProvider(apiKey, baseUrl);
+    const fetchFn: AsaasFetch = timeoutMs > 0
+      ? (input, init) =>
+        fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+      : fetch;
+    return new AsaasProvider(apiKey, baseUrl, fetchFn);
   }
 
   get sandbox(): boolean {
@@ -688,20 +693,19 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
-  /// Cancela uma autorização de cartão que ainda não foi capturada.
+  /// Solta a pré-autorização do cartão com estorno, como a API do Asaas
+  /// documenta. Pix pendente continua no DELETE de cancelPaymentConfirmed.
   cancelAuthorization(
     paymentId: string,
   ): Promise<{ id: string; status: string }> {
-    return this.#send(`/payments/${paymentId}`, undefined, "DELETE").then(
-      (body) => ({
-        id: typeof body.id === "string" && body.id.length > 0
-          ? body.id
-          : paymentId,
-        status: typeof body.status === "string" && body.status.length > 0
-          ? body.status
-          : "DELETED",
-      }),
-    );
+    return this.#send(`/payments/${paymentId}/refund`, {}).then((body) => ({
+      id: typeof body.id === "string" && body.id.length > 0
+        ? body.id
+        : paymentId,
+      status: typeof body.status === "string" && body.status.length > 0
+        ? body.status
+        : "REFUNDED",
+    }));
   }
 
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
