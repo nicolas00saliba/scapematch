@@ -41,8 +41,18 @@ begin
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'private'
     and p.proname = 'check_venue_duplicates';
-  if v_public or not v_private then
-    raise exception 'check_venue_duplicates ficou definidor no schema exposto';
+  if not v_public or not v_private then
+    raise exception 'check_venue_duplicates precisa ser security definer nos dois schemas';
+  end if;
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'check_venue_duplicates'
+      and 'search_path=""' = any (p.proconfig)
+  ) then
+    raise exception 'check_venue_duplicates público sem search_path vazio';
   end if;
 
   select pg_get_function_result(p.oid)
@@ -546,7 +556,7 @@ do $$
 begin
   if not exists (
     select 1
-    from public.venue_link_status('cccccccc-cccc-cccc-cccc-cccccccccccc')
+    from private.venue_link_status('cccccccc-cccc-cccc-cccc-cccccccccccc')
     where possible_duplicate_of = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
   ) then
     raise exception 'admin não vê a casa pendente marcada';
@@ -584,7 +594,7 @@ do $$
 begin
   if not exists (
     select 1
-    from public.venue_link_status('cccccccc-cccc-cccc-cccc-cccccccccccc')
+    from private.venue_link_status('cccccccc-cccc-cccc-cccc-cccccccccccc')
     where merged_into = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
   ) then
     raise exception 'mescla não gravou o vínculo';
