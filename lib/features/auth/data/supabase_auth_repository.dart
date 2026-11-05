@@ -1,7 +1,9 @@
 import 'package:dominio/dominio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
+import 'package:scapematch/core/web/document_base.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
+import 'package:scapematch/features/auth/data/auth_return_url.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
@@ -104,6 +106,7 @@ class SupabaseAuthRepository implements AuthRepository {
       final response = await _client.auth.signUp(
         email: email.trim(),
         password: password,
+        emailRedirectTo: kIsWeb ? _webRedirect() : null,
         data: {
           'display_name': trimmed,
           'birth_date': _isoDate(birthDate),
@@ -176,10 +179,9 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   static String? _webRedirect() {
-    final base = Uri.base;
-    if (!base.hasScheme || base.host.isEmpty) return null;
-    final path = base.path.endsWith('/') ? base.path : '${base.path}/';
-    return base.replace(path: path, query: '', fragment: '').toString();
+    final href = documentBaseHref();
+    if (href == null) return null;
+    return authReturnUrl(Uri.base, href);
   }
 }
 

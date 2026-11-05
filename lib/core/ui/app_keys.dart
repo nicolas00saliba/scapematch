@@ -241,4 +241,7 @@ abstract final class AppKeys {
   static Key partyCrewOption(String id) => Key('party-crew-$id');
   static Key partyFriend(String id) => Key('party-friend-$id');
   static Key friendBadge(String id) => Key('friend-badge-$id');
+  static const installBanner = Key('install-banner');
+  static const installBannerAction = Key('install-banner-action');
+  static const installBannerDismiss = Key('install-banner-dismiss');
 }

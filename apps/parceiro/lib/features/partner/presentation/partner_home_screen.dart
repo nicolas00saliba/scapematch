@@ -66,6 +66,7 @@ class PartnerHome extends ConsumerWidget {
                     ],
                   ),
           ),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom),
         ],
       ),
     );

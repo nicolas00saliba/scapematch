@@ -5,14 +5,16 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="ScapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda. Esta versão usa dados de exemplo.">
   <meta name="scapematch-parceiro" content="separate-app">
   <meta name="theme-color" content="#0F4C4A">
 
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="ScapeMatch Parceiro">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
 
   <link rel="icon" type="image/png" href="favicon.png"/>
 
@@ -21,8 +23,63 @@
   <style>
     html, body {
       overscroll-behavior: none;
+      background: #F3F0EA;
     }
   </style>
+  <script>
+    // O Flutter 3.47 reescreve o viewport e tira o viewport-fit.
+    // Sem cover, o iOS não informa a safe area do notch.
+    (function () {
+      function cover() {
+        var meta = document.querySelector('meta[name="viewport"]');
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('name', 'viewport');
+          meta.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+          document.head.appendChild(meta);
+          return;
+        }
+        var content = meta.getAttribute('content') || '';
+        if (content.indexOf('viewport-fit=cover') !== -1) return;
+        var next = content.replace(/,?\s*viewport-fit=[^,]+/gi, '').replace(/,\s*$/, '');
+        meta.setAttribute('content', next + ', viewport-fit=cover');
+      }
+      cover();
+      new MutationObserver(cover).observe(document.head, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['content']
+      });
+    })();
+  </script>
+  <script>
+    // O Chrome dispara beforeinstallprompt uma vez. O app real guarda
+    // o evento para o aviso "Instalar o app". A demonstração não leva
+    // a meta scapematch-install e deixa o navegador mostrar o seu.
+    (function () {
+      window.scapeInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (event) {
+        var meta = document.querySelector('meta[name="scapematch-install"]');
+        if (!meta || meta.getAttribute('content') !== 'real') return;
+        event.preventDefault();
+        window.scapeInstallPrompt = event;
+        window.dispatchEvent(new Event('scape-install-prompt'));
+      });
+      window.scapeLaunchInstall = function () {
+        var event = window.scapeInstallPrompt;
+        if (!event || typeof event.prompt !== 'function') {
+          return Promise.resolve('missing');
+        }
+        window.scapeInstallPrompt = null;
+        return event.prompt().then(function () {
+          return event.userChoice;
+        }).then(function (choice) {
+          return choice && choice.outcome ? choice.outcome : 'dismissed';
+        });
+      };
+    })();
+  </script>
 </head>
 <body>
   <script>

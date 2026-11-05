@@ -1,8 +1,11 @@
 import 'package:dominio/dominio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/core/web/document_base.dart';
+import 'package:scapematch/features/auth/data/auth_return_url.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
@@ -90,6 +93,9 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
       final response = await scapeSupabase.auth.signUp(
         email: email,
         password: _password.text,
+        emailRedirectTo: kIsWeb
+            ? authReturnUrl(Uri.base, documentBaseHref() ?? '')
+            : null,
         data: {'display_name': name},
       );
       if (response.session == null) {

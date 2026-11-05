@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Tira a frase de dados de exemplo do index.html de um build real.
-# A demonstração conserva a frase. Não mexe no app do celular.
+# Tira a frase de dados de exemplo do index e do manifest de um build real.
+# Liga a meta que o aviso "Instalar o app" espera. A demonstração conserva
+# a frase e não ganha essa meta. Não mexe no app do celular.
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
@@ -10,26 +11,54 @@ fi
 
 dest="$1"
 role="$2"
-index="$dest/index.html"
-if [ ! -f "$index" ]; then
-  echo "arquivo ausente: $index" >&2
-  exit 1
-fi
 
-python3 - "$index" "$role" <<'PY'
+python3 - "$dest" "$role" <<'PY'
 import pathlib, sys
-path, role = sys.argv[1], sys.argv[2]
-file = pathlib.Path(path)
-text = file.read_text()
+dest, role = sys.argv[1], sys.argv[2]
+root = pathlib.Path(dest)
+index = root / "index.html"
+manifest = root / "manifest.json"
 if role == "player":
-    old = "ScapeMatch ajuda a montar grupos para escape rooms. Esta versão usa dados de exemplo."
-    new = "ScapeMatch ajuda a montar grupos para escape rooms."
+    pairs = [
+        (
+            index,
+            "ScapeMatch ajuda a montar grupos para escape rooms. Esta versão usa dados de exemplo.",
+            "ScapeMatch ajuda a montar grupos para escape rooms.",
+        ),
+        (
+            manifest,
+            "Monte grupos para escape rooms. Esta versão usa dados de exemplo.",
+            "Monte grupos para escape rooms.",
+        ),
+    ]
 elif role == "partner":
-    old = "ScapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda. Esta versão usa dados de exemplo."
-    new = "ScapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda."
+    pairs = [
+        (
+            index,
+            "ScapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
+            "ScapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda.",
+        ),
+        (
+            manifest,
+            "Painel da casa no ScapeMatch. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
+            "Painel da casa no ScapeMatch. Saldo, reservas e agenda.",
+        ),
+    ]
 else:
     raise SystemExit(f"papel desconhecido: {role}")
-if old not in text:
-    raise SystemExit(f"frase de exemplo não encontrada em {path}")
-file.write_text(text.replace(old, new, 1))
+
+for path, old, new in pairs:
+    file = pathlib.Path(path)
+    text = file.read_text()
+    if old not in text:
+        raise SystemExit(f"frase de exemplo não encontrada em {path}")
+    file.write_text(text.replace(old, new, 1))
+
+page = index.read_text()
+meta = '<meta name="scapematch-install" content="real">'
+if meta not in page:
+    if "</head>" not in page:
+        raise SystemExit(f"head ausente em {index}")
+    page = page.replace("</head>", f"  {meta}\n</head>", 1)
+    index.write_text(page)
 PY
