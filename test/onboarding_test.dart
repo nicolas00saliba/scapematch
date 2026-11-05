@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/account/presentation/account_screen.dart';
 import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
@@ -127,9 +129,149 @@ void main() {
     }
   });
 
-  testWidgets('Conta can replay the intro without an account', (tester) async {
+  test('real opens on the intro until it is seen; demo never does', () {
+    expect(introIsFirstScreen(mode: AppMode.real, seen: false), isTrue);
+    expect(introIsFirstScreen(mode: AppMode.real, seen: true), isFalse);
+    expect(introIsFirstScreen(mode: AppMode.demo, seen: false), isFalse);
+    expect(showsIntroReplay(AppMode.real), isFalse);
+    expect(showsIntroReplay(AppMode.demo), isTrue);
+  });
+
+  test('demo does not write the real intro flag', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_seen', true);
+    await prefs.remove(OnboardingStore.storageKey);
+
+    final real = OnboardingStore(seen: false);
+    await real.load();
+    expect(real.seen, isFalse);
+
+    final demo = OnboardingStore(persist: false, seen: false);
+    await demo.markSeen();
+    expect(demo.seen, isTrue);
+    expect(prefs.getBool(OnboardingStore.storageKey), isNull);
+
+    await real.markSeen();
+    expect(prefs.getBool(OnboardingStore.storageKey), isTrue);
+    final again = OnboardingStore();
+    await again.load();
+    expect(again.seen, isTrue);
+  });
+
+  testWidgets('real mode opens on the intro on phone and web', (tester) async {
+    final store = OnboardingStore(seen: false);
     await pumpScapeMatch(
       tester,
+      showOnboarding: true,
+      onboardingMode: AppMode.real,
+      overrides: [
+        onboardingStoreProvider.overrideWithValue(store),
+        authRepositoryProvider.overrideWithValue(
+          FakeAuthRepository(signedIn: null),
+        ),
+      ],
+    );
+
+    for (final size in const [Size(390, 844), Size(1280, 800)]) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      expect(find.byType(OnboardingScreen), findsOneWidget, reason: '$size');
+      expect(find.byType(HomeScreen), findsNothing, reason: '$size');
+      expect(tester.takeException(), isNull, reason: '$size');
+      if (size.width >= 960) {
+        expect(
+          tester.getTopLeft(find.text(OnboardingMessages.findTitle)).dx,
+          greaterThan(size.width * 0.5),
+          reason: '$size',
+        );
+        expect(find.byKey(AppKeys.onboardingBack), findsNothing);
+      }
+    }
+
+    await tester.tap(find.byKey(AppKeys.onboardingSkip));
+    await tester.pumpAndSettle();
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(store.seen, isTrue);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(OnboardingStore.storageKey), isTrue);
+
+    tester.view.physicalSize = const Size(400, 1800);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.accountTab));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.accountDestination('help')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ajuda'), findsWidgets);
+    expect(find.text(OnboardingMessages.replay), findsNothing);
+    expect(find.byKey(AppKeys.accountIntro), findsNothing);
+    expect(find.text('Como achar um grupo?'), findsOneWidget);
+  });
+
+  testWidgets('a direct invite in real mode skips the intro', (tester) async {
+    await pumpScapeMatch(
+      tester,
+      showOnboarding: true,
+      onboardingMode: AppMode.real,
+      overrides: [
+        onboardingStoreProvider.overrideWithValue(OnboardingStore(seen: false)),
+      ],
+    );
+    expect(find.byType(OnboardingScreen), findsOneWidget);
+    GoRouter.of(tester.element(find.byType(OnboardingScreen)))
+        .go('/convite/${SampleIds.groupCwbCofreAlmost}');
+    await tester.pumpAndSettle();
+    expect(find.byType(OnboardingScreen), findsNothing);
+    expect(find.text('Convite'), findsOneWidget);
+  });
+
+  testWidgets('demo opens on Home and Help can replay the intro', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(OnboardingStore.storageKey);
+    final store = OnboardingStore(persist: false, seen: false);
+    await pumpScapeMatch(
+      tester,
+      showOnboarding: true,
+      onboardingMode: AppMode.demo,
+      overrides: [
+        onboardingStoreProvider.overrideWithValue(store),
+        authRepositoryProvider.overrideWithValue(
+          FakeAuthRepository(signedIn: null),
+        ),
+      ],
+    );
+
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.byType(OnboardingScreen), findsNothing);
+    expect(store.seen, isFalse);
+
+    await tester.tap(find.byKey(AppKeys.accountTab));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.accountDestination('help')));
+    await tester.pumpAndSettle();
+    expect(find.text(OnboardingMessages.replay), findsOneWidget);
+    await tester.tap(find.byKey(AppKeys.accountIntro));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OnboardingScreen), findsOneWidget);
+    expect(find.text(OnboardingMessages.findBody), findsOneWidget);
+    expect(find.byType(HomeScreen), findsNothing);
+
+    await tester.tap(find.byKey(AppKeys.onboardingSkip));
+    await tester.pumpAndSettle();
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(store.seen, isTrue);
+    expect(prefs.getBool(OnboardingStore.storageKey), isNull);
+  });
+
+  testWidgets('demo Help can replay the intro without an account', (
+    tester,
+  ) async {
+    await pumpScapeMatch(
+      tester,
+      onboardingMode: AppMode.demo,
       overrides: [
         authRepositoryProvider.overrideWithValue(
           FakeAuthRepository(signedIn: null),

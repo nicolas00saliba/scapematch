@@ -33,7 +33,8 @@ import 'package:scapematch/features/social/presentation/friends_screen.dart';
 /// Rotas do app.
 ///
 /// A barra tem quatro ramos: `/` (Home), `/perto` (Perto de você),
-/// `/groups/mine` (Meus grupos) e `/account` (Conta). O app abre na Home.
+/// `/groups/mine` (Meus grupos) e `/account` (Conta). O app real, na
+/// primeira abertura, começa em `/introducao`. A demonstração abre na Home.
 /// Criar grupo, o detalhe do grupo,
 /// o detalhe da notícia, a lista de uma sala e as páginas da Conta abrem
 /// por cima da barra. `new` continua antes de `:groupId` para a palavra não
@@ -43,9 +44,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     redirect: (context, state) {
       final path = state.uri.path;
-      // A Home da primeira abertura é a introdução. Um convite direto não
-      // passa por aqui: só `/` redireciona, e só enquanto ninguém viu.
-      if (path == '/' && !ref.read(onboardingSeenProvider)) {
+      // No app real, a primeira abertura é a introdução. A demonstração
+      // abre na Home. Um convite direto não passa por aqui: só `/`
+      // redireciona, e só enquanto ninguém viu.
+      if (path == '/' &&
+          introIsFirstScreen(
+            mode: ref.read(onboardingModeProvider),
+            seen: ref.read(onboardingSeenProvider),
+          )) {
         return '/introducao';
       }
       if (path == '/groups') {

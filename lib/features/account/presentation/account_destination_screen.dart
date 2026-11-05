@@ -8,6 +8,7 @@ import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/features/account/presentation/account_destination.dart';
 import 'package:scapematch/features/account/presentation/account_list_tile.dart';
 import 'package:scapematch/features/account/presentation/current_user_provider.dart';
+import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_control.dart';
 import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
@@ -99,14 +100,16 @@ class AccountDestinationScreen extends ConsumerWidget {
       ],
       AccountDestination.cards => [const PaymentMethodsBody()],
       AccountDestination.help => [
-        _AccountLink(
-          tileKey: AppKeys.accountIntro,
-          icon: Icons.slideshow_outlined,
-          title: OnboardingMessages.replay,
-          subtitle: 'As quatro telas da primeira abertura.',
-          onTap: () => context.go('/introducao'),
-        ),
-        const SizedBox(height: 10),
+        if (showsIntroReplay(ref.watch(onboardingModeProvider))) ...[
+          _AccountLink(
+            tileKey: AppKeys.accountIntro,
+            icon: Icons.slideshow_outlined,
+            title: OnboardingMessages.replay,
+            subtitle: 'As quatro telas da primeira abertura.',
+            onTap: () => context.go('/introducao'),
+          ),
+          const SizedBox(height: 10),
+        ],
         const _InfoCard(
           title: 'Como achar um grupo?',
           subtitle: 'Escolha a cidade, abra uma sala e toque em Achar grupo, ou use a busca da Home.',

@@ -3,6 +3,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:scapematch/app/retry.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/app/scapematch_app.dart';
 import 'package:scapematch/app/url_strategy.dart';
@@ -29,7 +30,8 @@ Future<void> main() async {
   // “escolha a cidade” antes de ler o que foi salvo.
   final cityStore = SelectedCityStore();
   final gameTypeStore = SelectedGameTypeStore();
-  final onboarding = OnboardingStore();
+  // A demonstração não grava a chave: real e demo dividem o localStorage.
+  final onboarding = OnboardingStore(persist: kAppMode == AppMode.real);
   final pendingInvites = PendingInviteStore();
   final themeStore = ThemeChoiceStore();
   await cityStore.load();
