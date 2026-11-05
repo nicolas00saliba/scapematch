@@ -1,12 +1,9 @@
 {
   "mcpServers": {
     "serena": {
-      "command": "serena",
+      "command": "bash",
       "args": [
-        "start-mcp-server",
-        "--context",
-        "ide",
-        "--project",
+        "${workspaceFolder}/.cursor/bin/serena-mcp.sh",
         "${workspaceFolder}"
       ]
     },

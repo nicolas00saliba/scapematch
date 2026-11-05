@@ -10,7 +10,7 @@ alwaysApply: false
 - Não leia arquivos gerados (`*.g.dart`, `dist/`, lockfiles) salvo se a tarefa for sobre eles.
 
 ## Comandos de terminal (RTK)
-- Os comandos Shell passam pelo hook do RTK (`.cursor/hooks.json` → `rtk hook cursor`), que reescreve `git status` em `rtk git status` etc. e compacta a saída.
+- Os comandos Shell passam pelo hook do repositório (`.cursor/hooks.json` → `.cursor/hooks/rtk-cursor.sh` → `rtk hook cursor`), inclusive no cloud agent, que não carrega `~/.cursor/hooks.json`. O hook reescreve `git status` em `rtk git status` e compacta a saída.
 - Se precisar da saída completa de um comando, rode-o de novo pedindo explicitamente (ex.: `rtk bypass <cmd>`), ou redirecione para arquivo e leia só o trecho útil.
 - Use filtros: `| tail -n 50`, `rg -n padrão`, `--quiet`, `-q`. Testes: rode só o arquivo/caso afetado primeiro.
 - `rtk gain` mostra quanto foi economizado.
