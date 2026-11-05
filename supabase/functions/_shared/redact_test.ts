@@ -72,3 +72,39 @@ Deno.test("mascara creditCardToken aninhado e na mensagem de erro", () => {
   assertEquals(redacted.includes("ref 999"), true);
   assertEquals(redacted.includes("2026-11-12"), true);
 });
+
+Deno.test("mascara os campos do titular e preserva a palavra solta", () => {
+  const holder = {
+    name: "Ana Silva",
+    email: "ana.titular@example.com",
+    phone: "1133334444",
+    mobilePhone: "11987654321",
+    postalCode: "01310100",
+    addressNumber: "1000",
+    addressComplement: "sala 2",
+    postal_code: "04567000",
+    address_number: "42",
+  };
+  const body = JSON.stringify({ creditCardHolderInfo: holder });
+  const labeled = "Asaas 400: email=ana.titular@example.com rejeitado";
+  const redacted = redactSensitive(
+    `${body}\n${labeled}\no campo name é obrigatório\npedido 12 ref 999`,
+  );
+  for (const value of Object.values(holder)) {
+    assertEquals(redacted.includes(value), false);
+  }
+  assertEquals(redacted.includes("ana.titular@example.com"), false);
+  assertEquals(redacted.includes('"name":"[redacted]"'), true);
+  assertEquals(redacted.includes('"email":"[redacted]"'), true);
+  assertEquals(redacted.includes('"phone":"[redacted]"'), true);
+  assertEquals(redacted.includes('"mobilePhone":"[redacted]"'), true);
+  assertEquals(redacted.includes('"postalCode":"[redacted]"'), true);
+  assertEquals(redacted.includes('"addressNumber":"[redacted]"'), true);
+  assertEquals(redacted.includes('"addressComplement":"[redacted]"'), true);
+  assertEquals(redacted.includes('"postal_code":"[redacted]"'), true);
+  assertEquals(redacted.includes("email=[redacted]"), true);
+  assertEquals(redacted.includes("o campo name é obrigatório"), true);
+  assertEquals(redacted.includes("pedido 12"), true);
+  assertEquals(redacted.includes("ref 999"), true);
+  assertEquals(redacted.includes("Asaas 400"), true);
+});

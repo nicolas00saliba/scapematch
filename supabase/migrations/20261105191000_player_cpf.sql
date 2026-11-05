@@ -2,7 +2,7 @@
 -- authenticated lê e grava o próprio perfil, menos esta coluna.
 -- O número só entra por set_my_cpf, e só enquanto o perfil está vazio.
 -- Troca futura fica com suporte/admin. Cada definição vai para
--- profile_cpf_audit com user_id, instante e hash. O CPF não entra na tabela.
+-- profile_cpf_audit só com user_id e instante. Sem CPF e sem hash.
 -- my_cpf_status devolve só boolean. service_role lê a coluna nas funções.
 -- O valor não volta no erro.
 
@@ -80,11 +80,10 @@ grant update (
   asaas_customer_id
 ) on public.profiles to authenticated;
 
--- Auditoria da definição. Sem coluna de CPF: só quem, quando e o hash.
+-- Auditoria da definição. Só quem e quando. Sem CPF e sem hash.
 create table public.profile_cpf_audit (
   user_id uuid not null references auth.users (id) on delete cascade,
   defined_at timestamptz not null default pg_catalog.now(),
-  cpf_hash bytea not null,
   primary key (user_id, defined_at)
 );
 
@@ -140,12 +139,8 @@ begin
   if not found then
     raise exception 'cpf ja definido' using errcode = '55000';
   end if;
-  insert into public.profile_cpf_audit (user_id, defined_at, cpf_hash)
-  values (
-    auth.uid(),
-    pg_catalog.clock_timestamp(),
-    extensions.digest(v_digits, 'sha256')
-  );
+  insert into public.profile_cpf_audit (user_id, defined_at)
+  values (auth.uid(), pg_catalog.clock_timestamp());
   return true;
 end;
 $$;

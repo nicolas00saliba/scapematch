@@ -67,20 +67,20 @@ begin
   then
     raise exception 'is_valid_cpf mudou o veredito';
   end if;
-  if exists (
-    select 1
+  if (
+    select count(*)
     from information_schema.columns
     where table_schema = 'public'
       and table_name = 'profile_cpf_audit'
-      and column_name not in ('user_id', 'defined_at', 'cpf_hash')
-  ) or not exists (
-    select 1
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'profile_cpf_audit'
-      and column_name = 'cpf_hash'
-      and udt_name = 'bytea'
-  ) then
+  ) <> 2
+    or exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'profile_cpf_audit'
+        and column_name not in ('user_id', 'defined_at')
+    )
+  then
     raise exception 'auditoria do cpf ganhou coluna a mais';
   end if;
   if has_table_privilege('authenticated', 'public.profile_cpf_audit', 'select')
@@ -194,20 +194,17 @@ begin
     select count(*)
     from public.profile_cpf_audit
     where user_id = 'a9111111-1111-1111-1111-111111111111'
+      and defined_at is not null
   ) <> 1 then
     raise exception 'auditoria nao registrou uma definicao';
   end if;
   if exists (
     select 1
     from public.profile_cpf_audit
-    where user_id = 'a9111111-1111-1111-1111-111111111111'
-      and (
-        cpf_hash is distinct from extensions.digest('52998224725', 'sha256')
-        or encode(cpf_hash, 'hex') like '%52998224725%'
-        or defined_at is null
-      )
+    where user_id::text like '%52998224725%'
+      or defined_at::text like '%52998224725%'
   ) then
-    raise exception 'auditoria guardou o cpf ou o hash nao confere';
+    raise exception 'auditoria guardou o cpf';
   end if;
 end $$;
 
