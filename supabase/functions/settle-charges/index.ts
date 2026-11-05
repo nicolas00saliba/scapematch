@@ -3,7 +3,11 @@ import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { issuePaidInvoices } from "../_shared/issue_invoices.ts";
-import { creditLedger, type ChargeRow } from "../_shared/ledger.ts";
+import {
+  applyPaymentTransition,
+  type ChargeRow,
+  creditLedger,
+} from "../_shared/ledger.ts";
 import { releaseCancelledCharges } from "../_shared/release_charges.ts";
 
 Deno.serve(async (req) => {
@@ -50,7 +54,12 @@ Deno.serve(async (req) => {
     const asaas = AsaasProvider.fromEnv(Deno.env);
     const settled: string[] = [];
     for (const groupId of ids) {
-      const allowed = await canSettle(admin, groupId, userData.user.id, Boolean(adminRow));
+      const allowed = await canSettle(
+        admin,
+        groupId,
+        userData.user.id,
+        Boolean(adminRow),
+      );
       if (!allowed) continue;
       await settleOne(admin, asaas, groupId);
       settled.push(groupId);
@@ -91,7 +100,9 @@ async function settleOne(
 ) {
   const { data: group } = await admin
     .from("groups")
-    .select("id, cancelled_at, closed_at, closes_at, starts_at, total_spots, minimum_spots")
+    .select(
+      "id, cancelled_at, closed_at, closes_at, starts_at, total_spots, minimum_spots",
+    )
     .eq("id", groupId)
     .maybeSingle();
   if (!group) return;
@@ -116,7 +127,9 @@ async function settleOne(
   // commission_bps é a taxa fotografada na cobrança por create-charge.
   const { data: charges } = await admin
     .from("payment_charges")
-    .select("id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type")
+    .select(
+      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type",
+    )
     .eq("group_id", groupId);
 
   for (const charge of charges ?? []) {
@@ -126,18 +139,21 @@ async function settleOne(
       billing_type: string;
     };
     if (!row.provider_ref) continue;
-    if (closed && row.status === "authorized" && row.billing_type === "CREDIT_CARD") {
+    if (
+      closed && row.status === "authorized" &&
+      row.billing_type === "CREDIT_CARD"
+    ) {
       const captured = await asaas.capture(row.provider_ref);
-      const paid = captured.status === "CONFIRMED" || captured.status === "RECEIVED";
-      await admin.from("payment_charges").update({
-        status: paid ? "paid" : "authorized",
-        paid_at: paid ? new Date().toISOString() : null,
-      }).eq("id", row.id);
+      const paid = captured.status === "CONFIRMED" ||
+        captured.status === "RECEIVED";
       if (paid) {
-        await admin.from("group_members").update({ payment_status: "paid" })
-          .eq("group_id", groupId)
-          .eq("user_id", row.user_id);
-        await creditLedger(admin, row);
+        const transition = await applyPaymentTransition(
+          admin,
+          row.id,
+          "paid",
+          true,
+        );
+        if (transition.status !== "paid") continue;
         await issuePaidInvoices(admin, row, {
           sandbox: asaas.sandbox,
           asaas: asaas.sandbox ? undefined : asaas,

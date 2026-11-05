@@ -1,6 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { commissionCents } from "./asaas_provider.ts";
-
 export type ChargeRow = {
   id: string;
   group_id: string;
@@ -10,71 +7,72 @@ export type ChargeRow = {
   commission_bps: number;
 };
 
-type Admin = ReturnType<typeof createClient>;
+export type TransitionResult = {
+  applied: boolean;
+  status: string;
+  paid_at: string | null;
+  refunded_at: string | null;
+};
 
-async function hasLine(
+type LedgerRpcError = { code?: string; message?: string } | null;
+
+type Admin = {
+  rpc(
+    name: string,
+    args: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: LedgerRpcError }>;
+};
+
+const sqlState = /^[0-9A-Z]{5}$/;
+
+function throwLedgerError(error: { code?: string }): never {
+  const code = error.code && sqlState.test(error.code) ? error.code : "unknown";
+  console.error(JSON.stringify({ scope: "ledger", code }));
+  throw new Error("ledger_write_failed");
+}
+
+function asTransition(data: unknown): TransitionResult {
+  const row = data && typeof data === "object"
+    ? data as Record<string, unknown>
+    : {};
+  return {
+    applied: row.applied === true,
+    status: typeof row.status === "string" ? row.status : "",
+    paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
+    refunded_at: typeof row.refunded_at === "string" ? row.refunded_at : null,
+  };
+}
+
+/// A função SQL trava a cobrança, aplica a transição e grava o livro
+/// na mesma transação. Duplicata fica no ON CONFLICT. Qualquer erro
+/// da chamada é lançado para o webhook responder 5xx.
+export async function applyPaymentTransition(
   admin: Admin,
   chargeId: string,
-  kind: string,
-  direction: string,
-): Promise<boolean> {
-  const { data } = await admin
-    .from("ledger_entries")
-    .select("id")
-    .eq("payment_charge_id", chargeId)
-    .eq("kind", kind)
-    .eq("direction", direction)
-    .maybeSingle();
-  return Boolean(data);
+  nextStatus: string,
+  credit: boolean,
+): Promise<TransitionResult> {
+  const { data, error } = await admin.rpc("apply_payment_transition", {
+    p_charge_id: chargeId,
+    p_next_status: nextStatus,
+    p_credit: credit,
+  });
+  if (error) throwLedgerError(error);
+  const result = asTransition(data);
+  if (!result.status) throwLedgerError({});
+  return result;
 }
 
-export async function creditLedger(admin: Admin, charge: ChargeRow) {
-  const fee = commissionCents(charge.amount_cents, charge.commission_bps);
-  const net = charge.amount_cents - fee;
-  if (net > 0 && !(await hasLine(admin, charge.id, "house_net", "credit"))) {
-    await admin.from("ledger_entries").insert({
-      venue_id: charge.venue_id,
-      group_id: charge.group_id,
-      user_id: charge.user_id,
-      account: "house",
-      direction: "credit",
-      kind: "house_net",
-      amount_cents: net,
-      payment_charge_id: charge.id,
-    });
-  }
-  if (fee > 0 && !(await hasLine(admin, charge.id, "commission", "credit"))) {
-    await admin.from("ledger_entries").insert({
-      venue_id: charge.venue_id,
-      group_id: charge.group_id,
-      user_id: charge.user_id,
-      account: "platform",
-      direction: "credit",
-      kind: "commission",
-      amount_cents: fee,
-      payment_charge_id: charge.id,
-    });
-  }
+export function creditLedger(
+  admin: Admin,
+  charge: ChargeRow,
+): Promise<TransitionResult> {
+  return applyPaymentTransition(admin, charge.id, "paid", true);
 }
 
-export async function reverseLedger(admin: Admin, charge: ChargeRow) {
-  const { data: credits } = await admin
-    .from("ledger_entries")
-    .select("account, kind, amount_cents")
-    .eq("payment_charge_id", charge.id)
-    .eq("direction", "credit");
-  for (const line of credits ?? []) {
-    const kind = line.kind === "commission" ? "commission_refund" : "house_refund";
-    if (await hasLine(admin, charge.id, kind, "debit")) continue;
-    await admin.from("ledger_entries").insert({
-      venue_id: charge.venue_id,
-      group_id: charge.group_id,
-      user_id: charge.user_id,
-      account: line.account,
-      direction: "debit",
-      kind,
-      amount_cents: line.amount_cents,
-      payment_charge_id: charge.id,
-    });
-  }
+export function reverseLedger(
+  admin: Admin,
+  charge: ChargeRow,
+): Promise<TransitionResult> {
+  return applyPaymentTransition(admin, charge.id, "refunded", false);
 }

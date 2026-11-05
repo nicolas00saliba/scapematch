@@ -1,7 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
+import {
+  clientFailure,
+  logAsaasFailure,
+} from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
+import {
+  nextSubaccountEmail,
+  subaccountEmailPlan,
+} from "../_shared/subaccount_email.ts";
 
 type VenueRow = {
   id: string;
@@ -30,8 +37,11 @@ Deno.serve(async (req) => {
     const userClient = createClient(url, anon, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
-    if (userError || !userData.user) return json({ error: "not authenticated" }, 401);
+    const { data: userData, error: userError } = await userClient.auth
+      .getUser();
+    if (userError || !userData.user) {
+      return json({ error: "not authenticated" }, 401);
+    }
 
     const admin = createClient(url, service);
     const { data: adminRow } = await admin
@@ -56,32 +66,16 @@ Deno.serve(async (req) => {
     const asaas = AsaasProvider.fromEnv(Deno.env);
     const provisioned: { venue_id: string; wallet_id: string }[] = [];
     for (const venue of (venues ?? []) as VenueRow[]) {
-      const owner = await admin.auth.admin.getUserById(venue.owner_id);
-      const email = owner.data.user?.email;
-      if (!email) {
-        return json({ error: "owner_email_missing" }, 422);
-      }
       const { data: profile } = await admin
         .from("profiles")
         .select("birth_date")
         .eq("id", venue.owner_id)
         .maybeSingle();
-      const created = await asaas.createSubaccount({
-        name: venue.name,
-        email,
-        cpfCnpj: venue.document_number,
-        companyType: venue.document_kind === "cnpj" ? "LIMITED" : undefined,
-        birthDate: venue.document_kind === "cpf"
-          ? profile?.birth_date ?? undefined
-          : undefined,
-        phone: venue.phone,
-        mobilePhone: venue.phone,
-        incomeValue: Number(venue.income_value),
-        address: venue.street_address,
-        addressNumber: venue.address_number,
-        province: venue.neighborhood,
-        postalCode: venue.postal_code,
-      });
+      const plan = subaccountEmailPlan(venue, Deno.env);
+      const birthDate = venue.document_kind === "cpf"
+        ? profile?.birth_date ?? undefined
+        : undefined;
+      const created = await openSubaccount(asaas, venue, plan, birthDate);
       const { error: updateError } = await admin
         .from("venues")
         .update({ asaas_wallet_id: created.walletId })
@@ -100,3 +94,46 @@ Deno.serve(async (req) => {
     return json(failure.body, failure.status);
   }
 });
+
+function subaccountBody(
+  venue: VenueRow,
+  email: string,
+  birthDate: string | undefined,
+) {
+  return {
+    name: venue.name,
+    email,
+    cpfCnpj: venue.document_number,
+    companyType: venue.document_kind === "cnpj"
+      ? "LIMITED" as const
+      : undefined,
+    birthDate,
+    phone: venue.phone,
+    mobilePhone: venue.phone,
+    incomeValue: Number(venue.income_value),
+    address: venue.street_address,
+    addressNumber: venue.address_number,
+    province: venue.neighborhood,
+    postalCode: venue.postal_code,
+  };
+}
+
+async function openSubaccount(
+  asaas: AsaasProvider,
+  venue: VenueRow,
+  plan: { primary: string; alias: string },
+  birthDate: string | undefined,
+) {
+  try {
+    return await asaas.createSubaccount(
+      subaccountBody(venue, plan.primary, birthDate),
+    );
+  } catch (error) {
+    const alias = nextSubaccountEmail(plan.primary, plan.alias, error);
+    if (!alias) throw error;
+    logAsaasFailure("provision-venue-wallet", error);
+    return await asaas.createSubaccount(
+      subaccountBody(venue, alias, birthDate),
+    );
+  }
+}

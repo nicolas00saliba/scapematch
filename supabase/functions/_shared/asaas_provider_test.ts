@@ -1,8 +1,16 @@
-import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "jsr:@std/assert@1";
 import {
   AsaasProvider,
   commissionCents,
   houseSplitPercent,
+  pickReusablePix,
+  PixQrUnavailableError,
+  PixReservationLost,
   tokensMatch,
 } from "./asaas_provider.ts";
 
@@ -22,7 +30,13 @@ Deno.test("o Pix manda o split para o walletId e a chave só no header", async (
   const calls: { url: string; init: RequestInit }[] = [];
   const fetchFn = (url: string, init?: RequestInit) => {
     calls.push({ url, init: init ?? {} });
-    if (url.endsWith("/payments")) {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+    }
+    if (method === "POST" && url.endsWith("/payments")) {
       return Promise.resolve(
         new Response(JSON.stringify({ id: "pay_1", status: "PENDING" }), {
           status: 200,
@@ -50,16 +64,418 @@ Deno.test("o Pix manda o split para o walletId e a chave só no header", async (
     split: { walletId: "wal_house", percentualValue: 90 },
   });
   assertEquals(pix.payload, "000201PIX");
-  const body = JSON.parse(String(calls[0].init.body));
+  const post = calls.find((call) => call.init.method === "POST");
+  assert(post);
+  const body = JSON.parse(String(post.init.body));
   assertEquals(body.billingType, "PIX");
   assertEquals(body.split[0].walletId, "wal_house");
   assertEquals(body.split[0].percentualValue, 90);
   assertEquals(JSON.stringify(body).includes("asaas-secret-key"), false);
-  const headers = calls[0].init.headers as Record<string, string>;
+  const headers = post.init.headers as Record<string, string>;
   assertEquals(headers.access_token, "asaas-secret-key");
-  assertEquals(calls[1].url.endsWith("/payments/pay_1/pixQrCode"), true);
-  assertEquals(calls[1].init.method, "GET");
-  assertEquals(calls[1].init.body, undefined);
+  const qr = calls.find((call) =>
+    call.url.endsWith("/payments/pay_1/pixQrCode")
+  );
+  assert(qr);
+  assertEquals(qr.init.method, "GET");
+  assertEquals(qr.init.body, undefined);
+});
+
+const pixInput = {
+  customer: "cus_1",
+  value: 120,
+  dueDate: "2026-11-07",
+  description: "ScapeMatch Demo",
+  externalReference: "charge-1",
+  split: { walletId: "wal_house", percentualValue: 90 },
+};
+
+function pixDetail(id: string, status: string) {
+  return {
+    id,
+    status,
+    billingType: "PIX",
+    customer: "cus_1",
+    value: 120,
+    split: [{ walletId: "wal_house", percentualValue: 90 }],
+  };
+}
+
+Deno.test("createPix reaproveita Pix pendente e não cria outro", async () => {
+  let posts = 0;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [{
+              id: "pay_existing",
+              status: "PENDING",
+              billingType: "PIX",
+              externalReference: "charge-1",
+            }],
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (
+      method === "GET" && url.includes("/payments/pay_existing") &&
+      !url.includes("pixQrCode")
+    ) {
+      return Promise.resolve(
+        new Response(JSON.stringify(pixDetail("pay_existing", "PENDING")), {
+          status: 200,
+        }),
+      );
+    }
+    if (method === "POST") {
+      posts += 1;
+      return Promise.resolve(new Response("não", { status: 500 }));
+    }
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({ payload: "000201PIX", encodedImage: "aW1n" }),
+        { status: 200 },
+      ),
+    );
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  const pix = await provider.createPix(pixInput);
+  assertEquals(pix.id, "pay_existing");
+  assertEquals(pix.payload, "000201PIX");
+  assertEquals(posts, 0);
+});
+
+Deno.test("createPix tenta o QR de novo e grava o id antes da busca", async () => {
+  const sleeps: number[] = [];
+  let qrGets = 0;
+  let posts = 0;
+  let createdBeforeQr = false;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+    }
+    if (method === "POST" && url.endsWith("/payments")) {
+      posts += 1;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ id: "pay_new", status: "PENDING" }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (url.includes("/pixQrCode")) {
+      qrGets += 1;
+      if (qrGets < 3) {
+        return Promise.resolve(new Response("indisponível", { status: 503 }));
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ payload: "000201PIX", encodedImage: "aW1n" }),
+          { status: 200 },
+        ),
+      );
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    (ms) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    },
+  );
+  const pix = await provider.createPix({
+    ...pixInput,
+    onCreated: () => {
+      createdBeforeQr = qrGets === 0;
+      return Promise.resolve();
+    },
+  });
+  assertEquals(pix.id, "pay_new");
+  assertEquals(posts, 1);
+  assertEquals(qrGets, 3);
+  assertEquals(sleeps, [100, 200]);
+  assertEquals(createdBeforeQr, true);
+});
+
+Deno.test("QR esgotado não apaga a cobrança e o retry não cria outra", async () => {
+  const payments: Array<{ id: string; status: string; billingType: string }> =
+    [];
+  let posts = 0;
+  let deletes = 0;
+  let failQr = true;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "DELETE") {
+      deletes += 1;
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: payments }), { status: 200 }),
+      );
+    }
+    if (method === "GET" && url.endsWith("/payments/pay_orphan")) {
+      return Promise.resolve(
+        new Response(JSON.stringify(pixDetail("pay_orphan", "PENDING")), {
+          status: 200,
+        }),
+      );
+    }
+    if (method === "POST" && url.endsWith("/payments")) {
+      posts += 1;
+      const created = {
+        id: "pay_orphan",
+        status: "PENDING",
+        billingType: "PIX",
+      };
+      payments.push(created);
+      return Promise.resolve(
+        new Response(JSON.stringify(created), { status: 200 }),
+      );
+    }
+    if (url.includes("/pixQrCode")) {
+      if (failQr) {
+        return Promise.resolve(new Response("indisponível", { status: 503 }));
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ payload: "000201PIX", encodedImage: "aW1n" }),
+          { status: 200 },
+        ),
+      );
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  const error = await assertRejects(
+    () => provider.createPix(pixInput),
+    PixQrUnavailableError,
+  );
+  assertEquals(error.paymentId, "pay_orphan");
+  assertEquals(posts, 1);
+  assertEquals(deletes, 0);
+  failQr = false;
+  const pix = await provider.createPix(pixInput);
+  assertEquals(pix.id, "pay_orphan");
+  assertEquals(posts, 1);
+  assertEquals(deletes, 0);
+});
+
+Deno.test("pickReusablePix ignora estorno e prefere a cobrança já paga", () => {
+  assertEquals(pickReusablePix([]), null);
+  assertEquals(
+    pickReusablePix([{
+      id: "pay_refunded",
+      status: "REFUNDED",
+      billingType: "PIX",
+    }]),
+    null,
+  );
+  assertEquals(
+    pickReusablePix([
+      { id: "pay_open", status: "PENDING", billingType: "PIX" },
+      { id: "pay_paid", status: "RECEIVED", billingType: "PIX" },
+    ]),
+    { id: "pay_paid", status: "RECEIVED" },
+  );
+  assertEquals(
+    pickReusablePix([{
+      id: "pay_open",
+      status: "PENDING",
+      billingType: "PIX",
+    }]),
+    { id: "pay_open", status: "PENDING" },
+  );
+});
+
+Deno.test("Pix reaproveitado pago devolve o status do Asaas mesmo sem QR", async () => {
+  let posts = 0;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [{
+              id: "pay_paid",
+              status: "CONFIRMED",
+              billingType: "PIX",
+            }],
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (
+      method === "GET" && url.includes("/payments/pay_paid") &&
+      !url.includes("pixQrCode")
+    ) {
+      return Promise.resolve(
+        new Response(JSON.stringify(pixDetail("pay_paid", "CONFIRMED")), {
+          status: 200,
+        }),
+      );
+    }
+    if (method === "POST") {
+      posts += 1;
+      return Promise.resolve(new Response("não", { status: 500 }));
+    }
+    if (url.includes("/pixQrCode")) {
+      return Promise.resolve(new Response("indisponível", { status: 503 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  const pix = await provider.createPix(pixInput);
+  assertEquals(pix.id, "pay_paid");
+  assertEquals(pix.status, "CONFIRMED");
+  assertEquals(pix.payload, "");
+  assertEquals(posts, 0);
+});
+
+Deno.test("Pix com outro customer não é reaproveitado nem recriado", async () => {
+  let posts = 0;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [{ id: "pay_other", status: "PENDING", billingType: "PIX" }],
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (
+      method === "GET" && url.includes("/payments/pay_other") &&
+      !url.includes("pixQrCode")
+    ) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            ...pixDetail("pay_other", "PENDING"),
+            customer: "cus_outro",
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (method === "POST") {
+      posts += 1;
+      return Promise.resolve(new Response("não", { status: 500 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  await assertRejects(
+    () => provider.createPix(pixInput),
+    Error,
+    "pix_reuse_mismatch",
+  );
+  assertEquals(posts, 0);
+});
+
+Deno.test("perder a reserva apaga o Pix recém-criado e não o reaproveitado", async () => {
+  let deletes = 0;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "DELETE") {
+      deletes += 1;
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    if (method === "GET" && url.includes("/payments?")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+    }
+    if (method === "POST" && url.endsWith("/payments")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: "pay_new", status: "PENDING" }), {
+          status: 200,
+        }),
+      );
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  await assertRejects(
+    () =>
+      provider.createPix({
+        ...pixInput,
+        onCreated: (payment) =>
+          Promise.reject(new PixReservationLost(payment.id)),
+      }),
+    PixReservationLost,
+  );
+  assertEquals(deletes, 1);
+});
+
+Deno.test("cancelar Pix só confirma se o pagamento não segue aberto", async () => {
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "DELETE") {
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    if (method === "GET" && url.includes("/payments/pay_open")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            id: "pay_open",
+            status: "PENDING",
+            billingType: "PIX",
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (method === "GET" && url.includes("/payments/pay_gone")) {
+      return Promise.resolve(new Response("não", { status: 404 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  assertEquals(await provider.cancelPaymentConfirmed("pay_open"), false);
+  assertEquals(await provider.cancelPaymentConfirmed("pay_gone"), true);
 });
 
 const sampleCard = {
@@ -196,8 +612,7 @@ Deno.test("erro da tokenização não ecoa número, CVV, validade nem o body", a
     }],
     creditCard: sampleCard,
   });
-  const fetchFn = () =>
-    Promise.resolve(new Response(echoed, { status: 400 }));
+  const fetchFn = () => Promise.resolve(new Response(echoed, { status: 400 }));
   const provider = new AsaasProvider(
     "asaas-secret-key",
     "https://api-sandbox.asaas.com/v3",
@@ -220,8 +635,14 @@ Deno.test("erro da tokenização não ecoa número, CVV, validade nem o body", a
   assertEquals(message.includes(sampleCard.number), false);
   assertEquals(message.includes("4111"), false);
   assertEquals(message.includes(`"ccv":"${sampleCard.ccv}"`), false);
-  assertEquals(message.includes(`"expiryMonth":"${sampleCard.expiryMonth}"`), false);
-  assertEquals(message.includes(`"expiryYear":"${sampleCard.expiryYear}"`), false);
+  assertEquals(
+    message.includes(`"expiryMonth":"${sampleCard.expiryMonth}"`),
+    false,
+  );
+  assertEquals(
+    message.includes(`"expiryYear":"${sampleCard.expiryYear}"`),
+    false,
+  );
   assertEquals(message.includes(`"number":"${sampleCard.number}"`), false);
   assertEquals(message.includes("pedido 12"), true);
   assertEquals(message.includes(`ref ${sampleCard.ccv}`), true);
