@@ -70,7 +70,13 @@ class FakeAuthRepository implements AuthRepository {
     _nextId += 1;
     _accounts[key] = (user: user, password: password);
     _user = user;
-    final acceptedAt = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    final acceptedAt = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    );
     for (final code in playerAcceptanceCodes) {
       _acceptances.add(
         LegalAcceptance(
@@ -92,6 +98,18 @@ class FakeAuthRepository implements AuthRepository {
   Future<String?> requestPasswordReset({required String email}) async {
     if (!email.contains('@')) return 'Informe um e-mail válido.';
     return 'Neste exemplo o link não é enviado.';
+  }
+
+  @override
+  Future<String?> changePassword({required String password}) async {
+    final user = _user;
+    if (user == null) return 'Entre para trocar a senha.';
+    for (final entry in _accounts.entries) {
+      if (entry.value.user.id != user.id) continue;
+      _accounts[entry.key] = (user: entry.value.user, password: password);
+      return null;
+    }
+    return 'Entre para trocar a senha.';
   }
 
   @override

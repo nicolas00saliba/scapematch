@@ -24,6 +24,9 @@ abstract class AuthRepository {
   /// Pede o e-mail de nova senha. Nulo quando o pedido foi aceito.
   Future<String?> requestPasswordReset({required String email});
 
+  /// Troca a senha de quem está na sessão. Nulo quando a senha nova valeu.
+  Future<String?> changePassword({required String password});
+
   /// Relê o perfil depois do login. A implementação em memória não faz nada.
   Future<void> refresh() async {}
 

@@ -1,3 +1,4 @@
+import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Traduz o erro do Supabase Auth para a frase que a tela mostra.
@@ -17,12 +18,17 @@ String authErrorMessage(Object error, {required String fallback}) {
       text.contains('user already')) {
     return 'Esse e-mail já tem conta. Entre com ele.';
   }
+  if (text.contains('pwned') ||
+      text.contains('leaked') ||
+      text.contains('known to be weak')) {
+    return leakedPasswordMessage;
+  }
   if (text.contains('password') &&
       (text.contains('short') ||
           text.contains('least') ||
           text.contains('weak') ||
-          text.contains('6'))) {
-    return 'A senha precisa de pelo menos 6 caracteres.';
+          text.contains('character'))) {
+    return passwordRuleMessage;
   }
   if (text.contains('invalid') && text.contains('email')) {
     return 'Esse e-mail não é válido.';
