@@ -1,12 +1,16 @@
 -- CPF do jogador, para o customer do Asaas. Não altera a 190000.
 -- authenticated lê e grava o próprio perfil, menos esta coluna.
--- O número só entra por set_my_cpf e só sai como boolean em my_cpf_status.
--- service_role lê a coluna nas Edge Functions. O valor não volta no erro.
+-- O número só entra por set_my_cpf, e só enquanto o perfil está vazio.
+-- Troca futura fica com suporte/admin. Cada definição vai para
+-- profile_cpf_audit com user_id, instante e hash. O CPF não entra na tabela.
+-- my_cpf_status devolve só boolean. service_role lê a coluna nas funções.
+-- O valor não volta no erro.
 
 create or replace function public.is_valid_cpf(p_cpf text)
 returns boolean
 language plpgsql
 immutable
+set search_path = ''
 as $$
 declare
   v_digits text;
@@ -17,30 +21,32 @@ begin
   if p_cpf is null then
     return false;
   end if;
-  v_digits := regexp_replace(p_cpf, '\D', '', 'g');
+  v_digits := pg_catalog.regexp_replace(p_cpf, '\D', '', 'g');
   if v_digits !~ '^\d{11}$' or v_digits ~ '^(\d)\1{10}$' then
     return false;
   end if;
   v_sum := 0;
   for v_i in 1..9 loop
-    v_sum := v_sum + substr(v_digits, v_i, 1)::integer * (11 - v_i);
+    v_sum := v_sum + pg_catalog.substr(v_digits, v_i, 1)::pg_catalog.int4
+      * (11 - v_i);
   end loop;
   v_digit := (v_sum * 10) % 11;
   if v_digit = 10 then
     v_digit := 0;
   end if;
-  if v_digit <> substr(v_digits, 10, 1)::integer then
+  if v_digit <> pg_catalog.substr(v_digits, 10, 1)::pg_catalog.int4 then
     return false;
   end if;
   v_sum := 0;
   for v_i in 1..10 loop
-    v_sum := v_sum + substr(v_digits, v_i, 1)::integer * (12 - v_i);
+    v_sum := v_sum + pg_catalog.substr(v_digits, v_i, 1)::pg_catalog.int4
+      * (12 - v_i);
   end loop;
   v_digit := (v_sum * 10) % 11;
   if v_digit = 10 then
     v_digit := 0;
   end if;
-  return v_digit = substr(v_digits, 11, 1)::integer;
+  return v_digit = pg_catalog.substr(v_digits, 11, 1)::pg_catalog.int4;
 end;
 $$;
 
@@ -74,6 +80,18 @@ grant update (
   asaas_customer_id
 ) on public.profiles to authenticated;
 
+-- Auditoria da definição. Sem coluna de CPF: só quem, quando e o hash.
+create table public.profile_cpf_audit (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  defined_at timestamptz not null default pg_catalog.now(),
+  cpf_hash bytea not null,
+  primary key (user_id, defined_at)
+);
+
+alter table public.profile_cpf_audit enable row level security;
+
+revoke all on table public.profile_cpf_audit from public, anon, authenticated;
+
 create or replace function public.my_cpf_status()
 returns boolean
 language sql
@@ -96,6 +114,7 @@ set search_path = ''
 as $$
 declare
   v_digits text;
+  v_current text;
 begin
   if auth.uid() is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -104,9 +123,29 @@ begin
   if not public.is_valid_cpf(v_digits) then
     raise exception 'cpf invalido' using errcode = '22023';
   end if;
+  select p.cpf into v_current
+  from public.profiles p
+  where p.id = auth.uid()
+  for update;
+  if not found then
+    raise exception 'perfil ausente' using errcode = 'P0002';
+  end if;
+  if v_current is not null then
+    raise exception 'cpf ja definido' using errcode = '55000';
+  end if;
   update public.profiles
     set cpf = v_digits
-    where id = auth.uid();
+    where id = auth.uid()
+      and cpf is null;
+  if not found then
+    raise exception 'cpf ja definido' using errcode = '55000';
+  end if;
+  insert into public.profile_cpf_audit (user_id, defined_at, cpf_hash)
+  values (
+    auth.uid(),
+    pg_catalog.clock_timestamp(),
+    extensions.digest(v_digits, 'sha256')
+  );
   return true;
 end;
 $$;
