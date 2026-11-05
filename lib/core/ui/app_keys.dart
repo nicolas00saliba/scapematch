@@ -123,6 +123,10 @@ abstract final class AppKeys {
   static const addCardNotice = Key('add-card-notice');
   static const addCardSave = Key('add-card-save');
   static const cardHolder = Key('card-holder');
+  static const cardHolderCpf = Key('card-holder-cpf');
+  static const cardHolderNote = Key('card-holder-note');
+  static const cardOwn = Key('card-own');
+  static const cardHolderForm = Key('card-holder-form');
   static const cardNumber = Key('card-number');
   static const cardMonth = Key('card-month');
   static const cardYear = Key('card-year');

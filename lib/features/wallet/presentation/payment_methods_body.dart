@@ -4,6 +4,7 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/account/presentation/cpf_screen.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
+import 'package:scapematch/features/payments/presentation/own_card_holder.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -37,11 +38,30 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
     ref.invalidate(paymentMethodsProvider);
   }
 
+  Future<void> _toggleOwn(bool checked) async {
+    setState(() => _entry.ownCard = checked);
+    if (!checked) return;
+    final ok = await fillOwnCardHolder(
+      context: context,
+      ref: ref,
+      entry: _entry,
+    );
+    if (!mounted) return;
+    setState(() {
+      _entry.ownCard = ok;
+      _error = ok ? null : 'Não foi possível usar os dados do perfil.';
+    });
+  }
+
   Future<void> _save() async {
+    final real = ref.read(backendPlanProvider).connectsSupabase;
+    _entry.requireHolderDocument = real;
     final draft = _entry.draft;
     if (draft == null) {
       setState(() {
-        _error = 'Preencha nome, número, validade e o código de segurança.';
+        _error =
+            _entry.holderDocumentProblem ??
+            'Preencha nome, número, validade e o código de segurança.';
       });
       return;
     }
@@ -69,7 +89,10 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final methods = ref.watch(paymentMethodsProvider);
+    final realHolder = ref.watch(backendPlanProvider).connectsSupabase;
+    _entry.requireHolderDocument = realHolder;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         methods.when(
@@ -91,6 +114,7 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
             }
             final canRemove = ref.watch(backendPlanProvider).connectsSupabase;
             return Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 for (final method in items)
                   Padding(
@@ -119,7 +143,13 @@ class _PaymentMethodsBodyState extends ConsumerState<PaymentMethodsBody> {
             style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
           ),
           const SizedBox(height: 12),
-          CardEntryFields(controllers: _entry),
+          RepaintBoundary(
+            key: AppKeys.cardHolderForm,
+            child: CardEntryFields(
+              controllers: _entry..requireHolderDocument = realHolder,
+              onOwnCard: realHolder ? _toggleOwn : null,
+            ),
+          ),
           const SizedBox(height: 12),
           FilledButton(
             key: AppKeys.addCardSave,

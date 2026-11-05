@@ -11,6 +11,8 @@ import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
+import 'package:scapematch/features/payments/presentation/own_card_holder.dart';
+import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Cartão de exemplo. O pagamento simulado não envia número.
@@ -100,19 +102,44 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     setState(() => _copied = true);
   }
 
+  Future<void> _toggleOwn(bool checked) async {
+    setState(() => _entry.ownCard = checked);
+    if (!checked) return;
+    final ok = await fillOwnCardHolder(
+      context: context,
+      ref: ref,
+      entry: _entry,
+    );
+    if (!mounted) return;
+    setState(() {
+      _entry.ownCard = ok;
+      _error = ok ? null : 'Não foi possível usar os dados do perfil.';
+    });
+  }
+
   Future<void> _confirm() async {
     setState(() => _busy = true);
+    final real = ref.read(backendPlanProvider).connectsSupabase;
+    _entry.requireHolderDocument = real;
     final bool ok;
     final draft = _method == PaymentMethodKind.card && _entry.started
         ? _entry.draft
         : null;
     if (_method == PaymentMethodKind.card && _entry.started && draft == null) {
       ok = false;
+      if (real && _entry.holderDocumentProblem != null) {
+        setState(() {
+          _busy = false;
+          _error = _entry.holderDocumentProblem;
+        });
+        return;
+      }
     } else if (draft != null) {
       final payNew = widget.onPayNewCard;
       ok = payNew == null ? false : await payNew(draft);
     } else {
-      final savedCardId = _method == PaymentMethodKind.card &&
+      final savedCardId =
+          _method == PaymentMethodKind.card &&
               _cardId != null &&
               _cardId != payTestCard.id
           ? _cardId
@@ -136,6 +163,8 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     final height = MediaQuery.sizeOf(context).height;
     final saved = ref.watch(paymentMethodsProvider).asData?.value ?? const [];
     final cards = scapeUsesLiveBackend ? saved : [payTestCard, ...saved];
+    final realHolder = ref.watch(backendPlanProvider).connectsSupabase;
+    _entry.requireHolderDocument = realHolder;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: ConstrainedBox(
@@ -222,6 +251,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                               cards: cards,
                               selectedId: _cardId,
                               entry: _entry,
+                              onOwnCard: realHolder ? _toggleOwn : null,
                               onSelect: (id) => setState(() => _cardId = id),
                             ),
                     ),
@@ -388,12 +418,14 @@ class _CardPanel extends StatelessWidget {
     required this.selectedId,
     required this.entry,
     required this.onSelect,
+    this.onOwnCard,
   });
 
   final List<PaymentMethod> cards;
   final String? selectedId;
   final CardEntryControllers entry;
   final ValueChanged<String> onSelect;
+  final ValueChanged<bool>? onOwnCard;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +453,7 @@ class _CardPanel extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 8),
-        CardEntryFields(controllers: entry),
+        CardEntryFields(controllers: entry, onOwnCard: onOwnCard),
       ],
     );
   }

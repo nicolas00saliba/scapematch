@@ -11,7 +11,9 @@ import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/account/data/player_cpf_store.dart';
+import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/features/account/presentation/cpf_screen.dart';
+import 'package:scapematch/features/account/presentation/current_user_provider.dart';
 import 'package:scapematch/features/payments/data/fake_payment_methods_repository.dart';
 import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -45,12 +47,12 @@ void main() {
     expect(find.byKey(AppKeys.playerCpfError), findsOneWidget);
     expect(find.text('CPF inválido.'), findsOneWidget);
     expect(store.saved, isFalse);
-    await _capture(tester, 'cpf-jogador-invalido');
+    await _captureKey(tester, AppKeys.playerCpfScreen, 'cpf-jogador-invalido');
 
     await tester.enterText(find.byKey(AppKeys.playerCpf), '529.982.247-25');
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.playerCpfError), findsNothing);
-    await _capture(tester, 'cpf-jogador');
+    await _captureKey(tester, AppKeys.playerCpfScreen, 'cpf-jogador');
     await tester.tap(find.byKey(AppKeys.playerCpfSave));
     await tester.pumpAndSettle();
     expect(store.digits, '52998224725');
@@ -67,36 +69,90 @@ void main() {
     expect(find.byKey(AppKeys.playerCpf), findsNothing);
   });
 
-  testWidgets('guardar cartão no modo real abre o CPF antes da tokenização', (
+  testWidgets('guardar cartão no modo real pede o CPF do titular', (
     tester,
   ) async {
+    await tester.runAsync(_loadFonts);
     final store = MemoryPlayerCpfStore();
-    await tester.pumpWidget(
-      ProviderScope(
-        retry: noAutomaticRetry,
-        overrides: [
-          backendPlanProvider.overrideWithValue(planFor(AppMode.real)),
-          playerCpfStoreProvider.overrideWithValue(store),
-          paymentMethodsRepositoryProvider.overrideWithValue(
-            FakePaymentMethodsRepository(),
-          ),
-        ],
-        child: MaterialApp(home: const Scaffold(body: PaymentMethodsBody())),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _pumpCard(tester, store);
     await tester.tap(find.byKey(AppKeys.addCard));
     await tester.pumpAndSettle();
+    expect(
+      find.text('Pode ser o cartão de outra pessoa, como pai ou empresa.'),
+      findsOneWidget,
+    );
+    expect(find.text('Nome do titular (como no cartão)'), findsOneWidget);
+    expect(find.text('CPF do titular'), findsOneWidget);
+    expect(find.text('O cartão é meu'), findsOneWidget);
+    expect(find.text('Nome no cartão'), findsNothing);
+    await tester.ensureVisible(find.byKey(AppKeys.cardHolderForm));
+    await _captureKey(tester, AppKeys.cardHolderForm, 'card-titular');
+
     await tester.enterText(find.byKey(AppKeys.cardHolder), 'Ana');
     await tester.enterText(find.byKey(AppKeys.cardNumber), '4111111111111111');
     await tester.enterText(find.byKey(AppKeys.cardMonth), '12');
     await tester.enterText(find.byKey(AppKeys.cardYear), '2028');
     await tester.enterText(find.byKey(AppKeys.cardSecurity), '123');
+    await tester.ensureVisible(find.byKey(AppKeys.addCardSave));
+    await tester.tap(find.byKey(AppKeys.addCardSave));
+    await tester.pumpAndSettle();
+    expect(find.text('Informe o CPF do titular.'), findsOneWidget);
+    expect(find.byKey(AppKeys.playerCpf), findsNothing);
+
+    await tester.enterText(find.byKey(AppKeys.cardHolderCpf), '111.111.111-11');
+    await tester.ensureVisible(find.byKey(AppKeys.addCardSave));
+    await tester.tap(find.byKey(AppKeys.addCardSave));
+    await tester.pumpAndSettle();
+    expect(find.text('CPF do titular inválido.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(AppKeys.cardHolderCpf), '529.982.247-25');
+    await tester.ensureVisible(find.byKey(AppKeys.addCardSave));
     await tester.tap(find.byKey(AppKeys.addCardSave));
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.playerCpf), findsOneWidget);
     expect(store.saved, isFalse);
   });
+
+  testWidgets('o cartão é meu copia o nome e o CPF do jogador', (tester) async {
+    await tester.runAsync(_loadFonts);
+    final store = MemoryPlayerCpfStore(saved: true)..digits = '52998224725';
+    await _pumpCard(tester, store);
+    await tester.tap(find.byKey(AppKeys.addCard));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.cardOwn));
+    await tester.pumpAndSettle();
+    expect(find.text('Nícolas'), findsOneWidget);
+    expect(find.text('52998224725'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(AppKeys.cardHolderForm));
+    await _captureKey(tester, AppKeys.cardHolderForm, 'card-titular-meu');
+  });
+}
+
+Future<void> _pumpCard(WidgetTester tester, MemoryPlayerCpfStore store) async {
+  tester.view.physicalSize = const Size(390, 1200);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    ProviderScope(
+      retry: noAutomaticRetry,
+      overrides: [
+        backendPlanProvider.overrideWithValue(planFor(AppMode.real)),
+        playerCpfStoreProvider.overrideWithValue(store),
+        currentUserProvider.overrideWithValue(sampleCurrentUser),
+        paymentMethodsRepositoryProvider.overrideWithValue(
+          FakePaymentMethodsRepository(),
+        ),
+      ],
+      child: MaterialApp(
+        theme: _shotTheme(),
+        home: Scaffold(
+          body: ListView(children: const [PaymentMethodsBody()]),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pump(
@@ -185,13 +241,11 @@ String? _fontDir() {
   return null;
 }
 
-Future<void> _capture(WidgetTester tester, String name) async {
+Future<void> _captureKey(WidgetTester tester, Key key, String name) async {
   final dir = Directory('/opt/cursor/artifacts');
   dir.createSync(recursive: true);
   await tester.pumpAndSettle();
-  final boundary = tester.renderObject<RenderRepaintBoundary>(
-    find.byKey(AppKeys.playerCpfScreen),
-  );
+  final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(key));
   final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 2));
   if (image == null) return;
   final bytes = await tester.runAsync(

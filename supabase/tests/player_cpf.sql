@@ -18,9 +18,22 @@ begin
   end if;
   if not has_function_privilege('authenticated', 'public.set_my_cpf(text)', 'execute')
     or not has_function_privilege('authenticated', 'public.my_cpf_status()', 'execute')
+    or not has_function_privilege('authenticated', 'public.my_cpf()', 'execute')
     or has_function_privilege('anon', 'public.set_my_cpf(text)', 'execute')
+    or has_function_privilege('anon', 'public.my_cpf()', 'execute')
   then
     raise exception 'execute do cpf saiu do combinado';
+  end if;
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'my_cpf'
+      and p.prosecdef
+      and 'search_path=""' = any (p.proconfig)
+  ) then
+    raise exception 'my_cpf sem security definer ou search_path vazio';
   end if;
   if not exists (
     select 1
@@ -60,6 +73,9 @@ begin
   if not public.my_cpf_status() then
     raise exception 'status nao viu o cpf guardado';
   end if;
+  if public.my_cpf() is distinct from '52998224725' then
+    raise exception 'my_cpf nao devolveu o cpf do dono';
+  end if;
   begin
     update public.profiles set cpf = '52998224725' where id = auth.uid();
     raise exception 'update direto da coluna passou';
@@ -77,7 +93,7 @@ set local role authenticated;
 
 do $$
 begin
-  if public.my_cpf_status() then
+  if public.my_cpf_status() or public.my_cpf() is not null then
     raise exception 'outro jogador viu o cpf';
   end if;
   begin

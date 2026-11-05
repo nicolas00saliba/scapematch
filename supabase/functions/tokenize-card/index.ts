@@ -46,6 +46,8 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const cpf = playerCpfDigits(profile?.cpf);
     if (!cpf) return json({ error: "cpf_required" }, 422);
+    const holderCpf = playerCpfDigits(card.holderCpfCnpj);
+    if (!holderCpf) return json({ error: "holder_cpf_invalid" }, 400);
     let responseBody: ReturnType<typeof tokenizePublicResponse> | null = null;
     const decision = await gateTokenize(
       async () => {
@@ -84,7 +86,7 @@ Deno.serve(async (req) => {
           creditCardHolderInfo: {
             name: card.holderName,
             email: user.email ?? "",
-            cpfCnpj: playerCpfDigits(card.holderCpfCnpj) ?? cpf,
+            cpfCnpj: holderCpf,
             postalCode: card.holderPostalCode,
             addressNumber: card.holderAddressNumber,
             phone: card.holderPhone,

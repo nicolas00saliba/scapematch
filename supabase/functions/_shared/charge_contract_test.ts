@@ -76,6 +76,16 @@ Deno.test("tokenize-card não loga e a resposta não leva o token", async () => 
   const customerAt = source.indexOf("customerWithCpf(asaas");
   assert(claimAt > 0 && claimAt < tokenizeAt);
   assert(claimAt < customerAt);
+  assert(source.includes("holder_cpf_invalid"));
+  assertEquals(source.includes("?? cpf"), false);
+  const holderAt = source.indexOf("creditCardHolderInfo");
+  const holder = source.slice(holderAt, holderAt + 320);
+  assert(holder.includes("card.holderName"));
+  assert(holder.includes("holderCpf"));
+  assertEquals(/\bcpf\b/.test(holder), false);
+  const stored = source.slice(source.indexOf("storeSavedCard(admin"));
+  assertEquals(stored.includes("holderCpf"), false);
+  assertEquals(stored.includes("cpfCnpj"), false);
   const helper = await Deno.readTextFile(
     new URL("./player_cpf.ts", import.meta.url),
   );

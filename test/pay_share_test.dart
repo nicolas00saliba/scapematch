@@ -36,6 +36,9 @@ void main() {
 
     await tester.tap(find.byKey(AppKeys.payMethodCard));
     await tester.pumpAndSettle();
+    expect(find.text('Nome no cartão'), findsOneWidget);
+    expect(find.text('CPF do titular'), findsNothing);
+    expect(find.text('O cartão é meu'), findsNothing);
     expect(find.textContaining('Cartão de teste'), findsOneWidget);
     expect(find.textContaining('4242'), findsOneWidget);
     expect(find.textContaining('CVV'), findsNothing);
