@@ -6,7 +6,7 @@
 // Não há SDK de navegador. O cartão só atravessa a chamada de tokenização;
 // a cobrança seguinte manda creditCardToken.
 
-import { redactSensitive, sensitiveStrings } from "./redact.ts";
+import { redactSensitive } from "./redact.ts";
 
 export const asaasSandboxBaseUrl = "https://api-sandbox.asaas.com/v3";
 export const asaasProductionBaseUrl = "https://api.asaas.com/v3";
@@ -190,7 +190,11 @@ type PaymentProvider = {
   createPix(input: PixInput): Promise<PixCreated>;
   tokenizeCard(
     input: TokenizeInput,
-  ): Promise<{ creditCardToken: string }>;
+  ): Promise<{
+    creditCardToken: string;
+    creditCardNumber: string;
+    creditCardBrand: string;
+  }>;
   authorizeCard(input: CardChargeInput): Promise<{ id: string; status: string }>;
   capture(paymentId: string): Promise<{ id: string; status: string }>;
   refund(paymentId: string): Promise<{ id: string; status: string }>;
@@ -325,7 +329,11 @@ export class AsaasProvider implements PaymentProvider {
     });
   }
 
-  tokenizeCard(input: TokenizeInput): Promise<{ creditCardToken: string }> {
+  tokenizeCard(input: TokenizeInput): Promise<{
+    creditCardToken: string;
+    creditCardNumber: string;
+    creditCardBrand: string;
+  }> {
     return this.#send("/creditCard/tokenizeCreditCard", {
       customer: input.customer,
       creditCard: input.creditCard,
@@ -333,6 +341,8 @@ export class AsaasProvider implements PaymentProvider {
       remoteIp: input.remoteIp,
     }).then((body) => ({
       creditCardToken: stringField(body, "creditCardToken"),
+      creditCardNumber: optionalString(body, "creditCardNumber"),
+      creditCardBrand: optionalString(body, "creditCardBrand"),
     }));
   }
 
@@ -414,7 +424,7 @@ export class AsaasProvider implements PaymentProvider {
     }
     const response = await this.fetchFn(`${this.baseUrl}${path}`, init);
     const text = await response.text();
-    const safe = redactOutbound(text, this.apiKey, payload);
+    const safe = redactOutbound(text, this.apiKey);
     if (!response.ok) {
       throw new Error(`Asaas ${response.status}: ${safe.slice(0, 500)}`);
     }
@@ -427,8 +437,7 @@ export class AsaasProvider implements PaymentProvider {
   }
 }
 
-/// Na primeira vez o cartão só vai para a tokenização. A cobrança usa o token.
-/// Com token já emitido, o cartão nem é lido de novo.
+/// O token usado aqui já foi lido no servidor. O body do cliente não entra.
 export async function authorizeStoredCard(
   provider: AsaasProvider,
   input: {
@@ -469,11 +478,9 @@ function requireHolder(holder: CardHolder | undefined): CardHolder {
   return holder;
 }
 
-function redactOutbound(text: string, apiKey: string, payload: unknown): string {
+function redactOutbound(text: string, apiKey: string): string {
   const withoutKey = apiKey ? text.split(apiKey).join("[redacted]") : text;
-  const secrets = sensitiveStrings(payload);
-  if (secrets.length === 0) return withoutKey;
-  return redactSensitive(withoutKey, secrets);
+  return redactSensitive(withoutKey);
 }
 
 function stringField(body: Record<string, unknown>, key: string): string {

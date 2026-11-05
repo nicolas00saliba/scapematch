@@ -1,33 +1,32 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { redactSensitive, sensitiveStrings } from "./redact.ts";
+import { redactSensitive } from "./redact.ts";
 
 const pan = "4111111111111111";
 const spaced = "4111 1111 1111 1111";
-const ccv = "999";
-const month = "12";
-const year = "2028";
 
-Deno.test("número, CVV, validade e o body mascarado não vazam", () => {
+Deno.test("mascara PAN e campos nomeados e preserva números curtos", () => {
   const body = JSON.stringify({
     card: {
       number: pan,
-      ccv,
-      expiryMonth: month,
-      expiryYear: year,
+      ccv: "999",
+      expiryMonth: "12",
+      expiryYear: "2028",
     },
+    note: "pedido 12 ref 999 vence 2026-11-12",
   });
   const leaked = [
-    `Asaas 400: cartão ${pan} ccv ${ccv} validade ${month}/${year}`,
-    `número espaçado ${spaced}`,
+    `Asaas 400: cartão ${pan} e ${spaced}`,
     body,
   ].join("\n");
-  const secrets = sensitiveStrings(JSON.parse(body));
-  const redacted = redactSensitive(leaked, secrets);
+  const redacted = redactSensitive(leaked);
   assertEquals(redacted.includes(pan), false);
   assertEquals(redacted.includes(spaced), false);
-  assertEquals(redacted.includes(ccv), false);
-  assertEquals(redacted.includes(`${month}/${year}`), false);
-  assertEquals(redacted.includes(`"number":"${pan}"`), false);
-  assertEquals(redacted.includes(`"ccv":"${ccv}"`), false);
-  assertEquals(redacted.includes("[redacted]"), true);
+  assertEquals(redacted.includes('"number":"[redacted]"'), true);
+  assertEquals(redacted.includes('"ccv":"[redacted]"'), true);
+  assertEquals(redacted.includes('"expiryMonth":"[redacted]"'), true);
+  assertEquals(redacted.includes('"expiryYear":"[redacted]"'), true);
+  assertEquals(redacted.includes("pedido 12"), true);
+  assertEquals(redacted.includes("ref 999"), true);
+  assertEquals(redacted.includes("2026-11-12"), true);
+  assertEquals(redacted.includes("Asaas 400"), true);
 });

@@ -59,8 +59,8 @@ export function bindJson(req: Request, env: EnvLike = Deno.env) {
   return (body: unknown, status = 200) => json(body, status, req, env);
 }
 
-export function publicError(message: string, secrets: readonly string[] = []): string {
-  return redactSensitive(message, secrets);
+export function publicError(message: string): string {
+  return redactSensitive(message);
 }
 
 export function todayInSaoPaulo(): string {

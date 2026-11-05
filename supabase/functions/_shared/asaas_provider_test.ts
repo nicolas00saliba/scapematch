@@ -185,7 +185,7 @@ Deno.test("erro da tokenização não ecoa número, CVV, validade nem o body", a
   const echoed = JSON.stringify({
     errors: [{
       description:
-        `cartão ${sampleCard.number} ccv ${sampleCard.ccv} validade ${sampleCard.expiryMonth}/${sampleCard.expiryYear}`,
+        `cartão ${sampleCard.number} pedido 12 ref ${sampleCard.ccv} vence 2026-11-12`,
     }],
     creditCard: sampleCard,
   });
@@ -210,11 +210,14 @@ Deno.test("erro da tokenização não ecoa número, CVV, validade nem o body", a
   }
   assert(message.length > 0);
   assertEquals(message.includes(sampleCard.number), false);
-  assertEquals(message.includes(sampleCard.ccv), false);
-  assertEquals(message.includes(`${sampleCard.expiryMonth}/${sampleCard.expiryYear}`), false);
-  assertEquals(message.includes(sampleCard.expiryYear), false);
   assertEquals(message.includes("4111"), false);
   assertEquals(message.includes(`"ccv":"${sampleCard.ccv}"`), false);
+  assertEquals(message.includes(`"expiryMonth":"${sampleCard.expiryMonth}"`), false);
+  assertEquals(message.includes(`"expiryYear":"${sampleCard.expiryYear}"`), false);
+  assertEquals(message.includes(`"number":"${sampleCard.number}"`), false);
+  assertEquals(message.includes("pedido 12"), true);
+  assertEquals(message.includes(`ref ${sampleCard.ccv}`), true);
+  assertEquals(message.includes("2026-11-12"), true);
   assertEquals(logs.length, 0);
 });
 

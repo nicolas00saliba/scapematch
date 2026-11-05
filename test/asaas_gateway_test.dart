@@ -33,9 +33,15 @@ void main() {
     final charge = File(
       'supabase/functions/create-charge/index.ts',
     ).readAsStringSync();
-    expect(charge.contains('authorizeStoredCard'), isTrue);
+    expect(charge.contains('cardForCharge'), isTrue);
+    expect(charge.contains('savedCardView'), isTrue);
     expect(charge.contains('publicError'), isTrue);
     expect(charge.contains('console.'), isFalse);
+    final responseAt = charge.indexOf('...(cardView ?? {})');
+    final response = charge.substring(responseAt - 280, responseAt + 20);
+    expect(response.contains('credit_card_token'), isFalse);
+    expect(text.contains('my_saved_cards'), isTrue);
+    expect(text.contains('saved_cards'), isTrue);
     expect(text.contains('https://api-sandbox.asaas.com/v3'), isTrue);
     expect(text.contains('/invoices'), isTrue);
     expect(text.contains('/fiscalInfo'), isTrue);

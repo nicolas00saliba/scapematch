@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
   AsaasProvider,
-  authorizeStoredCard,
   houseSplitPercent,
 } from "../_shared/asaas_provider.ts";
 import {
@@ -10,6 +9,15 @@ import {
   publicError,
   todayInSaoPaulo,
 } from "../_shared/http.ts";
+import {
+  type SavedCard,
+  assertOwnedCard,
+  cardBrand,
+  cardForCharge,
+  last4Digits,
+  requestedSavedCardId,
+  savedCardView,
+} from "../_shared/saved_card.ts";
 
 type CardBody = {
   holderName?: string;
@@ -28,8 +36,17 @@ type ChargeBody = {
   billing_type?: string;
   idempotency_key?: string;
   remote_ip?: string;
-  credit_card_token?: string;
+  saved_card_id?: string;
   card?: CardBody;
+};
+
+type SavedCardRow = {
+  id: string;
+  user_id: string;
+  asaas_customer_id: string;
+  credit_card_token: string;
+  last4: string;
+  brand: string;
 };
 
 Deno.serve(async (req) => {
@@ -140,7 +157,7 @@ Deno.serve(async (req) => {
     let status = "pending";
     let qrCode: string | null = null;
     let qrImage: string | null = null;
-    let creditCardToken = "";
+    let cardView: ReturnType<typeof savedCardView> | null = null;
 
     if (billingType === "PIX") {
       const pix = await asaas.createPix({
@@ -156,45 +173,35 @@ Deno.serve(async (req) => {
       qrCode = pix.payload;
       qrImage = pix.encodedImage;
     } else {
-      const suppliedToken = (body.credit_card_token ?? "").trim();
-      const card = suppliedToken ? undefined : body.card;
       const remoteIp = body.remote_ip ||
         req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
         "127.0.0.1";
-      const authorized = await authorizeStoredCard(asaas, {
-        charge: {
-          customer: customerId,
-          value: amountCents / 100,
-          dueDate,
-          description,
-          externalReference: idempotencyKey,
-          split,
+      const savedCardId = requestedSavedCardId(body);
+      const owned = savedCardId
+        ? await cardForCharge({
+          findOwned: (userId, customerIdForCard, cardId) =>
+            findOwnedCard(admin, userId, customerIdForCard, cardId),
+        }, user.id, customerId, savedCardId)
+        : await storeNewCard(admin, asaas, {
+          userId: user.id,
+          customerId,
           remoteIp,
-        },
-        creditCardToken: suppliedToken,
-        creditCard: card
-          ? {
-            holderName: card.holderName ?? "",
-            number: card.number ?? "",
-            expiryMonth: card.expiryMonth ?? "",
-            expiryYear: card.expiryYear ?? "",
-            ccv: card.ccv ?? "",
-          }
-          : undefined,
-        creditCardHolderInfo: card
-          ? {
-            name: card.holderName ?? "",
-            email: user.email ?? "",
-            cpfCnpj: card.holderCpfCnpj ?? "",
-            postalCode: card.holderPostalCode ?? "",
-            addressNumber: card.holderAddressNumber ?? "S/N",
-            phone: card.holderPhone ?? "",
-          }
-          : undefined,
+          email: user.email ?? "",
+          card: body.card,
+        });
+      const authorized = await asaas.authorizeCard({
+        customer: customerId,
+        value: amountCents / 100,
+        dueDate,
+        description,
+        externalReference: idempotencyKey,
+        split,
+        remoteIp,
+        creditCardToken: owned.creditCardToken,
       });
       providerRef = authorized.id;
       status = authorized.status === "AUTHORIZED" ? "authorized" : "pending";
-      creditCardToken = authorized.creditCardToken;
+      cardView = savedCardView(owned);
       const filled = await filledSpots(admin, groupId);
       const closed = Boolean(group.closed_at) || filled >= group.total_spots;
       if (closed && filled >= group.minimum_spots && status === "authorized") {
@@ -241,16 +248,111 @@ Deno.serve(async (req) => {
       qr_code_base64: qrImage,
       billing_type: billingType,
       amount_cents: amountCents,
-      ...(creditCardToken ? { credit_card_token: creditCardToken } : {}),
+      ...(cardView ?? {}),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "erro";
-    return json({ error: publicError(message) }, 500);
+    const status = message === "cartão não encontrado"
+      ? 403
+      : message === "Dados do cartão incompletos." ||
+          message === "Não foi possível guardar o cartão."
+      ? 400
+      : 500;
+    return json({ error: publicError(message) }, status);
   }
 });
 
+type ChargeDb = {
+  from(...args: unknown[]): any;
+};
+
+async function findOwnedCard(
+  admin: ChargeDb,
+  userId: string,
+  customerId: string,
+  cardId: string,
+): Promise<SavedCard | null> {
+  const { data, error } = await admin
+    .from("saved_cards")
+    .select("id, user_id, asaas_customer_id, credit_card_token, last4, brand")
+    .eq("id", cardId)
+    .eq("user_id", userId)
+    .eq("asaas_customer_id", customerId)
+    .maybeSingle();
+  if (error) throw new Error("cartão não encontrado");
+  if (!data) return null;
+  return toSavedCard(data as SavedCardRow);
+}
+
+async function storeNewCard(
+  admin: ChargeDb,
+  asaas: AsaasProvider,
+  input: {
+    userId: string;
+    customerId: string;
+    remoteIp: string;
+    email: string;
+    card?: CardBody;
+  },
+): Promise<SavedCard> {
+  const card = input.card;
+  if (!card?.number || !card.ccv || !card.holderName || !card.expiryMonth || !card.expiryYear) {
+    throw new Error("Dados do cartão incompletos.");
+  }
+  const tokenized = await asaas.tokenizeCard({
+    customer: input.customerId,
+    remoteIp: input.remoteIp,
+    creditCard: {
+      holderName: card.holderName,
+      number: card.number,
+      expiryMonth: card.expiryMonth,
+      expiryYear: card.expiryYear,
+      ccv: card.ccv,
+    },
+    creditCardHolderInfo: {
+      name: card.holderName,
+      email: input.email,
+      cpfCnpj: card.holderCpfCnpj ?? "",
+      postalCode: card.holderPostalCode ?? "",
+      addressNumber: card.holderAddressNumber ?? "S/N",
+      phone: card.holderPhone ?? "",
+    },
+  });
+  const inserted = await admin
+    .from("saved_cards")
+    .insert({
+      user_id: input.userId,
+      asaas_customer_id: input.customerId,
+      credit_card_token: tokenized.creditCardToken,
+      last4: last4Digits(tokenized.creditCardNumber),
+      brand: cardBrand(tokenized.creditCardBrand),
+    })
+    .select("id, user_id, asaas_customer_id, credit_card_token, last4, brand")
+    .single();
+  if (inserted.error || !inserted.data) {
+    throw new Error("Não foi possível guardar o cartão.");
+  }
+  return assertOwnedCard(
+    toSavedCard(inserted.data as SavedCardRow),
+    input.userId,
+    input.customerId,
+    inserted.data.id as string,
+  );
+}
+
+function toSavedCard(row: SavedCardRow): SavedCard {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    asaasCustomerId: row.asaas_customer_id,
+    creditCardToken: row.credit_card_token,
+    last4: row.last4,
+    brand: row.brand,
+  };
+}
+
 async function filledSpots(
-  admin: ReturnType<typeof createClient>,
+  admin: ChargeDb,
   groupId: string,
 ): Promise<number> {
   const { count } = await admin
