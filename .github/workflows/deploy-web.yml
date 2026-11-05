@@ -64,35 +64,44 @@ jobs:
         run: flutter pub get
 
       # --pwa-strategy=none no Flutter 3.47.8 não registra worker de cache.
+      # O Chrome Android atual aceita a instalação sem service worker.
       # O arquivo publicado no lugar se desregistra, apaga os caches e
       # recarrega quem ainda está preso no build antigo.
       - name: Build player web (real)
         run: |
           flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none
           bash tool/install_cleanup_service_worker.sh build/web
+          bash tool/stamp_web_manifest.sh build/web
           bash tool/mark_real_web_copy.sh build/web player
           bash tool/check_web_service_worker.sh build/web player
+          bash tool/check_web_manifest.sh build/web player real
 
       - name: Build partner web (real)
         working-directory: apps/parceiro
         run: |
           flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none
           bash ../../tool/install_cleanup_service_worker.sh build/web
+          bash ../../tool/stamp_web_manifest.sh build/web
           bash ../../tool/mark_real_web_copy.sh build/web partner
           bash ../../tool/check_web_service_worker.sh build/web partner
+          bash ../../tool/check_web_manifest.sh build/web partner real
 
       - name: Build player web (demo)
         run: |
           flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/player-demo
           bash tool/install_cleanup_service_worker.sh build/player-demo
+          bash tool/stamp_web_manifest.sh build/player-demo
           bash tool/check_web_service_worker.sh build/player-demo player
+          bash tool/check_web_manifest.sh build/player-demo player demo
 
       - name: Build partner web (demo)
         working-directory: apps/parceiro
         run: |
           flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/partner-demo
           bash ../../tool/install_cleanup_service_worker.sh build/partner-demo
+          bash ../../tool/stamp_web_manifest.sh build/partner-demo
           bash ../../tool/check_web_service_worker.sh build/partner-demo partner
+          bash ../../tool/check_web_manifest.sh build/partner-demo partner demo
 
       - name: Assemble the four apps
         run: |

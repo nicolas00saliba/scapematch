@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/router.dart';
 import 'package:scapematch/app/theme.dart';
+import 'package:scapematch/core/pwa/pwa_frame.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 
 class ScapeMatchApp extends ConsumerWidget {
@@ -20,6 +21,9 @@ class ScapeMatchApp extends ConsumerWidget {
       themeMode: themeChoice.mode,
       themeAnimationDuration: const Duration(milliseconds: 350),
       themeAnimationCurve: Curves.easeInOutCubic,
+      builder: (context, child) {
+        return PwaFrame(child: child ?? const SizedBox.shrink());
+      },
       routerConfig: router,
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [Locale('pt', 'BR')],

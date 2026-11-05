@@ -58,17 +58,21 @@ jobs:
         working-directory: apps/parceiro
         run: flutter test
 
-      # --pwa-strategy=none ainda é o interruptor no Flutter 3.47.8: o bootstrap
-      # não registra worker e o arquivo gerado sai vazio. O passo seguinte
-      # publica o script que desregistra o worker antigo e limpa o cache.
+      # --pwa-strategy=none continua de propósito no Flutter 3.47.8: o
+      # bootstrap não registra worker e o arquivo gerado sai vazio. O Chrome
+      # Android instala sem service worker (menu desde o 108; o Chrome atual
+      # também dispara beforeinstallprompt sem ele). O passo seguinte publica
+      # só o script que desregistra o worker antigo. Não é cache.
       - name: Build player web (real)
         run: flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none
 
       - name: Install the cleanup service worker
         run: |
           bash tool/install_cleanup_service_worker.sh build/web
+          bash tool/stamp_web_manifest.sh build/web
           bash tool/mark_real_web_copy.sh build/web player
           bash tool/check_web_service_worker.sh build/web player
+          bash tool/check_web_manifest.sh build/web player real
 
       - name: Player bundle excludes the partner app
         run: |
@@ -100,8 +104,10 @@ jobs:
       - name: Install the partner cleanup service worker
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
+          bash tool/stamp_web_manifest.sh apps/parceiro/build/web
           bash tool/mark_real_web_copy.sh apps/parceiro/build/web partner
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
+          bash tool/check_web_manifest.sh apps/parceiro/build/web partner real
           if grep -R -F -q 'xv@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
             echo 'O bundle do Parceiro ainda tem o login de demonstração.'
             exit 1
@@ -129,7 +135,9 @@ jobs:
       - name: Check player demo
         run: |
           bash tool/install_cleanup_service_worker.sh build/player-demo
+          bash tool/stamp_web_manifest.sh build/player-demo
           bash tool/check_web_service_worker.sh build/player-demo player
+          bash tool/check_web_manifest.sh build/player-demo player demo
           grep -F -q 'base href="/scapematch/demo/"' build/player-demo/index.html
           bash tool/js_contains.sh build/player-demo 'Demonstração'
           bash tool/js_contains.sh build/player-demo 'O Cofre do Café'
@@ -153,7 +161,9 @@ jobs:
       - name: Check partner demo
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/partner-demo
+          bash tool/stamp_web_manifest.sh apps/parceiro/build/partner-demo
           bash tool/check_web_service_worker.sh apps/parceiro/build/partner-demo partner
+          bash tool/check_web_manifest.sh apps/parceiro/build/partner-demo partner demo
           grep -F -q 'base href="/scapematch/parceiro/demo/"' apps/parceiro/build/partner-demo/index.html
           bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demonstração'
           bash tool/js_contains.sh apps/parceiro/build/partner-demo 'xv@scapematch.exemplo'
