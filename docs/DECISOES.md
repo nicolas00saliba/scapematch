@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## A introdução obrigatória é só do app real
+
+- **Data:** 2026-11-05
+- **Decisão:** no app do jogador com `APP_MODE=real`, a primeira abertura é a introdução, no site e no celular. Pular ou Começar abre a Home e grava `onboarding_seen_real` neste aparelho (na web, o localStorage). A abertura seguinte entra na Home. A Ajuda do app real não tem “Ver introdução”. Na demonstração, a abertura continua na Home e a Ajuda mantém o botão, que abre a mesma introdução. A demonstração não grava `onboarding_seen_real`: real e demo saem no mesmo domínio. Um convite direto não passa pela introdução. A tela em si não muda: no site, duas colunas, “← Voltar” ao lado de Pular a partir da segunda página, barra embaixo. O Parceiro não entra nisso.
+- **Motivo:** a introdução é o começo do app de verdade. Na demonstração ela continua um replay, para quem já está olhando a Home.
+- **Onde está no código:** `introIsFirstScreen` e `showsIntroReplay` em `onboarding_controller.dart`, o redirect de `/` em `router.dart`, `OnboardingStore` e o botão em `AccountDestinationScreen`.
+- **Como trocar depois:** se a demonstração também passar a abrir na introdução, `introIsFirstScreen` deixa de olhar o modo. Outra chave entra em `OnboardingStore.storageKey`.
+
 ## A nota fiscal sai no servidor, em duas vias
 
 - **Data:** 2026-11-04
@@ -293,7 +301,7 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Introdução na primeira abertura
 
 - **Data:** 2026-10-30
-- **Decisão:** quem abre o app pela primeira vez vê quatro telas curtas antes da Home: achar gente para completar o grupo, salas e grupos na cidade, criar um grupo e convidar, dividir e pagar a reserva. Há Pular e Próximo. Na última tela, Começar abre a Home. Pular também abre a Home e marca a introdução como vista. A segunda tela escolhe a cidade, com Curitiba como padrão, e o tipo de jogo. As duas escolhas usam as mesmas preferências da Home (`selected_city_id` e `selected_game_type`). A chave `onboarding_seen` no aparelho impede a introdução de voltar sozinha. A aba Conta, com ou sem sessão, tem “Ver introdução”. Não pede conta. Um link de convite não é interceptado: só a Home (`/`) redireciona enquanto a introdução não foi vista.
+- **Decisão:** substituída em 2026-11-05 pela seção “A introdução obrigatória é só do app real”. O texto abaixo vale para o desenho da tela, que não mudou. Quem abre o app pela primeira vez vê quatro telas curtas antes da Home: achar gente para completar o grupo, salas e grupos na cidade, criar um grupo e convidar, dividir e pagar a reserva. Há Pular e Próximo. Na última tela, Começar abre a Home. Pular também abre a Home e marca a introdução como vista. A segunda tela escolhe a cidade, com Curitiba como padrão, e o tipo de jogo. As duas escolhas usam as mesmas preferências da Home (`selected_city_id` e `selected_game_type`). A chave `onboarding_seen` no aparelho impede a introdução de voltar sozinha. A aba Conta, com ou sem sessão, tem “Ver introdução”. Não pede conta. Um link de convite não é interceptado: só a Home (`/`) redireciona enquanto a introdução não foi vista.
 - **Motivo:** a pessoa precisa entender a proposta antes da lista, e poder pular. A cidade já existia como preferência; a introdução só a mostra no começo.
 - **Onde está no código:** `OnboardingScreen`, `OnboardingStore`, o redirect de `/` em `router.dart`, o `main` que lê o store antes do primeiro frame, e o botão em `AccountScreen`.
 - **Como trocar depois:** outra ordem ou outro texto fica em `OnboardingMessages`. Uma conta de verdade continua sem ser exigida aqui. Se a introdução passar a voltar para a Conta quando foi aberta de lá, o destino deixa de ser sempre `/`.

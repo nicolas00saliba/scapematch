@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/scapematch_app.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/presentation/find_groups_section.dart';
 import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
@@ -22,6 +23,7 @@ Future<void> pumpScapeMatch(
   WidgetTester tester, {
   List<Override> overrides = const [],
   bool showOnboarding = false,
+  AppMode? onboardingMode,
 }) async {
   tester.view.physicalSize = const Size(400, 1800);
   tester.view.devicePixelRatio = 1;
@@ -32,9 +34,14 @@ Future<void> pumpScapeMatch(
     ProviderScope(
       retry: noAutomaticRetry,
       overrides: [
-        // A suíte abre na Home. Quem testa a introdução passa o store
-        // e liga [showOnboarding], porque o mesmo provider não pode
+        // A suíte abre na Home da demonstração. Quem testa a introdução
+        // liga [showOnboarding]: o store fica “não vista” e o modo da
+        // introdução vira real, o único que abre nela. [onboardingMode]
+        // troca isso sem subir o Supabase. O mesmo provider não pode
         // ser sobrescrito duas vezes.
+        onboardingModeProvider.overrideWithValue(
+          onboardingMode ?? (showOnboarding ? AppMode.real : AppMode.demo),
+        ),
         if (!showOnboarding)
           onboardingStoreProvider.overrideWithValue(
             OnboardingStore(seen: true),
