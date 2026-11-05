@@ -2,6 +2,7 @@ import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import {
   cardSwitchDecision,
   localChargeStatus,
+  lostAttemptCompensation,
   pixExternalReference,
   pixLeaseExpired,
   pixMatchesCharge,
@@ -79,6 +80,9 @@ Deno.test("create-charge reserva o Pix e não troca provider_ref", async () => {
   assert(source.includes("release_pix_reservation"));
   assert(source.includes("cancelPaymentConfirmed"));
   assert(source.includes("clear_pix_provider_ref"));
+  assert(source.includes("record_orphan_payment"));
+  assert(source.includes("findByExternalReference"));
+  assert(source.includes("p_attempt_id"));
   assertEquals(source.includes(".update(row)"), false);
   assertEquals(source.includes("persistPixCharge"), false);
   assertEquals(source.includes("error.message"), false);
@@ -181,6 +185,10 @@ Deno.test("lease de 2 minutos e 4xx liberam a reserva presa", () => {
     false,
   );
   assertEquals(releaseReservationOnError(new TypeError("timeout")), false);
+  assertEquals(lostAttemptCompensation("CONFIRMED"), "refund");
+  assertEquals(lostAttemptCompensation("RECEIVED"), "refund");
+  assertEquals(lostAttemptCompensation("AUTHORIZED"), "cancel");
+  assertEquals(lostAttemptCompensation("REFUNDED"), "none");
 });
 
 Deno.test("Pix pendente cancela antes do cartão; Pix pago recusa", () => {
@@ -219,4 +227,22 @@ Deno.test("Pix pendente cancela antes do cartão; Pix pago recusa", () => {
     "drop_lease",
   );
   assertEquals(cardSwitchDecision(null), "proceed");
+  assertEquals(
+    cardSwitchDecision({
+      billingType: "CREDIT_CARD",
+      status: "creating",
+      providerRef: null,
+      leaseExpired: false,
+    }),
+    "refuse",
+  );
+  assertEquals(
+    cardSwitchDecision({
+      billingType: "CREDIT_CARD",
+      status: "creating",
+      providerRef: null,
+      leaseExpired: true,
+    }),
+    "drop_lease",
+  );
 });

@@ -68,14 +68,35 @@ export function cardSwitchDecision(
   } | null,
 ): CardSwitchDecision {
   if (!input) return "proceed";
-  if (input.providerRef && input.billingType !== "PIX") return "refuse";
-  if (input.billingType !== "PIX") return "proceed";
+  if (input.billingType !== "PIX") {
+    if (input.providerRef) return "refuse";
+    if (input.status === "creating") {
+      return input.leaseExpired ? "drop_lease" : "refuse";
+    }
+    return "proceed";
+  }
   if (input.status === "pending" || input.status === "creating") {
     if (input.providerRef) return "cancel_pix";
     if (input.leaseExpired) return "drop_lease";
     return "refuse";
   }
   return "refuse";
+}
+
+/// CONFIRMED e RECEIVED já capturaram. A compensação é estorno.
+/// AUTHORIZED ainda é pré-autorização e sai com DELETE.
+export function lostAttemptCompensation(
+  status: string,
+): "refund" | "cancel" | "none" {
+  const upper = status.trim().toUpperCase();
+  if (upper === "CONFIRMED" || upper === "RECEIVED") return "refund";
+  if (
+    upper === "REFUNDED" || upper === "DELETED" || upper === "CANCELED" ||
+    upper === "CANCELLED"
+  ) {
+    return "none";
+  }
+  return "cancel";
 }
 
 /// 4xx do Asaas: a cobrança não foi criada. Timeout e 5xx ficam no lease.

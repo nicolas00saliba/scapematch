@@ -39,6 +39,26 @@ alter table public.payment_charges
   add column if not exists reserved_at timestamptz;
 
 alter table public.payment_charges
+  add column if not exists attempt_id uuid;
+
+-- Pix ou cartão que nasceu no Asaas e a tentativa perdeu o lease.
+-- Sem policy e sem grant: a API não lê. A service role só entra pela função.
+create table private.orphan_payments (
+  id uuid primary key default gen_random_uuid(),
+  provider_ref text not null,
+  charge_id uuid,
+  attempt_id uuid,
+  billing_type text,
+  reason text not null,
+  created_at timestamptz not null default pg_catalog.now()
+);
+
+alter table private.orphan_payments enable row level security;
+
+revoke all on table private.orphan_payments
+  from public, anon, authenticated, service_role;
+
+alter table public.payment_charges
   drop constraint if exists payment_charges_status_check;
 
 alter table public.payment_charges
@@ -327,11 +347,11 @@ begin
   insert into public.payment_charges (
     group_id, user_id, venue_id, amount_cents, billing_type, status,
     provider, provider_ref, idempotency_key, wallet_id, commission_bps,
-    reserved_at
+    reserved_at, attempt_id
   ) values (
     p_group_id, p_user_id, p_venue_id, p_amount_cents, 'PIX', 'creating',
     'asaas', null, p_idempotency_key, p_wallet_id, p_commission_bps,
-    pg_catalog.now()
+    pg_catalog.now(), gen_random_uuid()
   )
   on conflict (group_id, user_id) do nothing
   returning id into v_id;
@@ -351,6 +371,8 @@ begin
     'amount_cents', v_charge.amount_cents,
     'inserted', v_inserted,
     'reserved_at', v_charge.reserved_at,
+    'attempt_id', v_charge.attempt_id,
+    'idempotency_key', v_charge.idempotency_key,
     'lease_expired', (not v_inserted)
       and v_charge.provider_ref is null
       and v_charge.status = 'creating'
@@ -362,10 +384,12 @@ begin
 end;
 $$;
 
--- Grava o id do Asaas só enquanto a coluna está vazia.
+-- Grava o id só se o attempt_id ainda é o desta tentativa.
+-- Attempt diferente não escreve. O retorno é o id que ficou gravado.
 create or replace function private.attach_pix_provider(
   p_charge_id uuid,
-  p_provider_ref text
+  p_provider_ref text,
+  p_attempt_id uuid
 )
 returns text
 language plpgsql
@@ -383,6 +407,7 @@ begin
   set provider_ref = p_provider_ref
   where id = p_charge_id
     and provider_ref is null
+    and attempt_id is not distinct from p_attempt_id
   returning provider_ref into v_ref;
 
   if v_ref is not null then
@@ -396,18 +421,20 @@ begin
 end;
 $$;
 
--- Assume uma reserva vencida. Reserva fresca não muda.
+-- Assume uma reserva vencida e devolve o attempt_id novo. Reserva fresca não muda.
 create or replace function private.claim_expired_pix_reservation(p_charge_id uuid)
-returns boolean
+returns uuid
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  v_id uuid;
+  v_attempt uuid;
 begin
   update public.payment_charges
-  set reserved_at = pg_catalog.now()
+  set
+    reserved_at = pg_catalog.now(),
+    attempt_id = gen_random_uuid()
   where id = p_charge_id
     and status = 'creating'
     and provider_ref is null
@@ -415,57 +442,15 @@ begin
       reserved_at is null
       or reserved_at < pg_catalog.now() - interval '2 minutes'
     )
-  returning id into v_id;
-  return v_id is not null;
+  returning attempt_id into v_attempt;
+  return v_attempt;
 end;
 $$;
 
--- Reserva vencida sem id no provedor. A fresca permanece.
-create or replace function private.release_expired_pix_reservation(p_charge_id uuid)
-returns boolean
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_id uuid;
-begin
-  delete from public.payment_charges
-  where id = p_charge_id
-    and status = 'creating'
-    and provider_ref is null
-    and (
-      reserved_at is null
-      or reserved_at < pg_catalog.now() - interval '2 minutes'
-    )
-  returning id into v_id;
-  return v_id is not null;
-end;
-$$;
-
--- 4xx conhecido: a cobrança não nasceu no Asaas. Libera na hora.
-create or replace function private.release_pix_reservation(p_charge_id uuid)
-returns boolean
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_id uuid;
-begin
-  delete from public.payment_charges
-  where id = p_charge_id
-    and status = 'creating'
-    and provider_ref is null
-  returning id into v_id;
-  return v_id is not null;
-end;
-$$;
-
--- Só limpa o id depois que o DELETE do Pix foi confirmado.
-create or replace function private.clear_pix_provider_ref(
+-- Reserva vencida sem id no provedor, só se o attempt ainda for o lido.
+create or replace function private.release_expired_pix_reservation(
   p_charge_id uuid,
-  p_provider_ref text
+  p_attempt_id uuid
 )
 returns boolean
 language plpgsql
@@ -475,6 +460,143 @@ as $$
 declare
   v_id uuid;
 begin
+  delete from public.payment_charges
+  where id = p_charge_id
+    and status = 'creating'
+    and provider_ref is null
+    and attempt_id is not distinct from p_attempt_id
+    and (
+      reserved_at is null
+      or reserved_at < pg_catalog.now() - interval '2 minutes'
+    )
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
+-- 4xx conhecido: a cobrança não nasceu no Asaas. Só apaga a própria tentativa.
+create or replace function private.release_pix_reservation(
+  p_charge_id uuid,
+  p_attempt_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  delete from public.payment_charges
+  where id = p_charge_id
+    and status = 'creating'
+    and provider_ref is null
+    and attempt_id is not distinct from p_attempt_id
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+
+create or replace function private.reserve_card_charge(
+  p_group_id uuid,
+  p_user_id uuid,
+  p_venue_id uuid,
+  p_amount_cents integer,
+  p_idempotency_key text,
+  p_wallet_id text,
+  p_commission_bps integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_inserted boolean := false;
+  v_charge public.payment_charges%rowtype;
+begin
+  insert into public.payment_charges (
+    group_id, user_id, venue_id, amount_cents, billing_type, status,
+    provider, provider_ref, idempotency_key, wallet_id, commission_bps,
+    reserved_at, attempt_id
+  ) values (
+    p_group_id, p_user_id, p_venue_id, p_amount_cents, 'CREDIT_CARD', 'creating',
+    'asaas', null, p_idempotency_key, p_wallet_id, p_commission_bps,
+    pg_catalog.now(), gen_random_uuid()
+  )
+  on conflict (group_id, user_id) do nothing
+  returning id into v_id;
+  v_inserted := v_id is not null;
+
+  select * into v_charge
+  from public.payment_charges
+  where group_id = p_group_id
+    and user_id = p_user_id
+  for update;
+
+  return pg_catalog.jsonb_build_object(
+    'id', v_charge.id,
+    'status', v_charge.status,
+    'provider_ref', v_charge.provider_ref,
+    'billing_type', v_charge.billing_type,
+    'amount_cents', v_charge.amount_cents,
+    'inserted', v_inserted,
+    'reserved_at', v_charge.reserved_at,
+    'attempt_id', v_charge.attempt_id,
+    'idempotency_key', v_charge.idempotency_key,
+    'lease_expired', (not v_inserted)
+      and v_charge.provider_ref is null
+      and v_charge.status = 'creating'
+      and (
+        v_charge.reserved_at is null
+        or v_charge.reserved_at < pg_catalog.now() - interval '2 minutes'
+      )
+  );
+end;
+$$;
+
+create or replace function private.record_orphan_payment(
+  p_provider_ref text,
+  p_charge_id uuid,
+  p_attempt_id uuid,
+  p_billing_type text,
+  p_reason text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  if p_provider_ref is null or length(pg_catalog.btrim(p_provider_ref)) = 0 then
+    raise exception 'provider_ref ausente' using errcode = '22023';
+  end if;
+  insert into private.orphan_payments (
+    provider_ref, charge_id, attempt_id, billing_type, reason
+  ) values (
+    p_provider_ref, p_charge_id, p_attempt_id, p_billing_type, p_reason
+  )
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- Só limpa o id depois que o DELETE do Pix foi confirmado.
+create or replace function private.clear_pix_provider_ref(
+  p_charge_id uuid,
+  p_provider_ref text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_attempt uuid;
+begin
   update public.payment_charges
   set
     provider_ref = null,
@@ -482,13 +604,14 @@ begin
     status = 'creating',
     qr_code = null,
     qr_code_base64 = null,
-    reserved_at = pg_catalog.now()
+    reserved_at = pg_catalog.now(),
+    attempt_id = gen_random_uuid()
   where id = p_charge_id
     and provider_ref = p_provider_ref
     and billing_type = 'PIX'
     and status in ('pending', 'creating')
-  returning id into v_id;
-  return v_id is not null;
+  returning attempt_id into v_attempt;
+  return v_attempt;
 end;
 $$;
 
@@ -502,32 +625,40 @@ revoke all on function private.apply_payment_transition(uuid, text, boolean)
   from public, anon, authenticated;
 revoke all on function private.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
   from public, anon, authenticated;
-revoke all on function private.attach_pix_provider(uuid, text)
+revoke all on function private.attach_pix_provider(uuid, text, uuid)
   from public, anon, authenticated;
 revoke all on function private.sync_charge_member(public.payment_charges)
   from public, anon, authenticated;
 revoke all on function private.claim_expired_pix_reservation(uuid)
   from public, anon, authenticated;
-revoke all on function private.release_pix_reservation(uuid)
+revoke all on function private.release_pix_reservation(uuid, uuid)
   from public, anon, authenticated;
-revoke all on function private.release_expired_pix_reservation(uuid)
+revoke all on function private.release_expired_pix_reservation(uuid, uuid)
   from public, anon, authenticated;
 revoke all on function private.clear_pix_provider_ref(uuid, text)
+  from public, anon, authenticated;
+revoke all on function private.reserve_card_charge(uuid, uuid, uuid, integer, text, text, integer)
+  from public, anon, authenticated;
+revoke all on function private.record_orphan_payment(text, uuid, uuid, text, text)
   from public, anon, authenticated;
 
 grant execute on function private.apply_payment_transition(uuid, text, boolean)
   to service_role;
 grant execute on function private.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
   to service_role;
-grant execute on function private.attach_pix_provider(uuid, text)
+grant execute on function private.attach_pix_provider(uuid, text, uuid)
   to service_role;
 grant execute on function private.claim_expired_pix_reservation(uuid)
   to service_role;
-grant execute on function private.release_pix_reservation(uuid)
+grant execute on function private.release_pix_reservation(uuid, uuid)
   to service_role;
-grant execute on function private.release_expired_pix_reservation(uuid)
+grant execute on function private.release_expired_pix_reservation(uuid, uuid)
   to service_role;
 grant execute on function private.clear_pix_provider_ref(uuid, text)
+  to service_role;
+grant execute on function private.reserve_card_charge(uuid, uuid, uuid, integer, text, text, integer)
+  to service_role;
+grant execute on function private.record_orphan_payment(text, uuid, uuid, text, text)
   to service_role;
 
 -- O schema private não entra na API. Estes wrappers só existem para o
@@ -567,14 +698,15 @@ $$;
 
 create or replace function public.attach_pix_provider(
   p_charge_id uuid,
-  p_provider_ref text
+  p_provider_ref text,
+  p_attempt_id uuid
 )
 returns text
 language sql
 security invoker
 set search_path = ''
 as $$
-  select private.attach_pix_provider(p_charge_id, p_provider_ref);
+  select private.attach_pix_provider(p_charge_id, p_provider_ref, p_attempt_id);
 $$;
 
 revoke all on function public.apply_payment_transition(uuid, text, boolean)
@@ -582,7 +714,7 @@ revoke all on function public.apply_payment_transition(uuid, text, boolean)
 revoke all on function public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
   from public, anon, authenticated;
 create or replace function public.claim_expired_pix_reservation(p_charge_id uuid)
-returns boolean
+returns uuid
 language sql
 security invoker
 set search_path = ''
@@ -590,29 +722,35 @@ as $$
   select private.claim_expired_pix_reservation(p_charge_id);
 $$;
 
-create or replace function public.release_expired_pix_reservation(p_charge_id uuid)
+create or replace function public.release_expired_pix_reservation(
+  p_charge_id uuid,
+  p_attempt_id uuid
+)
 returns boolean
 language sql
 security invoker
 set search_path = ''
 as $$
-  select private.release_expired_pix_reservation(p_charge_id);
+  select private.release_expired_pix_reservation(p_charge_id, p_attempt_id);
 $$;
 
-create or replace function public.release_pix_reservation(p_charge_id uuid)
+create or replace function public.release_pix_reservation(
+  p_charge_id uuid,
+  p_attempt_id uuid
+)
 returns boolean
 language sql
 security invoker
 set search_path = ''
 as $$
-  select private.release_pix_reservation(p_charge_id);
+  select private.release_pix_reservation(p_charge_id, p_attempt_id);
 $$;
 
 create or replace function public.clear_pix_provider_ref(
   p_charge_id uuid,
   p_provider_ref text
 )
-returns boolean
+returns uuid
 language sql
 security invoker
 set search_path = ''
@@ -620,28 +758,73 @@ as $$
   select private.clear_pix_provider_ref(p_charge_id, p_provider_ref);
 $$;
 
-revoke all on function public.attach_pix_provider(uuid, text)
+create or replace function public.reserve_card_charge(
+  p_group_id uuid,
+  p_user_id uuid,
+  p_venue_id uuid,
+  p_amount_cents integer,
+  p_idempotency_key text,
+  p_wallet_id text,
+  p_commission_bps integer
+)
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.reserve_card_charge(
+    p_group_id, p_user_id, p_venue_id, p_amount_cents,
+    p_idempotency_key, p_wallet_id, p_commission_bps
+  );
+$$;
+
+create or replace function public.record_orphan_payment(
+  p_provider_ref text,
+  p_charge_id uuid,
+  p_attempt_id uuid,
+  p_billing_type text,
+  p_reason text
+)
+returns uuid
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.record_orphan_payment(
+    p_provider_ref, p_charge_id, p_attempt_id, p_billing_type, p_reason
+  );
+$$;
+
+revoke all on function public.attach_pix_provider(uuid, text, uuid)
   from public, anon, authenticated;
 revoke all on function public.claim_expired_pix_reservation(uuid)
   from public, anon, authenticated;
-revoke all on function public.release_pix_reservation(uuid)
+revoke all on function public.release_pix_reservation(uuid, uuid)
   from public, anon, authenticated;
-revoke all on function public.release_expired_pix_reservation(uuid)
+revoke all on function public.release_expired_pix_reservation(uuid, uuid)
   from public, anon, authenticated;
 revoke all on function public.clear_pix_provider_ref(uuid, text)
+  from public, anon, authenticated;
+revoke all on function public.reserve_card_charge(uuid, uuid, uuid, integer, text, text, integer)
+  from public, anon, authenticated;
+revoke all on function public.record_orphan_payment(text, uuid, uuid, text, text)
   from public, anon, authenticated;
 
 grant execute on function public.apply_payment_transition(uuid, text, boolean)
   to service_role;
 grant execute on function public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)
   to service_role;
-grant execute on function public.attach_pix_provider(uuid, text)
+grant execute on function public.attach_pix_provider(uuid, text, uuid)
   to service_role;
 grant execute on function public.claim_expired_pix_reservation(uuid)
   to service_role;
-grant execute on function public.release_pix_reservation(uuid)
+grant execute on function public.release_pix_reservation(uuid, uuid)
   to service_role;
-grant execute on function public.release_expired_pix_reservation(uuid)
+grant execute on function public.release_expired_pix_reservation(uuid, uuid)
   to service_role;
 grant execute on function public.clear_pix_provider_ref(uuid, text)
+  to service_role;
+grant execute on function public.reserve_card_charge(uuid, uuid, uuid, integer, text, text, integer)
+  to service_role;
+grant execute on function public.record_orphan_payment(text, uuid, uuid, text, text)
   to service_role;

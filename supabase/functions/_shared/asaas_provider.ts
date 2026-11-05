@@ -58,7 +58,10 @@ export type PixInput = {
   externalReference: string;
   split: ChargeSplit;
   /// Chamado assim que o id da cobrança existe, antes do QR.
-  onCreated?: (payment: PixPaymentRef) => Promise<void>;
+  onCreated?: (
+    payment: PixPaymentRef & { created: boolean },
+  ) => Promise<void | string>;
+  onCancelFailed?: (paymentId: string) => Promise<void>;
 };
 
 /// A linha local já tem outro id. Não sobrescreve o provider_ref.
@@ -416,31 +419,59 @@ export class AsaasProvider implements PaymentProvider {
 
   async createPix(input: PixInput): Promise<PixCreated> {
     const payment = await this.#resolvePixPayment(input);
+    let active = payment;
+    const cancelCreated = async (paymentId: string) => {
+      try {
+        await this.#deletePayment(paymentId);
+      } catch (cancelError) {
+        if (asaasStatus(cancelError) === 404) return;
+        if (!input.onCancelFailed) throw cancelError;
+        await input.onCancelFailed(paymentId);
+      }
+    };
     try {
-      if (input.onCreated) await input.onCreated(payment);
+      if (input.onCreated) {
+        const kept = await input.onCreated(payment);
+        if (
+          typeof kept === "string" && kept.length > 0 && kept !== payment.id
+        ) {
+          if (
+            payment.created &&
+            localChargeStatus(payment.status) !== "paid"
+          ) {
+            await cancelCreated(payment.id);
+          }
+          const remote = await this.getPayment(kept);
+          active = {
+            id: remote.id,
+            status: remote.status,
+            created: false,
+          };
+        }
+      }
     } catch (error) {
       if (
         payment.created &&
         error instanceof PixReservationLost &&
         localChargeStatus(payment.status) !== "paid"
       ) {
-        await this.#deletePayment(payment.id).catch(() => undefined);
+        await cancelCreated(payment.id);
       }
       throw error;
     }
     try {
-      const qr = await this.#pixQrWithRetry(payment.id);
+      const qr = await this.#pixQrWithRetry(active.id);
       return {
-        id: payment.id,
-        status: payment.status,
+        id: active.id,
+        status: active.status,
         payload: qr.payload,
         encodedImage: qr.encodedImage,
       };
     } catch (error) {
-      if (localChargeStatus(payment.status) === "paid") {
+      if (localChargeStatus(active.status) === "paid") {
         return {
-          id: payment.id,
-          status: payment.status,
+          id: active.id,
+          status: active.status,
           payload: "",
           encodedImage: "",
         };
@@ -513,6 +544,35 @@ export class AsaasProvider implements PaymentProvider {
 
   findPix(reference: string): Promise<PixPaymentRef | null> {
     return this.#findReusablePix(reference);
+  }
+
+  /// Qualquer cobrança ainda viva com esse externalReference.
+  async findByExternalReference(
+    reference: string,
+  ): Promise<PaymentView | null> {
+    const query = new URLSearchParams({
+      externalReference: reference,
+      limit: "20",
+    });
+    const body = await this.#send(`/payments?${query}`, undefined, "GET");
+    const rows = Array.isArray(body.data) ? body.data : [];
+    const live = rows.filter((row): row is Record<string, unknown> => {
+      if (!row || typeof row !== "object") return false;
+      const record = row as Record<string, unknown>;
+      if (typeof record.id !== "string" || record.id.length === 0) return false;
+      const status = String(record.status ?? "").toUpperCase();
+      return status !== "DELETED" && status !== "REFUNDED" &&
+        status !== "CANCELED" && status !== "CANCELLED";
+    });
+    const chosen = live[0];
+    if (!chosen || typeof chosen.id !== "string") return null;
+    return {
+      id: chosen.id,
+      status: typeof chosen.status === "string" ? chosen.status : "",
+      billingType: typeof chosen.billingType === "string"
+        ? chosen.billingType
+        : "",
+    };
   }
 
   /// DELETE e confirma que o Pix não segue pendente nem pago.

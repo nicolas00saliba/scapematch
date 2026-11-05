@@ -216,9 +216,14 @@ begin
     raise exception 'reserva inicial inesperada: %', v_first;
   end if;
 
+  if v_first->>'attempt_id' is null then
+    raise exception 'reserva não devolveu attempt_id';
+  end if;
+
   v_ref := private.attach_pix_provider(
     (v_first->>'id')::uuid,
-    'pay_primeiro'
+    'pay_primeiro',
+    (v_first->>'attempt_id')::uuid
   );
   if v_ref <> 'pay_primeiro' then
     raise exception 'attach não gravou o primeiro id: %', v_ref;
@@ -226,10 +231,20 @@ begin
 
   v_again := private.attach_pix_provider(
     (v_first->>'id')::uuid,
-    'pay_segundo'
+    'pay_segundo',
+    (v_first->>'attempt_id')::uuid
   );
   if v_again <> 'pay_primeiro' then
     raise exception 'attach sobrescreveu provider_ref: %', v_again;
+  end if;
+
+  v_again := private.attach_pix_provider(
+    (v_first->>'id')::uuid,
+    'pay_terceiro',
+    gen_random_uuid()
+  );
+  if v_again <> 'pay_primeiro' then
+    raise exception 'attempt errado gravou provider_ref: %', v_again;
   end if;
 
   v_second := private.reserve_pix_charge(
@@ -339,8 +354,9 @@ declare
   v_fee integer;
   v_net integer;
   v_paid text;
-  v_fresh boolean;
-  v_stale boolean;
+  v_fresh uuid;
+  v_stale uuid;
+  v_orphan uuid;
 begin
   perform private.apply_payment_transition(
     'aa911111-1111-1111-1111-111111111111',
@@ -389,7 +405,7 @@ begin
   v_fresh := private.claim_expired_pix_reservation(
     'aaa11111-1111-1111-1111-111111111111'
   );
-  if v_fresh then
+  if v_fresh is not null then
     raise exception 'reserva fresca foi assumida';
   end if;
   update public.payment_charges
@@ -398,13 +414,50 @@ begin
   v_stale := private.claim_expired_pix_reservation(
     'aaa11111-1111-1111-1111-111111111111'
   );
-  if not v_stale then
+  if v_stale is null then
     raise exception 'reserva vencida não foi assumida';
   end if;
   if private.claim_expired_pix_reservation(
     'aaa11111-1111-1111-1111-111111111111'
-  ) then
+  ) is not null then
     raise exception 'reserva recém-assumida foi tomada de novo';
+  end if;
+  if private.release_pix_reservation(
+    'aaa11111-1111-1111-1111-111111111111',
+    gen_random_uuid()
+  ) then
+    raise exception 'release de outro attempt apagou a reserva';
+  end if;
+  if not private.release_pix_reservation(
+    'aaa11111-1111-1111-1111-111111111111',
+    v_stale
+  ) then
+    raise exception 'release do attempt dono não apagou';
+  end if;
+
+  if has_table_privilege('anon', 'private.orphan_payments', 'select')
+    or has_table_privilege('authenticated', 'private.orphan_payments', 'select')
+    or has_table_privilege('anon', 'private.orphan_payments', 'insert')
+  then
+    raise exception 'orphan_payments aberto ao público';
+  end if;
+  if not (
+    select c.relrowsecurity
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'private' and c.relname = 'orphan_payments'
+  ) then
+    raise exception 'orphan_payments sem rls';
+  end if;
+  v_orphan := private.record_orphan_payment(
+    'pay_orfao',
+    null,
+    v_stale,
+    'PIX',
+    'cancel_failed'
+  );
+  if v_orphan is null then
+    raise exception 'órfão não foi gravado';
   end if;
 end $$;
 

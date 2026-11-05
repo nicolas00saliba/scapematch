@@ -130,5 +130,15 @@ Deno.test("o webhook confirma no Asaas e usa a transição", async () => {
   assert(source.includes("confirmedChargeStatus"));
   assertEquals(source.includes("paymentChargePatch"), false);
   assertEquals(source.includes("payment_status"), false);
+  const release = await Deno.readTextFile(
+    new URL("./release_charges.ts", import.meta.url),
+  );
+  const settle = await Deno.readTextFile(
+    new URL("../settle-charges/index.ts", import.meta.url),
+  );
+  assertEquals(release.includes("payment_status"), false);
+  assertEquals(settle.includes("payment_status"), false);
+  assert(release.includes("applyPaymentTransition"));
+  assert(settle.includes("applyPaymentTransition"));
   assertEquals(source.includes("error.message"), false);
 });

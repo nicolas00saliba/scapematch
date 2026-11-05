@@ -154,9 +154,6 @@ async function settleOne(
           true,
         );
         if (transition.status !== "paid") continue;
-        await admin.from("group_members").update({ payment_status: "paid" })
-          .eq("group_id", groupId)
-          .eq("user_id", row.user_id);
         await issuePaidInvoices(admin, row, {
           sandbox: asaas.sandbox,
           asaas: asaas.sandbox ? undefined : asaas,
