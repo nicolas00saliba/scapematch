@@ -1,13 +1,25 @@
 const namedCardField =
-  /"(number|ccv|cvv|expiryMonth|expiryYear)"\s*:\s*"(?:\\.|[^"\\])*"/gi;
+  /"(number|ccv|cvv|expiryMonth|expiryYear|credit[_-]?card[_-]?token)"\s*:\s*"(?:\\.|[^"\\])*"/gi;
+
+/// Token fora do par `"chave":"valor"`, como numa descrição de erro.
+const namedTokenInText =
+  /\b(credit[_-]?card[_-]?token)\b(\s*[:=]\s*)(?:"((?:\\.|[^"\\])*)"|([A-Za-z0-9_-]{8,}))/gi;
 
 /// 13 a 19 dígitos, com espaço ou hífen opcional entre eles.
 const pan = /\b(?:\d[ -]?){12,18}\d\b/g;
 
-/// Mascara PAN e, só em campos nomeados, CVV e validade.
+/// Mascara PAN e, só em campos nomeados, CVV, validade e token do cartão.
+/// Cobre camelCase e snake_case (`creditCardToken`, `credit_card_token`).
 /// Não troca um "12" solto nem outros números curtos.
 export function redactSensitive(text: string): string {
   return text
     .replace(namedCardField, (_match, key: string) => `"${key}":"[redacted]"`)
+    .replace(
+      namedTokenInText,
+      (_match, key: string, sep: string, quoted?: string) =>
+        quoted === undefined
+          ? `${key}${sep}[redacted]`
+          : `${key}${sep}"[redacted]"`,
+    )
     .replace(pan, "[redacted]");
 }

@@ -30,3 +30,45 @@ Deno.test("mascara PAN e campos nomeados e preserva números curtos", () => {
   assertEquals(redacted.includes("2026-11-12"), true);
   assertEquals(redacted.includes("Asaas 400"), true);
 });
+
+Deno.test("mascara creditCardToken aninhado e na mensagem de erro", () => {
+  const camel = "tok_camel_secret_value";
+  const snake = "tok_snake_secret_value";
+  const upper = "tok_upper_secret_value";
+  const echoed = "tok_echoed_in_error_body";
+  const nested = JSON.stringify({
+    errors: [{
+      description: "falhou",
+      details: {
+        creditCardToken: camel,
+        credit_card_token: snake,
+        CREDIT_CARD_TOKEN: upper,
+      },
+    }],
+  });
+  const message = [
+    `Asaas 400: ${JSON.stringify({
+      errors: [{
+        code: "invalid_object",
+        description: `creditCardToken=${echoed} rejeitado`,
+        credit_card_token: echoed,
+      }],
+    })}`,
+    "o campo creditCardToken é obrigatório",
+    "pedido 12 ref 999 vence 2026-11-12",
+  ].join("\n");
+  const redacted = redactSensitive(`${nested}\n${message}`);
+  assertEquals(redacted.includes(camel), false);
+  assertEquals(redacted.includes(snake), false);
+  assertEquals(redacted.includes(upper), false);
+  assertEquals(redacted.includes(echoed), false);
+  assertEquals(redacted.includes('"creditCardToken":"[redacted]"'), true);
+  assertEquals(redacted.includes('"credit_card_token":"[redacted]"'), true);
+  assertEquals(redacted.includes('"CREDIT_CARD_TOKEN":"[redacted]"'), true);
+  assertEquals(redacted.includes("creditCardToken=[redacted]"), true);
+  assertEquals(redacted.includes("Asaas 400"), true);
+  assertEquals(redacted.includes("o campo creditCardToken é obrigatório"), true);
+  assertEquals(redacted.includes("pedido 12"), true);
+  assertEquals(redacted.includes("ref 999"), true);
+  assertEquals(redacted.includes("2026-11-12"), true);
+});
