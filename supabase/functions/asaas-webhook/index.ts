@@ -10,6 +10,7 @@ import {
   cancelInvoicesForCharge,
   issuePaidInvoices,
 } from "../_shared/issue_invoices.ts";
+import { paymentChargePatch } from "../_shared/charge_patch.ts";
 import { creditLedger, reverseLedger } from "../_shared/ledger.ts";
 
 Deno.serve(async (req) => {
@@ -53,11 +54,12 @@ Deno.serve(async (req) => {
     status = "authorized";
   }
 
-  await admin.from("payment_charges").update({
-    status,
-    paid_at: status === "paid" ? new Date().toISOString() : charge.status === "paid" ? undefined : null,
-    refunded_at: status === "refunded" ? new Date().toISOString() : null,
-  }).eq("id", charge.id);
+  const patch = paymentChargePatch({
+    nextStatus: status,
+    previousStatus: charge.status as string,
+    now: new Date().toISOString(),
+  });
+  await admin.from("payment_charges").update(patch).eq("id", charge.id);
 
   const memberPayment = status === "paid"
     ? "paid"
