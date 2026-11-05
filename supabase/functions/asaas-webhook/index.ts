@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { logAsaasFailure } from "../_shared/asaas_client_error.ts";
+import { clientFailure, logCaught } from "../_shared/asaas_client_error.ts";
 import {
   AsaasProvider,
   isAsaasSandbox,
@@ -20,6 +20,7 @@ Deno.serve(async (req) => {
   const header = req.headers.get("asaas-access-token");
   if (!tokensMatch(header, expected)) return json({ error: "unauthorized" }, 401);
 
+  try {
   const payload = await req.json().catch(() => null) as {
     event?: string;
     payment?: { id?: string; status?: string; billingType?: string };
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
     await creditIfGroupClosed(admin, charge);
     await issuePaidInvoices(admin, charge, { sandbox, asaas }).catch(
       (error) => {
-        logAsaasFailure("asaas-webhook", error);
+        logCaught("asaas-webhook", error);
       },
     );
   }
@@ -99,18 +100,22 @@ Deno.serve(async (req) => {
     await reverseLedger(admin, charge);
     await cancelInvoicesForCharge(admin, charge.id, { sandbox, asaas }).catch(
       (error) => {
-        logAsaasFailure("asaas-webhook", error);
+        logCaught("asaas-webhook", error);
       },
     );
   }
   return json({ ok: true });
+  } catch (error) {
+    const failure = clientFailure(error, "asaas-webhook");
+    return json(failure.body, failure.status);
+  }
 });
 
 function safeAsaas(): AsaasProvider | undefined {
   try {
     return AsaasProvider.fromEnv(Deno.env);
   } catch (error) {
-    logAsaasFailure("asaas-webhook", error);
+    logCaught("asaas-webhook", error);
     return undefined;
   }
 }

@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     return json({ settled });
   } catch (error) {
     const failure = clientFailure(error, "settle-charges");
-    return json({ error: failure.error }, failure.status);
+    return json(failure.body, failure.status);
   }
 });
 

@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     return json({ cancelled: true, pending });
   } catch (error) {
     const failure = clientFailure(error, "cancel-house-group");
-    return json({ error: failure.error }, failure.status);
+    return json(failure.body, failure.status);
   }
 });
 

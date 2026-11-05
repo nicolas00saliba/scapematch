@@ -97,6 +97,6 @@ Deno.serve(async (req) => {
     return json({ provisioned });
   } catch (error) {
     const failure = clientFailure(error, "provision-venue-wallet");
-    return json({ error: failure.error }, failure.status);
+    return json(failure.body, failure.status);
   }
 });

@@ -246,7 +246,10 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const failure = clientFailure(error, "create-charge");
-    return json({ error: publicError(failure.error) }, failure.status);
+    return json({
+      ...failure.body,
+      error: publicError(failure.body.error),
+    }, failure.status);
   }
 });
 

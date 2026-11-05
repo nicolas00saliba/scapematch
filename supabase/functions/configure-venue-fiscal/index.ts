@@ -1,9 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import {
-  asaasUnavailable,
-  clientFailure,
-  logAsaasFailure,
-} from "../_shared/asaas_client_error.ts";
+import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 
@@ -138,13 +134,13 @@ Deno.serve(async (req) => {
         password: body.municipal_password,
       });
     } catch (error) {
-      logAsaasFailure("configure-venue-fiscal", error);
+      const failure = clientFailure(error, "configure-venue-fiscal");
       return json({
         venue_id: venueId,
         emission: "habilitada",
         asaas: "erro",
-        error: asaasUnavailable,
-      }, 502);
+        ...failure.body,
+      }, failure.status);
     }
 
     return json({
@@ -154,6 +150,6 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const failure = clientFailure(error, "configure-venue-fiscal");
-    return json({ error: failure.error }, failure.status);
+    return json(failure.body, failure.status);
   }
 });

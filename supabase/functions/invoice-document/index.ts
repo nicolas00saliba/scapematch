@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 
 Deno.serve(async (req) => {
@@ -8,6 +9,7 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
   if (req.method !== "GET") return json({ error: "method" }, 405);
+  try {
   const authHeader = req.headers.get("Authorization") ?? "";
   const url = new URL(req.url);
   const id = url.searchParams.get("id") ?? "";
@@ -63,6 +65,10 @@ Deno.serve(async (req) => {
       "Content-Disposition": `attachment; filename="${number}.pdf"`,
     },
   });
+  } catch (error) {
+    const failure = clientFailure(error, "invoice-document");
+    return json(failure.body, failure.status);
+  }
 });
 
 function isRemoteAsaasFile(url: string): boolean {

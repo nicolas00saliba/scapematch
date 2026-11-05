@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
@@ -108,7 +109,8 @@ Deno.serve(async (req) => {
       return json({ error: tokenizeLimitedMessage }, 429);
     }
     return json(responseBody);
-  } catch {
-    return json({ error: genericFailure }, 400);
+  } catch (error) {
+    const failure = clientFailure(error, "tokenize-card");
+    return json(failure.body, failure.status);
   }
 });
