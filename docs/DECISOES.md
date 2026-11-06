@@ -8,6 +8,14 @@
 - **Onde está no código:** `tool/web_install_identity.py`, `tool/stamp_web_manifest.sh`, `tool/check_web_manifest.sh`, `tool/flutter_service_worker.js`. Os workflows de CI e de deploy passam papel e modo ao carimbo.
 - **Como trocar depois:** outro host entra em `web_install_identity.py` e em `public_origins.dart`.
 
+## Os cabeçalhos de segurança vão no HTML, porque o Pages não os envia
+
+- **Data:** 2026-11-06
+- **Decisão:** app, Parceiro, demo e a landing em scapematch.com.br são GitHub Pages (`server: GitHub.com`). O Pages clássico ignora `_headers` e o `netlify.toml`. Não há arquivo de cabeçalho no build. O que o HTML consegue publicar é a CSP em `<meta http-equiv="Content-Security-Policy">` e o `Referrer-Policy` em `<meta name="referrer">`. A CSP dos apps libera dart2js (`unsafe-eval`), CanvasKit (`wasm-unsafe-eval` e `gstatic.com/flutter-canvaskit` ou a pasta local), Supabase (`eujlhicairvksvmssruz`, https e wss), o tile `tile.openstreetmap.org`, a API `api.pwnedpasswords.com`, worker `blob:` e imagens `https:`. A landing fica em `'self'`. `frame-ancestors` não entra na meta: o navegador ignora. O cliquejacking usa um guarda no HTML (o app esconde a página fora do topo; a landing, que funciona sem script, só esconde se o script vir um iframe). O CORS das Edge Functions continua a allowlist; o `Access-Control-Allow-Origin: *` é do Pages, não das funções.
+- **Motivo:** o achado pede HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy e reclama do `*` nas páginas estáticas. Meta não substitui HSTS, X-Frame-Options nem X-Content-Type-Options. O github.io já manda HSTS da própria plataforma; os domínios próprios, não.
+- **Onde está no código:** `web/index.html`, `apps/parceiro/web/index.html`, `apps/landing/` e `tool/check_security_meta.sh`. O CodeQL default setup do GitHub já cobre actions, JavaScript/TypeScript e Python; um workflow extra no repo seria duplicado e foi retirado. Dart continua fora do CodeQL. A landing de produção copia `apps/landing` no `sync.sh` de `nicolas00saliba/scapematch-site` depois do merge. O deploy deste monorepo publica os apps e a cópia legada em `/scapematch/site/`.
+- **Como trocar depois:** um host que deixe cabeçalho (na frente do Pages) é o único jeito de mandar HSTS, `nosniff`, `X-Frame-Options` e de tirar o `*` do Pages. Aí a CSP pode sair da meta e ganhar `frame-ancestors`.
+
 ## Os apps saem do github.io para subdomínios próprios
 
 - **Data:** 2026-11-05
