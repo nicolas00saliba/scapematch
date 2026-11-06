@@ -4,11 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
-import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
+import 'package:scapematch/features/payments/domain/live_charge.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
 import 'package:scapematch/features/payments/presentation/own_card_holder.dart';
@@ -23,16 +24,67 @@ final payTestCard = PaymentMethod(
   nickname: 'Cartão de teste',
 );
 
-/// Abre o pagamento simulado. Devolve verdadeiro quando a parte foi paga.
-Future<bool> showPayShareSheet({
+/// O que a folha faz com a resposta de `create-charge` ou da demonstração.
+enum PaySheetOutcome { dismissed, reserved, paid }
+
+/// Resultado que a folha desenha. O Pix real traz o copia-e-cola do Asaas.
+class ShareChargeView {
+  const ShareChargeView({
+    this.outcome = PaySheetOutcome.dismissed,
+    this.pixCode,
+    this.pixImageBase64,
+    this.message,
+  });
+
+  final PaySheetOutcome outcome;
+  final String? pixCode;
+  final String? pixImageBase64;
+  final String? message;
+
+  bool get hasError => message != null && message!.isNotEmpty;
+
+  bool get confirms =>
+      outcome == PaySheetOutcome.reserved || outcome == PaySheetOutcome.paid;
+
+  factory ShareChargeView.fromResult(PayShareResult result) {
+    return switch (result) {
+      PayShareSuccess(:final charge) => ShareChargeView(
+        outcome: _outcomeOf(charge),
+        pixCode: charge != null && charge.hasPixCode && !charge.confirmsSeat
+            ? charge.qrCode
+            : null,
+        pixImageBase64: charge != null && !charge.confirmsSeat
+            ? charge.qrImageBase64
+            : null,
+      ),
+      PayShareFailure(:final message) => ShareChargeView(
+        message: message ?? liveChargeFailed,
+      ),
+    };
+  }
+}
+
+PaySheetOutcome _outcomeOf(LiveCharge? charge) {
+  if (charge == null) return PaySheetOutcome.reserved;
+  if (charge.settlesPaid) return PaySheetOutcome.paid;
+  if (charge.confirmsSeat) return PaySheetOutcome.reserved;
+  return PaySheetOutcome.dismissed;
+}
+
+/// Abre o pagamento da parte. No modo real a cobrança é a do Asaas.
+/// Na demonstração o Pix e o botão continuam simulados.
+Future<PaySheetOutcome> showPayShareSheet({
   required BuildContext context,
   required int amountCents,
   required String reference,
-  required Future<bool> Function(PaymentMethodKind kind, {String? savedCardId})
+  required Future<ShareChargeView> Function(
+    PaymentMethodKind kind, {
+    String? savedCardId,
+  })
   onPay,
-  Future<bool> Function(CardDraft card)? onPayNewCard,
+  Future<ShareChargeView> Function(CardDraft card)? onPayNewCard,
 }) async {
-  final paid = await showModalBottomSheet<bool>(
+  final outcome = await showModalBottomSheet<PaySheetOutcome>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -47,7 +99,7 @@ Future<bool> showPayShareSheet({
       );
     },
   );
-  return paid ?? false;
+  return outcome ?? PaySheetOutcome.dismissed;
 }
 
 class PayShareSheet extends ConsumerStatefulWidget {
@@ -61,9 +113,12 @@ class PayShareSheet extends ConsumerStatefulWidget {
 
   final int amountCents;
   final String reference;
-  final Future<bool> Function(PaymentMethodKind kind, {String? savedCardId})
+  final Future<ShareChargeView> Function(
+    PaymentMethodKind kind, {
+    String? savedCardId,
+  })
   onPay;
-  final Future<bool> Function(CardDraft card)? onPayNewCard;
+  final Future<ShareChargeView> Function(CardDraft card)? onPayNewCard;
 
   @override
   ConsumerState<PayShareSheet> createState() => _PayShareSheetState();
@@ -72,11 +127,15 @@ class PayShareSheet extends ConsumerStatefulWidget {
 class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   var _method = PaymentMethodKind.pix;
   var _busy = false;
-  var _done = false;
+  PaySheetOutcome? _seat;
   var _copied = false;
   String? _error;
+  String? _issuedPix;
+  Uint8List? _issuedPixImage;
   String? _cardId = payTestCard.id;
   final _entry = CardEntryControllers();
+
+  bool get _done => _seat != null;
 
   @override
   void dispose() {
@@ -84,15 +143,16 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     super.dispose();
   }
 
-  String get _pixCode {
+  /// Payload local da demonstração. O modo real não usa isto.
+  String get _samplePixCode {
     final cents = widget.amountCents.toString().padLeft(4, '0');
     return '00020126580014BR.GOV.BCB.PIX0136scapematch.${widget.reference}'
         '.52040000530398654$cents';
   }
 
-  Future<void> _copy() async {
+  Future<void> _copy(String code) async {
     try {
-      await Clipboard.setData(ClipboardData(text: _pixCode));
+      await Clipboard.setData(ClipboardData(text: code));
     } catch (_) {
       // O teste do widget nem sempre entrega a área de transferência.
     }
@@ -100,6 +160,26 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
       return;
     }
     setState(() => _copied = true);
+  }
+
+  String? _savedCardId(List<PaymentMethod> cards) {
+    if (_cardId != null &&
+        _cardId != payTestCard.id &&
+        cards.any((card) => card.id == _cardId)) {
+      return _cardId;
+    }
+    final saved = [
+      for (final card in cards)
+        if (card.id != payTestCard.id) card,
+    ];
+    if (saved.length == 1) return saved.single.id;
+    return null;
+  }
+
+  String? _displayedCardId(List<PaymentMethod> cards, {required bool live}) {
+    if (cards.any((card) => card.id == _cardId)) return _cardId;
+    if (live && cards.length == 1) return cards.single.id;
+    return _cardId;
   }
 
   Future<void> _toggleOwn(bool checked) async {
@@ -118,42 +198,93 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   }
 
   Future<void> _confirm() async {
-    setState(() => _busy = true);
-    final real = ref.read(backendPlanProvider).connectsSupabase;
-    _entry.requireHolderDocument = real;
-    final bool ok;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final live = ref.read(backendPlanProvider).connectsSupabase;
+    _entry.requireHolderDocument = live;
     final draft = _method == PaymentMethodKind.card && _entry.started
         ? _entry.draft
         : null;
     if (_method == PaymentMethodKind.card && _entry.started && draft == null) {
-      ok = false;
-      if (real && _entry.holderDocumentProblem != null) {
-        setState(() {
-          _busy = false;
-          _error = _entry.holderDocumentProblem;
-        });
-        return;
-      }
-    } else if (draft != null) {
-      final payNew = widget.onPayNewCard;
-      ok = payNew == null ? false : await payNew(draft);
-    } else {
-      final savedCardId =
-          _method == PaymentMethodKind.card &&
-              _cardId != null &&
-              _cardId != payTestCard.id
-          ? _cardId
-          : null;
-      ok = await widget.onPay(_method, savedCardId: savedCardId);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = live && _entry.holderDocumentProblem != null
+            ? _entry.holderDocumentProblem
+            : 'Não foi possível pagar com este cartão.';
+      });
+      return;
     }
-    if (!mounted) {
+
+    final ShareChargeView view;
+    if (draft != null) {
+      final payNew = widget.onPayNewCard;
+      view = payNew == null
+          ? const ShareChargeView(message: liveChargeFailed)
+          : await payNew(draft);
+    } else if (live &&
+        _method == PaymentMethodKind.card &&
+        _savedCardId(_savedCards()) == null) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = liveChooseCard;
+      });
+      return;
+    } else {
+      view = await widget.onPay(
+        _method,
+        savedCardId: _method == PaymentMethodKind.card
+            ? _savedCardId(_savedCards())
+            : null,
+      );
+    }
+    if (!mounted) return;
+    if (!live) {
+      final ok = view.confirms && !view.hasError;
+      setState(() {
+        _busy = false;
+        _seat = ok ? PaySheetOutcome.reserved : null;
+        _error = ok ? null : 'Não foi possível pagar com este cartão.';
+      });
+      return;
+    }
+    if (view.hasError) {
+      setState(() {
+        _busy = false;
+        _error = view.message;
+      });
+      return;
+    }
+    final pix = view.pixCode?.trim();
+    if (pix != null && pix.isNotEmpty) {
+      setState(() {
+        _busy = false;
+        _issuedPix = pix;
+        _issuedPixImage = decodePixQrImage(view.pixImageBase64);
+        _copied = false;
+        _error = null;
+      });
+      return;
+    }
+    if (view.confirms) {
+      setState(() {
+        _busy = false;
+        _seat = view.outcome;
+        _error = null;
+      });
       return;
     }
     setState(() {
       _busy = false;
-      _done = ok;
-      _error = ok ? null : 'Não foi possível pagar com este cartão.';
+      _error = liveChargeFailed;
     });
+  }
+
+  List<PaymentMethod> _savedCards() {
+    return ref.read(paymentMethodsProvider).asData?.value ?? const [];
   }
 
   @override
@@ -162,9 +293,10 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     final scheme = theme.colorScheme;
     final height = MediaQuery.sizeOf(context).height;
     final saved = ref.watch(paymentMethodsProvider).asData?.value ?? const [];
-    final cards = scapeUsesLiveBackend ? saved : [payTestCard, ...saved];
-    final realHolder = ref.watch(backendPlanProvider).connectsSupabase;
-    _entry.requireHolderDocument = realHolder;
+    final live = ref.watch(backendPlanProvider).connectsSupabase;
+    final cards = live ? saved : [payTestCard, ...saved];
+    _entry.requireHolderDocument = live;
+    final issuedPix = _issuedPix;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: ConstrainedBox(
@@ -177,6 +309,16 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
               ? _Confirmed(
                   key: AppKeys.payConfirmed,
                   amount: formatPrice(widget.amountCents),
+                  outcome: _seat ?? PaySheetOutcome.reserved,
+                  simulated: !live,
+                )
+              : issuedPix != null
+              ? _IssuedPix(
+                  key: const Key('pay-pix-panel'),
+                  code: issuedPix,
+                  image: _issuedPixImage,
+                  copied: _copied,
+                  onCopy: () => _copy(issuedPix),
                 )
               : ListView(
                   key: AppKeys.paySheet,
@@ -200,7 +342,11 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      GroupMessages.simulatedNotice,
+                      live
+                          ? (_method == PaymentMethodKind.pix
+                                ? GroupMessages.livePixNotice
+                                : GroupMessages.chargeOnlyIfCloses)
+                          : GroupMessages.simulatedNotice,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -240,18 +386,20 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                         const Duration(milliseconds: 240),
                       ),
                       child: _method == PaymentMethodKind.pix
-                          ? _PixPanel(
-                              key: const Key('pay-pix-panel'),
-                              code: _pixCode,
-                              copied: _copied,
-                              onCopy: _copy,
-                            )
+                          ? live
+                                ? const _LivePixHint(key: Key('pay-pix-panel'))
+                                : _PixPanel(
+                                    key: const Key('pay-pix-panel'),
+                                    code: _samplePixCode,
+                                    copied: _copied,
+                                    onCopy: () => _copy(_samplePixCode),
+                                  )
                           : _CardPanel(
                               key: const Key('pay-card-panel'),
                               cards: cards,
-                              selectedId: _cardId,
+                              selectedId: _displayedCardId(cards, live: live),
                               entry: _entry,
-                              onOwnCard: realHolder ? _toggleOwn : null,
+                              onOwnCard: live ? _toggleOwn : null,
                               onSelect: (id) => setState(() => _cardId = id),
                             ),
                     ),
@@ -259,6 +407,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                       const SizedBox(height: 12),
                       Text(
                         _error!,
+                        key: AppKeys.payError,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: scheme.error,
                         ),
@@ -266,7 +415,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                     ],
                     const SizedBox(height: 18),
                     FilledButton(
-                      key: AppKeys.paySimulate,
+                      key: live ? AppKeys.payCharge : AppKeys.paySimulate,
                       onPressed: _busy ? null : _confirm,
                       child: _busy
                           ? const SizedBox(
@@ -276,7 +425,13 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                                 strokeWidth: 2.4,
                               ),
                             )
-                          : const Text('Simular pagamento'),
+                          : Text(
+                              live
+                                  ? (_method == PaymentMethodKind.pix
+                                        ? GroupMessages.generatePix
+                                        : GroupMessages.payWithCard)
+                                  : GroupMessages.simulatePayment,
+                            ),
                     ),
                   ],
                 ),
@@ -378,7 +533,7 @@ class _PixPanel extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Pix simulado. O código abaixo não cobra.',
+          GroupMessages.simulatedPixNotice,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: scheme.onSurfaceVariant,
           ),
@@ -407,6 +562,150 @@ class _PixPanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _LivePixHint extends StatelessWidget {
+  const _LivePixHint({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      GroupMessages.livePixHint,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        height: 1.35,
+      ),
+    );
+  }
+}
+
+class _IssuedPix extends StatelessWidget {
+  const _IssuedPix({
+    super.key,
+    required this.code,
+    required this.image,
+    required this.copied,
+    required this.onCopy,
+  });
+
+  final String code;
+  final Uint8List? image;
+  final bool copied;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return ListView(
+      key: AppKeys.paySheet,
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+      children: [
+        Text(
+          'Pagar minha parte',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          GroupMessages.livePixReady,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          GroupMessages.livePixNotice,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 16),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Center(
+              child: _PixCodeView(code: code, image: image),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              code,
+              key: AppKeys.payPixQr,
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: AppKeys.payCopyPix,
+            onPressed: onCopy,
+            icon: Icon(copied ? Icons.check : Icons.copy),
+            label: Text(copied ? 'Código copiado' : 'Copiar código'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          key: AppKeys.payDone,
+          onPressed: () => Navigator.pop(context, PaySheetOutcome.dismissed),
+          child: const Text('Fechar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PixCodeView extends StatelessWidget {
+  const _PixCodeView({required this.code, required this.image});
+
+  final String code;
+  final Uint8List? image;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = image;
+    if (bytes != null) {
+      return Image.memory(
+        bytes,
+        width: 168,
+        height: 168,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.none,
+      );
+    }
+    return QrImageView(
+      data: code,
+      size: 168,
+      backgroundColor: Colors.white,
+      eyeStyle: const QrEyeStyle(
+        eyeShape: QrEyeShape.square,
+        color: Colors.black,
+      ),
+      dataModuleStyle: const QrDataModuleStyle(
+        dataModuleShape: QrDataModuleShape.square,
+        color: Colors.black,
+      ),
     );
   }
 }
@@ -508,9 +807,16 @@ class _CardChoice extends StatelessWidget {
 }
 
 class _Confirmed extends StatelessWidget {
-  const _Confirmed({super.key, required this.amount});
+  const _Confirmed({
+    super.key,
+    required this.amount,
+    required this.outcome,
+    required this.simulated,
+  });
 
   final String amount;
+  final PaySheetOutcome outcome;
+  final bool simulated;
 
   @override
   Widget build(BuildContext context) {
@@ -544,7 +850,9 @@ class _Confirmed extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Valor reservado',
+            outcome == PaySheetOutcome.paid
+                ? GroupMessages.yourSharePaid
+                : 'Valor reservado',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -559,7 +867,9 @@ class _Confirmed extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            GroupMessages.simulatedNotice,
+            simulated
+                ? GroupMessages.simulatedNotice
+                : GroupMessages.chargeOnlyIfCloses,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -567,7 +877,10 @@ class _Confirmed extends StatelessWidget {
           const SizedBox(height: 18),
           FilledButton(
             key: AppKeys.payDone,
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(
+              context,
+              simulated ? PaySheetOutcome.reserved : outcome,
+            ),
             child: const Text('Fechar'),
           ),
         ],

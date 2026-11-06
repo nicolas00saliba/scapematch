@@ -27,11 +27,9 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
     return group;
   }
 
-  /// Nulo quando a parte foi paga.
-  ///
   /// [savedCardId] é o id interno de um cartão já tokenizado. Um cartão novo
   /// passa por [payWithNewCard], que chama `tokenize-card` antes da cobrança.
-  Future<PayShareFailureReason?> payShare(
+  Future<PayShareResult> payShare(
     PaymentMethodKind kind, {
     String? savedCardId,
   }) async {
@@ -44,34 +42,22 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
           kind: kind,
           savedCardId: savedCardId,
         );
-    if (!ref.mounted) {
-      return null;
+    if (ref.mounted && result is PayShareSuccess) {
+      _publish(result.group);
     }
-    switch (result) {
-      case PayShareSuccess(:final group):
-        _publish(group);
-        return null;
-      case PayShareFailure(:final reason):
-        return reason;
-    }
+    return result;
   }
 
   /// Tokeniza o cartão e cobra a parte com o id devolvido.
-  Future<PayShareFailureReason?> payWithNewCard(CardDraft card) async {
+  Future<PayShareResult> payWithNewCard(CardDraft card) async {
     final user = ref.read(currentUserProvider);
     final result = await ref
         .read(groupRepositoryProvider)
         .payWithNewCard(groupId, userId: user.id, card: card);
-    if (!ref.mounted) {
-      return null;
+    if (ref.mounted && result is PayShareSuccess) {
+      _publish(result.group);
     }
-    switch (result) {
-      case PayShareSuccess(:final group):
-        _publish(group);
-        return null;
-      case PayShareFailure(:final reason):
-        return reason;
-    }
+    return result;
   }
 
   /// Nulo quando a turma inteira sentou. A falha traz o motivo e, se houver,

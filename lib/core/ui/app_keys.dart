@@ -93,6 +93,9 @@ abstract final class AppKeys {
   static const payMethodPix = Key('pay-method-pix');
   static const payMethodCard = Key('pay-method-card');
   static const paySimulate = Key('pay-simulate');
+  static const payCharge = Key('pay-charge');
+  static const payPixQr = Key('pay-pix-qr');
+  static const payError = Key('pay-error');
   static const payCopyPix = Key('pay-copy-pix');
   static const payTestCard = Key('pay-test-card');
   static const payConfirmed = Key('pay-confirmed');
