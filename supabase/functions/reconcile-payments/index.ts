@@ -1,10 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { logCaught } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import {
   reconcileAsaasTimeoutMs,
   reconcilePayments,
 } from "../_shared/reconcile_payments.ts";
+import { settleAuthorizedCards, settleGroup } from "../_shared/settle_group.ts";
 
 type Deps = {
   // deno-lint-ignore no-explicit-any
@@ -34,9 +36,36 @@ export async function handleReconcile(
     );
     const asaas = deps?.asaas ??
       AsaasProvider.fromEnv(Deno.env, reconcileAsaasTimeoutMs);
-    return json(await reconcilePayments(admin, asaas));
+    const groupId = await settleGroupId(req);
+    const reconciled = await reconcilePayments(admin, asaas);
+    if (groupId) {
+      try {
+        await settleGroup(admin, asaas, groupId);
+      } catch (error) {
+        logCaught("settle-charges", error);
+      }
+    }
+    await settleAuthorizedCards(admin, asaas);
+    return json(reconciled);
   } catch (_error) {
     return json({ error: "erro" }, 500);
+  }
+}
+
+const groupIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function settleGroupId(req: Request): Promise<string> {
+  try {
+    const body = await req.clone().json();
+    const id = body && typeof body === "object"
+      ? (body as { settle_group_id?: unknown }).settle_group_id
+      : "";
+    return typeof id === "string" && groupIdPattern.test(id.trim())
+      ? id.trim()
+      : "";
+  } catch {
+    return "";
   }
 }
 

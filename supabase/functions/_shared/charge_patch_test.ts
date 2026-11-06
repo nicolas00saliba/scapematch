@@ -134,7 +134,7 @@ Deno.test("o webhook confirma no Asaas e usa a transição", async () => {
     new URL("./release_charges.ts", import.meta.url),
   );
   const settle = await Deno.readTextFile(
-    new URL("../settle-charges/index.ts", import.meta.url),
+    new URL("./settle_group.ts", import.meta.url),
   );
   assertEquals(release.includes("payment_status"), false);
   assertEquals(settle.includes("payment_status"), false);

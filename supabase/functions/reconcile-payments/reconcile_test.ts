@@ -469,6 +469,37 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
   assert(otherCalls.some((call) => call.name === "mark_orphan_resolved"));
 });
 
+Deno.test("órfão Pix deleted:true e PENDING solta o QR", async () => {
+  const calls: Call[] = [];
+  const http: string[] = [];
+  const result = await reconcilePayments(
+    adminFor(
+      {
+        creating: [],
+        orphans: [{
+          id: "99999999-9999-4999-8999-999999999999",
+          provider_ref: "pay_pix",
+          charge_id: "44444444-4444-4444-8444-444444444444",
+          attempt_id: attemptId,
+          billing_type: "PIX",
+          claimed_at: "2026-11-06T10:00:00.000Z",
+        }],
+      },
+      calls,
+    ),
+    providerFor(http, [{
+      id: "pay_pix",
+      status: "PENDING",
+      billingType: "PIX",
+      deleted: true,
+    }]),
+  );
+  assertEquals(result, { resolved: 1, pending: 0 });
+  assert(calls.some((call) => call.name === "detach_gone_pix"));
+  assertEquals(http.some((call) => call.startsWith("DELETE ")), false);
+  assert(calls.some((call) => call.name === "mark_orphan_resolved"));
+});
+
 Deno.test("reconcile-payments só aceita o segredo do cron", async () => {
   const secret = "segredo-reconcile-teste";
   const missing = await handleReconcile(

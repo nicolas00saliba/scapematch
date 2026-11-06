@@ -57,8 +57,9 @@ export type CardSwitchDecision =
   | "drop_lease"
   | "refuse";
 
-/// Pix pendente com id é cancelado e confirmado antes de virar cartão.
-/// Pix pago ou reserva fresca sem id recusa. Nunca troca o provider_ref no escuro.
+/// Pix pendente com id deve ser cancelado, mas só depois que o cartão
+/// for aceito. Pix pago ou reserva fresca sem id recusa.
+/// Nunca troca o provider_ref no escuro.
 export function cardSwitchDecision(
   input: {
     billingType: string;
@@ -81,6 +82,30 @@ export function cardSwitchDecision(
     return "refuse";
   }
   return "refuse";
+}
+
+/// pix_em_aberto só quando o Pix pago (ou ainda vinculado) impede a troca.
+/// Reserva de cartão ou lease fresco não usa esse código.
+export function cardSwitchBlock(
+  input: {
+    billingType: string;
+    status: string;
+    providerRef: string | null;
+  } | null,
+): "pix_em_aberto" | "pagamento em andamento" {
+  if (!input || input.billingType !== "PIX") {
+    return "pagamento em andamento";
+  }
+  if (input.status === "paid" || input.status === "refunded") {
+    return "pix_em_aberto";
+  }
+  if (
+    input.providerRef &&
+    (input.status === "pending" || input.status === "creating")
+  ) {
+    return "pix_em_aberto";
+  }
+  return "pagamento em andamento";
 }
 
 /// CONFIRMED e RECEIVED já capturaram. A compensação é estorno.
@@ -123,9 +148,11 @@ export function pixMatchesCharge(
     status?: unknown;
     billingType?: unknown;
     split?: unknown;
+    deleted?: unknown;
   },
   expected: PixExpectation,
 ): boolean {
+  if (remote.deleted === true) return false;
   if (remote.billingType !== "PIX") return false;
   if (remote.customer !== expected.customer) return false;
   const cents = Math.round(Number(remote.value) * 100);

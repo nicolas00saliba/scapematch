@@ -18,7 +18,7 @@ Deno.test("a cobrança lê a taxa configurada e não o 10% fixo", async () => {
   assert(charge.includes("commissionBpsForVenue"));
   assertEquals(charge.includes("?? 1000"), false);
   const settle = await Deno.readTextFile(
-    new URL("../settle-charges/index.ts", import.meta.url),
+    new URL("./settle_group.ts", import.meta.url),
   );
   assert(settle.includes("commission_bps"));
   assertEquals(settle.includes("?? 1000"), false);

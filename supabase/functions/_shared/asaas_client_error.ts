@@ -3,6 +3,9 @@ import { redactSensitive } from "./redact.ts";
 /// Código estável devolvido ao cliente quando o provedor falha.
 export const asaasUnavailable = "asaas_unavailable";
 
+/// Recusa do emissor. Não é indisponibilidade do Asaas.
+export const cardDeclined = "card_declined";
+
 const asaasMessage =
   /^(Asaas \d+|Resposta do Asaas|ASAAS_API_KEY ausente|ASAAS_BASE_URL inválida)/;
 
@@ -78,6 +81,18 @@ function sanitizeAsaasDescription(text: string): string {
     .slice(0, 180);
   if (cleaned.includes("@")) return "[redacted]";
   return cleaned;
+}
+
+/// HTTP 400 do cartão de teste recusado, ou a mesma recusa em produção.
+/// O corpo não volta para o cliente: só o código estável.
+export function isCardDeclined(error: unknown): boolean {
+  const status = asaasStatus(error);
+  if (status !== 400 && status !== 402) return false;
+  const items = asaasErrorItems(error);
+  if (items.some((item) => item.code === "invalid_creditCard")) return true;
+  const blob = items.map((item) => item.description).join(" ").toLowerCase();
+  return blob.includes("não autoriz") || blob.includes("nao autoriz") ||
+    blob.includes("recusad");
 }
 
 /// 400 de e-mail já cadastrado na conta Asaas.

@@ -34,6 +34,8 @@ type Payment = {
   customer: string;
   value: number;
   split: { walletId: string; percentualValue: number }[];
+  deleted?: boolean;
+  deleteAsPending?: boolean;
 };
 
 type Store = {
@@ -43,6 +45,7 @@ type Store = {
   calls: string[];
   member: string;
   closed: boolean;
+  detachMissing?: boolean;
 };
 
 function expiredAt(): string {
@@ -152,6 +155,7 @@ function adminFor(store: Store) {
       let mode: "select" | "update" = "select";
       let patch: Record<string, unknown> = {};
       let head = false;
+      let returning = false;
       const rows = () => {
         if (table === "groups") {
           return [{
@@ -204,6 +208,7 @@ function adminFor(store: Store) {
       const self = {
         select(_cols: string, opts?: { head?: boolean }) {
           head = Boolean(opts?.head);
+          if (mode === "update") returning = true;
           return self;
         },
         update(next: Record<string, unknown>) {
@@ -228,8 +233,9 @@ function adminFor(store: Store) {
         ) {
           try {
             if (mode === "update") {
-              for (const row of matched()) Object.assign(row, patch);
-              resolve({ data: null, error: null });
+              const hit = matched();
+              for (const row of hit) Object.assign(row, patch);
+              resolve({ data: returning ? hit : null, error: null });
               return;
             }
             resolve({
@@ -320,8 +326,30 @@ function adminFor(store: Store) {
             row.provider_ref = null;
             row.billing_type = "CREDIT_CARD";
             row.status = "creating";
+            row.qr_code = null;
+            row.qr_code_base64 = null;
             row.attempt_id = crypto.randomUUID();
             row.reserved_at = freshAt();
+            return { data: row.attempt_id, error: null };
+          }
+          return { data: null, error: null };
+        }
+        if (name === "detach_gone_pix") {
+          if (store.detachMissing) {
+            return { data: null, error: { code: "PGRST202" } };
+          }
+          const row = byId(String(args.p_charge_id));
+          if (
+            row && row.provider_ref === args.p_provider_ref &&
+            row.billing_type === "PIX" &&
+            (row.status === "pending" || row.status === "creating")
+          ) {
+            row.provider_ref = null;
+            row.qr_code = null;
+            row.qr_code_base64 = null;
+            row.status = "creating";
+            row.attempt_id = crypto.randomUUID();
+            row.reserved_at = expiredAt();
             return { data: row.attempt_id, error: null };
           }
           return { data: null, error: null };
@@ -375,14 +403,23 @@ function adminFor(store: Store) {
 }
 
 function paymentBody(payment: Payment): Record<string, unknown> {
-  return { ...payment };
+  return {
+    id: payment.id,
+    status: payment.status,
+    billingType: payment.billingType,
+    externalReference: payment.externalReference,
+    customer: payment.customer,
+    value: payment.value,
+    split: payment.split,
+    deleted: payment.deleted === true,
+  };
 }
 
 function providerFor(
   store: Store,
   hooks: {
     onPixPost?: (payment: Payment) => Promise<Payment | Response>;
-    onCardPost?: (payment: Payment) => Promise<Payment>;
+    onCardPost?: (payment: Payment) => Promise<Payment | Response>;
     onCapture?: () => Promise<Response | null>;
     onRefund?: () => Promise<Response | null>;
   },
@@ -434,6 +471,19 @@ function providerFor(
         item.id === paymentMatch[1]
       );
       if (!payment) return new Response("não", { status: 404 });
+      if (payment.deleteAsPending) {
+        payment.deleted = true;
+        payment.status = "PENDING";
+        return new Response(
+          JSON.stringify({
+            id: payment.id,
+            status: "PENDING",
+            deleted: true,
+            billingType: payment.billingType,
+          }),
+          { status: 200 },
+        );
+      }
       payment.status = "DELETED";
       return new Response(
         JSON.stringify({ id: payment.id, status: "DELETED" }),
@@ -493,6 +543,7 @@ function providerFor(
       }
       if (body.billingType === "CREDIT_CARD" && hooks.onCardPost) {
         const held = await hooks.onCardPost(payment);
+        if (held instanceof Response) return held;
         if (!store.payments.includes(held)) store.payments.push(held);
         return new Response(JSON.stringify(paymentBody(held)), { status: 200 });
       }
@@ -572,7 +623,7 @@ Deno.test("Pix e Pix: a tentativa que perde cancela o próprio pagamento", async
   assert(store.payments.some((item) => item.status === "DELETED"));
 });
 
-Deno.test("Pix e cartão: o cartão busca o Pix antes de apagar a reserva", async () => {
+Deno.test("Pix e cartão: o cartão é aceito antes de apagar o Pix", async () => {
   const store = makeStore();
   let releaseFirst: () => void = () => undefined;
   const gate = new Promise<void>((resolve) => {
@@ -618,10 +669,12 @@ Deno.test("Pix e cartão: o cartão busca o Pix antes de apagar a reserva", asyn
     .filter((item) =>
       item.call.startsWith("POST ") && item.call.endsWith("/payments")
     );
+  const deleted = store.calls.findIndex((call) => call.startsWith("DELETE "));
   assert(searches.length >= 2);
   assert(posts.length >= 2);
-  assert(searches[1].index > posts[0].index);
-  assert(searches[1].index < posts[1].index);
+  assert(posts[1].index > posts[0].index);
+  assert(searches[1].index > posts[1].index);
+  assert(deleted > searches[1].index);
   assertEquals(store.orphans.length, 0);
 });
 
@@ -775,4 +828,157 @@ Deno.test("estorno da captura que falha registra o órfão e fica authorized", a
   assertEquals(store.orphans.length, 1);
   assertEquals(store.orphans[0].reason, "refund_failed");
   assertEquals(store.member, "reserved");
+});
+
+function openPix(store: Store, id = "pay_pix") {
+  store.charges[0].billing_type = "PIX";
+  store.charges[0].status = "pending";
+  store.charges[0].provider_ref = id;
+  store.charges[0].qr_code = "qr-antigo";
+  store.charges[0].reserved_at = freshAt();
+  store.payments.push({
+    id,
+    status: "PENDING",
+    billingType: "PIX",
+    externalReference: `pix:${groupId}:${userId}`,
+    customer: "cus_1",
+    value: 100,
+    split: [{ walletId: "wal_house", percentualValue: 90 }],
+    deleteAsPending: true,
+  });
+}
+
+Deno.test("troca Pix para cartão com deleted:true e PENDING", async () => {
+  const store = makeStore({});
+  openPix(store);
+  const response = await createCharge(
+    request("CREDIT_CARD", "idem-switch-1"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  const cardPost = store.calls.findIndex((call) =>
+    call.startsWith("POST ") && call.endsWith("/payments")
+  );
+  const deleted = store.calls.findIndex((call) => call.startsWith("DELETE "));
+  assert(cardPost >= 0 && cardPost < deleted);
+  assertEquals(response.status, 200);
+  assertEquals(body.billing_type, "CREDIT_CARD");
+  assertEquals(body.status, "authorized");
+  assertEquals(body.qr_code, null);
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].billing_type, "CREDIT_CARD");
+  assertEquals(store.charges[0].qr_code, null);
+  assertEquals(store.charges[0].provider_ref, body.provider_ref);
+  assertEquals(store.orphans.length, 0);
+  assertEquals(store.payments[0].deleted, true);
+  assertEquals(store.payments[0].status, "PENDING");
+});
+
+Deno.test("cartão recusado não cancela o Pix nem reserva a vaga", async () => {
+  const store = makeStore({});
+  openPix(store);
+  const response = await createCharge(
+    request("CREDIT_CARD", "idem-declined-1"),
+    chargeRuntime(
+      store,
+      providerFor(store, {
+        onCardPost: () =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({
+                errors: [{
+                  code: "invalid_creditCard",
+                  description: "Transação não autorizada.",
+                }],
+              }),
+              { status: 400 },
+            ),
+          ),
+      }),
+    ),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 422);
+  assertEquals(body.error, "card_declined");
+  assertEquals(store.calls.some((call) => call.startsWith("DELETE ")), false);
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].billing_type, "PIX");
+  assertEquals(store.charges[0].status, "pending");
+  assertEquals(store.charges[0].provider_ref, "pay_pix");
+  assertEquals(store.charges[0].qr_code, "qr-antigo");
+  assertEquals(store.orphans.length, 0);
+  assertEquals(store.payments[0].deleted, undefined);
+});
+
+Deno.test("cartão ausente não reserva vaga nem mexe no Pix", async () => {
+  const store = makeStore({});
+  openPix(store);
+  const missing = new Request("https://example.test/create-charge", {
+    method: "POST",
+    body: JSON.stringify({
+      group_id: groupId,
+      billing_type: "CREDIT_CARD",
+      idempotency_key: "idem-sem-cartao",
+    }),
+  });
+  const absentId = await createCharge(
+    missing,
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(absentId.status, 400);
+  const unknown = new Request("https://example.test/create-charge", {
+    method: "POST",
+    body: JSON.stringify({
+      group_id: groupId,
+      billing_type: "CREDIT_CARD",
+      idempotency_key: "idem-cartao-alheio",
+      saved_card_id: "99999999-9999-4999-8999-999999999999",
+    }),
+  });
+  const notOwned = await createCharge(
+    unknown,
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(notOwned.status, 403);
+  assertEquals(store.calls.some((call) => call.includes("/payments")), false);
+  assertEquals(store.charges[0].billing_type, "PIX");
+  assertEquals(store.charges[0].qr_code, "qr-antigo");
+  assertEquals(store.charges.length, 1);
+});
+
+Deno.test("Pix apagado com PENDING não devolve o QR antigo", async () => {
+  const store = makeStore({});
+  openPix(store);
+  store.payments[0].deleted = true;
+  const response = await createCharge(
+    request("PIX", "idem-pix-de-novo"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.billing_type, "PIX");
+  assertEquals(body.qr_code, "qr");
+  assertEquals(body.qr_code === "qr-antigo", false);
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].provider_ref, body.provider_ref);
+  assertEquals(store.charges[0].provider_ref === "pay_pix", false);
+});
+
+Deno.test("Pix apagado sem detach_gone_pix ainda solta o QR", async () => {
+  const store = makeStore({});
+  openPix(store);
+  store.payments[0].deleted = true;
+  store.detachMissing = true;
+  const response = await createCharge(
+    request("PIX", "idem-pix-sem-funcao"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.qr_code, "qr");
+  assertEquals(body.qr_code === "qr-antigo", false);
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].billing_type, "PIX");
+  assertEquals(store.charges[0].provider_ref === "pay_pix", false);
+  assertEquals(store.charges[0].qr_code === "qr-antigo", false);
 });

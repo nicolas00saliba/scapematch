@@ -306,6 +306,15 @@ Deno.test("pickReusablePix ignora estorno e prefere a cobrança já paga", () =>
     }]),
     { id: "pay_open", status: "PENDING" },
   );
+  assertEquals(
+    pickReusablePix([{
+      id: "pay_deleted",
+      status: "PENDING",
+      billingType: "PIX",
+      deleted: true,
+    }]),
+    null,
+  );
 });
 
 Deno.test("Pix reaproveitado pago devolve o status do Asaas mesmo sem QR", async () => {
@@ -477,6 +486,45 @@ Deno.test("cancelar Pix só confirma se o pagamento não segue aberto", async ()
   );
   assertEquals(await provider.cancelPaymentConfirmed("pay_open"), false);
   assertEquals(await provider.cancelPaymentConfirmed("pay_gone"), true);
+});
+
+Deno.test("deleted:true com PENDING confirma o cancelamento do Pix", async () => {
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "DELETE" && url.includes("/payments/pay_flag")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ id: "pay_flag", deleted: true, status: "PENDING" }),
+          { status: 200 },
+        ),
+      );
+    }
+    if (method === "DELETE") {
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    if (method === "GET" && url.includes("/payments/pay_still")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            id: "pay_still",
+            deleted: true,
+            status: "PENDING",
+            billingType: "PIX",
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+    () => Promise.resolve(),
+  );
+  assertEquals(await provider.cancelPaymentConfirmed("pay_flag"), true);
+  assertEquals(await provider.cancelPaymentConfirmed("pay_still"), true);
 });
 
 const sampleCard = {

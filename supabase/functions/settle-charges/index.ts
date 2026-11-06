@@ -2,13 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
-import { issuePaidInvoices } from "../_shared/issue_invoices.ts";
-import {
-  applyPaymentTransition,
-  type ChargeRow,
-  creditLedger,
-} from "../_shared/ledger.ts";
-import { releaseCancelledCharges } from "../_shared/release_charges.ts";
+import { maySettle, settleGroup } from "../_shared/settle_group.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -54,14 +48,14 @@ Deno.serve(async (req) => {
     const asaas = AsaasProvider.fromEnv(Deno.env);
     const settled: string[] = [];
     for (const groupId of ids) {
-      const allowed = await canSettle(
+      const allowed = await maySettle(
         admin,
         groupId,
         userData.user.id,
         Boolean(adminRow),
       );
       if (!allowed) continue;
-      await settleOne(admin, asaas, groupId);
+      await settleGroup(admin, asaas, groupId);
       settled.push(groupId);
     }
     return json({ settled });
@@ -70,103 +64,3 @@ Deno.serve(async (req) => {
     return json(failure.body, failure.status);
   }
 });
-
-async function canSettle(
-  admin: ReturnType<typeof createClient>,
-  groupId: string,
-  userId: string,
-  isAdmin: boolean,
-): Promise<boolean> {
-  if (isAdmin) return true;
-  const { data: group } = await admin
-    .from("groups")
-    .select("created_by, venue_id")
-    .eq("id", groupId)
-    .maybeSingle();
-  if (!group) return false;
-  if (group.created_by === userId) return true;
-  const { data: venue } = await admin
-    .from("venues")
-    .select("owner_id")
-    .eq("id", group.venue_id)
-    .maybeSingle();
-  return venue?.owner_id === userId;
-}
-
-async function settleOne(
-  admin: ReturnType<typeof createClient>,
-  asaas: AsaasProvider,
-  groupId: string,
-) {
-  const { data: group } = await admin
-    .from("groups")
-    .select(
-      "id, cancelled_at, closed_at, closes_at, starts_at, total_spots, minimum_spots",
-    )
-    .eq("id", groupId)
-    .maybeSingle();
-  if (!group) return;
-  const { count } = await admin
-    .from("group_members")
-    .select("id", { count: "exact", head: true })
-    .eq("group_id", groupId)
-    .neq("attendance", "cancelled");
-  const filled = count ?? 0;
-  const closed = Boolean(group.closed_at) ||
-    (filled >= group.total_spots && filled >= group.minimum_spots);
-  const missed = !group.cancelled_at && !closed && group.closes_at &&
-    new Date(group.closes_at).getTime() <= Date.now() &&
-    filled < group.minimum_spots;
-  const release = Boolean(group.cancelled_at) || missed;
-
-  if (release) {
-    await releaseCancelledCharges(admin, asaas, groupId);
-    return;
-  }
-
-  // commission_bps é a taxa fotografada na cobrança por create-charge.
-  const { data: charges } = await admin
-    .from("payment_charges")
-    .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type",
-    )
-    .eq("group_id", groupId);
-
-  for (const charge of charges ?? []) {
-    const row = charge as ChargeRow & {
-      status: string;
-      provider_ref: string | null;
-      billing_type: string;
-    };
-    if (!row.provider_ref) continue;
-    if (
-      closed && row.status === "authorized" &&
-      row.billing_type === "CREDIT_CARD"
-    ) {
-      const captured = await asaas.capture(row.provider_ref);
-      const paid = captured.status === "CONFIRMED" ||
-        captured.status === "RECEIVED";
-      if (paid) {
-        const transition = await applyPaymentTransition(
-          admin,
-          row.id,
-          "paid",
-          true,
-        );
-        if (transition.status !== "paid") continue;
-        await issuePaidInvoices(admin, row, {
-          sandbox: asaas.sandbox,
-          asaas: asaas.sandbox ? undefined : asaas,
-        });
-      }
-      continue;
-    }
-    if (closed && row.status === "paid") {
-      await creditLedger(admin, row);
-      await issuePaidInvoices(admin, row, {
-        sandbox: asaas.sandbox,
-        asaas: asaas.sandbox ? undefined : asaas,
-      });
-    }
-  }
-}

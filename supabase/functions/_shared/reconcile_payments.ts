@@ -1,4 +1,5 @@
-import { AsaasProvider } from "./asaas_provider.ts";
+import { asaasPaymentGone, AsaasProvider } from "./asaas_provider.ts";
+import { detachGonePix } from "./detach_gone_pix.ts";
 import { lostAttemptCompensation, pixLeaseMs } from "./pix_charge.ts";
 
 /// Cada chamada ao Asaas cabe várias vezes dentro do lease de 2 minutos.
@@ -31,6 +32,7 @@ type RemotePayment = {
   id: string;
   status: string;
   billingType: string;
+  deleted?: boolean;
 };
 
 // deno-lint-ignore no-explicit-any
@@ -108,6 +110,23 @@ async function reconcileOrphan(
     return await finishOrphan(admin, row, "cancelled");
   }
   if (!remote || remote.id !== row.provider_ref) return false;
+  if (remote.deleted === true || asaasPaymentGone(remote)) {
+    if (
+      row.charge_id &&
+      (row.billing_type === "PIX" || remote.billingType === "PIX") &&
+      remote.status.trim().toUpperCase() !== "REFUNDED"
+    ) {
+      try {
+        await detachGonePix(admin, row.charge_id, row.provider_ref);
+      } catch (_error) {
+        return false;
+      }
+    }
+    const next = remote.status.trim().toUpperCase() === "REFUNDED"
+      ? "refunded"
+      : "cancelled";
+    return await finishOrphan(admin, row, next);
+  }
   const action = lostAttemptCompensation(remote.status);
   if (action === "none") {
     const next = remote.status.trim().toUpperCase() === "REFUNDED"
