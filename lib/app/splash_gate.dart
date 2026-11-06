@@ -14,10 +14,11 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// curto (o app ainda na memória) não repetem. Não grava flag. A introdução
 /// continua com a chave dela.
 ///
-/// O logo completo entra. O letreiro e o fio de cobre convergem para o
-/// símbolo. O símbolo se aproxima, gira e cresce, some, e só então a
-/// cortina revela a próxima tela. Com reduzir movimento, o logo já entra
-/// pronto e a cortina some em [reducedDuration], sem giro.
+/// A capa entra: floresta, círculo petróleo e “ScapeMatch”. O restante
+/// converge para o pin. O pin se aproxima e gira no próprio eixo vertical,
+/// como um pião, crescendo até sumir. Só então a cortina revela a próxima
+/// tela. Com reduzir movimento, a capa já entra pronta e a cortina some em
+/// [reducedDuration], sem giro.
 ///
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
@@ -26,8 +27,11 @@ class SplashGate extends StatefulWidget {
 
   final Widget child;
 
-  static const background = Color(0xFF0F4C4A);
+  /// Noite da capa, atrás da arte quando ela encolhe.
+  static const background = Color(0xFF142046);
   static const copper = Color(0xFF9A4F24);
+
+  static const coverAsset = 'assets/brand/capa_app.jpg';
 
   /// Entrada, pausa, convergência, giro e saída. Cabe em até 1,8s.
   static const duration = Duration(milliseconds: 1800);
@@ -50,9 +54,13 @@ class SplashGate extends StatefulWidget {
   static const approachTurns = 0.08;
   static const spinTurns = 1.25;
   static const exitTurns = 1.55;
-  static const accentWidth = 72.0;
+
+  /// Perspectiva leve do giro de pião. O pin continua de frente quando
+  /// [turns] é 0; o valor só aparece de lado.
+  static const yawPerspective = 0.003;
 
   static const curtainKey = Key('splash-curtain');
+  static const coverKey = Key('splash-cover');
   static const logoOpacityKey = Key('splash-logo');
   static const scaleKey = Key('splash-scale');
   static const spinKey = Key('splash-spin');
@@ -65,30 +73,34 @@ class SplashGate extends StatefulWidget {
 class SplashMotion {
   const SplashMotion({
     required this.logoOpacity,
+    required this.cover,
+    required this.coverScale,
     required this.absorb,
     required this.scale,
     required this.turns,
     required this.curtain,
-    required this.accent,
   });
 
-  /// Opacidade do logo. A cortina ainda pode estar fechada.
+  /// Opacidade do pin. A capa pode continuar por cima no começo.
   final double logoOpacity;
 
-  /// 0 é o logo completo. 1 é só o símbolo: o letreiro já entrou nele.
+  /// Opacidade da capa inteira. 0 quando ela já entrou no pin.
+  final double cover;
+
+  /// Escala da capa. 1 é o tamanho em que ela aparece.
+  final double coverScale;
+
+  /// 0 é a capa inteira. 1 é o instante em que o resto já entrou no pin.
   final double absorb;
 
   /// Escala do símbolo. 1 é o tamanho de repouso.
   final double scale;
 
-  /// Voltas no sentido horário. 0 não gira.
+  /// Voltas do pião, no eixo vertical. 0 não gira.
   final double turns;
 
   /// 1 cobre a próxima tela. 0 a revela.
   final double curtain;
-
-  /// Fio de cobre, de 0 a 1. Some junto com o letreiro.
-  final double accent;
 }
 
 double _span(double t, double start, double end) {
@@ -105,12 +117,13 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
   final progress = t.clamp(0.0, 1.0);
   if (reduced) {
     return SplashMotion(
-      logoOpacity: 1,
+      logoOpacity: 0,
+      cover: 1,
+      coverScale: SplashGate.restScale,
       absorb: 0,
       scale: SplashGate.restScale,
       turns: 0,
       curtain: (1 - Curves.easeOut.transform(progress)).clamp(0.0, 1.0),
-      accent: 1,
     );
   }
 
@@ -128,8 +141,20 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
     _span(progress, SplashGate.spinEnd, SplashGate.vanishEnd),
   );
 
-  final logoOpacity = progress >= SplashGate.spinEnd ? 1 - vanish : enter;
-  final accent = progress <= SplashGate.holdEnd ? enter : 1 - bury;
+  final cover = progress <= SplashGate.holdEnd ? enter : 1 - bury;
+  final logoOpacity = progress <= SplashGate.holdEnd
+      ? 0.0
+      : progress >= SplashGate.spinEnd
+      ? 1 - vanish
+      : bury;
+  final double coverScale;
+  if (progress <= SplashGate.enterEnd) {
+    coverScale = _lerp(SplashGate.enterScale, SplashGate.restScale, enter);
+  } else if (progress <= SplashGate.holdEnd) {
+    coverScale = SplashGate.restScale;
+  } else {
+    coverScale = _lerp(SplashGate.restScale, 0.08, bury);
+  }
 
   final double scale;
   if (progress <= SplashGate.enterEnd) {
@@ -165,13 +190,21 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
             .clamp(0.0, 1.0);
 
   return SplashMotion(
-    logoOpacity: logoOpacity,
+    logoOpacity: logoOpacity.clamp(0.0, 1.0),
+    cover: cover.clamp(0.0, 1.0),
+    coverScale: coverScale,
     absorb: bury,
     scale: scale,
     turns: turns,
     curtain: curtain,
-    accent: accent.clamp(0.0, 1.0),
   );
+}
+
+/// Giro no eixo vertical do símbolo. Não é rotação no plano da tela.
+Matrix4 splashYawTransform(double turns) {
+  return Matrix4.identity()
+    ..setEntry(3, 2, SplashGate.yawPerspective)
+    ..rotateY(turns * 2 * math.pi);
 }
 
 class _SplashGateState extends State<SplashGate>
@@ -313,54 +346,67 @@ class _SplashMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          clipBehavior: Clip.none,
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              Opacity(
-                key: SplashGate.logoOpacityKey,
-                opacity: motion.logoOpacity,
-                child: Transform.scale(
-                  key: SplashGate.scaleKey,
-                  scale: motion.scale,
-                  child: Transform.rotate(
-                    key: SplashGate.spinKey,
-                    angle: motion.turns * 2 * math.pi,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = math.min(
+          constraints.maxWidth,
+          constraints.maxHeight * 240 / 242,
+        );
+        final coverHeight = side * 242 / 240;
+        final pinHeight = side * 72 / 240;
+        const anchor = Alignment(0, -0.25);
+        return Center(
+          child: SizedBox(
+            width: side,
+            height: coverHeight,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Opacity(
+                  key: SplashGate.coverKey,
+                  opacity: motion.cover,
+                  child: Transform.scale(
+                    alignment: anchor,
+                    scale: motion.coverScale,
                     filterQuality: FilterQuality.medium,
-                    child: ScapeLogo(
-                      height: 80,
-                      onDark: true,
-                      wordmarkAbsorb: motion.absorb,
+                    child: Image.asset(
+                      SplashGate.coverAsset,
+                      width: side,
+                      height: coverHeight,
+                      fit: BoxFit.fill,
+                      excludeFromSemantics: true,
+                      filterQuality: FilterQuality.medium,
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                bottom: -25,
-                child: Opacity(
-                  opacity: motion.accent,
-                  child: Transform.translate(
-                    offset: Offset(0, -64 * motion.absorb),
-                    child: ColoredBox(
-                      color: SplashGate.copper,
-                      child: SizedBox(
-                        width: SplashGate.accentWidth * motion.accent,
-                        height: 3,
+                Align(
+                  alignment: anchor,
+                  child: Opacity(
+                    key: SplashGate.logoOpacityKey,
+                    opacity: motion.logoOpacity,
+                    child: Transform.scale(
+                      key: SplashGate.scaleKey,
+                      scale: motion.scale,
+                      child: Transform(
+                        key: SplashGate.spinKey,
+                        alignment: Alignment.center,
+                        filterQuality: FilterQuality.medium,
+                        transform: splashYawTransform(motion.turns),
+                        child: ScapeLogo(
+                          variant: ScapeLogoVariant.mark,
+                          height: pinHeight,
+                          onDark: true,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

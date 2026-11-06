@@ -22,21 +22,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  test('the splash logo appears, converges, spins, then reveals', () {
+  test('the splash cover appears, converges, spins, then reveals', () {
     final start = splashMotion(0, reduced: false);
     expect(start.logoOpacity, 0);
+    expect(start.cover, 0);
+    expect(start.coverScale, SplashGate.enterScale);
     expect(start.scale, SplashGate.enterScale);
     expect(start.absorb, 0);
     expect(start.turns, 0);
     expect(start.curtain, 1);
-    expect(start.accent, 0);
 
     final held = splashMotion(SplashGate.holdEnd, reduced: false);
-    expect(held.logoOpacity, 1);
+    expect(held.cover, 1);
+    expect(held.coverScale, SplashGate.restScale);
+    expect(held.logoOpacity, 0);
     expect(held.scale, SplashGate.restScale);
     expect(held.absorb, 0);
     expect(held.turns, 0);
-    expect(held.accent, 1);
     expect(held.curtain, 1);
 
     final burying = splashMotion(
@@ -50,7 +52,8 @@ void main() {
 
     final buried = splashMotion(SplashGate.buryEnd, reduced: false);
     expect(buried.absorb, 1);
-    expect(buried.accent, 0);
+    expect(buried.cover, 0);
+    expect(buried.logoOpacity, 1);
     expect(buried.turns, 0);
     expect(buried.scale, SplashGate.restScale);
 
@@ -89,7 +92,8 @@ void main() {
     expect(splashMotion(1, reduced: false).logoOpacity, 0);
 
     final reducedStart = splashMotion(0, reduced: true);
-    expect(reducedStart.logoOpacity, 1);
+    expect(reducedStart.cover, 1);
+    expect(reducedStart.logoOpacity, 0);
     expect(reducedStart.turns, 0);
     expect(reducedStart.absorb, 0);
     expect(reducedStart.scale, 1);
@@ -97,9 +101,19 @@ void main() {
     expect(splashMotion(1, reduced: true).curtain, 0);
     expect(splashMotion(0.5, reduced: true).turns, 0);
 
+    final yaw = splashYawTransform(0.25);
+    expect(yaw.storage[0], closeTo(0, 1e-6));
+    expect(yaw.storage[5], closeTo(1, 1e-6));
+    expect(yaw.storage[1], closeTo(0, 1e-6));
+    expect(yaw.storage[8], closeTo(1, 1e-6));
+    final flat = splashYawTransform(0);
+    expect(flat.storage[5], closeTo(1, 1e-6));
+    expect(flat.storage[1], closeTo(0, 1e-6));
+    expect(flat.entry(3, 2), closeTo(SplashGate.yawPerspective, 1e-9));
+
     expect(SplashGate.duration.inMilliseconds, inInclusiveRange(1200, 1800));
     expect(SplashGate.reducedDuration.inMilliseconds, 180);
-    expect(SplashGate.background, const Color(0xFF0F4C4A));
+    expect(SplashGate.background, const Color(0xFF142046));
     expect(SplashGate.copper, const Color(0xFF9A4F24));
   });
 
@@ -114,18 +128,13 @@ void main() {
     expect(find.byKey(AppKeys.splash), findsOneWidget);
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.byType(OnboardingScreen), findsNothing);
-    expect(_splashLogo(tester).variant, ScapeLogoVariant.full);
+    expect(_splashLogo(tester).variant, ScapeLogoVariant.mark);
     expect(_splashLogo(tester).onDark, isTrue);
-    expect(
-      find.descendant(
-        of: find.byKey(AppKeys.splash),
-        matching: find.text('ScapeMatch'),
-      ),
-      findsOneWidget,
-    );
+    expect(_coverImage(tester), findsOneWidget);
     _expectPose(tester, 0, reduced: false);
     _expectBrandColors(tester);
     _expectColdStartCover(tester);
+    await _precacheCover(tester);
 
     var elapsed = 0;
     Future<void> pumpTo(double t) async {
@@ -136,16 +145,26 @@ void main() {
 
     await pumpTo(0.22);
     _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
-    expect(_splashLogo(tester).wordmarkAbsorb, 0);
-    expect(_copperLineWidth(tester), SplashGate.accentWidth);
+    expect(_coverOpacity(tester), closeTo(1, 0.03));
+    expect(_logoOpacity(tester), 0);
     await _saveSplashShot(tester, 'splash-1-logo.png');
 
     await pumpTo(0.46);
     _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
-    expect(_splashLogo(tester).wordmarkAbsorb, greaterThan(0.5));
+    expect(_splashLogo(tester).wordmarkAbsorb, 0);
+    expect(_coverOpacity(tester), lessThan(0.6));
+    expect(_logoOpacity(tester), greaterThan(0.4));
     expect(_logoTurns(tester), 0);
     expect(_curtainOpacity(tester), 1);
     await _saveSplashShot(tester, 'splash-2-converge.png');
+
+    await pumpTo(0.80);
+    _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
+    expect(_logoScale(tester), greaterThan(2));
+    expect(_logoTurns(tester), inExclusiveRange(0.08, 0.22));
+    expect(_coverOpacity(tester), 0);
+    _expectYaw(tester);
+    await _saveSplashShot(tester, 'splash-3-spin.png');
 
     await pumpTo(SplashGate.spinEnd);
     _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
@@ -153,7 +172,7 @@ void main() {
     expect(_logoTurns(tester), closeTo(0.25, 0.02));
     expect(_curtainOpacity(tester), 1);
     expect(_logoOpacity(tester), 1);
-    await _saveSplashShot(tester, 'splash-3-spin.png');
+    _expectYaw(tester);
 
     await pumpTo((SplashGate.spinEnd + SplashGate.vanishEnd) / 2);
     _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
@@ -342,7 +361,8 @@ void main() {
 
     await pumpScapeMatch(tester, viewport: const Size(390, 844), settle: false);
     expect(find.byKey(AppKeys.splash), findsOneWidget);
-    expect(_logoOpacity(tester), 1);
+    expect(_coverOpacity(tester), 1);
+    expect(_logoOpacity(tester), 0);
     expect(_logoScale(tester), closeTo(1, 0.02));
     expect(_logoTurns(tester), 0);
     expect(_splashLogo(tester).wordmarkAbsorb, 0);
@@ -366,7 +386,7 @@ void main() {
     await pumpScapeMatch(tester, viewport: const Size(320, 568), settle: false);
     await tester.pump(const Duration(milliseconds: 700));
     expect(find.byKey(AppKeys.splash), findsOneWidget);
-    expect(_splashLogo(tester).variant, ScapeLogoVariant.full);
+    expect(_splashLogo(tester).variant, ScapeLogoVariant.mark);
     final splash = tester.getRect(find.byKey(AppKeys.splash));
     final logo = tester.getRect(
       find.descendant(
@@ -405,10 +425,41 @@ double _logoScale(WidgetTester tester) {
 }
 
 double _logoTurns(WidgetTester tester) {
-  final spin = tester.widget<Transform>(find.byKey(SplashGate.spinKey));
-  final matrix = spin.transform.storage;
-  final turns = math.atan2(matrix[1], matrix[0]) / (2 * math.pi);
+  final matrix = tester
+      .widget<Transform>(find.byKey(SplashGate.spinKey))
+      .transform
+      .storage;
+  final turns = math.atan2(matrix[8], matrix[0]) / (2 * math.pi);
   return turns < 0 ? turns + 1 : turns;
+}
+
+void _expectYaw(WidgetTester tester) {
+  final matrix = tester
+      .widget<Transform>(find.byKey(SplashGate.spinKey))
+      .transform
+      .storage;
+  expect(matrix[5], closeTo(1, 0.02));
+  expect(matrix[1].abs(), lessThan(0.02));
+}
+
+double _coverOpacity(WidgetTester tester) {
+  return tester.widget<Opacity>(find.byKey(SplashGate.coverKey)).opacity;
+}
+
+Finder _coverImage(WidgetTester tester) {
+  return find.descendant(
+    of: find.byKey(AppKeys.splash),
+    matching: find.byType(Image),
+  );
+}
+
+Future<void> _precacheCover(WidgetTester tester) async {
+  final image = tester.widget<Image>(_coverImage(tester));
+  await tester.runAsync(
+    () =>
+        precacheImage(image.image, tester.element(find.byKey(AppKeys.splash))),
+  );
+  await tester.pump();
 }
 
 double _logoOpacity(WidgetTester tester) {
@@ -425,11 +476,8 @@ void _expectPose(WidgetTester tester, double t, {bool reduced = false}) {
   expect(_logoScale(tester), closeTo(motion.scale, 0.03));
   expect(_logoTurns(tester), closeTo(_wrappedTurns(motion.turns), 0.03));
   expect(_curtainOpacity(tester), closeTo(motion.curtain, 0.03));
-  expect(_splashLogo(tester).wordmarkAbsorb, closeTo(motion.absorb, 0.03));
-  expect(
-    _copperLineWidth(tester),
-    closeTo(SplashGate.accentWidth * motion.accent, 1.5),
-  );
+  expect(_splashLogo(tester).wordmarkAbsorb, 0);
+  expect(_coverOpacity(tester), closeTo(motion.cover, 0.03));
 }
 
 double _wrappedTurns(double turns) {
@@ -451,16 +499,6 @@ void _expectColdStartCover(WidgetTester tester) {
   );
 }
 
-double _copperLineWidth(WidgetTester tester) {
-  final copper = find.byWidgetPredicate(
-    (widget) => widget is ColoredBox && widget.color == SplashGate.copper,
-  );
-  final line = tester.widget<SizedBox>(
-    find.descendant(of: copper, matching: find.byType(SizedBox)),
-  );
-  return line.width!;
-}
-
 void _expectBrandColors(WidgetTester tester) {
   expect(
     find.descendant(
@@ -473,10 +511,12 @@ void _expectBrandColors(WidgetTester tester) {
     findsOneWidget,
   );
   expect(
-    find.byWidgetPredicate(
-      (widget) => widget is ColoredBox && widget.color == SplashGate.copper,
+    tester.widget<Image>(_coverImage(tester)).image,
+    isA<AssetImage>().having(
+      (image) => image.assetName,
+      'assetName',
+      SplashGate.coverAsset,
     ),
-    findsOneWidget,
   );
 }
 
