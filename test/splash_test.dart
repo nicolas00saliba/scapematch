@@ -179,20 +179,50 @@ void main() {
     expect(trainingPin.width, closeTo(heldPin.width, 0.5));
     expect(trainingPin.height, closeTo(heldPin.height, 0.5));
     expect(trainingWord.left, lessThan(heldWord.left));
-    final clip = tester.getRect(
-      find.descendant(
-        of: find.byKey(AppKeys.splash),
-        matching: find.byType(ClipRect),
+    final clipFinder = find.descendant(
+      of: find.byKey(AppKeys.splash),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is ClipPath && widget.clipper is! ShapeBorderClipper,
       ),
     );
-    expect(clip.left, closeTo(trainingPin.right, 1));
+    expect(clipFinder, findsOneWidget);
+    final clip = tester.getRect(clipFinder);
+    final path = tester
+        .widget<ClipPath>(clipFinder)
+        .clipper!
+        .getClip(tester.getSize(clipFinder));
+    final clipOrigin = tester.getTopLeft(clipFinder);
+    Offset clipLocal(Offset global) => global - clipOrigin;
+    // x=195/200 ainda é folga transparente do viewBox, à direita do verde
+    // (x=190). O letreiro precisa poder ocupar essa faixa para encostar
+    // na silhueta. x=2/200 já é fora do pin, à esquerda.
+    expect(
+      path.contains(
+        clipLocal(
+          Offset(
+            trainingPin.left + trainingPin.width * 195 / 200,
+            trainingPin.top + trainingPin.height * 100 / 260,
+          ),
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      path.contains(
+        clipLocal(
+          Offset(
+            trainingPin.left + trainingPin.width * 2 / 200,
+            trainingPin.top + trainingPin.height * 100 / 260,
+          ),
+        ),
+      ),
+      isFalse,
+    );
+    expect(clip.left, lessThan(trainingPin.right - 8));
     expect(trainingWord.right, lessThanOrEqualTo(clip.right + 1));
     final splash = tester.getRect(find.byKey(AppKeys.splash));
-    final visibleLeft = math.max(trainingWord.left, clip.left);
-    final visibleRight = math.min(trainingWord.right, clip.right);
-    expect(visibleRight, greaterThan(visibleLeft));
-    expect(visibleLeft, greaterThanOrEqualTo(splash.left));
-    expect(visibleRight, lessThanOrEqualTo(splash.right));
+    expect(trainingWord.right, greaterThan(trainingPin.center.dx));
+    expect(trainingWord.right, lessThanOrEqualTo(splash.right));
     expect(trainingPin.left, greaterThanOrEqualTo(splash.left + 8));
     expect(trainingPin.right, lessThanOrEqualTo(splash.right - 8));
     await _saveSplashShot(tester, 'splash-2-converge.png');

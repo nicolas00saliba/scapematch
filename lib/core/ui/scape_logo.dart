@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -34,8 +36,9 @@ class ScapeLogo extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// 0 deixa o letreiro ao lado do símbolo. 1 já o enfiou no pin.
-  /// No meio, o letreiro desliza para a esquerda e some na borda do pin,
-  /// como um trem entrando. O pin não muda de tamanho nem de proporção.
+  /// No meio, o letreiro desliza para a esquerda e some na silhueta verde,
+  /// como um trem entrando. A folga transparente do viewBox não corta as
+  /// letras. O pin não muda de tamanho nem de proporção.
   final double wordmarkAbsorb;
 
   static const pin = Color(0xFF0F4C4A);
@@ -128,14 +131,39 @@ class ScapeLogo extends StatelessWidget {
         _Wordmark(height: height, onDark: dark),
       ],
     );
-    // A caixa não encolhe: o pin fica no lugar. O letreiro só é cortado
-    // depois que atravessa a borda direita do pin.
+    // A caixa não encolhe: o pin fica no lugar. O letreiro passa por baixo
+    // do SVG, então some nos pixels verdes e não na folga do viewBox.
     return SizedBox(
       width: width,
       height: height,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          if (absorb <= 0)
+            Positioned(
+              left: pinW,
+              top: 0,
+              width: lane,
+              height: height,
+              child: Align(alignment: Alignment.centerLeft, child: train),
+            )
+          else if (absorb < 1)
+            Positioned(
+              left: 0,
+              top: 0,
+              width: width,
+              height: height,
+              child: ClipPath(
+                clipper: _WordmarkTrainClipper(
+                  pinWidth: pinW,
+                  logoHeight: height,
+                ),
+                child: Transform.translate(
+                  offset: Offset(pinW - absorb * lane, 0),
+                  child: Align(alignment: Alignment.centerLeft, child: train),
+                ),
+              ),
+            ),
           Positioned(
             left: 0,
             top: 0,
@@ -143,27 +171,80 @@ class ScapeLogo extends StatelessWidget {
             height: height,
             child: _pin(dark),
           ),
-          if (absorb < 1)
-            Positioned(
-              left: pinW,
-              top: 0,
-              width: lane,
-              height: height,
-              child: absorb <= 0
-                  ? Align(alignment: Alignment.centerLeft, child: train)
-                  : ClipRect(
-                      child: Transform.translate(
-                        offset: Offset(-absorb * lane, 0),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: train,
-                        ),
-                      ),
-                    ),
-            ),
         ],
       ),
     );
+  }
+}
+
+/// Esconde o que já passou da silhueta, à esquerda.
+///
+/// O viewBox é 200×260 e o círculo verde vai de x=10 a x=190 (centro 100,
+/// raio 90; o pescoço do path está em y=154 e a ponta em y=250). A faixa
+/// entre o verde e a caixa é transparente. Recortar na borda da caixa faz
+/// as letras sumirem nessa faixa, que no branco da splash parece um halo.
+///
+/// O desenho do pin fica por cima e cobre as letras nos pixels opacos.
+/// Aqui o recorte só fecha a saída esquerda, para o começo do letreiro não
+/// reaparecer na folga transparente do outro lado. Ele entra um pixel no
+/// verde para o antialiasing da borda não deixar um fiapo de letra.
+class _WordmarkTrainClipper extends CustomClipper<Path> {
+  const _WordmarkTrainClipper({
+    required this.pinWidth,
+    required this.logoHeight,
+  });
+
+  final double pinWidth;
+  final double logoHeight;
+
+  static const _tuck = 1.0;
+  static const _cx = 100.0;
+  static const _cy = 100.0;
+  static const _radius = 90.0;
+  static const _neckY = 154.0;
+  static const _neckLeft = 28.0;
+  static const _tipY = 250.0;
+  static const _tipX = 100.0;
+
+  double _leftEdge(double y) {
+    final sx = pinWidth / ScapeLogo.markAspectWidth;
+    final sy = logoHeight / ScapeLogo.markAspectHeight;
+    final yb = sy == 0 ? 0.0 : y / sy;
+    final top = _cy - _radius;
+    if (yb <= top || yb >= _tipY) {
+      return pinWidth;
+    }
+    final double xVb;
+    if (yb <= _neckY) {
+      final dy = yb - _cy;
+      final rest = _radius * _radius - dy * dy;
+      final dx = rest <= 0 ? 0.0 : math.sqrt(rest);
+      xVb = _cx - dx;
+    } else {
+      final t = (yb - _neckY) / (_tipY - _neckY);
+      xVb = _neckLeft + (_tipX - _neckLeft) * t;
+    }
+    return xVb * sx + _tuck;
+  }
+
+  @override
+  Path getClip(Size size) {
+    final path = Path()..moveTo(size.width, 0);
+    const samples = 96;
+    for (var i = 0; i <= samples; i++) {
+      final y = size.height * i / samples;
+      path.lineTo(_leftEdge(y), y);
+    }
+    path
+      ..lineTo(size.width, size.height)
+      ..close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant _WordmarkTrainClipper oldDelegate) {
+    return oldDelegate.pinWidth != pinWidth ||
+        oldDelegate.logoHeight != logoHeight;
   }
 }
 
