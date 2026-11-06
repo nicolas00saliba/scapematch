@@ -3,7 +3,7 @@
 ## A demo instala como outro app
 
 - **Data:** 2026-11-06
-- **Decisão:** o atalho de `https://app.scapematch.com.br/` e o de `https://demo.scapematch.com.br/` são PWAs diferentes. O manifest de cada build leva `id`, `start_url` e `scope` absolutos: o real em `https://app.scapematch.com.br/`, a demo em `https://demo.scapematch.com.br/`. O nome da demo é ScapeMatch Demo (atalho: Scape Demo). O Parceiro real fica em `https://parceiro.scapematch.com.br/` e a demo da casa em `https://demo.scapematch.com.br/parceiro/`, com o nome ScapeMatch Parceiro Demo. O Pages antigo continua em `nicolas00saliba.github.io` mais o caminho (`/scapematch/`, `/scapematch/demo/`, …). O worker que só apaga cache antigo carrega essa mesma URL e não mexe no cache nem nas abas do outro app. Não há worker de cache novo. A splash do celular vale para os dois builds do jogador. “Ver introdução” continua só na Ajuda da demo.
+- **Decisão:** o atalho de `https://app.scapematch.com.br/` e o de `https://demo.scapematch.com.br/` são PWAs diferentes. O manifest de cada build leva `id`, `start_url` e `scope` absolutos: o real em `https://app.scapematch.com.br/`, a demo em `https://demo.scapematch.com.br/`. O nome da demo é ScapeMatch Demo (atalho: Scape Demo). O Parceiro real fica em `https://parceiro.scapematch.com.br/` e a demo da casa em `https://demo.scapematch.com.br/parceiro/`, com o nome ScapeMatch Parceiro Demo. O Pages antigo continua em `nicolas00saliba.github.io` mais o caminho (`/scapematch/`, `/scapematch/demo/`, …). O worker que só apaga cache antigo carrega essa mesma URL e não mexe no cache nem nas abas do outro app. Não há worker de cache novo. A splash do celular vale para os dois builds do jogador e para o Parceiro. “Ver introdução” continua só na Ajuda da demo.
 - **Motivo:** os dois hosts publicavam `id: "/"`. No Android essa string crua junta os atalhos num ícone só, e os dois se chamavam ScapeMatch.
 - **Onde está no código:** `tool/web_install_identity.py`, `tool/stamp_web_manifest.sh`, `tool/check_web_manifest.sh`, `tool/flutter_service_worker.js`. Os workflows de CI e de deploy passam papel e modo ao carimbo.
 - **Como trocar depois:** outro host entra em `web_install_identity.py` e em `public_origins.dart`.
@@ -145,13 +145,13 @@
 - **Onde está no código:** `assets/brand/`, `ScapeLogo` e os ícones em `web/`, `android/` e `ios/`. O letreiro é desenhado no widget com Poppins 500, porque o SVG aponta para a fonte e não traz as letras em traço. A barra do site usa a variante completa.
 - **Como trocar depois:** outro desenho entra nos arquivos de `assets/brand/` e o widget só troca o arquivo. A landing usa `ScapeLogo` completo. O app Parceiro usa só o símbolo, com o selo “Parceiro”.
 
-## A capa do app é o arquivo do pin, com o branco
+## A capa é o pin oficial inteiro, no branco
 
 - **Data:** 2026-11-06
-- **Decisão:** a capa do jogador (favicon, 192, 512, maskable e a splash) é o arquivo inteiro do pin: contorno teal, disco branco circular, pessoas cobre, fechadura e o fundo branco ao redor. Não se recorta o pin, não se troca o branco por transparência, floresta ou outra cor, e não se estica o disco. O app e a demo usam os mesmos pixels; nome, id, start_url e scope continuam separados. O app Parceiro não muda.
-- **Motivo:** o Nícolas mandou esse arquivo como a capa, incluindo a margem branca.
-- **Onde está no código:** `assets/brand/pin_capa.jpg`, `web/favicon.png`, `web/icons/` e `SplashGate`.
-- **Como trocar depois:** outro arquivo entra no lugar de `pin_capa.jpg` e os ícones são a mesma imagem, em escala uniforme.
+- **Decisão:** o pin oficial (contorno petróleo, disco branco circular, pessoas cobre e fechadura) entra inteiro, em escala uniforme, sobre fundo branco. Não se corta a ponta nem o topo, não se estica o disco e não se troca o branco por transparência ou floresta. No ícone comum há margem para a ponta não encostar na borda. No maskable o pin cabe no círculo seguro de 80%. A splash do celular, no jogador (real e demo) e no Parceiro, mostra primeiro o logo completo com o letreiro, parado o bastante para ler; o letreiro entra no pin como um trem; só então o pin avança, gira no eixo vertical e cresce até sumir. Desktop a partir de 960px, voltar do segundo plano e navegar entre telas não repetem. Reduzir movimento fica em 180ms, sem trem e sem giro.
+- **Motivo:** a capa anterior encostava na borda, a máscara cortava o pin, e a splash pulava o letreiro.
+- **Onde está no código:** `ScapeLogo`, `SplashGate`, `web/icons/`, `web/favicon.png`, `assets/brand/pin_capa.jpg` e os mesmos ícones em `apps/parceiro/web/`.
+- **Como trocar depois:** outro desenho entra no SVG do pin. Os ícones saem de novo desse arquivo, em escala uniforme, com a mesma folga.
 
 ## No computador o jogador usa um site
 

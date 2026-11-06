@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 
 /// Abertura do celular.
@@ -13,12 +14,13 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// curto (o app ainda na memória) não repetem. Não grava flag. A introdução
 /// continua com a chave dela.
 ///
-/// A capa é o arquivo inteiro do pin: o desenho teal, o disco branco e o
-/// branco ao redor. Ela aparece, se aproxima e gira no próprio eixo vertical,
-/// como um pião, crescendo até sumir. A escala é uniforme, então o disco
-/// continua circular. Só então a cortina revela a próxima tela. Com reduzir
-/// movimento, a capa já entra pronta e a cortina some em [reducedDuration],
-/// sem giro.
+/// Primeiro entra o logo completo (pin oficial e letreiro), parado o
+/// bastante para ler. O letreiro entra no pin como um trem. Só então o pin
+/// avança, gira no eixo vertical e cresce até sumir. A escala é uniforme,
+/// na proporção do viewBox, então o disco branco continua circular. A
+/// cortina só revela a próxima tela depois disso. Com reduzir movimento,
+/// o logo completo já entra pronto e a cortina some em [reducedDuration],
+/// sem trem e sem giro.
 ///
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
@@ -27,24 +29,23 @@ class SplashGate extends StatefulWidget {
 
   final Widget child;
 
-  /// Branco do arquivo da capa, inclusive a margem ao redor do pin.
+  /// Fundo da abertura. O disco do pin também é branco.
   static const background = Color(0xFFFFFFFF);
   static const copper = Color(0xFF9A4F24);
 
-  static const coverAsset = 'assets/brand/pin_capa.jpg';
+  /// Entrada, leitura do letreiro, trem, aproximação, giro e saída.
+  /// Um pouco mais lenta que os 1800ms em que o letreiro não aparecia.
+  static const duration = Duration(milliseconds: 2700);
 
-  /// Entrada, pausa, aproximação, giro e saída. Cabe em até 1,8s.
-  static const duration = Duration(milliseconds: 1800);
-
-  /// `prefers-reduced-motion`: o logo já está pronto e a cortina some.
+  /// `prefers-reduced-motion`: o logo completo já está pronto e a cortina some.
   static const reducedDuration = Duration(milliseconds: 180);
 
-  static const enterEnd = 0.16;
-  static const holdEnd = 0.30;
-  static const buryEnd = 0.48;
-  static const approachEnd = 0.58;
-  static const spinEnd = 0.82;
-  static const vanishEnd = 0.90;
+  static const enterEnd = 0.12;
+  static const holdEnd = 0.36;
+  static const buryEnd = 0.56;
+  static const approachEnd = 0.66;
+  static const spinEnd = 0.86;
+  static const vanishEnd = 0.93;
 
   static const enterScale = 0.9;
   static const restScale = 1.0;
@@ -75,6 +76,7 @@ class SplashMotion {
     required this.cover,
     required this.coverScale,
     required this.absorb,
+    required this.recenter,
     required this.scale,
     required this.turns,
     required this.curtain,
@@ -89,8 +91,12 @@ class SplashMotion {
   /// Escala uniforme do arquivo. Igual a [scale], sem esticar o disco.
   final double coverScale;
 
-  /// Progresso da pausa antes do giro. O desenho não encolhe nem estica.
+  /// 0 é o letreiro ao lado. 1 é o letreiro já dentro do pin.
   final double absorb;
+
+  /// 0 mantém o pin onde o logo completo o deixou. 1 o traz ao centro
+  /// da tela, depois do trem, para o giro sair do meio.
+  final double recenter;
 
   /// Escala do símbolo. 1 é o tamanho de repouso.
   final double scale;
@@ -120,6 +126,7 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
       cover: 1,
       coverScale: SplashGate.restScale,
       absorb: 0,
+      recenter: 0,
       scale: SplashGate.restScale,
       turns: 0,
       curtain: (1 - Curves.easeOut.transform(progress)).clamp(0.0, 1.0),
@@ -129,8 +136,11 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
   final enter = Curves.easeOutCubic.transform(
     _span(progress, 0, SplashGate.enterEnd),
   );
-  final bury = Curves.easeInCubic.transform(
+  final bury = Curves.easeInOutCubic.transform(
     _span(progress, SplashGate.holdEnd, SplashGate.buryEnd),
+  );
+  final recenter = Curves.easeInOut.transform(
+    _span(progress, SplashGate.buryEnd, SplashGate.approachEnd),
   );
   final approach = Curves.easeOut.transform(
     _span(progress, SplashGate.buryEnd, SplashGate.approachEnd),
@@ -187,6 +197,7 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
     cover: cover.clamp(0.0, 1.0),
     coverScale: scale,
     absorb: bury,
+    recenter: recenter,
     scale: scale,
     turns: turns,
     curtain: curtain,
@@ -337,31 +348,59 @@ class _SplashMark extends StatelessWidget {
 
   final SplashMotion motion;
 
+  double _heightThatFits(BuildContext context, BoxConstraints constraints) {
+    final maxW = math.max(0.0, constraints.maxWidth - 64);
+    final maxH = math.max(0.0, constraints.maxHeight - 64);
+    if (maxW <= 0 || maxH <= 0) {
+      return 1;
+    }
+    var lo = 1.0;
+    var hi = maxH;
+    for (var i = 0; i < 14; i++) {
+      final mid = (lo + hi) / 2;
+      if (ScapeLogo.lockupWidthFor(context, mid) <= maxW) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final side = math.min(constraints.maxWidth, constraints.maxHeight);
+        final height = _heightThatFits(context, constraints);
+        final pinW = ScapeLogo.pinWidthFor(height);
+        final fullW = ScapeLogo.lockupWidthFor(context, height);
+        // O giro e o crescimento saem do centro do pin, não do letreiro.
+        final alignX = fullW == 0 ? 0.0 : pinW / fullW - 1;
+        final alignment = Alignment(alignX, 0);
+        // Depois do trem, o pin vai ao centro. Antes disso ele fica parado
+        // para o letreiro entrar nele.
+        final shift = (fullW - pinW) / 2 * motion.recenter;
         return Center(
-          child: Opacity(
-            key: SplashGate.logoOpacityKey,
-            opacity: motion.logoOpacity,
-            child: Transform.scale(
-              key: SplashGate.scaleKey,
-              scale: motion.scale,
-              filterQuality: FilterQuality.medium,
-              child: Transform(
-                key: SplashGate.spinKey,
-                alignment: Alignment.center,
+          child: Transform.translate(
+            offset: Offset(shift, 0),
+            child: Opacity(
+              key: SplashGate.logoOpacityKey,
+              opacity: motion.logoOpacity,
+              child: Transform.scale(
+                key: SplashGate.scaleKey,
+                alignment: alignment,
+                scale: motion.scale,
                 filterQuality: FilterQuality.medium,
-                transform: splashYawTransform(motion.turns),
-                child: Image.asset(
-                  SplashGate.coverAsset,
-                  width: side,
-                  height: side,
-                  fit: BoxFit.contain,
-                  excludeFromSemantics: true,
+                child: Transform(
+                  key: SplashGate.spinKey,
+                  alignment: alignment,
                   filterQuality: FilterQuality.medium,
+                  transform: splashYawTransform(motion.turns),
+                  child: ScapeLogo(
+                    height: height,
+                    onDark: false,
+                    wordmarkAbsorb: motion.absorb,
+                  ),
                 ),
               ),
             ),

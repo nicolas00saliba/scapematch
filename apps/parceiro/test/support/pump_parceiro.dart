@@ -13,6 +13,7 @@ Future<void> pumpParceiro(
   WidgetTester tester, {
   List<Override> overrides = const [],
   Size size = const Size(400, 1800),
+  bool settle = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -26,5 +27,7 @@ Future<void> pumpParceiro(
       child: const ParceiroApp(),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  }
 }
