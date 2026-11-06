@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 /// Marca aprovada em 2026-11-03.
@@ -80,9 +81,8 @@ class ScapeLogo extends StatelessWidget {
   }
 
   Widget _pin(bool dark) {
-    return SvgPicture.asset(
-      dark ? markOnDarkAsset : markAsset,
-      package: 'scapematch',
+    return SvgPicture(
+      ScapePinLoader(dark ? markOnDarkAsset : markAsset),
       height: height,
       width: pinWidthFor(height),
       fit: BoxFit.contain,
@@ -164,6 +164,74 @@ class ScapeLogo extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Abre o SVG do pin no jogador e no Parceiro.
+///
+/// O jogador é o próprio pacote `scapematch`. O bundle dele registra
+/// `assets/brand/logo_simbolo.svg` (e o claro). O Parceiro depende do
+/// pacote, então o mesmo arquivo entra como
+/// `packages/scapematch/assets/brand/...`.
+///
+/// `SvgPicture.asset(..., package: 'scapematch')` pede sempre a chave com
+/// prefixo. No bundle do jogador — inclusive no build web — essa chave não
+/// existe: o SVG não pinta e sobra o letreiro, que é texto. A caixa do pin
+/// continua no [Stack]; o buraco é o desenho que não carregou.
+///
+/// A chave do pacote vem primeiro para o Parceiro usar o arquivo
+/// compartilhado, mesmo tendo uma cópia em `assets/brand/`. Sem essa chave,
+/// vale a do app, que é o caso do jogador.
+class ScapePinLoader extends SvgAssetLoader {
+  const ScapePinLoader(super.assetName, {super.assetBundle});
+
+  static const sharedPackage = 'scapematch';
+
+  static String packagedKey(String assetName) =>
+      'packages/$sharedPackage/$assetName';
+
+  @override
+  Future<ByteData?> prepareMessage(BuildContext? context) async {
+    final bundle = _bundle(context);
+    final packaged = packagedKey(assetName);
+    if (await _has(bundle, packaged)) {
+      return bundle.load(packaged);
+    }
+    return bundle.load(assetName);
+  }
+
+  /// Bytes do SVG na chave que este bundle realmente tem.
+  @visibleForTesting
+  Future<ByteData> readSvg() async {
+    final bytes = await prepareMessage(null);
+    if (bytes == null) {
+      throw FlutterError('Unable to load asset: $assetName');
+    }
+    return bytes;
+  }
+
+  AssetBundle _bundle(BuildContext? context) {
+    if (assetBundle != null) {
+      return assetBundle!;
+    }
+    if (context != null) {
+      return DefaultAssetBundle.of(context);
+    }
+    return rootBundle;
+  }
+
+  static Future<bool> _has(AssetBundle bundle, String key) async {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(bundle);
+      return manifest.getAssetVariants(key) != null;
+    } on Object {
+      try {
+        await bundle.load(key);
+        return true;
+      } on FlutterError {
+        return false;
+      }
+    }
   }
 }
 
