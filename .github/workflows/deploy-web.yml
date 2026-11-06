@@ -66,7 +66,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/app-root
           bash tool/install_cleanup_service_worker.sh build/app-root
-          bash tool/stamp_web_manifest.sh build/app-root
+          bash tool/stamp_web_manifest.sh build/app-root player real
           bash tool/mark_real_web_copy.sh build/app-root player
           bash tool/check_web_service_worker.sh build/app-root player
           bash tool/check_web_manifest.sh build/app-root player real
@@ -80,7 +80,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/parceiro-root
           bash ../../tool/install_cleanup_service_worker.sh build/parceiro-root
-          bash ../../tool/stamp_web_manifest.sh build/parceiro-root
+          bash ../../tool/stamp_web_manifest.sh build/parceiro-root partner real
           bash ../../tool/mark_real_web_copy.sh build/parceiro-root partner
           bash ../../tool/check_web_service_worker.sh build/parceiro-root partner
           bash ../../tool/check_web_manifest.sh build/parceiro-root partner real
@@ -93,7 +93,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-player
           bash tool/install_cleanup_service_worker.sh build/demo-player
-          bash tool/stamp_web_manifest.sh build/demo-player
+          bash tool/stamp_web_manifest.sh build/demo-player player demo
           bash tool/check_web_service_worker.sh build/demo-player player
           bash tool/check_web_manifest.sh build/demo-player player demo
           grep -F 'base href="/"' build/demo-player/index.html
@@ -103,7 +103,7 @@ jobs:
         run: |
           flutter build web --release --base-href /parceiro/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-parceiro
           bash ../../tool/install_cleanup_service_worker.sh build/demo-parceiro
-          bash ../../tool/stamp_web_manifest.sh build/demo-parceiro
+          bash ../../tool/stamp_web_manifest.sh build/demo-parceiro partner demo
           bash ../../tool/check_web_service_worker.sh build/demo-parceiro partner
           bash ../../tool/check_web_manifest.sh build/demo-parceiro partner demo
           grep -F 'base href="/parceiro/"' build/demo-parceiro/index.html
@@ -124,23 +124,31 @@ jobs:
         run: |
           flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-player
           bash tool/install_cleanup_service_worker.sh build/legacy-player
-          bash tool/stamp_web_manifest.sh build/legacy-player
+          bash tool/stamp_web_manifest.sh build/legacy-player player real
           bash tool/mark_real_web_copy.sh build/legacy-player player
+          bash tool/check_web_service_worker.sh build/legacy-player player
+          bash tool/check_web_manifest.sh build/legacy-player player real
           (
             cd apps/parceiro
             flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-parceiro
             bash ../../tool/install_cleanup_service_worker.sh build/legacy-parceiro
-            bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro
+            bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro partner real
             bash ../../tool/mark_real_web_copy.sh build/legacy-parceiro partner
+            bash ../../tool/check_web_service_worker.sh build/legacy-parceiro partner
+            bash ../../tool/check_web_manifest.sh build/legacy-parceiro partner real
           )
           flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-player-demo
           bash tool/install_cleanup_service_worker.sh build/legacy-player-demo
-          bash tool/stamp_web_manifest.sh build/legacy-player-demo
+          bash tool/stamp_web_manifest.sh build/legacy-player-demo player demo
+          bash tool/check_web_service_worker.sh build/legacy-player-demo player
+          bash tool/check_web_manifest.sh build/legacy-player-demo player demo
           (
             cd apps/parceiro
             flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-parceiro-demo
             bash ../../tool/install_cleanup_service_worker.sh build/legacy-parceiro-demo
-            bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro-demo
+            bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro-demo partner demo
+            bash ../../tool/check_web_service_worker.sh build/legacy-parceiro-demo partner
+            bash ../../tool/check_web_manifest.sh build/legacy-parceiro-demo partner demo
           )
           mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/site
           cp -a build/legacy-player/. build/legacy/

@@ -20,6 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Check install identities
+        run: bash tool/test_web_install_identity.sh
+
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -69,7 +72,7 @@ jobs:
       - name: Install the cleanup service worker
         run: |
           bash tool/install_cleanup_service_worker.sh build/web
-          bash tool/stamp_web_manifest.sh build/web
+          bash tool/stamp_web_manifest.sh build/web player real
           bash tool/mark_real_web_copy.sh build/web player
           bash tool/check_web_service_worker.sh build/web player
           bash tool/check_web_manifest.sh build/web player real
@@ -104,7 +107,7 @@ jobs:
       - name: Install the partner cleanup service worker
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
-          bash tool/stamp_web_manifest.sh apps/parceiro/build/web
+          bash tool/stamp_web_manifest.sh apps/parceiro/build/web partner real
           bash tool/mark_real_web_copy.sh apps/parceiro/build/web partner
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
           bash tool/check_web_manifest.sh apps/parceiro/build/web partner real
@@ -135,7 +138,7 @@ jobs:
       - name: Check player demo
         run: |
           bash tool/install_cleanup_service_worker.sh build/player-demo
-          bash tool/stamp_web_manifest.sh build/player-demo
+          bash tool/stamp_web_manifest.sh build/player-demo player demo
           bash tool/check_web_service_worker.sh build/player-demo player
           bash tool/check_web_manifest.sh build/player-demo player demo
           grep -F -q 'base href="/"' build/player-demo/index.html
@@ -161,7 +164,7 @@ jobs:
       - name: Check partner demo
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/partner-demo
-          bash tool/stamp_web_manifest.sh apps/parceiro/build/partner-demo
+          bash tool/stamp_web_manifest.sh apps/parceiro/build/partner-demo partner demo
           bash tool/check_web_service_worker.sh apps/parceiro/build/partner-demo partner
           bash tool/check_web_manifest.sh apps/parceiro/build/partner-demo partner demo
           grep -F -q 'base href="/parceiro/"' apps/parceiro/build/partner-demo/index.html
