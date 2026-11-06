@@ -32,8 +32,9 @@ class ScapeLogo extends StatelessWidget {
   final bool? onDark;
   final VoidCallback? onTap;
 
-  /// 0 deixa o letreiro ao lado do símbolo. 1 enfia o letreiro nele.
-  /// A splash do celular usa isso; o resto do app passa 0.
+  /// 0 deixa o letreiro ao lado do símbolo. 1 já o enfiou no pin.
+  /// No meio, o letreiro desliza para a esquerda e some na borda do pin,
+  /// como um trem entrando. O pin não muda de tamanho nem de proporção.
   final double wordmarkAbsorb;
 
   static const pin = Color(0xFF0F4C4A);
@@ -43,23 +44,59 @@ class ScapeLogo extends StatelessWidget {
   static const markAsset = 'assets/brand/logo_simbolo.svg';
   static const markOnDarkAsset = 'assets/brand/logo_simbolo_claro.svg';
 
+  /// viewBox do símbolo. A largura e a altura do pin usam esta razão:
+  /// outra razão estica o disco branco.
+  static const markAspectWidth = 200.0;
+  static const markAspectHeight = 260.0;
+
+  /// Folga à direita do letreiro para o texto medido não ser cortado.
+  static const wordmarkSlack = 16.0;
+
+  static double pinWidthFor(double height) =>
+      height * markAspectWidth / markAspectHeight;
+
+  static double wordmarkGapFor(double height) => height * 0.18;
+
+  static double wordmarkWidthFor(BuildContext context, double height) {
+    final painter = TextPainter(
+      text: TextSpan(text: 'ScapeMatch', style: _Wordmark.styleFor(height)),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    return painter.width;
+  }
+
+  /// Largura do pin, do vão e do letreiro. Não muda enquanto o trem entra,
+  /// para o pin não saltar no centro da tela.
+  static double lockupWidthFor(BuildContext context, double height) {
+    return pinWidthFor(height) +
+        wordmarkGapFor(height) +
+        wordmarkWidthFor(context, height) +
+        wordmarkSlack;
+  }
+
   bool _onDark(BuildContext context) {
     return onDark ?? Theme.of(context).brightness == Brightness.dark;
+  }
+
+  Widget _pin(bool dark) {
+    return SvgPicture.asset(
+      dark ? markOnDarkAsset : markAsset,
+      package: 'scapematch',
+      height: height,
+      width: pinWidthFor(height),
+      fit: BoxFit.contain,
+      alignment: Alignment.center,
+      excludeFromSemantics: true,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final dark = _onDark(context);
-    final mark = SvgPicture.asset(
-      dark ? markOnDarkAsset : markAsset,
-      height: height,
-      width: height * 200 / 260,
-      fit: BoxFit.contain,
-      excludeFromSemantics: true,
-    );
     final logo = variant == ScapeLogoVariant.mark
-        ? mark
-        : _fullLogo(mark, dark);
+        ? _pin(dark)
+        : _fullLogo(context, dark);
     final labeled = Semantics(
       label: variant == ScapeLogoVariant.mark ? 'ScapeMatch' : null,
       child: logo,
@@ -77,52 +114,55 @@ class ScapeLogo extends StatelessWidget {
     );
   }
 
-  Widget _fullLogo(Widget mark, bool dark) {
-    final gap = height * 0.18;
-    final wordmark = _Wordmark(height: height, onDark: dark);
-    if (wordmarkAbsorb <= 0) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          mark,
-          SizedBox(width: gap),
-          wordmark,
-        ],
-      );
-    }
-    if (wordmarkAbsorb >= 1) {
-      return mark;
-    }
+  Widget _fullLogo(BuildContext context, bool dark) {
+    final pinW = pinWidthFor(height);
+    final width = lockupWidthFor(context, height);
+    final gap = wordmarkGapFor(height);
     final absorb = wordmarkAbsorb.clamp(0.0, 1.0);
-    final remain = 1 - absorb;
-    return Row(
+    final lane = width - pinW;
+    final train = Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        mark,
-        Align(
-          alignment: Alignment.centerLeft,
-          widthFactor: remain,
-          child: Opacity(
-            opacity: remain,
-            child: Transform.translate(
-              offset: Offset(-height * 0.62 * absorb, -height * 0.04 * absorb),
-              child: Transform.scale(
-                alignment: Alignment.centerLeft,
-                scale: 0.05 + 0.95 * remain,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(width: gap),
-                    wordmark,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+        SizedBox(width: gap),
+        _Wordmark(height: height, onDark: dark),
       ],
+    );
+    // A caixa não encolhe: o pin fica no lugar. O letreiro só é cortado
+    // depois que atravessa a borda direita do pin.
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            width: pinW,
+            height: height,
+            child: _pin(dark),
+          ),
+          if (absorb < 1)
+            Positioned(
+              left: pinW,
+              top: 0,
+              width: lane,
+              height: height,
+              child: absorb <= 0
+                  ? Align(alignment: Alignment.centerLeft, child: train)
+                  : ClipRect(
+                      child: Transform.translate(
+                        offset: Offset(-absorb * lane, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: train,
+                        ),
+                      ),
+                    ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -133,22 +173,25 @@ class _Wordmark extends StatelessWidget {
   final double height;
   final bool onDark;
 
-  @override
-  Widget build(BuildContext context) {
+  static TextStyle styleFor(double height) {
     final size = height * 0.52;
     // O SVG usa letter-spacing -1 em 128px.
-    final tracking = size * -1 / 128;
+    return TextStyle(
+      fontFamily: 'Poppins',
+      fontWeight: FontWeight.w500,
+      fontSize: size,
+      letterSpacing: size * -1 / 128,
+      height: 1,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(bottom: height * 0.08),
       child: Text.rich(
         TextSpan(
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w500,
-            fontSize: size,
-            letterSpacing: tracking,
-            height: 1,
-          ),
+          style: styleFor(height),
           children: [
             TextSpan(
               text: 'Scape',
