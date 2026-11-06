@@ -1,4 +1,5 @@
 import { asaasPaymentGone, AsaasProvider } from "./asaas_provider.ts";
+import { detachGonePix } from "./detach_gone_pix.ts";
 import { lostAttemptCompensation, pixLeaseMs } from "./pix_charge.ts";
 
 /// Cada chamada ao Asaas cabe várias vezes dentro do lease de 2 minutos.
@@ -115,11 +116,11 @@ async function reconcileOrphan(
       (row.billing_type === "PIX" || remote.billingType === "PIX") &&
       remote.status.trim().toUpperCase() !== "REFUNDED"
     ) {
-      const { error } = await admin.rpc("detach_gone_pix", {
-        p_charge_id: row.charge_id,
-        p_provider_ref: row.provider_ref,
-      });
-      if (error && !isUndefinedFunction(error)) return false;
+      try {
+        await detachGonePix(admin, row.charge_id, row.provider_ref);
+      } catch (_error) {
+        return false;
+      }
     }
     const next = remote.status.trim().toUpperCase() === "REFUNDED"
       ? "refunded"
@@ -258,9 +259,4 @@ function asWork(
 function isMissing(error: unknown): boolean {
   const raw = error instanceof Error ? error.message : "";
   return raw.startsWith("Asaas 404");
-}
-
-function isUndefinedFunction(error: { code?: string }): boolean {
-  const code = typeof error.code === "string" ? error.code : "";
-  return code === "PGRST202" || code === "42883";
 }

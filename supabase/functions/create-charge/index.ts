@@ -13,6 +13,7 @@ import {
   PixReuseRejected,
 } from "../_shared/asaas_provider.ts";
 import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
+import { detachGonePix } from "../_shared/detach_gone_pix.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import {
   cardSwitchBlock,
@@ -810,19 +811,6 @@ async function releaseExpiredPixReservation(
   });
   if (error) throw new Error("erro");
   return data === true;
-}
-
-async function detachGonePix(
-  admin: ChargeDb,
-  chargeId: string,
-  providerRef: string,
-): Promise<string | null> {
-  const { data, error } = await admin.rpc("detach_gone_pix", {
-    p_charge_id: chargeId,
-    p_provider_ref: providerRef,
-  });
-  if (error) throw new Error("erro");
-  return typeof data === "string" && data.length > 0 ? data : null;
 }
 
 async function clearPixProviderRef(

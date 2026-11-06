@@ -157,12 +157,19 @@ async function captureAuthorizedCard(
   if (!claimed) return;
   try {
     const remote = await asaas.getPayment(row.provider_ref);
-    const already = remote.status === "CONFIRMED" ||
-      remote.status === "RECEIVED";
-    if (!already && asaasPaymentGone(remote)) {
+    if (asaasPaymentGone(remote)) {
       await releaseCardCaptureClaim(admin, row.id);
+      const transition = await applyPaymentTransition(
+        admin,
+        row.id,
+        goneProviderLocalStatus(remote.status),
+        false,
+      );
+      if (transition.status === "authorized") throw new Error("erro");
       return;
     }
+    const already = remote.status === "CONFIRMED" ||
+      remote.status === "RECEIVED";
     let paid = already;
     if (!already) {
       const captured = await asaas.capture(row.provider_ref);
@@ -187,6 +194,14 @@ async function captureAuthorizedCard(
     await releaseCardCaptureClaim(admin, row.id);
     throw error;
   }
+}
+
+/// REFUNDED vira estorno. deleted, CANCELED e CANCELLED viram cancelamento.
+/// O membro sai de reserved/paid e fica released pela transição do ledger.
+export function goneProviderLocalStatus(
+  status: string,
+): "refunded" | "cancelled" {
+  return status.trim().toUpperCase() === "REFUNDED" ? "refunded" : "cancelled";
 }
 
 /// Sem a função no banco, segue em frente: a leitura do status no Asaas

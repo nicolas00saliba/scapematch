@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { AsaasProvider } from "./asaas_provider.ts";
+import { memberPaymentForStatus } from "./charge_patch.ts";
 import { maySettle, settleGroup } from "./settle_group.ts";
 
 const groupId = "11111111-1111-4111-8111-111111111111";
@@ -32,8 +33,10 @@ function adminFor(options: {
   owner?: string;
 }) {
   const calls: string[] = [];
+  const transitions: Record<string, unknown>[] = [];
   return {
     calls,
+    transitions,
     from(table: string) {
       let head = false;
       const self = {
@@ -119,6 +122,7 @@ function adminFor(options: {
         return Promise.resolve({ data: null, error: null });
       }
       if (name === "apply_payment_transition") {
+        transitions.push(args);
         const charge = options.charges.find((item) =>
           item.id === args.p_charge_id
         );
@@ -138,7 +142,11 @@ function adminFor(options: {
   };
 }
 
-function provider(remoteStatus: string, captures: string[]) {
+function provider(
+  remoteStatus: string,
+  captures: string[],
+  deleted = false,
+) {
   const fetchFn = (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     if (method === "GET" && url.includes("/payments/pay_card")) {
@@ -148,7 +156,7 @@ function provider(remoteStatus: string, captures: string[]) {
             id: "pay_card",
             status: remoteStatus,
             billingType: "CREDIT_CARD",
-            deleted: false,
+            deleted,
           }),
           { status: 200 },
         ),
@@ -228,6 +236,40 @@ Deno.test("grupo ainda aberto não captura", async () => {
   await settleGroup(admin, provider("AUTHORIZED", captures), groupId);
   assertEquals(captures.length, 0);
   assertEquals(charges[0].status, "authorized");
+});
+
+Deno.test("provedor já encerrado não deixa o cartão authorized", async () => {
+  const cases = [
+    { status: "REFUNDED", deleted: false, local: "refunded" },
+    { status: "PENDING", deleted: true, local: "cancelled" },
+    { status: "CANCELED", deleted: false, local: "cancelled" },
+    { status: "CANCELLED", deleted: false, local: "cancelled" },
+    { status: "CONFIRMED", deleted: true, local: "cancelled" },
+  ];
+  for (const item of cases) {
+    const charges = [card()];
+    const admin = adminFor({ closed: true, charges });
+    const captures: string[] = [];
+    await settleGroup(
+      admin,
+      provider(item.status, captures, item.deleted),
+      groupId,
+    );
+    assertEquals(captures.length, 0, item.status);
+    assertEquals(charges[0].status, item.local, item.status);
+    assertEquals(
+      memberPaymentForStatus(charges[0].status).payment_status,
+      "released",
+      item.status,
+    );
+    assertEquals(
+      admin.transitions.some((call) =>
+        call.p_next_status === "paid" || call.p_credit === true
+      ),
+      false,
+      item.status,
+    );
+  }
 });
 
 Deno.test("trava de captura impede a segunda chamada simultânea", async () => {

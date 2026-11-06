@@ -45,6 +45,7 @@ type Store = {
   calls: string[];
   member: string;
   closed: boolean;
+  detachMissing?: boolean;
 };
 
 function expiredAt(): string {
@@ -154,6 +155,7 @@ function adminFor(store: Store) {
       let mode: "select" | "update" = "select";
       let patch: Record<string, unknown> = {};
       let head = false;
+      let returning = false;
       const rows = () => {
         if (table === "groups") {
           return [{
@@ -206,6 +208,7 @@ function adminFor(store: Store) {
       const self = {
         select(_cols: string, opts?: { head?: boolean }) {
           head = Boolean(opts?.head);
+          if (mode === "update") returning = true;
           return self;
         },
         update(next: Record<string, unknown>) {
@@ -230,8 +233,9 @@ function adminFor(store: Store) {
         ) {
           try {
             if (mode === "update") {
-              for (const row of matched()) Object.assign(row, patch);
-              resolve({ data: null, error: null });
+              const hit = matched();
+              for (const row of hit) Object.assign(row, patch);
+              resolve({ data: returning ? hit : null, error: null });
               return;
             }
             resolve({
@@ -331,6 +335,9 @@ function adminFor(store: Store) {
           return { data: null, error: null };
         }
         if (name === "detach_gone_pix") {
+          if (store.detachMissing) {
+            return { data: null, error: { code: "PGRST202" } };
+          }
           const row = byId(String(args.p_charge_id));
           if (
             row && row.provider_ref === args.p_provider_ref &&
@@ -955,4 +962,23 @@ Deno.test("Pix apagado com PENDING não devolve o QR antigo", async () => {
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].provider_ref, body.provider_ref);
   assertEquals(store.charges[0].provider_ref === "pay_pix", false);
+});
+
+Deno.test("Pix apagado sem detach_gone_pix ainda solta o QR", async () => {
+  const store = makeStore({});
+  openPix(store);
+  store.payments[0].deleted = true;
+  store.detachMissing = true;
+  const response = await createCharge(
+    request("PIX", "idem-pix-sem-funcao"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.qr_code, "qr");
+  assertEquals(body.qr_code === "qr-antigo", false);
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].billing_type, "PIX");
+  assertEquals(store.charges[0].provider_ref === "pay_pix", false);
+  assertEquals(store.charges[0].qr_code === "qr-antigo", false);
 });
