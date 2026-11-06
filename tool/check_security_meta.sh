@@ -21,11 +21,14 @@ flutter_csp = (
     "https://www.gstatic.com/flutter-canvaskit/ blob:; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: blob: https:; "
+    # Roboto e Noto saem de fonts.gstatic.com/s/ via fetch (connect-src).
+    # font-src não cobre esse fetch; ícone e Poppins continuam em 'self'.
     "font-src 'self' data:; "
     "connect-src 'self' https://eujlhicairvksvmssruz.supabase.co "
     "wss://eujlhicairvksvmssruz.supabase.co "
     "https://api.pwnedpasswords.com "
     "https://www.gstatic.com/flutter-canvaskit/ "
+    "https://fonts.gstatic.com/s/ "
     "https://tile.openstreetmap.org; "
     "worker-src 'self' blob:; frame-src 'none'; "
     "manifest-src 'self'; form-action 'self'"
