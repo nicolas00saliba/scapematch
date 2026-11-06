@@ -1,6 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
 import {
+  cardDeclined,
+  clientFailure,
+  isCardDeclined,
+  logAsaasFailure,
+} from "../_shared/asaas_client_error.ts";
+import {
+  asaasPaymentGone,
   AsaasProvider,
   houseSplitPercent,
   PixReservationLost,
@@ -9,6 +15,7 @@ import {
 import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import {
+  cardSwitchBlock,
   cardSwitchDecision,
   localChargeStatus,
   lostAttemptCompensation,
@@ -285,33 +292,44 @@ export async function createCharge(
       }
       if (action === "reuse" && reserved.provider_ref) {
         const full = await asaas.readPayment(reserved.provider_ref);
-        if (!pixMatchesCharge(full, expected)) {
+        if (asaasPaymentGone(full)) {
+          const reopened = await detachGonePix(
+            admin,
+            reserved.id,
+            reserved.provider_ref,
+          );
+          if (!reopened) return json({ error: "pix_em_aberto" }, 409);
+          attemptId = reopened;
+          createPix = true;
+        } else if (!pixMatchesCharge(full, expected)) {
           return json({ error: "pix_reuse_mismatch" }, 409);
-        }
-        const confirmed = confirmedChargeStatus(String(full.status ?? ""));
-        if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
-        const transition = await applyPaymentTransition(
-          admin,
-          reserved.id,
-          confirmed,
-          mayCredit && confirmed === "paid",
-        );
-        status = transition.status;
-        providerRef = reserved.provider_ref;
-        if (status === "pending" && !existing?.qr_code) {
-          const qr = await asaas.getPixQrCode(providerRef);
-          qrCode = qr.payload;
-          qrImage = qr.encodedImage;
-          const qrSaved = await admin.from("payment_charges").update({
-            qr_code: qrCode,
-            qr_code_base64: qrImage,
-          }).eq("id", savedId);
-          if (qrSaved.error) return json({ error: publicError("erro") }, 400);
         } else {
-          qrCode = existing?.qr_code ?? null;
-          qrImage = existing?.qr_code_base64 ?? null;
+          const confirmed = confirmedChargeStatus(String(full.status ?? ""));
+          if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
+          const transition = await applyPaymentTransition(
+            admin,
+            reserved.id,
+            confirmed,
+            mayCredit && confirmed === "paid",
+          );
+          status = transition.status;
+          providerRef = reserved.provider_ref;
+          if (status === "pending" && !existing?.qr_code) {
+            const qr = await asaas.getPixQrCode(providerRef);
+            qrCode = qr.payload;
+            qrImage = qr.encodedImage;
+            const qrSaved = await admin.from("payment_charges").update({
+              qr_code: qrCode,
+              qr_code_base64: qrImage,
+            }).eq("id", savedId);
+            if (qrSaved.error) return json({ error: publicError("erro") }, 400);
+          } else {
+            qrCode = existing?.qr_code ?? null;
+            qrImage = existing?.qr_code_base64 ?? null;
+          }
         }
-      } else if (createPix) {
+      }
+      if (createPix) {
         try {
           const pix = await asaas.createPix({
             customer: customerId,
@@ -381,27 +399,68 @@ export async function createCharge(
         }
       }
     } else {
+      const savedCardId = requestedSavedCardId(body);
+      if (!savedCardId) {
+        return json({ error: "saved_card_id é obrigatório" }, 400);
+      }
+      const owned = await cardForCharge(
+        {
+          findOwned: (userId, customerIdForCard, cardId) =>
+            findOwnedCard(admin, userId, customerIdForCard, cardId),
+        },
+        user.id,
+        customerId,
+        savedCardId,
+      );
       let cardChargeId = existing?.id ?? "";
       let attemptId = "";
-      const decision = cardSwitchDecision(
-        existing
-          ? {
-            billingType: existing.billing_type,
-            status: existing.status,
-            providerRef: existing.provider_ref,
-            leaseExpired: pixLeaseExpired(
-              existing.reserved_at ?? null,
-              Date.now(),
-            ),
-          }
-          : null,
-      );
+      const switchInput = existing
+        ? {
+          billingType: existing.billing_type,
+          status: existing.status,
+          providerRef: existing.provider_ref,
+          leaseExpired: pixLeaseExpired(
+            existing.reserved_at ?? null,
+            Date.now(),
+          ),
+        }
+        : null;
+      const decision = cardSwitchDecision(switchInput);
       if (decision === "refuse") {
-        return json({ error: "pix_em_aberto" }, 409);
+        return json({ error: cardSwitchBlock(switchInput) }, 409);
       }
+      const remoteIp = clientIp(req) ?? undefined;
+      let authorized: { id: string; status: string };
+      try {
+        authorized = await asaas.authorizeCard({
+          customer: customerId,
+          value: amountCents / 100,
+          dueDate,
+          description,
+          externalReference: idempotencyKey,
+          split,
+          remoteIp,
+          creditCardToken: owned.creditCardToken,
+        });
+      } catch (error) {
+        if (isCardDeclined(error)) {
+          logAsaasFailure("create-charge", error);
+          return json({ error: cardDeclined }, 422);
+        }
+        throw error;
+      }
+      const loseCard = (chargeId: string, attempt: string | null) =>
+        compensateLostPayment(asaas, admin, {
+          providerRef: authorized.id,
+          status: authorized.status,
+          chargeId,
+          attemptId: attempt,
+          billingType: "CREDIT_CARD",
+        });
       if (decision === "cancel_pix" && existing?.provider_ref) {
         const gone = await asaas.cancelPaymentConfirmed(existing.provider_ref);
         if (!gone) {
+          await loseCard(existing.id, existing.attempt_id ?? null);
           await recordOrphanPayment(admin, {
             providerRef: existing.provider_ref,
             chargeId: existing.id,
@@ -416,7 +475,10 @@ export async function createCharge(
           existing.id,
           existing.provider_ref,
         );
-        if (!cleared) return json({ error: "pix_em_aberto" }, 409);
+        if (!cleared) {
+          await loseCard(existing.id, existing.attempt_id ?? null);
+          return json({ error: "pix_em_aberto" }, 409);
+        }
         attemptId = cleared;
         cardChargeId = existing.id;
       }
@@ -429,7 +491,10 @@ export async function createCharge(
             ? pixExternalReference(groupId, user.id)
             : (existing.idempotency_key ?? ""),
         });
-        if (!dropped) return json({ error: "pagamento em andamento" }, 409);
+        if (!dropped) {
+          await loseCard(existing.id, existing.attempt_id ?? null);
+          return json({ error: "pagamento em andamento" }, 409);
+        }
         cardChargeId = "";
       }
       if (!attemptId) {
@@ -457,7 +522,10 @@ export async function createCharge(
               ? pixExternalReference(groupId, user.id)
               : (reservedCard.idempotency_key ?? idempotencyKey),
           });
-          if (!dropped) return json({ error: "pagamento em andamento" }, 409);
+          if (!dropped) {
+            await loseCard(reservedCard.id, reservedCard.attempt_id);
+            return json({ error: "pagamento em andamento" }, 409);
+          }
           const again = await reserveCardCharge(admin, {
             groupId,
             userId: user.id,
@@ -468,38 +536,19 @@ export async function createCharge(
             commissionBps,
           });
           if (!again.inserted || !again.attempt_id) {
+            await loseCard(again.id || reservedCard.id, again.attempt_id);
             return json({ error: "pagamento em andamento" }, 409);
           }
           attemptId = again.attempt_id;
           cardChargeId = again.id;
         } else {
+          await loseCard(
+            reservedCard.id,
+            reservedCard.attempt_id,
+          );
           return json({ error: "pagamento em andamento" }, 409);
         }
       }
-      const remoteIp = clientIp(req) ?? undefined;
-      const savedCardId = requestedSavedCardId(body);
-      if (!savedCardId) {
-        return json({ error: "saved_card_id é obrigatório" }, 400);
-      }
-      const owned = await cardForCharge(
-        {
-          findOwned: (userId, customerIdForCard, cardId) =>
-            findOwnedCard(admin, userId, customerIdForCard, cardId),
-        },
-        user.id,
-        customerId,
-        savedCardId,
-      );
-      const authorized = await asaas.authorizeCard({
-        customer: customerId,
-        value: amountCents / 100,
-        dueDate,
-        description,
-        externalReference: idempotencyKey,
-        split,
-        remoteIp,
-        creditCardToken: owned.creditCardToken,
-      });
       const capturedAlready = lostAttemptCompensation(authorized.status) ===
         "refund";
       status = authorized.status === "AUTHORIZED"
@@ -522,7 +571,8 @@ export async function createCharge(
           attemptId,
           billingType: "CREDIT_CARD",
         });
-        return json({ error: "pix_em_aberto" }, 409);
+        await releasePixReservation(admin, cardChargeId, attemptId);
+        return json({ error: "pagamento em andamento" }, 409);
       }
       if (!capturedAlready && mayCredit && status === "authorized") {
         const held = await applyPaymentTransition(
@@ -760,6 +810,19 @@ async function releaseExpiredPixReservation(
   });
   if (error) throw new Error("erro");
   return data === true;
+}
+
+async function detachGonePix(
+  admin: ChargeDb,
+  chargeId: string,
+  providerRef: string,
+): Promise<string | null> {
+  const { data, error } = await admin.rpc("detach_gone_pix", {
+    p_charge_id: chargeId,
+    p_provider_ref: providerRef,
+  });
+  if (error) throw new Error("erro");
+  return typeof data === "string" && data.length > 0 ? data : null;
 }
 
 async function clearPixProviderRef(

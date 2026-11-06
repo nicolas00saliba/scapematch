@@ -127,6 +127,9 @@ class SupabaseGroupRepository implements GroupRepository {
     }
     final group = await getById(groupId);
     if (group == null) return const JoinFailure(JoinFailureReason.notFound);
+    if (group.isFull && !group.isCancelled) {
+      await _settleClosed(groupId);
+    }
     return JoinSuccess(group);
   }
 
@@ -152,6 +155,9 @@ class SupabaseGroupRepository implements GroupRepository {
     }
     final group = await getById(groupId);
     if (group == null) return const JoinFailure(JoinFailureReason.notFound);
+    if (group.isFull && !group.isCancelled) {
+      await _settleClosed(groupId);
+    }
     return JoinSuccess(group);
   }
 
@@ -349,6 +355,7 @@ class SupabaseGroupRepository implements GroupRepository {
         closeFailure(rpcText(code: error.code, message: error.message)),
       );
     }
+    await _settleClosed(groupId);
     final group = await getById(groupId);
     if (group == null) {
       return const CloseGroupFailure(CloseGroupFailureReason.notFound);
@@ -431,7 +438,23 @@ class SupabaseGroupRepository implements GroupRepository {
     if (group == null) {
       return const EditGroupFailure(EditGroupFailureReason.notFound);
     }
+    if (group.isFull && !group.isCancelled) {
+      await _settleClosed(groupId);
+    }
     return EditGroupSuccess(group);
+  }
+
+  /// Captura o cartão quando o grupo enche ou o host fecha com menos.
+  /// Se a chamada falhar, a rotina de reconcile tenta de novo.
+  Future<void> _settleClosed(String groupId) async {
+    try {
+      await client.functions.invoke(
+        'settle-charges',
+        body: {'group_id': groupId},
+      );
+    } on Object {
+      // O grupo já fechou. A captura segue na próxima reconciliação.
+    }
   }
 
   Future<List<Group>> _hydrate(

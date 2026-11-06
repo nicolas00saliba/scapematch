@@ -136,7 +136,20 @@ export type PaymentView = {
   id: string;
   status: string;
   billingType: string;
+  deleted: boolean;
 };
+
+/// O Asaas, ao apagar um Pix, pode responder deleted:true e manter
+/// status PENDING. Isso é cancelamento confirmado, não cobrança aberta.
+export function asaasPaymentGone(body: {
+  status?: unknown;
+  deleted?: unknown;
+}): boolean {
+  if (body.deleted === true) return true;
+  const status = String(body.status ?? "").trim().toUpperCase();
+  return status === "DELETED" || status === "REFUNDED" ||
+    status === "CANCELED" || status === "CANCELLED";
+}
 
 /// Teto da comissão configurável: 30%. A fórmula ainda usa 10000 como 100%.
 const maxConfigurableCommissionBps = 3000;
@@ -272,7 +285,8 @@ export function pickReusablePix(rows: unknown[]): PixPaymentRef | null {
   const pix = rows.filter((row): row is Record<string, unknown> => {
     if (!row || typeof row !== "object") return false;
     const record = row as Record<string, unknown>;
-    return record.billingType === "PIX" && typeof record.id === "string";
+    return record.billingType === "PIX" && typeof record.id === "string" &&
+      !asaasPaymentGone(record);
   });
   const settled = pix.find((row) =>
     localChargeStatus(String(row.status ?? "")) === "paid"
@@ -565,9 +579,7 @@ export class AsaasProvider implements PaymentProvider {
       if (!row || typeof row !== "object") return false;
       const record = row as Record<string, unknown>;
       if (typeof record.id !== "string" || record.id.length === 0) return false;
-      const status = String(record.status ?? "").toUpperCase();
-      return status !== "DELETED" && status !== "REFUNDED" &&
-        status !== "CANCELED" && status !== "CANCELLED";
+      return !asaasPaymentGone(record);
     });
     const chosen = live[0];
     if (!chosen || typeof chosen.id !== "string") return null;
@@ -577,22 +589,27 @@ export class AsaasProvider implements PaymentProvider {
       billingType: typeof chosen.billingType === "string"
         ? chosen.billingType
         : "",
+      deleted: false,
     };
   }
 
-  /// DELETE e confirma que o Pix não segue pendente nem pago.
+  /// DELETE e confirma que o Pix não segue aberto.
+  /// deleted:true com status PENDING conta como cancelado.
   async cancelPaymentConfirmed(paymentId: string): Promise<boolean> {
     try {
-      await this.#send(`/payments/${paymentId}`, undefined, "DELETE");
+      const body = await this.#send(
+        `/payments/${paymentId}`,
+        undefined,
+        "DELETE",
+      );
+      if (asaasPaymentGone(body)) return true;
     } catch (error) {
       if (asaasStatus(error) === 404) return true;
       return false;
     }
     try {
-      const remote = await this.getPayment(paymentId);
-      const status = remote.status.trim().toUpperCase();
-      return status === "DELETED" || status === "REFUNDED" ||
-        status === "CANCELED" || status === "CANCELLED";
+      const remote = await this.readPayment(paymentId);
+      return asaasPaymentGone(remote);
     } catch (error) {
       return asaasStatus(error) === 404;
     }
@@ -718,6 +735,7 @@ export class AsaasProvider implements PaymentProvider {
         id: stringField(body, "id"),
         status: stringField(body, "status"),
         billingType: stringField(body, "billingType"),
+        deleted: body.deleted === true,
       }),
     );
   }

@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import {
+  cardSwitchBlock,
   cardSwitchDecision,
   localChargeStatus,
   lostAttemptCompensation,
@@ -114,6 +115,13 @@ Deno.test("reuso do Pix exige customer, valor, split e status", () => {
     pixMatchesCharge({ ...remote, status: "REFUNDED" }, expectedPix),
     false,
   );
+  assertEquals(
+    pixMatchesCharge(
+      { ...remote, status: "PENDING", deleted: true },
+      expectedPix,
+    ),
+    false,
+  );
   assertEquals(localChargeStatus("RECEIVED"), "paid");
 });
 
@@ -191,7 +199,7 @@ Deno.test("lease de 2 minutos e 4xx liberam a reserva presa", () => {
   assertEquals(lostAttemptCompensation("REFUNDED"), "none");
 });
 
-Deno.test("Pix pendente cancela antes do cartão; Pix pago recusa", () => {
+Deno.test("Pix pendente pede cancelamento; a ordem fica na cobrança", () => {
   assertEquals(
     cardSwitchDecision({
       billingType: "PIX",
@@ -227,6 +235,22 @@ Deno.test("Pix pendente cancela antes do cartão; Pix pago recusa", () => {
     "drop_lease",
   );
   assertEquals(cardSwitchDecision(null), "proceed");
+  assertEquals(
+    cardSwitchBlock({
+      billingType: "CREDIT_CARD",
+      status: "creating",
+      providerRef: null,
+    }),
+    "pagamento em andamento",
+  );
+  assertEquals(
+    cardSwitchBlock({
+      billingType: "PIX",
+      status: "paid",
+      providerRef: "pay_1",
+    }),
+    "pix_em_aberto",
+  );
   assertEquals(
     cardSwitchDecision({
       billingType: "CREDIT_CARD",
