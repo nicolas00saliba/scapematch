@@ -22,6 +22,7 @@ class ScapeLogo extends StatelessWidget {
     this.height = 40,
     this.onDark,
     this.onTap,
+    this.wordmarkAbsorb = 0,
   });
 
   final ScapeLogoVariant variant;
@@ -30,6 +31,10 @@ class ScapeLogo extends StatelessWidget {
   /// Versão clara, para foto escura. Nulo segue o tema.
   final bool? onDark;
   final VoidCallback? onTap;
+
+  /// 0 deixa o letreiro ao lado do símbolo. 1 enfia o letreiro nele.
+  /// A splash do celular usa isso; o resto do app passa 0.
+  final double wordmarkAbsorb;
 
   static const pin = Color(0xFF0F4C4A);
   static const copper = Color(0xFFD2642A);
@@ -54,15 +59,7 @@ class ScapeLogo extends StatelessWidget {
     );
     final logo = variant == ScapeLogoVariant.mark
         ? mark
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              mark,
-              SizedBox(width: height * 0.18),
-              _Wordmark(height: height, onDark: dark),
-            ],
-          );
+        : _fullLogo(mark, dark);
     final labeled = Semantics(
       label: variant == ScapeLogoVariant.mark ? 'ScapeMatch' : null,
       child: logo,
@@ -77,6 +74,55 @@ class ScapeLogo extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: labeled,
       ),
+    );
+  }
+
+  Widget _fullLogo(Widget mark, bool dark) {
+    final gap = height * 0.18;
+    final wordmark = _Wordmark(height: height, onDark: dark);
+    if (wordmarkAbsorb <= 0) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          mark,
+          SizedBox(width: gap),
+          wordmark,
+        ],
+      );
+    }
+    if (wordmarkAbsorb >= 1) {
+      return mark;
+    }
+    final absorb = wordmarkAbsorb.clamp(0.0, 1.0);
+    final remain = 1 - absorb;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        mark,
+        Align(
+          alignment: Alignment.centerLeft,
+          widthFactor: remain,
+          child: Opacity(
+            opacity: remain,
+            child: Transform.translate(
+              offset: Offset(-height * 0.62 * absorb, -height * 0.04 * absorb),
+              child: Transform.scale(
+                alignment: Alignment.centerLeft,
+                scale: 0.05 + 0.95 * remain,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(width: gap),
+                    wordmark,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

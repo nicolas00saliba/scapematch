@@ -1,16 +1,24 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
-import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 
-/// Abertura do celular, no jeito iFood/99.
+/// Abertura do celular.
 ///
 /// Cobre o app uma vez por processo: abrir, recarregar a página ou abrir
 /// o PWA de novo. Trocar de tela, voltar, um deep link interno e um resume
 /// curto (o app ainda na memória) não repetem. Não grava flag. A introdução
 /// continua com a chave dela.
+///
+/// A capa é o arquivo inteiro do pin: o desenho teal, o disco branco e o
+/// branco ao redor. Ela aparece, se aproxima e gira no próprio eixo vertical,
+/// como um pião, crescendo até sumir. A escala é uniforme, então o disco
+/// continua circular. Só então a cortina revela a próxima tela. Com reduzir
+/// movimento, a capa já entra pronta e a cortina some em [reducedDuration],
+/// sem giro.
 ///
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
@@ -19,49 +27,178 @@ class SplashGate extends StatefulWidget {
 
   final Widget child;
 
-  static const background = Color(0xFF0F4C4A);
+  /// Branco do arquivo da capa, inclusive a margem ao redor do pin.
+  static const background = Color(0xFFFFFFFF);
   static const copper = Color(0xFF9A4F24);
 
-  /// Fade, pausa e saída. Cabe na faixa de 1,2–1,8s.
-  static const duration = Duration(milliseconds: 1500);
+  static const coverAsset = 'assets/brand/pin_capa.jpg';
 
-  /// `prefers-reduced-motion`: o logo já entra pronto e a cortina some rápido.
+  /// Entrada, pausa, aproximação, giro e saída. Cabe em até 1,8s.
+  static const duration = Duration(milliseconds: 1800);
+
+  /// `prefers-reduced-motion`: o logo já está pronto e a cortina some.
   static const reducedDuration = Duration(milliseconds: 180);
 
-  /// Fim da entrada do logo (fade + scale), em fração da [duration].
-  static const enterEnd = 0.46;
+  static const enterEnd = 0.16;
+  static const holdEnd = 0.30;
+  static const buryEnd = 0.48;
+  static const approachEnd = 0.58;
+  static const spinEnd = 0.82;
+  static const vanishEnd = 0.90;
 
-  /// Início da saída da cortina, em fração da [duration].
-  static const exitStart = 0.72;
+  static const enterScale = 0.9;
+  static const restScale = 1.0;
+  static const approachScale = 1.14;
+  static const spinScale = 2.55;
+  static const exitScale = 4.6;
+  static const approachTurns = 0.08;
+  static const spinTurns = 1.25;
+  static const exitTurns = 1.55;
+
+  /// Perspectiva leve do giro de pião. O pin continua de frente quando
+  /// [turns] é 0; o valor só aparece de lado.
+  static const yawPerspective = 0.003;
+
+  static const curtainKey = Key('splash-curtain');
+  static const logoOpacityKey = Key('splash-logo');
+  static const scaleKey = Key('splash-scale');
+  static const spinKey = Key('splash-spin');
 
   @override
   State<SplashGate> createState() => _SplashGateState();
 }
 
-/// Quanto o logo já entrou, de 0 a 1.
-double splashLogoEnter(double t, {required bool reduced}) {
-  if (reduced) {
-    return 1;
-  }
-  final x = (t / SplashGate.enterEnd).clamp(0.0, 1.0);
-  return Curves.easeOutCubic.transform(x);
+/// Pose da splash em [t], de 0 a 1.
+class SplashMotion {
+  const SplashMotion({
+    required this.logoOpacity,
+    required this.cover,
+    required this.coverScale,
+    required this.absorb,
+    required this.scale,
+    required this.turns,
+    required this.curtain,
+  });
+
+  /// Opacidade do arquivo da capa. O pin e o branco usam o mesmo valor.
+  final double logoOpacity;
+
+  /// Opacidade do mesmo arquivo. Igual a [logoOpacity].
+  final double cover;
+
+  /// Escala uniforme do arquivo. Igual a [scale], sem esticar o disco.
+  final double coverScale;
+
+  /// Progresso da pausa antes do giro. O desenho não encolhe nem estica.
+  final double absorb;
+
+  /// Escala do símbolo. 1 é o tamanho de repouso.
+  final double scale;
+
+  /// Voltas do pião, no eixo vertical. 0 não gira.
+  final double turns;
+
+  /// 1 cobre a próxima tela. 0 a revela.
+  final double curtain;
 }
 
-/// Opacidade da cortina. 1 cobre a próxima tela; 0 a revela.
-double splashCurtainOpacity(double t, {required bool reduced}) {
+double _span(double t, double start, double end) {
+  if (end <= start) {
+    return t >= end ? 1 : 0;
+  }
+  return ((t - start) / (end - start)).clamp(0.0, 1.0);
+}
+
+double _lerp(double a, double b, double t) => a + (b - a) * t;
+
+/// Movimento da splash. [reduced] é a versão curta, sem giro.
+SplashMotion splashMotion(double t, {required bool reduced}) {
   final progress = t.clamp(0.0, 1.0);
   if (reduced) {
-    return (1 - Curves.easeOut.transform(progress)).clamp(0.0, 1.0);
+    return SplashMotion(
+      logoOpacity: 1,
+      cover: 1,
+      coverScale: SplashGate.restScale,
+      absorb: 0,
+      scale: SplashGate.restScale,
+      turns: 0,
+      curtain: (1 - Curves.easeOut.transform(progress)).clamp(0.0, 1.0),
+    );
   }
-  if (progress <= SplashGate.exitStart) {
-    return 1;
+
+  final enter = Curves.easeOutCubic.transform(
+    _span(progress, 0, SplashGate.enterEnd),
+  );
+  final bury = Curves.easeInCubic.transform(
+    _span(progress, SplashGate.holdEnd, SplashGate.buryEnd),
+  );
+  final approach = Curves.easeOut.transform(
+    _span(progress, SplashGate.buryEnd, SplashGate.approachEnd),
+  );
+  final spin = _span(progress, SplashGate.approachEnd, SplashGate.spinEnd);
+  final vanish = Curves.easeIn.transform(
+    _span(progress, SplashGate.spinEnd, SplashGate.vanishEnd),
+  );
+
+  // Um arquivo só: o pin e o branco entram juntos e ficam até sumir.
+  final shown = progress <= SplashGate.enterEnd
+      ? enter
+      : progress >= SplashGate.spinEnd
+      ? 1 - vanish
+      : 1.0;
+  final cover = shown;
+  final logoOpacity = shown;
+
+  final double scale;
+  if (progress <= SplashGate.enterEnd) {
+    scale = _lerp(SplashGate.enterScale, SplashGate.restScale, enter);
+  } else if (progress <= SplashGate.buryEnd) {
+    scale = SplashGate.restScale;
+  } else if (progress <= SplashGate.approachEnd) {
+    scale = _lerp(SplashGate.restScale, SplashGate.approachScale, approach);
+  } else if (progress <= SplashGate.spinEnd) {
+    // Linear no tempo: o símbolo cresce enquanto gira.
+    scale = _lerp(SplashGate.approachScale, SplashGate.spinScale, spin);
+  } else {
+    scale = _lerp(SplashGate.spinScale, SplashGate.exitScale, vanish);
   }
-  final x = (progress - SplashGate.exitStart) / (1 - SplashGate.exitStart);
-  return (1 - Curves.easeInOutCubic.transform(x)).clamp(0.0, 1.0);
+
+  final double turns;
+  if (progress <= SplashGate.buryEnd) {
+    turns = 0;
+  } else if (progress <= SplashGate.approachEnd) {
+    turns = _lerp(0, SplashGate.approachTurns, approach);
+  } else if (progress <= SplashGate.spinEnd) {
+    turns = _lerp(SplashGate.approachTurns, SplashGate.spinTurns, spin);
+  } else {
+    turns = _lerp(SplashGate.spinTurns, SplashGate.exitTurns, vanish);
+  }
+
+  final curtain = progress <= SplashGate.vanishEnd
+      ? 1.0
+      : (1 -
+                Curves.easeInOutCubic.transform(
+                  _span(progress, SplashGate.vanishEnd, 1),
+                ))
+            .clamp(0.0, 1.0);
+
+  return SplashMotion(
+    logoOpacity: logoOpacity.clamp(0.0, 1.0),
+    cover: cover.clamp(0.0, 1.0),
+    coverScale: scale,
+    absorb: bury,
+    scale: scale,
+    turns: turns,
+    curtain: curtain,
+  );
 }
 
-/// Scale suave: começa um pouco menor e assenta em 1.
-double splashLogoScale(double enter) => 0.9 + 0.1 * enter;
+/// Giro no eixo vertical do símbolo. Não é rotação no plano da tela.
+Matrix4 splashYawTransform(double turns) {
+  return Matrix4.identity()
+    ..setEntry(3, 2, SplashGate.yawPerspective)
+    ..rotateY(turns * 2 * math.pi);
+}
 
 class _SplashGateState extends State<SplashGate>
     with SingleTickerProviderStateMixin {
@@ -149,10 +286,10 @@ class _SplashCurtain extends StatelessWidget {
 
   static const _overlay = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    statusBarBrightness: Brightness.dark,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
     systemNavigationBarColor: SplashGate.background,
-    systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarIconBrightness: Brightness.dark,
   );
 
   @override
@@ -167,11 +304,10 @@ class _SplashCurtain extends StatelessWidget {
             child: AnimatedBuilder(
               animation: animation,
               builder: (context, _) {
-                final t = animation.value;
-                final enter = splashLogoEnter(t, reduced: reduced);
-                final curtain = splashCurtainOpacity(t, reduced: reduced);
+                final motion = splashMotion(animation.value, reduced: reduced);
                 return Opacity(
-                  opacity: curtain,
+                  key: SplashGate.curtainKey,
+                  opacity: motion.curtain,
                   child: AnnotatedRegion<SystemUiOverlayStyle>(
                     value: _overlay,
                     child: ColoredBox(
@@ -181,7 +317,7 @@ class _SplashCurtain extends StatelessWidget {
                       child: Material(
                         type: MaterialType.transparency,
                         child: SizedBox.expand(
-                          child: _SplashMark(enter: enter),
+                          child: _SplashMark(motion: motion),
                         ),
                       ),
                     ),
@@ -197,36 +333,41 @@ class _SplashCurtain extends StatelessWidget {
 }
 
 class _SplashMark extends StatelessWidget {
-  const _SplashMark({required this.enter});
+  const _SplashMark({required this.motion});
 
-  final double enter;
+  final SplashMotion motion;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Opacity(
-              opacity: enter,
-              child: Transform.scale(
-                scale: splashLogoScale(enter),
-                child: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: ScapeLogo(height: 80, onDark: true),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = math.min(constraints.maxWidth, constraints.maxHeight);
+        return Center(
+          child: Opacity(
+            key: SplashGate.logoOpacityKey,
+            opacity: motion.logoOpacity,
+            child: Transform.scale(
+              key: SplashGate.scaleKey,
+              scale: motion.scale,
+              filterQuality: FilterQuality.medium,
+              child: Transform(
+                key: SplashGate.spinKey,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.medium,
+                transform: splashYawTransform(motion.turns),
+                child: Image.asset(
+                  SplashGate.coverAsset,
+                  width: side,
+                  height: side,
+                  fit: BoxFit.contain,
+                  excludeFromSemantics: true,
+                  filterQuality: FilterQuality.medium,
                 ),
               ),
             ),
-            const SizedBox(height: 22),
-            ColoredBox(
-              color: SplashGate.copper,
-              child: SizedBox(width: 72 * enter, height: 3),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
