@@ -86,10 +86,12 @@ Deno.test("ALLOWED_ORIGINS troca a lista e o curinga não passa", () => {
 });
 
 Deno.test("os subdomínios próprios entram no padrão sem ALLOWED_ORIGINS", () => {
-  assertEquals(productionWebOrigins.includes(productionWebOrigin), true);
-  assertEquals(productionWebOrigins.includes("https://app.scapematch.com.br"), true);
-  assertEquals(productionWebOrigins.includes("https://parceiro.scapematch.com.br"), true);
-  assertEquals(productionWebOrigins.includes("https://demo.scapematch.com.br"), true);
+  const listed = (origin: string) =>
+    productionWebOrigins.some((item) => item === origin);
+  assertEquals(listed(productionWebOrigin), true);
+  assertEquals(listed("https://app.scapematch.com.br"), true);
+  assertEquals(listed("https://parceiro.scapematch.com.br"), true);
+  assertEquals(listed("https://demo.scapematch.com.br"), true);
   assertEquals(isAllowedOrigin("https://app.scapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://parceiro.scapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://demo.scapematch.com.br", hosted), true);
