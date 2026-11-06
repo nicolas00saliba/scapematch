@@ -169,7 +169,11 @@ export function commissionCents(
 
 /// Sandbox e produção trocam só a base URL (e a chave). O caminho da nota lê isto.
 export function isAsaasSandbox(baseUrl: string): boolean {
-  return baseUrl.includes("://api-sandbox.asaas.com");
+  try {
+    return new URL(baseUrl).hostname === "api-sandbox.asaas.com";
+  } catch {
+    return false;
+  }
 }
 
 export function centsToReais(cents: number): number {

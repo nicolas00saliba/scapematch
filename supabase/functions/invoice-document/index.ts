@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
+import { isRemoteAsaasFile } from "./remote_asaas_file.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -70,12 +71,6 @@ Deno.serve(async (req) => {
     return json(failure.body, failure.status);
   }
 });
-
-function isRemoteAsaasFile(url: string): boolean {
-  if (!url.startsWith("https://")) return false;
-  if (url.includes("/notas/teste/")) return false;
-  return url.includes("asaas.com");
-}
 
 function escapeXml(value: string): string {
   return value

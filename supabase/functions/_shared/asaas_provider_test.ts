@@ -8,6 +8,7 @@ import {
   AsaasProvider,
   commissionCents,
   houseSplitPercent,
+  isAsaasSandbox,
   pickReusablePix,
   PixQrUnavailableError,
   PixReservationLost,
@@ -785,6 +786,23 @@ Deno.test("fiscalInfo vai para /fiscalInfo sem a senha municipal no header", asy
   const headers = calls[0].init.headers as Record<string, string>;
   assertEquals(headers.access_token, "sub-key");
   assertEquals(JSON.stringify(headers).includes("segredo-municipal"), false);
+});
+
+Deno.test("sandbox só quando o host é api-sandbox.asaas.com", () => {
+  assertEquals(isAsaasSandbox("https://api-sandbox.asaas.com/v3"), true);
+  assertEquals(isAsaasSandbox("http://api-sandbox.asaas.com/v3"), true);
+  assertEquals(isAsaasSandbox("https://api.asaas.com/v3"), false);
+  assertEquals(
+    isAsaasSandbox("https://api-sandbox.asaas.com.evil.com/v3"),
+    false,
+  );
+  assertEquals(
+    isAsaasSandbox("https://evil.com/?x=://api-sandbox.asaas.com"),
+    false,
+  );
+  assertEquals(isAsaasSandbox("https://not-api-sandbox.asaas.com/v3"), false);
+  assertEquals(isAsaasSandbox("not a url"), false);
+  assertEquals(isAsaasSandbox(""), false);
 });
 
 Deno.test("webhook sem o token certo é recusado", () => {
