@@ -145,6 +145,14 @@
 - **Onde está no código:** `assets/brand/`, `ScapeLogo` e os ícones em `web/`, `android/` e `ios/`. O letreiro é desenhado no widget com Poppins 500, porque o SVG aponta para a fonte e não traz as letras em traço. A barra do site usa a variante completa.
 - **Como trocar depois:** outro desenho entra nos arquivos de `assets/brand/` e o widget só troca o arquivo. A landing usa `ScapeLogo` completo. O app Parceiro usa só o símbolo, com o selo “Parceiro”.
 
+## A capa do app é o arquivo do pin, com o branco
+
+- **Data:** 2026-11-06
+- **Decisão:** a capa do jogador (favicon, 192, 512, maskable e a splash) é o arquivo inteiro do pin: contorno teal, disco branco circular, pessoas cobre, fechadura e o fundo branco ao redor. Não se recorta o pin, não se troca o branco por transparência, floresta ou outra cor, e não se estica o disco. O app e a demo usam os mesmos pixels; nome, id, start_url e scope continuam separados. O app Parceiro não muda.
+- **Motivo:** o Nícolas mandou esse arquivo como a capa, incluindo a margem branca.
+- **Onde está no código:** `assets/brand/pin_capa.jpg`, `web/favicon.png`, `web/icons/` e `SplashGate`.
+- **Como trocar depois:** outro arquivo entra no lugar de `pin_capa.jpg` e os ícones são a mesma imagem, em escala uniforme.
+
 ## No computador o jogador usa um site
 
 - **Data:** 2026-11-03

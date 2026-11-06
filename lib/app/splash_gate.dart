@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/motion.dart';
-import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 
 /// Abertura do celular.
@@ -14,11 +13,12 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// curto (o app ainda na memória) não repetem. Não grava flag. A introdução
 /// continua com a chave dela.
 ///
-/// A capa entra: floresta, círculo petróleo e “ScapeMatch”. O restante
-/// converge para o pin. O pin se aproxima e gira no próprio eixo vertical,
-/// como um pião, crescendo até sumir. Só então a cortina revela a próxima
-/// tela. Com reduzir movimento, a capa já entra pronta e a cortina some em
-/// [reducedDuration], sem giro.
+/// A capa é o arquivo inteiro do pin: o desenho teal, o disco branco e o
+/// branco ao redor. Ela aparece, se aproxima e gira no próprio eixo vertical,
+/// como um pião, crescendo até sumir. A escala é uniforme, então o disco
+/// continua circular. Só então a cortina revela a próxima tela. Com reduzir
+/// movimento, a capa já entra pronta e a cortina some em [reducedDuration],
+/// sem giro.
 ///
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
@@ -27,13 +27,13 @@ class SplashGate extends StatefulWidget {
 
   final Widget child;
 
-  /// Noite da capa, atrás da arte quando ela encolhe.
-  static const background = Color(0xFF142046);
+  /// Branco do arquivo da capa, inclusive a margem ao redor do pin.
+  static const background = Color(0xFFFFFFFF);
   static const copper = Color(0xFF9A4F24);
 
-  static const coverAsset = 'assets/brand/capa_app.jpg';
+  static const coverAsset = 'assets/brand/pin_capa.jpg';
 
-  /// Entrada, pausa, convergência, giro e saída. Cabe em até 1,8s.
+  /// Entrada, pausa, aproximação, giro e saída. Cabe em até 1,8s.
   static const duration = Duration(milliseconds: 1800);
 
   /// `prefers-reduced-motion`: o logo já está pronto e a cortina some.
@@ -60,7 +60,6 @@ class SplashGate extends StatefulWidget {
   static const yawPerspective = 0.003;
 
   static const curtainKey = Key('splash-curtain');
-  static const coverKey = Key('splash-cover');
   static const logoOpacityKey = Key('splash-logo');
   static const scaleKey = Key('splash-scale');
   static const spinKey = Key('splash-spin');
@@ -81,16 +80,16 @@ class SplashMotion {
     required this.curtain,
   });
 
-  /// Opacidade do pin. A capa pode continuar por cima no começo.
+  /// Opacidade do arquivo da capa. O pin e o branco usam o mesmo valor.
   final double logoOpacity;
 
-  /// Opacidade da capa inteira. 0 quando ela já entrou no pin.
+  /// Opacidade do mesmo arquivo. Igual a [logoOpacity].
   final double cover;
 
-  /// Escala da capa. 1 é o tamanho em que ela aparece.
+  /// Escala uniforme do arquivo. Igual a [scale], sem esticar o disco.
   final double coverScale;
 
-  /// 0 é a capa inteira. 1 é o instante em que o resto já entrou no pin.
+  /// Progresso da pausa antes do giro. O desenho não encolhe nem estica.
   final double absorb;
 
   /// Escala do símbolo. 1 é o tamanho de repouso.
@@ -117,7 +116,7 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
   final progress = t.clamp(0.0, 1.0);
   if (reduced) {
     return SplashMotion(
-      logoOpacity: 0,
+      logoOpacity: 1,
       cover: 1,
       coverScale: SplashGate.restScale,
       absorb: 0,
@@ -141,20 +140,14 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
     _span(progress, SplashGate.spinEnd, SplashGate.vanishEnd),
   );
 
-  final cover = progress <= SplashGate.holdEnd ? enter : 1 - bury;
-  final logoOpacity = progress <= SplashGate.holdEnd
-      ? 0.0
+  // Um arquivo só: o pin e o branco entram juntos e ficam até sumir.
+  final shown = progress <= SplashGate.enterEnd
+      ? enter
       : progress >= SplashGate.spinEnd
       ? 1 - vanish
-      : bury;
-  final double coverScale;
-  if (progress <= SplashGate.enterEnd) {
-    coverScale = _lerp(SplashGate.enterScale, SplashGate.restScale, enter);
-  } else if (progress <= SplashGate.holdEnd) {
-    coverScale = SplashGate.restScale;
-  } else {
-    coverScale = _lerp(SplashGate.restScale, 0.08, bury);
-  }
+      : 1.0;
+  final cover = shown;
+  final logoOpacity = shown;
 
   final double scale;
   if (progress <= SplashGate.enterEnd) {
@@ -192,7 +185,7 @@ SplashMotion splashMotion(double t, {required bool reduced}) {
   return SplashMotion(
     logoOpacity: logoOpacity.clamp(0.0, 1.0),
     cover: cover.clamp(0.0, 1.0),
-    coverScale: coverScale,
+    coverScale: scale,
     absorb: bury,
     scale: scale,
     turns: turns,
@@ -293,10 +286,10 @@ class _SplashCurtain extends StatelessWidget {
 
   static const _overlay = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    statusBarBrightness: Brightness.dark,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
     systemNavigationBarColor: SplashGate.background,
-    systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarIconBrightness: Brightness.dark,
   );
 
   @override
@@ -348,61 +341,29 @@ class _SplashMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final side = math.min(
-          constraints.maxWidth,
-          constraints.maxHeight * 240 / 242,
-        );
-        final coverHeight = side * 242 / 240;
-        final pinHeight = side * 72 / 240;
-        const anchor = Alignment(0, -0.25);
+        final side = math.min(constraints.maxWidth, constraints.maxHeight);
         return Center(
-          child: SizedBox(
-            width: side,
-            height: coverHeight,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                Opacity(
-                  key: SplashGate.coverKey,
-                  opacity: motion.cover,
-                  child: Transform.scale(
-                    alignment: anchor,
-                    scale: motion.coverScale,
-                    filterQuality: FilterQuality.medium,
-                    child: Image.asset(
-                      SplashGate.coverAsset,
-                      width: side,
-                      height: coverHeight,
-                      fit: BoxFit.fill,
-                      excludeFromSemantics: true,
-                      filterQuality: FilterQuality.medium,
-                    ),
-                  ),
+          child: Opacity(
+            key: SplashGate.logoOpacityKey,
+            opacity: motion.logoOpacity,
+            child: Transform.scale(
+              key: SplashGate.scaleKey,
+              scale: motion.scale,
+              filterQuality: FilterQuality.medium,
+              child: Transform(
+                key: SplashGate.spinKey,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.medium,
+                transform: splashYawTransform(motion.turns),
+                child: Image.asset(
+                  SplashGate.coverAsset,
+                  width: side,
+                  height: side,
+                  fit: BoxFit.contain,
+                  excludeFromSemantics: true,
+                  filterQuality: FilterQuality.medium,
                 ),
-                Align(
-                  alignment: anchor,
-                  child: Opacity(
-                    key: SplashGate.logoOpacityKey,
-                    opacity: motion.logoOpacity,
-                    child: Transform.scale(
-                      key: SplashGate.scaleKey,
-                      scale: motion.scale,
-                      child: Transform(
-                        key: SplashGate.spinKey,
-                        alignment: Alignment.center,
-                        filterQuality: FilterQuality.medium,
-                        transform: splashYawTransform(motion.turns),
-                        child: ScapeLogo(
-                          variant: ScapeLogoVariant.mark,
-                          height: pinHeight,
-                          onDark: true,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
