@@ -10,7 +10,7 @@ create or replace function public.create_group(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_user uuid := auth.uid();
@@ -55,11 +55,11 @@ begin
   if v_session.starts_at - now() <= interval '1 hour' then
     raise exception 'too close to create' using errcode = '22023';
   end if;
-  if public.user_has_overlap(v_user, v_session.starts_at, v_room.duration_minutes, null) then
+  if private.user_has_overlap(v_user, v_session.starts_at, v_room.duration_minutes, null::uuid) then
     raise exception 'overlaps' using errcode = 'P0001';
   end if;
 
-  v_name := public.profile_display_name(v_user);
+  v_name := private.profile_display_name(v_user);
   if v_name is null then
     raise exception 'display name required' using errcode = '22023';
   end if;
@@ -107,7 +107,7 @@ create or replace function public.create_group_with_party(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_user uuid := auth.uid();
@@ -167,8 +167,8 @@ begin
     ) then
       raise exception 'not crew mate' using errcode = '42501';
     end if;
-    if public.user_has_overlap(
-      v_person, v_session.starts_at, v_room.duration_minutes, null
+    if private.user_has_overlap(
+      v_person, v_session.starts_at, v_room.duration_minutes, null::uuid
     ) then
       raise exception 'companion unavailable' using errcode = 'P0001';
     end if;
@@ -178,7 +178,7 @@ begin
   v_group_id := public.create_group(p_session_id, v_total, p_note);
 
   foreach v_person in array p_companion_ids loop
-    v_name := public.profile_display_name(v_person);
+    v_name := private.profile_display_name(v_person);
     if v_name is null then
       raise exception 'display name required' using errcode = '22023';
     end if;
@@ -187,7 +187,7 @@ begin
     ) values (
       v_group_id, v_person, v_name, false, 'pending'
     );
-    perform public.post_app_notice(
+    perform private.post_app_notice(
       v_person,
       'party_seat',
       'Vaga reservada',
@@ -197,7 +197,7 @@ begin
     );
   end loop;
 
-  if public.group_filled_spots(v_group_id) >= v_total then
+  if private.group_filled_spots(v_group_id) >= v_total then
     raise exception 'party does not fit' using errcode = 'P0001';
   end if;
   return v_group_id;
