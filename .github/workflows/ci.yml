@@ -76,6 +76,7 @@ jobs:
           bash tool/mark_real_web_copy.sh build/web player
           bash tool/check_web_service_worker.sh build/web player
           bash tool/check_web_manifest.sh build/web player real
+          bash tool/check_security_meta.sh flutter build/web/index.html
 
       - name: Player bundle excludes the partner app
         run: |
@@ -111,6 +112,7 @@ jobs:
           bash tool/mark_real_web_copy.sh apps/parceiro/build/web partner
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
           bash tool/check_web_manifest.sh apps/parceiro/build/web partner real
+          bash tool/check_security_meta.sh flutter apps/parceiro/build/web/index.html
           if grep -R -F -q 'xv@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
             echo 'O bundle do Parceiro ainda tem o login de demonstração.'
             exit 1
@@ -141,6 +143,7 @@ jobs:
           bash tool/stamp_web_manifest.sh build/player-demo player demo
           bash tool/check_web_service_worker.sh build/player-demo player
           bash tool/check_web_manifest.sh build/player-demo player demo
+          bash tool/check_security_meta.sh flutter build/player-demo/index.html
           grep -F -q 'base href="/"' build/player-demo/index.html
           bash tool/js_contains.sh build/player-demo 'Demonstração'
           bash tool/js_contains.sh build/player-demo 'O Cofre do Café'
@@ -167,6 +170,7 @@ jobs:
           bash tool/stamp_web_manifest.sh apps/parceiro/build/partner-demo partner demo
           bash tool/check_web_service_worker.sh apps/parceiro/build/partner-demo partner
           bash tool/check_web_manifest.sh apps/parceiro/build/partner-demo partner demo
+          bash tool/check_security_meta.sh flutter apps/parceiro/build/partner-demo/index.html
           grep -F -q 'base href="/parceiro/"' apps/parceiro/build/partner-demo/index.html
           bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demonstração'
           bash tool/js_contains.sh apps/parceiro/build/partner-demo 'xv@scapematch.exemplo'
@@ -219,6 +223,12 @@ jobs:
         run: |
           test -f apps/landing/index.html
           test -f apps/landing/styles.css
+          test ! -e _headers
+          test ! -e apps/landing/_headers
+          test ! -e web/_headers
+          bash tool/check_security_meta.sh landing apps/landing
+          bash tool/check_security_meta.sh flutter web/index.html
+          bash tool/check_security_meta.sh flutter apps/parceiro/web/index.html
           test -f apps/landing/assets/logo-simbolo.svg
           test -f apps/landing/assets/og.png
           test -f apps/landing/assets/favicon.svg
