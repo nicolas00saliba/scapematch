@@ -561,10 +561,10 @@ void _expectBrandColors(WidgetTester tester) {
   final svg = tester.widget<SvgPicture>(_splashPin(tester));
   expect(svg.width! / svg.height!, closeTo(200 / 260, 0.001));
   final loader = svg.bytesLoader;
-  expect(loader, isA<SvgAssetLoader>());
-  final asset = loader as SvgAssetLoader;
+  expect(loader, isA<ScapePinLoader>());
+  final asset = loader as ScapePinLoader;
   expect(asset.assetName, ScapeLogo.markAsset);
-  expect(asset.packageName, 'scapematch');
+  expect(asset.packageName, isNull);
   final text = tester.widget<Text>(_splashWordmark(tester));
   final spans = (text.textSpan! as TextSpan).children!.cast<TextSpan>();
   expect(spans.first.style!.color, ScapeLogo.pin);
