@@ -435,25 +435,31 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
 
   Future<void> _pay(Group group) async {
     if (!await ensurePlayerCpf(context, ref) || !mounted) return;
-    final paid = await showPayShareSheet(
+    final outcome = await showPayShareSheet(
       context: context,
       amountCents: group.priceCents,
       reference: group.id,
       onPay: (kind, {savedCardId}) async {
-        final reason = await ref
+        final result = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)
             .payShare(kind, savedCardId: savedCardId);
-        return reason == null;
+        return ShareChargeView.fromResult(result);
       },
       onPayNewCard: (card) async {
-        final reason = await ref
+        final result = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)
             .payWithNewCard(card);
-        return reason == null;
+        return ShareChargeView.fromResult(result);
       },
     );
-    if (paid && mounted) {
-      _snack(GroupMessages.yourShareReserved);
+    if (!mounted) return;
+    switch (outcome) {
+      case PaySheetOutcome.reserved:
+        _snack(GroupMessages.yourShareReserved);
+      case PaySheetOutcome.paid:
+        _snack(GroupMessages.yourSharePaid);
+      case PaySheetOutcome.dismissed:
+        break;
     }
   }
 

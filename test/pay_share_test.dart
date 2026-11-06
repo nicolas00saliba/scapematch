@@ -29,10 +29,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.payMethodPix), findsOneWidget);
     expect(find.byKey(AppKeys.playerCpf), findsNothing);
-    expect(
-      find.text('Pix simulado. O código abaixo não cobra.'),
-      findsOneWidget,
-    );
+    expect(find.text(GroupMessages.simulatedPixNotice), findsOneWidget);
+    expect(find.text(GroupMessages.simulatePayment), findsOneWidget);
 
     await tester.tap(find.byKey(AppKeys.payMethodCard));
     await tester.pumpAndSettle();

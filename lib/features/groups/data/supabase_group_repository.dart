@@ -16,6 +16,7 @@ import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
+import 'package:scapematch/features/payments/domain/live_charge.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const groupColumns =
@@ -189,29 +190,24 @@ class SupabaseGroupRepository implements GroupRepository {
     required String userId,
     required PaymentMethodKind kind,
     String? savedCardId,
-  }) async {
-    if (_userId == null || _userId != userId) {
-      return const PayShareFailure(PayShareFailureReason.unavailable);
-    }
+  }) {
     if (kind == PaymentMethodKind.card &&
         (savedCardId == null || savedCardId.isEmpty)) {
-      return const PayShareFailure(PayShareFailureReason.unavailable);
+      return Future.value(
+        const PayShareFailure(
+          PayShareFailureReason.unavailable,
+          message: liveChooseCard,
+        ),
+      );
     }
-    try {
-      await CardPaymentFlow(_invoke).charge(
+    return _charge(groupId, userId, () {
+      return CardPaymentFlow(_invoke).charge(
         groupId: groupId,
         idempotencyKey: _chargeKey(groupId, userId),
         kind: kind,
         savedCardId: savedCardId,
       );
-    } on Object {
-      return const PayShareFailure(PayShareFailureReason.unavailable);
-    }
-    final group = await getById(groupId);
-    if (group == null) {
-      return const PayShareFailure(PayShareFailureReason.notFound);
-    }
-    return PayShareSuccess(group);
+    });
   }
 
   @override
@@ -219,24 +215,63 @@ class SupabaseGroupRepository implements GroupRepository {
     String groupId, {
     required String userId,
     required CardDraft card,
-  }) async {
-    if (_userId == null || _userId != userId) {
-      return const PayShareFailure(PayShareFailureReason.unavailable);
-    }
-    try {
-      await CardPaymentFlow(_invoke).payWithNewCard(
+  }) {
+    return _charge(groupId, userId, () {
+      return CardPaymentFlow(_invoke).payWithNewCard(
         card: card,
         groupId: groupId,
         idempotencyKey: _chargeKey(groupId, userId),
       );
+    });
+  }
+
+  /// Lê o corpo de `create-charge`. Pix sem copia-e-cola não vira sucesso.
+  Future<PayShareResult> _charge(
+    String groupId,
+    String userId,
+    Future<Map<String, dynamic>> Function() call,
+  ) async {
+    if (_userId == null || _userId != userId) {
+      return const PayShareFailure(
+        PayShareFailureReason.unavailable,
+        message: liveChargeFailed,
+      );
+    }
+    try {
+      final body = await call();
+      if (body['error'] != null) {
+        return PayShareFailure(
+          PayShareFailureReason.unavailable,
+          message: liveChargeErrorMessage(body),
+        );
+      }
+      final charge = LiveCharge.fromBody(body);
+      final rejection = charge.rejectionMessage;
+      if (rejection != null) {
+        return PayShareFailure(
+          PayShareFailureReason.unavailable,
+          message: rejection,
+        );
+      }
+      final group = await getById(groupId);
+      if (group == null) {
+        return const PayShareFailure(
+          PayShareFailureReason.notFound,
+          message: 'Não encontramos esse grupo.',
+        );
+      }
+      return PayShareSuccess(group, charge: charge);
+    } on FunctionException catch (error) {
+      return PayShareFailure(
+        PayShareFailureReason.unavailable,
+        message: liveChargeErrorMessage(error.details),
+      );
     } on Object {
-      return const PayShareFailure(PayShareFailureReason.unavailable);
+      return const PayShareFailure(
+        PayShareFailureReason.unavailable,
+        message: liveChargeFailed,
+      );
     }
-    final group = await getById(groupId);
-    if (group == null) {
-      return const PayShareFailure(PayShareFailureReason.notFound);
-    }
-    return PayShareSuccess(group);
   }
 
   Future<Map<String, dynamic>> _invoke(

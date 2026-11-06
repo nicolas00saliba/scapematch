@@ -1,4 +1,5 @@
 import 'package:scapematch/features/groups/domain/group.dart';
+import 'package:scapematch/features/payments/domain/live_charge.dart';
 
 /// Results of "enter group" and "create group".
 ///
@@ -240,15 +241,21 @@ sealed class PayShareResult {
 }
 
 final class PayShareSuccess extends PayShareResult {
-  const PayShareSuccess(this.group);
+  const PayShareSuccess(this.group, {this.charge});
 
   final Group group;
+
+  /// Cobrança do Asaas. Nula no pagamento simulado da demonstração.
+  final LiveCharge? charge;
 }
 
 final class PayShareFailure extends PayShareResult {
-  const PayShareFailure(this.reason);
+  const PayShareFailure(this.reason, {this.message});
 
   final PayShareFailureReason reason;
+
+  /// Texto já seguro para a pessoa. Nulo quando a demonstração não cobra.
+  final String? message;
 }
 
 enum PayShareFailureReason {

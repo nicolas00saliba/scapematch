@@ -39,6 +39,21 @@ abstract final class GroupMessages {
 
   static const simulatedNotice = 'Pagamento simulado, nada é cobrado';
 
+  static const simulatedPixNotice = 'Pix simulado. O código abaixo não cobra.';
+
+  static const livePixHint = 'O código Pix vem do Asaas quando você confirma.';
+
+  static const livePixNotice =
+      'O Pix é pago agora. Se o grupo não fechar, o valor volta.';
+
+  static const livePixReady = 'Pix do Asaas. Escaneie o QR ou copie o código.';
+
+  static const simulatePayment = 'Simular pagamento';
+
+  static const generatePix = 'Gerar Pix';
+
+  static const payWithCard = 'Pagar com cartão';
+
   static const chargeOnlyIfCloses = 'Você só é cobrado se o grupo fechar.';
 
   static const holdReleased = 'Valor liberado, nada foi cobrado';
