@@ -343,7 +343,7 @@ class HomeGridSlotCard extends StatelessWidget {
         }
         _snack(
           context,
-          'Não foi possível abrir o app da casa. O endereço é /scapematch/parceiro/.',
+          'Não foi possível abrir o app da casa. O endereço é parceiro.scapematch.com.br.',
         );
       case HomeGridSlotKind.inviteFriends:
         final text = friendInviteText();

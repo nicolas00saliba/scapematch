@@ -1,9 +1,9 @@
 {
-    "id": "/scapematch/parceiro/",
+    "id": "/",
     "name": "ScapeMatch Parceiro",
     "short_name": "Parceiro",
-    "start_url": "/scapematch/parceiro/",
-    "scope": "/scapematch/parceiro/",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#F3F0EA",
     "theme_color": "#0F4C4A",

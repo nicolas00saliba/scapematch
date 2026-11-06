@@ -62,10 +62,18 @@ void main() {
   });
 
   test('the partner card points at the house app', () {
-    final uri = partnerAppUri(
-      page: Uri.parse('https://exemplo.test/scapematch/'),
+    expect(
+      partnerAppUri(
+        page: Uri.parse('https://nicolas00saliba.github.io/scapematch/'),
+      ).toString(),
+      'https://nicolas00saliba.github.io/scapematch/parceiro/',
     );
-    expect(uri.toString(), 'https://exemplo.test/scapematch/parceiro/');
+    expect(
+      partnerAppUri(
+        page: Uri.parse('https://app.scapematch.com.br/'),
+      ).toString(),
+      'https://parceiro.scapematch.com.br/',
+    );
   });
 
   testWidgets('phone with no forming group drops the window and lifts promos', (

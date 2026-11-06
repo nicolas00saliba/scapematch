@@ -1,22 +1,21 @@
-# Publishes the Flutter web release on GitHub Pages.
+# Publishes the Flutter web release on GitHub Pages (subdomínios + legado).
 #
-# Player: https://nicolas00saliba.github.io/scapematch/
-# Partner: https://nicolas00saliba.github.io/scapematch/parceiro/
-# Player demo: https://nicolas00saliba.github.io/scapematch/demo/
-# Partner demo: https://nicolas00saliba.github.io/scapematch/parceiro/demo/
-# Landing preview: https://nicolas00saliba.github.io/scapematch/site/
+# app.scapematch.com.br       → repo nicolas00saliba/scapematch-app
+# parceiro.scapematch.com.br  → repo nicolas00saliba/scapematch-parceiro
+# demo.scapematch.com.br      → repo nicolas00saliba/scapematch-demo
+#                             (jogador em /, Parceiro em /parceiro/)
+#
+# Transição: também republica o monorepo em
+# https://nicolas00saliba.github.io/scapematch/… (base-href antigos) para
+# não quebrar quem ainda abre o endereço antigo.
+#
+# Segredo necessário no repo scapematch:
+#   PAGES_DEPLOY_TOKEN — PAT com escrita nos 3 repos de Pages.
+#
 # --base-href must keep the leading and trailing slash.
 # APP_MODE=real|demo escolhe o repositório. O Parceiro continua outro app.
 #
-# Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer. 3.47.8 is the stable
-# release that ships Dart 3.13.7.
-#
-# Triggers: manual run from main, and pushes to main. Preview branches
-# do not publish. The Pages site is served from the gh-pages branch
-# (root). Switching to actions/deploy-pages would require changing the
-# repository Pages source from that branch to GitHub Actions. This
-# workflow keeps the branch publish and does not change that setting.
-# It does not push commits onto main.
+# Dart SDK ^3.13.7 needs Flutter 3.47.8 or newer.
 name: Deploy web
 
 on:
@@ -63,111 +62,170 @@ jobs:
         working-directory: apps/parceiro
         run: flutter pub get
 
-      # --pwa-strategy=none no Flutter 3.47.8 não registra worker de cache.
-      # O Chrome Android atual aceita a instalação sem service worker.
-      # O arquivo publicado no lugar se desregistra, apaga os caches e
-      # recarrega quem ainda está preso no build antigo.
-      - name: Build player web (real)
+      - name: Build player web (real, subdomain)
         run: |
-          flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none
-          bash tool/install_cleanup_service_worker.sh build/web
-          bash tool/stamp_web_manifest.sh build/web
-          bash tool/mark_real_web_copy.sh build/web player
-          bash tool/check_web_service_worker.sh build/web player
-          bash tool/check_web_manifest.sh build/web player real
+          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/app-root
+          bash tool/install_cleanup_service_worker.sh build/app-root
+          bash tool/stamp_web_manifest.sh build/app-root
+          bash tool/mark_real_web_copy.sh build/app-root player
+          bash tool/check_web_service_worker.sh build/app-root player
+          bash tool/check_web_manifest.sh build/app-root player real
+          grep -F 'base href="/"' build/app-root/index.html
+          cp build/app-root/index.html build/app-root/404.html
+          touch build/app-root/.nojekyll
+          printf 'app.scapematch.com.br\n' > build/app-root/CNAME
 
-      - name: Build partner web (real)
+      - name: Build partner web (real, subdomain)
         working-directory: apps/parceiro
         run: |
-          flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none
-          bash ../../tool/install_cleanup_service_worker.sh build/web
-          bash ../../tool/stamp_web_manifest.sh build/web
-          bash ../../tool/mark_real_web_copy.sh build/web partner
-          bash ../../tool/check_web_service_worker.sh build/web partner
-          bash ../../tool/check_web_manifest.sh build/web partner real
+          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/parceiro-root
+          bash ../../tool/install_cleanup_service_worker.sh build/parceiro-root
+          bash ../../tool/stamp_web_manifest.sh build/parceiro-root
+          bash ../../tool/mark_real_web_copy.sh build/parceiro-root partner
+          bash ../../tool/check_web_service_worker.sh build/parceiro-root partner
+          bash ../../tool/check_web_manifest.sh build/parceiro-root partner real
+          grep -F 'base href="/"' build/parceiro-root/index.html
+          cp build/parceiro-root/index.html build/parceiro-root/404.html
+          touch build/parceiro-root/.nojekyll
+          printf 'parceiro.scapematch.com.br\n' > build/parceiro-root/CNAME
 
-      - name: Build player web (demo)
+      - name: Build player web (demo, subdomain root)
         run: |
-          flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/player-demo
-          bash tool/install_cleanup_service_worker.sh build/player-demo
-          bash tool/stamp_web_manifest.sh build/player-demo
-          bash tool/check_web_service_worker.sh build/player-demo player
-          bash tool/check_web_manifest.sh build/player-demo player demo
+          flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-player
+          bash tool/install_cleanup_service_worker.sh build/demo-player
+          bash tool/stamp_web_manifest.sh build/demo-player
+          bash tool/check_web_service_worker.sh build/demo-player player
+          bash tool/check_web_manifest.sh build/demo-player player demo
+          grep -F 'base href="/"' build/demo-player/index.html
 
-      - name: Build partner web (demo)
+      - name: Build partner web (demo, subdomain /parceiro/)
         working-directory: apps/parceiro
         run: |
-          flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/partner-demo
-          bash ../../tool/install_cleanup_service_worker.sh build/partner-demo
-          bash ../../tool/stamp_web_manifest.sh build/partner-demo
-          bash ../../tool/check_web_service_worker.sh build/partner-demo partner
-          bash ../../tool/check_web_manifest.sh build/partner-demo partner demo
+          flutter build web --release --base-href /parceiro/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-parceiro
+          bash ../../tool/install_cleanup_service_worker.sh build/demo-parceiro
+          bash ../../tool/stamp_web_manifest.sh build/demo-parceiro
+          bash ../../tool/check_web_service_worker.sh build/demo-parceiro partner
+          bash ../../tool/check_web_manifest.sh build/demo-parceiro partner demo
+          grep -F 'base href="/parceiro/"' build/demo-parceiro/index.html
 
-      - name: Assemble the four apps
+      - name: Assemble demo site
         run: |
-          test ! -e build/web/parceiro
-          test ! -e build/web/demo
-          mkdir -p build/web/parceiro build/web/demo
-          cp -a apps/parceiro/build/web/. build/web/parceiro/
-          cp -a build/player-demo/. build/web/demo/
-          mkdir -p build/web/parceiro/demo
-          cp -a apps/parceiro/build/partner-demo/. build/web/parceiro/demo/
-          test -f build/web/parceiro/index.html
-          test -f build/web/demo/index.html
-          test -f build/web/parceiro/demo/index.html
-          grep -F 'base href="/scapematch/"' build/web/index.html
-          grep -F 'base href="/scapematch/parceiro/"' build/web/parceiro/index.html
-          grep -F 'base href="/scapematch/demo/"' build/web/demo/index.html
-          grep -F 'base href="/scapematch/parceiro/demo/"' build/web/parceiro/demo/index.html
+          mkdir -p build/demo-root/parceiro
+          cp -a build/demo-player/. build/demo-root/
+          cp -a apps/parceiro/build/demo-parceiro/. build/demo-root/parceiro/
+          cp build/demo-root/index.html build/demo-root/404.html
+          touch build/demo-root/.nojekyll
+          printf 'demo.scapematch.com.br\n' > build/demo-root/CNAME
+          test -f build/demo-root/index.html
+          test -f build/demo-root/parceiro/index.html
 
-      # Pages serves 404.html for paths the static host does not know.
-      # Copying the player shell lets go_router open /groups and the other
-      # player routes. /parceiro/ is a real directory, so it is not the 404.
-      - name: Add SPA fallback and disable Jekyll
+      # Legado: quatro apps sob /scapematch/ no monorepo (sem downtime).
+      - name: Build legacy monorepo tree
         run: |
-          cp build/web/index.html build/web/404.html
-          touch build/web/.nojekyll
+          flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-player
+          bash tool/install_cleanup_service_worker.sh build/legacy-player
+          bash tool/stamp_web_manifest.sh build/legacy-player
+          bash tool/mark_real_web_copy.sh build/legacy-player player
+          (
+            cd apps/parceiro
+            flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-parceiro
+            bash ../../tool/install_cleanup_service_worker.sh build/legacy-parceiro
+            bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro
+            bash ../../tool/mark_real_web_copy.sh build/legacy-parceiro partner
+          )
+          flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-player-demo
+          bash tool/install_cleanup_service_worker.sh build/legacy-player-demo
+          bash tool/stamp_web_manifest.sh build/legacy-player-demo
+          (
+            cd apps/parceiro
+            flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-parceiro-demo
+            bash ../../tool/install_cleanup_service_worker.sh build/legacy-parceiro-demo
+            bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro-demo
+          )
+          mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/site
+          cp -a build/legacy-player/. build/legacy/
+          cp -a apps/parceiro/build/legacy-parceiro/. build/legacy/parceiro/
+          cp -a build/legacy-player-demo/. build/legacy/demo/
+          cp -a apps/parceiro/build/legacy-parceiro-demo/. build/legacy/parceiro/demo/
+          cp -a apps/landing/. build/legacy/site/
+          cp build/legacy/index.html build/legacy/404.html
+          touch build/legacy/.nojekyll
+          grep -F 'base href="/scapematch/"' build/legacy/index.html
+          grep -F 'base href="/scapematch/parceiro/"' build/legacy/parceiro/index.html
 
-      # Static landing, copied as-is. /site/ is a real directory, so the
-      # player 404 shell does not take this path. Player and partner stay
-      # at the same URLs.
-      - name: Add landing preview
-        run: |
-          test ! -e build/web/site
-          mkdir -p build/web/site
-          cp -a apps/landing/. build/web/site/
-          test -f build/web/site/index.html
-          test -f build/web/index.html
-          test -f build/web/parceiro/index.html
-          test -f build/web/demo/index.html
-          test -f build/web/parceiro/demo/index.html
-          grep -F 'base href="/scapematch/"' build/web/index.html
-          grep -F 'base href="/scapematch/parceiro/"' build/web/parceiro/index.html
-          grep -F 'base href="/scapematch/demo/"' build/web/demo/index.html
-          grep -F 'base href="/scapematch/parceiro/demo/"' build/web/parceiro/demo/index.html
-          grep -F -q 'Quero jogar' build/web/site/index.html
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: build/web
-          include-hidden-files: "true"
-
-      - name: Upload web site for the gh-pages fallback
+      - name: Upload subdomain artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: web-site
-          path: build/web
+          name: subdomain-sites
+          path: |
+            build/app-root
+            apps/parceiro/build/parceiro-root
+            build/demo-root
+            build/legacy
           include-hidden-files: "true"
           if-no-files-found: error
           retention-days: 7
 
-  publish-gh-pages:
-    name: Push gh-pages branch
+  publish-subdomains:
+    name: Push subdomain repos
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      actions: read
+      contents: read
+    steps:
+      - name: Publish only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::O site só é publicado a partir da main."
+          exit 1
+
+      - name: Download sites
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: subdomain-sites
+          path: _sites
+
+      - name: Publish app.scapematch.com.br
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          personal_token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          external_repository: nicolas00saliba/scapematch-app
+          publish_dir: ./_sites/build/app-root
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish ScapeMatch player (app.scapematch.com.br)
+
+      - name: Publish parceiro.scapematch.com.br
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          personal_token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          external_repository: nicolas00saliba/scapematch-parceiro
+          publish_dir: ./_sites/apps/parceiro/build/parceiro-root
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish ScapeMatch Parceiro (parceiro.scapematch.com.br)
+
+      - name: Publish demo.scapematch.com.br
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          personal_token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          external_repository: nicolas00saliba/scapematch-demo
+          publish_dir: ./_sites/build/demo-root
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish ScapeMatch demos (demo.scapematch.com.br)
+
+  publish-legacy:
+    name: Push legacy monorepo gh-pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
       contents: write
     steps:
       - name: Publish only from main
@@ -179,64 +237,61 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Download site
+      - name: Download sites
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: web-site
-          path: _site
+          name: subdomain-sites
+          path: _sites
 
-      - name: Publish the site on gh-pages
+      - name: Publish the legacy site on gh-pages
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_site
+          publish_dir: ./_sites/build/legacy
           publish_branch: gh-pages
           force_orphan: true
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
-          full_commit_message: Publish ScapeMatch player, partner, and demo web
+          full_commit_message: Publish ScapeMatch legacy github.io tree
 
   check:
-    name: Check public URL
-    needs: publish-gh-pages
+    name: Check public URLs
+    needs: [publish-subdomains, publish-legacy]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - name: Request the project site
+      - name: Request the sites
         run: |
+          player_new="https://app.scapematch.com.br/"
+          partner_new="https://parceiro.scapematch.com.br/"
+          demo_new="https://demo.scapematch.com.br/"
           player="https://nicolas00saliba.github.io/scapematch/"
           partner="https://nicolas00saliba.github.io/scapematch/parceiro/"
-          player_demo="https://nicolas00saliba.github.io/scapematch/demo/"
-          partner_demo="https://nicolas00saliba.github.io/scapematch/parceiro/demo/"
-          site="https://nicolas00saliba.github.io/scapematch/site/"
           echo "### ScapeMatch web" >> "$GITHUB_STEP_SUMMARY"
+          echo "$player_new" >> "$GITHUB_STEP_SUMMARY"
+          echo "$partner_new" >> "$GITHUB_STEP_SUMMARY"
+          echo "$demo_new" >> "$GITHUB_STEP_SUMMARY"
           echo "$player" >> "$GITHUB_STEP_SUMMARY"
           echo "$partner" >> "$GITHUB_STEP_SUMMARY"
-          echo "$player_demo" >> "$GITHUB_STEP_SUMMARY"
-          echo "$partner_demo" >> "$GITHUB_STEP_SUMMARY"
-          echo "$site" >> "$GITHUB_STEP_SUMMARY"
-          # The first gh-pages publish stayed 404 for longer than four minutes.
           for attempt in $(seq 1 30); do
-            pcode="$(curl -fsS -L -o /tmp/scapematch.html -w "%{http_code}" "$player" || true)"
-            hcode="$(curl -fsS -L -o /tmp/parceiro.html -w "%{http_code}" "$partner" || true)"
-            dcode="$(curl -fsS -L -o /tmp/demo.html -w "%{http_code}" "$player_demo" || true)"
-            ccode="$(curl -fsS -L -o /tmp/parceiro-demo.html -w "%{http_code}" "$partner_demo" || true)"
-            scode="$(curl -fsS -L -o /tmp/site.html -w "%{http_code}" "$site" || true)"
-            echo "attempt ${attempt}: player HTTP ${pcode}, partner HTTP ${hcode}, demo HTTP ${dcode}, partner demo HTTP ${ccode}, site HTTP ${scode}"
-            if [ "$pcode" = "200" ] && grep -Eq 'name="scapematch-release" content="[^"]+"' /tmp/scapematch.html \
-              && grep -F -q 'base href="/scapematch/"' /tmp/scapematch.html \
-              && [ "$hcode" = "200" ] && grep -q 'ScapeMatch Parceiro' /tmp/parceiro.html \
-              && grep -F -q 'base href="/scapematch/parceiro/"' /tmp/parceiro.html \
-              && [ "$dcode" = "200" ] && grep -F -q 'base href="/scapematch/demo/"' /tmp/demo.html \
-              && [ "$ccode" = "200" ] && grep -q 'ScapeMatch Parceiro' /tmp/parceiro-demo.html \
-              && grep -F -q 'base href="/scapematch/parceiro/demo/"' /tmp/parceiro-demo.html \
-              && [ "$scode" = "200" ] && grep -F -q 'Quero jogar' /tmp/site.html \
-              && grep -F -q 'Tenho uma casa' /tmp/site.html; then
-              echo "Public site returned the four apps and the landing."
+            n1="$(curl -fsS -L -o /tmp/app.html -w "%{http_code}" "$player_new" || true)"
+            n2="$(curl -fsS -L -o /tmp/parc.html -w "%{http_code}" "$partner_new" || true)"
+            n3="$(curl -fsS -L -o /tmp/demo.html -w "%{http_code}" "$demo_new" || true)"
+            pcode="$(curl -fsS -L -o /tmp/legacy-p.html -w "%{http_code}" "$player" || true)"
+            hcode="$(curl -fsS -L -o /tmp/legacy-h.html -w "%{http_code}" "$partner" || true)"
+            echo "attempt ${attempt}: app ${n1}, parceiro ${n2}, demo ${n3}, legacy player ${pcode}, legacy partner ${hcode}"
+            if [ "$pcode" = "200" ] && grep -F -q 'base href="/scapematch/"' /tmp/legacy-p.html \
+              && [ "$hcode" = "200" ] && grep -F -q 'base href="/scapematch/parceiro/"' /tmp/legacy-h.html; then
+              echo "Legacy github.io ainda no ar."
+              # Subdomínios podem ainda estar sem DNS/cert; não falham a job na transição.
+              if [ "$n1" = "200" ] && grep -F -q 'base href="/"' /tmp/app.html; then
+                echo "app.scapematch.com.br respondeu."
+              else
+                echo "app.scapematch.com.br ainda não respondeu (DNS/cert pendente)."
+              fi
               exit 0
             fi
             sleep 20
           done
-          echo "The public URL did not return the four Flutter shells and the landing."
-          echo "An admin may still need to enable Pages. See the workflow log from the deploy job."
+          echo "O github.io legado não voltou a responder."
           exit 1

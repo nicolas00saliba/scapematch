@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Grava id, start_url e scope do manifest com o <base href> do build.
-# Jogador real: /scapematch/
-# Demonstração: /scapematch/demo/
-# Parceiro real: /scapematch/parceiro/
-# Parceiro demonstração: /scapematch/parceiro/demo/
-# O id separa os quatro apps no mesmo domínio. Um não substitui o outro.
+# Jogador real: / (app.scapematch.com.br)
+# Parceiro real: / (parceiro.scapematch.com.br)
+# Demonstração jogador: / (demo.scapematch.com.br)
+# Demonstração Parceiro: /parceiro/ (demo.scapematch.com.br/parceiro/)
+# Na transição o Pages antigo ainda usa /scapematch/… . O id/start_url/scope
+# acompanham o <base href> de cada build.
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then

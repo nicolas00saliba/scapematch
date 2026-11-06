@@ -64,7 +64,7 @@ jobs:
       # também dispara beforeinstallprompt sem ele). O passo seguinte publica
       # só o script que desregistra o worker antigo. Não é cache.
       - name: Build player web (real)
-        run: flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none
+        run: flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none
 
       - name: Install the cleanup service worker
         run: |
@@ -99,7 +99,7 @@ jobs:
 
       - name: Build partner web (real)
         working-directory: apps/parceiro
-        run: flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none
+        run: flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none
 
       - name: Install the partner cleanup service worker
         run: |
@@ -130,7 +130,7 @@ jobs:
           fi
 
       - name: Build player web (demo)
-        run: flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/player-demo
+        run: flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/player-demo
 
       - name: Check player demo
         run: |
@@ -138,7 +138,7 @@ jobs:
           bash tool/stamp_web_manifest.sh build/player-demo
           bash tool/check_web_service_worker.sh build/player-demo player
           bash tool/check_web_manifest.sh build/player-demo player demo
-          grep -F -q 'base href="/scapematch/demo/"' build/player-demo/index.html
+          grep -F -q 'base href="/"' build/player-demo/index.html
           bash tool/js_contains.sh build/player-demo 'Demonstração'
           bash tool/js_contains.sh build/player-demo 'O Cofre do Café'
           if bash tool/js_contains.sh build/player-demo 'supabase.co'; then
@@ -156,7 +156,7 @@ jobs:
 
       - name: Build partner web (demo)
         working-directory: apps/parceiro
-        run: flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/partner-demo
+        run: flutter build web --release --base-href /parceiro/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/partner-demo
 
       - name: Check partner demo
         run: |
@@ -164,7 +164,7 @@ jobs:
           bash tool/stamp_web_manifest.sh apps/parceiro/build/partner-demo
           bash tool/check_web_service_worker.sh apps/parceiro/build/partner-demo partner
           bash tool/check_web_manifest.sh apps/parceiro/build/partner-demo partner demo
-          grep -F -q 'base href="/scapematch/parceiro/demo/"' apps/parceiro/build/partner-demo/index.html
+          grep -F -q 'base href="/parceiro/"' apps/parceiro/build/partner-demo/index.html
           bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demonstração'
           bash tool/js_contains.sh apps/parceiro/build/partner-demo 'xv@scapematch.exemplo'
           bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demo: a / b'
@@ -224,8 +224,9 @@ jobs:
           grep -F -q 'Quero jogar' apps/landing/index.html
           grep -F -q 'Tenho uma casa' apps/landing/index.html
           grep -F -q 'href="#casas"' apps/landing/index.html
-          grep -F -q 'href="https://nicolas00saliba.github.io/scapematch/"' apps/landing/index.html
-          grep -F -q 'href="https://nicolas00saliba.github.io/scapematch/parceiro/"' apps/landing/index.html
+          grep -F -q 'href="https://app.scapematch.com.br/"' apps/landing/index.html
+          grep -F -q 'href="https://parceiro.scapematch.com.br/"' apps/landing/index.html
+          grep -F -q 'canonical" href="https://scapematch.com.br/"' apps/landing/index.html
           grep -F -q 'Acessar o ScapeMatch Parceiro' apps/landing/index.html
           grep -F -q 'Placeholder' apps/landing/index.html
           grep -F -q 'og:image' apps/landing/index.html

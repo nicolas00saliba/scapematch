@@ -1,9 +1,9 @@
 {
-    "id": "/scapematch/",
+    "id": "/",
     "name": "ScapeMatch",
     "short_name": "ScapeMatch",
-    "start_url": "/scapematch/",
-    "scope": "/scapematch/",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#F3F0EA",
     "theme_color": "#0F4C4A",
