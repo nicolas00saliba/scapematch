@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Confere manifest, ícones e metas de instalação de um build web.
-# Não exige service worker: o Chrome atual instala sem ele.
+# Confere manifest, ícones, título e identidade de instalação de um build web.
+# Não exige service worker de cache: o Chrome atual instala sem ele.
+# O worker publicado tem de carregar a mesma URL absoluta do manifest.
 set -euo pipefail
 
 if [ "$#" -ne 3 ]; then
@@ -8,11 +9,14 @@ if [ "$#" -ne 3 ]; then
   exit 1
 fi
 
-python3 - "$1" "$2" "$3" <<'PY'
+tool_dir="$(cd "$(dirname "$0")" && pwd)"
+
+python3 - "$1" "$2" "$3" "$tool_dir" <<'PY'
 import json, pathlib, re, sys
-dest, role, mode = sys.argv[1:]
-if role not in ("player", "partner") or mode not in ("real", "demo"):
-    raise SystemExit(f"papel ou modo desconhecido: {role} {mode}")
+sys.path.insert(0, sys.argv[4])
+from web_install_identity import install_identity, install_names
+
+dest, role, mode = sys.argv[1:4]
 root = pathlib.Path(dest)
 index = (root / "index.html").read_text()
 manifest = json.loads((root / "manifest.json").read_text())
@@ -20,15 +24,22 @@ match = re.search(r'<base href="([^"]+)">', index)
 if not match:
     raise SystemExit("base href ausente")
 href = match.group(1)
+identity = install_identity(role, mode, href)
 for key in ("id", "start_url", "scope"):
-    if manifest.get(key) != href:
-        raise SystemExit(f"{key}={manifest.get(key)!r}, esperado {href}")
-name = "ScapeMatch" if role == "player" else "ScapeMatch Parceiro"
-short = "ScapeMatch" if role == "player" else "Parceiro"
+    if manifest.get(key) != identity:
+        raise SystemExit(f"{key}={manifest.get(key)!r}, esperado {identity}")
+if manifest.get("id") == "/" or not str(manifest.get("id", "")).startswith("https://"):
+    raise SystemExit("id precisa ser a URL absoluta do host")
+name, short = install_names(role, mode)
 if manifest.get("name") != name:
-    raise SystemExit(f"name={manifest.get('name')!r}")
+    raise SystemExit(f"name={manifest.get('name')!r}, esperado {name}")
 if manifest.get("short_name") != short:
-    raise SystemExit(f"short_name={manifest.get('short_name')!r}")
+    raise SystemExit(f"short_name={manifest.get('short_name')!r}, esperado {short}")
+if f"<title>{name}</title>" not in index:
+    raise SystemExit(f"title não é {name}")
+apple = f'<meta name="apple-mobile-web-app-title" content="{name}">'
+if apple not in index:
+    raise SystemExit(f"apple title não é {name}")
 if manifest.get("display") != "standalone":
     raise SystemExit("display deve ser standalone")
 need = {
@@ -70,5 +81,10 @@ for needle in (
 ):
     if needle not in index:
         raise SystemExit(f"index sem {needle}")
-print(f"ok {role} {mode} {href}")
+worker = (root / "flutter_service_worker.js").read_text()
+if f'const INSTALL_ID = "{identity}";' not in worker:
+    raise SystemExit("worker sem a identidade deste build")
+if "__SCAPEMATCH_INSTALL_ID__" in worker:
+    raise SystemExit("worker ainda tem o marcador")
+print(f"ok {role} {mode} {identity}")
 PY

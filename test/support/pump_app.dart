@@ -24,8 +24,10 @@ Future<void> pumpScapeMatch(
   List<Override> overrides = const [],
   bool showOnboarding = false,
   AppMode? onboardingMode,
+  Size viewport = const Size(400, 1800),
+  bool settle = true,
 }) async {
-  tester.view.physicalSize = const Size(400, 1800);
+  tester.view.physicalSize = viewport;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -51,7 +53,11 @@ Future<void> pumpScapeMatch(
       child: const ScapeMatchApp(),
     ),
   );
-  await tester.pumpAndSettle();
+  // A splash do celular dura ~1,5s de relógio falso. No fim dela, a próxima
+  // tela (introdução ou Home) já está descoberta.
+  if (settle) {
+    await tester.pumpAndSettle();
+  }
 }
 
 /// Traz um quadro do carrossel para a faixa visível, um passo por vez.

@@ -8,6 +8,7 @@ abstract final class AppKeys {
   static const groupWindow = Key('group-window');
   static const findGroup = Key('find-group');
   static const createGroup = Key('create-group');
+  static const splash = Key('splash');
   static const onboardingBack = Key('onboarding-back');
   static const onboardingSkip = Key('onboarding-skip');
   static const onboardingNext = Key('onboarding-next');
