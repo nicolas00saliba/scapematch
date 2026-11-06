@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -21,18 +22,83 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  test('the splash motion fades in, holds, then reveals the next screen', () {
-    expect(splashLogoEnter(0, reduced: false), 0);
-    expect(splashLogoScale(0), 0.9);
-    expect(splashCurtainOpacity(0, reduced: false), 1);
-    expect(splashLogoEnter(SplashGate.enterEnd, reduced: false), 1);
-    expect(splashCurtainOpacity(SplashGate.exitStart, reduced: false), 1);
-    expect(splashCurtainOpacity(1, reduced: false), 0);
-    expect(splashLogoEnter(0, reduced: true), 1);
-    expect(splashCurtainOpacity(0, reduced: true), 1);
-    expect(splashCurtainOpacity(1, reduced: true), 0);
+  test('the splash logo appears, converges, spins, then reveals', () {
+    final start = splashMotion(0, reduced: false);
+    expect(start.logoOpacity, 0);
+    expect(start.scale, SplashGate.enterScale);
+    expect(start.absorb, 0);
+    expect(start.turns, 0);
+    expect(start.curtain, 1);
+    expect(start.accent, 0);
+
+    final held = splashMotion(SplashGate.holdEnd, reduced: false);
+    expect(held.logoOpacity, 1);
+    expect(held.scale, SplashGate.restScale);
+    expect(held.absorb, 0);
+    expect(held.turns, 0);
+    expect(held.accent, 1);
+    expect(held.curtain, 1);
+
+    final burying = splashMotion(
+      (SplashGate.holdEnd + SplashGate.buryEnd) / 2,
+      reduced: false,
+    );
+    expect(burying.absorb, inExclusiveRange(0, 1));
+    expect(burying.turns, 0);
+    expect(burying.scale, SplashGate.restScale);
+    expect(burying.curtain, 1);
+
+    final buried = splashMotion(SplashGate.buryEnd, reduced: false);
+    expect(buried.absorb, 1);
+    expect(buried.accent, 0);
+    expect(buried.turns, 0);
+    expect(buried.scale, SplashGate.restScale);
+
+    final approached = splashMotion(SplashGate.approachEnd, reduced: false);
+    expect(approached.scale, SplashGate.approachScale);
+    expect(approached.turns, SplashGate.approachTurns);
+    expect(approached.turns, greaterThan(0));
+    expect(approached.scale, lessThan(1.2));
+    expect(approached.curtain, 1);
+
+    final spinning = splashMotion(
+      (SplashGate.approachEnd + SplashGate.spinEnd) / 2,
+      reduced: false,
+    );
+    expect(spinning.scale, greaterThan(approached.scale));
+    expect(spinning.turns, greaterThan(approached.turns));
+    expect(spinning.curtain, 1);
+    expect(spinning.logoOpacity, 1);
+
+    final spun = splashMotion(SplashGate.spinEnd, reduced: false);
+    expect(spun.scale, SplashGate.spinScale);
+    expect(spun.turns, SplashGate.spinTurns);
+    expect(spun.turns, greaterThan(1));
+    expect(spun.logoOpacity, 1);
+    expect(spun.curtain, 1);
+    expect(spun.scale, greaterThan(spinning.scale));
+
+    final gone = splashMotion(SplashGate.vanishEnd, reduced: false);
+    expect(gone.logoOpacity, 0);
+    expect(gone.scale, SplashGate.exitScale);
+    expect(gone.scale, greaterThan(spun.scale));
+    expect(gone.turns, SplashGate.exitTurns);
+    expect(gone.curtain, 1);
+
+    expect(splashMotion(1, reduced: false).curtain, 0);
+    expect(splashMotion(1, reduced: false).logoOpacity, 0);
+
+    final reducedStart = splashMotion(0, reduced: true);
+    expect(reducedStart.logoOpacity, 1);
+    expect(reducedStart.turns, 0);
+    expect(reducedStart.absorb, 0);
+    expect(reducedStart.scale, 1);
+    expect(reducedStart.curtain, 1);
+    expect(splashMotion(1, reduced: true).curtain, 0);
+    expect(splashMotion(0.5, reduced: true).turns, 0);
+
     expect(SplashGate.duration.inMilliseconds, inInclusiveRange(1200, 1800));
-    expect(SplashGate.reducedDuration.inMilliseconds, lessThan(250));
+    expect(SplashGate.reducedDuration.inMilliseconds, 180);
     expect(SplashGate.background, const Color(0xFF0F4C4A));
     expect(SplashGate.copper, const Color(0xFF9A4F24));
   });
@@ -50,24 +116,51 @@ void main() {
     expect(find.byType(OnboardingScreen), findsNothing);
     expect(_splashLogo(tester).variant, ScapeLogoVariant.full);
     expect(_splashLogo(tester).onDark, isTrue);
-    expect(_curtainOpacity(tester), 1);
-    expect(_logoOpacity(tester), 0);
-    expect(_logoScale(tester), closeTo(0.9, 0.02));
+    expect(
+      find.descendant(
+        of: find.byKey(AppKeys.splash),
+        matching: find.text('ScapeMatch'),
+      ),
+      findsOneWidget,
+    );
+    _expectPose(tester, 0, reduced: false);
     _expectBrandColors(tester);
+    _expectColdStartCover(tester);
 
-    await tester.pump(const Duration(milliseconds: 750));
-    expect(find.byKey(AppKeys.splash), findsOneWidget);
-    expect(_logoOpacity(tester), 1);
-    expect(_logoScale(tester), closeTo(1, 0.02));
+    var elapsed = 0;
+    Future<void> pumpTo(double t) async {
+      final target = (SplashGate.duration.inMilliseconds * t).round();
+      await tester.pump(Duration(milliseconds: target - elapsed));
+      elapsed = target;
+    }
+
+    await pumpTo(0.22);
+    _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
+    expect(_splashLogo(tester).wordmarkAbsorb, 0);
+    expect(_copperLineWidth(tester), SplashGate.accentWidth);
+    await _saveSplashShot(tester, 'splash-1-logo.png');
+
+    await pumpTo(0.46);
+    _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
+    expect(_splashLogo(tester).wordmarkAbsorb, greaterThan(0.5));
+    expect(_logoTurns(tester), 0);
     expect(_curtainOpacity(tester), 1);
-    expect(_copperLineWidth(tester), 72);
-    await _saveSplashShot(tester, 'splash-mobile.png');
+    await _saveSplashShot(tester, 'splash-2-converge.png');
 
-    await tester.pump(const Duration(milliseconds: 650));
-    expect(_curtainOpacity(tester), lessThan(1));
+    await pumpTo(SplashGate.spinEnd);
+    _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
+    expect(_logoScale(tester), closeTo(SplashGate.spinScale, 0.02));
+    expect(_logoTurns(tester), closeTo(0.25, 0.02));
+    expect(_curtainOpacity(tester), 1);
     expect(_logoOpacity(tester), 1);
+    await _saveSplashShot(tester, 'splash-3-spin.png');
 
-    await tester.pump(const Duration(milliseconds: 200));
+    await pumpTo((SplashGate.spinEnd + SplashGate.vanishEnd) / 2);
+    _expectPose(tester, elapsed / SplashGate.duration.inMilliseconds);
+    expect(_logoOpacity(tester), lessThan(1));
+    expect(_curtainOpacity(tester), 1);
+
+    await pumpTo(1);
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.splash), findsNothing);
     expect(find.byType(HomeScreen), findsOneWidget);
@@ -250,6 +343,9 @@ void main() {
     await pumpScapeMatch(tester, viewport: const Size(390, 844), settle: false);
     expect(find.byKey(AppKeys.splash), findsOneWidget);
     expect(_logoOpacity(tester), 1);
+    expect(_logoScale(tester), closeTo(1, 0.02));
+    expect(_logoTurns(tester), 0);
+    expect(_splashLogo(tester).wordmarkAbsorb, 0);
     expect(_curtainOpacity(tester), 1);
 
     await tester.pump(const Duration(milliseconds: 40));
@@ -304,33 +400,55 @@ ScapeLogo _splashLogo(WidgetTester tester) {
 }
 
 double _logoScale(WidgetTester tester) {
-  final scale = tester.widget<Transform>(
-    find.descendant(
-      of: find.byKey(AppKeys.splash),
-      matching: find.byType(Transform),
-    ),
-  );
+  final scale = tester.widget<Transform>(find.byKey(SplashGate.scaleKey));
   return scale.transform.storage[0];
 }
 
+double _logoTurns(WidgetTester tester) {
+  final spin = tester.widget<Transform>(find.byKey(SplashGate.spinKey));
+  final matrix = spin.transform.storage;
+  final turns = math.atan2(matrix[1], matrix[0]) / (2 * math.pi);
+  return turns < 0 ? turns + 1 : turns;
+}
+
 double _logoOpacity(WidgetTester tester) {
-  final marks = tester.widgetList<Opacity>(
-    find.descendant(
-      of: find.byKey(AppKeys.splash),
-      matching: find.byType(Opacity),
-    ),
-  );
-  return marks.last.opacity;
+  return tester.widget<Opacity>(find.byKey(SplashGate.logoOpacityKey)).opacity;
 }
 
 double _curtainOpacity(WidgetTester tester) {
-  final marks = tester.widgetList<Opacity>(
-    find.descendant(
-      of: find.byKey(AppKeys.splash),
-      matching: find.byType(Opacity),
-    ),
+  return tester.widget<Opacity>(find.byKey(SplashGate.curtainKey)).opacity;
+}
+
+void _expectPose(WidgetTester tester, double t, {bool reduced = false}) {
+  final motion = splashMotion(t, reduced: reduced);
+  expect(_logoOpacity(tester), closeTo(motion.logoOpacity, 0.03));
+  expect(_logoScale(tester), closeTo(motion.scale, 0.03));
+  expect(_logoTurns(tester), closeTo(_wrappedTurns(motion.turns), 0.03));
+  expect(_curtainOpacity(tester), closeTo(motion.curtain, 0.03));
+  expect(_splashLogo(tester).wordmarkAbsorb, closeTo(motion.absorb, 0.03));
+  expect(
+    _copperLineWidth(tester),
+    closeTo(SplashGate.accentWidth * motion.accent, 1.5),
   );
-  return marks.first.opacity;
+}
+
+double _wrappedTurns(double turns) {
+  final wrapped = turns % 1;
+  return wrapped < 0 ? wrapped + 1 : wrapped;
+}
+
+void _expectColdStartCover(WidgetTester tester) {
+  final home = tester.element(find.byType(HomeScreen));
+  expect(
+    home.findAncestorWidgetOfExactType<ExcludeSemantics>()?.excluding,
+    isTrue,
+  );
+  expect(
+    tester
+        .element(find.byKey(AppKeys.splash))
+        .findAncestorWidgetOfExactType<AbsorbPointer>(),
+    isNotNull,
+  );
 }
 
 double _copperLineWidth(WidgetTester tester) {
