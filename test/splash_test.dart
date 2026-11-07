@@ -139,6 +139,7 @@ void main() {
     await pumpScapeMatch(tester, viewport: const Size(390, 844), settle: false);
 
     expect(find.byKey(AppKeys.splash), findsOneWidget);
+    expect(find.text('Parceiro'), findsNothing);
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.byType(OnboardingScreen), findsNothing);
     _expectPose(tester, 0, reduced: false);

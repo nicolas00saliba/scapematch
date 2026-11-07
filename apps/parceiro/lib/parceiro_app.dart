@@ -7,6 +7,7 @@ import 'package:scapematch/core/pwa/pwa_frame.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_screen.dart';
+import 'package:scapematch_parceiro/partner_mark.dart';
 
 class ParceiroApp extends ConsumerWidget {
   const ParceiroApp({super.key});
@@ -28,6 +29,15 @@ class ParceiroApp extends ConsumerWidget {
           markImage: const AssetImage('assets/parceiro/logo_parceiro_pin.png'),
           curtain: ScapeLogo.markImageBackground,
           onDark: true,
+          lockupFooterExtent: PartnerSealTrain.extentFor,
+          lockupFooter: (context, height, absorb, {double fade = 0}) {
+            return PartnerSealTrain(
+              logoHeight: height,
+              absorb: absorb,
+              fade: fade,
+              solidPeach: true,
+            );
+          },
           child: PwaFrame(child: child ?? const SizedBox.shrink()),
         );
       },

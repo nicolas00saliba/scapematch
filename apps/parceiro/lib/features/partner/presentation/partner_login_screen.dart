@@ -59,7 +59,7 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
         children: [
-          const Center(child: PartnerMark(height: 52)),
+          const Center(child: PartnerLockup()),
           const SizedBox(height: 20),
           Text(
             'ScapeMatch Parceiro',
