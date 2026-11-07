@@ -4,7 +4,7 @@
 #   jogador real     https://app.scapematch.com.br/
 #   jogador demo     https://demo.scapematch.com.br/
 #   Parceiro real    https://parceiro.scapematch.com.br/
-#   Parceiro demo    https://demo.scapematch.com.br/parceiro/
+#   Parceiro demo    https://parceiro-demo.scapematch.com.br/
 # O Pages antigo em /scapematch/… usa o host do github.io mais o base href.
 # Rode depois de install_cleanup_service_worker.sh.
 set -euo pipefail

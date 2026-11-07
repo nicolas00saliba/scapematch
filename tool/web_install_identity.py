@@ -4,13 +4,16 @@ Espelha os hosts de lib/core/sharing/public_origins.dart. O id do
 manifest sai como URL absoluta. Um id relativo "/" no app e na demo
 vira a mesma string crua; o Android trata os dois como um atalho só.
 A URL absoluta de cada host continua a mesma que o navegador já
-resolvia, então quem instalou certo só atualiza o ícone.
+resolvia, então quem instalou certo só atualiza o ícone. A demo da
+casa é a exceção: o host próprio troca o atalho de propósito, para
+sair do escopo da demo do jogador.
 """
 
 LEGACY_ORIGIN = "https://nicolas00saliba.github.io"
 PLAYER_ORIGIN = "https://app.scapematch.com.br"
 PARTNER_ORIGIN = "https://parceiro.scapematch.com.br"
 DEMO_ORIGIN = "https://demo.scapematch.com.br"
+PARTNER_DEMO_ORIGIN = "https://parceiro-demo.scapematch.com.br"
 
 
 def install_identity(role, mode, base_href):
@@ -27,8 +30,8 @@ def install_identity(role, mode, base_href):
             return DEMO_ORIGIN + "/"
         if role == "partner" and mode == "real":
             return PARTNER_ORIGIN + "/"
-    if base_href == "/parceiro/" and role == "partner" and mode == "demo":
-        return DEMO_ORIGIN + "/parceiro/"
+        if role == "partner" and mode == "demo":
+            return PARTNER_DEMO_ORIGIN + "/"
     if base_href.startswith("/scapematch/"):
         path_is_demo = "/demo/" in base_href
         if mode == "demo" and not path_is_demo:

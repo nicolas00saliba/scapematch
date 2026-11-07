@@ -130,8 +130,10 @@
 <body>
   <script>
     // Um service worker antigo do jogador cobria /scapematch/ inteiro.
-    // Se este shell abrir num caminho do Parceiro, solta esse worker e
-    // volta para o app da casa. Uma segunda passagem não recarrega.
+    // No Pages antigo, se este shell abrir num caminho do Parceiro,
+    // solta esse worker e volta para o app da casa. Na demo, /parceiro/
+    // não é mais o app: manda para o host próprio e não sobe o Flutter.
+    // A conta do destino é a mesma de tool/parceiro_demo_redirect/redirect.js.
     (function () {
       var path = location.pathname;
       var marker = '/parceiro';
@@ -139,6 +141,22 @@
       if (at < 0) return;
       var tail = path.slice(at + marker.length);
       if (tail !== '' && tail.charAt(0) !== '/') return;
+      if (location.host === 'demo.scapematch.com.br') {
+        window.scapeHoldFlutter = true;
+        var rest = (tail === '' || tail === '/' ||
+            tail === '/index.html' || tail === '/404.html') ? '/' : tail;
+        var dest = 'https://parceiro-demo.scapematch.com.br' + rest +
+            location.search + location.hash;
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (reg) {
+              if (reg.scope.indexOf(marker + '/') !== -1) return reg.unregister();
+            }));
+          });
+        }
+        location.replace(dest);
+        return;
+      }
       if (!('serviceWorker' in navigator)) return;
       if (sessionStorage.getItem('scape-partner-shell') === '1') return;
       sessionStorage.setItem('scape-partner-shell', '1');
@@ -178,6 +196,13 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    if (!window.scapeHoldFlutter) {
+      var boot = document.createElement('script');
+      boot.src = 'flutter_bootstrap.js';
+      boot.async = true;
+      document.body.appendChild(boot);
+    }
+  </script>
 </body>
 </html>

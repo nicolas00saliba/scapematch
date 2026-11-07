@@ -337,13 +337,15 @@ class HomeGridSlotCard extends StatelessWidget {
             : 'em ${cityName!.trim()}';
         _snack(context, 'Quando abrir uma sala $place, ela entra nesta grade.');
       case HomeGridSlotKind.partner:
-        final opened = await openExternalUrl(partnerAppUri());
+        final target = partnerAppUri();
+        final opened = await openExternalUrl(target);
         if (!context.mounted || opened) {
           return;
         }
+        final where = target.host.isEmpty ? target.path : target.host;
         _snack(
           context,
-          'Não foi possível abrir o app da casa. O endereço é parceiro.scapematch.com.br.',
+          'Não foi possível abrir o app da casa. O endereço é $where.',
         );
       case HomeGridSlotKind.inviteFriends:
         final text = friendInviteText();

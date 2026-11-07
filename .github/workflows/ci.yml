@@ -162,20 +162,21 @@ jobs:
 
       - name: Build partner web (demo)
         working-directory: apps/parceiro
-        run: flutter build web --release --base-href /parceiro/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/partner-demo
+        run: flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/parceiro-demo-root
 
       - name: Check partner demo
         run: |
-          bash tool/install_cleanup_service_worker.sh apps/parceiro/build/partner-demo
-          bash tool/stamp_web_manifest.sh apps/parceiro/build/partner-demo partner demo
-          bash tool/check_web_service_worker.sh apps/parceiro/build/partner-demo partner
-          bash tool/check_web_manifest.sh apps/parceiro/build/partner-demo partner demo
-          bash tool/check_security_meta.sh flutter apps/parceiro/build/partner-demo/index.html
-          grep -F -q 'base href="/parceiro/"' apps/parceiro/build/partner-demo/index.html
-          bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demonstração'
-          bash tool/js_contains.sh apps/parceiro/build/partner-demo 'xv@scapematch.exemplo'
-          bash tool/js_contains.sh apps/parceiro/build/partner-demo 'Demo: a / b'
-          if bash tool/js_contains.sh apps/parceiro/build/partner-demo 'supabase.co'; then
+          bash tool/install_cleanup_service_worker.sh apps/parceiro/build/parceiro-demo-root
+          bash tool/stamp_web_manifest.sh apps/parceiro/build/parceiro-demo-root partner demo
+          bash tool/check_web_service_worker.sh apps/parceiro/build/parceiro-demo-root partner
+          bash tool/check_web_manifest.sh apps/parceiro/build/parceiro-demo-root partner demo
+          bash tool/check_security_meta.sh flutter apps/parceiro/build/parceiro-demo-root/index.html
+          grep -F -q 'base href="/"' apps/parceiro/build/parceiro-demo-root/index.html
+          grep -F -q 'https://parceiro-demo.scapematch.com.br/' apps/parceiro/build/parceiro-demo-root/manifest.json
+          bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'Demonstração'
+          bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'xv@scapematch.exemplo'
+          bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'Demo: a / b'
+          if bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'supabase.co'; then
             echo 'A demonstração do Parceiro ainda aponta para o Supabase.'
             exit 1
           fi
@@ -239,6 +240,7 @@ jobs:
           grep -F -q 'href="#casas"' apps/landing/index.html
           grep -F -q 'href="https://app.scapematch.com.br/"' apps/landing/index.html
           grep -F -q 'href="https://parceiro.scapematch.com.br/"' apps/landing/index.html
+          grep -F -q 'href="https://parceiro-demo.scapematch.com.br/"' apps/landing/index.html
           grep -F -q 'canonical" href="https://scapematch.com.br/"' apps/landing/index.html
           grep -F -q 'Acessar o ScapeMatch Parceiro' apps/landing/index.html
           grep -F -q 'Placeholder' apps/landing/index.html

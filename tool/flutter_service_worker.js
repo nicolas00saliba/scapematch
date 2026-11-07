@@ -44,8 +44,9 @@ function inThisInstall(url) {
     return false;
   }
   const rest = url.slice(INSTALL_ID.length);
-  // No Pages antigo a demo fica embaixo do app real, e no host da demo
-  // o Parceiro fica em /parceiro/. Esses caminhos têm atalho próprio.
+  // No Pages antigo a demo fica embaixo do app real. No host da demo,
+  // /parceiro/ só redireciona: o atalho da casa está em outro host.
+  // Esses caminhos têm instalação própria e não são deste app.
   if (nestedInstall(rest, 'parceiro') || nestedInstall(rest, 'demo')) {
     return false;
   }

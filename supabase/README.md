@@ -108,7 +108,7 @@ Segredos, no painel da função (nunca no repositório):
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` a plataforma já injeta na função.
 
-`ALLOWED_ORIGINS` é opcional. Lista de origens exatas separadas por vírgula; o espaço ao redor da vírgula é ignorado. Sem essa variável, o CORS aceita `https://nicolas00saliba.github.io` e os subdomínios `app`, `parceiro`, `demo`, `www` e o apex de `scapematch.com.br`. `*` não é aceito. `http://localhost` e `http://127.0.0.1` (com porta) só entram quando `SUPABASE_URL` aponta para o Supabase local. Pedido sem `Origin` (webhook e app nativo) continua recebendo JSON, sem `Access-Control-Allow-Origin`.
+`ALLOWED_ORIGINS` é opcional. Lista de origens exatas separadas por vírgula; o espaço ao redor da vírgula é ignorado. Sem essa variável, o CORS aceita `https://nicolas00saliba.github.io` e os subdomínios `app`, `parceiro`, `demo`, `parceiro-demo`, `www` e o apex de `scapematch.com.br`. `*` não é aceito. `http://localhost` e `http://127.0.0.1` (com porta) só entram quando `SUPABASE_URL` aponta para o Supabase local. Pedido sem `Origin` (webhook e app nativo) continua recebendo JSON, sem `Access-Control-Allow-Origin`.
 
 Deploy, na sua máquina, depois da revisão:
 

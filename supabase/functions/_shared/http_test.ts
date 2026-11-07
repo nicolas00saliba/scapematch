@@ -92,8 +92,13 @@ Deno.test("os subdomínios próprios entram no padrão sem ALLOWED_ORIGINS", () 
   assertEquals(listed("https://app.scapematch.com.br"), true);
   assertEquals(listed("https://parceiro.scapematch.com.br"), true);
   assertEquals(listed("https://demo.scapematch.com.br"), true);
+  assertEquals(listed("https://parceiro-demo.scapematch.com.br"), true);
   assertEquals(isAllowedOrigin("https://app.scapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://parceiro.scapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://demo.scapematch.com.br", hosted), true);
+  assertEquals(
+    isAllowedOrigin("https://parceiro-demo.scapematch.com.br", hosted),
+    true,
+  );
   assertEquals(isAllowedOrigin("https://scapematch.com.br", hosted), true);
 });
