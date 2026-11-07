@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -115,6 +116,86 @@ void main() {
       partner.image.dispose();
     }
     source.image.dispose();
+  });
+
+  test(
+    'the partner splash pin is the same art without the black square',
+    () async {
+      final source = await _decode(
+        'apps/parceiro/assets/parceiro/logo_parceiro.png',
+      );
+      final pin = await _decode(
+        'apps/parceiro/assets/parceiro/logo_parceiro_pin.png',
+      );
+      expect(pin.image.width, source.image.width);
+      expect(pin.image.height, source.image.height);
+      expect(_pixel(pin, 0, 0).$4, 0);
+      expect(_pixel(pin, pin.image.width - 1, pin.image.height - 1).$4, 0);
+
+      final width = pin.image.width;
+      final height = pin.image.height;
+      var mismatches = 0;
+      var darkRim = 0;
+      for (var y = 0; y < height; y++) {
+        for (var x = 0; x < width; x++) {
+          final pixel = _pixel(pin, x, y);
+          final origin = _pixel(source, x, y);
+          final alpha = pixel.$4;
+          if (alpha == 255) {
+            if (pixel.$1 != origin.$1 ||
+                pixel.$2 != origin.$2 ||
+                pixel.$3 != origin.$3) {
+              mismatches++;
+            }
+            continue;
+          }
+          final neutral =
+              (pixel.$1 - pixel.$2).abs() <= 2 &&
+              (pixel.$2 - pixel.$3).abs() <= 2;
+          final dark = math.max(pixel.$1, math.max(pixel.$2, pixel.$3)) < 80;
+          if (alpha > 200 && neutral && dark) {
+            darkRim++;
+          }
+          if (alpha > 0 && alpha < 255) {
+            final scale = 255 / alpha;
+            final red = (pixel.$1 * scale).round();
+            final green = (pixel.$2 * scale).round();
+            final blue = (pixel.$3 * scale).round();
+            if (red < 248 || green < 248 || blue < 248) {
+              mismatches++;
+            }
+          }
+        }
+      }
+      expect(mismatches, 0);
+      expect(darkRim, 0);
+      source.image.dispose();
+      pin.image.dispose();
+    },
+  );
+
+  test('partner launch colors match the black splash', () {
+    final partner = jsonDecode(
+      File('apps/parceiro/web/manifest.json').readAsStringSync(),
+    ) as Map<String, Object?>;
+    expect(partner['background_color'], '#111111');
+    expect(partner['theme_color'], '#111111');
+    expect(partner['name'], 'ScapeMatch Parceiro');
+    expect(partner['short_name'], 'Parceiro');
+    expect(partner['id'], '/');
+    expect(partner['start_url'], '/');
+    expect(partner['scope'], '/');
+
+    final html = File('apps/parceiro/web/index.html').readAsStringSync();
+    expect(html, contains('content="#111111"'));
+    expect(html, contains('background: #111111'));
+
+    final player = jsonDecode(
+      File('web/manifest.json').readAsStringSync(),
+    ) as Map<String, Object?>;
+    expect(player['background_color'], '#FFFFFF');
+    expect(player['theme_color'], '#0F4C4A');
+    expect(player['name'], 'ScapeMatch');
   });
 }
 

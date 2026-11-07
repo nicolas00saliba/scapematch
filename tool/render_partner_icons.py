@@ -6,6 +6,9 @@ do JPEG aprovado, sem redesenho). Cada arquivo do jogador define a tela
 e a caixa do pin. O logo entra inteiro, em escala uniforme, centrado nessa
 caixa. O que sobra da tela quadrada ou do maskable é o mesmo preto do
 arquivo, #111111. Não corta o fundo, não usa transparência e não estica.
+
+O pin da abertura sai em logo_parceiro_pin.png: o mesmo desenho, com o
+preto do arquivo em alpha. Os ícones continuam opacos.
 """
 
 from __future__ import annotations
@@ -77,10 +80,98 @@ def render(source: Image.Image, player: Image.Image) -> Image.Image:
     return canvas
 
 
+PIN = ROOT / "apps/parceiro/assets/parceiro/logo_parceiro_pin.png"
+
+
+def knockout_pin(source: Image.Image) -> Image.Image:
+    """Tira o preto #111111 e deixa o pin com alpha.
+
+    O miolo (branco, petróleo, laranja) conserva o RGB do arquivo. A faixa
+    neutra da borda, que o JPEG misturou com o fundo, vira branco com alpha:
+    sobre #111111 ela reconstrói o arquivo, e não fica uma franja escura.
+    """
+    width, height = source.size
+    pixels = source.load()
+    background = bytearray(width * height)
+    stack = []
+    for x in range(width):
+        stack.append((x, 0))
+        stack.append((x, height - 1))
+    for y in range(height):
+        stack.append((0, y))
+        stack.append((width - 1, y))
+    while stack:
+        x, y = stack.pop()
+        index = y * width + x
+        if background[index]:
+            continue
+        red, green, blue = pixels[x, y]
+        if max(red, green, blue) - min(red, green, blue) > 8:
+            continue
+        if max(abs(red - 17), abs(green - 17), abs(blue - 17)) > 12:
+            continue
+        background[index] = 1
+        if x > 0:
+            stack.append((x - 1, y))
+        if x + 1 < width:
+            stack.append((x + 1, y))
+        if y > 0:
+            stack.append((x, y - 1))
+        if y + 1 < height:
+            stack.append((x, y + 1))
+
+    rim = bytearray(width * height)
+    rim_stack = []
+    for y in range(height):
+        for x in range(width):
+            if not background[y * width + x]:
+                continue
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= nx < width and 0 <= ny < height:
+                    rim_stack.append((nx, ny))
+    while rim_stack:
+        x, y = rim_stack.pop()
+        index = y * width + x
+        if background[index] or rim[index]:
+            continue
+        red, green, blue = pixels[x, y]
+        if max(red, green, blue) >= 240:
+            continue
+        if max(red, green, blue) - min(red, green, blue) > 12:
+            continue
+        rim[index] = 1
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= nx < width and 0 <= ny < height:
+                rim_stack.append((nx, ny))
+
+    image = Image.new("RGBA", source.size)
+    out = image.load()
+    span = 255 - 17
+    for y in range(height):
+        for x in range(width):
+            index = y * width + x
+            if background[index]:
+                out[x, y] = (0, 0, 0, 0)
+                continue
+            if rim[index]:
+                red, green, blue = pixels[x, y]
+                coverage = (max(red, green, blue) - 17) / span
+                alpha = max(0, min(255, round(coverage * 255)))
+                out[x, y] = (255, 255, 255, alpha)
+                continue
+            red, green, blue = pixels[x, y]
+            out[x, y] = (red, green, blue, 255)
+    return image
+
+
 def main() -> None:
     source = Image.open(SOURCE).convert("RGB")
     if source.getpixel((0, 0)) != BLACK:
         raise SystemExit(f"fundo do arquivo é {source.getpixel((0, 0))}, não {BLACK}")
+    pin = knockout_pin(source)
+    PIN.parent.mkdir(parents=True, exist_ok=True)
+    pin.save(PIN, format="PNG", optimize=True)
+    print(f"pin {PIN.name} {pin.size[0]}x{pin.size[1]}")
     for name in NAMES:
         player = Image.open(PLAYER / name).convert("RGB")
         icon = render(source, player)

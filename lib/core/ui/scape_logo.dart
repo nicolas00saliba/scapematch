@@ -47,7 +47,8 @@ class ScapeLogo extends StatelessWidget {
   /// continua [markAspectWidth] por [markAspectHeight].
   final ImageProvider? markImage;
 
-  /// Preto do arquivo do Parceiro. Fecha a folga do encaixe sem pintar branco.
+  /// Preto do arquivo do Parceiro, #111111. A abertura usa esta cor na tela
+  /// inteira. O pin transparente não leva um quadrado por cima.
   static const markImageBackground = Color(0xFF111111);
 
   static const pin = Color(0xFF0F4C4A);
@@ -96,18 +97,15 @@ class ScapeLogo extends StatelessWidget {
     final width = pinWidthFor(height);
     final image = markImage;
     if (image != null) {
-      return ColoredBox(
-        color: markImageBackground,
-        child: Image(
-          image: image,
-          height: height,
-          width: width,
-          fit: BoxFit.contain,
-          alignment: Alignment.center,
-          excludeFromSemantics: true,
-          filterQuality: FilterQuality.medium,
-          gaplessPlayback: true,
-        ),
+      return Image(
+        image: image,
+        height: height,
+        width: width,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        excludeFromSemantics: true,
+        filterQuality: FilterQuality.medium,
+        gaplessPlayback: true,
       );
     }
     return SvgPicture(

@@ -21,10 +21,13 @@ void main() {
     final logo = _splashLogo(tester);
     expect(logo.variant, ScapeLogoVariant.full);
     expect(logo.wordmarkAbsorb, 0);
-    expect(logo.onDark, isFalse);
+    expect(logo.onDark, isTrue);
     final mark = logo.markImage;
     expect(mark, isA<AssetImage>());
-    expect((mark! as AssetImage).assetName, 'assets/parceiro/logo_parceiro.png');
+    expect(
+      (mark! as AssetImage).assetName,
+      'assets/parceiro/logo_parceiro_pin.png',
+    );
 
     final pin = find.descendant(
       of: find.byKey(AppKeys.splash),
@@ -36,32 +39,39 @@ void main() {
       closeTo(ScapeLogo.markAspectWidth / ScapeLogo.markAspectHeight, 0.001),
     );
 
-    await tester.pump(
-      Duration(
-        milliseconds: (SplashGate.duration.inMilliseconds * SplashGate.holdEnd)
-            .round(),
-      ),
-    );
-    expect(_splashLogo(tester).wordmarkAbsorb, 0);
-    expect(
-      find.descendant(
-        of: find.byKey(AppKeys.splash),
-        matching: find.byWidgetPredicate(
-          (widget) =>
-              widget is ColoredBox &&
-              widget.color == ScapeLogo.markImageBackground,
-        ),
-      ),
-      findsOneWidget,
-    );
     await tester.runAsync(() async {
       await precacheImage(mark, tester.element(pin));
     });
     await tester.pump();
     expect(tester.takeException(), isNull);
+    _expectBlackCurtain(tester);
+    _expectLightWordmark(tester);
+
+    var elapsed = 0;
+    Future<void> pumpTo(double t) async {
+      final target = (SplashGate.duration.inMilliseconds * t).round();
+      await tester.pump(Duration(milliseconds: target - elapsed));
+      elapsed = target;
+    }
+
+    await pumpTo(SplashGate.holdEnd);
+    expect(_splashLogo(tester).wordmarkAbsorb, 0);
+    _expectBlackCurtain(tester);
+    _expectLightWordmark(tester);
     await _saveSplashShot(tester, 'parceiro-splash-hold.png');
 
-    await tester.pump(SplashGate.duration);
+    await pumpTo(0.46);
+    expect(_splashLogo(tester).wordmarkAbsorb, inExclusiveRange(0, 1));
+    _expectBlackCurtain(tester);
+    await _saveSplashShot(tester, 'parceiro-splash-trem.png');
+
+    await pumpTo(0.80);
+    expect(_splashLogo(tester).wordmarkAbsorb, 1);
+    expect(find.text('ScapeMatch'), findsNothing);
+    _expectBlackCurtain(tester);
+    await _saveSplashShot(tester, 'parceiro-splash-giro.png');
+
+    await pumpTo(1);
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.splash), findsNothing);
   });
@@ -76,6 +86,9 @@ void main() {
     await pumpParceiro(tester, size: const Size(390, 844), settle: false);
     expect(find.byKey(AppKeys.splash), findsOneWidget);
     expect(_splashLogo(tester).wordmarkAbsorb, 0);
+    expect(_splashLogo(tester).onDark, isTrue);
+    _expectBlackCurtain(tester);
+    _expectLightWordmark(tester);
     expect(SplashGate.reducedDuration, const Duration(milliseconds: 180));
 
     await tester.pump(const Duration(milliseconds: 40));
@@ -100,6 +113,32 @@ ScapeLogo _splashLogo(WidgetTester tester) {
       matching: find.byType(ScapeLogo),
     ),
   );
+}
+
+void _expectBlackCurtain(WidgetTester tester) {
+  expect(
+    find.descendant(
+      of: find.byKey(AppKeys.splash),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is ColoredBox &&
+            widget.color == ScapeLogo.markImageBackground,
+      ),
+    ),
+    findsOneWidget,
+  );
+}
+
+void _expectLightWordmark(WidgetTester tester) {
+  final text = tester.widget<Text>(
+    find.descendant(
+      of: find.byKey(AppKeys.splash),
+      matching: find.text('ScapeMatch'),
+    ),
+  );
+  final spans = (text.textSpan! as TextSpan).children!.cast<TextSpan>();
+  expect(spans.first.style!.color, ScapeLogo.pinOnDark);
+  expect(spans.last.style!.color, ScapeLogo.copper);
 }
 
 Future<void> _loadPoppins() async {
