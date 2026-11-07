@@ -16,21 +16,27 @@ import 'package:scapematch/core/ui/window_class.dart';
 ///
 /// Primeiro entra o logo completo (pin oficial e letreiro), parado o
 /// bastante para ler. O letreiro entra no pin como um trem. O Parceiro
-/// pode pôr um selo embaixo; ele desliza no mesmo trem e some ao tocar o
-/// corpo do pin. Só então o pin avança, gira no eixo vertical e cresce
-/// até sumir. A escala é uniforme, na proporção do viewBox, então o disco
-/// branco continua circular. A cortina só revela a próxima tela depois
-/// disso. Com reduzir movimento, o logo completo já entra pronto e a
-/// cortina some em [reducedDuration], sem trem e sem giro.
+/// pode pôr um selo embaixo: ele fica parado e se dissolve da esquerda
+/// para a direita enquanto o letreiro entra. Só então o pin avança, gira
+/// no eixo vertical e cresce até sumir. A escala é uniforme, na proporção
+/// do viewBox, então o disco branco continua circular. A cortina só
+/// revela a próxima tela depois disso. Com reduzir movimento, o logo
+/// completo já entra pronto, o selo some num fade e a cortina acaba em
+/// [reducedDuration], sem trem e sem giro.
 ///
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
-/// Selo sob o lockup. [absorb] é o mesmo do letreiro: 0 parado, 1 já no pin.
+/// Selo sob o lockup.
+///
+/// [absorb] acompanha o trem do letreiro: 0 parado, 1 já dentro do pin.
+/// [fade] é o sumiço simples quando o sistema pede menos movimento, de 0
+/// a 1. No movimento normal fica 0.
 typedef SplashLockupFooter = Widget Function(
   BuildContext context,
   double logoHeight,
-  double absorb,
-);
+  double absorb, {
+  double fade,
+});
 
 /// Altura do selo, incluindo o vão. O giro usa este valor para sair do pin.
 typedef SplashLockupFooterExtent = double Function(
@@ -64,8 +70,7 @@ class SplashGate extends StatefulWidget {
   final bool onDark;
 
   /// Peça extra sob o logo completo. O jogador deixa nulo: a abertura dele
-  /// não ganha selo. O Parceiro põe o selo "Parceiro", que entra no pin
-  /// junto com o letreiro.
+  /// não ganha selo. O Parceiro põe o selo "Parceiro".
   final SplashLockupFooter? lockupFooter;
 
   /// Altura de [lockupFooter] para o logo caber na tela e o giro sair do pin.
@@ -403,6 +408,7 @@ class _SplashCurtain extends StatelessWidget {
                             onDark: onDark,
                             lockupFooter: lockupFooter,
                             lockupFooterExtent: lockupFooterExtent,
+                            sealFade: reduced ? animation.value : 0,
                           ),
                         ),
                       ),
@@ -425,6 +431,7 @@ class _SplashMark extends StatelessWidget {
     required this.onDark,
     required this.lockupFooter,
     required this.lockupFooterExtent,
+    required this.sealFade,
   });
 
   final SplashMotion motion;
@@ -432,6 +439,9 @@ class _SplashMark extends StatelessWidget {
   final bool onDark;
   final SplashLockupFooter? lockupFooter;
   final SplashLockupFooterExtent? lockupFooterExtent;
+
+  /// 0 no movimento normal. No reduced motion, o quanto o selo já sumiu.
+  final double sealFade;
 
   double _heightThatFits(BuildContext context, BoxConstraints constraints) {
     final maxW = math.max(0.0, constraints.maxWidth - 64);
@@ -488,7 +498,10 @@ class _SplashMark extends StatelessWidget {
             ? logo
             : Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [logo, footer(context, height, motion.absorb)],
+                children: [
+                  logo,
+                  footer(context, height, motion.absorb, fade: sealFade),
+                ],
               );
         return Center(
           child: Transform.translate(

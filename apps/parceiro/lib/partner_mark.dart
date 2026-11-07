@@ -184,23 +184,31 @@ class PartnerLockup extends StatelessWidget {
   }
 }
 
-/// Selo da abertura. No quadro parado fica centrado sob o lockup.
-/// No trem, desliza a mesma distância do letreiro e some na ponta do pin,
-/// sem a folga transparente da caixa.
+/// Selo da abertura. Fica parado sob o lockup.
+///
+/// Enquanto o letreiro entra no pin, o selo se desfaz da esquerda para a
+/// direita, em brilho, e some antes do giro. Com menos movimento, [fade]
+/// apaga o selo inteiro, sem varredura e sem faísca.
 class PartnerSealTrain extends StatelessWidget {
   const PartnerSealTrain({
     super.key,
     required this.logoHeight,
     required this.absorb,
+    this.fade = 0,
     this.solidPeach = false,
   });
 
   final double logoHeight;
+
+  /// 0 no quadro parado. 1 quando o letreiro já entrou no pin.
   final double absorb;
+
+  /// Sumiço simples do reduced motion, de 0 a 1.
+  final double fade;
   final bool solidPeach;
 
   static const slotKey = Key('partner-seal-train-slot');
-  static const trainKey = Key('partner-seal-train');
+  static const fadeKey = Key('partner-seal-fade');
 
   static double extentFor(BuildContext context, double logoHeight) {
     final font = MediaQuery.textScalerOf(context)
@@ -212,34 +220,26 @@ class PartnerSealTrain extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = ScapeLogo.lockupWidthFor(context, logoHeight);
-    final pinW = ScapeLogo.pinWidthFor(logoHeight);
-    final lane = math.max(0.0, width - pinW);
     final font = MediaQuery.textScalerOf(context)
         .scale(PartnerSeal.fontFor(logoHeight));
     final pillH = PartnerSeal.pillHeight(context, font, scaleText: false);
     final tucked = absorb.clamp(0.0, 1.0);
-    final Widget pill = tucked >= 1
-        ? SizedBox(width: width, height: pillH)
-        : Align(
-            alignment: Alignment.topCenter,
-            child: PartnerSeal(
-              key: PartnerSeal.splashKey,
-              fontSize: font,
-              solidPeach: solidPeach,
-              scaleText: false,
-            ),
-          );
-    Widget train = Transform.translate(
-      key: trainKey,
-      offset: Offset(-tucked * lane, 0),
-      child: pill,
+    final faded = fade.clamp(0.0, 1.0);
+    final seal = PartnerSeal(
+      key: PartnerSeal.splashKey,
+      fontSize: font,
+      solidPeach: solidPeach,
+      scaleText: false,
     );
-    if (tucked > 0 && tucked < 1) {
-      train = ClipPath(
-        clipBehavior: Clip.hardEdge,
-        clipper: _SealIntoPinClipper(edge: pinW / 2 + _SealIntoPinClipper.tuck),
-        child: train,
-      );
+    final Widget body;
+    if (faded > 0) {
+      body = Opacity(key: fadeKey, opacity: 1 - faded, child: seal);
+    } else if (tucked <= 0) {
+      body = seal;
+    } else if (tucked >= 1) {
+      body = SizedBox(height: pillH);
+    } else {
+      body = PartnerSealDissolve(progress: tucked, child: seal);
     }
     return SizedBox(
       key: slotKey,
@@ -248,30 +248,165 @@ class PartnerSealTrain extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(height: PartnerSeal.gapFor(logoHeight)),
-          train,
+          Align(alignment: Alignment.topCenter, child: body),
         ],
       ),
     );
   }
 }
 
-/// Fecha o que já passou da ponta do pin. A caixa do PNG é mais larga que
-/// o corpo; cortar nela deixaria um halo antes do pin.
-class _SealIntoPinClipper extends CustomClipper<Path> {
-  const _SealIntoPinClipper({required this.edge});
+/// Varredura do selo, da esquerda para a direita, com brilho na borda.
+class PartnerSealDissolve extends StatelessWidget {
+  const PartnerSealDissolve({
+    super.key,
+    required this.progress,
+    required this.child,
+  });
 
-  final double edge;
+  static const dissolveKey = Key('partner-seal-dissolve');
+  static const sparksKey = Key('partner-seal-sparks');
 
-  static const tuck = 1.0;
+  /// 0 é o selo inteiro. 1 já o apagou.
+  final double progress;
+  final Widget child;
 
   @override
-  Path getClip(Size size) {
-    final left = edge.clamp(0.0, size.width);
-    return Path()..addRect(Rect.fromLTRB(left, 0, size.width, size.height));
+  Widget build(BuildContext context) {
+    final p = progress.clamp(0.0, 1.0);
+    return Stack(
+      key: dissolveKey,
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (rect) => _sealGlowShader(rect, p),
+          child: ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (rect) => _sealWipeShader(rect, p),
+            child: child,
+          ),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(
+              key: sparksKey,
+              painter: _SealSparkPainter(progress: p),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+double _after(double value, double previous) {
+  final next = value.clamp(0.0, 1.0);
+  return next < previous ? previous : next;
+}
+
+/// O que já passou da borda fica transparente. A borda sobe em branco.
+Shader _sealWipeShader(Rect rect, double progress) {
+  final edge = progress.clamp(0.0, 1.0);
+  final feather = (math.max(12.0, rect.width * 0.22) / math.max(rect.width, 1))
+      .clamp(0.08, 0.42);
+  final hot = _after(math.max(edge, 0.02), 0.0);
+  final solid = _after(edge + feather, hot);
+  return LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: const [Color(0x00000000), Color(0x66FFFFFF), Color(0xFFFFFFFF)],
+    stops: [0, hot, solid],
+  ).createShader(rect);
+}
+
+/// Clareia a faixa que ainda resta, colada na borda da dissolução.
+Shader _sealGlowShader(Rect rect, double progress) {
+  final edge = progress.clamp(0.0, 1.0);
+  final lead = edge <= 0.02 ? 0.0 : edge - 0.02;
+  final core = _after(edge + 0.04, lead);
+  final warm = _after(core + 0.04, core);
+  final tail = _after(edge + 0.16, warm);
+  return LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: const [
+      Color(0x00FFFFFF),
+      Color(0xFFFFF6EA),
+      Color(0xFFE8A06A),
+      Color(0x00FFFFFF),
+    ],
+    stops: [lead, core, warm, tail],
+  ).createShader(rect);
+}
+
+class _SealSparkPainter extends CustomPainter {
+  const _SealSparkPainter({required this.progress});
+
+  final double progress;
+
+  static const _copper = Color(0xFFD2642A);
+  static const _ember = Color(0xFFFFB27A);
+  static const _light = Color(0xFFFFF6EA);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) {
+      return;
+    }
+    final edge = size.width * progress;
+    final band = Rect.fromLTWH(edge - 16, -3, 28, size.height + 6);
+    canvas.drawRect(
+      band,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0x00D2642A), Color(0xFFFFF8EE), Color(0x00FFFFFF)],
+          stops: [0.05, 0.46, 1],
+        ).createShader(band)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
+    canvas.drawLine(
+      Offset(edge, 1),
+      Offset(edge, size.height - 1),
+      Paint()
+        ..color = _light.withValues(alpha: 0.9)
+        ..strokeWidth = 1.4
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
+    );
+
+    const count = 16;
+    for (var i = 0; i < count; i++) {
+      final n = i + 1;
+      final y = ((n * 37) % 100) / 100 * size.height;
+      final along = ((n % 5) - 2) * 3.4;
+      final lift = math.sin(progress * 16 + n * 1.3) * 2.2;
+      final twinkle = 0.4 + 0.6 * (0.5 + 0.5 * math.sin(progress * 28 + n));
+      final color = switch (n % 3) {
+        0 => _light,
+        1 => _copper,
+        _ => _ember,
+      };
+      final center = Offset(edge + along + lift, y);
+      final radius = 0.9 + (n % 4) * 0.55;
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()..color = color.withValues(alpha: twinkle.clamp(0.35, 1)),
+      );
+      if (n.isEven) {
+        canvas.drawCircle(
+          center,
+          radius + 1.8,
+          Paint()
+            ..color = color.withValues(alpha: 0.28 * twinkle)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.6),
+        );
+      }
+    }
   }
 
   @override
-  bool shouldReclip(covariant _SealIntoPinClipper oldDelegate) {
-    return oldDelegate.edge != edge;
+  bool shouldRepaint(covariant _SealSparkPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -61,34 +62,52 @@ void main() {
     _expectLightWordmark(tester);
     _expectSealUnderLockup(tester);
     _expectPrintSeal(tester, find.byKey(PartnerSeal.splashKey));
-    expect(_sealShift(tester), 0);
+    expect(find.byType(PartnerSealDissolve), findsNothing);
+    expect(find.byKey(PartnerSealDissolve.sparksKey), findsNothing);
     final heldWord = tester.getRect(_splashWordmark(tester));
     final heldSeal = tester.getRect(_splashSeal(tester));
     await _saveSplashShot(tester, 'parceiro-splash-hold.png');
+    final frames = await _beginSplashFrames();
+    await _captureSplashFrame(tester, frames, 0);
 
-    await pumpTo(0.46);
-    expect(_splashLogo(tester).wordmarkAbsorb, inExclusiveRange(0, 1));
-    _expectBlackCurtain(tester);
-    final trainingWord = tester.getRect(_splashWordmark(tester));
-    final trainingSeal = tester.getRect(_splashSeal(tester));
-    final pinRect = tester.getRect(_splashPin(tester));
-    expect(trainingWord.left, lessThan(heldWord.left));
-    expect(
-      heldSeal.left - trainingSeal.left,
-      closeTo(heldWord.left - trainingWord.left, 1),
+    var frame = 1;
+    frame = await _pumpUntilAbsorb(
+      tester,
+      frames,
+      frame,
+      0.30,
+      onReach: () async {
+        _expectDissolve(tester, heldSeal, heldWord, 0.30);
+        expect(await _peachOnRight(tester), isTrue);
+        await _saveSplashShot(tester, 'parceiro-splash-dissolve-30.png');
+      },
     );
-    expect(trainingSeal.center.dx, closeTo(pinRect.center.dx, 12));
-    expect(trainingSeal.left, lessThan(pinRect.center.dx));
-    expect(trainingSeal.right, greaterThan(pinRect.center.dx + 8));
-    _expectSealClippedAtPin(tester, pinRect);
-    await _saveSplashShot(tester, 'parceiro-splash-trem.png');
-
-    await pumpTo(0.80);
+    frame = await _pumpUntilAbsorb(
+      tester,
+      frames,
+      frame,
+      0.70,
+      onReach: () async {
+        _expectDissolve(tester, heldSeal, heldWord, 0.70);
+        expect(await _peachOnRight(tester), isTrue);
+        await _saveSplashShot(tester, 'parceiro-splash-dissolve-70.png');
+      },
+    );
+    frame = await _pumpUntilAbsorb(tester, frames, frame, 1);
     expect(_splashLogo(tester).wordmarkAbsorb, 1);
+    expect(_splashSeal(tester), findsNothing);
+    expect(find.byType(PartnerSealDissolve), findsNothing);
+
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 80));
+      await _captureSplashFrame(tester, frames, frame++);
+    }
     expect(_splashWordmark(tester), findsNothing);
     expect(_splashSeal(tester), findsNothing);
     _expectBlackCurtain(tester);
     await _saveSplashShot(tester, 'parceiro-splash-giro.png');
+    await _captureSplashFrame(tester, frames, frame);
+    await _encodeSplashClip(tester, frames);
 
     await pumpTo(1);
     await tester.pumpAndSettle();
@@ -110,14 +129,19 @@ void main() {
     _expectLightWordmark(tester);
     _expectSealUnderLockup(tester);
     _expectPrintSeal(tester, find.byKey(PartnerSeal.splashKey));
-    expect(_sealShift(tester), 0);
+    expect(find.byType(PartnerSealDissolve), findsNothing);
+    expect(find.byKey(PartnerSealDissolve.sparksKey), findsNothing);
+    expect(find.byKey(PartnerSealTrain.fadeKey), findsNothing);
     expect(SplashGate.reducedDuration, const Duration(milliseconds: 180));
 
     await tester.pump(const Duration(milliseconds: 40));
     expect(find.byKey(AppKeys.splash), findsOneWidget);
     expect(_splashLogo(tester).wordmarkAbsorb, 0);
     expect(_splashSeal(tester), findsOneWidget);
-    expect(_sealShift(tester), 0);
+    expect(find.byType(PartnerSealDissolve), findsNothing);
+    expect(find.byKey(PartnerSealDissolve.sparksKey), findsNothing);
+    final fade = tester.widget<Opacity>(find.byKey(PartnerSealTrain.fadeKey));
+    expect(fade.opacity, inExclusiveRange(0, 1));
 
     await tester.pump(SplashGate.reducedDuration);
     await tester.pumpAndSettle();
@@ -158,13 +182,6 @@ Finder _splashWordmark(WidgetTester tester) {
   return find.descendant(
     of: find.byKey(AppKeys.splash),
     matching: find.text('ScapeMatch'),
-  );
-}
-
-Finder _splashPin(WidgetTester tester) {
-  return find.descendant(
-    of: find.byKey(AppKeys.splash),
-    matching: find.byType(Image),
   );
 }
 
@@ -214,29 +231,172 @@ void _expectPrintSeal(WidgetTester tester, Finder seal) {
   expect(text.style!.fontWeight, FontWeight.w700);
 }
 
-void _expectSealClippedAtPin(WidgetTester tester, Rect pin) {
-  final clipFinder = find.ancestor(
-    of: find.byKey(PartnerSealTrain.trainKey),
-    matching: find.byWidgetPredicate(
-      (widget) => widget is ClipPath && widget.clipper is! ShapeBorderClipper,
-    ),
+void _expectDissolve(
+  WidgetTester tester,
+  Rect heldSeal,
+  Rect heldWord,
+  double around,
+) {
+  final absorb = _splashLogo(tester).wordmarkAbsorb;
+  expect(absorb, inInclusiveRange(around - 0.08, around + 0.08));
+  final dissolve = tester.widget<PartnerSealDissolve>(
+    find.byType(PartnerSealDissolve),
   );
-  expect(clipFinder, findsOneWidget);
-  final clip = tester.widget<ClipPath>(clipFinder);
-  expect(clip.clipBehavior, Clip.hardEdge);
-  final path = clip.clipper!.getClip(tester.getSize(clipFinder));
-  final origin = tester.getTopLeft(clipFinder);
+  expect(dissolve.progress, closeTo(absorb, 0.001));
+  expect(find.byKey(PartnerSealDissolve.sparksKey), findsOneWidget);
+  expect(find.byKey(PartnerSealTrain.fadeKey), findsNothing);
   final seal = tester.getRect(_splashSeal(tester));
-  Offset local(Offset global) => global - origin;
-  expect(path.contains(local(seal.centerLeft + const Offset(1, 0))), isFalse);
-  expect(path.contains(local(seal.centerRight + const Offset(-1, 0))), isTrue);
-  final edge = origin.dx + path.getBounds().left;
-  expect(edge - pin.center.dx, closeTo(1, 1.5));
+  final word = tester.getRect(_splashWordmark(tester));
+  expect(seal.left, closeTo(heldSeal.left, 1.5));
+  expect(seal.center.dx, closeTo(heldSeal.center.dx, 1.5));
+  expect(word.left, lessThan(heldWord.left - 4));
+  _expectBlackCurtain(tester);
 }
 
-double _sealShift(WidgetTester tester) {
-  final train = tester.widget<Transform>(find.byKey(PartnerSealTrain.trainKey));
-  return train.transform.getTranslation().x;
+Future<bool> _peachOnRight(WidgetTester tester) async {
+  final seal = tester.getRect(_splashSeal(tester));
+  final image = await _splashImage(tester);
+  var left = 0;
+  var right = 0;
+  final bytes = await tester.runAsync(
+    () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+  );
+  final data = bytes!.buffer.asUint8List();
+  final width = image.width;
+  bool peach(int x, int y) {
+    if (x < 0 || y < 0 || x >= width || y >= image.height) {
+      return false;
+    }
+    final i = (y * width + x) * 4;
+    final r = data[i];
+    final g = data[i + 1];
+    final b = data[i + 2];
+    return r > 215 && r < 252 && g > 190 && g < 236 && b > 175 && b < 225;
+  }
+
+  final top = seal.top.round().clamp(0, image.height - 1);
+  final bottom = seal.bottom.round().clamp(0, image.height);
+  final leftEdge = seal.left.round();
+  final rightEdge = seal.right.round();
+  final span = math.max(1, rightEdge - leftEdge);
+  for (var y = top; y < bottom; y += 2) {
+    for (var x = leftEdge; x < leftEdge + span * 0.28; x += 2) {
+      if (peach(x.round(), y)) {
+        left++;
+      }
+    }
+    for (var x = rightEdge - span * 0.28; x < rightEdge; x += 2) {
+      if (peach(x.round(), y)) {
+        right++;
+      }
+    }
+  }
+  image.dispose();
+  return right > left * 2 && right > 8;
+}
+
+Future<ui.Image> _splashImage(WidgetTester tester) async {
+  await tester.pump();
+  final view = tester.binding.renderViews.first;
+  // ignore: invalid_use_of_protected_member
+  final layer = view.layer! as OffsetLayer;
+  final image = await tester.runAsync(
+    () => layer.toImage(Offset.zero & view.size),
+  );
+  return image!;
+}
+
+Future<Directory?> _beginSplashFrames() async {
+  final artifacts = Directory('/opt/cursor/artifacts');
+  if (!artifacts.existsSync()) {
+    return null;
+  }
+  final frames = Directory('/tmp/parceiro-splash-frames');
+  if (frames.existsSync()) {
+    frames.deleteSync(recursive: true);
+  }
+  frames.createSync(recursive: true);
+  return frames;
+}
+
+Future<void> _captureSplashFrame(
+  WidgetTester tester,
+  Directory? frames,
+  int index,
+) async {
+  if (frames == null) {
+    return;
+  }
+  final image = await _splashImage(tester);
+  final bytes = await tester.runAsync(
+    () => image.toByteData(format: ui.ImageByteFormat.png),
+  );
+  File('${frames.path}/f${index.toString().padLeft(3, '0')}.png')
+      .writeAsBytesSync(bytes!.buffer.asUint8List());
+  image.dispose();
+}
+
+Future<int> _pumpUntilAbsorb(
+  WidgetTester tester,
+  Directory? frames,
+  int frame,
+  double target, {
+  Future<void> Function()? onReach,
+}) async {
+  var index = frame;
+  for (var step = 0; step < 80; step++) {
+    if (_splashLogo(tester).wordmarkAbsorb >= target) {
+      break;
+    }
+    await tester.pump(const Duration(milliseconds: 40));
+    await _captureSplashFrame(tester, frames, index++);
+  }
+  expect(
+    _splashLogo(tester).wordmarkAbsorb,
+    greaterThanOrEqualTo(target - 0.02),
+  );
+  if (onReach != null) {
+    await onReach();
+  }
+  return index;
+}
+
+Future<void> _encodeSplashClip(WidgetTester tester, Directory? frames) async {
+  if (frames == null) {
+    return;
+  }
+  final results = await tester.runAsync(() async {
+    final gif = await Process.run('ffmpeg', [
+      '-y',
+      '-framerate',
+      '12',
+      '-i',
+      '${frames.path}/f%03d.png',
+      '-vf',
+      'fps=12,scale=390:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=80[p];[s1][p]paletteuse',
+      '/opt/cursor/artifacts/parceiro-splash.gif',
+    ]);
+    final video = await Process.run('ffmpeg', [
+      '-y',
+      '-framerate',
+      '12',
+      '-i',
+      '${frames.path}/f%03d.png',
+      '-vf',
+      'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-movflags',
+      '+faststart',
+      '/opt/cursor/artifacts/parceiro-splash.mp4',
+    ]);
+    return [gif, video];
+  });
+  expect(results, isNotNull);
+  expect(results![0].exitCode, 0, reason: results[0].stderr.toString());
+  expect(results[1].exitCode, 0, reason: results[1].stderr.toString());
 }
 
 void _expectLightWordmark(WidgetTester tester) {

@@ -30,10 +30,11 @@ class ParceiroApp extends ConsumerWidget {
           curtain: ScapeLogo.markImageBackground,
           onDark: true,
           lockupFooterExtent: PartnerSealTrain.extentFor,
-          lockupFooter: (context, height, absorb) {
+          lockupFooter: (context, height, absorb, {double fade = 0}) {
             return PartnerSealTrain(
               logoHeight: height,
               absorb: absorb,
+              fade: fade,
               solidPeach: true,
             );
           },
