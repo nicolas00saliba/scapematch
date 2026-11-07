@@ -15,15 +15,29 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// continua com a chave dela.
 ///
 /// Primeiro entra o logo completo (pin oficial e letreiro), parado o
-/// bastante para ler. O letreiro entra no pin como um trem. Só então o pin
-/// avança, gira no eixo vertical e cresce até sumir. A escala é uniforme,
-/// na proporção do viewBox, então o disco branco continua circular. A
-/// cortina só revela a próxima tela depois disso. Com reduzir movimento,
-/// o logo completo já entra pronto e a cortina some em [reducedDuration],
-/// sem trem e sem giro.
+/// bastante para ler. O letreiro entra no pin como um trem. O Parceiro
+/// pode pôr um selo embaixo; ele desliza no mesmo trem e some ao tocar o
+/// corpo do pin. Só então o pin avança, gira no eixo vertical e cresce
+/// até sumir. A escala é uniforme, na proporção do viewBox, então o disco
+/// branco continua circular. A cortina só revela a próxima tela depois
+/// disso. Com reduzir movimento, o logo completo já entra pronto e a
+/// cortina some em [reducedDuration], sem trem e sem giro.
 ///
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
+/// Selo sob o lockup. [absorb] é o mesmo do letreiro: 0 parado, 1 já no pin.
+typedef SplashLockupFooter = Widget Function(
+  BuildContext context,
+  double logoHeight,
+  double absorb,
+);
+
+/// Altura do selo, incluindo o vão. O giro usa este valor para sair do pin.
+typedef SplashLockupFooterExtent = double Function(
+  BuildContext context,
+  double logoHeight,
+);
+
 class SplashGate extends StatefulWidget {
   const SplashGate({
     super.key,
@@ -31,7 +45,12 @@ class SplashGate extends StatefulWidget {
     this.markImage,
     this.curtain = background,
     this.onDark = false,
-  });
+    this.lockupFooter,
+    this.lockupFooterExtent,
+  }) : assert(
+         (lockupFooter == null) == (lockupFooterExtent == null),
+         'O selo da abertura precisa do desenho e da altura juntos.',
+       );
 
   final Widget child;
 
@@ -43,6 +62,14 @@ class SplashGate extends StatefulWidget {
 
   /// Letreiro claro, para a cortina preta. O jogador deixa falso.
   final bool onDark;
+
+  /// Peça extra sob o logo completo. O jogador deixa nulo: a abertura dele
+  /// não ganha selo. O Parceiro põe o selo "Parceiro", que entra no pin
+  /// junto com o letreiro.
+  final SplashLockupFooter? lockupFooter;
+
+  /// Altura de [lockupFooter] para o logo caber na tela e o giro sair do pin.
+  final SplashLockupFooterExtent? lockupFooterExtent;
 
   /// Fundo da abertura. O disco do pin também é branco.
   static const background = Color(0xFFFFFFFF);
@@ -305,6 +332,8 @@ class _SplashGateState extends State<SplashGate>
             markImage: widget.markImage,
             curtain: widget.curtain,
             onDark: widget.onDark,
+            lockupFooter: widget.lockupFooter,
+            lockupFooterExtent: widget.lockupFooterExtent,
           ),
       ],
     );
@@ -318,6 +347,8 @@ class _SplashCurtain extends StatelessWidget {
     required this.markImage,
     required this.curtain,
     required this.onDark,
+    required this.lockupFooter,
+    required this.lockupFooterExtent,
   });
 
   final Animation<double> animation;
@@ -325,6 +356,8 @@ class _SplashCurtain extends StatelessWidget {
   final ImageProvider? markImage;
   final Color curtain;
   final bool onDark;
+  final SplashLockupFooter? lockupFooter;
+  final SplashLockupFooterExtent? lockupFooterExtent;
 
   SystemUiOverlayStyle get _overlay {
     final light = curtain.computeLuminance() > 0.5;
@@ -368,6 +401,8 @@ class _SplashCurtain extends StatelessWidget {
                             motion: motion,
                             markImage: markImage,
                             onDark: onDark,
+                            lockupFooter: lockupFooter,
+                            lockupFooterExtent: lockupFooterExtent,
                           ),
                         ),
                       ),
@@ -388,11 +423,15 @@ class _SplashMark extends StatelessWidget {
     required this.motion,
     required this.markImage,
     required this.onDark,
+    required this.lockupFooter,
+    required this.lockupFooterExtent,
   });
 
   final SplashMotion motion;
   final ImageProvider? markImage;
   final bool onDark;
+  final SplashLockupFooter? lockupFooter;
+  final SplashLockupFooterExtent? lockupFooterExtent;
 
   double _heightThatFits(BuildContext context, BoxConstraints constraints) {
     final maxW = math.max(0.0, constraints.maxWidth - 64);
@@ -400,11 +439,16 @@ class _SplashMark extends StatelessWidget {
     if (maxW <= 0 || maxH <= 0) {
       return 1;
     }
+    final extentFor = lockupFooterExtent;
     var lo = 1.0;
     var hi = maxH;
     for (var i = 0; i < 14; i++) {
       final mid = (lo + hi) / 2;
-      if (ScapeLogo.lockupWidthFor(context, mid) <= maxW) {
+      final footer = extentFor?.call(context, mid) ?? 0;
+      // Sem selo, footer é 0 e mid já está abaixo de maxH: o mesmo encaixe
+      // de antes, só pela largura do lockup.
+      if (ScapeLogo.lockupWidthFor(context, mid) <= maxW &&
+          mid + footer <= maxH) {
         lo = mid;
       } else {
         hi = mid;
@@ -420,15 +464,35 @@ class _SplashMark extends StatelessWidget {
         final height = _heightThatFits(context, constraints);
         final pinW = ScapeLogo.pinWidthFor(height);
         final fullW = ScapeLogo.lockupWidthFor(context, height);
-        // O giro e o crescimento saem do centro do pin, não do letreiro.
+        final footer = lockupFooter;
+        final footerH = footer == null
+            ? 0.0
+            : lockupFooterExtent!(context, height);
+        // O giro e o crescimento saem do centro do pin, não do letreiro
+        // nem do selo que fica embaixo.
         final alignX = fullW == 0 ? 0.0 : pinW / fullW - 1;
-        final alignment = Alignment(alignX, 0);
+        final columnH = height + footerH;
+        final alignY = footerH == 0 || columnH == 0 ? 0.0 : -footerH / columnH;
+        final alignment = Alignment(alignX, alignY);
         // Depois do trem, o pin vai ao centro. Antes disso ele fica parado
-        // para o letreiro entrar nele.
+        // para o letreiro (e o selo, se houver) entrar nele.
         final shift = (fullW - pinW) / 2 * motion.recenter;
+        final drop = footerH / 2 * motion.recenter;
+        final logo = ScapeLogo(
+          height: height,
+          onDark: onDark,
+          wordmarkAbsorb: motion.absorb,
+          markImage: markImage,
+        );
+        final Widget mark = footer == null
+            ? logo
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [logo, footer(context, height, motion.absorb)],
+              );
         return Center(
           child: Transform.translate(
-            offset: Offset(shift, 0),
+            offset: Offset(shift, drop),
             child: Opacity(
               key: SplashGate.logoOpacityKey,
               opacity: motion.logoOpacity,
@@ -442,12 +506,7 @@ class _SplashMark extends StatelessWidget {
                   alignment: alignment,
                   filterQuality: FilterQuality.medium,
                   transform: splashYawTransform(motion.turns),
-                  child: ScapeLogo(
-                    height: height,
-                    onDark: onDark,
-                    wordmarkAbsorb: motion.absorb,
-                    markImage: markImage,
-                  ),
+                  child: mark,
                 ),
               ),
             ),
