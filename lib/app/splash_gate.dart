@@ -25,9 +25,12 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
 class SplashGate extends StatefulWidget {
-  const SplashGate({super.key, required this.child});
+  const SplashGate({super.key, required this.child, this.markImage});
 
   final Widget child;
+
+  /// Troca só a arte do pin. Nulo é o SVG do jogador. O movimento não muda.
+  final ImageProvider? markImage;
 
   /// Fundo da abertura. O disco do pin também é branco.
   static const background = Color(0xFFFFFFFF);
@@ -283,17 +286,27 @@ class _SplashGateState extends State<SplashGate>
       fit: StackFit.expand,
       children: [
         ExcludeSemantics(excluding: _show, child: widget.child),
-        if (_show) _SplashCurtain(animation: _controller, reduced: _reduced),
+        if (_show)
+          _SplashCurtain(
+            animation: _controller,
+            reduced: _reduced,
+            markImage: widget.markImage,
+          ),
       ],
     );
   }
 }
 
 class _SplashCurtain extends StatelessWidget {
-  const _SplashCurtain({required this.animation, required this.reduced});
+  const _SplashCurtain({
+    required this.animation,
+    required this.reduced,
+    required this.markImage,
+  });
 
   final Animation<double> animation;
   final bool reduced;
+  final ImageProvider? markImage;
 
   static const _overlay = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -328,7 +341,10 @@ class _SplashCurtain extends StatelessWidget {
                       child: Material(
                         type: MaterialType.transparency,
                         child: SizedBox.expand(
-                          child: _SplashMark(motion: motion),
+                          child: _SplashMark(
+                            motion: motion,
+                            markImage: markImage,
+                          ),
                         ),
                       ),
                     ),
@@ -344,9 +360,10 @@ class _SplashCurtain extends StatelessWidget {
 }
 
 class _SplashMark extends StatelessWidget {
-  const _SplashMark({required this.motion});
+  const _SplashMark({required this.motion, required this.markImage});
 
   final SplashMotion motion;
+  final ImageProvider? markImage;
 
   double _heightThatFits(BuildContext context, BoxConstraints constraints) {
     final maxW = math.max(0.0, constraints.maxWidth - 64);
@@ -400,6 +417,7 @@ class _SplashMark extends StatelessWidget {
                     height: height,
                     onDark: false,
                     wordmarkAbsorb: motion.absorb,
+                    markImage: markImage,
                   ),
                 ),
               ),

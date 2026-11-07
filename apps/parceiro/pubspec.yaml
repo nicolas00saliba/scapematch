@@ -33,6 +33,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/
+    - assets/parceiro/
     - assets/fonts/Poppins-Medium.ttf
   fonts:
     - family: Poppins

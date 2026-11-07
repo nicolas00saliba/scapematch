@@ -24,6 +24,7 @@ class ParceiroApp extends ConsumerWidget {
       builder: (context, child) {
         // A mesma abertura do jogador: só no cold start do celular.
         return SplashGate(
+          markImage: const AssetImage('assets/parceiro/logo_parceiro.png'),
           child: PwaFrame(child: child ?? const SizedBox.shrink()),
         );
       },
