@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/splash_gate.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/pwa/pwa_frame.dart';
+import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_screen.dart';
 
@@ -24,6 +25,9 @@ class ParceiroApp extends ConsumerWidget {
       builder: (context, child) {
         // A mesma abertura do jogador: só no cold start do celular.
         return SplashGate(
+          markImage: const AssetImage('assets/parceiro/logo_parceiro_pin.png'),
+          curtain: ScapeLogo.markImageBackground,
+          onDark: true,
           child: PwaFrame(child: child ?? const SizedBox.shrink()),
         );
       },

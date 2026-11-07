@@ -25,9 +25,24 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// O site, a partir de [scapeDesktopMinWidth], não mostra. A sessão e o
 /// login seguem por baixo; a cortina só esconde o primeiro instante.
 class SplashGate extends StatefulWidget {
-  const SplashGate({super.key, required this.child});
+  const SplashGate({
+    super.key,
+    required this.child,
+    this.markImage,
+    this.curtain = background,
+    this.onDark = false,
+  });
 
   final Widget child;
+
+  /// Troca só a arte do pin. Nulo é o SVG do jogador. O movimento não muda.
+  final ImageProvider? markImage;
+
+  /// Cor da cortina. O jogador fica no branco. O Parceiro usa o preto do logo.
+  final Color curtain;
+
+  /// Letreiro claro, para a cortina preta. O jogador deixa falso.
+  final bool onDark;
 
   /// Fundo da abertura. O disco do pin também é branco.
   static const background = Color(0xFFFFFFFF);
@@ -283,25 +298,46 @@ class _SplashGateState extends State<SplashGate>
       fit: StackFit.expand,
       children: [
         ExcludeSemantics(excluding: _show, child: widget.child),
-        if (_show) _SplashCurtain(animation: _controller, reduced: _reduced),
+        if (_show)
+          _SplashCurtain(
+            animation: _controller,
+            reduced: _reduced,
+            markImage: widget.markImage,
+            curtain: widget.curtain,
+            onDark: widget.onDark,
+          ),
       ],
     );
   }
 }
 
 class _SplashCurtain extends StatelessWidget {
-  const _SplashCurtain({required this.animation, required this.reduced});
+  const _SplashCurtain({
+    required this.animation,
+    required this.reduced,
+    required this.markImage,
+    required this.curtain,
+    required this.onDark,
+  });
 
   final Animation<double> animation;
   final bool reduced;
+  final ImageProvider? markImage;
+  final Color curtain;
+  final bool onDark;
 
-  static const _overlay = SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    statusBarBrightness: Brightness.light,
-    systemNavigationBarColor: SplashGate.background,
-    systemNavigationBarIconBrightness: Brightness.dark,
-  );
+  SystemUiOverlayStyle get _overlay {
+    final light = curtain.computeLuminance() > 0.5;
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: light ? Brightness.dark : Brightness.light,
+      statusBarBrightness: light ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: curtain,
+      systemNavigationBarIconBrightness: light
+          ? Brightness.dark
+          : Brightness.light,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -322,13 +358,17 @@ class _SplashCurtain extends StatelessWidget {
                   child: AnnotatedRegion<SystemUiOverlayStyle>(
                     value: _overlay,
                     child: ColoredBox(
-                      color: SplashGate.background,
+                      color: curtain,
                       // Sem um Material, o letreiro herda o estilo de erro
                       // (sublinhado amarelo) do MaterialApp.
                       child: Material(
                         type: MaterialType.transparency,
                         child: SizedBox.expand(
-                          child: _SplashMark(motion: motion),
+                          child: _SplashMark(
+                            motion: motion,
+                            markImage: markImage,
+                            onDark: onDark,
+                          ),
                         ),
                       ),
                     ),
@@ -344,9 +384,15 @@ class _SplashCurtain extends StatelessWidget {
 }
 
 class _SplashMark extends StatelessWidget {
-  const _SplashMark({required this.motion});
+  const _SplashMark({
+    required this.motion,
+    required this.markImage,
+    required this.onDark,
+  });
 
   final SplashMotion motion;
+  final ImageProvider? markImage;
+  final bool onDark;
 
   double _heightThatFits(BuildContext context, BoxConstraints constraints) {
     final maxW = math.max(0.0, constraints.maxWidth - 64);
@@ -398,8 +444,9 @@ class _SplashMark extends StatelessWidget {
                   transform: splashYawTransform(motion.turns),
                   child: ScapeLogo(
                     height: height,
-                    onDark: false,
+                    onDark: onDark,
                     wordmarkAbsorb: motion.absorb,
+                    markImage: markImage,
                   ),
                 ),
               ),

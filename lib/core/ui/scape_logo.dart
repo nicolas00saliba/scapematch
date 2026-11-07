@@ -26,6 +26,7 @@ class ScapeLogo extends StatelessWidget {
     this.onDark,
     this.onTap,
     this.wordmarkAbsorb = 0,
+    this.markImage,
   });
 
   final ScapeLogoVariant variant;
@@ -40,6 +41,15 @@ class ScapeLogo extends StatelessWidget {
   /// como um trem entrando. A folga transparente do viewBox não corta as
   /// letras. O pin não muda de tamanho nem de proporção.
   final double wordmarkAbsorb;
+
+  /// Pin em arquivo, no lugar do SVG. O Parceiro usa o logo com fundo
+  /// preto. Nulo mantém o desenho compartilhado do jogador. A caixa
+  /// continua [markAspectWidth] por [markAspectHeight].
+  final ImageProvider? markImage;
+
+  /// Preto do arquivo do Parceiro, #111111. A abertura usa esta cor na tela
+  /// inteira. O pin transparente não leva um quadrado por cima.
+  static const markImageBackground = Color(0xFF111111);
 
   static const pin = Color(0xFF0F4C4A);
   static const copper = Color(0xFFD2642A);
@@ -84,10 +94,24 @@ class ScapeLogo extends StatelessWidget {
   }
 
   Widget _pin(bool dark) {
+    final width = pinWidthFor(height);
+    final image = markImage;
+    if (image != null) {
+      return Image(
+        image: image,
+        height: height,
+        width: width,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        excludeFromSemantics: true,
+        filterQuality: FilterQuality.medium,
+        gaplessPlayback: true,
+      );
+    }
     return SvgPicture(
       ScapePinLoader(dark ? markOnDarkAsset : markAsset),
       height: height,
-      width: pinWidthFor(height),
+      width: width,
       fit: BoxFit.contain,
       alignment: Alignment.center,
       excludeFromSemantics: true,
