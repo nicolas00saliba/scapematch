@@ -78,7 +78,7 @@ void main() {
       0.30,
       onReach: () async {
         _expectDissolve(tester, heldSeal, heldWord, 0.30);
-        expect(await _peachOnRight(tester), isTrue);
+        await _expectSweptIsBackground(tester);
         await _saveSplashShot(tester, 'parceiro-splash-dissolve-30.png');
       },
     );
@@ -89,7 +89,7 @@ void main() {
       0.70,
       onReach: () async {
         _expectDissolve(tester, heldSeal, heldWord, 0.70);
-        expect(await _peachOnRight(tester), isTrue);
+        await _expectSweptIsBackground(tester);
         await _saveSplashShot(tester, 'parceiro-splash-dissolve-70.png');
       },
     );
@@ -253,46 +253,84 @@ void _expectDissolve(
   _expectBlackCurtain(tester);
 }
 
-Future<bool> _peachOnRight(WidgetTester tester) async {
+/// À esquerda da frente, fora da faixa das faíscas, o pixel é #111111.
+/// Na faixa, o que não é fundo é faísca clara. A direita do corte ainda
+/// tem o pêssego do selo.
+Future<void> _expectSweptIsBackground(WidgetTester tester) async {
   final seal = tester.getRect(_splashSeal(tester));
+  final progress = tester
+      .widget<PartnerSealDissolve>(find.byType(PartnerSealDissolve))
+      .progress;
   final image = await _splashImage(tester);
-  var left = 0;
-  var right = 0;
   final bytes = await tester.runAsync(
     () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
   );
   final data = bytes!.buffer.asUint8List();
+  const bg = 0x11;
   final width = image.width;
-  bool peach(int x, int y) {
-    if (x < 0 || y < 0 || x >= width || y >= image.height) {
-      return false;
+  final height = image.height;
+  final edge = seal.left + seal.width * progress;
+  final strictRight = edge - PartnerSealDissolve.frontBand;
+  final top = (seal.top + 1).ceil().clamp(0, height - 1);
+  final bottom = (seal.bottom - 1).floor().clamp(0, height);
+  final left = seal.left.ceil().clamp(0, width - 1);
+  final lastStrict = strictRight.floor().clamp(0, width);
+  var swept = 0;
+  for (var y = top; y < bottom; y++) {
+    for (var x = left; x < lastStrict; x++) {
+      final i = (y * width + x) * 4;
+      final r = data[i];
+      final g = data[i + 1];
+      final b = data[i + 2];
+      swept++;
+      expect(
+        (r, g, b),
+        (bg, bg, bg),
+        reason:
+            'resto em ($x,$y) rgb($r,$g,$b), corte em ${edge.toStringAsFixed(1)}',
+      );
     }
-    final i = (y * width + x) * 4;
-    final r = data[i];
-    final g = data[i + 1];
-    final b = data[i + 2];
-    return r > 215 && r < 252 && g > 190 && g < 236 && b > 175 && b < 225;
+  }
+  expect(swept, greaterThan(20));
+
+  final bandLeft = lastStrict.clamp(0, width - 1);
+  final bandRight = edge.ceil().clamp(0, width);
+  for (var y = top; y < bottom; y++) {
+    for (var x = bandLeft; x < bandRight; x++) {
+      final i = (y * width + x) * 4;
+      final r = data[i];
+      final g = data[i + 1];
+      final b = data[i + 2];
+      if (r == bg && g == bg && b == bg) {
+        continue;
+      }
+      expect(r, greaterThanOrEqualTo(bg), reason: 'sombra em ($x,$y)');
+      expect(g, greaterThanOrEqualTo(bg), reason: 'sombra em ($x,$y)');
+      expect(b, greaterThanOrEqualTo(bg), reason: 'sombra em ($x,$y)');
+      expect(
+        math.max(r, math.max(g, b)),
+        greaterThanOrEqualTo(170),
+        reason: 'faísca escura em ($x,$y) rgb($r,$g,$b)',
+      );
+    }
   }
 
-  final top = seal.top.round().clamp(0, image.height - 1);
-  final bottom = seal.bottom.round().clamp(0, image.height);
-  final leftEdge = seal.left.round();
-  final rightEdge = seal.right.round();
-  final span = math.max(1, rightEdge - leftEdge);
+  var peach = 0;
+  final rightStart = (edge + 6).ceil().clamp(0, width);
+  final rightEnd = seal.right.floor().clamp(0, width);
   for (var y = top; y < bottom; y += 2) {
-    for (var x = leftEdge; x < leftEdge + span * 0.28; x += 2) {
-      if (peach(x.round(), y)) {
-        left++;
-      }
-    }
-    for (var x = rightEdge - span * 0.28; x < rightEdge; x += 2) {
-      if (peach(x.round(), y)) {
-        right++;
+    for (var x = rightStart; x < rightEnd; x += 2) {
+      final i = (y * width + x) * 4;
+      final r = data[i];
+      final g = data[i + 1];
+      final b = data[i + 2];
+      if (r > 215 && r < 252 && g > 190 && g < 236 && b > 175 && b < 225) {
+        peach++;
       }
     }
   }
   image.dispose();
-  return right > left * 2 && right > 8;
+  expect(peach, greaterThan(8));
 }
 
 Future<ui.Image> _splashImage(WidgetTester tester) async {

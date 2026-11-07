@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
 
@@ -255,7 +253,8 @@ class PartnerSealTrain extends StatelessWidget {
   }
 }
 
-/// Varredura do selo, da esquerda para a direita, com brilho na borda.
+/// Varredura do selo. À esquerda do corte não resta pílula: o pedaço
+/// acende numa faixa estreita e vira faísca. Sem gradiente largo nem blur.
 class PartnerSealDissolve extends StatelessWidget {
   const PartnerSealDissolve({
     super.key,
@@ -265,6 +264,10 @@ class PartnerSealDissolve extends StatelessWidget {
 
   static const dissolveKey = Key('partner-seal-dissolve');
   static const sparksKey = Key('partner-seal-sparks');
+
+  /// Faixa, em px, onde a frente e as faíscas podem pintar.
+  /// À esquerda disso o fundo fica intacto.
+  static const frontBand = 6.0;
 
   /// 0 é o selo inteiro. 1 já o apagou.
   final double progress;
@@ -276,16 +279,11 @@ class PartnerSealDissolve extends StatelessWidget {
     return Stack(
       key: dissolveKey,
       alignment: Alignment.center,
-      clipBehavior: Clip.none,
       children: [
-        ShaderMask(
-          blendMode: BlendMode.srcATop,
-          shaderCallback: (rect) => _sealGlowShader(rect, p),
-          child: ShaderMask(
-            blendMode: BlendMode.dstIn,
-            shaderCallback: (rect) => _sealWipeShader(rect, p),
-            child: child,
-          ),
+        ClipRect(
+          clipper: _KeepRightClipper(progress: p),
+          clipBehavior: Clip.hardEdge,
+          child: child,
         ),
         Positioned.fill(
           child: IgnorePointer(
@@ -300,44 +298,22 @@ class PartnerSealDissolve extends StatelessWidget {
   }
 }
 
-double _after(double value, double previous) {
-  final next = value.clamp(0.0, 1.0);
-  return next < previous ? previous : next;
-}
+/// Corta o selo no pixel do corte. Não deixa alpha parcial à esquerda.
+class _KeepRightClipper extends CustomClipper<Rect> {
+  const _KeepRightClipper({required this.progress});
 
-/// O que já passou da borda fica transparente. A borda sobe em branco.
-Shader _sealWipeShader(Rect rect, double progress) {
-  final edge = progress.clamp(0.0, 1.0);
-  final feather = (math.max(12.0, rect.width * 0.22) / math.max(rect.width, 1))
-      .clamp(0.08, 0.42);
-  final hot = _after(math.max(edge, 0.02), 0.0);
-  final solid = _after(edge + feather, hot);
-  return LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: const [Color(0x00000000), Color(0x66FFFFFF), Color(0xFFFFFFFF)],
-    stops: [0, hot, solid],
-  ).createShader(rect);
-}
+  final double progress;
 
-/// Clareia a faixa que ainda resta, colada na borda da dissolução.
-Shader _sealGlowShader(Rect rect, double progress) {
-  final edge = progress.clamp(0.0, 1.0);
-  final lead = edge <= 0.02 ? 0.0 : edge - 0.02;
-  final core = _after(edge + 0.04, lead);
-  final warm = _after(core + 0.04, core);
-  final tail = _after(edge + 0.16, warm);
-  return LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: const [
-      Color(0x00FFFFFF),
-      Color(0xFFFFF6EA),
-      Color(0xFFE8A06A),
-      Color(0x00FFFFFF),
-    ],
-    stops: [lead, core, warm, tail],
-  ).createShader(rect);
+  @override
+  Rect getClip(Size size) {
+    final edge = size.width * progress;
+    return Rect.fromLTRB(edge, 0, size.width, size.height);
+  }
+
+  @override
+  bool shouldReclip(covariant _KeepRightClipper oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
 }
 
 class _SealSparkPainter extends CustomPainter {
@@ -355,53 +331,38 @@ class _SealSparkPainter extends CustomPainter {
       return;
     }
     final edge = size.width * progress;
-    final band = Rect.fromLTWH(edge - 16, -3, 28, size.height + 6);
+    // Faixa de 3px, só no que ainda resta, encostada no corte.
     canvas.drawRect(
-      band,
+      Rect.fromLTWH(edge, 0, 3, size.height),
       Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0x00D2642A), Color(0xFFFFF8EE), Color(0x00FFFFFF)],
-          stops: [0.05, 0.46, 1],
-        ).createShader(band)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+        ..color = _light
+        ..isAntiAlias = false,
     );
-    canvas.drawLine(
-      Offset(edge, 1),
-      Offset(edge, size.height - 1),
+    canvas.drawRect(
+      Rect.fromLTWH(edge + 2, 0, 1.5, size.height),
       Paint()
-        ..color = _light.withValues(alpha: 0.9)
-        ..strokeWidth = 1.4
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
+        ..color = _ember
+        ..isAntiAlias = false,
     );
 
-    const count = 16;
+    const count = 11;
     for (var i = 0; i < count; i++) {
       final n = i + 1;
-      final y = ((n * 37) % 100) / 100 * size.height;
-      final along = ((n % 5) - 2) * 3.4;
-      final lift = math.sin(progress * 16 + n * 1.3) * 2.2;
-      final twinkle = 0.4 + 0.6 * (0.5 + 0.5 * math.sin(progress * 28 + n));
+      final y = (0.16 + ((n * 37) % 68) / 100) * size.height;
+      // Cabe na faixa de [PartnerSealDissolve.frontBand] à esquerda do corte.
+      final dx = ((n % 4) - 2) * 1.2;
       final color = switch (n % 3) {
         0 => _light,
-        1 => _copper,
-        _ => _ember,
+        1 => _ember,
+        _ => _copper,
       };
-      final center = Offset(edge + along + lift, y);
-      final radius = 0.9 + (n % 4) * 0.55;
       canvas.drawCircle(
-        center,
-        radius,
-        Paint()..color = color.withValues(alpha: twinkle.clamp(0.35, 1)),
+        Offset(edge + dx, y),
+        1.0 + (n % 3) * 0.35,
+        Paint()
+          ..color = color
+          ..isAntiAlias = false,
       );
-      if (n.isEven) {
-        canvas.drawCircle(
-          center,
-          radius + 1.8,
-          Paint()
-            ..color = color.withValues(alpha: 0.28 * twinkle)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.6),
-        );
-      }
     }
   }
 
