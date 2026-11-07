@@ -399,8 +399,21 @@ Future<int> _pumpUntilAbsorb(
   return index;
 }
 
+Future<bool> _ffmpegExists() async {
+  try {
+    final result = await Process.run('ffmpeg', ['-version']);
+    return result.exitCode == 0;
+  } on ProcessException {
+    return false;
+  }
+}
+
 Future<void> _encodeSplashClip(WidgetTester tester, Directory? frames) async {
   if (frames == null) {
+    return;
+  }
+  final canEncode = await tester.runAsync(_ffmpegExists);
+  if (canEncode != true) {
     return;
   }
   final results = await tester.runAsync(() async {
