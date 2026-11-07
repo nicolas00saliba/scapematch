@@ -1,16 +1,17 @@
 # Publishes the Flutter web release on GitHub Pages (subdomínios + legado).
 #
-# app.scapematch.com.br       → repo nicolas00saliba/scapematch-app
-# parceiro.scapematch.com.br  → repo nicolas00saliba/scapematch-parceiro
-# demo.scapematch.com.br      → repo nicolas00saliba/scapematch-demo
-#                             (jogador em /, Parceiro em /parceiro/)
+# app.scapematch.com.br            → repo nicolas00saliba/scapematch-app
+# parceiro.scapematch.com.br       → repo nicolas00saliba/scapematch-parceiro
+# parceiro-demo.scapematch.com.br  → repo nicolas00saliba/scapematch-parceiro-demo
+# demo.scapematch.com.br           → repo nicolas00saliba/scapematch-demo
+#                                    (jogador em /, /parceiro/ só redireciona)
 #
 # Transição: também republica o monorepo em
 # https://nicolas00saliba.github.io/scapematch/… (base-href antigos) para
 # não quebrar quem ainda abre o endereço antigo.
 #
 # Segredo necessário no repo scapematch:
-#   PAGES_DEPLOY_TOKEN — PAT com escrita nos 3 repos de Pages.
+#   PAGES_DEPLOY_TOKEN — PAT com escrita nos 4 repos de Pages.
 #
 # --base-href must keep the leading and trailing slash.
 # APP_MODE=real|demo escolhe o repositório. O Parceiro continua outro app.
@@ -101,27 +102,50 @@ jobs:
           bash tool/check_security_meta.sh flutter build/demo-player/index.html
           grep -F 'base href="/"' build/demo-player/index.html
 
-      - name: Build partner web (demo, subdomain /parceiro/)
+      - name: Build partner web (demo, parceiro-demo.scapematch.com.br)
         working-directory: apps/parceiro
         run: |
-          flutter build web --release --base-href /parceiro/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-parceiro
-          bash ../../tool/install_cleanup_service_worker.sh build/demo-parceiro
-          bash ../../tool/stamp_web_manifest.sh build/demo-parceiro partner demo
-          bash ../../tool/check_web_service_worker.sh build/demo-parceiro partner
-          bash ../../tool/check_web_manifest.sh build/demo-parceiro partner demo
-          bash ../../tool/check_security_meta.sh flutter build/demo-parceiro/index.html
-          grep -F 'base href="/parceiro/"' build/demo-parceiro/index.html
+          flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/parceiro-demo-root
+          bash ../../tool/install_cleanup_service_worker.sh build/parceiro-demo-root
+          bash ../../tool/stamp_web_manifest.sh build/parceiro-demo-root partner demo
+          bash ../../tool/check_web_service_worker.sh build/parceiro-demo-root partner
+          bash ../../tool/check_web_manifest.sh build/parceiro-demo-root partner demo
+          bash ../../tool/check_security_meta.sh flutter build/parceiro-demo-root/index.html
+          grep -F 'base href="/"' build/parceiro-demo-root/index.html
+          cp build/parceiro-demo-root/index.html build/parceiro-demo-root/404.html
+          touch build/parceiro-demo-root/.nojekyll
+          printf 'parceiro-demo.scapematch.com.br\n' > build/parceiro-demo-root/CNAME
 
       - name: Assemble demo site
         run: |
           mkdir -p build/demo-root/parceiro
           cp -a build/demo-player/. build/demo-root/
-          cp -a apps/parceiro/build/demo-parceiro/. build/demo-root/parceiro/
+          cp tool/parceiro_demo_redirect/index.html build/demo-root/parceiro/index.html
+          cp tool/parceiro_demo_redirect/index.html build/demo-root/parceiro/404.html
+          cp tool/parceiro_demo_redirect/redirect.js build/demo-root/parceiro/redirect.js
           cp build/demo-root/index.html build/demo-root/404.html
           touch build/demo-root/.nojekyll
           printf 'demo.scapematch.com.br\n' > build/demo-root/CNAME
           test -f build/demo-root/index.html
           test -f build/demo-root/parceiro/index.html
+          test -f build/demo-root/parceiro/404.html
+          test ! -e build/demo-root/parceiro/manifest.json
+          test ! -e build/demo-root/parceiro/flutter_service_worker.js
+          grep -F -q 'https://parceiro-demo.scapematch.com.br/' build/demo-root/parceiro/index.html
+          grep -F -q 'http-equiv="refresh"' build/demo-root/parceiro/index.html
+          ! grep -F -q 'rel="manifest"' build/demo-root/parceiro/index.html
+          ! grep -F -q 'serviceWorker.register' build/demo-root/parceiro/redirect.js
+          python3 - <<'PY'
+          import json
+          manifest = json.load(open("build/demo-root/manifest.json"))
+          identity = "https://demo.scapematch.com.br/"
+          for key in ("id", "start_url", "scope"):
+              if manifest.get(key) != identity:
+                  raise SystemExit(f"PWA da demo do jogador mudou: {key}")
+          if manifest.get("name") != "ScapeMatch Demo" or manifest.get("short_name") != "Scape Demo":
+              raise SystemExit("nome da demo do jogador mudou")
+          print("demo do jogador intacta")
+          PY
 
       # Legado: quatro apps sob /scapematch/ no monorepo (sem downtime).
       - name: Build legacy monorepo tree
@@ -177,6 +201,7 @@ jobs:
           path: |
             build/app-root
             apps/parceiro/build/parceiro-root
+            apps/parceiro/build/parceiro-demo-root
             build/demo-root
             build/legacy
           include-hidden-files: "true"
@@ -225,6 +250,18 @@ jobs:
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
           full_commit_message: Publish ScapeMatch Parceiro (parceiro.scapematch.com.br)
+
+      - name: Publish parceiro-demo.scapematch.com.br
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          personal_token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          external_repository: nicolas00saliba/scapematch-parceiro-demo
+          publish_dir: ./_sites/apps/parceiro/build/parceiro-demo-root
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish ScapeMatch Parceiro Demo (parceiro-demo.scapematch.com.br)
 
       - name: Publish demo.scapematch.com.br
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
@@ -281,34 +318,115 @@ jobs:
         run: |
           player_new="https://app.scapematch.com.br/"
           partner_new="https://parceiro.scapematch.com.br/"
+          partner_demo="https://parceiro-demo.scapematch.com.br/"
           demo_new="https://demo.scapematch.com.br/"
+          demo_partner="https://demo.scapematch.com.br/parceiro/"
           player="https://nicolas00saliba.github.io/scapematch/"
           partner="https://nicolas00saliba.github.io/scapematch/parceiro/"
           echo "### ScapeMatch web" >> "$GITHUB_STEP_SUMMARY"
           echo "$player_new" >> "$GITHUB_STEP_SUMMARY"
           echo "$partner_new" >> "$GITHUB_STEP_SUMMARY"
+          echo "$partner_demo" >> "$GITHUB_STEP_SUMMARY"
           echo "$demo_new" >> "$GITHUB_STEP_SUMMARY"
+          echo "$demo_partner" >> "$GITHUB_STEP_SUMMARY"
           echo "$player" >> "$GITHUB_STEP_SUMMARY"
           echo "$partner" >> "$GITHUB_STEP_SUMMARY"
+          legacy_ok=0
+          app_ok=0
+          demo_up=0
+          partner_demo_ok=0
+          partner_demo_seen=0
+          redirect_ok=0
+          demo_manifest_ok=0
           for attempt in $(seq 1 30); do
-            n1="$(curl -fsS -L -o /tmp/app.html -w "%{http_code}" "$player_new" || true)"
-            n2="$(curl -fsS -L -o /tmp/parc.html -w "%{http_code}" "$partner_new" || true)"
-            n3="$(curl -fsS -L -o /tmp/demo.html -w "%{http_code}" "$demo_new" || true)"
-            pcode="$(curl -fsS -L -o /tmp/legacy-p.html -w "%{http_code}" "$player" || true)"
-            hcode="$(curl -fsS -L -o /tmp/legacy-h.html -w "%{http_code}" "$partner" || true)"
-            echo "attempt ${attempt}: app ${n1}, parceiro ${n2}, demo ${n3}, legacy player ${pcode}, legacy partner ${hcode}"
+            n1="$(curl -sS -L --max-time 25 -o /tmp/app.html -w "%{http_code}" "$player_new" || true)"
+            n2="$(curl -sS -L --max-time 25 -o /tmp/parc.html -w "%{http_code}" "$partner_new" || true)"
+            n3="$(curl -sS -L --max-time 25 -o /tmp/demo.html -w "%{http_code}" "$demo_new" || true)"
+            n4="$(curl -sS -L --max-time 25 -o /tmp/pdemo.html -w "%{http_code}" "$partner_demo" || true)"
+            n4m="$(curl -sS -L --max-time 25 -o /tmp/pdemo-manifest.json -w "%{http_code}" "${partner_demo}manifest.json" || true)"
+            n5="$(curl -sS -L --max-time 25 -o /tmp/predir.html -w "%{http_code}" "$demo_partner" || true)"
+            n3m="$(curl -sS -L --max-time 25 -o /tmp/demo-manifest.json -w "%{http_code}" "${demo_new}manifest.json" || true)"
+            pcode="$(curl -sS -L --max-time 25 -o /tmp/legacy-p.html -w "%{http_code}" "$player" || true)"
+            hcode="$(curl -sS -L --max-time 25 -o /tmp/legacy-h.html -w "%{http_code}" "$partner" || true)"
+            echo "attempt ${attempt}: app ${n1}, parceiro ${n2}, demo ${n3}, parceiro-demo ${n4}/${n4m}, demo/parceiro ${n5}, legacy player ${pcode}, legacy partner ${hcode}"
             if [ "$pcode" = "200" ] && grep -F -q 'base href="/scapematch/"' /tmp/legacy-p.html \
               && [ "$hcode" = "200" ] && grep -F -q 'base href="/scapematch/parceiro/"' /tmp/legacy-h.html; then
-              echo "Legacy github.io ainda no ar."
-              # Subdomínios podem ainda estar sem DNS/cert; não falham a job na transição.
-              if [ "$n1" = "200" ] && grep -F -q 'base href="/"' /tmp/app.html; then
-                echo "app.scapematch.com.br respondeu."
-              else
-                echo "app.scapematch.com.br ainda não respondeu (DNS/cert pendente)."
+              legacy_ok=1
+            fi
+            if [ "$n1" = "200" ] && grep -F -q 'base href="/"' /tmp/app.html; then
+              app_ok=1
+            fi
+            if [ "$n3" = "200" ]; then
+              demo_up=1
+            fi
+            if [ -n "$n4" ] && [ "$n4" != "000" ]; then
+              partner_demo_seen=1
+            fi
+            if [ "$n4" = "200" ] && grep -F -q 'base href="/"' /tmp/pdemo.html \
+              && [ "$n4m" = "200" ] \
+              && grep -F -q '"id": "https://parceiro-demo.scapematch.com.br/"' /tmp/pdemo-manifest.json \
+              && grep -F -q '"start_url": "https://parceiro-demo.scapematch.com.br/"' /tmp/pdemo-manifest.json \
+              && grep -F -q '"scope": "https://parceiro-demo.scapematch.com.br/"' /tmp/pdemo-manifest.json \
+              && grep -F -q '"name": "ScapeMatch Parceiro Demo"' /tmp/pdemo-manifest.json; then
+              partner_demo_ok=1
+            fi
+            if [ "$n5" = "200" ] && grep -F -q 'https://parceiro-demo.scapematch.com.br/' /tmp/predir.html \
+              && grep -F -q 'http-equiv="refresh"' /tmp/predir.html \
+              && ! grep -F -q 'rel="manifest"' /tmp/predir.html \
+              && ! grep -F -q 'serviceWorker.register' /tmp/predir.html; then
+              redirect_ok=1
+            fi
+            if [ "$n3m" = "200" ] \
+              && grep -F -q '"id": "https://demo.scapematch.com.br/"' /tmp/demo-manifest.json \
+              && grep -F -q '"start_url": "https://demo.scapematch.com.br/"' /tmp/demo-manifest.json \
+              && grep -F -q '"scope": "https://demo.scapematch.com.br/"' /tmp/demo-manifest.json \
+              && grep -F -q '"name": "ScapeMatch Demo"' /tmp/demo-manifest.json; then
+              demo_manifest_ok=1
+            fi
+            if [ "$legacy_ok" = "1" ]; then
+              pending=0
+              if [ "$partner_demo_seen" = "1" ] && [ "$partner_demo_ok" != "1" ]; then
+                pending=1
               fi
-              exit 0
+              if [ "$demo_up" = "1" ] && [ "$redirect_ok" != "1" ]; then
+                pending=1
+              fi
+              if [ "$demo_up" = "1" ] && [ "$demo_manifest_ok" != "1" ]; then
+                pending=1
+              fi
+              if [ "$pending" = "0" ]; then
+                break
+              fi
             fi
             sleep 20
           done
-          echo "O github.io legado não voltou a responder."
-          exit 1
+          if [ "$legacy_ok" != "1" ]; then
+            echo "O github.io legado não voltou a responder."
+            exit 1
+          fi
+          echo "Legacy github.io ainda no ar."
+          if [ "$app_ok" = "1" ]; then
+            echo "app.scapematch.com.br respondeu."
+          else
+            echo "app.scapematch.com.br ainda não respondeu (DNS/cert pendente)."
+          fi
+          if [ "$partner_demo_ok" = "1" ]; then
+            echo "parceiro-demo.scapematch.com.br respondeu."
+          elif [ "$partner_demo_seen" = "1" ]; then
+            echo "parceiro-demo.scapematch.com.br respondeu sem o app da demonstração."
+            exit 1
+          else
+            echo "parceiro-demo.scapematch.com.br ainda não respondeu (repo, DNS ou cert pendente)."
+          fi
+          if [ "$demo_up" != "1" ]; then
+            echo "demo.scapematch.com.br ainda não respondeu (DNS/cert pendente)."
+          elif [ "$redirect_ok" != "1" ]; then
+            echo "A demo respondeu, mas /parceiro/ ainda não redireciona."
+            exit 1
+          elif [ "$demo_manifest_ok" != "1" ]; then
+            echo "O manifest da demo do jogador mudou."
+            exit 1
+          else
+            echo "demo.scapematch.com.br/parceiro/ redireciona para o Parceiro demo."
+            echo "O PWA da demo do jogador segue em https://demo.scapematch.com.br/."
+          fi

@@ -34,32 +34,32 @@ void main() {
       'https://nicolas00saliba.github.io/scapematch/parceiro/demo/',
     );
     expect(
-      authReturnUrl(
-        Uri.parse('https://app.scapematch.com.br/cadastro'),
-        '/',
-      ),
+      authReturnUrl(Uri.parse('https://app.scapematch.com.br/cadastro'), '/'),
       'https://app.scapematch.com.br/',
     );
     expect(
-      authReturnUrl(
-        Uri.parse('https://parceiro.scapematch.com.br/login'),
-        '/',
-      ),
+      authReturnUrl(Uri.parse('https://parceiro.scapematch.com.br/login'), '/'),
       'https://parceiro.scapematch.com.br/',
     );
     expect(
       authReturnUrl(
-        Uri.parse('https://demo.scapematch.com.br/parceiro/agenda'),
-        '/parceiro/',
+        Uri.parse('https://parceiro-demo.scapematch.com.br/agenda'),
+        '/',
       ),
-      'https://demo.scapematch.com.br/parceiro/',
+      'https://parceiro-demo.scapematch.com.br/',
     );
   });
 
   test('sem host ou sem base não há redirect', () {
-    expect(authReturnUrl(Uri(path: '/scapematch/login'), '/scapematch/'), isNull);
     expect(
-      authReturnUrl(Uri.parse('https://nicolas00saliba.github.io/scapematch/'), ''),
+      authReturnUrl(Uri(path: '/scapematch/login'), '/scapematch/'),
+      isNull,
+    );
+    expect(
+      authReturnUrl(
+        Uri.parse('https://nicolas00saliba.github.io/scapematch/'),
+        '',
+      ),
       isNull,
     );
   });

@@ -1,11 +1,14 @@
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/sharing/public_origins.dart';
 import 'package:scapematch/core/sharing/web_base.dart';
 
 /// App da casa.
 ///
-/// Em produção o Parceiro mora em [partnerAppOrigin]. No GitHub Pages antigo
-/// ele ainda fica em [legacyPartnerPath] no mesmo host. Fora da web, o
-/// caminho relativo aponta o Pages antigo para quem cola o link à mão.
+/// O Parceiro real mora em [partnerAppOrigin]. A demonstração do jogador
+/// aponta para [partnerDemoOrigin], noutro host, para não abrir dentro
+/// do PWA da demo. No GitHub Pages antigo o Parceiro continua em
+/// [legacyPartnerPath]. Fora da web, o app real ainda usa esse caminho
+/// relativo; o build de demonstração usa o host novo.
 Uri partnerAppUri({Uri? page}) {
   final current = page ?? Uri.base;
   if (current.host == legacyPagesHost) {
@@ -16,10 +19,24 @@ Uri partnerAppUri({Uri? page}) {
       path: legacyPartnerPath,
     );
   }
+  if (_openPartnerDemo(current)) {
+    return Uri.parse('$partnerDemoOrigin/');
+  }
   if (current.host.isEmpty) {
     return Uri(path: legacyPartnerPath);
   }
   return Uri.parse('$partnerAppOrigin/');
+}
+
+/// A demo do jogador abre a demo da casa. O Pages antigo não entra aqui.
+bool _openPartnerDemo(Uri current) {
+  if (current.host == 'demo.scapematch.com.br') return true;
+  if (kAppMode != AppMode.demo) return false;
+  if (current.host == 'app.scapematch.com.br' ||
+      current.host == 'parceiro.scapematch.com.br') {
+    return false;
+  }
+  return true;
 }
 
 /// Página do jogador, para colar num convite.

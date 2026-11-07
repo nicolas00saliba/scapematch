@@ -11,8 +11,12 @@ const playerAppOrigin = 'https://app.scapematch.com.br';
 /// Parceiro real.
 const partnerAppOrigin = 'https://parceiro.scapematch.com.br';
 
-/// Demonstrações (jogador em `/`, Parceiro em `/parceiro/`).
+/// Demonstração do jogador. O caminho `/parceiro/` neste host só redireciona.
 const demoAppOrigin = 'https://demo.scapematch.com.br';
+
+/// Demonstração do Parceiro. Host próprio: o escopo não cabe dentro
+/// do PWA do jogador em [demoAppOrigin].
+const partnerDemoOrigin = 'https://parceiro-demo.scapematch.com.br';
 
 /// Landing institucional.
 const landingOrigin = 'https://scapematch.com.br';

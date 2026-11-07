@@ -69,10 +69,19 @@ void main() {
       'https://nicolas00saliba.github.io/scapematch/parceiro/',
     );
     expect(
-      partnerAppUri(
-        page: Uri.parse('https://app.scapematch.com.br/'),
-      ).toString(),
+      partnerAppUri(page: Uri.parse('https://app.scapematch.com.br/'))
+          .toString(),
       'https://parceiro.scapematch.com.br/',
+    );
+    expect(
+      partnerAppUri(page: Uri.parse('https://demo.scapematch.com.br/'))
+          .toString(),
+      'https://parceiro-demo.scapematch.com.br/',
+    );
+    expect(
+      partnerAppUri(page: Uri.parse('https://demo.scapematch.com.br/grupos'))
+          .toString(),
+      'https://parceiro-demo.scapematch.com.br/',
     );
   });
 

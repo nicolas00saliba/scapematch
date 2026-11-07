@@ -39,7 +39,7 @@ stamp() {
 prepare "$tmp/player-real" web "/"
 prepare "$tmp/player-demo" web "/"
 prepare "$tmp/partner-real" apps/parceiro/web "/"
-prepare "$tmp/partner-demo" apps/parceiro/web "/parceiro/"
+prepare "$tmp/partner-demo" apps/parceiro/web "/"
 prepare "$tmp/legacy-player" web "/scapematch/"
 prepare "$tmp/legacy-demo" web "/scapematch/demo/"
 
@@ -57,7 +57,7 @@ want = {
     "player-real": "https://app.scapematch.com.br/",
     "player-demo": "https://demo.scapematch.com.br/",
     "partner-real": "https://parceiro.scapematch.com.br/",
-    "partner-demo": "https://demo.scapematch.com.br/parceiro/",
+    "partner-demo": "https://parceiro-demo.scapematch.com.br/",
     "legacy-player": "https://nicolas00saliba.github.io/scapematch/",
     "legacy-demo": "https://nicolas00saliba.github.io/scapematch/demo/",
 }
@@ -77,6 +77,13 @@ demo = json.loads((root / "player-demo" / "manifest.json").read_text())
 real = json.loads((root / "player-real" / "manifest.json").read_text())
 if demo["name"] != "ScapeMatch Demo" or demo["short_name"] != "Scape Demo":
     raise SystemExit(f"nome da demo: {demo['name']!r} / {demo['short_name']!r}")
+partner_demo = json.loads((root / "partner-demo" / "manifest.json").read_text())
+if partner_demo["name"] != "ScapeMatch Parceiro Demo" or partner_demo["short_name"] != "Parceiro Demo":
+    raise SystemExit(
+        f"nome do Parceiro demo: {partner_demo['name']!r} / {partner_demo['short_name']!r}"
+    )
+if partner_demo["id"] != "https://parceiro-demo.scapematch.com.br/":
+    raise SystemExit("o Parceiro demo não ficou no host próprio")
 if real["name"] != "ScapeMatch":
     raise SystemExit("o app real mudou de nome")
 if "https://app.scapematch.com.br/" in (root / "player-demo" / "flutter_service_worker.js").read_text():
@@ -115,7 +122,10 @@ if (!api.ownsCache(mine) || !api.ownsCache('flutter-app-cache')) {
   throw new Error('o worker deixou de apagar o cache deste app');
 }
 if (api.inThisInstall('https://demo.scapematch.com.br/parceiro/')) {
-  throw new Error('o worker do jogador tomou a demo do Parceiro');
+  throw new Error('o worker do jogador tomou o redirect do Parceiro');
+}
+if (api.inThisInstall('https://parceiro-demo.scapematch.com.br/')) {
+  throw new Error('o worker do jogador tomou o host do Parceiro demo');
 }
 if (!api.inThisInstall('https://demo.scapematch.com.br/')) {
   throw new Error('o worker do jogador largou a própria página');
@@ -133,4 +143,75 @@ if (legacy.ownsCache('scapematch-cache:' + legacyDemo + '|shell')) {
   throw new Error('o cache da demo antiga cairia no app real');
 }
 console.log('ok caches separados');
+JS
+
+python3 - "$root" <<'PY'
+import pathlib, sys
+root = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(root / "tool"))
+from web_install_identity import install_identity
+legacy = install_identity("partner", "demo", "/scapematch/parceiro/demo/")
+if legacy != "https://nicolas00saliba.github.io/scapematch/parceiro/demo/":
+    raise SystemExit(f"legado do Parceiro demo mudou: {legacy}")
+own = install_identity("partner", "demo", "/")
+if own != "https://parceiro-demo.scapematch.com.br/":
+    raise SystemExit(f"host do Parceiro demo: {own}")
+player = install_identity("player", "demo", "/")
+if player != "https://demo.scapematch.com.br/":
+    raise SystemExit(f"o PWA da demo do jogador mudou: {player}")
+print("ok legado e hosts")
+PY
+
+ROOT="$root" node <<'JS'
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = process.env.ROOT;
+const { partnerDemoRedirectTarget } = require(path.join(root, 'tool/parceiro_demo_redirect/redirect.js'));
+const origin = 'https://parceiro-demo.scapematch.com.br';
+assert.strictEqual(
+  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/'),
+  origin + '/',
+);
+assert.strictEqual(
+  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro'),
+  origin + '/',
+);
+assert.strictEqual(
+  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/agenda'),
+  origin + '/agenda',
+);
+assert.strictEqual(
+  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/agenda?x=1#token'),
+  origin + '/agenda?x=1#token',
+);
+assert.strictEqual(
+  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/index.html'),
+  origin + '/',
+);
+assert.strictEqual(
+  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/404.html'),
+  origin + '/',
+);
+const page = fs.readFileSync(path.join(root, 'tool/parceiro_demo_redirect/index.html'), 'utf8');
+if (page.includes('rel="manifest"') || page.includes('serviceWorker.register')) {
+  throw new Error('a página de redirect não pode ser PWA');
+}
+if (!page.includes('http-equiv="refresh"') || !page.includes(origin + '/')) {
+  throw new Error('falta o meta refresh');
+}
+if (!page.includes('id="parceiro-demo-link"')) {
+  throw new Error('falta o link visível');
+}
+if (page.includes('unsafe-inline') || page.includes('unsafe-eval')) {
+  throw new Error('CSP do redirect folgada');
+}
+const script = fs.readFileSync(path.join(root, 'tool/parceiro_demo_redirect/redirect.js'), 'utf8');
+if (!script.includes("reg.scope.indexOf('/parceiro/')") || !script.includes('unregister')) {
+  throw new Error('o redirect não solta o worker antigo de /parceiro/');
+}
+if (script.includes('serviceWorker.register')) {
+  throw new Error('o redirect não pode registrar worker');
+}
+console.log('ok redirect do Parceiro demo');
 JS
