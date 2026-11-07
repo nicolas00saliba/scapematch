@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'none'; frame-src 'none'; manifest-src 'self'; form-action 'self'">
+  <script src="frame-guard.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScapeMatch — Junta a galera e divide a reserva</title>
+  <meta name="description" content="Monte um grupo de escape room, divida a reserva e pague a sua parte. A cobrança só acontece quando o grupo fecha. Casas parceiras enchem horários vazios.">
+  <meta name="theme-color" content="#0F4C4A">
+  <!-- canonical/og apontam para o domínio próprio (scapematch-site). CTAs abrem os apps nos subdomínios. -->
+  <link rel="canonical" href="https://scapematch.com.br/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:site_name" content="ScapeMatch">
+  <meta property="og:title" content="ScapeMatch — Junta a galera e divide a reserva">
+  <meta property="og:description" content="Cada pessoa paga a sua parte. A cobrança só acontece quando o grupo fecha.">
+  <meta property="og:url" content="https://scapematch.com.br/">
+  <meta property="og:image" content="https://scapematch.com.br/assets/og.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Logo do ScapeMatch: pin teal com três pessoas em cobre e o nome ScapeMatch.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ScapeMatch — Junta a galera e divide a reserva">
+  <meta name="twitter:description" content="Cada pessoa paga a sua parte. A cobrança só acontece quando o grupo fecha.">
+  <meta name="twitter:image" content="https://scapematch.com.br/assets/og.png">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#conteudo">Ir para o conteúdo</a>
+  <header class="site-header">
+    <div class="wrap header-bar">
+      <a class="logo" href="#topo" aria-label="ScapeMatch">
+        <img src="assets/logo-simbolo.svg" alt="" width="31" height="40">
+        <span class="wordmark" aria-hidden="true"><span class="scape">Scape</span><span class="match">Match</span></span>
+      </a>
+      <nav class="nav" aria-label="Seções">
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#casas">Casas</a>
+        <a href="#perguntas">Perguntas</a>
+        <a href="termos.html">Termos</a>
+      </nav>
+      <a class="btn btn-pin header-cta" href="https://app.scapematch.com.br/" target="_blank" rel="noopener noreferrer">Quero jogar</a>
+    </div>
+  </header>
+
+  <main id="conteudo">
+    <section class="hero" id="topo">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="kicker">Escape room agora. Tabuleiro, laser tag e afins na sequência.</p>
+          <h1>Junta a galera.<br>Divide a reserva.</h1>
+          <p class="lead">Você entra num grupo, cada pessoa paga a sua parte, e a cobrança só acontece quando o grupo fecha.</p>
+          <div class="hero-actions">
+            <a class="btn btn-pin" href="https://app.scapematch.com.br/" target="_blank" rel="noopener noreferrer">Quero jogar</a>
+            <a class="btn btn-line" href="#casas">Tenho uma casa</a>
+          </div>
+        </div>
+        <aside class="poster" aria-label="A promessa do ScapeMatch">
+          <img src="assets/logo-simbolo.svg" alt="" width="92" height="120">
+          <p class="wordmark poster-name" aria-hidden="true"><span class="scape">Scape</span><span class="match">Match</span></p>
+          <p class="poster-line">Cada um paga a sua parte.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="band" id="como-funciona">
+      <div class="wrap">
+        <p class="kicker">Para quem joga</p>
+        <h2>Como funciona</h2>
+        <ol class="steps">
+          <li>
+            <span class="num">1</span>
+            <h3>Acha um grupo</h3>
+            <p>Escolhe a cidade, a sala e um horário que já está se formando.</p>
+          </li>
+          <li>
+            <span class="num">2</span>
+            <h3>Divide a reserva</h3>
+            <p>Você entra no grupo. A sala é de todo mundo, e você paga só a sua parte.</p>
+          </li>
+          <li>
+            <span class="num">3</span>
+            <h3>Só paga se fechar</h3>
+            <p>A cobrança acontece quando o grupo fecha. Se não fechar, nada é cobrado.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="casas" id="casas">
+      <div class="wrap">
+        <p class="kicker kicker-light">Para quem tem uma casa</p>
+        <h2>Enche o horário que ficaria vazio.</h2>
+        <p class="lead lead-light">O ScapeMatch Parceiro é um app separado, da casa. Agenda de salas e horários, reservas, saldo e extrato ficam nele. O app de quem joga continua em outro endereço.</p>
+        <ul class="benefits">
+          <li>
+            <h3>Mais salas cheias nos horários vazios</h3>
+            <p>Jogadores se juntam e fecham a reserva juntos, inclusive no horário que a casa costuma ver vazio.</p>
+          </li>
+          <li>
+            <h3>Agenda simples</h3>
+            <p>Salas, horários e as reservas feitas pelo app, no mesmo lugar.</p>
+          </li>
+          <li>
+            <h3>Recebimento e extrato</h3>
+            <p>A casa acompanha o saldo, o que entrou e o que ficou líquido.</p>
+          </li>
+          <li>
+            <h3>Comissão só das reservas do app</h3>
+            <p>A comissão incide só sobre reservas feitas pelo ScapeMatch. O que a casa vende por fora fica fora.</p>
+          </li>
+        </ul>
+        <div class="casa-actions">
+          <a class="btn btn-cream" href="https://parceiro.scapematch.com.br/" target="_blank" rel="noopener noreferrer">Acessar o ScapeMatch Parceiro</a>
+          <a class="text-link" href="https://parceiro-demo.scapematch.com.br/" target="_blank" rel="noopener noreferrer">Ver a demonstração (login a / b)</a>
+          <a class="text-link" href="#contato">O contato ainda é um placeholder</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="perguntas">
+      <div class="wrap narrow">
+        <p class="kicker">Dúvidas rápidas</p>
+        <h2>Perguntas frequentes</h2>
+        <div class="faq">
+          <details>
+            <summary>Eu pago a reserva inteira?</summary>
+            <p>Não. Cada pessoa paga a própria parte.</p>
+          </details>
+          <details>
+            <summary>Quando o valor é cobrado?</summary>
+            <p>Só quando o grupo fecha. Enquanto o grupo está aberto, a cobrança não acontece.</p>
+          </details>
+          <details>
+            <summary>E se o grupo não fechar?</summary>
+            <p>Nada é cobrado.</p>
+          </details>
+          <details>
+            <summary>Só tem escape room?</summary>
+            <p>Escape room é o começo. Jogos de tabuleiro, laser tag e experiências parecidas vêm em seguida.</p>
+          </details>
+          <details>
+            <summary>A casa usa o mesmo app de quem joga?</summary>
+            <p>Não. A casa usa o ScapeMatch Parceiro, com agenda, reservas, saldo e extrato.</p>
+          </details>
+          <details>
+            <summary>A comissão vale para toda a casa?</summary>
+            <p>Não. Só para as reservas feitas pelo app.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="contato">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="logo" href="#topo" aria-label="ScapeMatch">
+          <img src="assets/logo-simbolo.svg" alt="" width="31" height="40">
+          <span class="wordmark" aria-hidden="true"><span class="scape">Scape</span><span class="match">Match</span></span>
+        </a>
+        <p class="footer-note">Monta o grupo e divide a reserva. A cobrança só acontece quando o grupo fecha.</p>
+      </div>
+      <div class="placeholder">
+        <p class="badge">Placeholder — não é contato oficial</p>
+        <p>E-mail: contato@exemplo.invalid</p>
+        <p>Telefone: não informado</p>
+        <p>CNPJ: não informado</p>
+        <p class="hint">Troque este bloco por um canal real antes de divulgar a página.</p>
+      </div>
+      <ul class="footer-links">
+        <li><a href="https://app.scapematch.com.br/" target="_blank" rel="noopener noreferrer">App do jogador</a></li>
+        <li><a href="https://parceiro.scapematch.com.br/" target="_blank" rel="noopener noreferrer">ScapeMatch Parceiro</a></li>
+        <li><a href="https://parceiro-demo.scapematch.com.br/" target="_blank" rel="noopener noreferrer">Demonstração do Parceiro</a></li>
+        <li><a href="termos.html">Termos de uso</a></li>
+        <li><a href="privacidade.html">Privacidade</a></li>
+        <li><a href="cancelamento.html">Cancelamento e reembolso</a></li>
+        <li><a href="termos-parceiro.html">Termos do Parceiro</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>

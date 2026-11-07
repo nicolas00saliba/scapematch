@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/scapematch/demo/">
+
+  <meta charset="UTF-8">
+  <!--
+    O GitHub Pages não aplica _headers e não deixa escolher cabeçalhos.
+    CSP e Referrer-Policy valem nesta meta. O navegador ignora
+    frame-ancestors, sandbox e report-uri quando a CSP vem em meta, então
+    eles não entram aqui. HSTS, X-Frame-Options, X-Content-Type-Options e o
+    Access-Control-Allow-Origin: * do Pages não têm equivalente no HTML.
+    O estilo some quando a janela não está num iframe. unsafe-eval e
+    wasm-unsafe-eval são do dart2js e do CanvasKit (gstatic ou a pasta
+    local). O mapa pede o tile do OpenStreetMap. A senha consulta a API
+    do Pwned Passwords. O Asaas fica nas Edge Functions: o navegador só
+    abre o PDF da nota, não chama a API. O CanvasKit baixa a Roboto e as
+    Noto de fallback com fetch em fonts.gstatic.com/s/ — isso é
+    connect-src. font-src continua 'self' e data:.
+  -->
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://www.gstatic.com/flutter-canvaskit/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://eujlhicairvksvmssruz.supabase.co wss://eujlhicairvksvmssruz.supabase.co https://api.pwnedpasswords.com https://www.gstatic.com/flutter-canvaskit/ https://fonts.gstatic.com/s/ https://tile.openstreetmap.org; worker-src 'self' blob:; frame-src 'none'; manifest-src 'self'; form-action 'self'">
+  <style id="scape-frame-guard">html{display:none !important}</style>
+  <script>
+    // Flutter já exige script. Enquanto esta janela for a de cima, o
+    // estilo sai. Num iframe o conteúdo continua escondido: frame-ancestors
+    // não funciona em meta, e o Pages não envia X-Frame-Options.
+    (function () {
+      if (window.top !== window.self) {
+        try { window.top.location = window.self.location; } catch (e) {}
+        return;
+      }
+      var guard = document.getElementById('scape-frame-guard');
+      if (guard) guard.remove();
+    })();
+  </script>
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="ScapeMatch ajuda a montar grupos para escape rooms. Esta versão usa dados de exemplo.">
+  <meta name="scapematch-release" content="home-feed">
+  <meta name="theme-color" content="#0F4C4A">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ScapeMatch Demo">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>ScapeMatch Demo</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* O arraste do mapa no Chrome do Android não recarrega a página. */
+    html, body {
+      overscroll-behavior: none;
+      background: #FFFFFF;
+    }
+  </style>
+  <script>
+    // O Flutter 3.47 reescreve o viewport e tira o viewport-fit.
+    // Sem cover, o iOS não informa a safe area do notch.
+    (function () {
+      function cover() {
+        var meta = document.querySelector('meta[name="viewport"]');
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('name', 'viewport');
+          meta.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+          document.head.appendChild(meta);
+          return;
+        }
+        var content = meta.getAttribute('content') || '';
+        if (content.indexOf('viewport-fit=cover') !== -1) return;
+        var next = content.replace(/,?\s*viewport-fit=[^,]+/gi, '').replace(/,\s*$/, '');
+        meta.setAttribute('content', next + ', viewport-fit=cover');
+      }
+      cover();
+      new MutationObserver(cover).observe(document.head, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['content']
+      });
+    })();
+  </script>
+  <script>
+    // O Chrome dispara beforeinstallprompt uma vez. O app real guarda
+    // o evento para o aviso "Instalar o app". A demonstração não leva
+    // a meta scapematch-install e deixa o navegador mostrar o seu.
+    (function () {
+      window.scapeInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (event) {
+        var meta = document.querySelector('meta[name="scapematch-install"]');
+        if (!meta || meta.getAttribute('content') !== 'real') return;
+        event.preventDefault();
+        window.scapeInstallPrompt = event;
+        window.dispatchEvent(new Event('scape-install-prompt'));
+      });
+      window.scapeLaunchInstall = function () {
+        var event = window.scapeInstallPrompt;
+        if (!event || typeof event.prompt !== 'function') {
+          return Promise.resolve('missing');
+        }
+        window.scapeInstallPrompt = null;
+        return event.prompt().then(function () {
+          return event.userChoice;
+        }).then(function (choice) {
+          return choice && choice.outcome ? choice.outcome : 'dismissed';
+        });
+      };
+    })();
+  </script>
+</head>
+<body>
+  <script>
+    // Um service worker antigo do jogador cobria /scapematch/ inteiro.
+    // No Pages antigo, se este shell abrir num caminho do Parceiro,
+    // solta esse worker e volta para o app da casa. Na demo, /parceiro/
+    // não é mais o app: manda para o host próprio e não sobe o Flutter.
+    // A conta do destino é a mesma de tool/parceiro_demo_redirect/redirect.js.
+    (function () {
+      var path = location.pathname;
+      var marker = '/parceiro';
+      var at = path.indexOf(marker);
+      if (at < 0) return;
+      var tail = path.slice(at + marker.length);
+      if (tail !== '' && tail.charAt(0) !== '/') return;
+      if (location.host === 'demo.scapematch.com.br') {
+        window.scapeHoldFlutter = true;
+        var rest = (tail === '' || tail === '/' ||
+            tail === '/index.html' || tail === '/404.html') ? '/' : tail;
+        var dest = 'https://parceiro-demo.scapematch.com.br' + rest +
+            location.search + location.hash;
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (reg) {
+              if (reg.scope.indexOf(marker + '/') !== -1) return reg.unregister();
+            }));
+          });
+        }
+        location.replace(dest);
+        return;
+      }
+      if (!('serviceWorker' in navigator)) return;
+      if (sessionStorage.getItem('scape-partner-shell') === '1') return;
+      sessionStorage.setItem('scape-partner-shell', '1');
+      var home = path.slice(0, at + marker.length) + '/';
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (reg) {
+          if (reg.scope.indexOf(marker + '/') === -1) return reg.unregister();
+        }));
+      }).then(function () {
+        location.replace(home);
+      });
+    })();
+  </script>
+  <script>
+    // Não registra um worker novo. Se ainda houver um, pede a atualização
+    // na hora: o arquivo publicado se desregistra e limpa o cache. No
+    // caminho do Parceiro o script acima é quem solta o worker do jogador.
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      var path = location.pathname;
+      var marker = '/parceiro';
+      var at = path.indexOf(marker);
+      if (at >= 0) {
+        var tail = path.slice(at + marker.length);
+        if (tail === '' || tail.charAt(0) === '/') return;
+      }
+      navigator.serviceWorker.getRegistration().then(function (reg) {
+        if (reg) reg.update();
+      });
+    })();
+  </script>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script>
+    if (!window.scapeHoldFlutter) {
+      var boot = document.createElement('script');
+      boot.src = 'flutter_bootstrap.js';
+      boot.async = true;
+      document.body.appendChild(boot);
+    }
+  </script>
+</body>
+</html>
