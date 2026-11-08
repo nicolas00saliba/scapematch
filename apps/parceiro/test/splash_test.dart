@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -33,12 +34,16 @@ void main() {
 
     final pin = find.descendant(
       of: find.byKey(AppKeys.splash),
-      matching: find.byType(Image),
+      matching: find.byType(ScapePinBox),
     );
     expect(pin, findsOneWidget);
     expect(
       tester.getSize(pin).aspectRatio,
       closeTo(ScapeLogo.markAspectWidth / ScapeLogo.markAspectHeight, 0.001),
+    );
+    expect(
+      tester.widget<ScapePinBox>(pin).assetName,
+      'assets/parceiro/logo_parceiro_pin.png',
     );
 
     await tester.runAsync(() async {
@@ -146,6 +151,51 @@ void main() {
     await tester.pump(SplashGate.reducedDuration);
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.splash), findsNothing);
+  });
+
+  testWidgets('the partner lockup waits until the pin image is ready', (
+    tester,
+  ) async {
+    final bundle = _LatePartnerPin(rootBundle);
+    await pumpParceiro(
+      tester,
+      size: const Size(390, 844),
+      settle: false,
+      bundle: bundle,
+    );
+    for (var i = 0; i < 6; i++) {
+      expect(find.byKey(AppKeys.splash), findsOneWidget);
+      expect(_splashWordmark(tester), findsNothing);
+      expect(find.byType(ScapePinBox), findsNothing);
+      expect(_splashSeal(tester), findsNothing);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    bundle.release();
+    var appeared = false;
+    for (var i = 0; i < 4; i++) {
+      await flushSplashArt(tester);
+      final word = _splashWordmark(tester).evaluate().isNotEmpty;
+      final pin = find
+          .descendant(
+            of: find.byKey(AppKeys.splash),
+            matching: find.byType(ScapePinBox),
+          )
+          .evaluate()
+          .isNotEmpty;
+      final seal = _splashSeal(tester).evaluate().isNotEmpty;
+      expect(word, pin, reason: 'frame $i');
+      expect(seal, pin, reason: 'frame $i');
+      if (pin) {
+        appeared = true;
+        expect(
+          tester.widget<ScapePinBox>(find.byType(ScapePinBox)).assetName,
+          'assets/parceiro/logo_parceiro_pin.png',
+        );
+        break;
+      }
+    }
+    expect(appeared, isTrue);
   });
 
   testWidgets('the site width skips the splash', (tester) async {
@@ -513,4 +563,32 @@ Future<void> _saveSplashShot(WidgetTester tester, String name) async {
   );
   File('${dir.path}/$name').writeAsBytesSync(bytes!.buffer.asUint8List());
   image!.dispose();
+}
+
+class _LatePartnerPin extends CachingAssetBundle {
+  _LatePartnerPin(this.inner);
+
+  final AssetBundle inner;
+  final Completer<void> _gate = Completer<void>();
+
+  void release() {
+    if (!_gate.isCompleted) {
+      _gate.complete();
+    }
+  }
+
+  bool _holds(String key) => key.contains('logo_parceiro_pin');
+
+  @override
+  Future<ByteData> load(String key) {
+    if (_holds(key)) {
+      return _gate.future.then((_) => inner.load(key));
+    }
+    return inner.load(key);
+  }
+
+  @override
+  Future<String> loadString(String key, {bool cache = true}) {
+    return inner.loadString(key, cache: cache);
+  }
 }

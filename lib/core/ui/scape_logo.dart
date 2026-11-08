@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +29,7 @@ class ScapeLogo extends StatelessWidget {
     this.onTap,
     this.wordmarkAbsorb = 0,
     this.markImage,
+    this.pinArt,
   });
 
   final ScapeLogoVariant variant;
@@ -46,6 +49,11 @@ class ScapeLogo extends StatelessWidget {
   /// preto. Nulo mantém o desenho compartilhado do jogador. A caixa
   /// continua [markAspectWidth] por [markAspectHeight].
   final ImageProvider? markImage;
+
+  /// Pin já decodificado. A abertura usa isto para o letreiro e o símbolo
+  /// nascerem no mesmo frame: [SvgPicture] e [Image] só pintam no frame
+  /// seguinte ao futuro do arquivo.
+  final ScapePinArt? pinArt;
 
   /// Preto do arquivo do Parceiro, #111111. A abertura usa esta cor na tela
   /// inteira. O pin transparente não leva um quadrado por cima.
@@ -95,6 +103,10 @@ class ScapeLogo extends StatelessWidget {
 
   Widget _pin(bool dark) {
     final width = pinWidthFor(height);
+    final ready = pinArt;
+    if (ready != null) {
+      return ready.build(width: width, height: height);
+    }
     final image = markImage;
     if (image != null) {
       return Image(
@@ -381,4 +393,154 @@ class _Wordmark extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Caixa do pin na proporção do viewBox. O retângulo não muda quando o
+/// desenho chega: só o conteúdo.
+class ScapePinBox extends StatelessWidget {
+  const ScapePinBox({
+    super.key,
+    required this.assetName,
+    required this.width,
+    required this.height,
+    required this.child,
+  });
+
+  final String assetName;
+  final double width;
+  final double height;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(width: width, height: height, child: child);
+  }
+}
+
+/// Pin já pronto para pintar, sem outro futuro no meio.
+///
+/// O [SvgPicture] mostra um [SizedBox] vazio até o arquivo voltar. O
+/// letreiro é [Text] e pinta nesse intervalo. A abertura espera esta
+/// arte e só então monta os dois.
+class ScapePinArt {
+  ScapePinArt._({this.picture, this.image, required this.assetName});
+
+  final PictureInfo? picture;
+  final ui.Image? image;
+  final String assetName;
+
+  static Future<ScapePinArt> load(
+    BuildContext context, {
+    ImageProvider? markImage,
+    bool onDark = false,
+  }) async {
+    if (markImage != null) {
+      final resolved = await _resolve(context, markImage);
+      return ScapePinArt._(
+        image: resolved,
+        assetName: markImage is AssetImage ? markImage.assetName : '$markImage',
+      );
+    }
+    final asset = onDark ? ScapeLogo.markOnDarkAsset : ScapeLogo.markAsset;
+    final info = await vg.loadPicture(ScapePinLoader(asset), context);
+    return ScapePinArt._(picture: info, assetName: asset);
+  }
+
+  /// Buraco do tamanho do pin, quando o arquivo falha. O letreiro ainda
+  /// entra, e a abertura não fica presa.
+  factory ScapePinArt.missing({required String assetName}) {
+    return ScapePinArt._(assetName: assetName);
+  }
+
+  var _disposed = false;
+
+  void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+    picture?.picture.dispose();
+    image?.dispose();
+  }
+
+  Widget build({required double width, required double height}) {
+    final Widget child;
+    final drawn = picture;
+    final raster = image;
+    if (drawn != null) {
+      child = CustomPaint(
+        painter: _ScapePinPainter(drawn),
+        child: const SizedBox.expand(),
+      );
+    } else if (raster != null) {
+      child = RawImage(
+        image: raster,
+        width: width,
+        height: height,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.medium,
+      );
+    } else {
+      child = const SizedBox.expand();
+    }
+    return ScapePinBox(
+      assetName: assetName,
+      width: width,
+      height: height,
+      child: child,
+    );
+  }
+}
+
+class _ScapePinPainter extends CustomPainter {
+  const _ScapePinPainter(this.info);
+
+  final PictureInfo info;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final source = info.size;
+    if (source.isEmpty || size.isEmpty) {
+      return;
+    }
+    final fitted = applyBoxFit(BoxFit.contain, source, size);
+    final dest = Alignment.center.inscribe(
+      fitted.destination,
+      Offset.zero & size,
+    );
+    canvas
+      ..save()
+      ..translate(dest.left, dest.top)
+      ..scale(dest.width / source.width, dest.height / source.height)
+      ..drawPicture(info.picture)
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScapePinPainter oldDelegate) {
+    return oldDelegate.info != info;
+  }
+}
+
+Future<ui.Image> _resolve(BuildContext context, ImageProvider provider) {
+  final completer = Completer<ui.Image>();
+  final stream = provider.resolve(createLocalImageConfiguration(context));
+  late final ImageStreamListener listener;
+  listener = ImageStreamListener(
+    (info, _) {
+      stream.removeListener(listener);
+      if (!completer.isCompleted) {
+        completer.complete(info.image.clone());
+      }
+    },
+    onError: (error, stack) {
+      stream.removeListener(listener);
+      if (!completer.isCompleted) {
+        completer.completeError(error, stack);
+      }
+    },
+  );
+  stream.addListener(listener);
+  return completer.future;
 }

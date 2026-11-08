@@ -15,7 +15,11 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// continua com a chave dela.
 ///
 /// Primeiro entra o logo completo (pin oficial e letreiro), parado o
-/// bastante para ler. O letreiro entra no pin como um trem. O Parceiro
+/// bastante para ler. Os dois só aparecem juntos: o pin é um arquivo
+/// (SVG do jogador, PNG do Parceiro) e o widget de imagem deixa um
+/// quadro vazio até o futuro voltar. A cortina sobe na hora; o relógio
+/// da entrada só anda quando o pin já pode ser pintado. O letreiro entra
+/// no pin como um trem. O Parceiro
 /// pode pôr um selo embaixo: ele fica parado e se dissolve da esquerda
 /// para a direita enquanto o letreiro entra. Só então o pin avança, gira
 /// no eixo vertical e cresce até sumir. A escala é uniforme, na proporção
@@ -264,6 +268,9 @@ class _SplashGateState extends State<SplashGate>
   var _decided = false;
   var _show = false;
   var _reduced = false;
+  var _loadingPin = false;
+  var _motionStarted = false;
+  ScapePinArt? _pinArt;
 
   @override
   void initState() {
@@ -307,7 +314,7 @@ class _SplashGateState extends State<SplashGate>
       _controller.duration = _reduced
           ? SplashGate.reducedDuration
           : SplashGate.duration;
-      _controller.forward();
+      _loadPin();
       return;
     }
     // Girou para o site no meio da abertura: a splash é só do celular.
@@ -317,8 +324,61 @@ class _SplashGateState extends State<SplashGate>
     }
   }
 
+  /// O letreiro fica de fora até este futuro. Aí o frame seguinte pinta
+  /// o símbolo e o texto juntos, e a entrada de 2700ms começa do zero.
+  void _loadPin() {
+    if (_loadingPin) {
+      return;
+    }
+    _loadingPin = true;
+    final markImage = widget.markImage;
+    final onDark = widget.onDark;
+    ScapePinArt.load(context, markImage: markImage, onDark: onDark).then(
+      (art) {
+        _mountPin(art);
+      },
+      onError: (Object error, StackTrace stack) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            library: 'splash',
+            context: ErrorDescription('enquanto o pin da abertura carregava'),
+          ),
+        );
+        _mountPin(
+          ScapePinArt.missing(
+            assetName: markImage is AssetImage
+                ? markImage.assetName
+                : onDark
+                ? ScapeLogo.markOnDarkAsset
+                : ScapeLogo.markAsset,
+          ),
+        );
+      },
+    );
+  }
+
+  void _mountPin(ScapePinArt art) {
+    if (!mounted || !_show) {
+      art.dispose();
+      return;
+    }
+    setState(() => _pinArt = art);
+    _startMotion();
+  }
+
+  void _startMotion() {
+    if (_motionStarted || !mounted || !_show) {
+      return;
+    }
+    _motionStarted = true;
+    _controller.forward();
+  }
+
   @override
   void dispose() {
+    _pinArt?.dispose();
     _controller.removeStatusListener(_onStatus);
     _controller.dispose();
     super.dispose();
@@ -335,6 +395,7 @@ class _SplashGateState extends State<SplashGate>
             animation: _controller,
             reduced: _reduced,
             markImage: widget.markImage,
+            pinArt: _pinArt,
             curtain: widget.curtain,
             onDark: widget.onDark,
             lockupFooter: widget.lockupFooter,
@@ -350,6 +411,7 @@ class _SplashCurtain extends StatelessWidget {
     required this.animation,
     required this.reduced,
     required this.markImage,
+    required this.pinArt,
     required this.curtain,
     required this.onDark,
     required this.lockupFooter,
@@ -359,6 +421,7 @@ class _SplashCurtain extends StatelessWidget {
   final Animation<double> animation;
   final bool reduced;
   final ImageProvider? markImage;
+  final ScapePinArt? pinArt;
   final Color curtain;
   final bool onDark;
   final SplashLockupFooter? lockupFooter;
@@ -405,6 +468,7 @@ class _SplashCurtain extends StatelessWidget {
                           child: _SplashMark(
                             motion: motion,
                             markImage: markImage,
+                            pinArt: pinArt,
                             onDark: onDark,
                             lockupFooter: lockupFooter,
                             lockupFooterExtent: lockupFooterExtent,
@@ -428,6 +492,7 @@ class _SplashMark extends StatelessWidget {
   const _SplashMark({
     required this.motion,
     required this.markImage,
+    required this.pinArt,
     required this.onDark,
     required this.lockupFooter,
     required this.lockupFooterExtent,
@@ -436,6 +501,7 @@ class _SplashMark extends StatelessWidget {
 
   final SplashMotion motion;
   final ImageProvider? markImage;
+  final ScapePinArt? pinArt;
   final bool onDark;
   final SplashLockupFooter? lockupFooter;
   final SplashLockupFooterExtent? lockupFooterExtent;
@@ -469,6 +535,10 @@ class _SplashMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ready = pinArt;
+    if (ready == null) {
+      return const SizedBox.expand();
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = _heightThatFits(context, constraints);
@@ -493,6 +563,7 @@ class _SplashMark extends StatelessWidget {
           onDark: onDark,
           wordmarkAbsorb: motion.absorb,
           markImage: markImage,
+          pinArt: ready,
         );
         final Widget mark = footer == null
             ? logo

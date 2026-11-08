@@ -53,6 +53,9 @@ Future<void> pumpScapeMatch(
       child: const ScapeMatchApp(),
     ),
   );
+  // O pin decodifica num microtask. Este frame monta o lockup com o
+  // relógio da abertura ainda em zero.
+  await tester.pump();
   // A splash do celular dura ~1,5s de relógio falso. No fim dela, a próxima
   // tela (introdução ou Home) já está descoberta.
   if (settle) {
