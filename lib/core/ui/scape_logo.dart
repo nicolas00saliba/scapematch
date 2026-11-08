@@ -422,10 +422,14 @@ class ScapePinBox extends StatelessWidget {
 /// O [SvgPicture] mostra um [SizedBox] vazio até o arquivo voltar. O
 /// letreiro é [Text] e pinta nesse intervalo. A abertura espera esta
 /// arte e só então monta os dois.
+///
+/// No web, `drawPicture` do SVG ainda aparece um quadro depois do texto,
+/// mesmo com o picture já em mãos. O Parceiro não sofre isso porque o
+/// pin é um bitmap. O SVG do jogador é rasterizado aqui, na mesma
+/// proporção do viewBox, e pintado com [RawImage].
 class ScapePinArt {
-  ScapePinArt._({this.picture, this.image, required this.assetName});
+  ScapePinArt._({this.image, required this.assetName});
 
-  final PictureInfo? picture;
   final ui.Image? image;
   final String assetName;
 
@@ -442,8 +446,14 @@ class ScapePinArt {
       );
     }
     final asset = onDark ? ScapeLogo.markOnDarkAsset : ScapeLogo.markAsset;
+    final rasterScale = _splashRasterScale(context);
     final info = await vg.loadPicture(ScapePinLoader(asset), context);
-    return ScapePinArt._(picture: info, assetName: asset);
+    try {
+      final image = await _rasterizePin(info, rasterScale);
+      return ScapePinArt._(image: image, assetName: asset);
+    } finally {
+      info.picture.dispose();
+    }
   }
 
   /// Buraco do tamanho do pin, quando o arquivo falha. O letreiro ainda
@@ -459,31 +469,21 @@ class ScapePinArt {
       return;
     }
     _disposed = true;
-    picture?.picture.dispose();
     image?.dispose();
   }
 
   Widget build({required double width, required double height}) {
-    final Widget child;
-    final drawn = picture;
     final raster = image;
-    if (drawn != null) {
-      child = CustomPaint(
-        painter: _ScapePinPainter(drawn),
-        child: const SizedBox.expand(),
-      );
-    } else if (raster != null) {
-      child = RawImage(
-        image: raster,
-        width: width,
-        height: height,
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        filterQuality: FilterQuality.medium,
-      );
-    } else {
-      child = const SizedBox.expand();
-    }
+    final child = raster == null
+        ? const SizedBox.expand()
+        : RawImage(
+            image: raster,
+            width: width,
+            height: height,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+          );
     return ScapePinBox(
       assetName: assetName,
       width: width,
@@ -493,33 +493,42 @@ class ScapePinArt {
   }
 }
 
-class _ScapePinPainter extends CustomPainter {
-  const _ScapePinPainter(this.info);
+/// Pico do giro da splash em que o pin ainda está opaco. O bitmap cobre
+/// esse tamanho em pixels físicos. Não importa [SplashGate] daqui.
+const _splashSpinScale = 2.55;
 
-  final PictureInfo info;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final source = info.size;
-    if (source.isEmpty || size.isEmpty) {
-      return;
-    }
-    final fitted = applyBoxFit(BoxFit.contain, source, size);
-    final dest = Alignment.center.inscribe(
-      fitted.destination,
-      Offset.zero & size,
-    );
-    canvas
-      ..save()
-      ..translate(dest.left, dest.top)
-      ..scale(dest.width / source.width, dest.height / source.height)
-      ..drawPicture(info.picture)
-      ..restore();
+double _splashRasterScale(BuildContext context) {
+  final view = View.maybeOf(context);
+  if (view == null) {
+    return 4;
   }
+  final dpr = view.devicePixelRatio == 0 ? 1.0 : view.devicePixelRatio;
+  final logicalShort =
+      math.min(view.physicalSize.width, view.physicalSize.height) / dpr;
+  final scale =
+      logicalShort * dpr * _splashSpinScale / ScapeLogo.markAspectHeight;
+  return scale.clamp(2, 6);
+}
 
-  @override
-  bool shouldRepaint(covariant _ScapePinPainter oldDelegate) {
-    return oldDelegate.info != info;
+/// Raster na proporção do viewBox. A mesma escala nos dois eixos deixa
+/// o disco branco circular.
+Future<ui.Image> _rasterizePin(PictureInfo info, double scale) async {
+  final source = info.size;
+  if (source.isEmpty) {
+    scale = 4;
+  }
+  final width = math.max(1, (source.width * scale).round());
+  final height = math.max(1, (source.height * scale).round());
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  canvas
+    ..scale(width / source.width, height / source.height)
+    ..drawPicture(info.picture);
+  final picture = recorder.endRecording();
+  try {
+    return await picture.toImage(width, height);
+  } finally {
+    picture.dispose();
   }
 }
 

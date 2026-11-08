@@ -62,6 +62,16 @@ void main() {
             tester.widget<ScapePinBox>(_pin()).assetName,
             ScapeLogo.markAsset,
           );
+          final raw = tester.widget<RawImage>(
+            find.descendant(of: _pin(), matching: find.byType(RawImage)),
+          );
+          expect(
+            raw.image!.width / raw.image!.height,
+            closeTo(
+              ScapeLogo.markAspectWidth / ScapeLogo.markAspectHeight,
+              0.02,
+            ),
+          );
           break;
         }
       }
@@ -83,8 +93,77 @@ void main() {
           48;
       await tester.pump(Duration(milliseconds: holdMs));
       await _saveFrame(tester, 'after-splash-hold.png');
+      final pinRect = tester.getRect(_pin());
+      final held = await _raster(tester);
+      final heldData = await tester.runAsync(
+        () => held.toByteData(format: ui.ImageByteFormat.rawRgba),
+      );
+      final disc = _pixel(held, heldData!, _viewBox(pinRect, 46, 120));
+      final ring = _pixel(held, heldData, _viewBox(pinRect, 18, 100));
+      held.dispose();
+      expect(_nearWhite(disc), isTrue, reason: '$disc');
+      expect(_nearGreen(ring), isTrue, reason: '$ring');
     },
   );
+
+  testWidgets('a hung pin load does not freeze the splash', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final bundle = _LatePinBundle(rootBundle);
+    addTearDown(bundle.release);
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: DefaultAssetBundle(
+          bundle: bundle,
+          child: const SplashGate(child: SizedBox.expand()),
+        ),
+      ),
+    );
+
+    await tester.pump(
+      SplashGate.pinLoadTimeout - const Duration(milliseconds: 16),
+    );
+    expect(_wordmark(), findsNothing);
+    expect(find.byKey(SplashGate.logoOpacityKey), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(_wordmark(), findsOneWidget);
+    expect(
+      find.descendant(of: _pin(), matching: find.byType(RawImage)),
+      findsNothing,
+    );
+
+    await tester.pump(SplashGate.duration);
+    await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.splash), findsNothing);
+  });
+}
+
+Offset _viewBox(Rect pin, double x, double y) {
+  return Offset(
+    pin.left + pin.width * x / ScapeLogo.markAspectWidth,
+    pin.top + pin.height * y / ScapeLogo.markAspectHeight,
+  );
+}
+
+Color _pixel(ui.Image image, ByteData data, Offset point) {
+  final bytes = data.buffer.asUint8List();
+  final x = point.dx.round().clamp(0, image.width - 1);
+  final y = point.dy.round().clamp(0, image.height - 1);
+  final i = (y * image.width + x) * 4;
+  return Color.fromARGB(bytes[i + 3], bytes[i], bytes[i + 1], bytes[i + 2]);
+}
+
+bool _nearWhite(Color color) {
+  return color.r > 0.9 && color.g > 0.9 && color.b > 0.9;
+}
+
+bool _nearGreen(Color color) {
+  return color.g > color.r && color.g > color.b && color.g > 0.15;
 }
 
 Future<void> _saveFrame(WidgetTester tester, String name) async {
