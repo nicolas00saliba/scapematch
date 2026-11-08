@@ -58,7 +58,7 @@ Deno.test("jogador e casa dividem a comissão, sem deixar a casa negativa", () =
   assertEquals(lines[0].points + lines[1].points, 300);
 });
 
-Deno.test("fora de um ano, na mesma casa e no primeiro cliente não lança", () => {
+Deno.test("fora de um ano e na mesma casa não lança", () => {
   assertEquals(attributionCovers(window, "2027-01-01T00:00:00.000Z"), false);
   assertEquals(
     quoteReferralRewards({
@@ -86,7 +86,7 @@ Deno.test("fora de um ano, na mesma casa e no primeiro cliente não lança", () 
       commissionBps: 2500,
       paidAt: "2026-06-01T00:00:00.000Z",
       venueReferrer: window,
-      payerCustomerRank: 1,
+      firstBookingDiscountCents: 2000,
     }),
     [],
   );
@@ -95,11 +95,17 @@ Deno.test("fora de um ano, na mesma casa e no primeiro cliente não lança", () 
     commissionBps: 2500,
     paidAt: "2026-06-01T00:00:00.000Z",
     venueReferrer: window,
-    payerCustomerRank: 2,
   });
   assertEquals(b2b[0].program, "b2b");
   assertEquals(b2b[0].cents, 500);
   assertEquals(b2b[0].payee, "venue_credit");
+  const again = quoteReferralRewards({
+    grossCents: 10000,
+    commissionBps: 2500,
+    paidAt: "2026-07-01T00:00:00.000Z",
+    venueReferrer: window,
+  });
+  assertEquals(again[0].cents, 500);
 });
 
 Deno.test("estorno e bloqueio: fraude zera e a chave não duplica", () => {

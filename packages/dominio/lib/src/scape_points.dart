@@ -17,7 +17,6 @@ class ReferralRates {
     this.attributionDays = 365,
     this.holdDays = 30,
     this.firstBookingDiscountBps = 2000,
-    this.b2bSkipCustomers = 1,
   });
 
   /// Jogador que indicou outro jogador, sobre o gasto do indicado.
@@ -42,11 +41,9 @@ class ReferralRates {
   final int holdDays;
 
   /// Desconto da primeira reserva com código, em basis points.
-  /// Não é aplicado neste fluxo. O teto continua sendo a comissão.
+  /// Não é aplicado sozinho. Quando a cobrança traz esse desconto,
+  /// o B2B daquela reserva não é lançado.
   final int firstBookingDiscountBps;
-
-  /// Quantos primeiros clientes da casa indicada ficam fora do B2B.
-  final int b2bSkipCustomers;
 
   static const official = ReferralRates();
 }
@@ -89,12 +86,12 @@ class SpendRewardInput {
     required this.commissionBps,
     required this.paidAt,
     this.subsidyCents = 0,
+    this.firstBookingDiscountCents = 0,
     this.playerReferrer,
     this.playerReferrerIsVenue = false,
     this.spendAtReferrerVenue = false,
     this.venueReferrer,
     this.venueReferrerIsPlayer = false,
-    this.payerCustomerRank = 1,
     this.payerCpfMissing = false,
     this.playerReferrerCpfMissing = false,
     this.venueReferrerCpfMissing = false,
@@ -104,6 +101,10 @@ class SpendRewardInput {
   final int grossCents;
   final int commissionBps;
   final int subsidyCents;
+
+  /// Desconto de primeira reserva já fotografado nesta cobrança.
+  /// Maior que zero: esta reserva não gera B2B.
+  final int firstBookingDiscountCents;
   final DateTime paidAt;
 
   /// Janela de quem indicou o jogador que pagou. Nula se ninguém indicou.
@@ -120,9 +121,6 @@ class SpendRewardInput {
 
   /// Verdadeiro quando quem indicou a casa é um jogador (C2B).
   final bool venueReferrerIsPlayer;
-
-  /// 1 = primeiro cliente distinto que já pagou nesta casa.
-  final int payerCustomerRank;
 
   final bool payerCpfMissing;
   final bool playerReferrerCpfMissing;
@@ -272,7 +270,8 @@ String? referralFraudReason({
 }
 
 /// Recompensas de um nível, na ordem: indicação do jogador, depois da casa.
-/// A soma não passa da comissão que sobrou depois do abatimento de pontos.
+/// A soma não passa da comissão que sobrou depois dos pontos e do desconto
+/// de primeira reserva. O B2B não entra na reserva que levou esse desconto.
 /// O líquido da casa não entra nessa conta.
 List<RewardLine> quoteReferralRewards(
   SpendRewardInput input, {
@@ -282,7 +281,7 @@ List<RewardLine> quoteReferralRewards(
   if (input.fraudReason != null) return const [];
   final gross = input.grossCents;
   final commission = commissionCents(gross, input.commissionBps);
-  var pool = commission - input.subsidyCents;
+  var pool = commission - input.subsidyCents - input.firstBookingDiscountCents;
   if (pool < 0) pool = 0;
   final lines = <RewardLine>[];
 
@@ -347,7 +346,7 @@ List<RewardLine> quoteReferralRewards(
           );
         }
       }
-    } else if (input.payerCustomerRank > rates.b2bSkipCustomers) {
+    } else if (input.firstBookingDiscountCents <= 0) {
       final cents = _takeCents(gross, rates.b2bBps, pool);
       if (cents > 0) {
         lines.add(

@@ -30,13 +30,13 @@ export type SpendRewardInput = {
   grossCents: number;
   commissionBps: number;
   subsidyCents?: number;
+  firstBookingDiscountCents?: number;
   paidAt: string;
   playerReferrer?: AttributionSlice | null;
   playerReferrerIsVenue?: boolean;
   spendAtReferrerVenue?: boolean;
   venueReferrer?: AttributionSlice | null;
   venueReferrerIsPlayer?: boolean;
-  payerCustomerRank?: number;
   payerCpfMissing?: boolean;
   playerReferrerCpfMissing?: boolean;
   venueReferrerCpfMissing?: boolean;
@@ -46,7 +46,6 @@ export type SpendRewardInput = {
   c2bBps?: number;
   b2bBps?: number;
   pointValueCents?: number;
-  b2bSkipCustomers?: number;
 };
 
 export function commissionCents(amountCents: number, basisPoints: number): number {
@@ -91,7 +90,8 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
   if (input.fraudReason) return [];
   const pointValue = input.pointValueCents ?? officialPointValueCents;
   const commission = commissionCents(input.grossCents, input.commissionBps);
-  let pool = commission - (input.subsidyCents ?? 0);
+  let pool = commission - (input.subsidyCents ?? 0) -
+    (input.firstBookingDiscountCents ?? 0);
   if (pool < 0) pool = 0;
   const lines: RewardLine[] = [];
   const player = input.playerReferrer;
@@ -148,7 +148,7 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
           });
         }
       }
-    } else if ((input.payerCustomerRank ?? 1) > (input.b2bSkipCustomers ?? 1)) {
+    } else if ((input.firstBookingDiscountCents ?? 0) <= 0) {
       const cents = takeCents(input.grossCents, input.b2bBps ?? officialB2bBps, pool);
       if (cents > 0) {
         lines.push({

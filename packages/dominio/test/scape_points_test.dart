@@ -12,12 +12,12 @@ void main() {
     int grossCents = 10000,
     int commissionBps = 2500,
     int subsidyCents = 0,
+    int firstBookingDiscountCents = 0,
     AttributionSlice? playerReferrer,
     bool playerReferrerIsVenue = false,
     bool spendAtReferrerVenue = false,
     AttributionSlice? venueReferrer,
     bool venueReferrerIsPlayer = false,
-    int payerCustomerRank = 2,
     bool payerCpfMissing = false,
     bool playerReferrerCpfMissing = false,
     bool venueReferrerCpfMissing = false,
@@ -28,13 +28,13 @@ void main() {
       grossCents: grossCents,
       commissionBps: commissionBps,
       subsidyCents: subsidyCents,
+      firstBookingDiscountCents: firstBookingDiscountCents,
       paidAt: at ?? paidAt,
       playerReferrer: playerReferrer,
       playerReferrerIsVenue: playerReferrerIsVenue,
       spendAtReferrerVenue: spendAtReferrerVenue,
       venueReferrer: venueReferrer,
       venueReferrerIsPlayer: venueReferrerIsPlayer,
-      payerCustomerRank: payerCustomerRank,
       payerCpfMissing: payerCpfMissing,
       playerReferrerCpfMissing: playerReferrerCpfMissing,
       venueReferrerCpfMissing: venueReferrerCpfMissing,
@@ -105,17 +105,19 @@ void main() {
     expect(lines.single.cents, 250);
   });
 
-  test('B2B começa no segundo cliente e é 5%', () {
+  test('B2B é 5% em toda reserva do ano, menos a do desconto de 20%', () {
     expect(
-      quoteReferralRewards(spend(venueReferrer: window, payerCustomerRank: 1)),
+      quoteReferralRewards(
+        spend(venueReferrer: window, firstBookingDiscountCents: 2000),
+      ),
       isEmpty,
     );
-    final lines = quoteReferralRewards(
-      spend(venueReferrer: window, payerCustomerRank: 2),
-    );
-    expect(lines.single.program, 'b2b');
-    expect(lines.single.cents, 500);
-    expect(lines.single.payee, RewardPayee.venueCredit);
+    final firstVisit = quoteReferralRewards(spend(venueReferrer: window));
+    final nextVisit = quoteReferralRewards(spend(venueReferrer: window));
+    expect(firstVisit.single.program, 'b2b');
+    expect(firstVisit.single.cents, 500);
+    expect(nextVisit.single.cents, 500);
+    expect(firstVisit.single.payee, RewardPayee.venueCredit);
   });
 
   test('C2B paga o jogador que indicou a casa', () {

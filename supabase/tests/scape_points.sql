@@ -623,6 +623,226 @@ begin
   end if;
 end $$;
 
+insert into public.venues (
+  id, owner_id, city_id, name, neighborhood, street_address, address_number,
+  postal_code, latitude, longitude, income_value, document_kind,
+  document_number, phone, status
+) values (
+  'bb321111-1111-1111-1111-111111111111',
+  'bb000000-0000-0000-0000-000000000000',
+  'curitiba',
+  'Casa que indicou',
+  'Batel',
+  'Rua da Indicação',
+  '20',
+  '80420000',
+  -25.44,
+  -49.29,
+  4000,
+  'cnpj',
+  '88777666000155',
+  '4133330011',
+  'approved'
+);
+
+insert into public.referral_attributions (
+  subject_kind, subject_venue_id, referrer_kind, referrer_venue_id,
+  code, starts_at, ends_at, status
+)
+select
+  'venue',
+  'bb311111-1111-1111-1111-111111111111',
+  'venue',
+  'bb321111-1111-1111-1111-111111111111',
+  code,
+  pg_catalog.now() - interval '10 days',
+  pg_catalog.now() + interval '355 days',
+  'active'
+from public.referral_codes
+where owner_venue_id = 'bb321111-1111-1111-1111-111111111111';
+
+insert into auth.users (id, email, raw_user_meta_data)
+values
+  (
+    'bb777777-7777-7777-7777-777777777777',
+    'primeira@example.com',
+    '{"display_name":"Primeira"}'
+  ),
+  (
+    'bb888888-8888-8888-8888-888888888888',
+    'seguinte@example.com',
+    '{"display_name":"Seguinte"}'
+  );
+
+update public.profiles
+set cpf = '15350946056'
+where id = 'bb777777-7777-7777-7777-777777777777';
+
+update public.profiles
+set cpf = '11144477735'
+where id = 'bb888888-8888-8888-8888-888888888888';
+
+insert into public.group_members (
+  group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+) values
+  (
+    'bb611111-1111-1111-1111-111111111111',
+    'bb777777-7777-7777-7777-777777777777',
+    'Primeira',
+    false,
+    'pending',
+    'none',
+    'none'
+  ),
+  (
+    'bb611111-1111-1111-1111-111111111111',
+    'bb888888-8888-8888-8888-888888888888',
+    'Seguinte',
+    false,
+    'pending',
+    'none',
+    'none'
+  );
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  provider_ref, idempotency_key, commission_bps, payer_document_status,
+  first_booking_discount_cents
+) values
+  (
+    'bbc11111-1111-1111-1111-111111111111',
+    'bb611111-1111-1111-1111-111111111111',
+    'bb777777-7777-7777-7777-777777777777',
+    'bb311111-1111-1111-1111-111111111111',
+    10000,
+    'PIX',
+    'pending',
+    'pay_b2b_discount',
+    'idem-b2b-discount',
+    2500,
+    'matched',
+    2000
+  );
+
+do $$
+declare
+  v_cents integer;
+begin
+  perform private.apply_payment_transition(
+    'bbc11111-1111-1111-1111-111111111111',
+    'paid',
+    true
+  );
+  if exists (
+    select 1 from public.venue_referral_entries
+    where source_charge_id = 'bbc11111-1111-1111-1111-111111111111'
+      and program = 'b2b'
+      and kind = 'accrual'
+  ) then
+    raise exception 'B2B entrou na reserva com desconto de primeira reserva';
+  end if;
+end $$;
+
+insert into public.groups (
+  id, city_id, venue_id, room_id, session_id, starts_at,
+  total_spots, minimum_spots, price_cents, created_by
+) values (
+  'bbe11111-1111-1111-1111-111111111111',
+  'curitiba',
+  'bb311111-1111-1111-1111-111111111111',
+  'bb411111-1111-1111-1111-111111111111',
+  'bb511111-1111-1111-1111-111111111111',
+  '2027-09-01 18:00:00+00',
+  4,
+  2,
+  10000,
+  'bb777777-7777-7777-7777-777777777777'
+);
+
+insert into public.group_members (
+  group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+) values
+  (
+    'bbe11111-1111-1111-1111-111111111111',
+    'bb777777-7777-7777-7777-777777777777',
+    'Primeira',
+    true,
+    'pending',
+    'none',
+    'none'
+  ),
+  (
+    'bbe11111-1111-1111-1111-111111111111',
+    'bb888888-8888-8888-8888-888888888888',
+    'Seguinte',
+    false,
+    'pending',
+    'none',
+    'none'
+  );
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  provider_ref, idempotency_key, commission_bps, payer_document_status,
+  first_booking_discount_cents
+) values
+  (
+    'bbf11111-1111-1111-1111-111111111111',
+    'bbe11111-1111-1111-1111-111111111111',
+    'bb777777-7777-7777-7777-777777777777',
+    'bb311111-1111-1111-1111-111111111111',
+    10000,
+    'PIX',
+    'pending',
+    'pay_b2b_again',
+    'idem-b2b-again',
+    2500,
+    'matched',
+    0
+  ),
+  (
+    'bc011111-1111-1111-1111-111111111111',
+    'bbe11111-1111-1111-1111-111111111111',
+    'bb888888-8888-8888-8888-888888888888',
+    'bb311111-1111-1111-1111-111111111111',
+    10000,
+    'PIX',
+    'pending',
+    'pay_b2b_other',
+    'idem-b2b-other',
+    2500,
+    'matched',
+    0
+  );
+
+do $$
+begin
+  perform private.apply_payment_transition(
+    'bbf11111-1111-1111-1111-111111111111',
+    'paid',
+    true
+  );
+  perform private.apply_payment_transition(
+    'bc011111-1111-1111-1111-111111111111',
+    'paid',
+    true
+  );
+  if (
+    select amount_cents from public.venue_referral_entries
+    where source_charge_id = 'bbf11111-1111-1111-1111-111111111111'
+      and program = 'b2b' and kind = 'accrual'
+  ) is distinct from 500 then
+    raise exception 'a volta do mesmo cliente nao gerou B2B';
+  end if;
+  if (
+    select amount_cents from public.venue_referral_entries
+    where source_charge_id = 'bc011111-1111-1111-1111-111111111111'
+      and program = 'b2b' and kind = 'accrual'
+  ) is distinct from 500 then
+    raise exception 'outro cliente nao gerou B2B';
+  end if;
+end $$;
+
 begin;
 select set_config('request.jwt.claim.sub', 'bb222222-2222-2222-2222-222222222222', true);
 set local role authenticated;

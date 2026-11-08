@@ -17,7 +17,6 @@ create table public.referral_program_settings (
   first_booking_discount_bps integer not null default 2000 check (
     first_booking_discount_bps between 0 and 10000
   ),
-  b2b_skip_customers integer not null default 1 check (b2b_skip_customers >= 0),
   updated_at timestamptz not null default pg_catalog.now()
 );
 
@@ -45,6 +44,13 @@ alter table public.payment_charges
 alter table public.payment_charges
   add constraint payment_charges_subsidy_nonnegative
   check (subsidy_cents >= 0 and points_redeemed >= 0);
+
+alter table public.payment_charges
+  add column first_booking_discount_cents integer not null default 0;
+
+alter table public.payment_charges
+  add constraint payment_charges_first_booking_discount
+  check (first_booking_discount_cents >= 0);
 
 alter table public.payment_charges
   add column payer_document_status text;
@@ -903,31 +909,6 @@ begin
 end;
 $$;
 
-create or replace function private.payer_customer_rank(
-  p_venue_id uuid,
-  p_user_id uuid
-)
-returns integer
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  with firsts as (
-    select user_id, min(paid_at) as first_paid
-    from public.payment_charges
-    where venue_id = p_venue_id
-      and status = 'paid'
-    group by user_id
-  ), ranked as (
-    select user_id, row_number() over (
-      order by first_paid, user_id
-    ) as n
-    from firsts
-  )
-  select coalesce((select n from ranked where user_id = p_user_id), 0)::integer;
-$$;
-
 create table public.referral_withholdings (
   id uuid primary key default gen_random_uuid(),
   payment_charge_id uuid not null references public.payment_charges (id) on delete cascade,
@@ -996,7 +977,6 @@ declare
   v_points integer;
   v_value integer;
   v_existing integer;
-  v_rank integer;
   v_referrer uuid;
 begin
   select * into v_charge from public.payment_charges where id = p_charge_id;
@@ -1012,7 +992,9 @@ begin
   select * into v_settings from public.referral_program_settings where id = 1;
   v_gross := coalesce(v_charge.gross_amount_cents, v_charge.amount_cents);
   v_pool := greatest(
-    private.reward_cents(v_gross, v_charge.commission_bps) - v_charge.subsidy_cents,
+    private.reward_cents(v_gross, v_charge.commission_bps)
+      - v_charge.subsidy_cents
+      - v_charge.first_booking_discount_cents,
     0
   );
   v_paid := coalesce(v_charge.paid_at, pg_catalog.now());
@@ -1173,8 +1155,7 @@ begin
     return;
   end if;
 
-  v_rank := private.payer_customer_rank(v_charge.venue_id, v_charge.user_id);
-  if v_rank <= v_settings.b2b_skip_customers then
+  if v_charge.first_booking_discount_cents > 0 then
     return;
   end if;
   select amount_cents into v_existing
@@ -1926,7 +1907,6 @@ revoke all on function private.subsidy_quote(uuid, integer, integer, integer, bo
 revoke all on function private.hold_point_redemption(uuid, text, integer, integer, integer) from public, anon, authenticated;
 revoke all on function private.release_point_hold(text) from public, anon, authenticated;
 revoke all on function private.attach_point_hold(text, uuid) from public, anon, authenticated;
-revoke all on function private.payer_customer_rank(uuid, uuid) from public, anon, authenticated;
 revoke all on function private.note_payer_withholding(uuid) from public, anon, authenticated;
 revoke all on function private.post_referral_rewards(uuid) from public, anon, authenticated;
 revoke all on function private.reverse_referral_rewards(uuid) from public, anon, authenticated;
