@@ -22,6 +22,11 @@ void main() {
     bool playerReferrerCpfMissing = false,
     bool venueReferrerCpfMissing = false,
     String? fraudReason,
+    bool playerPayerIsReferrer = false,
+    bool venuePayerIsReferrer = false,
+    int payerRewardedAccounts = 0,
+    bool playerSubjectAlreadyRewarded = false,
+    int playerDeviceCluster = 0,
     DateTime? at,
   }) {
     return SpendRewardInput(
@@ -39,6 +44,11 @@ void main() {
       playerReferrerCpfMissing: playerReferrerCpfMissing,
       venueReferrerCpfMissing: venueReferrerCpfMissing,
       fraudReason: fraudReason,
+      playerPayerIsReferrer: playerPayerIsReferrer,
+      venuePayerIsReferrer: venuePayerIsReferrer,
+      payerRewardedAccounts: payerRewardedAccounts,
+      playerSubjectAlreadyRewarded: playerSubjectAlreadyRewarded,
+      playerDeviceCluster: playerDeviceCluster,
     );
   }
 
@@ -272,8 +282,8 @@ void main() {
       'unverified',
     );
     expect(referralBenefitAllowed('matched'), isTrue);
-    expect(referralBenefitAllowed('mismatch'), isFalse);
-    expect(referralBenefitAllowed('unverified'), isFalse);
+    expect(referralBenefitAllowed('mismatch'), isTrue);
+    expect(referralBenefitAllowed('unverified'), isTrue);
     expect(
       gatedFirstBookingDiscountCents(
         payerStatus: 'mismatch',
@@ -281,7 +291,7 @@ void main() {
         discountBps: 2000,
         commissionCentsValue: 2500,
       ),
-      0,
+      2000,
     );
     expect(
       gatedFirstBookingDiscountCents(
@@ -290,7 +300,7 @@ void main() {
         discountBps: 2000,
         commissionCentsValue: 2500,
       ),
-      0,
+      2000,
     );
     expect(
       gatedFirstBookingDiscountCents(
@@ -316,5 +326,36 @@ void main() {
     );
     expect(lines.map((line) => line.program), ['b2b']);
     expect(lines.single.cents, 2);
+  });
+
+  test('pagador indicador, teto de 3 contas e aparelho repetido', () {
+    final self = quoteReferralRewards(
+      spend(playerReferrer: window, playerPayerIsReferrer: true),
+    );
+    expect(self.map((line) => line.program), ['cashback']);
+
+    final fourth = quoteReferralRewards(
+      spend(playerReferrer: window, payerRewardedAccounts: 3),
+    );
+    expect(fourth.map((line) => line.program), ['cashback']);
+
+    final again = quoteReferralRewards(
+      spend(
+        playerReferrer: window,
+        payerRewardedAccounts: 3,
+        playerSubjectAlreadyRewarded: true,
+      ),
+    );
+    expect(again.map((line) => line.program), ['cashback', 'c2c']);
+
+    final review = quoteReferralRewards(
+      spend(playerReferrer: window, playerDeviceCluster: 2),
+    );
+    expect(review.last.program, 'c2c');
+    expect(review.last.reviewStatus, 'em_revisao');
+    expect(review.first.reviewStatus, isNull);
+
+    expect(ReferralRates.official.payerReferredAccountCap, 3);
+    expect(ReferralRates.official.sameDeviceReviewThreshold, 2);
   });
 }

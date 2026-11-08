@@ -19,6 +19,7 @@ export type RewardLine = {
   cents: number;
   points: number;
   payee: RewardPayee;
+  reviewStatus?: "em_revisao";
 };
 
 export type AttributionSlice = {
@@ -48,6 +49,16 @@ export type SpendRewardInput = {
   b2bBps?: number;
   cashbackBps?: number;
   pointValueCents?: number;
+  blockSelfPayer?: boolean;
+  payerReferredAccountCap?: number;
+  sameDeviceReviewThreshold?: number;
+  playerPayerIsReferrer?: boolean;
+  venuePayerIsReferrer?: boolean;
+  payerRewardedAccounts?: number;
+  playerSubjectAlreadyRewarded?: boolean;
+  venueSubjectAlreadyRewarded?: boolean;
+  playerDeviceCluster?: number;
+  venueDeviceCluster?: number;
 };
 
 export function commissionCents(amountCents: number, basisPoints: number): number {
@@ -88,6 +99,28 @@ export function referralFraudReason(input: {
   return null;
 }
 
+function payerBlocksReferral(input: {
+  payerIsReferrer?: boolean;
+  rewardedAccounts?: number;
+  subjectAlreadyRewarded?: boolean;
+  cap?: number;
+  blockSelfPayer?: boolean;
+}): boolean {
+  if ((input.blockSelfPayer ?? true) && input.payerIsReferrer) return true;
+  const cap = input.cap ?? 3;
+  if (cap <= 0 || input.subjectAlreadyRewarded) return false;
+  return (input.rewardedAccounts ?? 0) >= cap;
+}
+
+function deviceReview(
+  cluster: number | undefined,
+  input: SpendRewardInput,
+): "em_revisao" | undefined {
+  const threshold = input.sameDeviceReviewThreshold ?? 2;
+  if (threshold <= 0 || (cluster ?? 0) < threshold) return undefined;
+  return "em_revisao";
+}
+
 export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
   const pointValue = input.pointValueCents ?? officialPointValueCents;
   const commission = commissionCents(input.grossCents, input.commissionBps);
@@ -112,8 +145,16 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
     pool -= cash.cents;
   }
   const player = input.fraudReason ? null : input.playerReferrer;
+  const playerReview = deviceReview(input.playerDeviceCluster, input);
   if (
-    player && attributionCovers(player, input.paidAt) && !input.payerCpfMissing
+    player && attributionCovers(player, input.paidAt) && !input.payerCpfMissing &&
+    !payerBlocksReferral({
+      payerIsReferrer: input.playerPayerIsReferrer,
+      rewardedAccounts: input.payerRewardedAccounts,
+      subjectAlreadyRewarded: input.playerSubjectAlreadyRewarded,
+      cap: input.payerReferredAccountCap,
+      blockSelfPayer: input.blockSelfPayer,
+    })
   ) {
     if (input.playerReferrerIsVenue) {
       if (!input.spendAtReferrerVenue) {
@@ -124,6 +165,7 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
             cents,
             points: 0,
             payee: "venue_credit",
+            ...(playerReview ? { reviewStatus: playerReview } : {}),
           });
           pool -= cents;
         }
@@ -141,13 +183,24 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
           cents: taken.cents,
           points: taken.points,
           payee: "player_points",
+          ...(playerReview ? { reviewStatus: playerReview } : {}),
         });
         pool -= taken.cents;
       }
     }
   }
   const venue = input.fraudReason ? null : input.venueReferrer;
-  if (venue && attributionCovers(venue, input.paidAt)) {
+  const venueReview = deviceReview(input.venueDeviceCluster, input);
+  if (
+    venue && attributionCovers(venue, input.paidAt) &&
+    !payerBlocksReferral({
+      payerIsReferrer: input.venuePayerIsReferrer,
+      rewardedAccounts: input.payerRewardedAccounts,
+      subjectAlreadyRewarded: input.venueSubjectAlreadyRewarded,
+      cap: input.payerReferredAccountCap,
+      blockSelfPayer: input.blockSelfPayer,
+    })
+  ) {
     if (input.venueReferrerIsPlayer) {
       if (!input.venueReferrerCpfMissing) {
         const taken = takePoints(
@@ -162,6 +215,7 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
             cents: taken.cents,
             points: taken.points,
             payee: "player_points",
+            ...(venueReview ? { reviewStatus: venueReview } : {}),
           });
         }
       }
@@ -173,6 +227,7 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
           cents,
           points: 0,
           payee: "venue_credit",
+          ...(venueReview ? { reviewStatus: venueReview } : {}),
         });
       }
     }
@@ -316,7 +371,7 @@ export function payerDocumentStatus(
 export function referralBenefitAllowed(
   status: string | null | undefined,
 ): boolean {
-  return status === "matched";
+  return status !== "blocked-by-removed-rule";
 }
 
 /// O webhook da cobrança não traz o pagador. A consulta da transação Pix

@@ -212,3 +212,31 @@ Deno.test("abatimento muda o percentual e preserva o líquido da casa", () => {
   assertEquals(capped.points, 100);
   assertEquals(capped.houseNetCents, 7500);
 });
+
+Deno.test("pagador indicador e teto não tiram o cashback", () => {
+  const self = quoteReferralRewards({
+    grossCents: 10000,
+    commissionBps: 2500,
+    paidAt: "2026-06-01T00:00:00.000Z",
+    playerReferrer: window,
+    playerPayerIsReferrer: true,
+  });
+  assertEquals(self.map((line) => line.program), ["cashback"]);
+  const fourth = quoteReferralRewards({
+    grossCents: 10000,
+    commissionBps: 2500,
+    paidAt: "2026-06-01T00:00:00.000Z",
+    playerReferrer: window,
+    payerRewardedAccounts: 3,
+  });
+  assertEquals(fourth.map((line) => line.program), ["cashback"]);
+  const review = quoteReferralRewards({
+    grossCents: 10000,
+    commissionBps: 2500,
+    paidAt: "2026-06-01T00:00:00.000Z",
+    playerReferrer: window,
+    playerDeviceCluster: 2,
+  });
+  assertEquals(review[1].reviewStatus, "em_revisao");
+  assertEquals(review[0].reviewStatus, undefined);
+});

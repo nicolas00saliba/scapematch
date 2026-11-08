@@ -176,6 +176,10 @@ create table public.scape_point_entries (
   split_percent numeric(7, 4),
   idempotency_key text not null unique,
   available_at timestamptz,
+  review_status text check (
+    review_status is null
+    or review_status in ('em_revisao', 'approved', 'rejected')
+  ),
   created_at timestamptz not null default pg_catalog.now()
 );
 
@@ -206,6 +210,10 @@ create table public.venue_referral_entries (
   payment_charge_id uuid references public.payment_charges (id) on delete set null,
   relates_to uuid references public.venue_referral_entries (id),
   idempotency_key text not null unique,
+  review_status text check (
+    review_status is null
+    or review_status in ('em_revisao', 'approved', 'rejected')
+  ),
   created_at timestamptz not null default pg_catalog.now()
 );
 
@@ -506,6 +514,7 @@ begin
   end if;
 
   if v_reason is null then
+    perform private.flag_same_device_rewards(p_subject_user, p_subject_venue);
     return 'ok';
   end if;
   return 'blocked';
@@ -520,11 +529,21 @@ set search_path = ''
 as $$
 declare
   v_code text;
+  v_device text;
 begin
   perform private.ensure_player_code(new.id);
-  select raw_user_meta_data ->> 'referral_code' into v_code
+  select raw_user_meta_data ->> 'referral_code',
+         raw_user_meta_data ->> 'device_install_id'
+    into v_code, v_device
   from auth.users
   where id = new.id;
+  v_device := private.normalize_install_id(v_device);
+  if v_device is not null then
+    update public.profiles
+    set device_install_id = v_device
+    where id = new.id
+      and device_install_id is null;
+  end if;
   if v_code is not null and pg_catalog.btrim(v_code) <> '' then
     perform private.attach_referral('player', new.id, null, v_code, true);
   end if;
@@ -668,6 +687,8 @@ as $$
       select sum(a.points)::integer
       from entries a
       where a.kind = 'accrual'
+        and a.review_status is distinct from 'em_revisao'
+        and a.review_status is distinct from 'rejected'
         and not exists (
           select 1 from entries r
           where r.relates_to = a.id and r.kind = 'release'
@@ -914,9 +935,10 @@ create table public.referral_withholdings (
   id uuid primary key default gen_random_uuid(),
   payment_charge_id uuid not null references public.payment_charges (id) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
-  reason text not null check (reason in ('payer_cpf_mismatch')),
+  reason text not null check (reason in ('payer_is_referrer', 'payer_account_cap')),
+  program text not null,
   created_at timestamptz not null default pg_catalog.now(),
-  unique (payment_charge_id, reason)
+  unique (payment_charge_id, reason, program)
 );
 
 create index referral_withholdings_by_user
@@ -945,17 +967,7 @@ begin
   select * into v_charge
   from public.payment_charges
   where id = p_charge_id;
-  if v_charge.id is null
-    or v_charge.payer_document_status is distinct from 'mismatch'
-  then
-    return;
-  end if;
-  insert into public.referral_withholdings (
-    payment_charge_id, user_id, reason
-  ) values (
-    v_charge.id, v_charge.user_id, 'payer_cpf_mismatch'
-  )
-  on conflict (payment_charge_id, reason) do nothing;
+  return;
 end;
 $$;
 
@@ -979,13 +991,12 @@ declare
   v_value integer;
   v_existing integer;
   v_referrer uuid;
+  v_gate text;
 begin
   select * into v_charge from public.payment_charges where id = p_charge_id;
   if v_charge.id is null or v_charge.status <> 'paid' then
     return;
   end if;
-  -- A indicação só segue com o CPF de quem pagou. O cashback não espera isso.
-  perform private.note_payer_withholding(v_charge.id);
   select * into v_settings from public.referral_program_settings where id = 1;
   v_gross := coalesce(v_charge.gross_amount_cents, v_charge.amount_cents);
   v_pool := greatest(
@@ -1025,10 +1036,6 @@ begin
       on conflict (idempotency_key) do nothing;
       v_pool := v_pool - v_cents;
     end if;
-  end if;
-
-  if v_charge.payer_document_status is distinct from 'matched' then
-    return;
   end if;
 
   if private.identity_conflict(v_charge.user_id, null, v_charge.venue_id, null) is not null then
@@ -1071,17 +1078,25 @@ begin
         if found then
           v_pool := greatest(v_pool - v_existing, 0);
         else
+          v_gate := private.referral_reward_gate(
+            v_charge.id, 'b2c', null, v_player.referrer_venue_id,
+            v_charge.user_id, null
+          );
           v_cents := least(private.reward_cents(v_gross, v_settings.b2c_bps), v_pool);
-          if v_cents > 0 then
+          if v_gate is distinct from 'skip' and v_cents > 0 then
             insert into public.venue_referral_entries (
               venue_id, kind, amount_cents, program, source_charge_id,
-              payment_charge_id, idempotency_key
+              payment_charge_id, idempotency_key, review_status
             ) values (
               v_player.referrer_venue_id, 'accrual', v_cents, 'b2c',
               v_charge.id, v_charge.id,
-              'accrual:' || v_charge.id::text || ':b2c'
+              'accrual:' || v_charge.id::text || ':b2c',
+              nullif(v_gate, 'post')
             )
             on conflict (idempotency_key) do nothing;
+            perform private.note_payer_reward_subject(
+              v_charge.id, v_charge.user_id, null
+            );
             v_pool := v_pool - v_cents;
           end if;
         end if;
@@ -1102,20 +1117,29 @@ begin
         if found then
           v_pool := greatest(v_pool - v_existing, 0);
         else
+          v_gate := private.referral_reward_gate(
+            v_charge.id, 'c2c', v_player.referrer_user_id, null,
+            v_charge.user_id, null
+          );
           v_cents := least(private.reward_cents(v_gross, v_settings.c2c_bps), v_pool);
           v_points := v_cents / v_value;
           v_cents := v_points * v_value;
-          if v_points > 0 then
+          if v_gate is distinct from 'skip' and v_points > 0 then
             insert into public.scape_point_entries (
               user_id, kind, points, amount_cents, program,
-              source_charge_id, payment_charge_id, idempotency_key, available_at
+              source_charge_id, payment_charge_id, idempotency_key, available_at,
+              review_status
             ) values (
               v_player.referrer_user_id, 'accrual', v_points, v_cents, 'c2c',
               v_charge.id, v_charge.id,
               'accrual:' || v_charge.id::text || ':c2c',
-              v_paid + make_interval(days => v_settings.hold_days)
+              v_paid + make_interval(days => v_settings.hold_days),
+              nullif(v_gate, 'post')
             )
             on conflict (idempotency_key) do nothing;
+            perform private.note_payer_reward_subject(
+              v_charge.id, v_charge.user_id, null
+            );
             v_pool := v_pool - v_cents;
           end if;
         end if;
@@ -1167,22 +1191,28 @@ begin
     if found then
       return;
     end if;
+    v_gate := private.referral_reward_gate(
+      v_charge.id, 'c2b', v_referrer, null, null, v_charge.venue_id
+    );
     v_cents := least(private.reward_cents(v_gross, v_settings.c2b_bps), v_pool);
     v_points := v_cents / v_value;
     v_cents := v_points * v_value;
-    if v_points <= 0 then
+    if v_gate = 'skip' or v_points <= 0 then
       return;
     end if;
     insert into public.scape_point_entries (
       user_id, kind, points, amount_cents, program,
-      source_charge_id, payment_charge_id, idempotency_key, available_at
+      source_charge_id, payment_charge_id, idempotency_key, available_at,
+      review_status
     ) values (
       v_referrer, 'accrual', v_points, v_cents, 'c2b',
       v_charge.id, v_charge.id,
       'accrual:' || v_charge.id::text || ':c2b',
-      v_paid + make_interval(days => v_settings.hold_days)
+      v_paid + make_interval(days => v_settings.hold_days),
+      nullif(v_gate, 'post')
     )
     on conflict (idempotency_key) do nothing;
+    perform private.note_payer_reward_subject(v_charge.id, null, v_charge.venue_id);
     return;
   end if;
 
@@ -1197,19 +1227,24 @@ begin
   if found then
     return;
   end if;
+  v_gate := private.referral_reward_gate(
+    v_charge.id, 'b2b', null, v_venue.referrer_venue_id, null, v_charge.venue_id
+  );
   v_cents := least(private.reward_cents(v_gross, v_settings.b2b_bps), v_pool);
-  if v_cents <= 0 then
+  if v_gate = 'skip' or v_cents <= 0 then
     return;
   end if;
   insert into public.venue_referral_entries (
     venue_id, kind, amount_cents, program, source_charge_id,
-    payment_charge_id, idempotency_key
+    payment_charge_id, idempotency_key, review_status
   ) values (
     v_venue.referrer_venue_id, 'accrual', v_cents, 'b2b',
     v_charge.id, v_charge.id,
-    'accrual:' || v_charge.id::text || ':b2b'
+    'accrual:' || v_charge.id::text || ':b2b',
+    nullif(v_gate, 'post')
   )
   on conflict (idempotency_key) do nothing;
+  perform private.note_payer_reward_subject(v_charge.id, null, v_charge.venue_id);
 end;
 $$;
 
@@ -1314,6 +1349,8 @@ begin
   from public.scape_point_entries e
   where e.kind = 'accrual'
     and e.available_at <= p_now
+    and e.review_status is distinct from 'em_revisao'
+    and e.review_status is distinct from 'rejected'
     and not exists (
       select 1 from public.scape_point_entries r
       where r.relates_to = e.id and r.kind in ('release', 'reversal')
@@ -1837,7 +1874,7 @@ begin
     'entries', coalesce((
       select pg_catalog.jsonb_agg(row_to_json(s))
       from (
-        select kind, program, points, amount_cents, available_at, created_at
+        select kind, program, points, amount_cents, available_at, created_at, review_status
         from public.scape_point_entries
         where user_id = v_uid
         order by created_at desc

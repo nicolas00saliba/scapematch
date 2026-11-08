@@ -82,6 +82,7 @@ class ScapePointEntry {
     required this.amountCents,
     this.program,
     this.createdAt,
+    this.reviewStatus,
   });
 
   final String kind;
@@ -89,6 +90,7 @@ class ScapePointEntry {
   final int points;
   final int amountCents;
   final DateTime? createdAt;
+  final String? reviewStatus;
 
   factory ScapePointEntry.fromJson(Map<String, dynamic> json) {
     final rawDate = json['created_at']?.toString();
@@ -98,10 +100,12 @@ class ScapePointEntry {
       points: _intOf(json['points']),
       amountCents: _intOf(json['amount_cents']),
       createdAt: rawDate == null ? null : DateTime.tryParse(rawDate),
+      reviewStatus: json['review_status']?.toString(),
     );
   }
 
   String get title {
+    if (reviewStatus == 'em_revisao') return 'Indicação em revisão';
     return switch (kind) {
       'accrual' => switch (program) {
         'c2c' => 'Indicação de jogador',
@@ -121,7 +125,9 @@ class ScapePointEntry {
   String get detail {
     return switch (kind) {
       'accrual' =>
-        program == 'cashback'
+        reviewStatus == 'em_revisao'
+            ? 'Aguardando conferência. Ainda não fica disponível.'
+            : program == 'cashback'
             ? 'Do que você pagou nesta reserva. Fica pendente por 30 dias.'
             : 'Ficam pendentes por 30 dias.',
       'release' => 'Disponíveis para pagar sala.',
@@ -154,6 +160,40 @@ class PointSpendChoice {
       points: _intOf(json['points']),
       subsidyCents: _intOf(json['subsidy_cents']),
       chargedCents: _intOf(json['charged_cents']),
+    );
+  }
+}
+
+class ReferralReview {
+  const ReferralReview({
+    required this.id,
+    required this.entryKind,
+    required this.program,
+    required this.amountCents,
+    this.points,
+  });
+
+  final String id;
+  final String entryKind;
+  final String program;
+  final int? points;
+  final int amountCents;
+
+  String get label => switch (program) {
+    'c2c' => 'Indicação de jogador',
+    'c2b' => 'Indicação de casa',
+    'b2c' => 'Crédito da casa',
+    'b2b' => 'Crédito entre casas',
+    _ => 'Indicação',
+  };
+
+  factory ReferralReview.fromJson(Map<String, dynamic> json) {
+    return ReferralReview(
+      id: json['id']?.toString() ?? '',
+      entryKind: json['entry_kind']?.toString() ?? 'points',
+      program: json['program']?.toString() ?? '',
+      points: json['points'] == null ? null : _intOf(json['points']),
+      amountCents: _intOf(json['amount_cents']),
     );
   }
 }

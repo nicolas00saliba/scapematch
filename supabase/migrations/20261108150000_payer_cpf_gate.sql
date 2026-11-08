@@ -1,10 +1,8 @@
--- A recompensa de indicação só sai se o CPF de quem pagou for o da conta.
--- Cartão: o titular enviado em creditCardHolderInfo, comparado na tokenização.
--- Pix: o documento vem de GET /v3/pix/transactions/{id} (payer.cpfCnpj ou
--- externalAccount.cpfCnpj). O webhook da cobrança não traz esse documento.
--- A documentação de exemplo mascara o CPF. Sem 11 ou 14 dígitos, fica
--- não verificado e a recompensa não é lançada até uma consulta devolver
--- o número inteiro. Divergente grava o motivo e não lança.
+-- O CPF de quem pagou não precisa ser o da conta. Pais pagam pelos filhos.
+-- O estado abaixo fica só como registro. A trava nova está em
+-- 20261108160000_referral_payer_antifraud.sql.
+-- Pix: o documento vem de GET /v3/pix/transactions/{id}. O webhook não traz.
+-- O exemplo oficial mascara o CPF. Sem 11 ou 14 dígitos não há hash.
 -- Não guarda o CPF do pagador. Não foi aplicado no projeto remoto.
 
 comment on column public.payment_charges.payer_document_status is
@@ -51,9 +49,6 @@ begin
     set payer_document_status = v_next
     where id = p_charge_id;
   end if;
-  if v_next = 'mismatch' then
-    perform private.note_payer_withholding(p_charge_id);
-  end if;
   return v_next;
 end;
 $$;
@@ -69,7 +64,6 @@ as $$
     select 1
     from public.payment_charges
     where id = p_charge_id
-      and payer_document_status = 'matched'
   );
 $$;
 

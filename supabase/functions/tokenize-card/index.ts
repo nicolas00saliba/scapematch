@@ -4,6 +4,7 @@ import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
+import { cardKey, documentHash } from "../_shared/payer_identity.ts";
 import {
   cardBrand,
   last4Digits,
@@ -95,6 +96,8 @@ Deno.serve(async (req) => {
         });
         const last4 = last4Digits(tokenized.creditCardNumber);
         const brand = cardBrand(tokenized.creditCardBrand);
+        const payerHash = await documentHash(holderCpf);
+        const payerCardKey = cardKey(brand, last4);
         const savedCardId = await storeSavedCard(admin, {
           userId: user.id,
           customerId,
@@ -102,6 +105,8 @@ Deno.serve(async (req) => {
           last4,
           brand,
           holderMatches,
+          holderDocumentHash: payerHash,
+          cardKey: payerCardKey,
         });
         responseBody = tokenizePublicResponse({
           id: savedCardId,

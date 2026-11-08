@@ -43,7 +43,9 @@ Deno.test("CPF do pagador diferente barra e a reserva não depende disso", async
       Promise.resolve({ externalAccount: { cpfCnpj: "39053344705" } }),
   }, charge(), null);
   assertEquals(status, "mismatch");
-  assertEquals(writes, ["mismatch"]);
+  assertEquals(writes.at(-1), "mismatch");
+  assertEquals(writes[0]?.startsWith("hash:"), true);
+  assertEquals((writes[0] ?? "").length, "hash:".length + 64);
 });
 
 Deno.test("consulta que falha não impede o pagamento e fica não verificada", async () => {
@@ -85,9 +87,14 @@ function admin(writes: string[], cpf: string | null) {
         },
       };
     },
-    rpc(_name: string, args: Record<string, unknown>) {
-      writes.push(String(args.p_status));
-      return Promise.resolve({ data: args.p_status, error: null });
+    rpc(name: string, args: Record<string, unknown>) {
+      if (name === "record_payer_document_status") {
+        writes.push(String(args.p_status));
+      }
+      if (name === "record_payer_identity") {
+        writes.push(`hash:${args.p_document_hash}`);
+      }
+      return Promise.resolve({ data: args.p_status ?? null, error: null });
     },
   };
 }

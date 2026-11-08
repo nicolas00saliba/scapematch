@@ -1172,4 +1172,9 @@ async function noteCardPayer(
     p_charge_id: chargeId,
     p_status: status,
   });
+  await admin.rpc("copy_saved_card_payer", {
+    p_charge_id: chargeId,
+    p_user_id: userId,
+    p_card_id: cardId,
+  });
 }

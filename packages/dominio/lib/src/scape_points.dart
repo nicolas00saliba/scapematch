@@ -18,6 +18,9 @@ class ReferralRates {
     this.holdDays = 30,
     this.cashbackBps = 100,
     this.firstBookingDiscountBps = 2000,
+    this.blockSelfPayer = true,
+    this.payerReferredAccountCap = 3,
+    this.sameDeviceReviewThreshold = 2,
   });
 
   /// Jogador que indicou outro jogador, sobre o gasto do indicado.
@@ -50,6 +53,16 @@ class ReferralRates {
   /// o B2B daquela reserva não é lançado.
   final int firstBookingDiscountBps;
 
+  /// O pagador é o próprio indicador: aquela indicação não é lançada.
+  final bool blockSelfPayer;
+
+  /// Contas indicadas distintas que o mesmo pagador pode premiar. 0 desliga.
+  final int payerReferredAccountCap;
+
+  /// Contas do mesmo indicador no mesmo aparelho a partir deste número
+  /// ficam em revisão. 0 desliga.
+  final int sameDeviceReviewThreshold;
+
   static const official = ReferralRates();
 }
 
@@ -62,6 +75,7 @@ class RewardLine {
     required this.cents,
     required this.points,
     required this.payee,
+    this.reviewStatus,
   });
 
   /// `cashback`, `c2c`, `b2c`, `c2b` ou `b2b`.
@@ -69,6 +83,9 @@ class RewardLine {
   final int cents;
   final int points;
   final RewardPayee payee;
+
+  /// `em_revisao` quando a conta veio do mesmo aparelho que outra do indicador.
+  final String? reviewStatus;
 
   bool get posts => payee == RewardPayee.venueCredit ? cents > 0 : points > 0;
 }
@@ -101,6 +118,13 @@ class SpendRewardInput {
     this.playerReferrerCpfMissing = false,
     this.venueReferrerCpfMissing = false,
     this.fraudReason,
+    this.playerPayerIsReferrer = false,
+    this.venuePayerIsReferrer = false,
+    this.payerRewardedAccounts = 0,
+    this.playerSubjectAlreadyRewarded = false,
+    this.venueSubjectAlreadyRewarded = false,
+    this.playerDeviceCluster = 0,
+    this.venueDeviceCluster = 0,
   });
 
   final int grossCents;
@@ -133,6 +157,22 @@ class SpendRewardInput {
 
   /// Fraude já decidida. Não lança e a atribuição deve ser bloqueada.
   final String? fraudReason;
+
+  /// O documento ou o cartão de quem pagou é o do indicador do jogador.
+  final bool playerPayerIsReferrer;
+
+  /// O documento ou o cartão de quem pagou é o do indicador da casa.
+  final bool venuePayerIsReferrer;
+
+  /// Outras contas indicadas que este pagador já premiou.
+  final int payerRewardedAccounts;
+
+  final bool playerSubjectAlreadyRewarded;
+  final bool venueSubjectAlreadyRewarded;
+
+  /// Contas deste indicador criadas no mesmo aparelho, incluindo esta.
+  final int playerDeviceCluster;
+  final int venueDeviceCluster;
 }
 
 class PointSubsidyQuote {
@@ -193,10 +233,13 @@ String payerDocumentStatus({
   return account == payer ? 'matched' : 'mismatch';
 }
 
-/// Recompensa e desconto de indicação só com CPF conferido.
-bool referralBenefitAllowed(String? payerStatus) => payerStatus == 'matched';
+/// Pagamento por terceiro libera recompensa e desconto.
+/// [payerStatus] fica no registro e não barra.
+bool referralBenefitAllowed(String? payerStatus) {
+  return payerStatus != 'blocked-by-removed-rule';
+}
 
-/// O desconto da primeira reserva usa a mesma trava do CPF do pagador.
+/// O desconto da primeira reserva não exige o CPF de quem pagou.
 int gatedFirstBookingDiscountCents({
   required String? payerStatus,
   required int grossCents,
@@ -274,6 +317,24 @@ String? referralFraudReason({
   return null;
 }
 
+bool _payerBlocksReferral({
+  required bool payerIsReferrer,
+  required int rewardedAccounts,
+  required bool subjectAlreadyRewarded,
+  required ReferralRates rates,
+}) {
+  if (rates.blockSelfPayer && payerIsReferrer) return true;
+  final cap = rates.payerReferredAccountCap;
+  if (cap <= 0 || subjectAlreadyRewarded) return false;
+  return rewardedAccounts >= cap;
+}
+
+String? _deviceReview(int cluster, ReferralRates rates) {
+  final threshold = rates.sameDeviceReviewThreshold;
+  if (threshold <= 0 || cluster < threshold) return null;
+  return 'em_revisao';
+}
+
 /// Recompensas de um nível. O cashback do pagador sai primeiro, da comissão
 /// que sobrou depois dos pontos e do desconto de primeira reserva. Depois
 /// vem a indicação do jogador e a da casa. O B2B não entra na reserva que
@@ -309,9 +370,16 @@ List<RewardLine> quoteReferralRewards(
   }
 
   final player = input.fraudReason == null ? input.playerReferrer : null;
+  final playerReview = _deviceReview(input.playerDeviceCluster, rates);
   if (player != null &&
       attributionCovers(player, input.paidAt) &&
-      !input.payerCpfMissing) {
+      !input.payerCpfMissing &&
+      !_payerBlocksReferral(
+        payerIsReferrer: input.playerPayerIsReferrer,
+        rewardedAccounts: input.payerRewardedAccounts,
+        subjectAlreadyRewarded: input.playerSubjectAlreadyRewarded,
+        rates: rates,
+      )) {
     if (input.playerReferrerIsVenue) {
       if (!input.spendAtReferrerVenue) {
         final cents = _takeCents(gross, rates.b2cBps, pool);
@@ -322,6 +390,7 @@ List<RewardLine> quoteReferralRewards(
               cents: cents,
               points: 0,
               payee: RewardPayee.venueCredit,
+              reviewStatus: playerReview,
             ),
           );
           pool -= cents;
@@ -341,6 +410,7 @@ List<RewardLine> quoteReferralRewards(
             cents: taken.cents,
             points: taken.points,
             payee: RewardPayee.playerPoints,
+            reviewStatus: playerReview,
           ),
         );
         pool -= taken.cents;
@@ -349,7 +419,15 @@ List<RewardLine> quoteReferralRewards(
   }
 
   final venue = input.fraudReason == null ? input.venueReferrer : null;
-  if (venue != null && attributionCovers(venue, input.paidAt)) {
+  final venueReview = _deviceReview(input.venueDeviceCluster, rates);
+  if (venue != null &&
+      attributionCovers(venue, input.paidAt) &&
+      !_payerBlocksReferral(
+        payerIsReferrer: input.venuePayerIsReferrer,
+        rewardedAccounts: input.payerRewardedAccounts,
+        subjectAlreadyRewarded: input.venueSubjectAlreadyRewarded,
+        rates: rates,
+      )) {
     if (input.venueReferrerIsPlayer) {
       if (!input.venueReferrerCpfMissing) {
         final taken = _takePoints(
@@ -365,6 +443,7 @@ List<RewardLine> quoteReferralRewards(
               cents: taken.cents,
               points: taken.points,
               payee: RewardPayee.playerPoints,
+              reviewStatus: venueReview,
             ),
           );
         }
@@ -378,6 +457,7 @@ List<RewardLine> quoteReferralRewards(
             cents: cents,
             points: 0,
             payee: RewardPayee.venueCredit,
+            reviewStatus: venueReview,
           ),
         );
       }

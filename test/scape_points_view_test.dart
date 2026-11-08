@@ -21,12 +21,20 @@ void main() {
           'points': 10,
           'amount_cents': 10,
         },
+        {
+          'kind': 'accrual',
+          'program': 'c2c',
+          'points': 4,
+          'amount_cents': 4,
+          'review_status': 'em_revisao',
+        },
       ],
     });
     expect(wallet.referralCode, 'AB12CD34');
     expect(wallet.availableCents, 10);
     expect(wallet.entries.first.title, 'Indicação de jogador');
-    expect(wallet.entries.last.title, 'Cashback');
+    expect(wallet.entries[1].title, 'Cashback');
+    expect(wallet.entries.last.title, 'Indicação em revisão');
     expect(formatPoints(1800), '1.800');
   });
 

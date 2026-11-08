@@ -1,3 +1,4 @@
+import { documentHash } from "./payer_identity.ts";
 import { payerDocumentStatus, pixPayerDocument } from "./scape_points.ts";
 
 type Status = "matched" | "mismatch" | "unverified";
@@ -39,7 +40,16 @@ export async function syncPayerDocument(
   } catch (_error) {
     payer = null;
   }
-  return await record(admin, charge.id, payerDocumentStatus(account, payer));
+  const status = payerDocumentStatus(account, payer);
+  const hash = await documentHash(payer);
+  if (hash) {
+    await admin.rpc("record_payer_identity", {
+      p_charge_id: charge.id,
+      p_document_hash: hash,
+      p_card_key: null,
+    });
+  }
+  return await record(admin, charge.id, status);
 }
 
 export function pixTransactionId(body: unknown): string | null {

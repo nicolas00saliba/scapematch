@@ -2,6 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/core/web/document_base.dart';
+import 'package:scapematch/core/device/install_id.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/auth_return_url.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
@@ -116,6 +117,7 @@ class SupabaseAuthRepository implements AuthRepository {
           if (cityId != null && cityId.isNotEmpty) 'city_id': cityId,
           if (referralCode != null && referralCode.trim().isNotEmpty)
             'referral_code': referralCode.trim(),
+          'device_install_id': ?await InstallId.readOrCreate(),
         },
       );
       if (response.session == null) {
