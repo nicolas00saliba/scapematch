@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scapematch/app/splash_gate.dart';
@@ -516,7 +515,7 @@ ScapeLogo _splashLogo(WidgetTester tester) {
 Finder _splashPin(WidgetTester tester) {
   return find.descendant(
     of: find.byKey(AppKeys.splash),
-    matching: find.byType(SvgPicture),
+    matching: find.byType(ScapePinBox),
   );
 }
 
@@ -589,13 +588,9 @@ void _expectBrandColors(WidgetTester tester) {
     ),
     findsOneWidget,
   );
-  final svg = tester.widget<SvgPicture>(_splashPin(tester));
-  expect(svg.width! / svg.height!, closeTo(200 / 260, 0.001));
-  final loader = svg.bytesLoader;
-  expect(loader, isA<ScapePinLoader>());
-  final asset = loader as ScapePinLoader;
-  expect(asset.assetName, ScapeLogo.markAsset);
-  expect(asset.packageName, isNull);
+  final pin = tester.widget<ScapePinBox>(_splashPin(tester));
+  expect(pin.width / pin.height, closeTo(200 / 260, 0.001));
+  expect(pin.assetName, ScapeLogo.markAsset);
   final text = tester.widget<Text>(_splashWordmark(tester));
   final spans = (text.textSpan! as TextSpan).children!.cast<TextSpan>();
   expect(spans.first.style!.color, ScapeLogo.pin);
