@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
     if (!cpf) return json({ error: "cpf_required" }, 422);
     const holderCpf = playerCpfDigits(card.holderCpfCnpj);
     if (!holderCpf) return json({ error: "holder_cpf_invalid" }, 400);
+    const holderMatches = holderCpf === cpf;
     let responseBody: ReturnType<typeof tokenizePublicResponse> | null = null;
     const decision = await gateTokenize(
       async () => {
@@ -100,6 +101,7 @@ Deno.serve(async (req) => {
           token: tokenized.creditCardToken,
           last4,
           brand,
+          holderMatches,
         });
         responseBody = tokenizePublicResponse({
           id: savedCardId,

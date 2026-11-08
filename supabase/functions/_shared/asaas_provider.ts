@@ -733,6 +733,11 @@ export class AsaasProvider implements PaymentProvider {
     return this.#send(`/payments/${paymentId}`, undefined, "GET");
   }
 
+  /// O webhook da cobrança não traz o CPF. O id vem em pixTransaction.
+  getPixTransaction(id: string): Promise<Record<string, unknown>> {
+    return this.#send(`/pix/transactions/${id}`, undefined, "GET");
+  }
+
   getPayment(paymentId: string): Promise<PaymentView> {
     return this.#send(`/payments/${paymentId}`, undefined, "GET").then(
       (body) => ({

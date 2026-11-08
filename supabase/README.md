@@ -65,7 +65,7 @@ tool/apply_auth_email_templates.sh
 - `close_group_with_fewer` só fecha se N ≥ mínimo da sala e N < tamanho planejado.
 - O Pix é cobrado na hora (`billingType PIX`) e estornado se o grupo não fechar. O cartão nasce com `authorizeOnly` e só é capturado quando o grupo fecha; se não fechar, a reserva é estornada.
 - O split manda `(100% − comissão)` para `venues.asaas_wallet_id`. A comissão é `platform_settings.commission_bps` (padrão 1000, 10%) e fica na conta Asaas que cria a cobrança.
-- Scape Points (`20261108140000_scape_points.sql`) lançam a indicação quando a cobrança fica paga. A casa não perde líquido. Com pontos na cobrança, o valor do jogador cai e o percentual do split sobe para caber o líquido cheio. O cron de reconcile libera o que completou 30 dias. O app não escreve no ledger.
+- Scape Points (`20261108140000_scape_points.sql` e `20261108150000_payer_cpf_gate.sql`) lançam a indicação quando a cobrança fica paga e o CPF de quem pagou é o da conta. Sem documento inteiro do Pix, a recompensa espera. CPF diferente não lança e grava o motivo. A casa não perde líquido. Com pontos na cobrança, o valor do jogador cai e o percentual do split sobe para caber o líquido cheio. O cron de reconcile libera o que completou 30 dias. O app não escreve no ledger.
 
 ## Asaas (sandbox na demo)
 

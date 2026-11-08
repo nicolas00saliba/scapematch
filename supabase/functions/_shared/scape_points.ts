@@ -9,7 +9,6 @@ export const officialC2bBps = 250;
 export const officialB2bBps = 500;
 export const officialAttributionDays = 365;
 export const officialHoldDays = 30;
-export const officialMonthlyReferralCap = 20;
 export const officialFirstBookingDiscountBps = 2000;
 
 export type RewardPayee = "player_points" | "venue_credit";
@@ -61,13 +60,6 @@ export function attributionCovers(
   if (slice.blocked) return false;
   const paid = Date.parse(paidAt);
   return paid >= Date.parse(slice.startsAt) && paid < Date.parse(slice.endsAt);
-}
-
-export function monthlyReferralCapReached(
-  referralsThisMonth: number,
-  cap: number,
-): boolean {
-  return referralsThisMonth >= cap;
 }
 
 export function referralFraudReason(input: {
@@ -282,4 +274,48 @@ function digits(value: string | null | undefined): string | null {
   if (!value) return null;
   const only = value.replace(/\D/g, "");
   return only.length > 0 ? only : null;
+}
+
+/// 11 ou 14 dígitos. Asterisco é a máscara do Asaas e não compara.
+export function fullPayerDocument(value: string | null | undefined): string | null {
+  if (!value || value.includes("*")) return null;
+  const only = digits(value);
+  if (!only || (only.length !== 11 && only.length !== 14)) return null;
+  return only;
+}
+
+export type PayerDocumentStatus = "matched" | "mismatch" | "unverified";
+
+export function payerDocumentStatus(
+  accountCpf: string | null | undefined,
+  payerDocument: string | null | undefined,
+): PayerDocumentStatus {
+  const account = fullPayerDocument(accountCpf);
+  const payer = fullPayerDocument(payerDocument);
+  if (!account || !payer) return "unverified";
+  return account === payer ? "matched" : "mismatch";
+}
+
+export function referralBenefitAllowed(
+  status: string | null | undefined,
+): boolean {
+  return status === "matched";
+}
+
+/// O webhook da cobrança não traz o pagador. A consulta da transação Pix
+/// traz payer.cpfCnpj e, em outro formato, externalAccount.cpfCnpj.
+/// Dois números inteiros diferentes não escolhem um lado.
+export function pixPayerDocument(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const record = body as Record<string, unknown>;
+  const payer = nestedDocument(record.payer);
+  const external = nestedDocument(record.externalAccount);
+  if (payer && external && payer !== external) return null;
+  return payer ?? external;
+}
+
+function nestedDocument(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = (value as { cpfCnpj?: unknown }).cpfCnpj;
+  return typeof raw === "string" ? fullPayerDocument(raw) : null;
 }

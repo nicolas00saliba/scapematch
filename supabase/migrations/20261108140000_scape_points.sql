@@ -14,7 +14,6 @@ create table public.referral_program_settings (
   point_value_cents integer not null default 1 check (point_value_cents > 0),
   attribution_days integer not null default 365 check (attribution_days > 0),
   hold_days integer not null default 30 check (hold_days >= 0),
-  monthly_referral_cap integer not null default 20 check (monthly_referral_cap >= 0),
   first_booking_discount_bps integer not null default 2000 check (
     first_booking_discount_bps between 0 and 10000
   ),
@@ -46,6 +45,16 @@ alter table public.payment_charges
 alter table public.payment_charges
   add constraint payment_charges_subsidy_nonnegative
   check (subsidy_cents >= 0 and points_redeemed >= 0);
+
+alter table public.payment_charges
+  add column payer_document_status text;
+
+alter table public.payment_charges
+  add constraint payment_charges_payer_document_status
+  check (
+    payer_document_status is null
+    or payer_document_status in ('matched', 'mismatch', 'unverified')
+  );
 
 alter table public.payment_charges
   add constraint payment_charges_subsidy_matches
@@ -291,19 +300,6 @@ begin
 end;
 $$;
 
-create or replace function private.referral_month_start()
-returns timestamptz
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select (date_trunc(
-    'month',
-    pg_catalog.now() at time zone 'America/Sao_Paulo'
-  ) at time zone 'America/Sao_Paulo');
-$$;
-
 create or replace function private.identity_conflict(
   p_user_a uuid,
   p_user_b uuid,
@@ -406,10 +402,7 @@ declare
   v_owner_venue uuid;
   v_started timestamptz;
   v_days integer;
-  v_cap integer;
-  v_count integer;
   v_reason text;
-  v_month timestamptz;
 begin
   if p_subject_kind = 'player' then
     if exists (
@@ -462,21 +455,9 @@ begin
     return 'self';
   end if;
 
-  select monthly_referral_cap, attribution_days
-    into v_cap, v_days
+  select attribution_days into v_days
   from public.referral_program_settings
   where id = 1;
-  v_month := private.referral_month_start();
-  select count(*) into v_count
-  from public.referral_attributions
-  where created_at >= v_month
-    and (
-      (v_owner_user is not null and referrer_user_id = v_owner_user)
-      or (v_owner_venue is not null and referrer_venue_id = v_owner_venue)
-    );
-  if v_count >= v_cap then
-    return 'cap';
-  end if;
 
   if p_subject_kind = 'player' and v_owner_kind = 'player' then
     v_reason := private.identity_conflict(p_subject_user, v_owner_user, null, null);
@@ -947,6 +928,55 @@ as $$
   select coalesce((select n from ranked where user_id = p_user_id), 0)::integer;
 $$;
 
+create table public.referral_withholdings (
+  id uuid primary key default gen_random_uuid(),
+  payment_charge_id uuid not null references public.payment_charges (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  reason text not null check (reason in ('payer_cpf_mismatch')),
+  created_at timestamptz not null default pg_catalog.now(),
+  unique (payment_charge_id, reason)
+);
+
+create index referral_withholdings_by_user
+  on public.referral_withholdings (user_id, created_at desc);
+
+alter table public.referral_withholdings enable row level security;
+
+revoke all on table public.referral_withholdings
+  from public, anon, authenticated, service_role;
+
+grant select on table public.referral_withholdings to authenticated;
+
+create policy referral_withholdings_select on public.referral_withholdings
+  for select to authenticated
+  using (user_id = auth.uid() or private.is_admin());
+
+create or replace function private.note_payer_withholding(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_charge public.payment_charges%rowtype;
+begin
+  select * into v_charge
+  from public.payment_charges
+  where id = p_charge_id;
+  if v_charge.id is null
+    or v_charge.payer_document_status is distinct from 'mismatch'
+  then
+    return;
+  end if;
+  insert into public.referral_withholdings (
+    payment_charge_id, user_id, reason
+  ) values (
+    v_charge.id, v_charge.user_id, 'payer_cpf_mismatch'
+  )
+  on conflict (payment_charge_id, reason) do nothing;
+end;
+$$;
+
 create or replace function private.post_referral_rewards(p_charge_id uuid)
 returns void
 language plpgsql
@@ -971,6 +1001,12 @@ declare
 begin
   select * into v_charge from public.payment_charges where id = p_charge_id;
   if v_charge.id is null or v_charge.status <> 'paid' then
+    return;
+  end if;
+  -- Só lança recompensa se o CPF de quem pagou for o da conta.
+  -- Não verificado espera. Divergente grava o motivo e não lança.
+  perform private.note_payer_withholding(v_charge.id);
+  if v_charge.payer_document_status is distinct from 'matched' then
     return;
   end if;
   select * into v_settings from public.referral_program_settings where id = 1;
@@ -1881,7 +1917,6 @@ $$;
 revoke all on function private.reward_cents(integer, integer) from public, anon, authenticated;
 revoke all on function private.ensure_player_code(uuid) from public, anon, authenticated;
 revoke all on function private.ensure_venue_code(uuid) from public, anon, authenticated;
-revoke all on function private.referral_month_start() from public, anon, authenticated;
 revoke all on function private.identity_conflict(uuid, uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function private.attach_referral(text, uuid, uuid, text, boolean) from public, anon, authenticated;
 revoke all on function private.profile_referral_code() from public, anon, authenticated;
@@ -1892,6 +1927,7 @@ revoke all on function private.hold_point_redemption(uuid, text, integer, intege
 revoke all on function private.release_point_hold(text) from public, anon, authenticated;
 revoke all on function private.attach_point_hold(text, uuid) from public, anon, authenticated;
 revoke all on function private.payer_customer_rank(uuid, uuid) from public, anon, authenticated;
+revoke all on function private.note_payer_withholding(uuid) from public, anon, authenticated;
 revoke all on function private.post_referral_rewards(uuid) from public, anon, authenticated;
 revoke all on function private.reverse_referral_rewards(uuid) from public, anon, authenticated;
 revoke all on function private.release_due_scape_points(timestamptz) from public, anon, authenticated;

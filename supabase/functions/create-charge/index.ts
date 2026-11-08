@@ -28,6 +28,7 @@ import {
 } from "../_shared/pix_charge.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
+import { syncPayerDocument } from "../_shared/payer_document.ts";
 import { splitMatchesSubsidy } from "../_shared/scape_points.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import {
@@ -321,6 +322,14 @@ export async function createCharge(
           }
           const confirmed = confirmedChargeStatus(String(remote.status ?? ""));
           if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
+          if (confirmed === "paid") {
+            await syncPayerDocument(admin, asaas, {
+              id: reserved.id,
+              user_id: user.id,
+              billing_type: "PIX",
+              provider_ref: stored,
+            }, remote);
+          }
           const transition = await applyPaymentTransition(
             admin,
             reserved.id,
@@ -365,6 +374,14 @@ export async function createCharge(
         } else {
           const confirmed = confirmedChargeStatus(String(full.status ?? ""));
           if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
+          if (confirmed === "paid") {
+            await syncPayerDocument(admin, asaas, {
+              id: reserved.id,
+              user_id: user.id,
+              billing_type: "PIX",
+              provider_ref: reserved.provider_ref,
+            }, full);
+          }
           const transition = await applyPaymentTransition(
             admin,
             reserved.id,
@@ -412,6 +429,14 @@ export async function createCharge(
                 throw new PixReservationLost(payment.id);
               }
               const next = localChargeStatus(payment.status);
+              if (mayCredit && next === "paid") {
+                await syncPayerDocument(admin, asaas, {
+                  id: reserved.id,
+                  user_id: user.id,
+                  billing_type: "PIX",
+                  provider_ref: payment.id,
+                });
+              }
               await applyPaymentTransition(
                 admin,
                 reserved.id,
@@ -429,6 +454,14 @@ export async function createCharge(
               }),
           });
           const next = localChargeStatus(pix.status);
+          if (mayCredit && next === "paid") {
+            await syncPayerDocument(admin, asaas, {
+              id: reserved.id,
+              user_id: user.id,
+              billing_type: "PIX",
+              provider_ref: pix.id,
+            });
+          }
           const transition = await applyPaymentTransition(
             admin,
             reserved.id,
@@ -576,6 +609,7 @@ export async function createCharge(
         }
         holdOpen = false;
         cardChargeId = reservedCard.id;
+        await noteCardPayer(admin, user.id, savedCardId, cardChargeId);
         if (reservedCard.inserted && reservedCard.attempt_id) {
           attemptId = reservedCard.attempt_id;
         } else if (
@@ -618,6 +652,7 @@ export async function createCharge(
             splitPercent,
           });
           holdOpen = false;
+          await noteCardPayer(admin, user.id, savedCardId, again.id);
           if (!again.inserted || !again.attempt_id) {
             await loseCard(again.id || reservedCard.id, again.attempt_id);
             return json({ error: "pagamento em andamento" }, 409);
@@ -1120,4 +1155,21 @@ async function releasePointHold(
     p_idempotency_key: idempotencyKey,
   });
   if (error) throw new Error("erro");
+}
+
+async function noteCardPayer(
+  admin: ChargeDb,
+  userId: string,
+  cardId: string,
+  chargeId: string,
+): Promise<void> {
+  const { data } = await admin.rpc("saved_card_holder_status", {
+    p_user_id: userId,
+    p_card_id: cardId,
+  });
+  const status = data === "matched" || data === "mismatch" ? data : "unverified";
+  await admin.rpc("record_payer_document_status", {
+    p_charge_id: chargeId,
+    p_status: status,
+  });
 }

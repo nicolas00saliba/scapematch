@@ -2,9 +2,10 @@ import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   accrualIdempotencyKey,
   attributionCovers,
-  monthlyReferralCapReached,
   officialHoldDays,
   officialPointValueCents,
+  payerDocumentStatus,
+  pixPayerDocument,
   postRewardsOnce,
   quotePointSubsidy,
   quoteReferralRewards,
@@ -141,8 +142,34 @@ Deno.test("estorno e bloqueio: fraude zera e a chave não duplica", () => {
   assertEquals(postRewardsOnce(keys, "ch-1", lines).length, 1);
   assertEquals(postRewardsOnce(keys, "ch-1", lines).length, 0);
   assertEquals(accrualIdempotencyKey("ch-1", "c2c"), "accrual:ch-1:c2c");
-  assertEquals(monthlyReferralCapReached(20, 20), true);
   assertEquals(officialHoldDays, 30);
+});
+
+Deno.test("CPF do pagador: igual libera, diferente barra, máscara espera", () => {
+  assertEquals(payerDocumentStatus("529.982.247-25", "52998224725"), "matched");
+  assertEquals(payerDocumentStatus("52998224725", "39053344705"), "mismatch");
+  assertEquals(
+    payerDocumentStatus("52998224725", "***.456.789-**"),
+    "unverified",
+  );
+  assertEquals(payerDocumentStatus("52998224725", null), "unverified");
+  assertEquals(
+    pixPayerDocument({ payer: { cpfCnpj: "529.982.247-25" } }),
+    "52998224725",
+  );
+  assertEquals(
+    pixPayerDocument({
+      externalAccount: { cpfCnpj: "***.982.247-**" },
+    }),
+    null,
+  );
+  assertEquals(
+    pixPayerDocument({
+      payer: { cpfCnpj: "52998224725" },
+      externalAccount: { cpfCnpj: "39053344705" },
+    }),
+    null,
+  );
 });
 
 Deno.test("abatimento muda o percentual e preserva o líquido da casa", () => {

@@ -17,6 +17,7 @@ import {
   requestedChargeStatus,
 } from "../_shared/charge_patch.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
+import { syncPayerDocument } from "../_shared/payer_document.ts";
 
 Deno.serve(async (req) => {
   // Servidor a servidor: a resposta segue mesmo sem o header de navegador.
@@ -68,6 +69,14 @@ Deno.serve(async (req) => {
 
     const credit = next === "paid" &&
       await groupIsClosed(admin, charge.group_id);
+    if (next === "paid") {
+      await syncPayerDocument(admin, safeAsaas(), {
+        id: charge.id,
+        user_id: charge.user_id,
+        billing_type: charge.billing_type,
+        provider_ref: charge.provider_ref,
+      });
+    }
     const result = await applyPaymentTransition(admin, charge.id, next, credit);
     const status = result.status;
 

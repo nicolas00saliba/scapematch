@@ -222,8 +222,7 @@ void main() {
     expect(quote.maxPoints, 2500);
   });
 
-  test('teto mensal, carência de 30 dias e desconto ainda não aplicado', () {
-    expect(monthlyReferralCapReached(referralsThisMonth: 20, cap: 20), isTrue);
+  test('carência de 30 dias e desconto só com o CPF de quem pagou', () {
     expect(
       pointsAvailableAt(DateTime.utc(2026, 6, 1), 30),
       DateTime.utc(2026, 7, 1),
@@ -235,6 +234,61 @@ void main() {
         commissionCentsValue: 1500,
       ),
       1500,
+    );
+    expect(
+      payerDocumentStatus(
+        accountCpf: '529.982.247-25',
+        payerDocument: '52998224725',
+      ),
+      'matched',
+    );
+    expect(
+      payerDocumentStatus(
+        accountCpf: '52998224725',
+        payerDocument: '39053344705',
+      ),
+      'mismatch',
+    );
+    expect(
+      payerDocumentStatus(
+        accountCpf: '52998224725',
+        payerDocument: '***.456.789-**',
+      ),
+      'unverified',
+    );
+    expect(
+      payerDocumentStatus(accountCpf: '52998224725', payerDocument: null),
+      'unverified',
+    );
+    expect(referralBenefitAllowed('matched'), isTrue);
+    expect(referralBenefitAllowed('mismatch'), isFalse);
+    expect(referralBenefitAllowed('unverified'), isFalse);
+    expect(
+      gatedFirstBookingDiscountCents(
+        payerStatus: 'mismatch',
+        grossCents: 10000,
+        discountBps: 2000,
+        commissionCentsValue: 2500,
+      ),
+      0,
+    );
+    expect(
+      gatedFirstBookingDiscountCents(
+        payerStatus: 'unverified',
+        grossCents: 10000,
+        discountBps: 2000,
+        commissionCentsValue: 2500,
+      ),
+      0,
+    );
+    expect(
+      gatedFirstBookingDiscountCents(
+        payerStatus: 'matched',
+        grossCents: 10000,
+        discountBps: 2000,
+        commissionCentsValue: 2500,
+      ),
+      2000,
     );
   });
 

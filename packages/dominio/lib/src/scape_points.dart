@@ -16,7 +16,6 @@ class ReferralRates {
     this.pointValueCents = 1,
     this.attributionDays = 365,
     this.holdDays = 30,
-    this.monthlyReferralCap = 20,
     this.firstBookingDiscountBps = 2000,
     this.b2bSkipCustomers = 1,
   });
@@ -41,9 +40,6 @@ class ReferralRates {
 
   /// Dias em que o crédito fica pendente antes de poder pagar sala.
   final int holdDays;
-
-  /// Indicados novos por indicador no mês. 0 desliga indicação nova.
-  final int monthlyReferralCap;
 
   /// Desconto da primeira reserva com código, em basis points.
   /// Não é aplicado neste fluxo. O teto continua sendo a comissão.
@@ -182,14 +178,34 @@ DateTime pointsAvailableAt(DateTime paidAt, int holdDays) {
   return paidAt.add(Duration(days: holdDays));
 }
 
-bool monthlyReferralCapReached({
-  required int referralsThisMonth,
-  required int cap,
+/// `matched` quando o documento de quem pagou é o CPF da conta.
+/// Máscara, ausência ou tamanho diferente de 11/14 fica `unverified`.
+String payerDocumentStatus({
+  required String? accountCpf,
+  required String? payerDocument,
 }) {
-  if (cap < 0) {
-    throw ArgumentError('O teto mensal não pode ser negativo.');
-  }
-  return referralsThisMonth >= cap;
+  final account = _fullDocument(accountCpf);
+  final payer = _fullDocument(payerDocument);
+  if (account == null || payer == null) return 'unverified';
+  return account == payer ? 'matched' : 'mismatch';
+}
+
+/// Recompensa e desconto de indicação só com CPF conferido.
+bool referralBenefitAllowed(String? payerStatus) => payerStatus == 'matched';
+
+/// O desconto da primeira reserva usa a mesma trava do CPF do pagador.
+int gatedFirstBookingDiscountCents({
+  required String? payerStatus,
+  required int grossCents,
+  required int discountBps,
+  required int commissionCentsValue,
+}) {
+  if (!referralBenefitAllowed(payerStatus)) return 0;
+  return firstBookingDiscountCents(
+    grossCents: grossCents,
+    discountBps: discountBps,
+    commissionCentsValue: commissionCentsValue,
+  );
 }
 
 int pointsFromCents(int cents, int pointValueCents) {
@@ -464,4 +480,13 @@ String? _digits(String? value) {
   final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
   if (digits.isEmpty) return null;
   return digits;
+}
+
+/// Documento inteiro. Asterisco é máscara do Asaas e não serve para comparar.
+String? _fullDocument(String? value) {
+  if (value == null || value.contains('*')) return null;
+  final digits = _digits(value);
+  if (digits == null) return null;
+  if (digits.length == 11 || digits.length == 14) return digits;
+  return null;
 }

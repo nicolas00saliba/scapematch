@@ -74,7 +74,6 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
       final message = switch (result) {
         'ok' => 'Código aplicado.',
         'blocked' => 'Este código não pode ser usado nesta conta.',
-        'cap' => 'Este código atingiu o limite do mês.',
         'late' => 'O código só entra no cadastro.',
         'exists' => 'Esta conta já tem um código.',
         'self' => 'Use o código de outra pessoa.',
