@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -15,10 +16,11 @@ import 'package:scapematch/core/ui/window_class.dart';
 /// continua com a chave dela.
 ///
 /// Primeiro entra o logo completo (pin oficial e letreiro), parado o
-/// bastante para ler. Os dois só aparecem juntos: o pin é um arquivo
-/// (SVG do jogador, PNG do Parceiro) e o widget de imagem deixa um
-/// quadro vazio até o futuro voltar. A cortina sobe na hora; o relógio
-/// da entrada só anda quando o pin já pode ser pintado. O letreiro entra
+/// bastante para ler. Os dois só aparecem juntos. O PNG do Parceiro já
+/// é um bitmap. O SVG do jogador vira bitmap antes do lockup: no web,
+/// desenhar o picture no mesmo quadro do texto deixa o pin para o
+/// quadro seguinte. A cortina sobe na hora; o relógio da entrada só
+/// anda quando o pin já pode ser pintado. O letreiro entra
 /// no pin como um trem. O Parceiro
 /// pode pôr um selo embaixo: ele fica parado e se dissolve da esquerda
 /// para a direita enquanto o letreiro entra. Só então o pin avança, gira
@@ -90,6 +92,9 @@ class SplashGate extends StatefulWidget {
 
   /// `prefers-reduced-motion`: o logo completo já está pronto e a cortina some.
   static const reducedDuration = Duration(milliseconds: 180);
+
+  /// Se o pin não decodificar, a cortina não fica presa nessa espera.
+  static const pinLoadTimeout = Duration(milliseconds: 1200);
 
   static const enterEnd = 0.12;
   static const holdEnd = 0.36;
@@ -270,6 +275,8 @@ class _SplashGateState extends State<SplashGate>
   var _reduced = false;
   var _loadingPin = false;
   var _motionStarted = false;
+  var _pinSettled = false;
+  Timer? _pinTimer;
   ScapePinArt? _pinArt;
 
   @override
@@ -333,6 +340,9 @@ class _SplashGateState extends State<SplashGate>
     _loadingPin = true;
     final markImage = widget.markImage;
     final onDark = widget.onDark;
+    _pinTimer = Timer(SplashGate.pinLoadTimeout, () {
+      _mountPin(_missingPin(markImage, onDark));
+    });
     ScapePinArt.load(context, markImage: markImage, onDark: onDark).then(
       (art) {
         _mountPin(art);
@@ -346,24 +356,28 @@ class _SplashGateState extends State<SplashGate>
             context: ErrorDescription('enquanto o pin da abertura carregava'),
           ),
         );
-        _mountPin(
-          ScapePinArt.missing(
-            assetName: markImage is AssetImage
-                ? markImage.assetName
-                : onDark
-                ? ScapeLogo.markOnDarkAsset
-                : ScapeLogo.markAsset,
-          ),
-        );
+        _mountPin(_missingPin(markImage, onDark));
       },
     );
   }
 
+  ScapePinArt _missingPin(ImageProvider? markImage, bool onDark) {
+    return ScapePinArt.missing(
+      assetName: markImage is AssetImage
+          ? markImage.assetName
+          : onDark
+          ? ScapeLogo.markOnDarkAsset
+          : ScapeLogo.markAsset,
+    );
+  }
+
   void _mountPin(ScapePinArt art) {
-    if (!mounted || !_show) {
+    if (!mounted || !_show || _pinSettled) {
       art.dispose();
       return;
     }
+    _pinSettled = true;
+    _pinTimer?.cancel();
     setState(() => _pinArt = art);
     _startMotion();
   }
@@ -378,6 +392,7 @@ class _SplashGateState extends State<SplashGate>
 
   @override
   void dispose() {
+    _pinTimer?.cancel();
     _pinArt?.dispose();
     _controller.removeStatusListener(_onStatus);
     _controller.dispose();
