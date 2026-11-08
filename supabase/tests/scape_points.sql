@@ -156,8 +156,15 @@ begin
   from public.scape_point_entries
   where source_charge_id = 'bb711111-1111-1111-1111-111111111111'
     and kind = 'accrual';
-  if v_count <> 1 then
-    raise exception 'lancamento duplicou: %', v_count;
+  if v_count <> 2 then
+    raise exception 'lancamento duplicou ou faltou o cashback: %', v_count;
+  end if;
+  if (
+    select points from public.scape_point_entries
+    where source_charge_id = 'bb711111-1111-1111-1111-111111111111'
+      and program = 'cashback' and kind = 'accrual'
+  ) is distinct from 100 then
+    raise exception 'cashback de 1%% nao entrou';
   end if;
 
   select pending_points, available_points
@@ -232,6 +239,14 @@ begin
   ) <> 1 then
     raise exception 'estorno duplicou ou faltou';
   end if;
+  if (
+    select count(*) from public.scape_point_entries
+    where kind = 'reversal'
+      and program = 'cashback'
+      and user_id = 'bb222222-2222-2222-2222-222222222222'
+  ) <> 1 then
+    raise exception 'o cashback nao foi estornado';
+  end if;
 end $$;
 
 insert into auth.users (id, email, raw_user_meta_data)
@@ -293,8 +308,16 @@ begin
     select 1 from public.scape_point_entries
     where source_charge_id = 'bb811111-1111-1111-1111-111111111111'
       and kind = 'accrual'
+      and program is distinct from 'cashback'
   ) then
     raise exception 'pagou fora da janela de um ano';
+  end if;
+  if (
+    select points from public.scape_point_entries
+    where source_charge_id = 'bb811111-1111-1111-1111-111111111111'
+      and program = 'cashback' and kind = 'accrual'
+  ) is distinct from 100 then
+    raise exception 'cashback nao entrou fora da indicacao';
   end if;
 end $$;
 
@@ -412,8 +435,16 @@ begin
     select 1 from public.scape_point_entries
     where source_charge_id = 'bb911111-1111-1111-1111-111111111111'
       and kind = 'accrual'
+      and program is distinct from 'cashback'
   ) then
-    raise exception 'nao verificado liberou recompensa';
+    raise exception 'nao verificado liberou indicacao';
+  end if;
+  if (
+    select points from public.scape_point_entries
+    where source_charge_id = 'bb911111-1111-1111-1111-111111111111'
+      and program = 'cashback' and kind = 'accrual'
+  ) is distinct from 100 then
+    raise exception 'cashback nao entrou sem indicacao conferida';
   end if;
   if exists (
     select 1 from public.referral_withholdings
@@ -440,6 +471,7 @@ begin
     select points from public.scape_point_entries
     where source_charge_id = 'bb911111-1111-1111-1111-111111111111'
       and kind = 'accrual'
+      and program = 'c2c'
   ) is distinct from 250 then
     raise exception 'depois de conferir o CPF a recompensa nao entrou';
   end if;
@@ -512,8 +544,16 @@ begin
     select 1 from public.scape_point_entries
     where source_charge_id = 'bba11111-1111-1111-1111-111111111111'
       and kind = 'accrual'
+      and program is distinct from 'cashback'
   ) then
-    raise exception 'CPF diferente liberou recompensa';
+    raise exception 'CPF diferente liberou indicacao';
+  end if;
+  if (
+    select points from public.scape_point_entries
+    where source_charge_id = 'bba11111-1111-1111-1111-111111111111'
+      and program = 'cashback' and kind = 'accrual'
+  ) is distinct from 80 then
+    raise exception 'cashback de 1%% sobre 8000 nao entrou';
   end if;
   if not exists (
     select 1 from public.referral_withholdings

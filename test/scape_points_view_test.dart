@@ -15,15 +15,24 @@ void main() {
       'can_claim': false,
       'entries': [
         {'kind': 'accrual', 'program': 'c2c', 'points': 4, 'amount_cents': 4},
+        {
+          'kind': 'accrual',
+          'program': 'cashback',
+          'points': 10,
+          'amount_cents': 10,
+        },
       ],
     });
     expect(wallet.referralCode, 'AB12CD34');
     expect(wallet.availableCents, 10);
-    expect(wallet.entries.single.title, 'Indicação de jogador');
+    expect(wallet.entries.first.title, 'Indicação de jogador');
+    expect(wallet.entries.last.title, 'Cashback');
     expect(formatPoints(1800), '1.800');
   });
 
   testWidgets('a tela mostra disponível, pendente e o código', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(body: ScapePointsBody(preview: ScapeWallet.sample)),
@@ -33,6 +42,7 @@ void main() {
     expect(find.textContaining('disponíveis'), findsOneWidget);
     expect(find.textContaining('250 pendentes'), findsOneWidget);
     expect(find.textContaining('SCAPEDEMO'), findsOneWidget);
+    expect(find.text('Cashback'), findsOneWidget);
     expect(find.text('Indicação de jogador'), findsOneWidget);
     expect(
       find.text('Números de exemplo. Nada aqui é uma carteira real.'),

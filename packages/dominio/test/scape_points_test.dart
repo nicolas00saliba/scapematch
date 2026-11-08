@@ -45,18 +45,20 @@ void main() {
   test('1 ponto vale 1 centavo e o C2C fica em 2,5%', () {
     expect(ReferralRates.official.pointValueCents, 1);
     expect(ReferralRates.official.c2cBps, 250);
+    expect(ReferralRates.official.cashbackBps, 100);
     final lines = quoteReferralRewards(spend(playerReferrer: window));
-    expect(lines, hasLength(1));
-    expect(lines.single.program, 'c2c');
-    expect(lines.single.points, 250);
-    expect(lines.single.cents, 250);
-    expect(lines.single.payee, RewardPayee.playerPoints);
+    expect(lines.map((line) => line.program), ['cashback', 'c2c']);
+    expect(lines.first.points, 100);
+    expect(lines.last.points, 250);
+    expect(lines.last.cents, 250);
+    expect(lines.last.payee, RewardPayee.playerPoints);
   });
 
   test('a recompensa não passa da comissão que sobrou', () {
     final lines = quoteReferralRewards(
       spend(playerReferrer: window, commissionBps: 100, subsidyCents: 40),
     );
+    expect(lines.single.program, 'cashback');
     expect(lines.single.points, 60);
     expect(lines.single.cents, 60);
   });
@@ -70,9 +72,9 @@ void main() {
         commissionBps: 300,
       ),
     );
-    expect(lines.map((line) => line.program), ['c2c', 'c2b']);
-    expect(lines[0].points, 250);
-    expect(lines[1].points, 50);
+    expect(lines.map((line) => line.program), ['cashback', 'c2c']);
+    expect(lines[0].points, 100);
+    expect(lines[1].points, 200);
     expect(lines[0].cents + lines[1].cents, 300);
   });
 
@@ -81,7 +83,9 @@ void main() {
       startsAt: DateTime.utc(2025, 1, 1),
       endsAt: attributionEndsAt(DateTime.utc(2025, 1, 1), 365),
     );
-    expect(quoteReferralRewards(spend(playerReferrer: expired)), isEmpty);
+    final expiredLines = quoteReferralRewards(spend(playerReferrer: expired));
+    expect(expiredLines.map((line) => line.program), ['cashback']);
+    expect(expiredLines.single.points, 100);
     expect(attributionCovers(window, window.endsAt), isFalse);
   });
 
@@ -93,54 +97,59 @@ void main() {
           playerReferrerIsVenue: true,
           spendAtReferrerVenue: true,
         ),
-      ),
-      isEmpty,
+      ).map((line) => line.program),
+      ['cashback'],
     );
     final lines = quoteReferralRewards(
       spend(playerReferrer: window, playerReferrerIsVenue: true),
     );
-    expect(lines.single.program, 'b2c');
-    expect(lines.single.payee, RewardPayee.venueCredit);
-    expect(lines.single.points, 0);
-    expect(lines.single.cents, 250);
+    final credit = lines.singleWhere((line) => line.program == 'b2c');
+    expect(lines.first.program, 'cashback');
+    expect(credit.payee, RewardPayee.venueCredit);
+    expect(credit.points, 0);
+    expect(credit.cents, 250);
   });
 
   test('B2B é 5% em toda reserva do ano, menos a do desconto de 20%', () {
     expect(
       quoteReferralRewards(
         spend(venueReferrer: window, firstBookingDiscountCents: 2000),
-      ),
-      isEmpty,
+      ).map((line) => line.program),
+      ['cashback'],
     );
     final firstVisit = quoteReferralRewards(spend(venueReferrer: window));
     final nextVisit = quoteReferralRewards(spend(venueReferrer: window));
-    expect(firstVisit.single.program, 'b2b');
-    expect(firstVisit.single.cents, 500);
-    expect(nextVisit.single.cents, 500);
-    expect(firstVisit.single.payee, RewardPayee.venueCredit);
+    final firstCredit = firstVisit.singleWhere((line) => line.program == 'b2b');
+    final nextCredit = nextVisit.singleWhere((line) => line.program == 'b2b');
+    expect(firstVisit.first.program, 'cashback');
+    expect(firstCredit.cents, 500);
+    expect(nextCredit.cents, 500);
+    expect(firstCredit.payee, RewardPayee.venueCredit);
   });
 
   test('C2B paga o jogador que indicou a casa', () {
     final lines = quoteReferralRewards(
       spend(venueReferrer: window, venueReferrerIsPlayer: true),
     );
-    expect(lines.single.program, 'c2b');
-    expect(lines.single.points, 250);
+    expect(lines.map((line) => line.program), ['cashback', 'c2b']);
+    expect(lines.last.points, 250);
   });
 
   test('CPF ausente segura o ponto e a fraude zera o lançamento', () {
     expect(
-      quoteReferralRewards(
-        spend(playerReferrer: window, payerCpfMissing: true),
-      ),
-      isEmpty,
+      quoteReferralRewards(spend(playerReferrer: window, payerCpfMissing: true))
+          .map((line) => line.program),
+      ['cashback'],
     );
     expect(
       quoteReferralRewards(
         spend(playerReferrer: window, fraudReason: 'shared_cpf'),
-      ),
-      isEmpty,
+      ).map((line) => line.program),
+      ['cashback'],
     );
+    final alone = quoteReferralRewards(spend());
+    expect(alone.single.program, 'cashback');
+    expect(alone.single.points, 100);
   });
 
   test('antifraude compara documento, telefone, cartão e dono da casa', () {
@@ -189,7 +198,7 @@ void main() {
       chargeId: 'ch-1',
       lines: lines,
     );
-    expect(first, hasLength(1));
+    expect(first, hasLength(2));
     expect(second, isEmpty);
     expect(accrualIdempotencyKey('ch-1', 'c2c'), 'accrual:ch-1:c2c');
   });

@@ -31,6 +31,12 @@ class ScapeWallet {
     entries: [
       ScapePointEntry(
         kind: 'accrual',
+        program: 'cashback',
+        points: 100,
+        amountCents: 100,
+      ),
+      ScapePointEntry(
+        kind: 'accrual',
         program: 'c2c',
         points: 250,
         amountCents: 250,
@@ -100,10 +106,12 @@ class ScapePointEntry {
       'accrual' => switch (program) {
         'c2c' => 'Indicação de jogador',
         'c2b' => 'Indicação de casa',
+        'cashback' => 'Cashback',
         _ => 'Pontos a liberar',
       },
       'release' => 'Pontos liberados',
-      'reversal' => 'Estorno da indicação',
+      'reversal' =>
+        program == 'cashback' ? 'Estorno do cashback' : 'Estorno da indicação',
       'redemption' => 'Pagamento de sala',
       'redemption_reversal' => 'Devolução de pontos',
       _ => 'Lançamento',
@@ -112,7 +120,10 @@ class ScapePointEntry {
 
   String get detail {
     return switch (kind) {
-      'accrual' => 'Ficam pendentes por 30 dias.',
+      'accrual' =>
+        program == 'cashback'
+            ? 'Do que você pagou nesta reserva. Fica pendente por 30 dias.'
+            : 'Ficam pendentes por 30 dias.',
       'release' => 'Disponíveis para pagar sala.',
       'reversal' => 'O pagamento da reserva foi estornado.',
       'redemption' => 'Abatidos da sua parte. A casa recebe o valor cheio.',

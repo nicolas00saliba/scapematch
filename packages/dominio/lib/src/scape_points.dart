@@ -16,6 +16,7 @@ class ReferralRates {
     this.pointValueCents = 1,
     this.attributionDays = 365,
     this.holdDays = 30,
+    this.cashbackBps = 100,
     this.firstBookingDiscountBps = 2000,
   });
 
@@ -28,7 +29,7 @@ class ReferralRates {
   /// Jogador que indicou a casa, sobre o faturamento dela na plataforma.
   final int c2bBps;
 
-  /// Casa que indicou outra casa, a partir do cliente seguinte ao primeiro.
+  /// Casa que indicou outra casa. Não incide na reserva com desconto de primeira visita.
   final int b2bBps;
 
   /// Centavos de um ponto. 1 = R\$ 0,01.
@@ -39,6 +40,10 @@ class ReferralRates {
 
   /// Dias em que o crédito fica pendente antes de poder pagar sala.
   final int holdDays;
+
+  /// Cashback do jogador que pagou, sobre a parte que ele pagou.
+  /// 100 = 1%. Sai da comissão que sobrou.
+  final int cashbackBps;
 
   /// Desconto da primeira reserva com código, em basis points.
   /// Não é aplicado sozinho. Quando a cobrança traz esse desconto,
@@ -59,7 +64,7 @@ class RewardLine {
     required this.payee,
   });
 
-  /// `c2c`, `b2c`, `c2b` ou `b2b`.
+  /// `cashback`, `c2c`, `b2c`, `c2b` ou `b2b`.
   final String program;
   final int cents;
   final int points;
@@ -269,23 +274,41 @@ String? referralFraudReason({
   return null;
 }
 
-/// Recompensas de um nível, na ordem: indicação do jogador, depois da casa.
-/// A soma não passa da comissão que sobrou depois dos pontos e do desconto
-/// de primeira reserva. O B2B não entra na reserva que levou esse desconto.
-/// O líquido da casa não entra nessa conta.
+/// Recompensas de um nível. O cashback do pagador sai primeiro, da comissão
+/// que sobrou depois dos pontos e do desconto de primeira reserva. Depois
+/// vem a indicação do jogador e a da casa. O B2B não entra na reserva que
+/// levou esse desconto. O líquido da casa não entra nessa conta.
 List<RewardLine> quoteReferralRewards(
   SpendRewardInput input, {
   ReferralRates rates = ReferralRates.official,
 }) {
   _requirePointValue(rates.pointValueCents);
-  if (input.fraudReason != null) return const [];
   final gross = input.grossCents;
   final commission = commissionCents(gross, input.commissionBps);
   var pool = commission - input.subsidyCents - input.firstBookingDiscountCents;
   if (pool < 0) pool = 0;
   final lines = <RewardLine>[];
 
-  final player = input.playerReferrer;
+  final paid = gross - input.subsidyCents;
+  final cash = _takePoints(
+    paid,
+    rates.cashbackBps,
+    pool,
+    rates.pointValueCents,
+  );
+  if (cash.points > 0) {
+    lines.add(
+      RewardLine(
+        program: 'cashback',
+        cents: cash.cents,
+        points: cash.points,
+        payee: RewardPayee.playerPoints,
+      ),
+    );
+    pool -= cash.cents;
+  }
+
+  final player = input.fraudReason == null ? input.playerReferrer : null;
   if (player != null &&
       attributionCovers(player, input.paidAt) &&
       !input.payerCpfMissing) {
@@ -325,7 +348,7 @@ List<RewardLine> quoteReferralRewards(
     }
   }
 
-  final venue = input.venueReferrer;
+  final venue = input.fraudReason == null ? input.venueReferrer : null;
   if (venue != null && attributionCovers(venue, input.paidAt)) {
     if (input.venueReferrerIsPlayer) {
       if (!input.venueReferrerCpfMissing) {
@@ -360,6 +383,7 @@ List<RewardLine> quoteReferralRewards(
       }
     }
   }
+
   return lines;
 }
 

@@ -14,6 +14,7 @@ create table public.referral_program_settings (
   point_value_cents integer not null default 1 check (point_value_cents > 0),
   attribution_days integer not null default 365 check (attribution_days > 0),
   hold_days integer not null default 30 check (hold_days >= 0),
+  cashback_bps integer not null default 100 check (cashback_bps between 0 and 10000),
   first_booking_discount_bps integer not null default 2000 check (
     first_booking_discount_bps between 0 and 10000
   ),
@@ -23,7 +24,7 @@ create table public.referral_program_settings (
 insert into public.referral_program_settings (id) values (1);
 
 comment on table public.referral_program_settings is
-  'Modelo 2. 1 ponto vale point_value_cents centavos (padrão R$ 0,01). O desconto da primeira reserva fica guardado e ainda não é aplicado.';
+  'Modelo 2. 1 ponto vale point_value_cents centavos (padrão R$ 0,01). cashback_bps é o percentual do pagador (padrão 1%). O desconto da primeira reserva fica guardado e ainda não é aplicado.';
 
 alter table public.profiles
   add column phone text;
@@ -165,7 +166,7 @@ create table public.scape_point_entries (
   points integer not null check (points > 0),
   amount_cents integer not null check (amount_cents > 0),
   program text check (
-    program is null or program in ('c2c', 'c2b', 'redeem')
+    program is null or program in ('c2c', 'c2b', 'cashback', 'redeem')
   ),
   source_charge_id uuid,
   payment_charge_id uuid references public.payment_charges (id) on delete set null,
@@ -983,12 +984,8 @@ begin
   if v_charge.id is null or v_charge.status <> 'paid' then
     return;
   end if;
-  -- Só lança recompensa se o CPF de quem pagou for o da conta.
-  -- Não verificado espera. Divergente grava o motivo e não lança.
+  -- A indicação só segue com o CPF de quem pagou. O cashback não espera isso.
   perform private.note_payer_withholding(v_charge.id);
-  if v_charge.payer_document_status is distinct from 'matched' then
-    return;
-  end if;
   select * into v_settings from public.referral_program_settings where id = 1;
   v_gross := coalesce(v_charge.gross_amount_cents, v_charge.amount_cents);
   v_pool := greatest(
@@ -999,6 +996,40 @@ begin
   );
   v_paid := coalesce(v_charge.paid_at, pg_catalog.now());
   v_value := v_settings.point_value_cents;
+
+  -- Cashback do pagador, com ou sem indicação. A carência é a mesma.
+  select amount_cents into v_existing
+  from public.scape_point_entries
+  where source_charge_id = v_charge.id
+    and program = 'cashback'
+    and kind = 'accrual';
+  if found then
+    v_pool := greatest(v_pool - v_existing, 0);
+  else
+    v_cents := least(
+      private.reward_cents(v_charge.amount_cents, v_settings.cashback_bps),
+      v_pool
+    );
+    v_points := v_cents / v_value;
+    v_cents := v_points * v_value;
+    if v_points > 0 then
+      insert into public.scape_point_entries (
+        user_id, kind, points, amount_cents, program,
+        source_charge_id, payment_charge_id, idempotency_key, available_at
+      ) values (
+        v_charge.user_id, 'accrual', v_points, v_cents, 'cashback',
+        v_charge.id, v_charge.id,
+        'accrual:' || v_charge.id::text || ':cashback',
+        v_paid + make_interval(days => v_settings.hold_days)
+      )
+      on conflict (idempotency_key) do nothing;
+      v_pool := v_pool - v_cents;
+    end if;
+  end if;
+
+  if v_charge.payer_document_status is distinct from 'matched' then
+    return;
+  end if;
 
   if private.identity_conflict(v_charge.user_id, null, v_charge.venue_id, null) is not null then
     return;

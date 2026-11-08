@@ -7,6 +7,7 @@ export const officialC2cBps = 250;
 export const officialB2cBps = 250;
 export const officialC2bBps = 250;
 export const officialB2bBps = 500;
+export const officialCashbackBps = 100;
 export const officialAttributionDays = 365;
 export const officialHoldDays = 30;
 export const officialFirstBookingDiscountBps = 2000;
@@ -14,7 +15,7 @@ export const officialFirstBookingDiscountBps = 2000;
 export type RewardPayee = "player_points" | "venue_credit";
 
 export type RewardLine = {
-  program: "c2c" | "b2c" | "c2b" | "b2b";
+  program: "c2c" | "b2c" | "c2b" | "b2b" | "cashback";
   cents: number;
   points: number;
   payee: RewardPayee;
@@ -45,6 +46,7 @@ export type SpendRewardInput = {
   b2cBps?: number;
   c2bBps?: number;
   b2bBps?: number;
+  cashbackBps?: number;
   pointValueCents?: number;
 };
 
@@ -87,14 +89,29 @@ export function referralFraudReason(input: {
 }
 
 export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
-  if (input.fraudReason) return [];
   const pointValue = input.pointValueCents ?? officialPointValueCents;
   const commission = commissionCents(input.grossCents, input.commissionBps);
   let pool = commission - (input.subsidyCents ?? 0) -
     (input.firstBookingDiscountCents ?? 0);
   if (pool < 0) pool = 0;
   const lines: RewardLine[] = [];
-  const player = input.playerReferrer;
+  const paid = input.grossCents - (input.subsidyCents ?? 0);
+  const cash = takePoints(
+    paid,
+    input.cashbackBps ?? officialCashbackBps,
+    pool,
+    pointValue,
+  );
+  if (cash.points > 0) {
+    lines.push({
+      program: "cashback",
+      cents: cash.cents,
+      points: cash.points,
+      payee: "player_points",
+    });
+    pool -= cash.cents;
+  }
+  const player = input.fraudReason ? null : input.playerReferrer;
   if (
     player && attributionCovers(player, input.paidAt) && !input.payerCpfMissing
   ) {
@@ -129,7 +146,7 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
       }
     }
   }
-  const venue = input.venueReferrer;
+  const venue = input.fraudReason ? null : input.venueReferrer;
   if (venue && attributionCovers(venue, input.paidAt)) {
     if (input.venueReferrerIsPlayer) {
       if (!input.venueReferrerCpfMissing) {

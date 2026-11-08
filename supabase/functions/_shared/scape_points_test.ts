@@ -26,12 +26,10 @@ Deno.test("C2C de 2,5% vira 250 pontos de 1 centavo", () => {
     paidAt: "2026-06-01T00:00:00.000Z",
     playerReferrer: window,
   });
-  assertEquals(lines, [{
-    program: "c2c",
-    cents: 250,
-    points: 250,
-    payee: "player_points",
-  }]);
+  assertEquals(lines, [
+    { program: "cashback", cents: 100, points: 100, payee: "player_points" },
+    { program: "c2c", cents: 250, points: 250, payee: "player_points" },
+  ]);
 });
 
 Deno.test("a recompensa não passa da comissão restante", () => {
@@ -42,7 +40,12 @@ Deno.test("a recompensa não passa da comissão restante", () => {
     paidAt: "2026-06-01T00:00:00.000Z",
     playerReferrer: window,
   });
-  assertEquals(lines[0].points, 60);
+  assertEquals(lines, [{
+    program: "cashback",
+    cents: 60,
+    points: 60,
+    payee: "player_points",
+  }]);
 });
 
 Deno.test("jogador e casa dividem a comissão, sem deixar a casa negativa", () => {
@@ -54,7 +57,7 @@ Deno.test("jogador e casa dividem a comissão, sem deixar a casa negativa", () =
     venueReferrer: window,
     venueReferrerIsPlayer: true,
   });
-  assertEquals(lines.map((line) => line.program), ["c2c", "c2b"]);
+  assertEquals(lines.map((line) => line.program), ["cashback", "c2c"]);
   assertEquals(lines[0].points + lines[1].points, 300);
 });
 
@@ -66,8 +69,8 @@ Deno.test("fora de um ano e na mesma casa não lança", () => {
       commissionBps: 2500,
       paidAt: "2027-06-01T00:00:00.000Z",
       playerReferrer: window,
-    }),
-    [],
+    }).map((line) => line.program),
+    ["cashback"],
   );
   assertEquals(
     quoteReferralRewards({
@@ -77,8 +80,8 @@ Deno.test("fora de um ano e na mesma casa não lança", () => {
       playerReferrer: window,
       playerReferrerIsVenue: true,
       spendAtReferrerVenue: true,
-    }),
-    [],
+    }).map((line) => line.program),
+    ["cashback"],
   );
   assertEquals(
     quoteReferralRewards({
@@ -87,8 +90,8 @@ Deno.test("fora de um ano e na mesma casa não lança", () => {
       paidAt: "2026-06-01T00:00:00.000Z",
       venueReferrer: window,
       firstBookingDiscountCents: 2000,
-    }),
-    [],
+    }).map((line) => line.program),
+    ["cashback"],
   );
   const b2b = quoteReferralRewards({
     grossCents: 10000,
@@ -96,16 +99,17 @@ Deno.test("fora de um ano e na mesma casa não lança", () => {
     paidAt: "2026-06-01T00:00:00.000Z",
     venueReferrer: window,
   });
-  assertEquals(b2b[0].program, "b2b");
-  assertEquals(b2b[0].cents, 500);
-  assertEquals(b2b[0].payee, "venue_credit");
+  const credit = b2b.find((line) => line.program === "b2b");
+  assertEquals(b2b[0].program, "cashback");
+  assertEquals(credit?.cents, 500);
+  assertEquals(credit?.payee, "venue_credit");
   const again = quoteReferralRewards({
     grossCents: 10000,
     commissionBps: 2500,
     paidAt: "2026-07-01T00:00:00.000Z",
     venueReferrer: window,
   });
-  assertEquals(again[0].cents, 500);
+  assertEquals(again.find((line) => line.program === "b2b")?.cents, 500);
 });
 
 Deno.test("estorno e bloqueio: fraude zera e a chave não duplica", () => {
@@ -116,8 +120,16 @@ Deno.test("estorno e bloqueio: fraude zera e a chave não duplica", () => {
       paidAt: "2026-06-01T00:00:00.000Z",
       playerReferrer: window,
       fraudReason: "shared_cpf",
+    }).map((line) => line.program),
+    ["cashback"],
+  );
+  assertEquals(
+    quoteReferralRewards({
+      grossCents: 10000,
+      commissionBps: 2500,
+      paidAt: "2026-06-01T00:00:00.000Z",
     }),
-    [],
+    [{ program: "cashback", cents: 100, points: 100, payee: "player_points" }],
   );
   assertEquals(
     referralFraudReason({
@@ -145,7 +157,7 @@ Deno.test("estorno e bloqueio: fraude zera e a chave não duplica", () => {
     playerReferrer: window,
   });
   const keys = new Set<string>();
-  assertEquals(postRewardsOnce(keys, "ch-1", lines).length, 1);
+  assertEquals(postRewardsOnce(keys, "ch-1", lines).length, 2);
   assertEquals(postRewardsOnce(keys, "ch-1", lines).length, 0);
   assertEquals(accrualIdempotencyKey("ch-1", "c2c"), "accrual:ch-1:c2c");
   assertEquals(officialHoldDays, 30);
