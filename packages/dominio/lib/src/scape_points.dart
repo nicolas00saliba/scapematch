@@ -1,0 +1,467 @@
+import 'package:dominio/src/commission.dart';
+
+/// Regras do Modelo 2. Os números abaixo são o padrão aprovado;
+/// o banco guarda a mesma tabela e pode mudá-la sem recompilar o app.
+///
+/// 1 Scape Point vale [ReferralRates.pointValueCents] centavos.
+/// O padrão é 1 ponto = R\$ 0,01. O ponto não vence e não saca:
+/// só abate sala. A casa continua recebendo o líquido cheio;
+/// o abatimento sai da comissão da ScapeMatch.
+class ReferralRates {
+  const ReferralRates({
+    this.c2cBps = 250,
+    this.b2cBps = 250,
+    this.c2bBps = 250,
+    this.b2bBps = 500,
+    this.pointValueCents = 1,
+    this.attributionDays = 365,
+    this.holdDays = 30,
+    this.monthlyReferralCap = 20,
+    this.firstBookingDiscountBps = 2000,
+    this.b2bSkipCustomers = 1,
+  });
+
+  /// Jogador que indicou outro jogador, sobre o gasto do indicado.
+  final int c2cBps;
+
+  /// Casa que indicou o jogador, sobre o gasto dele em outra casa.
+  final int b2cBps;
+
+  /// Jogador que indicou a casa, sobre o faturamento dela na plataforma.
+  final int c2bBps;
+
+  /// Casa que indicou outra casa, a partir do cliente seguinte ao primeiro.
+  final int b2bBps;
+
+  /// Centavos de um ponto. 1 = R\$ 0,01.
+  final int pointValueCents;
+
+  /// Janela da indicação, em dias, contada do cadastro de quem foi indicado.
+  final int attributionDays;
+
+  /// Dias em que o crédito fica pendente antes de poder pagar sala.
+  final int holdDays;
+
+  /// Indicados novos por indicador no mês. 0 desliga indicação nova.
+  final int monthlyReferralCap;
+
+  /// Desconto da primeira reserva com código, em basis points.
+  /// Não é aplicado neste fluxo. O teto continua sendo a comissão.
+  final int firstBookingDiscountBps;
+
+  /// Quantos primeiros clientes da casa indicada ficam fora do B2B.
+  final int b2bSkipCustomers;
+
+  static const official = ReferralRates();
+}
+
+/// Quem ganha o lançamento: pontos do jogador ou crédito pendente da casa.
+enum RewardPayee { playerPoints, venueCredit }
+
+class RewardLine {
+  const RewardLine({
+    required this.program,
+    required this.cents,
+    required this.points,
+    required this.payee,
+  });
+
+  /// `c2c`, `b2c`, `c2b` ou `b2b`.
+  final String program;
+  final int cents;
+  final int points;
+  final RewardPayee payee;
+
+  bool get posts => payee == RewardPayee.venueCredit ? cents > 0 : points > 0;
+}
+
+class AttributionSlice {
+  const AttributionSlice({
+    required this.startsAt,
+    required this.endsAt,
+    this.blocked = false,
+  });
+
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final bool blocked;
+}
+
+class SpendRewardInput {
+  const SpendRewardInput({
+    required this.grossCents,
+    required this.commissionBps,
+    required this.paidAt,
+    this.subsidyCents = 0,
+    this.playerReferrer,
+    this.playerReferrerIsVenue = false,
+    this.spendAtReferrerVenue = false,
+    this.venueReferrer,
+    this.venueReferrerIsPlayer = false,
+    this.payerCustomerRank = 1,
+    this.payerCpfMissing = false,
+    this.playerReferrerCpfMissing = false,
+    this.venueReferrerCpfMissing = false,
+    this.fraudReason,
+  });
+
+  final int grossCents;
+  final int commissionBps;
+  final int subsidyCents;
+  final DateTime paidAt;
+
+  /// Janela de quem indicou o jogador que pagou. Nula se ninguém indicou.
+  final AttributionSlice? playerReferrer;
+
+  /// Verdadeiro quando quem indicou o jogador é uma casa (B2C).
+  final bool playerReferrerIsVenue;
+
+  /// O gasto foi na própria casa que indicou o jogador.
+  final bool spendAtReferrerVenue;
+
+  /// Janela de quem indicou a casa desta reserva.
+  final AttributionSlice? venueReferrer;
+
+  /// Verdadeiro quando quem indicou a casa é um jogador (C2B).
+  final bool venueReferrerIsPlayer;
+
+  /// 1 = primeiro cliente distinto que já pagou nesta casa.
+  final int payerCustomerRank;
+
+  final bool payerCpfMissing;
+  final bool playerReferrerCpfMissing;
+  final bool venueReferrerCpfMissing;
+
+  /// Fraude já decidida. Não lança e a atribuição deve ser bloqueada.
+  final String? fraudReason;
+}
+
+class PointSubsidyQuote {
+  const PointSubsidyQuote({
+    required this.grossCents,
+    required this.chargedCents,
+    required this.subsidyCents,
+    required this.points,
+    required this.houseNetCents,
+    required this.commissionCents,
+    required this.splitPercent,
+    required this.maxPoints,
+  });
+
+  final int grossCents;
+  final int chargedCents;
+  final int subsidyCents;
+  final int points;
+  final int houseNetCents;
+  final int commissionCents;
+
+  /// Nulo quando não há abatimento: o split percentual antigo continua.
+  /// Com abatimento, é o percentual (até 4 casas) que devolve o líquido
+  /// cheio da casa sobre o valor menor cobrado do jogador.
+  final double? splitPercent;
+  final int maxPoints;
+}
+
+/// Fim da janela. O instante final não entra (`paidAt < fim`).
+DateTime attributionEndsAt(DateTime startedAt, int days) {
+  if (days <= 0) {
+    throw ArgumentError('A janela da indicação precisa de ao menos um dia.');
+  }
+  return startedAt.add(Duration(days: days));
+}
+
+bool attributionCovers(AttributionSlice slice, DateTime paidAt) {
+  if (slice.blocked) return false;
+  return !paidAt.isBefore(slice.startsAt) && paidAt.isBefore(slice.endsAt);
+}
+
+DateTime pointsAvailableAt(DateTime paidAt, int holdDays) {
+  if (holdDays < 0) {
+    throw ArgumentError('A carência não pode ser negativa.');
+  }
+  return paidAt.add(Duration(days: holdDays));
+}
+
+bool monthlyReferralCapReached({
+  required int referralsThisMonth,
+  required int cap,
+}) {
+  if (cap < 0) {
+    throw ArgumentError('O teto mensal não pode ser negativo.');
+  }
+  return referralsThisMonth >= cap;
+}
+
+int pointsFromCents(int cents, int pointValueCents) {
+  _requirePointValue(pointValueCents);
+  if (cents <= 0) return 0;
+  return cents ~/ pointValueCents;
+}
+
+int centsFromPoints(int points, int pointValueCents) {
+  _requirePointValue(pointValueCents);
+  if (points <= 0) return 0;
+  return points * pointValueCents;
+}
+
+/// Desconto da primeira reserva, limitado à comissão. Não entra no
+/// lançamento automático; existe para o ledger tratar o mesmo teto
+/// quando o desconto for ligado.
+int firstBookingDiscountCents({
+  required int grossCents,
+  required int discountBps,
+  required int commissionCentsValue,
+}) {
+  if (commissionCentsValue < 0) {
+    throw ArgumentError('A comissão não pode ser negativa.');
+  }
+  final wanted = commissionCents(grossCents, discountBps);
+  return wanted > commissionCentsValue ? commissionCentsValue : wanted;
+}
+
+/// CPF, telefone e cartão iguais, ou CPF do jogador igual ao da casa.
+/// Não devolve o documento. `shared_card` só quando o token é o mesmo.
+String? referralFraudReason({
+  String? leftCpf,
+  String? rightCpf,
+  String? leftPhone,
+  String? rightPhone,
+  bool sharedCardToken = false,
+  String? playerCpf,
+  String? venueDocument,
+  String? venueOwnerCpf,
+}) {
+  if (sharedCardToken) return 'shared_card';
+  final left = _digits(leftCpf);
+  final right = _digits(rightCpf);
+  if (left != null && right != null && left == right) return 'shared_cpf';
+  final phoneLeft = _digits(leftPhone);
+  final phoneRight = _digits(rightPhone);
+  if (phoneLeft != null &&
+      phoneRight != null &&
+      phoneLeft.isNotEmpty &&
+      phoneLeft == phoneRight) {
+    return 'shared_phone';
+  }
+  final player = _digits(playerCpf);
+  final venue = _digits(venueDocument);
+  final owner = _digits(venueOwnerCpf);
+  if (player != null && venue != null && player == venue) {
+    return 'player_owns_venue';
+  }
+  if (player != null && owner != null && player == owner) {
+    return 'player_owns_venue';
+  }
+  return null;
+}
+
+/// Recompensas de um nível, na ordem: indicação do jogador, depois da casa.
+/// A soma não passa da comissão que sobrou depois do abatimento de pontos.
+/// O líquido da casa não entra nessa conta.
+List<RewardLine> quoteReferralRewards(
+  SpendRewardInput input, {
+  ReferralRates rates = ReferralRates.official,
+}) {
+  _requirePointValue(rates.pointValueCents);
+  if (input.fraudReason != null) return const [];
+  final gross = input.grossCents;
+  final commission = commissionCents(gross, input.commissionBps);
+  var pool = commission - input.subsidyCents;
+  if (pool < 0) pool = 0;
+  final lines = <RewardLine>[];
+
+  final player = input.playerReferrer;
+  if (player != null &&
+      attributionCovers(player, input.paidAt) &&
+      !input.payerCpfMissing) {
+    if (input.playerReferrerIsVenue) {
+      if (!input.spendAtReferrerVenue) {
+        final cents = _takeCents(gross, rates.b2cBps, pool);
+        if (cents > 0) {
+          lines.add(
+            RewardLine(
+              program: 'b2c',
+              cents: cents,
+              points: 0,
+              payee: RewardPayee.venueCredit,
+            ),
+          );
+          pool -= cents;
+        }
+      }
+    } else if (!input.playerReferrerCpfMissing) {
+      final taken = _takePoints(
+        gross,
+        rates.c2cBps,
+        pool,
+        rates.pointValueCents,
+      );
+      if (taken.points > 0) {
+        lines.add(
+          RewardLine(
+            program: 'c2c',
+            cents: taken.cents,
+            points: taken.points,
+            payee: RewardPayee.playerPoints,
+          ),
+        );
+        pool -= taken.cents;
+      }
+    }
+  }
+
+  final venue = input.venueReferrer;
+  if (venue != null && attributionCovers(venue, input.paidAt)) {
+    if (input.venueReferrerIsPlayer) {
+      if (!input.venueReferrerCpfMissing) {
+        final taken = _takePoints(
+          gross,
+          rates.c2bBps,
+          pool,
+          rates.pointValueCents,
+        );
+        if (taken.points > 0) {
+          lines.add(
+            RewardLine(
+              program: 'c2b',
+              cents: taken.cents,
+              points: taken.points,
+              payee: RewardPayee.playerPoints,
+            ),
+          );
+        }
+      }
+    } else if (input.payerCustomerRank > rates.b2bSkipCustomers) {
+      final cents = _takeCents(gross, rates.b2bBps, pool);
+      if (cents > 0) {
+        lines.add(
+          RewardLine(
+            program: 'b2b',
+            cents: cents,
+            points: 0,
+            payee: RewardPayee.venueCredit,
+          ),
+        );
+      }
+    }
+  }
+  return lines;
+}
+
+/// Abate pontos do valor cobrado do jogador. O líquido da casa fica o do
+/// preço cheio. O percentual novo só existe quando há abatimento; ele é
+/// arredondado para cima em 4 casas, que é o limite do Asaas.
+PointSubsidyQuote quotePointSubsidy({
+  required int grossCents,
+  required int commissionBps,
+  required int requestedPoints,
+  required int availablePoints,
+  ReferralRates rates = ReferralRates.official,
+}) {
+  _requirePointValue(rates.pointValueCents);
+  if (grossCents <= 0) {
+    throw ArgumentError('A reserva precisa de um valor.');
+  }
+  final commission = commissionCents(grossCents, commissionBps);
+  final houseNet = grossCents - commission;
+  final room = grossCents > 1 ? grossCents - 1 : 0;
+  final maxSubsidy = commission < room ? commission : room;
+  final maxPoints = pointsFromCents(
+    maxSubsidy < 0 ? 0 : maxSubsidy,
+    rates.pointValueCents,
+  );
+  var points = requestedPoints;
+  if (points < 0) points = 0;
+  if (points > availablePoints) points = availablePoints;
+  if (points > maxPoints) points = maxPoints;
+  final subsidy = centsFromPoints(points, rates.pointValueCents);
+  final charged = grossCents - subsidy;
+  final split = subsidy == 0
+      ? null
+      : subsidizedHouseSplitPercent(
+          houseNetCents: houseNet,
+          chargedCents: charged,
+        );
+  return PointSubsidyQuote(
+    grossCents: grossCents,
+    chargedCents: charged,
+    subsidyCents: subsidy,
+    points: points,
+    houseNetCents: houseNet,
+    commissionCents: commission,
+    splitPercent: split,
+    maxPoints: maxPoints,
+  );
+}
+
+/// Percentual do valor cobrado (já com abatimento) que devolve o líquido
+/// cheio da casa. Sobe na 4ª casa decimal para a casa não perder centavo
+/// por arredondamento. O Asaas aplica esse percentual sobre o líquido
+/// depois da taxa dele; o centavo que sobrar sai da ScapeMatch.
+double subsidizedHouseSplitPercent({
+  required int houseNetCents,
+  required int chargedCents,
+}) {
+  if (chargedCents <= 0) {
+    throw ArgumentError('A cobrança ficou sem valor.');
+  }
+  if (houseNetCents < 0 || houseNetCents > chargedCents) {
+    throw ArgumentError('O líquido da casa não cabe na cobrança.');
+  }
+  if (houseNetCents == 0) return 0;
+  final scaled = (houseNetCents * 1000000 + chargedCents - 1) ~/ chargedCents;
+  final percent = scaled / 10000;
+  if (percent > 100) {
+    throw ArgumentError('O split passou de 100%.');
+  }
+  return percent;
+}
+
+String accrualIdempotencyKey(String chargeId, String program) {
+  return 'accrual:$chargeId:$program';
+}
+
+/// Segunda chamada com a mesma chave não gera outra linha.
+List<RewardLine> postRewardsOnce({
+  required Set<String> existingKeys,
+  required String chargeId,
+  required List<RewardLine> lines,
+}) {
+  final posted = <RewardLine>[];
+  for (final line in lines) {
+    if (!line.posts) continue;
+    final key = accrualIdempotencyKey(chargeId, line.program);
+    if (existingKeys.add(key)) posted.add(line);
+  }
+  return posted;
+}
+
+int _takeCents(int grossCents, int bps, int pool) {
+  if (pool <= 0 || bps <= 0) return 0;
+  final raw = commissionCents(grossCents, bps);
+  return raw > pool ? pool : raw;
+}
+
+({int cents, int points}) _takePoints(
+  int grossCents,
+  int bps,
+  int pool,
+  int pointValueCents,
+) {
+  final centsRoom = _takeCents(grossCents, bps, pool);
+  final points = pointsFromCents(centsRoom, pointValueCents);
+  return (cents: centsFromPoints(points, pointValueCents), points: points);
+}
+
+void _requirePointValue(int pointValueCents) {
+  if (pointValueCents <= 0) {
+    throw ArgumentError('O ponto precisa valer ao menos um centavo.');
+  }
+}
+
+String? _digits(String? value) {
+  if (value == null) return null;
+  final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.isEmpty) return null;
+  return digits;
+}

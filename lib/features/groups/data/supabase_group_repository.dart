@@ -190,6 +190,7 @@ class SupabaseGroupRepository implements GroupRepository {
     required String userId,
     required PaymentMethodKind kind,
     String? savedCardId,
+    int points = 0,
   }) {
     if (kind == PaymentMethodKind.card &&
         (savedCardId == null || savedCardId.isEmpty)) {
@@ -206,6 +207,7 @@ class SupabaseGroupRepository implements GroupRepository {
         idempotencyKey: _chargeKey(groupId, userId),
         kind: kind,
         savedCardId: savedCardId,
+        points: points,
       );
     });
   }

@@ -65,6 +65,7 @@ tool/apply_auth_email_templates.sh
 - `close_group_with_fewer` só fecha se N ≥ mínimo da sala e N < tamanho planejado.
 - O Pix é cobrado na hora (`billingType PIX`) e estornado se o grupo não fechar. O cartão nasce com `authorizeOnly` e só é capturado quando o grupo fecha; se não fechar, a reserva é estornada.
 - O split manda `(100% − comissão)` para `venues.asaas_wallet_id`. A comissão é `platform_settings.commission_bps` (padrão 1000, 10%) e fica na conta Asaas que cria a cobrança.
+- Scape Points (`20261108140000_scape_points.sql`) lançam a indicação quando a cobrança fica paga. A casa não perde líquido. Com pontos na cobrança, o valor do jogador cai e o percentual do split sobe para caber o líquido cheio. O cron de reconcile libera o que completou 30 dias. O app não escreve no ledger.
 
 ## Asaas (sandbox na demo)
 
@@ -74,7 +75,7 @@ A implementação é `AsaasProvider` em `supabase/functions/_shared/asaas_provid
 | --- | --- | --- |
 | `provision-venue-wallet` | admin | Cria a subconta (`POST /v3/accounts`) e grava só o `walletId`. A `apiKey` da subconta não é salva. |
 | `tokenize-card` | jogador autenticado | Única função que recebe número, CVV e validade. O IP sai do header da borda, nunca do body. Antes do Asaas, `private.claim_card_tokenize_attempt` (só service role) registra a tentativa e recusa com 429 no 6º cartão ou na 6ª tentativa da hora. Grava o token cifrado por `insert_saved_card` e devolve só `saved_card_id`, `last4` e a bandeira. |
-| `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly` a partir de `saved_card_id`. O token é lido por `load_owned_card`. Recusa número, CVV e validade. O percentual do split sai da tabela de comissão, não do celular. |
+| `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly` a partir de `saved_card_id`. O token é lido por `load_owned_card`. Recusa número, CVV e validade. O percentual do split sai da tabela de comissão, não do celular. `points` opcional abate a parte do jogador e reserva o saldo antes do Asaas. |
 | `settle-charges` | host, casa ou admin | Grupo fechado: captura o cartão e lança o extrato. Grupo que não fechou: estorna Pix pago e cancela a autorização do cartão. |
 | `cancel-house-group` | dono da casa ou admin | Cancela o grupo (`house_cancel_group`) e, com a service role, estorna o Pix ou cancela a autorização. `refunded` só depois da resposta da API ou do webhook. |
 | `asaas-webhook` | não | Exige o header `asaas-access-token` igual a `ASAAS_WEBHOOK_TOKEN`. Quando a cobrança fica paga e o grupo está fechado, emite as NFS-e. |

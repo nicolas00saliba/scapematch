@@ -14,6 +14,7 @@ import 'package:scapematch/features/auth/presentation/password_change_dialog.dar
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_control.dart';
+import 'package:scapematch/features/scape_points/presentation/scape_points_view.dart';
 import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -93,14 +94,7 @@ class AccountDestinationScreen extends ConsumerWidget {
                   ),
               ]
             : [const Text('Ainda não há parceiros de jogo nesta conta.')],
-      AccountDestination.referral => [
-        _InfoCard(
-          title: sample ? 'SCAPE-NICOLAS' : 'Em breve',
-          subtitle: sample
-              ? 'Código fictício. Indique e ganhe não paga nada nesta versão.'
-              : 'Indique e ganhe ainda não está disponível.',
-        ),
-      ],
+      AccountDestination.referral => [const ScapePointsBody()],
       AccountDestination.cards => [const PaymentMethodsBody()],
       AccountDestination.help => [
         if (showsIntroReplay(ref.watch(onboardingModeProvider))) ...[

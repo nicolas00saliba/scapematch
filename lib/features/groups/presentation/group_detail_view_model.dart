@@ -32,6 +32,7 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
   Future<PayShareResult> payShare(
     PaymentMethodKind kind, {
     String? savedCardId,
+    int points = 0,
   }) async {
     final user = ref.read(currentUserProvider);
     final result = await ref
@@ -41,6 +42,7 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
           userId: user.id,
           kind: kind,
           savedCardId: savedCardId,
+          points: points,
         );
     if (ref.mounted && result is PayShareSuccess) {
       _publish(result.group);

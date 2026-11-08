@@ -62,6 +62,7 @@ class FakeAuthRepository implements AuthRepository {
     required DateTime now,
     required bool acceptedTerms,
     String? cityId,
+    String? referralCode,
   }) async {
     if (!acceptedTerms) {
       return LegalDocuments.termsRequired;

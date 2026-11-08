@@ -49,6 +49,7 @@ abstract class GroupRepository {
     required String userId,
     required PaymentMethodKind kind,
     String? savedCardId,
+    int points = 0,
   });
 
   /// Tokeniza em `tokenize-card` e cobra em `create-charge` com o id devolvido.

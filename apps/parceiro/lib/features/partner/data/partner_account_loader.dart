@@ -113,7 +113,7 @@ Future<VenueSignupResult> submitVenue(
   }
   final income = double.parse(draft.incomeReais.trim().replaceAll(',', '.'));
   try {
-    await scapeSupabase
+    final inserted = await scapeSupabase
         .from('venues')
         .insert({
           'city_id': draft.cityId,
@@ -135,20 +135,24 @@ Future<VenueSignupResult> submitVenue(
           if (duplicates.duplicateOf != null)
             'possible_duplicate_of': duplicates.duplicateOf,
         })
-        .select('id');
-    final userId = scapeSupabase.auth.currentUser?.id;
-    if (userId != null) {
-      final created = await scapeSupabase
-          .from('venues')
-          .select('id')
-          .eq('owner_id', userId)
-          .order('created_at', ascending: false)
-          .limit(1);
-      if (created.isNotEmpty) {
-        await scapeSupabase.rpc(
-          'accept_terms',
-          params: {'p_audience': 'partner', 'p_venue_id': created.first['id']},
-        );
+        .select('id')
+        .maybeSingle();
+    final venueId = inserted?['id'] as String?;
+    if (venueId != null) {
+      await scapeSupabase.rpc(
+        'accept_terms',
+        params: {'p_audience': 'partner', 'p_venue_id': venueId},
+      );
+      final referral = draft.referralCode.trim();
+      if (referral.isNotEmpty) {
+        try {
+          await scapeSupabase.rpc(
+            'claim_venue_referral',
+            params: {'p_venue_id': venueId, 'p_code': referral},
+          );
+        } on Object {
+          // Código inválido não desfaz a casa. A indicação fica de fora.
+        }
       }
     }
     return const VenueSignupResult();

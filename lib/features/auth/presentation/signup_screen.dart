@@ -33,6 +33,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _referral = TextEditingController();
   final _day = TextEditingController();
   final _month = TextEditingController();
   final _year = TextEditingController();
@@ -69,6 +70,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _name.dispose();
     _email.dispose();
     _password.dispose();
+    _referral.dispose();
     _day.dispose();
     _month.dispose();
     _year.dispose();
@@ -143,6 +145,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           birthDate: birthDate,
           acceptedTerms: _accepted,
           cityId: _cityId,
+          referralCode: _referral.text,
         );
     if (!mounted) {
       return;
@@ -333,6 +336,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ? 'Pelo menos 8 caracteres, com letras e números.'
                     : null,
                 border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: AppKeys.signupReferral,
+              controller: _referral,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Código de indicação (opcional)',
+                helperText: 'Só entra neste cadastro. Um código por conta.',
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),

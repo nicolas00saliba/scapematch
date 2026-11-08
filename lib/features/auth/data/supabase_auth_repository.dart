@@ -95,6 +95,7 @@ class SupabaseAuthRepository implements AuthRepository {
     required DateTime now,
     required bool acceptedTerms,
     String? cityId,
+    String? referralCode,
   }) async {
     if (!acceptedTerms) return LegalDocuments.termsRequired;
     if (!GroupRules.isAdult(birthDate: birthDate, now: now)) {
@@ -113,6 +114,8 @@ class SupabaseAuthRepository implements AuthRepository {
           'display_name': trimmed,
           'birth_date': _isoDate(birthDate),
           if (cityId != null && cityId.isNotEmpty) 'city_id': cityId,
+          if (referralCode != null && referralCode.trim().isNotEmpty)
+            'referral_code': referralCode.trim(),
         },
       );
       if (response.session == null) {

@@ -14,6 +14,7 @@ import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
 import 'package:scapematch/features/payments/presentation/own_card_holder.dart';
 import 'package:scapematch/providers/repositories.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Cartão de exemplo. O pagamento simulado não envia número.
@@ -83,6 +84,7 @@ Future<PaySheetOutcome> showPayShareSheet({
   })
   onPay,
   Future<ShareChargeView> Function(CardDraft card)? onPayNewCard,
+  PointSpendChoice? points,
 }) async {
   final outcome = await showModalBottomSheet<PaySheetOutcome>(
     context: context,
@@ -96,6 +98,7 @@ Future<PaySheetOutcome> showPayShareSheet({
         reference: reference,
         onPay: onPay,
         onPayNewCard: onPayNewCard,
+        points: points,
       );
     },
   );
@@ -109,10 +112,12 @@ class PayShareSheet extends ConsumerStatefulWidget {
     required this.reference,
     required this.onPay,
     this.onPayNewCard,
+    this.points,
   });
 
   final int amountCents;
   final String reference;
+  final PointSpendChoice? points;
   final Future<ShareChargeView> Function(
     PaymentMethodKind kind, {
     String? savedCardId,
@@ -133,9 +138,18 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   String? _issuedPix;
   Uint8List? _issuedPixImage;
   String? _cardId = payTestCard.id;
+  var _usePoints = false;
   final _entry = CardEntryControllers();
 
   bool get _done => _seat != null;
+
+  int get _chargedCents {
+    final points = widget.points;
+    if (_usePoints && points != null && points.points > 0) {
+      return points.chargedCents;
+    }
+    return widget.amountCents;
+  }
 
   @override
   void dispose() {
@@ -308,7 +322,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
           child: _done
               ? _Confirmed(
                   key: AppKeys.payConfirmed,
-                  amount: formatPrice(widget.amountCents),
+                  amount: formatPrice(_chargedCents),
                   outcome: _seat ?? PaySheetOutcome.reserved,
                   simulated: !live,
                 )
@@ -334,12 +348,34 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      formatPrice(widget.amountCents),
+                      formatPrice(_chargedCents),
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: scheme.primary,
                       ),
                     ),
+                    if (widget.points != null && widget.points!.points > 0) ...[
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        key: AppKeys.payUsePoints,
+                        contentPadding: EdgeInsets.zero,
+                        value: _usePoints,
+                        title: Text(
+                          'Usar ${formatPoints(widget.points!.points)} Scape Points',
+                        ),
+                        subtitle: Text(
+                          'Abate ${formatPrice(widget.points!.subsidyCents)}. A casa recebe o valor cheio.',
+                        ),
+                        onChanged: _busy
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _usePoints = value;
+                                  widget.points!.use = value;
+                                });
+                              },
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       live

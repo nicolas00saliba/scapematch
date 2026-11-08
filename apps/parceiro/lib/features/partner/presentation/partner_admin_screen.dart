@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/commission_admin_panel.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/scape_liability_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
@@ -91,6 +92,8 @@ class _PartnerAdminScreenState extends ConsumerState<PartnerAdminScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
               children: [
                 const CommissionAdminPanel(),
+                const SizedBox(height: 24),
+                const ScapeLiabilityPanel(),
                 const SizedBox(height: 24),
                 const VenuePayoutPanel(),
                 const SizedBox(height: 24),

@@ -46,6 +46,8 @@ export async function handleReconcile(
       }
     }
     await settleAuthorizedCards(admin, asaas);
+    const released = await admin.rpc("release_due_scape_points");
+    if (released.error) throw new Error("points");
     return json(reconciled);
   } catch (_error) {
     return json({ error: "erro" }, 500);
