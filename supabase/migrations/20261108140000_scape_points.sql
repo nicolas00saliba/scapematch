@@ -1315,6 +1315,10 @@ begin
   where e.kind = 'accrual'
     and e.source_charge_id = p_charge_id
     and e.applied_cents > 0
+    and not exists (
+      select 1 from public.venue_credit_applications a
+      where a.entry_id = e.id and a.reversed_at is not null
+    )
     and exists (
       select 1 from public.venue_referral_entries r
       where r.relates_to = e.id and r.kind = 'reversal'

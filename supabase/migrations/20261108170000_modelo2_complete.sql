@@ -52,7 +52,8 @@ alter table public.ledger_entries
       'venue_credit_applied',
       'venue_credit_refund',
       'venue_credit_clawback',
-      'venue_credit_clawback_refund'
+      'venue_credit_clawback_refund',
+      'venue_credit_clawback_offset'
     )
   );
 
@@ -78,6 +79,7 @@ create table if not exists public.venue_credit_clawbacks (
   ),
   applied_charge_id uuid references public.payment_charges (id),
   voided_at timestamptz,
+  neutralized_at timestamptz,
   created_at timestamptz not null default pg_catalog.now(),
   unique (entry_id)
 );
@@ -321,7 +323,41 @@ begin
     and a.reversed_at is null
     and c.entry_id = a.entry_id
     and c.voided_at is null
+    and c.neutralized_at is null
     and c.applied_cents = 0;
+
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id
+  )
+  select
+    c.venue_id,
+    ch.group_id,
+    ch.user_id,
+    'house',
+    'credit',
+    'venue_credit_clawback_offset',
+    c.applied_cents,
+    p_charge_id
+  from public.venue_credit_clawbacks c
+  join public.venue_credit_applications a on a.entry_id = c.entry_id
+  join public.payment_charges ch on ch.id = p_charge_id
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and c.voided_at is null
+    and c.neutralized_at is null
+    and c.applied_cents > 0
+  on conflict (payment_charge_id, kind, direction) do nothing;
+
+  update public.venue_credit_clawbacks c
+  set neutralized_at = pg_catalog.now()
+  from public.venue_credit_applications a
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and c.entry_id = a.entry_id
+    and c.voided_at is null
+    and c.neutralized_at is null
+    and c.applied_cents > 0;
 
   update public.venue_referral_entries e
   set settlement = 'released',
@@ -345,7 +381,8 @@ begin
   set applied_cents = 0,
       applied_charge_id = null
   where applied_charge_id = p_charge_id
-    and voided_at is null;
+    and voided_at is null
+    and neutralized_at is null;
 end;
 $$;
 
