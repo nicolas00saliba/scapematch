@@ -20,6 +20,7 @@ import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_referral_code.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_invoices_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
@@ -300,6 +301,8 @@ class _BalanceSection extends StatelessWidget {
           PartnerMessages.balanceBody,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.35),
         ),
+        const SizedBox(height: 16),
+        const VenueReferralCode(),
         const SizedBox(height: 16),
         _MoneyGrid(snapshot: snapshot),
         const SizedBox(height: 24),

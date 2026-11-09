@@ -430,6 +430,7 @@ class FakeGroupRepository implements GroupRepository {
     required String userId,
     required PaymentMethodKind kind,
     String? savedCardId,
+    int points = 0,
   }) async {
     await _pause();
     final index = _indexOf(groupId);

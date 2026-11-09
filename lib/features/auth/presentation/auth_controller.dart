@@ -31,6 +31,8 @@ class AuthController extends Notifier<CurrentUser?> {
     required DateTime birthDate,
     required bool acceptedTerms,
     String? cityId,
+    String? referralCode,
+    String? phone,
   }) async {
     final repo = ref.read(authRepositoryProvider);
     final error = await repo.signUp(
@@ -41,6 +43,8 @@ class AuthController extends Notifier<CurrentUser?> {
       now: ref.read(clockProvider).now(),
       acceptedTerms: acceptedTerms,
       cityId: cityId,
+      referralCode: referralCode,
+      phone: phone,
     );
     await repo.refresh();
     state = repo.signedInUser;

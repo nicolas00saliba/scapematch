@@ -13,6 +13,7 @@ class VenueDraft {
     required this.category,
     required this.incomeReais,
     this.inviteCode = '',
+    this.referralCode = '',
   });
 
   final String name;
@@ -27,6 +28,7 @@ class VenueDraft {
   final String category;
   final String incomeReais;
   final String inviteCode;
+  final String referralCode;
 
   static String digits(String raw) => raw.replaceAll(RegExp(r'[^0-9]'), '');
 
@@ -61,6 +63,10 @@ class VenueDraft {
     final income = double.tryParse(incomeReais.trim().replaceAll(',', '.'));
     if (income == null || income <= 0) {
       return 'Informe a renda mensal em reais.';
+    }
+    final referral = referralCode.trim().toUpperCase();
+    if (referral.isNotEmpty && !RegExp(r'^[A-Z0-9]{8}$').hasMatch(referral)) {
+      return 'O código de indicação tem 8 letras ou números.';
     }
     final code = inviteCode.trim().toLowerCase();
     if (code.isNotEmpty &&

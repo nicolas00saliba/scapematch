@@ -4,6 +4,7 @@ import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
+import { cardKey, documentHash } from "../_shared/payer_identity.ts";
 import {
   cardBrand,
   last4Digits,
@@ -48,6 +49,7 @@ Deno.serve(async (req) => {
     if (!cpf) return json({ error: "cpf_required" }, 422);
     const holderCpf = playerCpfDigits(card.holderCpfCnpj);
     if (!holderCpf) return json({ error: "holder_cpf_invalid" }, 400);
+    const holderMatches = holderCpf === cpf;
     let responseBody: ReturnType<typeof tokenizePublicResponse> | null = null;
     const decision = await gateTokenize(
       async () => {
@@ -94,12 +96,17 @@ Deno.serve(async (req) => {
         });
         const last4 = last4Digits(tokenized.creditCardNumber);
         const brand = cardBrand(tokenized.creditCardBrand);
+        const payerHash = await documentHash(holderCpf);
+        const payerCardKey = cardKey(brand, last4);
         const savedCardId = await storeSavedCard(admin, {
           userId: user.id,
           customerId,
           token: tokenized.creditCardToken,
           last4,
           brand,
+          holderMatches,
+          holderDocumentHash: payerHash,
+          cardKey: payerCardKey,
         });
         responseBody = tokenizePublicResponse({
           id: savedCardId,

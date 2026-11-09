@@ -10,6 +10,7 @@ import 'package:scapematch/core/sharing/external_url.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
@@ -18,6 +19,7 @@ import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/core/ui/person_avatar.dart';
 import 'package:scapematch/features/fiscal/presentation/service_invoice_card.dart';
 import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
 import 'package:scapematch/core/ui/status_views.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
@@ -433,16 +435,41 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     return '$status · ${GroupMessages.paymentStatus(person.payment)}';
   }
 
+  Future<PointSpendChoice?> _pointSpend(String groupId) async {
+    if (!scapeUsesLiveBackend) return null;
+    try {
+      final data = await scapeSupabase.rpc(
+        'quote_my_point_subsidy',
+        params: {'p_group_id': groupId, 'p_points': 100000000},
+      );
+      if (data is! Map) return null;
+      final choice = PointSpendChoice.fromQuote(
+        Map<String, dynamic>.from(data),
+      );
+      return choice.points > 0 || choice.discountCents > 0 ? choice : null;
+    } on Object {
+      return null;
+    }
+  }
+
   Future<void> _pay(Group group) async {
     if (!await ensurePlayerCpf(context, ref) || !mounted) return;
+    final spend = await _pointSpend(group.id);
+    if (!mounted) return;
     final outcome = await showPayShareSheet(
       context: context,
       amountCents: group.priceCents,
       reference: group.id,
+      points: spend,
+      discountCents: spend?.discountCents ?? 0,
       onPay: (kind, {savedCardId}) async {
         final result = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)
-            .payShare(kind, savedCardId: savedCardId);
+            .payShare(
+              kind,
+              savedCardId: savedCardId,
+              points: spend?.selected ?? 0,
+            );
         return ShareChargeView.fromResult(result);
       },
       onPayNewCard: (card) async {

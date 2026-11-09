@@ -298,7 +298,7 @@ begin
     )
     or has_function_privilege(
       'anon',
-      'public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer)',
+      'public.reserve_pix_charge(uuid, uuid, uuid, integer, text, text, integer, integer, integer, integer, numeric)',
       'execute'
     )
     or not has_function_privilege(

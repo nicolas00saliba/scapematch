@@ -2,6 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/core/web/document_base.dart';
+import 'package:scapematch/core/device/install_id.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/auth_return_url.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
@@ -95,6 +96,8 @@ class SupabaseAuthRepository implements AuthRepository {
     required DateTime now,
     required bool acceptedTerms,
     String? cityId,
+    String? referralCode,
+    String? phone,
   }) async {
     if (!acceptedTerms) return LegalDocuments.termsRequired;
     if (!GroupRules.isAdult(birthDate: birthDate, now: now)) {
@@ -104,6 +107,7 @@ class SupabaseAuthRepository implements AuthRepository {
     if (rejected != null) return rejected;
     final trimmed = name.trim();
     if (trimmed.isEmpty) return 'Informe o nome.';
+    final phoneDigits = _phoneDigits(phone);
     try {
       final response = await _client.auth.signUp(
         email: email.trim(),
@@ -113,6 +117,10 @@ class SupabaseAuthRepository implements AuthRepository {
           'display_name': trimmed,
           'birth_date': _isoDate(birthDate),
           if (cityId != null && cityId.isNotEmpty) 'city_id': cityId,
+          if (referralCode != null && referralCode.trim().isNotEmpty)
+            'referral_code': referralCode.trim(),
+          'phone': ?phoneDigits,
+          'device_install_id': ?await InstallId.readOrCreate(),
         },
       );
       if (response.session == null) {
@@ -212,6 +220,13 @@ CurrentUser currentUserFromAuth(User user) {
     birthDate: birth,
     cityId: cityIdOf(user),
   );
+}
+
+String? _phoneDigits(String? phone) {
+  if (phone == null || phone.trim().isEmpty) return null;
+  final digits = phone.replaceAll(RegExp(r'\D'), '');
+  if (!RegExp(r'^[0-9]{10,13}$').hasMatch(digits)) return null;
+  return digits;
 }
 
 String? cityIdOf(User user) {

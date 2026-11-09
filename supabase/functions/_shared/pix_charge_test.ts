@@ -94,7 +94,7 @@ const expectedPix = {
   customer: "cus_1",
   valueCents: 12000,
   walletId: "wal_house",
-  percentualValue: 90,
+  fixedValue: 90,
 };
 
 Deno.test("reuso do Pix exige customer, valor, split e status", () => {
@@ -103,7 +103,7 @@ Deno.test("reuso do Pix exige customer, valor, split e status", () => {
     value: 120,
     status: "RECEIVED",
     billingType: "PIX",
-    split: [{ walletId: "wal_house", percentualValue: 90 }],
+    split: [{ walletId: "wal_house", fixedValue: 90 }],
   };
   assertEquals(pixMatchesCharge(remote, expectedPix), true);
   assertEquals(
@@ -123,6 +123,26 @@ Deno.test("reuso do Pix exige customer, valor, split e status", () => {
     false,
   );
   assertEquals(localChargeStatus("RECEIVED"), "paid");
+  assertEquals(
+    pixMatchesCharge(
+      {
+        ...remote,
+        split: [{ walletId: "wal_house", percentualValue: 90 }],
+      },
+      expectedPix,
+    ),
+    false,
+  );
+  assertEquals(
+    pixMatchesCharge(
+      {
+        ...remote,
+        split: [{ walletId: "wal_house", fixedValue: 10 }],
+      },
+      expectedPix,
+    ),
+    false,
+  );
 });
 
 Deno.test("reserva não cria de novo nem sobrescreve provider_ref", () => {

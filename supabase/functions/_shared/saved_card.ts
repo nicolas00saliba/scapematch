@@ -91,6 +91,9 @@ export async function storeSavedCard(
     token: string;
     last4: string;
     brand: string;
+    holderMatches?: boolean;
+    holderDocumentHash?: string | null;
+    cardKey?: string | null;
   },
 ): Promise<string> {
   const { data, error } = await db.rpc("insert_saved_card", {
@@ -102,6 +105,23 @@ export async function storeSavedCard(
   });
   if (error || typeof data !== "string" || data.length < 8) {
     throw new Error("Não foi possível guardar o cartão.");
+  }
+  if (typeof input.holderMatches === "boolean") {
+    const marked = await db.rpc("mark_saved_card_holder_match", {
+      p_card_id: data,
+      p_user_id: input.userId,
+      p_matches: input.holderMatches,
+    });
+    if (marked.error) throw new Error("Não foi possível guardar o cartão.");
+  }
+  if (input.holderDocumentHash || input.cardKey) {
+    const keyed = await db.rpc("mark_saved_card_payer_key", {
+      p_card_id: data,
+      p_user_id: input.userId,
+      p_document_hash: input.holderDocumentHash ?? null,
+      p_card_key: input.cardKey ?? null,
+    });
+    if (keyed.error) throw new Error("Não foi possível guardar o cartão.");
   }
   return data;
 }

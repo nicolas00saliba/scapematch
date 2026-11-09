@@ -8,7 +8,8 @@ import {
 import {
   asaasPaymentGone,
   AsaasProvider,
-  houseSplitPercent,
+  commissionCents,
+  fixedReaisFromCents,
   PixReservationLost,
   PixReuseRejected,
 } from "../_shared/asaas_provider.ts";
@@ -28,6 +29,8 @@ import {
 } from "../_shared/pix_charge.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
+import { syncPayerDocument } from "../_shared/payer_document.ts";
+import { splitMatchesSubsidy } from "../_shared/scape_points.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import {
   bindJson,
@@ -49,6 +52,7 @@ type ChargeBody = {
   billing_type?: string;
   idempotency_key?: string;
   saved_card_id?: string;
+  points?: number;
 };
 
 type ChargeUser = { id: string; email?: string | null };
@@ -64,6 +68,9 @@ export async function createCharge(
   deps?: ChargeRuntime,
 ): Promise<Response> {
   const json = bindJson(req);
+  let holdOpen = false;
+  let holdKey = "";
+  let holdAdmin: ChargeDb | null = null;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeadersFor(req, Deno.env) });
   }
@@ -133,7 +140,7 @@ export async function createCharge(
     const { data: existing } = await admin
       .from("payment_charges")
       .select(
-        "id, status, qr_code, qr_code_base64, provider_ref, billing_type, amount_cents, reserved_at, attempt_id, idempotency_key",
+        "id, status, qr_code, qr_code_base64, provider_ref, billing_type, amount_cents, subsidy_cents, split_percent, house_fixed_cents, points_redeemed, reserved_at, attempt_id, idempotency_key",
       )
       .eq("group_id", groupId)
       .eq("user_id", user.id)
@@ -169,9 +176,54 @@ export async function createCharge(
       admin,
       venue.id as string,
     );
+    const grossCents = group.price_cents as number;
+    const points = requestedPoints(body.points);
+    const openExisting = Boolean(
+      existing &&
+        !["failed", "cancelled", "refunded"].includes(existing.status),
+    );
+    let amountCents = grossCents;
+    let subsidyCents = 0;
+    let pointsRedeemed = 0;
+    let grossForReserve: number | null = null;
+    let splitPercent: number | null = null;
+    if (openExisting && typeof existing?.amount_cents === "number") {
+      amountCents = existing.amount_cents;
+      const storedSplit = numberOrNull(existing.split_percent);
+      if (storedSplit != null) splitPercent = storedSplit;
+    } else if (points > 0) {
+      const held = await holdPointRedemption(admin, {
+        userId: user.id,
+        idempotencyKey,
+        grossCents,
+        commissionBps,
+        points,
+      });
+      if (held.points > 0 && held.chargedCents > 0) {
+        if (
+          held.houseNetCents != null &&
+          held.splitPercent != null &&
+          !splitMatchesSubsidy(
+            held.splitPercent,
+            held.houseNetCents,
+            held.chargedCents,
+          )
+        ) {
+          throw new Error("split");
+        }
+        holdOpen = true;
+        holdKey = idempotencyKey;
+        holdAdmin = admin;
+        amountCents = held.chargedCents;
+        subsidyCents = held.subsidyCents;
+        pointsRedeemed = held.points;
+        grossForReserve = held.grossCents;
+        splitPercent = held.splitPercent;
+      }
+    }
     const split = {
       walletId: venue.asaas_wallet_id as string,
-      percentualValue: houseSplitPercent(commissionBps),
+      fixedValue: 0,
     };
 
     const { data: profile } = await admin
@@ -196,7 +248,6 @@ export async function createCharge(
       );
     }
 
-    const amountCents = group.price_cents as number;
     const dueDate = todayInSaoPaulo();
     const description = `${venue.name}`;
     let providerRef = "";
@@ -217,7 +268,21 @@ export async function createCharge(
         idempotencyKey,
         walletId: venue.asaas_wallet_id as string,
         commissionBps,
+        grossCents: grossForReserve,
+        subsidyCents,
+        pointsRedeemed,
+        splitPercent,
       });
+      amountCents = reserved.amount_cents || amountCents;
+      if (reserved.house_fixed_cents >= 0) {
+        split.fixedValue = fixedReaisFromCents(reserved.house_fixed_cents);
+      } else {
+        const gross = grossForReserve ?? amountCents;
+        split.fixedValue = fixedReaisFromCents(
+          Math.max(gross - commissionCents(gross, commissionBps), 0),
+        );
+      }
+      holdOpen = false;
       const action = pixReservationAction({
         inserted: reserved.inserted,
         providerRef: reserved.provider_ref,
@@ -235,7 +300,7 @@ export async function createCharge(
         customer: customerId,
         valueCents: amountCents,
         walletId: split.walletId,
-        percentualValue: split.percentualValue,
+        fixedValue: split.fixedValue,
       };
       let attemptId = reserved.attempt_id;
       let createPix = action === "create";
@@ -263,6 +328,14 @@ export async function createCharge(
           }
           const confirmed = confirmedChargeStatus(String(remote.status ?? ""));
           if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
+          if (confirmed === "paid") {
+            await syncPayerDocument(admin, asaas, {
+              id: reserved.id,
+              user_id: user.id,
+              billing_type: "PIX",
+              provider_ref: stored,
+            }, remote);
+          }
           const transition = await applyPaymentTransition(
             admin,
             reserved.id,
@@ -307,6 +380,14 @@ export async function createCharge(
         } else {
           const confirmed = confirmedChargeStatus(String(full.status ?? ""));
           if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
+          if (confirmed === "paid") {
+            await syncPayerDocument(admin, asaas, {
+              id: reserved.id,
+              user_id: user.id,
+              billing_type: "PIX",
+              provider_ref: reserved.provider_ref,
+            }, full);
+          }
           const transition = await applyPaymentTransition(
             admin,
             reserved.id,
@@ -354,6 +435,14 @@ export async function createCharge(
                 throw new PixReservationLost(payment.id);
               }
               const next = localChargeStatus(payment.status);
+              if (mayCredit && next === "paid") {
+                await syncPayerDocument(admin, asaas, {
+                  id: reserved.id,
+                  user_id: user.id,
+                  billing_type: "PIX",
+                  provider_ref: payment.id,
+                });
+              }
               await applyPaymentTransition(
                 admin,
                 reserved.id,
@@ -371,6 +460,14 @@ export async function createCharge(
               }),
           });
           const next = localChargeStatus(pix.status);
+          if (mayCredit && next === "paid") {
+            await syncPayerDocument(admin, asaas, {
+              id: reserved.id,
+              user_id: user.id,
+              billing_type: "PIX",
+              provider_ref: pix.id,
+            });
+          }
           const transition = await applyPaymentTransition(
             admin,
             reserved.id,
@@ -431,6 +528,12 @@ export async function createCharge(
         return json({ error: cardSwitchBlock(switchInput) }, 409);
       }
       const remoteIp = clientIp(req) ?? undefined;
+      const storedFixed = numberOrNull(existing?.house_fixed_cents);
+      const previewGross = grossForReserve ?? amountCents;
+      split.fixedValue = fixedReaisFromCents(
+        storedFixed ??
+          Math.max(previewGross - commissionCents(previewGross, commissionBps), 0),
+      );
       let authorized: { id: string; status: string };
       try {
         authorized = await asaas.authorizeCard({
@@ -458,6 +561,30 @@ export async function createCharge(
           attemptId: attempt,
           billingType: "CREDIT_CARD",
         });
+      const alignCardSplit = async (
+        fixedCents: number,
+        nextAmount: number,
+        chargeId: string,
+        attempt: string | null,
+      ) => {
+        if (fixedCents < 0) return;
+        const nextFixed = fixedReaisFromCents(fixedCents);
+        if (nextFixed === split.fixedValue && nextAmount === amountCents) return;
+        await loseCard(chargeId, attempt);
+        split.fixedValue = nextFixed;
+        amountCents = nextAmount;
+        authorized = await asaas.authorizeCard({
+          customer: customerId,
+          value: amountCents / 100,
+          dueDate,
+          description,
+          externalReference: idempotencyKey,
+          split,
+          remoteIp,
+          creditCardToken: owned.creditCardToken,
+        });
+      };
+      try {
       if (decision === "cancel_pix" && existing?.provider_ref) {
         const gone = await asaas.cancelPaymentConfirmed(existing.provider_ref);
         if (!gone) {
@@ -507,8 +634,21 @@ export async function createCharge(
           idempotencyKey,
           walletId: venue.asaas_wallet_id as string,
           commissionBps,
+          grossCents: grossForReserve,
+          subsidyCents,
+          pointsRedeemed,
+          splitPercent,
         });
+        await alignCardSplit(
+          reservedCard.house_fixed_cents,
+          reservedCard.amount_cents || amountCents,
+          reservedCard.id,
+          reservedCard.attempt_id,
+        );
+        amountCents = reservedCard.amount_cents || amountCents;
+        holdOpen = false;
         cardChargeId = reservedCard.id;
+        await noteCardPayer(admin, user.id, savedCardId, cardChargeId);
         if (reservedCard.inserted && reservedCard.attempt_id) {
           attemptId = reservedCard.attempt_id;
         } else if (
@@ -527,6 +667,16 @@ export async function createCharge(
             await loseCard(reservedCard.id, reservedCard.attempt_id);
             return json({ error: "pagamento em andamento" }, 409);
           }
+          if (pointsRedeemed > 0) {
+            const heldAgain = await holdPointRedemption(admin, {
+              userId: user.id,
+              idempotencyKey,
+              grossCents,
+              commissionBps,
+              points: pointsRedeemed,
+            });
+            holdOpen = heldAgain.points > 0;
+          }
           const again = await reserveCardCharge(admin, {
             groupId,
             userId: user.id,
@@ -535,7 +685,20 @@ export async function createCharge(
             idempotencyKey,
             walletId: venue.asaas_wallet_id as string,
             commissionBps,
+            grossCents: grossForReserve,
+            subsidyCents,
+            pointsRedeemed,
+            splitPercent,
           });
+          holdOpen = false;
+          await alignCardSplit(
+            again.house_fixed_cents,
+            again.amount_cents || amountCents,
+            again.id,
+            again.attempt_id,
+          );
+          amountCents = again.amount_cents || amountCents;
+          await noteCardPayer(admin, user.id, savedCardId, again.id);
           if (!again.inserted || !again.attempt_id) {
             await loseCard(again.id || reservedCard.id, again.attempt_id);
             return json({ error: "pagamento em andamento" }, 409);
@@ -638,6 +801,18 @@ export async function createCharge(
       status = transition.status;
       providerRef = stored;
       savedId = cardChargeId;
+      } catch (error) {
+        try {
+          await loseCard(
+            cardChargeId || existing?.id ||
+              "00000000-0000-0000-0000-000000000000",
+            attemptId || null,
+          );
+        } catch (_loseError) {
+          // O erro original segue.
+        }
+        throw error;
+      }
     }
 
     return json({
@@ -651,11 +826,22 @@ export async function createCharge(
       ...(cardView ?? {}),
     });
   } catch (error) {
+    if (error instanceof SplitExceedsNetError) {
+      return json({ error: "split_excede_liquido" }, 422);
+    }
     const failure = clientFailure(error, "create-charge");
     return json({
       ...failure.body,
       error: publicError(failure.body.error),
     }, failure.status);
+  } finally {
+    if (holdOpen && holdAdmin && holdKey) {
+      try {
+        await releasePointHold(holdAdmin, holdKey);
+      } catch (_releaseError) {
+        // O cron solta a reserva de pontos se esta chamada falhar.
+      }
+    }
   }
 }
 
@@ -668,7 +854,10 @@ type ChargeDb = {
   rpc(
     name: string,
     args: Record<string, unknown>,
-  ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+  ): PromiseLike<{
+    data: unknown;
+    error: { code?: string; message?: string } | null;
+  }>;
 };
 
 function findOwnedCard(
@@ -690,6 +879,15 @@ type ReservedPix = {
   lease_expired: boolean;
   attempt_id: string | null;
   idempotency_key: string | null;
+  split_percent: number | null;
+  house_fixed_cents: number;
+};
+
+type SubsidyFields = {
+  grossCents?: number | null;
+  subsidyCents?: number;
+  pointsRedeemed?: number;
+  splitPercent?: number | null;
 };
 
 async function reservePixCharge(
@@ -702,7 +900,7 @@ async function reservePixCharge(
     idempotencyKey: string;
     walletId: string;
     commissionBps: number;
-  },
+  } & SubsidyFields,
 ): Promise<ReservedPix> {
   const { data, error } = await admin.rpc("reserve_pix_charge", {
     p_group_id: input.groupId,
@@ -712,7 +910,9 @@ async function reservePixCharge(
     p_idempotency_key: input.idempotencyKey,
     p_wallet_id: input.walletId,
     p_commission_bps: input.commissionBps,
+    ...subsidyArgs(input),
   });
+  if (isSplitExceeded(error)) throw new SplitExceedsNetError();
   if (error || !data || typeof data !== "object") throw new Error("erro");
   return parseReserved(data as Record<string, unknown>);
 }
@@ -734,6 +934,8 @@ function parseReserved(row: Record<string, unknown>): ReservedPix {
     idempotency_key: typeof row.idempotency_key === "string"
       ? row.idempotency_key
       : null,
+    split_percent: numberOrNull(row.split_percent),
+    house_fixed_cents: numberOrNull(row.house_fixed_cents) ?? -1,
   };
 }
 
@@ -747,7 +949,7 @@ async function reserveCardCharge(
     idempotencyKey: string;
     walletId: string;
     commissionBps: number;
-  },
+  } & SubsidyFields,
 ): Promise<ReservedPix> {
   const { data, error } = await admin.rpc("reserve_card_charge", {
     p_group_id: input.groupId,
@@ -757,9 +959,24 @@ async function reserveCardCharge(
     p_idempotency_key: input.idempotencyKey,
     p_wallet_id: input.walletId,
     p_commission_bps: input.commissionBps,
+    ...subsidyArgs(input),
   });
+  if (isSplitExceeded(error)) throw new SplitExceedsNetError();
   if (error || !data || typeof data !== "object") throw new Error("erro");
   return parseReserved(data as Record<string, unknown>);
+}
+
+class SplitExceedsNetError extends Error {
+  constructor() {
+    super("split_excede_liquido");
+    this.name = "SplitExceedsNetError";
+  }
+}
+
+function isSplitExceeded(
+  error: { code?: string; message?: string } | null,
+): boolean {
+  return Boolean(error?.message?.includes("split_excede_liquido"));
 }
 
 async function attachPixProvider(
@@ -945,4 +1162,100 @@ async function filledSpots(
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
   return count ?? 0;
+}
+
+function requestedPoints(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    return 0;
+  }
+  return value;
+}
+
+function numberOrNull(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function subsidyArgs(input: SubsidyFields): Record<string, unknown> {
+  if (!input.subsidyCents) return {};
+  return {
+    p_gross_amount_cents: input.grossCents,
+    p_subsidy_cents: input.subsidyCents,
+    p_points_redeemed: input.pointsRedeemed ?? 0,
+    p_split_percent: input.splitPercent,
+  };
+}
+
+type HeldPoints = {
+  points: number;
+  chargedCents: number;
+  subsidyCents: number;
+  grossCents: number;
+  houseNetCents: number | null;
+  splitPercent: number | null;
+};
+
+async function holdPointRedemption(
+  admin: ChargeDb,
+  input: {
+    userId: string;
+    idempotencyKey: string;
+    grossCents: number;
+    commissionBps: number;
+    points: number;
+  },
+): Promise<HeldPoints> {
+  const { data, error } = await admin.rpc("hold_point_redemption", {
+    p_user_id: input.userId,
+    p_idempotency_key: input.idempotencyKey,
+    p_gross: input.grossCents,
+    p_commission_bps: input.commissionBps,
+    p_points: input.points,
+  });
+  if (error || !data || typeof data !== "object") throw new Error("erro");
+  const row = data as Record<string, unknown>;
+  return {
+    points: numberOrNull(row.points) ?? 0,
+    chargedCents: numberOrNull(row.charged_cents) ?? 0,
+    subsidyCents: numberOrNull(row.subsidy_cents) ?? 0,
+    grossCents: numberOrNull(row.gross_cents) ?? 0,
+    houseNetCents: numberOrNull(row.house_net_cents),
+    splitPercent: numberOrNull(row.split_percent),
+  };
+}
+
+async function releasePointHold(
+  admin: ChargeDb,
+  idempotencyKey: string,
+): Promise<void> {
+  const { error } = await admin.rpc("release_point_hold", {
+    p_idempotency_key: idempotencyKey,
+  });
+  if (error) throw new Error("erro");
+}
+
+async function noteCardPayer(
+  admin: ChargeDb,
+  userId: string,
+  cardId: string,
+  chargeId: string,
+): Promise<void> {
+  const { data } = await admin.rpc("saved_card_holder_status", {
+    p_user_id: userId,
+    p_card_id: cardId,
+  });
+  const status = data === "matched" || data === "mismatch" ? data : "unverified";
+  await admin.rpc("record_payer_document_status", {
+    p_charge_id: chargeId,
+    p_status: status,
+  });
+  await admin.rpc("copy_saved_card_payer", {
+    p_charge_id: chargeId,
+    p_user_id: userId,
+    p_card_id: cardId,
+  });
 }

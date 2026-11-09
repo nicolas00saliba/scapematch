@@ -6,6 +6,7 @@ import {
   type ChargeRow,
   creditLedger,
 } from "./ledger.ts";
+import { syncPayerDocument } from "./payer_document.ts";
 import { releaseCancelledCharges } from "./release_charges.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -110,6 +111,12 @@ export async function settleGroup(
       continue;
     }
     if (item.status === "paid") {
+      await syncPayerDocument(admin, asaas, {
+        id: item.id,
+        user_id: item.user_id,
+        billing_type: item.billing_type,
+        provider_ref: item.provider_ref,
+      });
       await creditLedger(admin, item);
       await issuePaidInvoices(admin, item, {
         sandbox: asaas.sandbox,

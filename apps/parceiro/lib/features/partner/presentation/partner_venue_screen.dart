@@ -27,6 +27,7 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
   final _document = TextEditingController();
   final _income = TextEditingController();
   final _invite = TextEditingController();
+  final _referral = TextEditingController();
   String _kind = 'cnpj';
   String _category = 'escape-room';
   String? _cityId = 'curitiba';
@@ -62,6 +63,7 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
     _document.dispose();
     _income.dispose();
     _invite.dispose();
+    _referral.dispose();
     super.dispose();
   }
 
@@ -79,11 +81,11 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       category: _category,
       incomeReais: _income.text,
       inviteCode: _invite.text,
+      referralCode: _referral.text,
     );
     if (!_accepted) {
       setState(() {
-        _error =
-            'Aceite os termos do Parceiro, a privacidade e a política de cancelamento para cadastrar a casa.';
+        _error = 'Aceite os termos do Parceiro, a privacidade e a política de cancelamento para cadastrar a casa.';
       });
       return;
     }
@@ -261,6 +263,16 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
             decoration: const InputDecoration(
               labelText: 'Código de convite (opcional)',
               hintText: 'ninja-cwb',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _referral,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              labelText: 'Código de indicação (opcional)',
+              helperText: 'De um jogador ou de outra casa. Só neste cadastro. Não é o convite.',
               border: OutlineInputBorder(),
             ),
           ),

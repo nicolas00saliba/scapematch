@@ -80,12 +80,14 @@ Map<String, dynamic> createChargeBody({
   required String idempotencyKey,
   required PaymentMethodKind kind,
   String? savedCardId,
+  int points = 0,
 }) {
   return {
     'group_id': groupId,
     'idempotency_key': idempotencyKey,
     'billing_type': kind == PaymentMethodKind.card ? 'CREDIT_CARD' : 'PIX',
     if (kind == PaymentMethodKind.card) 'saved_card_id': savedCardId,
+    if (points > 0) 'points': points,
   };
 }
 
@@ -121,12 +123,14 @@ class CardPaymentFlow {
     required String idempotencyKey,
     required PaymentMethodKind kind,
     String? savedCardId,
+    int points = 0,
   }) {
     final body = createChargeBody(
       groupId: groupId,
       idempotencyKey: idempotencyKey,
       kind: kind,
       savedCardId: savedCardId,
+      points: points,
     );
     if (chargeBodyHasRawCard(body)) {
       throw StateError('create-charge não recebe dados do cartão');

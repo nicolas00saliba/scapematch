@@ -33,6 +33,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _referral = TextEditingController();
+  final _phone = TextEditingController();
   final _day = TextEditingController();
   final _month = TextEditingController();
   final _year = TextEditingController();
@@ -69,6 +71,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _name.dispose();
     _email.dispose();
     _password.dispose();
+    _referral.dispose();
+    _phone.dispose();
     _day.dispose();
     _month.dispose();
     _year.dispose();
@@ -130,6 +134,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       setState(() => _error = LegalDocuments.termsRequired);
       return;
     }
+    final phoneDigits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    if (phoneDigits.isNotEmpty &&
+        !RegExp(r'^[0-9]{10,13}$').hasMatch(phoneDigits)) {
+      setState(() => _error = 'Informe o telefone com DDD, só números.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -143,6 +153,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           birthDate: birthDate,
           acceptedTerms: _accepted,
           cityId: _cityId,
+          referralCode: _referral.text,
+          phone: phoneDigits,
         );
     if (!mounted) {
       return;
@@ -333,6 +345,29 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ? 'Pelo menos 8 caracteres, com letras e números.'
                     : null,
                 border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: AppKeys.signupPhone,
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Telefone (opcional)',
+                helperText:
+                    'DDD e número. Serve para a indicação não se repetir.',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: AppKeys.signupReferral,
+              controller: _referral,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Código de indicação (opcional)',
+                helperText: 'Só entra neste cadastro. Um código por conta.',
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),
