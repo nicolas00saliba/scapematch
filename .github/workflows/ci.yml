@@ -90,10 +90,13 @@ jobs:
           root = pathlib.Path("apps/admin/build/web")
           jwt = re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")
           failed = False
+          # O SDK cita o prefixo sb_secret_ para recusar a chave. Uma chave
+          # de verdade continua com mais caracteres depois do prefixo.
+          secret_key = re.compile(r"sb_secret_[A-Za-z0-9_-]{16,}")
           for path in (*root.rglob("*.js"), *root.rglob("*.html")):
               text = path.read_text(errors="ignore")
-              if "sb_secret_" in text:
-                  print(f"sb_secret_ em {path}")
+              if secret_key.search(text):
+                  print(f"chave sb_secret_ em {path}")
                   failed = True
               for token in jwt.findall(text):
                   payload = token.split(".")[1]
