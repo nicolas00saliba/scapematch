@@ -86,7 +86,7 @@ Deno.test("sem header válido o pedido não leva remoteIp", async () => {
     dueDate: "2026-11-07",
     description: "reserva",
     externalReference: "charge-2",
-    split: { walletId: "wal_house", percentualValue: 90 },
+    split: { walletId: "wal_house", fixedValue: 90 },
     creditCardToken: "tok_card_1",
   });
   for (const body of bodies) {

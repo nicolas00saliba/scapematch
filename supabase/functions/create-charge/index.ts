@@ -8,7 +8,8 @@ import {
 import {
   asaasPaymentGone,
   AsaasProvider,
-  houseSplitPercent,
+  commissionCents,
+  fixedReaisFromCents,
   PixReservationLost,
   PixReuseRejected,
 } from "../_shared/asaas_provider.ts";
@@ -139,7 +140,7 @@ export async function createCharge(
     const { data: existing } = await admin
       .from("payment_charges")
       .select(
-        "id, status, qr_code, qr_code_base64, provider_ref, billing_type, amount_cents, subsidy_cents, split_percent, points_redeemed, reserved_at, attempt_id, idempotency_key",
+        "id, status, qr_code, qr_code_base64, provider_ref, billing_type, amount_cents, subsidy_cents, split_percent, house_fixed_cents, points_redeemed, reserved_at, attempt_id, idempotency_key",
       )
       .eq("group_id", groupId)
       .eq("user_id", user.id)
@@ -222,7 +223,7 @@ export async function createCharge(
     }
     const split = {
       walletId: venue.asaas_wallet_id as string,
-      percentualValue: splitPercent ?? houseSplitPercent(commissionBps),
+      fixedValue: 0,
     };
 
     const { data: profile } = await admin
@@ -273,8 +274,13 @@ export async function createCharge(
         splitPercent,
       });
       amountCents = reserved.amount_cents || amountCents;
-      if (reserved.split_percent != null) {
-        split.percentualValue = reserved.split_percent;
+      if (reserved.house_fixed_cents >= 0) {
+        split.fixedValue = fixedReaisFromCents(reserved.house_fixed_cents);
+      } else {
+        const gross = grossForReserve ?? amountCents;
+        split.fixedValue = fixedReaisFromCents(
+          Math.max(gross - commissionCents(gross, commissionBps), 0),
+        );
       }
       holdOpen = false;
       const action = pixReservationAction({
@@ -294,7 +300,7 @@ export async function createCharge(
         customer: customerId,
         valueCents: amountCents,
         walletId: split.walletId,
-        percentualValue: split.percentualValue,
+        fixedValue: split.fixedValue,
       };
       let attemptId = reserved.attempt_id;
       let createPix = action === "create";
@@ -522,6 +528,12 @@ export async function createCharge(
         return json({ error: cardSwitchBlock(switchInput) }, 409);
       }
       const remoteIp = clientIp(req) ?? undefined;
+      const storedFixed = numberOrNull(existing?.house_fixed_cents);
+      const previewGross = grossForReserve ?? amountCents;
+      split.fixedValue = fixedReaisFromCents(
+        storedFixed ??
+          Math.max(previewGross - commissionCents(previewGross, commissionBps), 0),
+      );
       let authorized: { id: string; status: string };
       try {
         authorized = await asaas.authorizeCard({
@@ -549,6 +561,29 @@ export async function createCharge(
           attemptId: attempt,
           billingType: "CREDIT_CARD",
         });
+      const alignCardSplit = async (
+        fixedCents: number,
+        nextAmount: number,
+        chargeId: string,
+        attempt: string | null,
+      ) => {
+        if (fixedCents < 0) return;
+        const nextFixed = fixedReaisFromCents(fixedCents);
+        if (nextFixed === split.fixedValue && nextAmount === amountCents) return;
+        await loseCard(chargeId, attempt);
+        split.fixedValue = nextFixed;
+        amountCents = nextAmount;
+        authorized = await asaas.authorizeCard({
+          customer: customerId,
+          value: amountCents / 100,
+          dueDate,
+          description,
+          externalReference: idempotencyKey,
+          split,
+          remoteIp,
+          creditCardToken: owned.creditCardToken,
+        });
+      };
       try {
       if (decision === "cancel_pix" && existing?.provider_ref) {
         const gone = await asaas.cancelPaymentConfirmed(existing.provider_ref);
@@ -604,10 +639,13 @@ export async function createCharge(
           pointsRedeemed,
           splitPercent,
         });
+        await alignCardSplit(
+          reservedCard.house_fixed_cents,
+          reservedCard.amount_cents || amountCents,
+          reservedCard.id,
+          reservedCard.attempt_id,
+        );
         amountCents = reservedCard.amount_cents || amountCents;
-        if (reservedCard.split_percent != null) {
-          split.percentualValue = reservedCard.split_percent;
-        }
         holdOpen = false;
         cardChargeId = reservedCard.id;
         await noteCardPayer(admin, user.id, savedCardId, cardChargeId);
@@ -653,6 +691,13 @@ export async function createCharge(
             splitPercent,
           });
           holdOpen = false;
+          await alignCardSplit(
+            again.house_fixed_cents,
+            again.amount_cents || amountCents,
+            again.id,
+            again.attempt_id,
+          );
+          amountCents = again.amount_cents || amountCents;
           await noteCardPayer(admin, user.id, savedCardId, again.id);
           if (!again.inserted || !again.attempt_id) {
             await loseCard(again.id || reservedCard.id, again.attempt_id);
@@ -781,6 +826,9 @@ export async function createCharge(
       ...(cardView ?? {}),
     });
   } catch (error) {
+    if (error instanceof SplitExceedsNetError) {
+      return json({ error: "split_excede_liquido" }, 422);
+    }
     const failure = clientFailure(error, "create-charge");
     return json({
       ...failure.body,
@@ -806,7 +854,10 @@ type ChargeDb = {
   rpc(
     name: string,
     args: Record<string, unknown>,
-  ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+  ): PromiseLike<{
+    data: unknown;
+    error: { code?: string; message?: string } | null;
+  }>;
 };
 
 function findOwnedCard(
@@ -829,6 +880,7 @@ type ReservedPix = {
   attempt_id: string | null;
   idempotency_key: string | null;
   split_percent: number | null;
+  house_fixed_cents: number;
 };
 
 type SubsidyFields = {
@@ -860,6 +912,7 @@ async function reservePixCharge(
     p_commission_bps: input.commissionBps,
     ...subsidyArgs(input),
   });
+  if (isSplitExceeded(error)) throw new SplitExceedsNetError();
   if (error || !data || typeof data !== "object") throw new Error("erro");
   return parseReserved(data as Record<string, unknown>);
 }
@@ -882,6 +935,7 @@ function parseReserved(row: Record<string, unknown>): ReservedPix {
       ? row.idempotency_key
       : null,
     split_percent: numberOrNull(row.split_percent),
+    house_fixed_cents: numberOrNull(row.house_fixed_cents) ?? -1,
   };
 }
 
@@ -907,8 +961,22 @@ async function reserveCardCharge(
     p_commission_bps: input.commissionBps,
     ...subsidyArgs(input),
   });
+  if (isSplitExceeded(error)) throw new SplitExceedsNetError();
   if (error || !data || typeof data !== "object") throw new Error("erro");
   return parseReserved(data as Record<string, unknown>);
+}
+
+class SplitExceedsNetError extends Error {
+  constructor() {
+    super("split_excede_liquido");
+    this.name = "SplitExceedsNetError";
+  }
+}
+
+function isSplitExceeded(
+  error: { code?: string; message?: string } | null,
+): boolean {
+  return Boolean(error?.message?.includes("split_excede_liquido"));
 }
 
 async function attachPixProvider(

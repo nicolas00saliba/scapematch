@@ -15,6 +15,7 @@ import {
   movesMoney,
   paymentRefForRead,
   requestedChargeStatus,
+  splitDivergenceEvent,
 } from "../_shared/charge_patch.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import { syncPayerDocument } from "../_shared/payer_document.ts";
@@ -41,6 +42,15 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+    const divergence = splitDivergenceEvent(payload?.event ?? "");
+    if (divergence) {
+      console.error(`split_divergence ${divergence} ${paymentId}`);
+      await admin.rpc("note_split_divergence", {
+        p_provider_ref: paymentId,
+        p_event: divergence,
+      });
+    }
+
     const { data: charge } = await admin
       .from("payment_charges")
       .select(

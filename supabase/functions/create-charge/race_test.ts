@@ -33,7 +33,7 @@ type Payment = {
   externalReference: string;
   customer: string;
   value: number;
-  split: { walletId: string; percentualValue: number }[];
+  split: { walletId: string; fixedValue: number }[];
   deleted?: boolean;
   deleteAsPending?: boolean;
 };
@@ -544,7 +544,7 @@ function providerFor(
         externalReference: body.externalReference ?? "",
         customer: "cus_1",
         value: 100,
-        split: [{ walletId: "wal_house", percentualValue: 90 }],
+        split: [{ walletId: "wal_house", fixedValue: 90 }],
       };
       if (body.billingType === "PIX" && hooks.onPixPost) {
         const held = await hooks.onPixPost(payment);
@@ -854,7 +854,7 @@ function openPix(store: Store, id = "pay_pix") {
     externalReference: `pix:${groupId}:${userId}`,
     customer: "cus_1",
     value: 100,
-    split: [{ walletId: "wal_house", percentualValue: 90 }],
+    split: [{ walletId: "wal_house", fixedValue: 90 }],
     deleteAsPending: true,
   });
 }

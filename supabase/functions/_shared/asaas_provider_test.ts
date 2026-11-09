@@ -62,7 +62,7 @@ Deno.test("o Pix manda o split para o walletId e a chave só no header", async (
     dueDate: "2026-11-07",
     description: "ScapeMatch Demo",
     externalReference: "charge-1",
-    split: { walletId: "wal_house", percentualValue: 90 },
+    split: { walletId: "wal_house", fixedValue: 90 },
   });
   assertEquals(pix.payload, "000201PIX");
   const post = calls.find((call) => call.init.method === "POST");
@@ -70,7 +70,7 @@ Deno.test("o Pix manda o split para o walletId e a chave só no header", async (
   const body = JSON.parse(String(post.init.body));
   assertEquals(body.billingType, "PIX");
   assertEquals(body.split[0].walletId, "wal_house");
-  assertEquals(body.split[0].percentualValue, 90);
+  assertEquals(body.split[0].fixedValue, 90);
   assertEquals(JSON.stringify(body).includes("asaas-secret-key"), false);
   const headers = post.init.headers as Record<string, string>;
   assertEquals(headers.access_token, "asaas-secret-key");
@@ -88,7 +88,7 @@ const pixInput = {
   dueDate: "2026-11-07",
   description: "ScapeMatch Demo",
   externalReference: "charge-1",
-  split: { walletId: "wal_house", percentualValue: 90 },
+  split: { walletId: "wal_house", fixedValue: 90 },
 };
 
 function pixDetail(id: string, status: string) {
@@ -98,7 +98,7 @@ function pixDetail(id: string, status: string) {
     billingType: "PIX",
     customer: "cus_1",
     value: 120,
-    split: [{ walletId: "wal_house", percentualValue: 90 }],
+    split: [{ walletId: "wal_house", fixedValue: 90 }],
   };
 }
 
@@ -550,7 +550,7 @@ const sampleCharge = {
   dueDate: "2026-11-07",
   description: "reserva",
   externalReference: "charge-2",
-  split: { walletId: "wal_house", percentualValue: 90 },
+  split: { walletId: "wal_house", fixedValue: 90 },
   remoteIp: "177.0.0.1",
 };
 
@@ -601,7 +601,7 @@ Deno.test("a primeira cobrança tokeniza e só então reserva com o token", asyn
   assertEquals(payment.billingType, "CREDIT_CARD");
   assertEquals(payment.creditCardToken, "tok_card_1");
   assertEquals(payment.split[0].walletId, "wal_house");
-  assertEquals(payment.split[0].percentualValue, 90);
+  assertEquals(payment.split[0].fixedValue, 90);
   assertEquals(payment.creditCard, undefined);
   assertEquals(payment.creditCardHolderInfo, undefined);
   const paymentText = JSON.stringify(payment);
