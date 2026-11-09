@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch_admin/admin_api.dart';
-import 'package:scapematch_admin/admin_place.dart';
 import 'package:scapematch_admin/admin_format.dart';
+import 'package:scapematch_admin/admin_place.dart';
 import 'package:scapematch_admin/admin_theme.dart';
 
 class CasasPage extends ConsumerStatefulWidget {
@@ -143,7 +143,7 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     final house = await ref.read(adminApiProvider).venue(widget.id);
     if (!mounted) return;
     _neighborhood.text = house.neighborhood;
-    _bps.text = house.commissionBps.toString();
+    _bps.text = percentInput(house.commissionBps);
     setState(() => _house = house);
   }
 
@@ -169,8 +169,6 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                 Text(
                   '${house.documentKind.toUpperCase()} final ${house.documentLast4} · ${house.phone}',
                 ),
-                if (house.suggestNinja)
-                  const Text('Esta casa pede a comissão Ninja, 20%.'),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
@@ -220,38 +218,30 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Comissão desta casa. A oficial é 25% e a Ninja é 20%. A cobrança já feita guarda o percentual dela.',
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    FilledButton.tonal(
-                      onPressed: () => _commission(2500),
-                      child: const Text('25% oficial'),
-                    ),
-                    FilledButton.tonal(
-                      onPressed: () => _commission(2000),
-                      child: const Text('20% Ninja'),
-                    ),
-                  ],
+                const Text(
+                  'Comissão desta casa, em percentual. A cobrança já feita guarda o percentual dela.',
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   key: const Key('admin-comissao'),
                   controller: _bps,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+                  ],
                   decoration: const InputDecoration(
-                    labelText: 'Pontos-base (2500 = 25%)',
+                    labelText: 'Comissão (%)',
+                    helperText: 'De 0 a 30. Exemplo: 22,5',
                   ),
                 ),
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: FilledButton(
-                    onPressed: () => _commission(int.tryParse(_bps.text) ?? 0),
+                    key: const Key('admin-gravar-comissao'),
+                    onPressed: _commission,
                     child: const Text('Gravar comissão'),
                   ),
                 ),
@@ -270,10 +260,48 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     );
   }
 
-  Future<void> _commission(int bps) async {
-    await ref.read(adminApiProvider).setCommission(venueId: widget.id, bps: bps);
+  Future<void> _commission() async {
+    final bps = bpsFromPercent(_bps.text);
+    if (bps == null) {
+      setState(() {
+        _message = 'A comissão fica entre 0% e 30%, com até duas casas decimais.';
+      });
+      return;
+    }
+    final label = percentBps(bps);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gravar comissão'),
+        content: Text(
+          'A comissão desta casa passa a ser $label. As reservas já feitas não mudam.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            key: const Key('admin-confirmar-comissao'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(adminApiProvider).setCommission(venueId: widget.id, bps: bps);
+    } on AdminRejected catch (error) {
+      if (!mounted) return;
+      setState(() => _message = error.message);
+      return;
+    }
     await _load();
-    setState(() => _message = 'Comissão gravada em ${percentBps(bps)}. As reservas antigas não mudam.');
+    if (!mounted) return;
+    setState(() {
+      _message = 'Comissão gravada em $label. As reservas antigas não mudam.';
+    });
   }
 
   Future<void> _review(String decision) async {

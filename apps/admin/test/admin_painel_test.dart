@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/retry.dart';
 import 'package:scapematch_admin/admin_api.dart';
 import 'package:scapematch_admin/admin_app.dart';
+import 'package:scapematch_admin/admin_format.dart';
 import 'package:scapematch_admin/admin_session.dart';
 
 void main() {
@@ -19,6 +20,16 @@ void main() {
     final data = ByteData.sublistView(Uint8List.fromList(bytes));
     final loader = FontLoader('Poppins')..addFont(Future<ByteData>.value(data));
     await loader.load();
+  });
+
+  test('22,5 vira 2250 pontos-base e passa de 30% não entra', () {
+    expect(bpsFromPercent('22,5'), 2250);
+    expect(bpsFromPercent('22.5'), 2250);
+    expect(bpsFromPercent('30'), 3000);
+    expect(bpsFromPercent('30,01'), isNull);
+    expect(bpsFromPercent('22,555'), isNull);
+    expect(percentBps(2250), '22,5%');
+    expect(percentInput(2000), '20');
   });
 
   testWidgets('painel mostra casas, ganhos e a taxa só quando existe', (tester) async {
@@ -33,7 +44,17 @@ void main() {
     await tester.tap(find.text('Casa da Fila'));
     await _frames(tester);
     expect(find.byKey(const Key('admin-aprovar')), findsOneWidget);
+    expect(find.text('25% oficial'), findsNothing);
+    expect(find.text('20% Ninja'), findsNothing);
+    expect(find.byKey(const Key('admin-comissao')), findsOneWidget);
     await _shot(tester, 'admin-casa');
+    await tester.enterText(find.byKey(const Key('admin-comissao')), '22,5');
+    await tester.tap(find.byKey(const Key('admin-gravar-comissao')));
+    await _frames(tester);
+    expect(find.text('Confirmar'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await _frames(tester);
+    expect(find.textContaining('Comissão gravada'), findsNothing);
     await tester.tap(find.byKey(const Key('admin-aprovar')));
     await _frames(tester);
     expect(find.byKey(const Key('admin-casa-aviso')), findsOneWidget);

@@ -105,7 +105,6 @@ class VenueProfile {
     required this.documentLast4,
     required this.ownerName,
     required this.ownerEmail,
-    required this.suggestNinja,
     required this.platformBps,
     required this.commissionBps,
     required this.commissionOverride,
@@ -129,7 +128,6 @@ class VenueProfile {
   final String documentLast4;
   final String ownerName;
   final String ownerEmail;
-  final bool suggestNinja;
   final int platformBps;
   final int commissionBps;
   final bool commissionOverride;
@@ -390,7 +388,6 @@ class SupabaseAdminApi implements AdminApi {
       documentLast4: _text(row['document_last4']),
       ownerName: _text(row['owner_name']),
       ownerEmail: _text(row['owner_email']),
-      suggestNinja: row['suggest_ninja'] == true,
       platformBps: _int(row['platform_bps']),
       commissionBps: _int(row['commission_bps']),
       commissionOverride: row['commission_override'] == true,
@@ -450,10 +447,14 @@ class SupabaseAdminApi implements AdminApi {
 
   @override
   Future<void> setCommission({String? venueId, required int bps}) async {
-    await _rpc('admin_set_commission', {
-      'p_venue_id': venueId,
-      'p_commission_bps': bps,
-    });
+    try {
+      await _rpc('admin_set_commission', {
+        'p_venue_id': venueId,
+        'p_commission_bps': bps,
+      });
+    } on PostgrestException catch (error) {
+      throw AdminRejected(error.message);
+    }
   }
 
   @override
@@ -701,7 +702,6 @@ class MemoryAdminApi implements AdminApi {
           documentLast4: '0181',
           ownerName: 'Dona Ninja',
           ownerEmail: 'dona@ninja.exemplo',
-          suggestNinja: true,
           platformBps: 2500,
           commissionBps: 2000,
           commissionOverride: true,
@@ -739,7 +739,6 @@ class MemoryAdminApi implements AdminApi {
           documentLast4: '0199',
           ownerName: 'Dono Novo',
           ownerEmail: 'novo@casa.exemplo',
-          suggestNinja: false,
           platformBps: 2500,
           commissionBps: 2500,
           commissionOverride: false,
@@ -855,7 +854,6 @@ class MemoryAdminApi implements AdminApi {
       documentLast4: house.documentLast4,
       ownerName: house.ownerName,
       ownerEmail: house.ownerEmail,
-      suggestNinja: house.suggestNinja,
       platformBps: platformBps,
       commissionBps: commissionBps ?? house.commissionBps,
       commissionOverride: commissionOverride ?? house.commissionOverride,
@@ -929,6 +927,9 @@ class MemoryAdminApi implements AdminApi {
 
   @override
   Future<void> setCommission({String? venueId, required int bps}) async {
+    if (bps < 0 || bps > 3000) {
+      throw const AdminRejected('A comissão fica entre 0% e 30%.');
+    }
     if (venueId == null) {
       platformBps = bps;
     } else {

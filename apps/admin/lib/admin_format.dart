@@ -6,11 +6,28 @@ String reais(int cents) {
   return '${negative ? '-' : ''}R\$ $whole,$frac';
 }
 
-String percentBps(int bps) {
+String percentBps(int bps) => '${percentInput(bps)}%';
+
+/// Texto do campo: 2000 vira "20" e 2250 vira "22,5".
+String percentInput(int bps) {
   final whole = bps ~/ 100;
-  final frac = bps % 100;
-  if (frac == 0) return '$whole%';
-  return '$whole,${(frac ~/ 10)}%';
+  final frac = (bps % 100).abs();
+  if (frac == 0) return '$whole';
+  if (frac % 10 == 0) return '$whole,${frac ~/ 10}';
+  return '$whole,${frac.toString().padLeft(2, '0')}';
+}
+
+/// Percentual digitado (22,5 ou 22.5) em pontos-base. Fora de 0% a 30%,
+/// ou com mais de duas casas, devolve nulo.
+int? bpsFromPercent(String raw) {
+  final text = raw.trim().replaceAll('%', '').replaceAll(' ', '').replaceAll(',', '.');
+  if (!RegExp(r'^\d{1,2}(\.\d{1,2})?$').hasMatch(text)) return null;
+  final value = double.tryParse(text);
+  if (value == null) return null;
+  final bps = (value * 100).round();
+  if ((bps - value * 100).abs() > 0.001) return null;
+  if (bps < 0 || bps > 3000) return null;
+  return bps;
 }
 
 String _thousands(int value) {

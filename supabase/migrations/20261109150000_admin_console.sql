@@ -522,8 +522,6 @@ begin
   end if;
   return pg_catalog.jsonb_build_object(
     'platform_bps', (select commission_bps from public.platform_settings where id = 1),
-    'official_bps', 2500,
-    'ninja_bps', 2000,
     'houses', coalesce((
       select pg_catalog.jsonb_agg(row_to_json(s) order by s.name)
       from (
@@ -605,16 +603,9 @@ begin
     'invite_code', (
       select i.code from public.partner_invites i where i.id = v_house.invite_id
     ),
-    'suggest_ninja', v_house.name_normalized = 'ninja'
-      or exists (
-        select 1 from public.partner_invites i
-        where i.id = v_house.invite_id and i.code = 'ninja-cwb'
-      ),
     'platform_bps', v_platform,
     'commission_bps', v_rate,
     'commission_override', v_override,
-    'official_bps', 2500,
-    'ninja_bps', 2000,
     'featured_rank', v_house.featured_rank,
     'snapshots', coalesce((
       select pg_catalog.jsonb_agg(row_to_json(c) order by c.created_at desc)
@@ -844,6 +835,13 @@ declare
   v_uid uuid := private.admin_require();
   v_before integer;
 begin
+  if p_commission_bps is null
+    or p_commission_bps < 0
+    or p_commission_bps > 3000
+  then
+    raise exception 'A comissão fica entre 0%% e 30%%.'
+      using errcode = '22023';
+  end if;
   if p_venue_id is null then
     select commission_bps into v_before
     from public.platform_settings where id = 1;

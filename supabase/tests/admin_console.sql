@@ -278,6 +278,44 @@ begin
     raise exception 'oficial reescreveu a reserva: %', v_snap;
   end if;
   perform public.admin_set_commission(null, 1000);
+  begin
+    perform public.admin_set_commission(
+      'ad311111-1111-4111-8111-111111111111', 3001
+    );
+    raise exception 'comissao acima de 30 gravou';
+  exception
+    when sqlstate '22023' then
+      if sqlerrm not ilike '%0% e 30%' then
+        raise exception 'mensagem da faixa: %', sqlerrm;
+      end if;
+  end;
+  begin
+    perform public.admin_set_commission(
+      'ad311111-1111-4111-8111-111111111111', null
+    );
+    raise exception 'comissao nula gravou';
+  exception
+    when sqlstate '22023' then
+      null;
+  end;
+  perform public.admin_set_commission(
+    'ad311111-1111-4111-8111-111111111111', 2250
+  );
+  v_review := public.admin_venue('ad311111-1111-4111-8111-111111111111');
+  if (v_review ->> 'commission_bps')::integer <> 2250
+    or (v_review ->> 'commission_override')::boolean is not true
+  then
+    raise exception '22,5%% nao gravou: %', v_review -> 'commission_bps';
+  end if;
+  select commission_bps into v_snap
+  from public.payment_charges
+  where id = 'ad611111-1111-4111-8111-111111111111';
+  if v_snap <> 1000 then
+    raise exception '22,5%% reescreveu a reserva: %', v_snap;
+  end if;
+  perform public.admin_set_commission(
+    'ad311111-1111-4111-8111-111111111111', 2000
+  );
   perform public.admin_update_venue(
     'ad311111-1111-4111-8111-111111111111',
     '{"neighborhood":"Batel"}'::jsonb
