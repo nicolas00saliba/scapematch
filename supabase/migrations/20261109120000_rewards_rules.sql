@@ -79,6 +79,7 @@ alter table public.ledger_entries
       'venue_credit_refund',
       'venue_credit_clawback',
       'venue_credit_clawback_refund',
+      'venue_credit_clawback_offset',
       'empty_slot_offset',
       'empty_slot_offset_refund',
       'empty_slot_offset_undo',

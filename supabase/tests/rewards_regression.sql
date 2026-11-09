@@ -307,6 +307,186 @@ begin
   ) then
     raise exception 'o gerador estornado pagou de novo o horario vazio';
   end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values
+    ('aa400000-0000-4000-8000-000000000004', 'curitiba', 'aa200000-0000-4000-8000-000000000001', 'aa300000-0000-4000-8000-000000000001', 'aa310000-0000-4000-8000-000000000001', v_paid + interval '4 day', 4, 2, 10000, 'aa100000-0000-4000-8000-000000000001'),
+    ('aa400000-0000-4000-8000-000000000005', 'curitiba', 'aa200000-0000-4000-8000-000000000001', 'aa300000-0000-4000-8000-000000000001', 'aa310000-0000-4000-8000-000000000001', v_paid + interval '5 day', 4, 2, 10000, 'aa100000-0000-4000-8000-000000000001'),
+    ('aa400000-0000-4000-8000-000000000006', 'curitiba', 'aa200000-0000-4000-8000-000000000001', 'aa300000-0000-4000-8000-000000000001', 'aa310000-0000-4000-8000-000000000001', v_paid + interval '6 day', 4, 2, 10000, 'aa100000-0000-4000-8000-000000000001'),
+    ('aa400000-0000-4000-8000-000000000007', 'curitiba', 'aa200000-0000-4000-8000-000000000001', 'aa300000-0000-4000-8000-000000000001', 'aa310000-0000-4000-8000-000000000001', v_paid + interval '7 day', 4, 2, 10000, 'aa100000-0000-4000-8000-000000000001'),
+    ('aa400000-0000-4000-8000-000000000008', 'curitiba', 'aa200000-0000-4000-8000-000000000001', 'aa300000-0000-4000-8000-000000000001', 'aa310000-0000-4000-8000-000000000001', v_paid + interval '8 day', 4, 2, 10000, 'aa100000-0000-4000-8000-000000000001');
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps
+  ) values
+    ('aa500000-0000-4000-8000-000000000004', 'aa400000-0000-4000-8000-000000000004', 'aa100000-0000-4000-8000-000000000002', 'aa200000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'idem-reg-d1', 'wal', 2500),
+    ('aa500000-0000-4000-8000-000000000005', 'aa400000-0000-4000-8000-000000000005', 'aa100000-0000-4000-8000-000000000002', 'aa200000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'idem-reg-d2', 'wal', 2500),
+    ('aa500000-0000-4000-8000-000000000006', 'aa400000-0000-4000-8000-000000000006', 'aa100000-0000-4000-8000-000000000002', 'aa200000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'idem-reg-abs', 'wal', 2500),
+    ('aa500000-0000-4000-8000-000000000007', 'aa400000-0000-4000-8000-000000000007', 'aa100000-0000-4000-8000-000000000002', 'aa200000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'idem-reg-dev', 'wal', 2500),
+    ('aa500000-0000-4000-8000-000000000008', 'aa400000-0000-4000-8000-000000000008', 'aa100000-0000-4000-8000-000000000002', 'aa200000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'idem-reg-src', 'wal', 2500);
+  insert into public.venue_cashback_debits (
+    venue_id, source_charge_id, amount_cents, applied_cents, applied_charge_id
+  ) values
+    ('aa200000-0000-4000-8000-000000000001', 'aa500000-0000-4000-8000-000000000004', 200, 200, 'aa500000-0000-4000-8000-000000000006'),
+    ('aa200000-0000-4000-8000-000000000001', 'aa500000-0000-4000-8000-000000000005', 150, 150, 'aa500000-0000-4000-8000-000000000006');
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind, amount_cents, payment_charge_id
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa400000-0000-4000-8000-000000000006',
+    'aa100000-0000-4000-8000-000000000002',
+    'house', 'debit', 'empty_slot_offset', 350,
+    'aa500000-0000-4000-8000-000000000006'
+  );
+  perform private.ledger_reverse_charge('aa500000-0000-4000-8000-000000000006');
+  perform private.ledger_reverse_charge('aa500000-0000-4000-8000-000000000006');
+  if (
+    select count(*) from public.venue_cashback_debits
+    where applied_charge_id = 'aa500000-0000-4000-8000-000000000006'
+  ) <> 0 or (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = 'aa500000-0000-4000-8000-000000000006'
+      and kind = 'empty_slot_offset_undo'
+  ) is distinct from 350 or exists (
+    select 1 from public.ledger_entries
+    where payment_charge_id = 'aa500000-0000-4000-8000-000000000006'
+      and kind = 'empty_slot_refund_reversal'
+  ) then
+    raise exception 'dois debitos na mesma cobranca nao estornaram juntos ou o replay mudou o livro';
+  end if;
+
+  insert into public.venue_cashback_debits (
+    venue_id, source_charge_id, amount_cents, applied_cents, applied_charge_id
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa500000-0000-4000-8000-000000000008',
+    400, 400, 'aa500000-0000-4000-8000-000000000006'
+  );
+  insert into public.venue_cashback_refunds (
+    venue_id, debit_id, amount_cents, applied_cents, applied_charge_id
+  )
+  select
+    'aa200000-0000-4000-8000-000000000001', d.id, 400, 400,
+    'aa500000-0000-4000-8000-000000000007'
+  from public.venue_cashback_debits d
+  where d.source_charge_id = 'aa500000-0000-4000-8000-000000000008';
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind, amount_cents, payment_charge_id
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa400000-0000-4000-8000-000000000007',
+    'aa100000-0000-4000-8000-000000000002',
+    'house', 'credit', 'house_net', 7500,
+    'aa500000-0000-4000-8000-000000000007'
+  ), (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa400000-0000-4000-8000-000000000007',
+    'aa100000-0000-4000-8000-000000000002',
+    'house', 'credit', 'empty_slot_offset_refund', 400,
+    'aa500000-0000-4000-8000-000000000007'
+  );
+  perform private.ledger_reverse_charge('aa500000-0000-4000-8000-000000000007');
+  perform private.ledger_reverse_charge('aa500000-0000-4000-8000-000000000007');
+  if (
+    select f.applied_cents from public.venue_cashback_refunds f
+    join public.venue_cashback_debits d on d.id = f.debit_id
+    where d.source_charge_id = 'aa500000-0000-4000-8000-000000000008'
+  ) <> 0 or (
+    select coalesce(sum(case when direction = 'credit' then amount_cents else -amount_cents end), 0)
+    from public.ledger_entries
+    where payment_charge_id = 'aa500000-0000-4000-8000-000000000007'
+      and account = 'house'
+  ) <> 0 then
+    raise exception 'estorno da devolucao nao reabriu a obrigacao ou o livro da casa nao zerou';
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'aa400000-0000-4000-8000-000000000009',
+    'curitiba', 'aa200000-0000-4000-8000-000000000001',
+    'aa300000-0000-4000-8000-000000000001',
+    'aa310000-0000-4000-8000-000000000001',
+    v_paid + interval '9 day', 4, 2, 10000,
+    'aa100000-0000-4000-8000-000000000001'
+  ), (
+    'aa400000-0000-4000-8000-000000000010',
+    'curitiba', 'aa200000-0000-4000-8000-000000000001',
+    'aa300000-0000-4000-8000-000000000001',
+    'aa310000-0000-4000-8000-000000000001',
+    v_paid + interval '10 day', 4, 2, 10000,
+    'aa100000-0000-4000-8000-000000000001'
+  );
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values (
+    'aa400000-0000-4000-8000-000000000009',
+    'aa100000-0000-4000-8000-000000000002',
+    'Regressao Jogador', true, 'pending', 'none', 'none'
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps
+  ) values (
+    'aa500000-0000-4000-8000-000000000009',
+    'aa400000-0000-4000-8000-000000000009',
+    'aa100000-0000-4000-8000-000000000002',
+    'aa200000-0000-4000-8000-000000000001',
+    10000, 'PIX', 'pending', 'idem-reg-replay', 'wal', 2500
+  ), (
+    'aa500000-0000-4000-8000-000000000010',
+    'aa400000-0000-4000-8000-000000000010',
+    'aa100000-0000-4000-8000-000000000002',
+    'aa200000-0000-4000-8000-000000000001',
+    10000, 'PIX', 'paid', 'idem-reg-replay-src', 'wal', 2500
+  );
+  perform private.apply_payment_transition(
+    'aa500000-0000-4000-8000-000000000009', 'paid', true
+  );
+  insert into public.venue_cashback_debits (
+    venue_id, source_charge_id, amount_cents, applied_cents, applied_charge_id
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa500000-0000-4000-8000-000000000010',
+    400, 400, 'aa500000-0000-4000-8000-000000000009'
+  );
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind, amount_cents, payment_charge_id
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa400000-0000-4000-8000-000000000009',
+    'aa100000-0000-4000-8000-000000000002',
+    'house', 'debit', 'empty_slot_offset', 400,
+    'aa500000-0000-4000-8000-000000000009'
+  );
+  perform private.apply_payment_transition(
+    'aa500000-0000-4000-8000-000000000009', 'refunded', true
+  );
+  perform private.apply_payment_transition(
+    'aa500000-0000-4000-8000-000000000009', 'refunded', true
+  );
+  if (
+    select applied_cents from public.venue_cashback_debits
+    where source_charge_id = 'aa500000-0000-4000-8000-000000000010'
+  ) <> 0 or (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = 'aa500000-0000-4000-8000-000000000009'
+      and kind = 'empty_slot_offset_undo'
+  ) is distinct from 400 or exists (
+    select 1 from public.ledger_entries
+    where payment_charge_id = 'aa500000-0000-4000-8000-000000000009'
+      and kind = 'empty_slot_refund_reversal'
+  ) or (
+    select coalesce(sum(case when direction = 'credit' then amount_cents else -amount_cents end), 0)
+    from public.ledger_entries
+    where payment_charge_id = 'aa500000-0000-4000-8000-000000000009'
+      and account = 'house'
+  ) <> 0 then
+    raise exception 'replay do estorno reabriu o debito ou tirou o undo do livro';
+  end if;
 end $$;
 
 rollback;

@@ -78,12 +78,18 @@ begin
     and f.voided_at is null
     and f.applied_cents = 0;
 
+  update public.venue_cashback_refunds
+  set applied_cents = 0,
+      applied_charge_id = null
+  where applied_charge_id = p_charge_id
+    and voided_at is null;
+
   insert into public.ledger_entries (
     venue_id, group_id, user_id, account, direction, kind,
     amount_cents, payment_charge_id
   )
-  select d.venue_id, ch.group_id, ch.user_id, 'house', 'credit',
-    'empty_slot_offset_undo', d.applied_cents, p_charge_id
+  select ch.venue_id, ch.group_id, ch.user_id, 'house', 'credit',
+    'empty_slot_offset_undo', sum(d.applied_cents), p_charge_id
   from public.venue_cashback_debits d
   join public.payment_charges ch on ch.id = p_charge_id
   where d.applied_charge_id = p_charge_id
@@ -96,7 +102,8 @@ begin
       select 1 from public.ledger_entries l
       where l.payment_charge_id = p_charge_id
         and l.kind = 'empty_slot_offset_undo' and l.direction = 'credit'
-    );
+    )
+  group by ch.venue_id, ch.group_id, ch.user_id;
 
   update public.venue_cashback_debits d
   set applied_cents = 0, applied_charge_id = null
@@ -620,13 +627,13 @@ begin
     amount_cents, payment_charge_id
   )
   select
-    c.venue_id,
+    ch.venue_id,
     ch.group_id,
     ch.user_id,
     'house',
     'credit',
     'venue_credit_clawback_offset',
-    c.applied_cents,
+    sum(c.applied_cents),
     p_charge_id
   from public.venue_credit_clawbacks c
   join public.venue_credit_applications a on a.entry_id = c.entry_id
@@ -636,6 +643,7 @@ begin
     and c.voided_at is null
     and c.neutralized_at is null
     and c.applied_cents > 0
+  group by ch.venue_id, ch.group_id, ch.user_id
   on conflict (payment_charge_id, kind, direction) do nothing;
 
   update public.venue_credit_clawbacks c
@@ -705,6 +713,11 @@ begin
   from public.ledger_entries as credit
   where credit.payment_charge_id = p_charge_id
     and credit.direction = 'credit'
+    and credit.kind not in (
+      'venue_credit_clawback_offset',
+      'venue_credit_clawback_refund',
+      'empty_slot_offset_undo'
+    )
   on conflict (payment_charge_id, kind, direction) do nothing;
 
   insert into public.ledger_entries (

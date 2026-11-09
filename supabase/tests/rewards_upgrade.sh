@@ -1,13 +1,14 @@
 #!/bin/bash
-# Prova que um banco que já aplicou o #84 em 70bbdd1 fica igual a um banco novo
-# depois das migrations atuais do #85. Não fala com o Asaas.
+# main → migrations do #84 → dados financeiros gravados → migrations do #85.
+# 70bbdd1 nunca foi aplicado fora de teste e não é caminho suportado.
+# Não fala com o Asaas e não publica função.
 set -euo pipefail
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
-old_ref="70bbdd183dc2ded5e0f75faee8d0de5a0c62f0a5"
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$root"
 
-if ! git cat-file -e "${old_ref}^{commit}" 2>/dev/null; then
-  git fetch --no-tags origin "$old_ref"
+if ! git cat-file -e origin/main^{commit} 2>/dev/null; then
+  git fetch --no-tags origin main
 fi
 
 admin_psql() {
@@ -28,45 +29,39 @@ psql_db() {
   fi
 }
 
-make_db() {
-  local db="$1"
-  admin_psql -c "drop database if exists ${db} with (force);" >/dev/null
-  admin_psql -c "create database ${db};" >/dev/null
-  psql_db "$db" -f "$root/tests/local_harness.sql" >/dev/null
-}
+admin_psql -c "drop database if exists scapematch_rewards_upgrade with (force);" >/dev/null
+admin_psql -c "create database scapematch_rewards_upgrade;" >/dev/null
+psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/local_harness.sql" >/dev/null
 
-make_db scapematch_upgrade
-mapfile -t old_migrations < <(git ls-tree -r --name-only "$old_ref" supabase/migrations | sort)
-if [[ ${#old_migrations[@]} -eq 0 ]]; then
-  echo "o commit ${old_ref} nao tem migrations" >&2
-  exit 1
-fi
-for path in "${old_migrations[@]}"; do
-  git show "${old_ref}:${path}" | psql_db scapematch_upgrade -f - >/dev/null
+while IFS= read -r path; do
+  git show "origin/main:${path}" | psql_db scapematch_rewards_upgrade -f - >/dev/null
+done < <(git ls-tree -r --name-only origin/main supabase/migrations | sort)
+
+for path in supabase/migrations/20261108*.sql; do
+  psql_db scapematch_rewards_upgrade -f "$root/$path" >/dev/null
 done
-psql_db scapematch_upgrade -f "$root/migrations/20261109120000_rewards_rules.sql" >/dev/null
-psql_db scapematch_upgrade -f "$root/migrations/20261109130000_reward_reversal.sql" >/dev/null
 
-psql_db scapematch_upgrade -v ON_ERROR_STOP=1 -c "
-do \$\$
-begin
-  if to_regprocedure('private.apply_venue_clawback(uuid,uuid,integer)') is null
-    or to_regprocedure('private.restore_applied_venue_credits(uuid)') is null
-    or to_regprocedure('private.reopen_empty_slot_on_refund(uuid)') is null
-  then
-    raise exception 'upgrade do #84 antigo nao criou clawback, restore ou reopen';
-  end if;
-  if pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure)
-    not like '%post_player_cashback%'
-    or pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure)
-    not like '%referrer_tier_bonus%'
-  then
-    raise exception 'upgrade nao ligou cashback variavel nem nivel';
-  end if;
-end \$\$;
-"
-psql_db scapematch_upgrade -f "$root/tests/reward_reversal.sql" >/dev/null
-psql_db scapematch_upgrade -f "$root/tests/rewards_regression.sql" >/dev/null
+psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/paid_cashback_84.sql" >/dev/null
+psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/reward_reversal.sql" >/dev/null
+psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/commit_84_offset.sql" >/dev/null
 
-admin_psql -c "drop database if exists scapematch_upgrade with (force);" >/dev/null
+for path in supabase/migrations/20261109*.sql; do
+  psql_db scapematch_rewards_upgrade -f "$root/$path" >/dev/null
+done
+
+psql_db scapematch_rewards_upgrade -v ON_ERROR_STOP=1 -c "
+  do \$\$
+  begin
+    if (
+      select amount_cents from public.ledger_entries
+      where kind = 'venue_credit_clawback_offset'
+        and payment_charge_id = 'cb500000-0000-4000-8000-000000000001'
+    ) is distinct from 700 then
+      raise exception 'o offset gravado no #84 sumiu na migration do #85';
+    end if;
+  end \$\$;
+" >/dev/null
+
+psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/rewards_regression.sql" >/dev/null
+admin_psql -c "drop database if exists scapematch_rewards_upgrade with (force);" >/dev/null
 echo "rewards upgrade ok"

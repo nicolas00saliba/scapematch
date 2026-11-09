@@ -1121,10 +1121,7 @@ begin
             v_charge.id, 'c2c', v_player.referrer_user_id, null,
             v_charge.user_id, null
           );
-          v_cents := least(private.reward_cents(
-            v_gross,
-            v_settings.c2c_bps
-          ), v_pool);
+          v_cents := least(private.reward_cents(v_gross, v_settings.c2c_bps), v_pool);
           v_points := v_cents / v_value;
           v_cents := v_points * v_value;
           if v_gate is distinct from 'skip' and v_points > 0 then
@@ -1197,10 +1194,7 @@ begin
     v_gate := private.referral_reward_gate(
       v_charge.id, 'c2b', v_referrer, null, null, v_charge.venue_id
     );
-    v_cents := least(private.reward_cents(
-      v_gross,
-      v_settings.c2b_bps
-    ), v_pool);
+    v_cents := least(private.reward_cents(v_gross, v_settings.c2b_bps), v_pool);
     v_points := v_cents / v_value;
     v_cents := v_points * v_value;
     if v_gate = 'skip' or v_points <= 0 then
