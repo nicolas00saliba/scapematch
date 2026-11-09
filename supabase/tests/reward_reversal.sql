@@ -192,6 +192,49 @@ begin
   ) then
     raise exception 'clawback cobrado continuou aberto depois do estorno';
   end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values
+    ('c4000000-0000-4000-8000-000000000004', 'curitiba', 'c2000000-0000-4000-8000-000000000001', 'c3000000-0000-4000-8000-000000000001', 'c3100000-0000-4000-8000-000000000001', '2027-08-04 18:00:00+00', 4, 2, 10000, 'c1000000-0000-4000-8000-000000000001'),
+    ('c4000000-0000-4000-8000-000000000005', 'curitiba', 'c2000000-0000-4000-8000-000000000001', 'c3000000-0000-4000-8000-000000000001', 'c3100000-0000-4000-8000-000000000001', '2027-08-05 18:00:00+00', 4, 2, 10000, 'c1000000-0000-4000-8000-000000000001'),
+    ('c4000000-0000-4000-8000-000000000006', 'curitiba', 'c2000000-0000-4000-8000-000000000001', 'c3000000-0000-4000-8000-000000000001', 'c3100000-0000-4000-8000-000000000001', '2027-08-06 18:00:00+00', 4, 2, 10000, 'c1000000-0000-4000-8000-000000000001');
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps
+  ) values
+    ('c5000000-0000-4000-8000-000000000004', 'c4000000-0000-4000-8000-000000000004', 'c1000000-0000-4000-8000-000000000002', 'c2000000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'idem-dois-a', 'wal', 2500),
+    ('c5000000-0000-4000-8000-000000000005', 'c4000000-0000-4000-8000-000000000005', 'c1000000-0000-4000-8000-000000000002', 'c2000000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'idem-dois-b', 'wal', 2500),
+    ('c5000000-0000-4000-8000-000000000006', 'c4000000-0000-4000-8000-000000000006', 'c1000000-0000-4000-8000-000000000002', 'c2000000-0000-4000-8000-000000000001', 10000, 'PIX', 'creating', 'idem-dois-c', 'wal', 2500);
+  insert into public.venue_referral_entries (
+    venue_id, kind, amount_cents, program, settlement, source_charge_id,
+    idempotency_key, available_at, applied_cents
+  ) values
+    ('c2000000-0000-4000-8000-000000000001', 'accrual', 400, 'b2c', 'released', 'c5000000-0000-4000-8000-000000000004', 'idem-dois-credito-a', now(), 0),
+    ('c2000000-0000-4000-8000-000000000001', 'accrual', 300, 'b2c', 'released', 'c5000000-0000-4000-8000-000000000005', 'idem-dois-credito-b', now(), 0);
+  if private.apply_venue_credit(
+    'c5000000-0000-4000-8000-000000000006',
+    'c2000000-0000-4000-8000-000000000001', 2500
+  ) <> 700 then
+    raise exception 'os dois creditos nao entraram juntos';
+  end if;
+  perform private.reverse_referral_rewards('c5000000-0000-4000-8000-000000000004');
+  perform private.reverse_referral_rewards('c5000000-0000-4000-8000-000000000005');
+  if private.apply_venue_clawback(
+    'c5000000-0000-4000-8000-000000000002',
+    'c2000000-0000-4000-8000-000000000001', 7500
+  ) <> 700 then
+    raise exception 'os dois clawbacks nao foram cobrados';
+  end if;
+  perform private.ledger_reverse_charge('c5000000-0000-4000-8000-000000000006');
+  if (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = 'c5000000-0000-4000-8000-000000000006'
+      and kind = 'venue_credit_clawback_offset'
+  ) is distinct from 700 then
+    raise exception 'o offset dos dois clawbacks nao somou 700';
+  end if;
 end $$;
 
 rollback;

@@ -1008,9 +1008,35 @@ begin
   v_paid := coalesce(v_charge.paid_at, pg_catalog.now());
   v_value := v_settings.point_value_cents;
 
-  -- Cashback sorteado. Sem as travas de indicação. A função devolve os centavos usados.
-  v_cents := private.post_player_cashback(v_charge.id, v_pool);
-  v_pool := greatest(v_pool - coalesce(v_cents, 0), 0);
+  -- Cashback fixo de 1%. O sorteio entra só na migration do #85.
+  select amount_cents into v_existing
+  from public.scape_point_entries
+  where source_charge_id = v_charge.id
+    and program = 'cashback'
+    and kind = 'accrual';
+  if found then
+    v_pool := greatest(v_pool - v_existing, 0);
+  else
+    v_cents := least(
+      private.reward_cents(v_charge.amount_cents, v_settings.cashback_bps),
+      v_pool
+    );
+    v_points := v_cents / v_value;
+    v_cents := v_points * v_value;
+    if v_points > 0 then
+      insert into public.scape_point_entries (
+        user_id, kind, points, amount_cents, program,
+        source_charge_id, payment_charge_id, idempotency_key, available_at
+      ) values (
+        v_charge.user_id, 'accrual', v_points, v_cents, 'cashback',
+        v_charge.id, v_charge.id,
+        'accrual:' || v_charge.id::text || ':cashback',
+        v_paid + make_interval(days => v_settings.hold_days)
+      )
+      on conflict (idempotency_key) do nothing;
+      v_pool := v_pool - v_cents;
+    end if;
+  end if;
 
   if private.identity_conflict(v_charge.user_id, null, v_charge.venue_id, null) is not null then
     return;
@@ -1097,7 +1123,7 @@ begin
           );
           v_cents := least(private.reward_cents(
             v_gross,
-            v_settings.c2c_bps + private.referrer_tier_bonus(v_player.referrer_user_id)
+            v_settings.c2c_bps
           ), v_pool);
           v_points := v_cents / v_value;
           v_cents := v_points * v_value;
@@ -1173,7 +1199,7 @@ begin
     );
     v_cents := least(private.reward_cents(
       v_gross,
-      v_settings.c2b_bps + private.referrer_tier_bonus(v_referrer)
+      v_settings.c2b_bps
     ), v_pool);
     v_points := v_cents / v_value;
     v_cents := v_points * v_value;

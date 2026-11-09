@@ -48,6 +48,11 @@ begin
   from public.ledger_entries as credit
   where credit.payment_charge_id = p_charge_id
     and credit.direction = 'credit'
+    and credit.kind not in (
+      'venue_credit_clawback_offset',
+      'venue_credit_clawback_refund',
+      'empty_slot_offset_undo'
+    )
   on conflict (payment_charge_id, kind, direction) do nothing;
 
   insert into public.ledger_entries (
