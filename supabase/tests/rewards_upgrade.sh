@@ -6,21 +6,28 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 old_ref="70bbdd183dc2ded5e0f75faee8d0de5a0c62f0a5"
 
+admin_psql() {
+  if [[ -n "${DATABASE_URL:-}" ]]; then
+    psql "${DATABASE_URL%/*}/postgres" -v ON_ERROR_STOP=1 "$@"
+  else
+    sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 "$@"
+  fi
+}
+
 psql_db() {
   local db="$1"
   shift
   if [[ -n "${DATABASE_URL:-}" ]]; then
-    echo "rewards upgrade precisa do Postgres local" >&2
-    exit 1
+    psql "${DATABASE_URL%/*}/${db}" -v ON_ERROR_STOP=1 "$@"
+  else
+    sudo -u postgres psql -d "$db" -v ON_ERROR_STOP=1 "$@"
   fi
-  sudo -u postgres psql -d "$db" -v ON_ERROR_STOP=1 "$@"
 }
 
 make_db() {
   local db="$1"
-  sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 \
-    -c "drop database if exists ${db} with (force);" >/dev/null
-  sudo -u postgres createdb "$db" >/dev/null
+  admin_psql -c "drop database if exists ${db} with (force);" >/dev/null
+  admin_psql -c "create database ${db};" >/dev/null
   psql_db "$db" -f "$root/tests/local_harness.sql" >/dev/null
 }
 
@@ -72,8 +79,6 @@ do
   fi
 done
 
-sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 \
-  -c "drop database if exists scapematch_upgrade with (force);" >/dev/null
-sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 \
-  -c "drop database if exists scapematch_fresh with (force);" >/dev/null
+admin_psql -c "drop database if exists scapematch_upgrade with (force);" >/dev/null
+admin_psql -c "drop database if exists scapematch_fresh with (force);" >/dev/null
 echo "rewards upgrade ok"
