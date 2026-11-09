@@ -346,7 +346,7 @@ begin
     select count(*) from public.venue_cashback_debits
     where applied_charge_id = 'aa500000-0000-4000-8000-000000000006'
   ) <> 0 or (
-    select amount_cents from public.ledger_entries
+    select coalesce(sum(amount_cents), 0) from public.ledger_entries
     where payment_charge_id = 'aa500000-0000-4000-8000-000000000006'
       and kind = 'empty_slot_offset_undo'
   ) is distinct from 350 or exists (

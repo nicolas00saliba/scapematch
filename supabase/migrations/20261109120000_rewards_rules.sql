@@ -434,7 +434,15 @@ declare
   v_row public.venue_cashback_debits%rowtype;
   v_open integer;
 begin
+  perform private.lock_venue_rewards(p_venue_id);
   if v_left <= 0 then
+    return 0;
+  end if;
+  if exists (
+    select 1 from public.payment_charges
+    where id = p_charge_id
+      and status in ('refunded', 'cancelled', 'failed')
+  ) then
     return 0;
   end if;
   for v_row in
@@ -860,7 +868,15 @@ declare
   v_row public.venue_referral_entries%rowtype;
   v_open integer;
 begin
+  perform private.lock_venue_rewards(p_venue_id);
   if v_left <= 0 then
+    return 0;
+  end if;
+  if exists (
+    select 1 from public.payment_charges
+    where id = p_charge_id
+      and status in ('refunded', 'cancelled', 'failed')
+  ) then
     return 0;
   end if;
   if exists (
@@ -933,7 +949,15 @@ declare
   v_row public.venue_cashback_refunds%rowtype;
   v_open integer;
 begin
+  perform private.lock_venue_rewards(p_venue_id);
   if v_left <= 0 then
+    return 0;
+  end if;
+  if exists (
+    select 1 from public.payment_charges
+    where id = p_charge_id
+      and status in ('refunded', 'cancelled', 'failed')
+  ) then
     return 0;
   end if;
   for v_row in
@@ -1112,60 +1136,72 @@ begin
   if v_net > 0 then
     insert into public.ledger_entries (
       venue_id, group_id, user_id, account, direction, kind,
-      amount_cents, payment_charge_id
+      amount_cents, payment_charge_id, component_key
     ) values (
       v_charge.venue_id, v_charge.group_id, v_charge.user_id,
-      'house', 'credit', 'house_net', v_net, v_charge.id
-    ) on conflict (payment_charge_id, kind, direction) do nothing;
+      'house', 'credit', 'house_net', v_net, v_charge.id, ''
+    ) on conflict (payment_charge_id, kind, direction, component_key) do nothing;
   end if;
-  if v_charge.venue_credit_applied_cents > 0 then
-    insert into public.ledger_entries (
-      venue_id, group_id, user_id, account, direction, kind,
-      amount_cents, payment_charge_id
-    ) values (
-      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
-      'house', 'credit', 'venue_credit_applied',
-      v_charge.venue_credit_applied_cents, v_charge.id
-    ) on conflict (payment_charge_id, kind, direction) do nothing;
-  end if;
-  if v_charge.venue_credit_clawback_cents > 0 then
-    insert into public.ledger_entries (
-      venue_id, group_id, user_id, account, direction, kind,
-      amount_cents, payment_charge_id
-    ) values (
-      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
-      'house', 'debit', 'venue_credit_clawback',
-      v_charge.venue_credit_clawback_cents, v_charge.id
-    ) on conflict (payment_charge_id, kind, direction) do nothing;
-  end if;
-  if v_charge.cashback_refund_cents > 0 then
-    insert into public.ledger_entries (
-      venue_id, group_id, user_id, account, direction, kind,
-      amount_cents, payment_charge_id
-    ) values (
-      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
-      'house', 'credit', 'empty_slot_offset_refund',
-      v_charge.cashback_refund_cents, v_charge.id
-    ) on conflict (payment_charge_id, kind, direction) do nothing;
-  end if;
-  if v_charge.empty_slot_offset_cents > 0 then
-    insert into public.ledger_entries (
-      venue_id, group_id, user_id, account, direction, kind,
-      amount_cents, payment_charge_id
-    ) values (
-      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
-      'house', 'debit', 'empty_slot_offset',
-      v_charge.empty_slot_offset_cents, v_charge.id
-    ) on conflict (payment_charge_id, kind, direction) do nothing;
-  end if;
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id, component_key
+  )
+  select
+    v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+    'house', 'credit', 'venue_credit_applied',
+    a.amount_cents, v_charge.id, a.entry_id::text
+  from public.venue_credit_applications a
+  where a.payment_charge_id = v_charge.id
+    and a.reversed_at is null
+    and a.amount_cents > 0
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id, component_key
+  )
+  select
+    v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+    'house', 'debit', 'venue_credit_clawback',
+    c.applied_cents, v_charge.id, c.id::text
+  from public.venue_credit_clawbacks c
+  where c.applied_charge_id = v_charge.id
+    and c.voided_at is null
+    and c.applied_cents > 0
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id, component_key
+  )
+  select
+    v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+    'house', 'credit', 'empty_slot_offset_refund',
+    f.applied_cents, v_charge.id, f.id::text
+  from public.venue_cashback_refunds f
+  where f.applied_charge_id = v_charge.id
+    and f.voided_at is null
+    and f.applied_cents > 0
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id, component_key
+  )
+  select
+    v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+    'house', 'debit', 'empty_slot_offset',
+    d.applied_cents, v_charge.id, d.id::text
+  from public.venue_cashback_debits d
+  where d.applied_charge_id = v_charge.id
+    and d.voided_at is null
+    and d.applied_cents > 0
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
   if v_fee > 0 then
     insert into public.ledger_entries (
       venue_id, group_id, user_id, account, direction, kind,
-      amount_cents, payment_charge_id
+      amount_cents, payment_charge_id, component_key
     ) values (
       v_charge.venue_id, v_charge.group_id, v_charge.user_id,
-      'platform', 'credit', 'commission', v_fee, v_charge.id
-    ) on conflict (payment_charge_id, kind, direction) do nothing;
+      'platform', 'credit', 'commission', v_fee, v_charge.id, ''
+    ) on conflict (payment_charge_id, kind, direction, component_key) do nothing;
   end if;
 end;
 $$;

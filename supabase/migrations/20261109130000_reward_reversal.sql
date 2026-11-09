@@ -70,6 +70,10 @@ security definer
 set search_path = ''
 as $$
 begin
+  perform private.lock_venue_rewards(ch.venue_id)
+  from public.payment_charges ch
+  where ch.id = p_charge_id;
+
   update public.venue_cashback_refunds f
   set voided_at = pg_catalog.now()
   from public.venue_cashback_debits d
@@ -86,10 +90,10 @@ begin
 
   insert into public.ledger_entries (
     venue_id, group_id, user_id, account, direction, kind,
-    amount_cents, payment_charge_id
+    amount_cents, payment_charge_id, component_key
   )
   select ch.venue_id, ch.group_id, ch.user_id, 'house', 'credit',
-    'empty_slot_offset_undo', sum(d.applied_cents), p_charge_id
+    'empty_slot_offset_undo', d.applied_cents, p_charge_id, d.id::text
   from public.venue_cashback_debits d
   join public.payment_charges ch on ch.id = p_charge_id
   where d.applied_charge_id = p_charge_id
@@ -98,12 +102,7 @@ begin
       select 1 from public.venue_cashback_refunds f
       where f.debit_id = d.id and f.voided_at is null and f.applied_cents > 0
     )
-    and not exists (
-      select 1 from public.ledger_entries l
-      where l.payment_charge_id = p_charge_id
-        and l.kind = 'empty_slot_offset_undo' and l.direction = 'credit'
-    )
-  group by ch.venue_id, ch.group_id, ch.user_id;
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
 
   update public.venue_cashback_debits d
   set applied_cents = 0, applied_charge_id = null
@@ -438,6 +437,10 @@ security definer
 set search_path = ''
 as $$
 begin
+  perform private.lock_venue_rewards(ch.venue_id)
+  from public.payment_charges ch
+  where ch.id = p_charge_id;
+
   insert into public.scape_point_entries (
     user_id, kind, points, amount_cents, program,
     source_charge_id, payment_charge_id, relates_to, idempotency_key
@@ -572,7 +575,15 @@ declare
   v_row public.venue_credit_clawbacks%rowtype;
   v_open integer;
 begin
+  perform private.lock_venue_rewards(p_venue_id);
   if v_left <= 0 then
+    return 0;
+  end if;
+  if exists (
+    select 1 from public.payment_charges
+    where id = p_charge_id
+      and status in ('refunded', 'cancelled', 'failed')
+  ) then
     return 0;
   end if;
   for v_row in
@@ -580,6 +591,7 @@ begin
     from public.venue_credit_clawbacks
     where venue_id = p_venue_id
       and voided_at is null
+      and neutralized_at is null
       and applied_cents < amount_cents
     order by created_at
     for update
@@ -593,7 +605,8 @@ begin
         applied_charge_id = p_charge_id
     where id = v_row.id
       and applied_cents = v_row.applied_cents
-      and voided_at is null;
+      and voided_at is null
+      and neutralized_at is null;
     if not found then
       continue;
     end if;
@@ -612,49 +625,54 @@ security definer
 set search_path = ''
 as $$
 begin
-  update public.venue_credit_clawbacks c
-  set voided_at = pg_catalog.now()
-  from public.venue_credit_applications a
-  where a.payment_charge_id = p_charge_id
-    and a.reversed_at is null
-    and c.entry_id = a.entry_id
-    and c.voided_at is null
-    and c.neutralized_at is null
-    and c.applied_cents = 0;
+  perform private.lock_venue_rewards(ch.venue_id)
+  from public.payment_charges ch
+  where ch.id = p_charge_id;
 
-  insert into public.ledger_entries (
-    venue_id, group_id, user_id, account, direction, kind,
-    amount_cents, payment_charge_id
+  with locked as (
+    select c.id, c.applied_cents
+    from public.venue_credit_clawbacks c
+    join public.venue_credit_applications a on a.entry_id = c.entry_id
+    where a.payment_charge_id = p_charge_id
+      and a.reversed_at is null
+      and c.voided_at is null
+      and c.neutralized_at is null
+    for update of c
+  ),
+  voided as (
+    update public.venue_credit_clawbacks c
+    set voided_at = pg_catalog.now()
+    from locked l
+    where c.id = l.id
+      and l.applied_cents = 0
+    returning c.id
+  ),
+  posted as (
+    insert into public.ledger_entries (
+      venue_id, group_id, user_id, account, direction, kind,
+      amount_cents, payment_charge_id, component_key
+    )
+    select
+      ch.venue_id,
+      ch.group_id,
+      ch.user_id,
+      'house',
+      'credit',
+      'venue_credit_clawback_offset',
+      l.applied_cents,
+      p_charge_id,
+      l.id::text
+    from locked l
+    join public.payment_charges ch on ch.id = p_charge_id
+    where l.applied_cents > 0
+    on conflict (payment_charge_id, kind, direction, component_key) do nothing
+    returning component_key
   )
-  select
-    ch.venue_id,
-    ch.group_id,
-    ch.user_id,
-    'house',
-    'credit',
-    'venue_credit_clawback_offset',
-    sum(c.applied_cents),
-    p_charge_id
-  from public.venue_credit_clawbacks c
-  join public.venue_credit_applications a on a.entry_id = c.entry_id
-  join public.payment_charges ch on ch.id = p_charge_id
-  where a.payment_charge_id = p_charge_id
-    and a.reversed_at is null
-    and c.voided_at is null
-    and c.neutralized_at is null
-    and c.applied_cents > 0
-  group by ch.venue_id, ch.group_id, ch.user_id
-  on conflict (payment_charge_id, kind, direction) do nothing;
-
   update public.venue_credit_clawbacks c
   set neutralized_at = pg_catalog.now()
-  from public.venue_credit_applications a
-  where a.payment_charge_id = p_charge_id
-    and a.reversed_at is null
-    and c.entry_id = a.entry_id
-    and c.voided_at is null
-    and c.neutralized_at is null
-    and c.applied_cents > 0;
+  from locked l
+  where c.id = l.id
+    and l.applied_cents > 0;
 
   update public.venue_referral_entries e
   set settlement = 'released',
@@ -693,7 +711,7 @@ as $$
 begin
   insert into public.ledger_entries (
     venue_id, group_id, user_id, account, direction, kind,
-    amount_cents, payment_charge_id
+    amount_cents, payment_charge_id, component_key
   )
   select
     credit.venue_id,
@@ -709,7 +727,8 @@ begin
       else 'house_refund'
     end,
     credit.amount_cents,
-    credit.payment_charge_id
+    credit.payment_charge_id,
+    credit.component_key
   from public.ledger_entries as credit
   where credit.payment_charge_id = p_charge_id
     and credit.direction = 'credit'
@@ -718,11 +737,11 @@ begin
       'venue_credit_clawback_refund',
       'empty_slot_offset_undo'
     )
-  on conflict (payment_charge_id, kind, direction) do nothing;
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
 
   insert into public.ledger_entries (
     venue_id, group_id, user_id, account, direction, kind,
-    amount_cents, payment_charge_id
+    amount_cents, payment_charge_id, component_key
   )
   select
     debit.venue_id,
@@ -732,12 +751,17 @@ begin
     'credit',
     'venue_credit_clawback_refund',
     debit.amount_cents,
-    debit.payment_charge_id
+    debit.payment_charge_id,
+    debit.component_key
   from public.ledger_entries as debit
+  join public.venue_credit_clawbacks c
+    on c.id::text = debit.component_key
   where debit.payment_charge_id = p_charge_id
     and debit.direction = 'debit'
     and debit.kind = 'venue_credit_clawback'
-  on conflict (payment_charge_id, kind, direction) do nothing;
+    and c.neutralized_at is null
+    and c.voided_at is null
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
 
   perform private.restore_applied_venue_credits(p_charge_id);
 end;

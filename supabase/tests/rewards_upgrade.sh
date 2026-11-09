@@ -43,6 +43,7 @@ done
 
 psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/paid_cashback_84.sql" >/dev/null
 psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/reward_reversal.sql" >/dev/null
+psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/ledger_permutations.sql" >/dev/null
 psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/commit_84_offset.sql" >/dev/null
 
 for path in supabase/migrations/20261109*.sql; do

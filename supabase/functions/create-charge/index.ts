@@ -16,6 +16,11 @@ import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
 import { detachGonePix } from "../_shared/detach_gone_pix.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import {
+  DbRpcError,
+  isSerializationConflict,
+  retrySerialization,
+} from "../_shared/serialization.ts";
+import {
   cardSwitchBlock,
   cardSwitchDecision,
   localChargeStatus,
@@ -266,7 +271,9 @@ export async function createCharge(
     const mayCredit = await groupClosedForCredit(admin, group);
 
     if (billingType === "PIX") {
-      const reserved = await reservePixCharge(admin, {
+      let reserved;
+      try {
+        reserved = await reservePixCharge(admin, {
         groupId,
         userId: user.id,
         venueId: venue.id as string,
@@ -279,6 +286,12 @@ export async function createCharge(
         pointsRedeemed,
         splitPercent,
       });
+      } catch (error) {
+        if (isSerializationConflict(error)) {
+          return json({ error: "pagamento em andamento" }, 409);
+        }
+        throw error;
+      }
       amountCents = reserved.amount_cents || amountCents;
       if (reserved.split_percent != null) {
         split.percentualValue = reserved.split_percent;
@@ -597,7 +610,9 @@ export async function createCharge(
         cardChargeId = "";
       }
       if (!attemptId) {
-        const reservedCard = await reserveCardCharge(admin, {
+        let reservedCard;
+        try {
+          reservedCard = await reserveCardCharge(admin, {
           groupId,
           userId: user.id,
           venueId: venue.id as string,
@@ -610,6 +625,16 @@ export async function createCharge(
           pointsRedeemed,
           splitPercent,
         });
+        } catch (error) {
+          if (isSerializationConflict(error)) {
+            await loseCard(
+              existing?.id ?? "00000000-0000-0000-0000-000000000000",
+              null,
+            );
+            return json({ error: "pagamento em andamento" }, 409);
+          }
+          throw error;
+        }
         amountCents = reservedCard.amount_cents || amountCents;
         if (reservedCard.split_percent != null) {
           split.percentualValue = reservedCard.split_percent;
@@ -645,7 +670,9 @@ export async function createCharge(
             });
             holdOpen = heldAgain.points > 0;
           }
-          const again = await reserveCardCharge(admin, {
+          let again;
+          try {
+            again = await reserveCardCharge(admin, {
             groupId,
             userId: user.id,
             venueId: venue.id as string,
@@ -658,6 +685,13 @@ export async function createCharge(
             pointsRedeemed,
             splitPercent,
           });
+          } catch (error) {
+            if (isSerializationConflict(error)) {
+              await loseCard(reservedCard.id, reservedCard.attempt_id);
+              return json({ error: "pagamento em andamento" }, 409);
+            }
+            throw error;
+          }
           holdOpen = false;
           await noteCardPayer(admin, user.id, savedCardId, again.id);
           if (!again.inserted || !again.attempt_id) {
@@ -844,18 +878,21 @@ async function reservePixCharge(
     commissionBps: number;
   } & SubsidyFields,
 ): Promise<ReservedPix> {
-  const { data, error } = await admin.rpc("reserve_pix_charge", {
-    p_group_id: input.groupId,
-    p_user_id: input.userId,
-    p_venue_id: input.venueId,
-    p_amount_cents: input.amountCents,
-    p_idempotency_key: input.idempotencyKey,
-    p_wallet_id: input.walletId,
-    p_commission_bps: input.commissionBps,
-    ...subsidyArgs(input),
+  return retrySerialization(async () => {
+    const { data, error } = await admin.rpc("reserve_pix_charge", {
+      p_group_id: input.groupId,
+      p_user_id: input.userId,
+      p_venue_id: input.venueId,
+      p_amount_cents: input.amountCents,
+      p_idempotency_key: input.idempotencyKey,
+      p_wallet_id: input.walletId,
+      p_commission_bps: input.commissionBps,
+      ...subsidyArgs(input),
+    });
+    if (error) throw new DbRpcError(error.code ?? "");
+    if (!data || typeof data !== "object") throw new Error("erro");
+    return parseReserved(data as Record<string, unknown>);
   });
-  if (error || !data || typeof data !== "object") throw new Error("erro");
-  return parseReserved(data as Record<string, unknown>);
 }
 
 function parseReserved(row: Record<string, unknown>): ReservedPix {
@@ -891,18 +928,21 @@ async function reserveCardCharge(
     commissionBps: number;
   } & SubsidyFields,
 ): Promise<ReservedPix> {
-  const { data, error } = await admin.rpc("reserve_card_charge", {
-    p_group_id: input.groupId,
-    p_user_id: input.userId,
-    p_venue_id: input.venueId,
-    p_amount_cents: input.amountCents,
-    p_idempotency_key: input.idempotencyKey,
-    p_wallet_id: input.walletId,
-    p_commission_bps: input.commissionBps,
-    ...subsidyArgs(input),
+  return retrySerialization(async () => {
+    const { data, error } = await admin.rpc("reserve_card_charge", {
+      p_group_id: input.groupId,
+      p_user_id: input.userId,
+      p_venue_id: input.venueId,
+      p_amount_cents: input.amountCents,
+      p_idempotency_key: input.idempotencyKey,
+      p_wallet_id: input.walletId,
+      p_commission_bps: input.commissionBps,
+      ...subsidyArgs(input),
+    });
+    if (error) throw new DbRpcError(error.code ?? "");
+    if (!data || typeof data !== "object") throw new Error("erro");
+    return parseReserved(data as Record<string, unknown>);
   });
-  if (error || !data || typeof data !== "object") throw new Error("erro");
-  return parseReserved(data as Record<string, unknown>);
 }
 
 async function attachPixProvider(
