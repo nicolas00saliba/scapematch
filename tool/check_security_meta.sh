@@ -7,6 +7,7 @@ set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
   echo "uso: $0 flutter <index.html>" >&2
+  echo "     $0 admin <index.html>" >&2
   echo "     $0 landing <diretório>" >&2
   exit 1
 fi
@@ -30,6 +31,21 @@ flutter_csp = (
     "https://www.gstatic.com/flutter-canvaskit/ "
     "https://fonts.gstatic.com/s/ "
     "https://tile.openstreetmap.org; "
+    "worker-src 'self' blob:; frame-src 'none'; "
+    "manifest-src 'self'; form-action 'self'"
+)
+# O Admin não consulta senha vazada nem o mapa.
+admin_csp = (
+    "default-src 'self'; base-uri 'self'; object-src 'none'; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' "
+    "https://www.gstatic.com/flutter-canvaskit/ blob:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob: https:; "
+    "font-src 'self' data:; "
+    "connect-src 'self' https://eujlhicairvksvmssruz.supabase.co "
+    "wss://eujlhicairvksvmssruz.supabase.co "
+    "https://www.gstatic.com/flutter-canvaskit/ "
+    "https://fonts.gstatic.com/s/; "
     "worker-src 'self' blob:; frame-src 'none'; "
     "manifest-src 'self'; form-action 'self'"
 )
@@ -63,13 +79,17 @@ def reject(text, where):
                     f"{where} põe {item} na CSP em meta; o navegador ignora"
                 )
 
-def check_flutter(path):
+def check_flutter(path, csp):
     text = path.read_text()
     require(text, referrer, path)
-    require(text, f'<meta http-equiv="Content-Security-Policy" content="{flutter_csp}">', path)
+    require(text, f'<meta http-equiv="Content-Security-Policy" content="{csp}">', path)
     require(text, 'id="scape-frame-guard"', path)
     require(text, "flutter_bootstrap.js", path)
     require(text, 'rel="manifest"', path)
+    if "api.pwnedpasswords.com" in csp or "tile.openstreetmap.org" in csp:
+        pass
+    elif "api.pwnedpasswords.com" in text or "tile.openstreetmap.org" in text:
+        raise SystemExit(f"{path} abre rede que o Admin não usa")
     reject(text, path)
 
 def check_landing(directory):
@@ -93,7 +113,9 @@ def check_landing(directory):
         reject(text, path)
 
 if mode == "flutter":
-    check_flutter(target)
+    check_flutter(target, flutter_csp)
+elif mode == "admin":
+    check_flutter(target, admin_csp)
 elif mode == "landing":
     check_landing(target)
 else:

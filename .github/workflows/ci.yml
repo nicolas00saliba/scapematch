@@ -84,7 +84,7 @@ jobs:
           bash tool/mark_real_web_copy.sh apps/admin/build/web admin
           bash tool/check_web_service_worker.sh apps/admin/build/web admin
           bash tool/check_web_manifest.sh apps/admin/build/web admin real
-          bash tool/check_security_meta.sh flutter apps/admin/build/web/index.html
+          bash tool/check_security_meta.sh admin apps/admin/build/web/index.html
           python3 - <<'PY'
           import base64, json, pathlib, re, sys
           root = pathlib.Path("apps/admin/build/web")

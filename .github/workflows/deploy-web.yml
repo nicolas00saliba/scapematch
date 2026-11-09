@@ -109,7 +109,7 @@ jobs:
           bash ../../tool/mark_real_web_copy.sh build/admin-root admin
           bash ../../tool/check_web_service_worker.sh build/admin-root admin
           bash ../../tool/check_web_manifest.sh build/admin-root admin real
-          bash ../../tool/check_security_meta.sh flutter build/admin-root/index.html
+          bash ../../tool/check_security_meta.sh admin build/admin-root/index.html
           grep -F 'base href="/"' build/admin-root/index.html
           cp build/admin-root/index.html build/admin-root/404.html
           touch build/admin-root/.nojekyll
@@ -213,7 +213,7 @@ jobs:
             bash ../../tool/mark_real_web_copy.sh build/legacy-admin admin
             bash ../../tool/check_web_service_worker.sh build/legacy-admin admin
             bash ../../tool/check_web_manifest.sh build/legacy-admin admin real
-            bash ../../tool/check_security_meta.sh flutter build/legacy-admin/index.html
+            bash ../../tool/check_security_meta.sh admin build/legacy-admin/index.html
           )
           mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/admin build/legacy/site
           cp -a build/legacy-player/. build/legacy/
