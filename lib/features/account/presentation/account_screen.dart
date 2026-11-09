@@ -57,14 +57,24 @@ class AccountScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            ref.watch(backendPlanProvider).loadsSampleDatabase
-                ? 'Sua conta de exemplo nesta versão.'
-                : 'Sua conta no EscapeMatch.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
+          ref.watch(backendPlanProvider).loadsSampleDatabase
+              ? Text(
+                  'Sua conta de exemplo nesta versão.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                )
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Sua conta no EscapeMatch.',
+                    maxLines: 1,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
           const SizedBox(height: 16),
           if (isScapeDesktop(context))
             Row(
@@ -257,11 +267,16 @@ class _WalletCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Carteira EscapeMatch',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: scheme.onPrimary,
-                fontWeight: FontWeight.w800,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Carteira EscapeMatch',
+                maxLines: 1,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: scheme.onPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             const SizedBox(height: 8),
