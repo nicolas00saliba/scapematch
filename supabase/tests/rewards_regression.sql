@@ -221,6 +221,32 @@ begin
   if (v_quote ->> 'points')::integer <> 0 then
     raise exception 'regressao deixou resgatar abaixo de 1000 %', v_quote;
   end if;
+
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (
+    'aa100000-0000-4000-8000-000000000003',
+    'regressao-admin@example.com',
+    '{"display_name":"Regressao Admin"}'
+  );
+  insert into public.admins (user_id)
+  values ('aa100000-0000-4000-8000-000000000003');
+  perform set_config(
+    'request.jwt.claim.sub',
+    'aa100000-0000-4000-8000-000000000003',
+    true
+  );
+  execute 'set local role authenticated';
+  begin
+    perform public.upsert_venue_empty_slot(
+      'aa200000-0000-4000-8000-000000000001', 1, 0, 60
+    );
+    raise exception 'admin marcou horario vazio sem a casa';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', '', true);
 end $$;
 
 rollback;

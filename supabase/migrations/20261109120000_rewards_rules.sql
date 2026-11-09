@@ -755,7 +755,7 @@ as $$
 declare
   v_id uuid;
 begin
-  if not private.owns_venue(p_venue_id) and not private.is_admin() then
+  if not private.owns_venue(p_venue_id) then
     raise exception 'not owner' using errcode = '42501';
   end if;
   insert into public.venue_empty_slots (
