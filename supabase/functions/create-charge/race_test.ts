@@ -255,6 +255,9 @@ function adminFor(store: Store) {
         if (name === "commission_bps_for_venue") {
           return { data: 1000, error: null };
         }
+        if (name === "cap_point_redemption") {
+          return { data: Number(args.p_points ?? 0), error: null };
+        }
         if (name === "load_owned_card") {
           return {
             data: {
