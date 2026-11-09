@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Pino de localização no desenho do ScapeMatch.
+/// Pino de localização no desenho do EscapeMatch.
 ///
 /// O formato lembra um alfinete de mapa. As cores vêm do tema: roxo no
 /// corpo, fundo da página no miolo e dourado no ponto.

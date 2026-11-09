@@ -2,7 +2,7 @@
 # Confere manifest, ícones, título e identidade de instalação de um build web.
 # Não exige service worker de cache: o Chrome atual instala sem ele.
 # O worker publicado tem de carregar a mesma URL absoluta do manifest.
-# A demo do Parceiro, com base "/", é https://parceiro-demo.scapematch.com.br/.
+# A demo do Parceiro, com base "/", é https://parceiro-demo.escapematch.com.br/.
 # O Pages antigo em /scapematch/parceiro/demo/ continua no github.io.
 set -euo pipefail
 

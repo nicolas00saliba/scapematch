@@ -186,7 +186,7 @@ void main() {
 
   testWidgets('bad credentials stay on the house login', (tester) async {
     await pumpParceiro(tester);
-    expect(find.text('ScapeMatch Parceiro'), findsOneWidget);
+    expect(find.text('EscapeMatch Parceiro'), findsOneWidget);
     expect(find.text(partnerDemoEmailHint()), findsOneWidget);
     expect(find.text(partnerDemoQuickLabel()), findsOneWidget);
     expect(find.text('App do jogador'), findsNothing);
@@ -278,7 +278,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Nota de teste'), findsWidgets);
     expect(find.text('Serviço da casa'), findsWidgets);
-    expect(find.text('Comissão da ScapeMatch'), findsWidgets);
+    expect(find.text('Comissão da EscapeMatch'), findsWidgets);
     expect(find.textContaining('Nícolas'), findsWidgets);
   });
 

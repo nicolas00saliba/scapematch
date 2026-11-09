@@ -13,7 +13,7 @@ import 'package:scapematch/features/groups/domain/participant.dart';
 
 /// Nota de serviço da casa para o jogador desta reserva.
 ///
-/// A comissão não entra aqui: ela é a nota da ScapeMatch contra a casa.
+/// A comissão não entra aqui: ela é a nota da EscapeMatch contra a casa.
 class ServiceInvoiceCard extends StatelessWidget {
   const ServiceInvoiceCard({super.key, required this.invoice});
 
@@ -108,7 +108,7 @@ class ServiceInvoiceCard extends StatelessWidget {
 
   Future<void> _share(BuildContext context) async {
     final link = invoice.shareLink;
-    final text = 'Nota ${invoice.number ?? ''} da sua reserva no ScapeMatch.\n$link';
+    final text = 'Nota ${invoice.number ?? ''} da sua reserva no EscapeMatch.\n$link';
     final shared = await sharePlainText(text);
     if (!context.mounted || shared) return;
     await Clipboard.setData(ClipboardData(text: link));

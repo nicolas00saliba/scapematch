@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Grava a identidade de instalação no manifest, no título e no worker.
 # Cada build leva id, start_url e scope absolutos e distintos:
-#   jogador real     https://app.scapematch.com.br/
-#   jogador demo     https://demo.scapematch.com.br/
-#   Parceiro real    https://parceiro.scapematch.com.br/
-#   Parceiro demo    https://parceiro-demo.scapematch.com.br/
+#   jogador real     https://app.escapematch.com.br/
+#   jogador demo     https://demo.escapematch.com.br/
+#   Parceiro real    https://parceiro.escapematch.com.br/
+#   Parceiro demo    https://parceiro-demo.escapematch.com.br/
 # O Pages antigo em /scapematch/… usa o host do github.io mais o base href.
 # Rode depois de install_cleanup_service_worker.sh.
 set -euo pipefail

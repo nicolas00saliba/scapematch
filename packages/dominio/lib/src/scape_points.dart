@@ -6,7 +6,7 @@ import 'package:dominio/src/commission.dart';
 /// 1 Scape Point vale [ReferralRates.pointValueCents] centavos.
 /// O padrão é 1 ponto = R\$ 0,01. O ponto não vence e não saca:
 /// só abate sala. A casa continua recebendo o líquido cheio;
-/// o abatimento sai da comissão da ScapeMatch.
+/// o abatimento sai da comissão da EscapeMatch.
 class ReferralRates {
   const ReferralRates({
     this.c2cBps = 250,
@@ -534,7 +534,7 @@ PointSubsidyQuote quotePointSubsidy({
 /// Percentual do valor cobrado (já com abatimento) que devolve o líquido
 /// cheio da casa. Sobe na 4ª casa decimal para a casa não perder centavo
 /// por arredondamento. O Asaas aplica esse percentual sobre o líquido
-/// depois da taxa dele; o centavo que sobrar sai da ScapeMatch.
+/// depois da taxa dele; o centavo que sobrar sai da EscapeMatch.
 double subsidizedHouseSplitPercent({
   required int houseNetCents,
   required int chargedCents,

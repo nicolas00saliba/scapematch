@@ -81,7 +81,7 @@ class ScapeLogo extends StatelessWidget {
 
   static double wordmarkWidthFor(BuildContext context, double height) {
     final painter = TextPainter(
-      text: TextSpan(text: 'ScapeMatch', style: _Wordmark.styleFor(height)),
+      text: TextSpan(text: 'EscapeMatch', style: _Wordmark.styleFor(height)),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
     )..layout();
@@ -137,7 +137,7 @@ class ScapeLogo extends StatelessWidget {
         ? _pin(dark)
         : _fullLogo(context, dark);
     final labeled = Semantics(
-      label: variant == ScapeLogoVariant.mark ? 'ScapeMatch' : null,
+      label: variant == ScapeLogoVariant.mark ? 'EscapeMatch' : null,
       child: logo,
     );
     if (onTap == null) {
@@ -379,7 +379,7 @@ class _Wordmark extends StatelessWidget {
           style: styleFor(height),
           children: [
             TextSpan(
-              text: 'Scape',
+              text: 'Escape',
               style: TextStyle(
                 color: onDark ? ScapeLogo.pinOnDark : ScapeLogo.pin,
               ),

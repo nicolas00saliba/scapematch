@@ -60,7 +60,7 @@ Deno.test("o Pix manda o split para o walletId e a chave só no header", async (
     customer: "cus_1",
     value: 120,
     dueDate: "2026-11-07",
-    description: "ScapeMatch Demo",
+    description: "EscapeMatch Demo",
     externalReference: "charge-1",
     split: { walletId: "wal_house", fixedValue: 90 },
   });
@@ -86,7 +86,7 @@ const pixInput = {
   customer: "cus_1",
   value: 120,
   dueDate: "2026-11-07",
-  description: "ScapeMatch Demo",
+  description: "EscapeMatch Demo",
   externalReference: "charge-1",
   split: { walletId: "wal_house", fixedValue: 90 },
 };
@@ -713,7 +713,7 @@ Deno.test("a subconta devolve walletId e apiKey para a função gravar", async (
     fetchFn,
   );
   const created = await provider.createSubaccount({
-    name: "ScapeMatch Demo",
+    name: "EscapeMatch Demo",
     email: "demo@example.com",
     cpfCnpj: "04252011000110",
     companyType: "LIMITED",

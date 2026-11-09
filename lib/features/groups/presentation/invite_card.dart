@@ -28,7 +28,7 @@ class InviteCard extends StatelessWidget {
             color: scheme.primary,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Text(
-              'ScapeMatch',
+              'EscapeMatch',
               style: theme.textTheme.titleMedium?.copyWith(
                 color: scheme.onPrimary,
                 fontWeight: FontWeight.w800,

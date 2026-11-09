@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>ScapeMatch</string>
+	<string>EscapeMatch</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O mapa mostra grupos se formando perto de você.</string>
 	<key>CFBundleExecutable</key>

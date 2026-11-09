@@ -4,9 +4,16 @@ import { redactSensitive } from "./redact.ts";
 export const productionWebOrigin = "https://nicolas00saliba.github.io";
 
 /// Origens aceitas quando `ALLOWED_ORIGINS` não está definida.
-/// Inclui o Pages antigo e os subdomínios próprios na transição.
+/// O domínio novo entra junto com o antigo: o antigo responde 301
+/// enquanto a virada de DNS não termina. O Pages legado continua.
 export const productionWebOrigins = [
   productionWebOrigin,
+  "https://app.escapematch.com.br",
+  "https://parceiro.escapematch.com.br",
+  "https://demo.escapematch.com.br",
+  "https://parceiro-demo.escapematch.com.br",
+  "https://escapematch.com.br",
+  "https://www.escapematch.com.br",
   "https://app.scapematch.com.br",
   "https://parceiro.scapematch.com.br",
   "https://demo.scapematch.com.br",

@@ -84,7 +84,7 @@ class _PartnerInvoicesState extends ConsumerState<PartnerInvoices> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Duas notas por reserva paga: o serviço, da casa para o jogador, e a comissão, da ScapeMatch para a casa. No sandbox a nota é de teste.',
+          'Duas notas por reserva paga: o serviço, da casa para o jogador, e a comissão, da EscapeMatch para a casa. No sandbox a nota é de teste.',
           style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
         ),
         const SizedBox(height: 16),

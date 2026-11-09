@@ -15,7 +15,7 @@ class ScapeMatchApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeChoice = ref.watch(themeChoiceProvider);
     return MaterialApp.router(
-      title: 'ScapeMatch',
+      title: 'EscapeMatch',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),

@@ -1,4 +1,4 @@
-# Supabase do ScapeMatch
+# Supabase do EscapeMatch
 
 O app não aplica estas migrações sozinho. A ordem é a do nome do arquivo. No SQL Editor do projeto `eujlhicairvksvmssruz` (região sa-east-1), rode um arquivo por vez, de cima para baixo, ou use a CLI com a sua conta:
 
@@ -21,7 +21,7 @@ supabase db push
 10. `migrations/20261104140000_house_cancel_group.sql` — a casa cancela o grupo dela e deixa o estorno `pending`. O botão chama `cancel-house-group`. Não foi aplicada no projeto.
 11. `migrations/20261104150000_refund_fix.sql` — `delete_group` também deixa `pending` em vez de `refunded`, avisa os jogadores e tira privilégios extras de `venues` e `profiles`. Não foi aplicada no projeto.
 
-`seed_demo.sql` fica **fora** dessa lista. É opcional e cria a casa real ScapeMatch Demo (Curitiba, três salas, horários e duas promoções). Não é dado de exemplo do app.
+`seed_demo.sql` fica **fora** dessa lista. É opcional e cria a casa real EscapeMatch Demo (Curitiba, três salas, horários e duas promoções). Não é dado de exemplo do app.
 
 Não há `service_role`, chave do Asaas nem chave da Stability nestes arquivos. As funções leem o gateway só de `Deno.env`.
 
@@ -40,7 +40,7 @@ insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000
 
 ## E-mails de autenticação
 
-Os HTML ficam em `supabase/templates/` e os assuntos em `supabase/config.toml` (`[auth.email.template.*]`). São cinco: confirmação de cadastro, redefinição de senha, magic link, troca de e-mail e convite. O desenho usa a paleta do app (verde-petróleo `#0F4C4A`, cobre `#9A4F24`, fundo `#F5F1EA`), tabelas e CSS inline. A marca é texto, sem imagem nem outro recurso remoto. Cada mensagem tem um botão, o mesmo link em texto e a linha de que o link leva a `app.scapematch.com.br`. As variáveis são as do Supabase (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}` e, na troca, `{{ .NewEmail }}`).
+Os HTML ficam em `supabase/templates/` e os assuntos em `supabase/config.toml` (`[auth.email.template.*]`). São cinco: confirmação de cadastro, redefinição de senha, magic link, troca de e-mail e convite. O desenho usa a paleta do app (verde-petróleo `#0F4C4A`, cobre `#9A4F24`, fundo `#F5F1EA`), tabelas e CSS inline. A marca é texto, sem imagem nem outro recurso remoto. Cada mensagem tem um botão, o mesmo link em texto e a linha de que o link leva a `app.escapematch.com.br`. As variáveis são as do Supabase (`{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}` e, na troca, `{{ .NewEmail }}`).
 
 Nada disso foi aplicado no projeto remoto por este repositório. Duas formas de publicar:
 
@@ -109,7 +109,7 @@ Segredos, no painel da função (nunca no repositório):
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` a plataforma já injeta na função.
 
-`ALLOWED_ORIGINS` é opcional. Lista de origens exatas separadas por vírgula; o espaço ao redor da vírgula é ignorado. Sem essa variável, o CORS aceita `https://nicolas00saliba.github.io` e os subdomínios `app`, `parceiro`, `demo`, `parceiro-demo`, `www` e o apex de `scapematch.com.br`. `*` não é aceito. `http://localhost` e `http://127.0.0.1` (com porta) só entram quando `SUPABASE_URL` aponta para o Supabase local. Pedido sem `Origin` (webhook e app nativo) continua recebendo JSON, sem `Access-Control-Allow-Origin`.
+`ALLOWED_ORIGINS` é opcional. Lista de origens exatas separadas por vírgula; o espaço ao redor da vírgula é ignorado. Sem essa variável, o CORS aceita `https://nicolas00saliba.github.io` e os subdomínios `app`, `parceiro`, `demo`, `parceiro-demo`, `www` e o apex de `escapematch.com.br` e de `scapematch.com.br`. O domínio antigo fica na lista enquanto o 301 da virada estiver no ar. `*` não é aceito. `http://localhost` e `http://127.0.0.1` (com porta) só entram quando `SUPABASE_URL` aponta para o Supabase local. Pedido sem `Origin` (webhook e app nativo) continua recebendo JSON, sem `Access-Control-Allow-Origin`.
 
 Deploy, na sua máquina, depois da revisão:
 
@@ -127,7 +127,7 @@ supabase secrets set ASAAS_API_KEY=… ASAAS_BASE_URL=https://api-sandbox.asaas.
 
 No painel do Asaas sandbox, o webhook aponta para `https://eujlhicairvksvmssruz.supabase.co/functions/v1/asaas-webhook` com o mesmo token. Eventos: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_REFUNDED` e `PAYMENT_AUTHORIZED`.
 
-A ScapeMatch Demo não recebe `walletId` no SQL. Com a chave já gravada, entre como admin e chame `provision-venue-wallet` sem `venue_id` (ou com o id da demo). Ela cria a subconta sandbox. O sandbox limita 20 subcontas por dia. Estornar um Pix logo depois de pago pode falhar se a taxa do Asaas deixar o saldo insuficiente: deixe saldo na conta raiz do sandbox.
+A EscapeMatch Demo não recebe `walletId` no SQL. Com a chave já gravada, entre como admin e chame `provision-venue-wallet` sem `venue_id` (ou com o id da demo). Ela cria a subconta sandbox. O sandbox limita 20 subcontas por dia. Estornar um Pix logo depois de pago pode falhar se a taxa do Asaas deixar o saldo insuficiente: deixe saldo na conta raiz do sandbox.
 
 O Asaas não oferece SDK de navegador para tokenizar o cartão. Quem recebe número, CVV e validade é só `tokenize-card`: ela autentica o JWT, chama `POST /v3/creditCard/tokenizeCreditCard` e grava o token em `saved_cards`, ligado ao `user_id` e ao customer Asaas dele. O `remoteIp` que o Asaas pede sai de `x-real-ip`, depois de `cf-connecting-ip`, e só então do último endereço de `x-forwarded-for`. Endereço vazio ou inválido é descartado. Sem header válido, o pedido segue sem `remoteIp`. Um `remote_ip` no body é ignorado. A resposta leva só `saved_card_id`, `last4` e a bandeira. O app chama essa função primeiro e, em seguida, `create-charge` só com `saved_card_id`. A cobrança (`authorizeOnly` e o split) usa o token salvo dessa pessoa, lido por `load_owned_card`. Se o body da cobrança trouxer número, CVV ou validade, a função responde 400 e não chama o Asaas. O token não volta para o app. `my_saved_cards()` devolve só o id interno, os 4 últimos dígitos e a bandeira. Em repouso a coluna é `bytea` cifrada com `pgp_sym_encrypt`; a chave fica no vault (`card_token_key`) e as funções de gravar e ler estão em `private`, com `execute` só para a service role. A chave da API também não volta na resposta. Erro de tokenização volta genérico, sem o corpo do Asaas. O teto é 5 cartões por jogador e 5 tentativas por hora, contando as que falham. Estourar qualquer um responde 429 e não chama o Asaas.
 

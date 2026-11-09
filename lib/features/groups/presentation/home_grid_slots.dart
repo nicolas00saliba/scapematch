@@ -305,7 +305,7 @@ class HomeGridSlotCard extends StatelessWidget {
       HomeGridSlotKind.createGroup => 'Abre o formulário $place',
       HomeGridSlotKind.comingSoon => 'A grade espera a próxima sala',
       HomeGridSlotKind.partner => 'Abre o app da casa',
-      HomeGridSlotKind.inviteFriends => 'Copia um convite do ScapeMatch',
+      HomeGridSlotKind.inviteFriends => 'Copia um convite do EscapeMatch',
     };
   }
 

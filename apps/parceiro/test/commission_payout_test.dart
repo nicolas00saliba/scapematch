@@ -37,7 +37,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('ScapeMatch'), findsOneWidget);
+    expect(find.text('EscapeMatch'), findsOneWidget);
     expect(find.text('Casa Sem Subconta'), findsOneWidget);
     expect(find.text('10%'), findsNWidgets(2));
 

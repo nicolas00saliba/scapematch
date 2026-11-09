@@ -1,5 +1,5 @@
 name: dominio
-description: Reservation, split, commission and simulated payment rules for ScapeMatch.
+description: Reservation, split, commission and simulated payment rules for EscapeMatch.
 publish_to: none
 version: 0.1.0
 

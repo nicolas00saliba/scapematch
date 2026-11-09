@@ -252,7 +252,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             const SizedBox(height: 16),
             Text(
               scapeUsesLiveBackend
-                  ? 'A conta fica no ScapeMatch. O perfil nasce com o seu nome. O cadastro só segue com o aceite.'
+                  ? 'A conta fica no EscapeMatch. O perfil nasce com o seu nome. O cadastro só segue com o aceite.'
                   : 'O cadastro só segue com o aceite. A versão do texto e a data ficam registradas.',
             ),
             const SizedBox(height: 16),

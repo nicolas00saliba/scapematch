@@ -17,13 +17,13 @@ void main() {
     (tester) async {
       await pumpScapeMatch(tester);
       expect(find.byType(ScapeLogo), findsOneWidget);
-      expect(find.text('ScapeMatch'), findsNothing);
+      expect(find.text('EscapeMatch'), findsNothing);
 
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1;
       await tester.pumpAndSettle();
 
-      expect(find.text('ScapeMatch'), findsOneWidget);
+      expect(find.text('EscapeMatch'), findsOneWidget);
       final logo = tester.widget<ScapeLogo>(find.byType(ScapeLogo));
       expect(logo.variant, ScapeLogoVariant.full);
     },
@@ -32,7 +32,7 @@ void main() {
   testWidgets('the intro shows the full logo', (tester) async {
     await pumpScapeMatch(tester, showOnboarding: true);
     expect(find.byType(OnboardingScreen), findsOneWidget);
-    expect(find.text('ScapeMatch'), findsWidgets);
+    expect(find.text('EscapeMatch'), findsWidgets);
     expect(
       tester
           .widgetList<ScapeLogo>(find.byType(ScapeLogo))
@@ -67,7 +67,7 @@ void main() {
 
     await pump(0);
     final pin = tester.getRect(find.byType(SvgPicture));
-    final word = tester.getRect(find.text('ScapeMatch'));
+    final word = tester.getRect(find.text('EscapeMatch'));
     final box = tester.getRect(find.byType(ScapeLogo));
     expect(
       pin.width / pin.height,
@@ -89,7 +89,7 @@ void main() {
 
     await pump(0.5);
     final movedPin = pinInLogo();
-    final movedWord = tester.getRect(find.text('ScapeMatch'));
+    final movedWord = tester.getRect(find.text('EscapeMatch'));
     expect(movedPin.width, closeTo(held.width, 0.5));
     expect(movedPin.height, closeTo(held.height, 0.5));
     expect(movedPin.left, closeTo(held.left, 0.5));
@@ -135,7 +135,7 @@ void main() {
     );
 
     await pump(1);
-    expect(find.text('ScapeMatch'), findsNothing);
+    expect(find.text('EscapeMatch'), findsNothing);
     final buried = tester.getRect(find.byType(SvgPicture));
     expect(
       buried.width / buried.height,
@@ -222,9 +222,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('ScapeMatch'), findsOneWidget);
+      expect(find.text('EscapeMatch'), findsOneWidget);
       final pin = tester.getRect(find.byType(SvgPicture));
-      final word = tester.getRect(find.text('ScapeMatch'));
+      final word = tester.getRect(find.text('EscapeMatch'));
       expect(pin.width, greaterThan(20));
       expect(pin.height, closeTo(96, 0.5));
       expect(pin.right, lessThanOrEqualTo(word.left + 1));
@@ -286,7 +286,7 @@ void main() {
     await pump(0, Colors.white);
     await tester.pumpAndSettle();
     final heldPin = tester.getRect(find.byType(SvgPicture));
-    final heldWord = tester.getRect(find.text('ScapeMatch'));
+    final heldWord = tester.getRect(find.text('EscapeMatch'));
     final heldLogo = tester.getRect(find.byType(ScapeLogo));
     final heldImage = await _capture(tester);
     final discBox = await tester.runAsync(() => _whiteDisc(heldImage, heldPin));
@@ -345,7 +345,7 @@ void main() {
     final junction = Rect.fromLTRB(
       pin.left + pin.width * 0.72,
       pin.top + pin.height * 0.08,
-      tester.getRect(find.text('ScapeMatch')).right + 8,
+      tester.getRect(find.text('EscapeMatch')).right + 8,
       pin.top + pin.height * 0.78,
     );
     await tester.runAsync(

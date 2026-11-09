@@ -16,7 +16,7 @@ class ParceiroApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeChoice = ref.watch(themeChoiceProvider);
     return MaterialApp(
-      title: 'ScapeMatch Parceiro',
+      title: 'EscapeMatch Parceiro',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),

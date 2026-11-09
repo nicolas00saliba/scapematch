@@ -1,4 +1,4 @@
-# Arquitetura do ScapeMatch
+# Arquitetura do EscapeMatch
 
 Este texto é para ler o código com calma. A primeira versão é de propósito pequena: dá para seguir uma tela do botão até o dado fictício sem atravessar dez camadas.
 

@@ -78,7 +78,7 @@ class PartnerSnapshot {
   /// Resultado da [AbsencePolicy] para cada pessoa que já tem falta.
   final Map<String, AbsenceStanding> standings;
 
-  /// Notas da casa: serviço para o jogador e comissão da ScapeMatch.
+  /// Notas da casa: serviço para o jogador e comissão da EscapeMatch.
   final List<FiscalInvoiceView> invoices;
 
   /// Dados fiscais desta sessão. CPF fica sem emissão do serviço.

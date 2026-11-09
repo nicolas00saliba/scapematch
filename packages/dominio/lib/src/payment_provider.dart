@@ -2,7 +2,7 @@
 enum PaymentMethodKind { pix, card }
 
 /// Repasse para a subconta da casa. No Asaas o split usa o walletId;
-/// a comissão da ScapeMatch fica na conta que cria a cobrança.
+/// a comissão da EscapeMatch fica na conta que cria a cobrança.
 class MarketplaceSplit {
   const MarketplaceSplit({
     required this.sellerId,

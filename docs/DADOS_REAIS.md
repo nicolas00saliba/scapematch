@@ -103,7 +103,7 @@ O caminho preferido continua sendo o da seção de ética acima: a casa, ou um p
 - um endpoint que a casa ou o parceiro oferecer, devolvendo os mesmos campos do `NewsItem`;
 - leitura do site da casa, só se os termos e o `robots.txt` autorizarem, nas regras já escritas neste arquivo.
 
-Se os termos proíbem acesso automatizado, scraping ou o reuso do texto, não coletar. A casa fica sem notícia automática. Curadoria manual, com texto escrito por quem opera o ScapeMatch e não copiado da página, ainda cabe. Na dúvida, o feed fica vazio naquela casa. Um buraco é melhor do que um parágrafo que a casa não autorizou.
+Se os termos proíbem acesso automatizado, scraping ou o reuso do texto, não coletar. A casa fica sem notícia automática. Curadoria manual, com texto escrito por quem opera o EscapeMatch e não copiado da página, ainda cabe. Na dúvida, o feed fica vazio naquela casa. Um buraco é melhor do que um parágrafo que a casa não autorizou.
 
 O que não entra, mesmo com a grade pública: texto de marketing copiado, foto da sala, descrição longa, avaliação com nome de pessoa, lista de clientes. Reexibir isso pede permissão própria. O resumo mostrado no app tem de ser um texto que a casa entregou ou que a curadoria escreveu, com a origem guardada no item (`sourceKind` e `sourceUrl`).
 

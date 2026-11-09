@@ -91,7 +91,7 @@ class _CommissionAdminPanelState extends ConsumerState<CommissionAdminPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Comissão ScapeMatch',
+          'Comissão EscapeMatch',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
           ),

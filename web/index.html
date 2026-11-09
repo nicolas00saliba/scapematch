@@ -49,7 +49,7 @@
   </script>
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="ScapeMatch ajuda a montar grupos para escape rooms. Esta versão usa dados de exemplo.">
+  <meta name="description" content="EscapeMatch ajuda a montar grupos para escape rooms. Esta versão usa dados de exemplo.">
   <meta name="scapematch-release" content="home-feed">
   <meta name="theme-color" content="#0F4C4A">
 
@@ -57,13 +57,13 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="ScapeMatch">
+  <meta name="apple-mobile-web-app-title" content="EscapeMatch">
   <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>ScapeMatch</title>
+  <title>EscapeMatch</title>
   <link rel="manifest" href="manifest.json">
   <style>
     /* O arraste do mapa no Chrome do Android não recarrega a página. */
@@ -141,11 +141,11 @@
       if (at < 0) return;
       var tail = path.slice(at + marker.length);
       if (tail !== '' && tail.charAt(0) !== '/') return;
-      if (location.host === 'demo.scapematch.com.br') {
+      if (location.host === 'demo.escapematch.com.br') {
         window.scapeHoldFlutter = true;
         var rest = (tail === '' || tail === '/' ||
             tail === '/index.html' || tail === '/404.html') ? '/' : tail;
-        var dest = 'https://parceiro-demo.scapematch.com.br' + rest +
+        var dest = 'https://parceiro-demo.escapematch.com.br' + rest +
             location.search + location.hash;
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function (regs) {

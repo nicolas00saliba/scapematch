@@ -96,7 +96,7 @@ class _ApprovedSession extends PartnerSessionController {
     return const PartnerAccount(
       email: 'casa@exemplo.invalid',
       houseId: 'demo',
-      houseName: 'ScapeMatch Demo',
+      houseName: 'EscapeMatch Demo',
       userId: 'user-1',
       venueStatus: 'approved',
     );
@@ -133,7 +133,7 @@ PartnerSnapshot _desk() {
   const house = EscapeHouse(
     id: 'demo',
     cityId: 'curitiba',
-    name: 'ScapeMatch Demo',
+    name: 'EscapeMatch Demo',
     neighborhood: 'Centro',
     latitude: -25.4296,
     longitude: -49.2719,
