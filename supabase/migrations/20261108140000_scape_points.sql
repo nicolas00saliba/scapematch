@@ -1255,6 +1255,10 @@ security definer
 set search_path = ''
 as $$
 begin
+  perform private.lock_venue_rewards(ch.venue_id)
+  from public.payment_charges ch
+  where ch.id = p_charge_id;
+
   insert into public.scape_point_entries (
     user_id, kind, points, amount_cents, program,
     source_charge_id, payment_charge_id, relates_to, idempotency_key
