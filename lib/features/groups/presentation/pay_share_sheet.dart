@@ -361,6 +361,11 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                         color: scheme.primary,
                       ),
                     ),
+                    Text(
+                      'Cashback sorteado de ${formatBasisPoints(widget.points?.cashbackMinBps ?? 50)} a ${formatBasisPoints(widget.points?.cashbackMaxBps ?? 500)} quando o pagamento confirma. O percentual sai no extrato.',
+                      key: AppKeys.payCashbackRange,
+                    ),
+                    const SizedBox(height: 8),
                     if (widget.discountCents > 0) ...[
                       const SizedBox(height: 8),
                       Text(
@@ -368,6 +373,10 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                         key: AppKeys.payFirstDiscount,
                       ),
                     ],
+                    if (widget.points != null && widget.points!.points == 0)
+                      Text(
+                        'Para usar pontos é preciso juntar pelo menos ${formatPoints(widget.points!.redeemMinPoints)}. O máximo é ${formatBasisPoints(widget.points!.redeemMaxBps)} do valor da sala.',
+                      ),
                     if (widget.points != null && widget.points!.points > 0) ...[
                       const SizedBox(height: 8),
                       SwitchListTile(

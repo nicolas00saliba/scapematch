@@ -176,7 +176,14 @@ export async function createCharge(
       venue.id as string,
     );
     const grossCents = group.price_cents as number;
-    const points = requestedPoints(body.points);
+    const requested = requestedPoints(body.points);
+    const capped = await admin.rpc("cap_point_redemption", {
+      p_group_id: groupId,
+      p_user_id: user.id,
+      p_points: requested,
+    });
+    if (capped.error) throw new Error("pontos");
+    const points = typeof capped.data === "number" ? capped.data : 0;
     const openExisting = Boolean(
       existing &&
         !["failed", "cancelled", "refunded"].includes(existing.status),

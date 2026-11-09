@@ -5,7 +5,9 @@
 
 -- Os cenários antigos medem a comissão cheia. O desconto de 20% tem teste próprio.
 update public.referral_program_settings
-set first_booking_discount_bps = 0
+set first_booking_discount_bps = 0,
+    redeem_min_points = 1,
+    redeem_max_bps = 10000
 where id = 1;
 
 insert into auth.users (id, email, raw_user_meta_data)
@@ -164,12 +166,8 @@ begin
   if v_count <> 2 then
     raise exception 'lancamento duplicou ou faltou o cashback: %', v_count;
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bb711111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
-    raise exception 'cashback de 1%% nao entrou';
+  if not private.cashback_points_ok('bb711111-1111-1111-1111-111111111111') then
+    raise exception 'cashback sorteado nao entrou';
   end if;
 
   select pending_points, available_points
@@ -317,11 +315,7 @@ begin
   ) then
     raise exception 'pagou fora da janela de um ano';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bb811111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bb811111-1111-1111-1111-111111111111') then
     raise exception 'cashback nao entrou fora da indicacao';
   end if;
 end $$;
@@ -444,11 +438,7 @@ begin
   ) is distinct from 250 then
     raise exception 'pagamento por terceiro nao liberou a indicacao';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bb911111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bb911111-1111-1111-1111-111111111111') then
     raise exception 'cashback nao entrou sem indicacao conferida';
   end if;
   if exists (
@@ -553,12 +543,8 @@ begin
   ) is distinct from 200 then
     raise exception 'cartao de terceiro nao liberou a indicacao';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bba11111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 80 then
-    raise exception 'cashback de 1%% sobre 8000 nao entrou';
+  if not private.cashback_points_ok('bba11111-1111-1111-1111-111111111111') then
+    raise exception 'cashback de terceiro nao entrou';
   end if;
   if exists (
     select 1 from public.referral_withholdings
@@ -965,11 +951,7 @@ begin
   ) then
     raise exception 'pagador indicador ainda ganhou C2C';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bd711111-1111-4111-8111-111111111115'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bd711111-1111-4111-8111-111111111115') then
     raise exception 'cashback saiu junto com a trava do pagador';
   end if;
   if not exists (
@@ -1101,11 +1083,7 @@ begin
   ) then
     raise exception 'a quarta conta do mesmo pagador ainda premiou';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bd844444-4444-4444-8444-444444444444'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bd844444-4444-4444-8444-444444444444') then
     raise exception 'o teto do pagador comeu o cashback';
   end if;
   if not exists (
@@ -1541,6 +1519,54 @@ begin
       and kind = 'house_net'
   ) is distinct from 7500 then
     raise exception 'repasse do credito mudou o liquido da reserva';
+  end if;
+end $$;
+
+update public.referral_program_settings
+set redeem_min_points = 1000,
+    redeem_max_bps = 3000,
+    welcome_points = 100
+where id = 1;
+
+do $$
+declare
+  v_quote jsonb;
+  v_bonus integer;
+begin
+  perform private.grant_welcome_points('be222222-2222-4222-8222-222222222222');
+  perform private.grant_welcome_points('be222222-2222-4222-8222-222222222222');
+  if (
+    select count(*) from public.scape_point_entries
+    where user_id = 'be222222-2222-4222-8222-222222222222'
+      and program = 'welcome'
+      and kind = 'release'
+  ) <> 1 then
+    raise exception 'boas-vindas duplicou ou nao entrou';
+  end if;
+  v_quote := private.subsidy_quote(
+    'be222222-2222-4222-8222-222222222222', 10000, 2500, 5000, false
+  );
+  if (v_quote ->> 'points')::integer <> 0 then
+    raise exception 'menos de 1000 pontos ainda resgata %', v_quote;
+  end if;
+  insert into public.scape_point_entries (
+    user_id, kind, points, amount_cents, program, idempotency_key
+  ) values (
+    'be222222-2222-4222-8222-222222222222',
+    'release', 4000, 4000, 'welcome', 'teste-saldo-resgate'
+  );
+  v_quote := private.subsidy_quote(
+    'be222222-2222-4222-8222-222222222222', 10000, 10000, 9000, false
+  );
+  if (v_quote ->> 'points')::integer <> 3000 then
+    raise exception 'teto de 30%% nao segurou o resgate %', v_quote;
+  end if;
+  if private.referrer_tier_bonus('be222222-2222-4222-8222-222222222222') <> 0 then
+    raise exception 'conta sem indicado nao ficou no bronze';
+  end if;
+  v_bonus := private.referrer_tier_bonus('bb111111-1111-1111-1111-111111111111');
+  if v_bonus not in (0, 50, 100) then
+    raise exception 'bonus de nivel inesperado %', v_bonus;
   end if;
 end $$;
 

@@ -237,10 +237,18 @@ void main() {
       requestedPoints: 9000,
       availablePoints: 100,
     );
-    expect(quote.points, 100);
-    expect(quote.chargedCents, 9900);
+    expect(quote.points, 0);
+    expect(quote.chargedCents, 10000);
     expect(quote.houseNetCents, 7500);
-    expect(quote.maxPoints, 2500);
+    expect(quote.maxPoints, 0);
+    final capped = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 10000,
+      requestedPoints: 5000,
+      availablePoints: 5000,
+    );
+    expect(capped.points, 3000);
+    expect(capped.chargedCents, 7000);
   });
 
   test('carência de 30 dias e desconto só com o CPF de quem pagou', () {

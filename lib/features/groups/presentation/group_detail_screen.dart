@@ -446,7 +446,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       final choice = PointSpendChoice.fromQuote(
         Map<String, dynamic>.from(data),
       );
-      return choice.points > 0 || choice.discountCents > 0 ? choice : null;
+      return choice;
     } on Object {
       return null;
     }

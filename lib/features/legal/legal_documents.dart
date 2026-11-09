@@ -18,6 +18,16 @@ Você paga só a sua parte. A cobrança é confirmada quando o grupo fecha. Enqu
 
 A nota fiscal do serviço, quando a casa emite, é da casa para você. A comissão da intermediação é uma nota à parte, da ScapeMatch para a casa, e não aparece como nota sua.
 
+Scape Points. 1 ponto vale R\$ 0,01. Não há saque. Os pontos só abatem a sua parte de uma sala. Para usar, a conta precisa juntar pelo menos 1.000 pontos (R\$ 10). Numa reserva, os pontos pagam no máximo 30% do valor da sua parte. O restante continua no meio de pagamento que você escolher. Esses dois limites podem ser ajustados pela plataforma e a tela de pagamento mostra o valor que vale na hora.
+
+Boas-vindas. Quando o cadastro fica com um CPF válido, a conta recebe 100 pontos uma única vez. Esses pontos já podem entrar na conta, mas só são usados depois que o saldo chega ao mínimo de resgate.
+
+Cashback. Em cada reserva paga, o servidor sorteia uma taxa entre 0,5% e 5% do valor que você pagou. A distribuição é configurada para que a média não passe de 1% (o padrão esperado é 0,9%). A taxa sorteada e a semente da auditoria ficam gravadas. O resultado aparece no extrato depois que o pagamento confirma. A tela, antes de pagar, mostra a faixa de 0,5% a 5%. O cashback nasce da comissão da ScapeMatch, fica pendente por 30 dias e é estornado se o pagamento for cancelado.
+
+Horário vazio. A casa pode marcar, por escolha dela, faixas de horário vazio. Nessas reservas o cashback sorteado dobra. A parte extra é dividida: 50% sai do repasse da casa que fez essa escolha e 50% sai da ScapeMatch. Sem essa marcação, nada é descontado da casa.
+
+Indicação. Quem indica começa no nível Bronze, com a taxa base. Com 5 indicados ativos passa a Prata e ganha 0,5 ponto percentual a mais. Com 15 passa a Ouro e ganha 1 ponto percentual a mais. Ativo é o indicado com reserva paga nos últimos 90 dias. O nível é recalculado quando a recompensa é lançada. A tela de indicação mostra o nível e quantos indicados faltam para o próximo.
+
 Nesta versão de demonstração os dados de exemplo continuam no aparelho até a conta real entrar no ar. As regras acima são o combinado que a versão ligada ao servidor vai aplicar.
 ''';
 

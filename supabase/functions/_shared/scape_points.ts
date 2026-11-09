@@ -267,17 +267,24 @@ export function quotePointSubsidy(input: {
   requestedPoints: number;
   availablePoints: number;
   pointValueCents?: number;
+  redeemMinPoints?: number;
+  redeemMaxBps?: number;
 }): PointSubsidyQuote {
   const pointValue = input.pointValueCents ?? officialPointValueCents;
+  const minPoints = input.redeemMinPoints ?? 1000;
+  const maxBps = input.redeemMaxBps ?? 3000;
   const commission = commissionCents(input.grossCents, input.commissionBps);
   const houseNet = input.grossCents - commission;
   const room = input.grossCents > 1 ? input.grossCents - 1 : 0;
-  const maxSubsidy = Math.min(commission, room);
-  const maxPoints = Math.floor(Math.max(maxSubsidy, 0) / pointValue);
+  const percentCap = commissionCents(input.grossCents, maxBps);
+  const maxSubsidy = Math.min(commission, room, Math.max(percentCap, 0));
+  let maxPoints = Math.floor(Math.max(maxSubsidy, 0) / pointValue);
+  if (input.availablePoints < minPoints || maxPoints < minPoints) maxPoints = 0;
   let points = input.requestedPoints;
   if (points < 0) points = 0;
   if (points > input.availablePoints) points = input.availablePoints;
   if (points > maxPoints) points = maxPoints;
+  if (points < minPoints) points = 0;
   const subsidy = points * pointValue;
   const charged = input.grossCents - subsidy;
   return {
