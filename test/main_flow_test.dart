@@ -14,7 +14,13 @@ void main() {
   testWidgets('finds a group in the chosen city, filters, and joins', (
     tester,
   ) async {
-    await pumpScapeMatch(tester);
+    // O relógio real atravessa o prazo curto (13:00, 15:30, 18:00 ou 20:00)
+    // enquanto o teste corre. A releitura então solta a vaga pendente e o
+    // 6/6 volta a 5/6. sampleNow fica parado uma hora antes desse prazo.
+    await pumpScapeMatch(
+      tester,
+      overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
+    );
 
     expect(find.text('Escolha uma cidade'), findsNothing);
     expect(find.text('Curitiba'), findsWidgets);
