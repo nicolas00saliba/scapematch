@@ -4,6 +4,26 @@
 \set ON_ERROR_STOP on
 
 -- Os cenários antigos medem a comissão cheia. O desconto de 20% tem teste próprio.
+-- Cada cobrança de teste nasce com um pagador verificável e distinto.
+-- O caso sem documento fica no teste de estorno.
+create or replace function private.test_stamp_payer_hash()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.payer_document_hash is null and new.payer_card_key is null then
+    new.payer_document_hash := md5(coalesce(new.id, gen_random_uuid())::text)
+      || md5(coalesce(new.idempotency_key, 'pagador'));
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists test_stamp_payer_hash on public.payment_charges;
+create trigger test_stamp_payer_hash
+  before insert on public.payment_charges
+  for each row execute function private.test_stamp_payer_hash();
+
 update public.referral_program_settings
 set first_booking_discount_bps = 0
 where id = 1;
