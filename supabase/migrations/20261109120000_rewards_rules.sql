@@ -1,6 +1,7 @@
 -- Regras extras de Scape Points. Não aplicado no remoto.
 -- Resgate mínimo, teto de 30%, boas-vindas, cashback sorteado,
 -- horário vazio e níveis de quem indica. Tudo em referral_program_settings.
+-- A semente do sorteio é extensions.gen_random_bytes e fica em cashback_draws.
 
 alter table public.referral_program_settings
   add column if not exists redeem_min_points integer not null default 1000
@@ -313,8 +314,9 @@ declare
   v_settings public.referral_program_settings%rowtype;
   v_existing integer;
   v_seed text;
+  v_bytes bytea;
   v_total integer := 0;
-  v_roll integer;
+  v_roll bigint;
   v_bps integer;
   v_row record;
   v_cursor integer := 0;
@@ -337,6 +339,7 @@ begin
   select platform_cents into v_existing
   from public.cashback_draws
   where payment_charge_id = p_charge_id;
+  -- Replay de webhook e reconciliação devolve o sorteio gravado.
   if found then
     return v_existing;
   end if;
@@ -347,14 +350,14 @@ begin
   if v_total <= 0 then
     return 0;
   end if;
-  v_seed := pg_catalog.encode(
-    extensions.digest(
-      pg_catalog.convert_to(p_charge_id::text || ':' || pg_catalog.clock_timestamp()::text, 'UTF8'),
-      'sha256'
-    ),
-    'hex'
-  );
-  v_roll := ('x' || pg_catalog.substr(v_seed, 1, 8))::bit(32)::bigint % v_total;
+  v_bytes := extensions.gen_random_bytes(16);
+  v_seed := pg_catalog.encode(v_bytes, 'hex');
+  v_roll := (
+    pg_catalog.get_byte(v_bytes, 0)::bigint * 16777216
+    + pg_catalog.get_byte(v_bytes, 1)::bigint * 65536
+    + pg_catalog.get_byte(v_bytes, 2)::bigint * 256
+    + pg_catalog.get_byte(v_bytes, 3)::bigint
+  ) % v_total::bigint;
   v_bps := v_settings.cashback_min_bps;
   for v_row in select * from private.cashback_distribution() loop
     v_cursor := v_cursor + v_row.weight;
