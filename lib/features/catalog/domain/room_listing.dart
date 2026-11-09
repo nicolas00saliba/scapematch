@@ -8,6 +8,7 @@ class RoomListing {
     required this.houseName,
     required this.cityId,
     required this.cityName,
+    this.houseFeaturedRank,
   });
 
   final EscapeRoom room;
@@ -15,4 +16,7 @@ class RoomListing {
   final String houseName;
   final String cityId;
   final String cityName;
+
+  /// Destaque da casa, quando o Admin marcou uma. Nulo fica de fora.
+  final int? houseFeaturedRank;
 }

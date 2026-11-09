@@ -31,6 +31,7 @@ class NewsItem {
     this.illustration = NewsIllustration.category,
     this.sourceUrl,
     this.gameType = GameTypes.escapeRoom,
+    this.carouselRank,
   });
 
   final String id;
@@ -58,4 +59,7 @@ class NewsItem {
   /// Gênero da notícia, no mesmo id de [GameTypes]. Uma fonte real preenche
   /// este campo. Sem ele, a notícia conta como escape room.
   final String gameType;
+
+  /// Posição no carrossel da Home. Nulo não entra na seleção do Admin.
+  final int? carouselRank;
 }

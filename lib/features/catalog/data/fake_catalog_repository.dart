@@ -1,6 +1,7 @@
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/features/catalog/data/catalog_repository.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
+import 'package:scapematch/features/catalog/domain/feature_order.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
@@ -19,7 +20,10 @@ class FakeCatalogRepository implements CatalogRepository {
     await _pause();
     final houses =
         _database.houses.where((house) => house.cityId == cityId).toList()
-          ..sort((a, b) => a.name.compareTo(b.name));
+          ..sort(
+            (a, b) =>
+                compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name),
+          );
     return houses;
   }
 
@@ -28,7 +32,10 @@ class FakeCatalogRepository implements CatalogRepository {
     await _pause();
     final rooms =
         _database.rooms.where((room) => room.houseId == houseId).toList()
-          ..sort((a, b) => a.name.compareTo(b.name));
+          ..sort(
+            (a, b) =>
+                compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name),
+          );
     return rooms;
   }
 
@@ -49,7 +56,14 @@ class FakeCatalogRepository implements CatalogRepository {
         if (house.cityId == cityId)
           for (final room in _database.rooms)
             if (room.houseId == house.id) _listing(room, house),
-    ]..sort((a, b) => a.room.name.compareTo(b.room.name));
+    ]..sort(
+      (a, b) => compareFeatured(
+        a.room.featuredRank,
+        b.room.featuredRank,
+        a.room.name,
+        b.room.name,
+      ),
+    );
     return listings;
   }
 
@@ -102,6 +116,7 @@ class FakeCatalogRepository implements CatalogRepository {
       houseName: house.name,
       cityId: house.cityId,
       cityName: cityName,
+      houseFeaturedRank: house.featuredRank,
     );
   }
 
