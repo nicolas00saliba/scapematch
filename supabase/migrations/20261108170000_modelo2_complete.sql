@@ -331,13 +331,13 @@ begin
     amount_cents, payment_charge_id
   )
   select
-    c.venue_id,
+    ch.venue_id,
     ch.group_id,
     ch.user_id,
     'house',
     'credit',
     'venue_credit_clawback_offset',
-    c.applied_cents,
+    sum(c.applied_cents),
     p_charge_id
   from public.venue_credit_clawbacks c
   join public.venue_credit_applications a on a.entry_id = c.entry_id
@@ -347,6 +347,7 @@ begin
     and c.voided_at is null
     and c.neutralized_at is null
     and c.applied_cents > 0
+  group by ch.venue_id, ch.group_id, ch.user_id
   on conflict (payment_charge_id, kind, direction) do nothing;
 
   update public.venue_credit_clawbacks c

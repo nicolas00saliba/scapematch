@@ -1008,7 +1008,7 @@ begin
   v_paid := coalesce(v_charge.paid_at, pg_catalog.now());
   v_value := v_settings.point_value_cents;
 
-  -- Cashback do pagador, com ou sem indicação. A carência é a mesma.
+  -- Cashback fixo de 1%. O sorteio entra só na migration do #85.
   select amount_cents into v_existing
   from public.scape_point_entries
   where source_charge_id = v_charge.id
