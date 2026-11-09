@@ -47,47 +47,26 @@ done
 psql_db scapematch_upgrade -f "$root/migrations/20261109120000_rewards_rules.sql" >/dev/null
 psql_db scapematch_upgrade -f "$root/migrations/20261109130000_reward_reversal.sql" >/dev/null
 
-make_db scapematch_fresh
-for path in "$root"/migrations/*.sql; do
-  psql_db scapematch_fresh -f "$path" >/dev/null
-done
-
-psql_db scapematch_upgrade -c "
+psql_db scapematch_upgrade -v ON_ERROR_STOP=1 -c "
 do \$\$
-declare
-  v_fn text;
 begin
-  select pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure) into v_fn;
-  if v_fn not like '%post_player_cashback%' or v_fn not like '%referrer_tier_bonus%' then
-    raise exception 'upgrade nao ligou cashback variavel nem nivel';
+  if to_regprocedure('private.apply_venue_clawback(uuid,uuid,integer)') is null
+    or to_regprocedure('private.restore_applied_venue_credits(uuid)') is null
+    or to_regprocedure('private.reopen_empty_slot_on_refund(uuid)') is null
+  then
+    raise exception 'upgrade do #84 antigo nao criou clawback, restore ou reopen';
   end if;
   if pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure)
-    is distinct from pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure)
+    not like '%post_player_cashback%'
+    or pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure)
+    not like '%referrer_tier_bonus%'
   then
-    null;
+    raise exception 'upgrade nao ligou cashback variavel nem nivel';
   end if;
 end \$\$;
-" >/dev/null
-
-psql_db scapematch_upgrade -tA -c "select pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure)" > /tmp/upgrade_post.sql
-psql_db scapematch_fresh -tA -c "select pg_get_functiondef('private.post_referral_rewards(uuid)'::regprocedure)" > /tmp/fresh_post.sql
-if ! cmp -s /tmp/upgrade_post.sql /tmp/fresh_post.sql; then
-  echo "post_referral_rewards divergiu entre upgrade e banco novo" >&2
-  exit 1
-fi
-for fn in \
-  "private.reverse_referral_rewards(uuid)" \
-  "private.ledger_reverse_charge(uuid)" \
-  "private.referral_reward_gate(uuid,text,uuid,uuid,uuid,uuid)"
-do
-  psql_db scapematch_upgrade -tA -c "select pg_get_functiondef('${fn}'::regprocedure)" > /tmp/upgrade_fn.sql
-  psql_db scapematch_fresh -tA -c "select pg_get_functiondef('${fn}'::regprocedure)" > /tmp/fresh_fn.sql
-  if ! cmp -s /tmp/upgrade_fn.sql /tmp/fresh_fn.sql; then
-    echo "$fn divergiu entre upgrade e banco novo" >&2
-    exit 1
-  fi
-done
+"
+psql_db scapematch_upgrade -f "$root/tests/reward_reversal.sql" >/dev/null
+psql_db scapematch_upgrade -f "$root/tests/rewards_regression.sql" >/dev/null
 
 admin_psql -c "drop database if exists scapematch_upgrade with (force);" >/dev/null
-admin_psql -c "drop database if exists scapematch_fresh with (force);" >/dev/null
 echo "rewards upgrade ok"

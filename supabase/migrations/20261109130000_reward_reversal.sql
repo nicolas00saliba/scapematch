@@ -1,6 +1,5 @@
--- Corrige o upgrade de quem já aplicou o #84 antigo.
--- Recria o lançamento com cashback sorteado e nível, estorna crédito e
--- débito de horário vazio, e não reexecuta migration já registrada.
+-- Upgrade real: main ou #84 antigo recebem estas funções aqui.
+-- O arquivo histórico do livro não é reaplicado.
 
 alter table public.venue_referral_entries
   drop constraint if exists venue_referral_entries_settlement_check;
@@ -12,11 +11,11 @@ alter table public.payment_charges
   add column if not exists venue_credit_clawback_cents integer not null default 0;
 alter table public.payment_charges
   add column if not exists cashback_refund_cents integer not null default 0;
-
 alter table public.venue_credit_applications
   add column if not exists reversed_at timestamptz;
-
 alter table public.venue_cashback_debits
+  add column if not exists voided_at timestamptz;
+alter table public.venue_cashback_refunds
   add column if not exists voided_at timestamptz;
 
 create table if not exists public.venue_credit_clawbacks (
@@ -29,6 +28,7 @@ create table if not exists public.venue_credit_clawbacks (
   ),
   applied_charge_id uuid references public.payment_charges (id),
   voided_at timestamptz,
+  neutralized_at timestamptz,
   created_at timestamptz not null default pg_catalog.now(),
   unique (entry_id)
 );
@@ -44,25 +44,71 @@ create table if not exists public.venue_cashback_refunds (
     applied_cents >= 0 and applied_cents <= amount_cents
   ),
   applied_charge_id uuid references public.payment_charges (id),
+  voided_at timestamptz,
   created_at timestamptz not null default pg_catalog.now(),
   unique (debit_id)
 );
 alter table public.venue_cashback_refunds enable row level security;
 revoke all on table public.venue_cashback_refunds from public, anon, authenticated, service_role;
 
-alter table public.ledger_entries
-  drop constraint if exists ledger_entries_kind_check;
-alter table public.ledger_entries
-  add constraint ledger_entries_kind_check
-  check (
-    kind in (
-      'house_net', 'commission', 'house_refund', 'commission_refund',
-      'venue_credit_applied', 'venue_credit_refund',
-      'venue_credit_clawback', 'venue_credit_clawback_refund',
-      'empty_slot_offset', 'empty_slot_offset_refund', 'empty_slot_refund_reversal'
-    )
-  );
+alter table public.ledger_entries drop constraint if exists ledger_entries_kind_check;
+alter table public.ledger_entries add constraint ledger_entries_kind_check check (
+  kind in (
+    'house_net', 'commission', 'house_refund', 'commission_refund',
+    'venue_credit_applied', 'venue_credit_refund',
+    'venue_credit_clawback', 'venue_credit_clawback_refund',
+    'venue_credit_clawback_offset',
+    'empty_slot_offset', 'empty_slot_offset_refund',
+    'empty_slot_offset_undo', 'empty_slot_refund_reversal'
+  )
+);
 
+create or replace function private.reopen_empty_slot_on_refund(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.venue_cashback_refunds f
+  set voided_at = pg_catalog.now()
+  from public.venue_cashback_debits d
+  where d.applied_charge_id = p_charge_id
+    and f.debit_id = d.id
+    and f.voided_at is null
+    and f.applied_cents = 0;
+
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id
+  )
+  select d.venue_id, ch.group_id, ch.user_id, 'house', 'credit',
+    'empty_slot_offset_undo', d.applied_cents, p_charge_id
+  from public.venue_cashback_debits d
+  join public.payment_charges ch on ch.id = p_charge_id
+  where d.applied_charge_id = p_charge_id
+    and d.applied_cents > 0
+    and not exists (
+      select 1 from public.venue_cashback_refunds f
+      where f.debit_id = d.id and f.voided_at is null and f.applied_cents > 0
+    )
+    and not exists (
+      select 1 from public.ledger_entries l
+      where l.payment_charge_id = p_charge_id
+        and l.kind = 'empty_slot_offset_undo' and l.direction = 'credit'
+    );
+
+  update public.venue_cashback_debits d
+  set applied_cents = 0, applied_charge_id = null
+  where d.applied_charge_id = p_charge_id
+    and d.voided_at is null
+    and not exists (
+      select 1 from public.venue_cashback_refunds f where f.debit_id = d.id
+    );
+end;
+$$;
+
+revoke all on function private.reopen_empty_slot_on_refund(uuid) from public, anon, authenticated;
 
 create or replace function private.referral_reward_gate(
   p_charge_id uuid,
@@ -445,6 +491,10 @@ begin
   where e.kind = 'accrual'
     and e.source_charge_id = p_charge_id
     and e.applied_cents > 0
+    and not exists (
+      select 1 from public.venue_credit_applications a
+      where a.entry_id = e.id and a.reversed_at is not null
+    )
     and exists (
       select 1 from public.venue_referral_entries r
       where r.relates_to = e.id and r.kind = 'reversal'
@@ -498,6 +548,134 @@ begin
 end;
 $$;
 
+
+create or replace function private.apply_venue_clawback(
+  p_charge_id uuid,
+  p_venue_id uuid,
+  p_room integer
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_left integer := greatest(coalesce(p_room, 0), 0);
+  v_taken integer := 0;
+  v_row public.venue_credit_clawbacks%rowtype;
+  v_open integer;
+begin
+  if v_left <= 0 then
+    return 0;
+  end if;
+  for v_row in
+    select *
+    from public.venue_credit_clawbacks
+    where venue_id = p_venue_id
+      and voided_at is null
+      and applied_cents < amount_cents
+    order by created_at
+    for update
+  loop
+    v_open := v_row.amount_cents - v_row.applied_cents;
+    if v_open <= 0 or v_open > v_left then
+      continue;
+    end if;
+    update public.venue_credit_clawbacks
+    set applied_cents = amount_cents,
+        applied_charge_id = p_charge_id
+    where id = v_row.id
+      and applied_cents = v_row.applied_cents
+      and voided_at is null;
+    if not found then
+      continue;
+    end if;
+    v_left := v_left - v_open;
+    v_taken := v_taken + v_open;
+    exit when v_left <= 0;
+  end loop;
+  return v_taken;
+end;
+$$;
+
+create or replace function private.restore_applied_venue_credits(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.venue_credit_clawbacks c
+  set voided_at = pg_catalog.now()
+  from public.venue_credit_applications a
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and c.entry_id = a.entry_id
+    and c.voided_at is null
+    and c.neutralized_at is null
+    and c.applied_cents = 0;
+
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id
+  )
+  select
+    c.venue_id,
+    ch.group_id,
+    ch.user_id,
+    'house',
+    'credit',
+    'venue_credit_clawback_offset',
+    c.applied_cents,
+    p_charge_id
+  from public.venue_credit_clawbacks c
+  join public.venue_credit_applications a on a.entry_id = c.entry_id
+  join public.payment_charges ch on ch.id = p_charge_id
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and c.voided_at is null
+    and c.neutralized_at is null
+    and c.applied_cents > 0
+  on conflict (payment_charge_id, kind, direction) do nothing;
+
+  update public.venue_credit_clawbacks c
+  set neutralized_at = pg_catalog.now()
+  from public.venue_credit_applications a
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and c.entry_id = a.entry_id
+    and c.voided_at is null
+    and c.neutralized_at is null
+    and c.applied_cents > 0;
+
+  update public.venue_referral_entries e
+  set settlement = 'released',
+      applied_cents = 0
+  from public.venue_credit_applications a
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and a.entry_id = e.id
+    and e.settlement = 'applied'
+    and not exists (
+      select 1 from public.venue_referral_entries r
+      where r.relates_to = e.id and r.kind = 'reversal'
+    );
+
+  update public.venue_credit_applications
+  set reversed_at = pg_catalog.now()
+  where payment_charge_id = p_charge_id
+    and reversed_at is null;
+
+  update public.venue_credit_clawbacks
+  set applied_cents = 0,
+      applied_charge_id = null
+  where applied_charge_id = p_charge_id
+    and voided_at is null
+    and neutralized_at is null;
+  perform private.reopen_empty_slot_on_refund(p_charge_id);
+end;
+$$;
+
 create or replace function private.ledger_reverse_charge(p_charge_id uuid)
 returns void
 language plpgsql
@@ -519,6 +697,7 @@ begin
       when 'commission' then 'commission_refund'
       when 'venue_credit_applied' then 'venue_credit_refund'
       when 'empty_slot_offset_refund' then 'empty_slot_refund_reversal'
+      when 'empty_slot_offset_undo' then 'empty_slot_refund_reversal'
       else 'house_refund'
     end,
     credit.amount_cents,
@@ -550,6 +729,3 @@ begin
   perform private.restore_applied_venue_credits(p_charge_id);
 end;
 $$;
-
--- O membro acompanha o status que ficou, não o que o evento pediu.
--- refunded terminal continua released/refunded.

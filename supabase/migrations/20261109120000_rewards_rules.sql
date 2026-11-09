@@ -81,6 +81,7 @@ alter table public.ledger_entries
       'venue_credit_clawback_refund',
       'empty_slot_offset',
       'empty_slot_offset_refund',
+      'empty_slot_offset_undo',
       'empty_slot_refund_reversal'
     )
   );
@@ -155,6 +156,7 @@ create table if not exists public.venue_cashback_refunds (
     applied_cents >= 0 and applied_cents <= amount_cents
   ),
   applied_charge_id uuid references public.payment_charges (id),
+  voided_at timestamptz,
   created_at timestamptz not null default pg_catalog.now(),
   unique (debit_id)
 );
@@ -937,6 +939,7 @@ begin
     select *
     from public.venue_cashback_refunds
     where venue_id = p_venue_id
+      and voided_at is null
       and applied_cents < amount_cents
     order by created_at
     for update
@@ -949,7 +952,8 @@ begin
     set applied_cents = amount_cents,
         applied_charge_id = p_charge_id
     where id = v_row.id
-      and applied_cents = v_row.applied_cents;
+      and applied_cents = v_row.applied_cents
+      and voided_at is null;
     if not found then
       continue;
     end if;

@@ -270,6 +270,43 @@ begin
   ) then
     raise exception 'debito de horario vazio sobreviveu ao estorno';
   end if;
+
+  insert into public.venue_cashback_debits (
+    venue_id, source_charge_id, amount_cents, applied_cents, applied_charge_id
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa500000-0000-4000-8000-000000000003',
+    300, 300, 'aa500000-0000-4000-8000-000000000002'
+  );
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind, amount_cents, payment_charge_id
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa400000-0000-4000-8000-000000000002',
+    'aa100000-0000-4000-8000-000000000002',
+    'house', 'debit', 'empty_slot_offset', 300,
+    'aa500000-0000-4000-8000-000000000002'
+  );
+  perform private.ledger_reverse_charge('aa500000-0000-4000-8000-000000000002');
+  if (
+    select applied_cents from public.venue_cashback_debits
+    where source_charge_id = 'aa500000-0000-4000-8000-000000000003'
+  ) <> 0 or not exists (
+    select 1 from public.ledger_entries
+    where payment_charge_id = 'aa500000-0000-4000-8000-000000000002'
+      and kind = 'empty_slot_offset_undo' and direction = 'credit' and amount_cents = 300
+  ) then
+    raise exception 'estorno da cobranca que absorveu o horario vazio nao devolveu os 300';
+  end if;
+  perform private.reverse_referral_rewards('aa500000-0000-4000-8000-000000000003');
+  if exists (
+    select 1 from public.venue_cashback_refunds f
+    join public.venue_cashback_debits d on d.id = f.debit_id
+    where d.source_charge_id = 'aa500000-0000-4000-8000-000000000003'
+      and f.voided_at is null
+  ) then
+    raise exception 'o gerador estornado pagou de novo o horario vazio';
+  end if;
 end $$;
 
 rollback;

@@ -165,8 +165,6 @@ begin
     'debit',
     case credit.kind
       when 'commission' then 'commission_refund'
-      when 'venue_credit_applied' then 'venue_credit_refund'
-      when 'empty_slot_offset_refund' then 'empty_slot_refund_reversal'
       else 'house_refund'
     end,
     credit.amount_cents,
@@ -175,27 +173,6 @@ begin
   where credit.payment_charge_id = p_charge_id
     and credit.direction = 'credit'
   on conflict (payment_charge_id, kind, direction) do nothing;
-
-  insert into public.ledger_entries (
-    venue_id, group_id, user_id, account, direction, kind,
-    amount_cents, payment_charge_id
-  )
-  select
-    debit.venue_id,
-    debit.group_id,
-    debit.user_id,
-    debit.account,
-    'credit',
-    'venue_credit_clawback_refund',
-    debit.amount_cents,
-    debit.payment_charge_id
-  from public.ledger_entries as debit
-  where debit.payment_charge_id = p_charge_id
-    and debit.direction = 'debit'
-    and debit.kind = 'venue_credit_clawback'
-  on conflict (payment_charge_id, kind, direction) do nothing;
-
-  perform private.restore_applied_venue_credits(p_charge_id);
 end;
 $$;
 
