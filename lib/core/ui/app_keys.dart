@@ -39,10 +39,12 @@ abstract final class AppKeys {
   static const accountRefund = Key('account-refund');
   static const accountData = Key('account-data');
   static const signupReferral = Key('signup-referral');
+  static const signupPhone = Key('signup-phone');
   static const scapePointsBalance = Key('scape-points-balance');
   static const scapeReferralCode = Key('scape-referral-code');
   static const scapeReferralClaim = Key('scape-referral-claim');
   static const payUsePoints = Key('pay-use-points');
+  static const payFirstDiscount = Key('pay-first-discount');
   static const accountDelete = Key('account-delete');
   static const accountDeleteConfirm = Key('account-delete-confirm');
   static const extraSpotsIncrement = Key('extra-spots-increment');

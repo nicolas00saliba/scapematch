@@ -97,6 +97,7 @@ class SupabaseAuthRepository implements AuthRepository {
     required bool acceptedTerms,
     String? cityId,
     String? referralCode,
+    String? phone,
   }) async {
     if (!acceptedTerms) return LegalDocuments.termsRequired;
     if (!GroupRules.isAdult(birthDate: birthDate, now: now)) {
@@ -106,6 +107,7 @@ class SupabaseAuthRepository implements AuthRepository {
     if (rejected != null) return rejected;
     final trimmed = name.trim();
     if (trimmed.isEmpty) return 'Informe o nome.';
+    final phoneDigits = _phoneDigits(phone);
     try {
       final response = await _client.auth.signUp(
         email: email.trim(),
@@ -117,6 +119,7 @@ class SupabaseAuthRepository implements AuthRepository {
           if (cityId != null && cityId.isNotEmpty) 'city_id': cityId,
           if (referralCode != null && referralCode.trim().isNotEmpty)
             'referral_code': referralCode.trim(),
+          'phone': ?phoneDigits,
           'device_install_id': ?await InstallId.readOrCreate(),
         },
       );
@@ -217,6 +220,13 @@ CurrentUser currentUserFromAuth(User user) {
     birthDate: birth,
     cityId: cityIdOf(user),
   );
+}
+
+String? _phoneDigits(String? phone) {
+  if (phone == null || phone.trim().isEmpty) return null;
+  final digits = phone.replaceAll(RegExp(r'\D'), '');
+  if (!RegExp(r'^[0-9]{10,13}$').hasMatch(digits)) return null;
+  return digits;
 }
 
 String? cityIdOf(User user) {

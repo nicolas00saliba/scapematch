@@ -22,6 +22,7 @@ abstract class AuthRepository {
     required bool acceptedTerms,
     String? cityId,
     String? referralCode,
+    String? phone,
   });
 
   /// Reenvia o e-mail de confirmação do cadastro. Nulo quando saiu.

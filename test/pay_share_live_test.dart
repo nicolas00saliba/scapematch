@@ -31,6 +31,16 @@ void main() {
     expect(find.byKey(AppKeys.payCharge), findsNothing);
   });
 
+  testWidgets('o desconto de primeira reserva aparece na cobrança', (
+    tester,
+  ) async {
+    await _open(tester, live: false, discountCents: 2000, onPay: _unusedPay);
+    expect(find.byKey(AppKeys.payFirstDiscount), findsOneWidget);
+    expect(find.textContaining('Desconto de primeira reserva'), findsOneWidget);
+    expect(find.textContaining('20,00'), findsOneWidget);
+    expect(find.byKey(AppKeys.payCharge), findsNothing);
+  });
+
   testWidgets('o modo real mostra o Pix devolvido e não cobra de mentira', (
     tester,
   ) async {
@@ -142,6 +152,7 @@ Future<void> _open(
   })
   onPay,
   List<PaymentMethod> cards = const [],
+  int discountCents = 0,
 }) async {
   tester.view.physicalSize = const Size(400, 2200);
   tester.view.devicePixelRatio = 1;
@@ -167,6 +178,7 @@ Future<void> _open(
                     context: context,
                     amountCents: 9000,
                     reference: 'group-1',
+                    discountCents: discountCents,
                     onPay: onPay,
                   );
                 },

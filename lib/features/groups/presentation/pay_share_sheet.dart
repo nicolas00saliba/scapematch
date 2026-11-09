@@ -85,6 +85,7 @@ Future<PaySheetOutcome> showPayShareSheet({
   onPay,
   Future<ShareChargeView> Function(CardDraft card)? onPayNewCard,
   PointSpendChoice? points,
+  int discountCents = 0,
 }) async {
   final outcome = await showModalBottomSheet<PaySheetOutcome>(
     context: context,
@@ -99,6 +100,9 @@ Future<PaySheetOutcome> showPayShareSheet({
         onPay: onPay,
         onPayNewCard: onPayNewCard,
         points: points,
+        discountCents: discountCents > 0
+            ? discountCents
+            : points?.discountCents ?? 0,
       );
     },
   );
@@ -113,11 +117,13 @@ class PayShareSheet extends ConsumerStatefulWidget {
     required this.onPay,
     this.onPayNewCard,
     this.points,
+    this.discountCents = 0,
   });
 
   final int amountCents;
   final String reference;
   final PointSpendChoice? points;
+  final int discountCents;
   final Future<ShareChargeView> Function(
     PaymentMethodKind kind, {
     String? savedCardId,
@@ -144,11 +150,12 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   bool get _done => _seat != null;
 
   int get _chargedCents {
+    final discount = widget.discountCents;
     final points = widget.points;
     if (_usePoints && points != null && points.points > 0) {
-      return points.chargedCents;
+      return points.chargedCents - discount;
     }
-    return widget.amountCents;
+    return widget.amountCents - discount;
   }
 
   @override
@@ -354,6 +361,13 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                         color: scheme.primary,
                       ),
                     ),
+                    if (widget.discountCents > 0) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Desconto de primeira reserva − ${formatPrice(widget.discountCents)}. A casa recebe o valor cheio.',
+                        key: AppKeys.payFirstDiscount,
+                      ),
+                    ],
                     if (widget.points != null && widget.points!.points > 0) ...[
                       const SizedBox(height: 8),
                       SwitchListTile(

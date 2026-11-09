@@ -146,11 +146,13 @@ class PointSpendChoice {
     required this.points,
     required this.subsidyCents,
     required this.chargedCents,
+    this.discountCents = 0,
   });
 
   final int points;
   final int subsidyCents;
   final int chargedCents;
+  final int discountCents;
   var use = false;
 
   int get selected => use && points > 0 ? points : 0;
@@ -160,6 +162,7 @@ class PointSpendChoice {
       points: _intOf(json['points']),
       subsidyCents: _intOf(json['subsidy_cents']),
       chargedCents: _intOf(json['charged_cents']),
+      discountCents: _intOf(json['first_booking_discount_cents']),
     );
   }
 }

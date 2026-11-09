@@ -3,6 +3,11 @@
 
 \set ON_ERROR_STOP on
 
+-- Os cenários antigos medem a comissão cheia. O desconto de 20% tem teste próprio.
+update public.referral_program_settings
+set first_booking_discount_bps = 0
+where id = 1;
+
 insert into auth.users (id, email, raw_user_meta_data)
 values (
   'bb111111-1111-1111-1111-111111111111',
@@ -1298,6 +1303,244 @@ begin
     where relates_to = v_second and kind = 'reversal'
   ) then
     raise exception 'recusar nao estornou';
+  end if;
+end $$;
+
+update public.referral_program_settings
+set first_booking_discount_bps = 2000
+where id = 1;
+
+insert into auth.users (id, email, raw_user_meta_data)
+values (
+  'be111111-1111-4111-8111-111111111111',
+  'primeira@example.com',
+  jsonb_build_object(
+    'display_name', 'Primeira',
+    'phone', '41999990001',
+    'referral_code', (
+      select code from public.referral_codes
+      where owner_user_id = 'bb111111-1111-1111-1111-111111111111'
+    )
+  )
+);
+
+update public.profiles
+set cpf = '39053344705'
+where id = 'be111111-1111-4111-8111-111111111111'
+  and cpf is null;
+
+do $$
+declare
+  v_reserved jsonb;
+  v_house integer;
+  v_fee integer;
+  v_second jsonb;
+begin
+  if (
+    select phone from public.profiles
+    where id = 'be111111-1111-4111-8111-111111111111'
+  ) is distinct from '41999990001' then
+    raise exception 'telefone do cadastro nao entrou no perfil';
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be611111-1111-4111-8111-111111111111',
+    'curitiba',
+    'bd311111-1111-4111-8111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-11-01 18:00:00+00',
+    4,
+    2,
+    10000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values (
+    'be611111-1111-4111-8111-111111111111',
+    'be111111-1111-4111-8111-111111111111',
+    'Primeira',
+    true,
+    'pending',
+    'none',
+    'none'
+  );
+
+  v_reserved := private.reserve_pix_charge(
+    'be611111-1111-4111-8111-111111111111',
+    'be111111-1111-4111-8111-111111111111',
+    'bd311111-1111-4111-8111-111111111111',
+    10000,
+    'idem-primeira-reserva',
+    'wal_house',
+    2500
+  );
+  if (v_reserved ->> 'amount_cents')::integer <> 8000
+    or (
+      select first_booking_discount_cents
+      from public.payment_charges
+      where id = (v_reserved ->> 'id')::uuid
+    ) <> 2000
+  then
+    raise exception 'desconto de 20%% nao saiu da comissao %', v_reserved;
+  end if;
+
+  perform private.apply_payment_transition(
+    (v_reserved ->> 'id')::uuid, 'paid', true
+  );
+  select amount_cents into v_house
+  from public.ledger_entries
+  where payment_charge_id = (v_reserved ->> 'id')::uuid
+    and kind = 'house_net';
+  select amount_cents into v_fee
+  from public.ledger_entries
+  where payment_charge_id = (v_reserved ->> 'id')::uuid
+    and kind = 'commission';
+  if v_house <> 7500 or v_fee <> 500 then
+    raise exception 'a casa nao ficou com o liquido no desconto % / %', v_house, v_fee;
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be622222-2222-4222-8222-222222222222',
+    'curitiba',
+    'bd311111-1111-4111-8111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-11-02 18:00:00+00',
+    4,
+    2,
+    10000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values (
+    'be622222-2222-4222-8222-222222222222',
+    'be111111-1111-4111-8111-111111111111',
+    'Primeira',
+    true,
+    'pending',
+    'none',
+    'none'
+  );
+  v_second := private.reserve_pix_charge(
+    'be622222-2222-4222-8222-222222222222',
+    'be111111-1111-4111-8111-111111111111',
+    'bd311111-1111-4111-8111-111111111111',
+    10000,
+    'idem-segunda-reserva',
+    'wal_house',
+    2500
+  );
+  if (v_second ->> 'amount_cents')::integer <> 10000 then
+    raise exception 'a segunda reserva repetiu o desconto %', v_second;
+  end if;
+end $$;
+
+insert into public.venue_referral_entries (
+  venue_id, kind, amount_cents, program, idempotency_key, settlement, available_at
+) values (
+  'bd311111-1111-4111-8111-111111111111',
+  'accrual',
+  400,
+  'b2c',
+  'idem-credito-casa',
+  'pending',
+  pg_catalog.now() - interval '1 day'
+);
+
+do $$
+declare
+  v_reserved jsonb;
+  v_credit integer;
+begin
+  perform private.release_due_venue_credits(pg_catalog.now());
+  if (
+    select settlement from public.venue_referral_entries
+    where idempotency_key = 'idem-credito-casa'
+  ) is distinct from 'released' then
+    raise exception 'credito da casa nao liberou em 30 dias';
+  end if;
+
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (
+    'be222222-2222-4222-8222-222222222222',
+    'semcodigo@example.com',
+    '{"display_name":"Sem codigo"}'
+  );
+  update public.profiles
+  set cpf = '15350946056'
+  where id = 'be222222-2222-4222-8222-222222222222';
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be633333-3333-4333-8333-333333333333',
+    'curitiba',
+    'bd311111-1111-4111-8111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-11-03 18:00:00+00',
+    4,
+    2,
+    10000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values (
+    'be633333-3333-4333-8333-333333333333',
+    'be222222-2222-4222-8222-222222222222',
+    'Sem codigo',
+    true,
+    'pending',
+    'none',
+    'none'
+  );
+  v_reserved := private.reserve_pix_charge(
+    'be633333-3333-4333-8333-333333333333',
+    'be222222-2222-4222-8222-222222222222',
+    'bd311111-1111-4111-8111-111111111111',
+    10000,
+    'idem-repasse-credito',
+    'wal_house',
+    2500
+  );
+  select venue_credit_applied_cents into v_credit
+  from public.payment_charges
+  where id = (v_reserved ->> 'id')::uuid;
+  if v_credit <> 400 then
+    raise exception 'credito da casa nao entrou no split %', v_reserved;
+  end if;
+  if (
+    select settlement from public.venue_referral_entries
+    where idempotency_key = 'idem-credito-casa'
+  ) is distinct from 'applied' then
+    raise exception 'credito da casa ficou liberado depois do repasse';
+  end if;
+  perform private.apply_payment_transition(
+    (v_reserved ->> 'id')::uuid, 'paid', true
+  );
+  if (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+      and kind = 'venue_credit_applied'
+  ) is distinct from 400 then
+    raise exception 'livro nao recebeu o repasse do credito';
+  end if;
+  if (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+      and kind = 'house_net'
+  ) is distinct from 7500 then
+    raise exception 'repasse do credito mudou o liquido da reserva';
   end if;
 end $$;
 

@@ -1373,6 +1373,7 @@ begin
       where r.relates_to = e.id and r.kind = 'redemption_reversal'
     );
   get diagnostics v_holds = row_count;
+  perform private.release_due_venue_credits(p_now);
   return v_released + v_holds;
 end;
 $$;
@@ -1607,6 +1608,13 @@ begin
     perform private.release_point_hold(p_idempotency_key);
   elsif not v_inserted and v_charge.points_redeemed > 0 then
     perform private.attach_point_hold(p_idempotency_key, v_charge.id);
+  end if;
+
+  if v_inserted then
+    perform private.apply_share_adjustments(v_charge.id);
+    select * into v_charge
+    from public.payment_charges
+    where id = v_charge.id;
   end if;
 
   return pg_catalog.jsonb_build_object(

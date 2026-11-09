@@ -446,7 +446,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       final choice = PointSpendChoice.fromQuote(
         Map<String, dynamic>.from(data),
       );
-      return choice.points > 0 ? choice : null;
+      return choice.points > 0 || choice.discountCents > 0 ? choice : null;
     } on Object {
       return null;
     }
@@ -461,6 +461,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       amountCents: group.priceCents,
       reference: group.id,
       points: spend,
+      discountCents: spend?.discountCents ?? 0,
       onPay: (kind, {savedCardId}) async {
         final result = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)

@@ -63,6 +63,7 @@ class FakeAuthRepository implements AuthRepository {
     required bool acceptedTerms,
     String? cityId,
     String? referralCode,
+    String? phone,
   }) async {
     if (!acceptedTerms) {
       return LegalDocuments.termsRequired;
