@@ -256,6 +256,7 @@ function adminFor(store: Store) {
           return { data: 1000, error: null };
         }
         if (name === "cap_point_redemption") {
+          // A corrida não resgata. A regra de verdade está em cap_point_redemption no SQL.
           return { data: Number(args.p_points ?? 0), error: null };
         }
         if (name === "load_owned_card") {

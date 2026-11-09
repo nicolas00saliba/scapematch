@@ -34,6 +34,22 @@ alter table public.payment_charges
   add column if not exists empty_slot_offset_cents integer not null default 0
     check (empty_slot_offset_cents >= 0);
 
+alter table public.payment_charges
+  drop constraint if exists payment_charges_subsidy_matches;
+
+alter table public.payment_charges
+  add constraint payment_charges_subsidy_matches
+  check (
+    subsidy_cents = 0
+    or (
+      gross_amount_cents is not null
+      and points_redeemed > 0
+      and gross_amount_cents = amount_cents
+        + subsidy_cents
+        + first_booking_discount_cents
+    )
+  );
+
 alter table public.scape_point_entries
   drop constraint if exists scape_point_entries_program_check;
 
@@ -67,6 +83,7 @@ create table if not exists public.cashback_draws (
   applied_bps integer not null check (applied_bps >= 0),
   doubled boolean not null default false,
   house_share_cents integer not null default 0 check (house_share_cents >= 0),
+  platform_cents integer not null default 0 check (platform_cents >= 0),
   seed text not null,
   distribution jsonb not null,
   created_at timestamptz not null default pg_catalog.now()
@@ -108,7 +125,9 @@ create table if not exists public.venue_cashback_debits (
   venue_id uuid not null references public.venues (id) on delete cascade,
   source_charge_id uuid not null references public.payment_charges (id) on delete cascade,
   amount_cents integer not null check (amount_cents > 0),
-  applied_cents integer not null default 0 check (applied_cents >= 0),
+  applied_cents integer not null default 0 check (
+    applied_cents >= 0 and applied_cents <= amount_cents
+  ),
   applied_charge_id uuid references public.payment_charges (id),
   created_at timestamptz not null default pg_catalog.now(),
   unique (source_charge_id)
@@ -192,10 +211,20 @@ declare
   v_weight integer;
 begin
   select * into v_settings from public.referral_program_settings where id = 1;
-  select coalesce(sum((item ->> 'weight')::numeric), 0),
-         coalesce(sum((item ->> 'bps')::numeric * (item ->> 'weight')::numeric), 0)
+  -- Faixa primeiro. A média só olha o que cabe entre o mínimo e o máximo.
+  select coalesce(sum(band.weight), 0),
+         coalesce(sum(band.bps::numeric * band.weight), 0)
     into v_weight, v_ev
-  from pg_catalog.jsonb_array_elements(v_settings.cashback_distribution) item;
+  from (
+    select (item ->> 'bps')::integer as bps,
+           (item ->> 'weight')::integer as weight
+    from pg_catalog.jsonb_array_elements(v_settings.cashback_distribution) item
+    where (item ->> 'bps') ~ '^[0-9]+$'
+      and (item ->> 'weight') ~ '^[0-9]+$'
+      and (item ->> 'bps')::integer between v_settings.cashback_min_bps
+        and v_settings.cashback_max_bps
+      and (item ->> 'weight')::integer > 0
+  ) band;
   if v_weight <= 0
     or v_ev / v_weight > v_settings.cashback_ev_cap_bps
   then
@@ -205,7 +234,10 @@ begin
   return query
   select (item ->> 'bps')::integer, (item ->> 'weight')::integer
   from pg_catalog.jsonb_array_elements(v_settings.cashback_distribution) item
-  where (item ->> 'bps')::integer between v_settings.cashback_min_bps and v_settings.cashback_max_bps
+  where (item ->> 'bps') ~ '^[0-9]+$'
+    and (item ->> 'weight') ~ '^[0-9]+$'
+    and (item ->> 'bps')::integer between v_settings.cashback_min_bps
+      and v_settings.cashback_max_bps
     and (item ->> 'weight')::integer > 0;
 end;
 $$;
@@ -265,16 +297,16 @@ declare
   v_cents integer;
   v_points integer;
   v_doubled boolean := false;
+  v_platform_cost integer;
+  v_inserted integer;
 begin
   select * into v_charge from public.payment_charges where id = p_charge_id;
   if v_charge.id is null then
     return 0;
   end if;
-  select amount_cents into v_existing
-  from public.scape_point_entries
-  where source_charge_id = p_charge_id
-    and program = 'cashback'
-    and kind = 'accrual';
+  select platform_cents into v_existing
+  from public.cashback_draws
+  where payment_charge_id = p_charge_id;
   if found then
     return v_existing;
   end if;
@@ -314,16 +346,26 @@ begin
   end if;
   v_cents := ((v_base + v_extra) / v_value) * v_value;
   v_points := v_cents / v_value;
-  v_platform_extra := ((v_base + v_platform_extra) / v_value) * v_value;
+  v_platform_cost := least(
+    ((v_base + v_platform_extra) / v_value) * v_value,
+    greatest(p_pool, 0)
+  );
   insert into public.cashback_draws (
     payment_charge_id, user_id, drawn_bps, applied_bps, doubled,
-    house_share_cents, seed, distribution
+    house_share_cents, platform_cents, seed, distribution
   ) values (
     p_charge_id, v_charge.user_id, v_bps,
     case when v_charge.amount_cents > 0 then (v_cents * 10000) / v_charge.amount_cents else 0 end,
-    v_doubled, v_house, v_seed, v_settings.cashback_distribution
+    v_doubled, v_house, v_platform_cost, v_seed, v_settings.cashback_distribution
   )
   on conflict (payment_charge_id) do nothing;
+  get diagnostics v_inserted = row_count;
+  if v_inserted = 0 then
+    select platform_cents into v_platform_cost
+    from public.cashback_draws
+    where payment_charge_id = p_charge_id;
+    return coalesce(v_platform_cost, 0);
+  end if;
   if v_house > 0 then
     insert into public.venue_cashback_debits (venue_id, source_charge_id, amount_cents)
     values (v_charge.venue_id, p_charge_id, v_house)
@@ -341,14 +383,15 @@ begin
     )
     on conflict (idempotency_key) do nothing;
   end if;
-  return least(v_platform_extra, greatest(p_pool, 0));
+  return v_platform_cost;
 end;
 $$;
 
 create or replace function private.apply_empty_slot_debit(
   p_charge_id uuid,
   p_venue_id uuid,
-  p_room integer
+  p_room integer,
+  p_commit boolean default true
 )
 returns integer
 language plpgsql
@@ -377,10 +420,16 @@ begin
     if v_open <= 0 or v_open > v_left then
       continue;
     end if;
-    update public.venue_cashback_debits
-    set applied_cents = amount_cents,
-        applied_charge_id = p_charge_id
-    where id = v_row.id;
+    if p_commit then
+      update public.venue_cashback_debits
+      set applied_cents = amount_cents,
+          applied_charge_id = p_charge_id
+      where id = v_row.id
+        and applied_cents = v_row.applied_cents;
+      if not found then
+        continue;
+      end if;
+    end if;
     v_left := v_left - v_open;
     v_taken := v_taken + v_open;
     exit when v_left <= 0;
@@ -478,6 +527,78 @@ begin
 end;
 $$;
 
+create or replace function private.quote_redemption(
+  p_user_id uuid,
+  p_venue_id uuid,
+  p_gross integer,
+  p_commission_bps integer,
+  p_points integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_quote jsonb;
+  v_discount integer;
+  v_fee integer;
+  v_value integer;
+  v_min integer;
+  v_house integer;
+  v_room integer;
+  v_cap_points integer;
+  v_points integer;
+  v_subsidy integer;
+  v_charged integer;
+  v_split numeric;
+  v_cash_min integer;
+  v_cash_max integer;
+begin
+  v_discount := private.first_booking_discount_for(
+    p_user_id, p_venue_id, p_gross, p_commission_bps, 0, null
+  );
+  v_quote := private.subsidy_quote(
+    p_user_id, p_gross, p_commission_bps, p_points, false
+  );
+  v_fee := (v_quote ->> 'commission_cents')::integer;
+  v_value := greatest((v_quote ->> 'point_value_cents')::integer, 1);
+  v_min := coalesce((v_quote ->> 'redeem_min_points')::integer, 0);
+  v_house := (v_quote ->> 'house_net_cents')::integer;
+  v_room := greatest(least(v_fee - v_discount, p_gross - v_discount - 1), 0);
+  v_cap_points := least(
+    coalesce((v_quote ->> 'max_points')::integer, 0),
+    v_room / v_value
+  );
+  if v_cap_points < v_min then
+    v_cap_points := 0;
+  end if;
+  v_points := least(coalesce((v_quote ->> 'points')::integer, 0), v_cap_points);
+  if v_points < v_min then
+    v_points := 0;
+  end if;
+  v_subsidy := v_points * v_value;
+  v_charged := p_gross - v_subsidy;
+  if v_subsidy = 0 or v_charged <= 0 then
+    v_split := null;
+  else
+    v_split := ceil((v_house::numeric * 1000000) / v_charged) / 10000;
+  end if;
+  select cashback_min_bps, cashback_max_bps into v_cash_min, v_cash_max
+  from public.referral_program_settings where id = 1;
+  return v_quote || pg_catalog.jsonb_build_object(
+    'points', v_points,
+    'subsidy_cents', v_subsidy,
+    'charged_cents', v_charged,
+    'split_percent', v_split,
+    'max_points', v_cap_points,
+    'first_booking_discount_cents', v_discount,
+    'cashback_min_bps', v_cash_min,
+    'cashback_max_bps', v_cash_max
+  );
+end;
+$$;
+
 create or replace function public.cap_point_redemption(
   p_group_id uuid,
   p_user_id uuid,
@@ -498,7 +619,9 @@ begin
     return 0;
   end if;
   v_bps := public.commission_bps_for_venue(v_group.venue_id);
-  v_quote := private.subsidy_quote(p_user_id, v_group.price_cents, v_bps, p_points, false);
+  v_quote := private.quote_redemption(
+    p_user_id, v_group.venue_id, v_group.price_cents, v_bps, p_points
+  );
   return coalesce((v_quote ->> 'points')::integer, 0);
 end;
 $$;
@@ -674,8 +797,9 @@ revoke all on function private.referrer_tier_name(uuid) from public, anon, authe
 revoke all on function private.cashback_distribution() from public, anon, authenticated;
 revoke all on function private.venue_in_empty_slot(uuid, timestamptz) from public, anon, authenticated;
 revoke all on function private.post_player_cashback(uuid, integer) from public, anon, authenticated;
-revoke all on function private.apply_empty_slot_debit(uuid, uuid, integer) from public, anon, authenticated;
+revoke all on function private.apply_empty_slot_debit(uuid, uuid, integer, boolean) from public, anon, authenticated;
 revoke all on function private.grant_welcome_points(uuid) from public, anon, authenticated;
+revoke all on function private.quote_redemption(uuid, uuid, integer, integer, integer) from public, anon, authenticated;
 revoke all on function public.cap_point_redemption(uuid, uuid, integer) from public, anon, authenticated;
 revoke all on function public.my_rewards_summary() from public, anon;
 revoke all on function public.upsert_venue_empty_slot(uuid, integer, integer, integer) from public, anon;
@@ -685,6 +809,77 @@ grant execute on function public.cap_point_redemption(uuid, uuid, integer) to se
 grant execute on function public.my_rewards_summary() to authenticated;
 grant execute on function public.upsert_venue_empty_slot(uuid, integer, integer, integer) to authenticated;
 grant execute on function public.my_venue_empty_slots() to authenticated;
+
+drop function if exists private.apply_venue_credit(uuid, uuid, integer);
+
+create or replace function private.apply_venue_credit(
+  p_charge_id uuid,
+  p_venue_id uuid,
+  p_room integer,
+  p_commit boolean default true
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_left integer := greatest(coalesce(p_room, 0), 0);
+  v_taken integer := 0;
+  v_row public.venue_referral_entries%rowtype;
+  v_open integer;
+begin
+  if v_left <= 0 then
+    return 0;
+  end if;
+  if exists (
+    select 1 from public.venue_credit_applications
+    where payment_charge_id = p_charge_id
+  ) then
+    select coalesce(sum(amount_cents), 0)::integer into v_taken
+    from public.venue_credit_applications
+    where payment_charge_id = p_charge_id;
+    return v_taken;
+  end if;
+  for v_row in
+    select *
+    from public.venue_referral_entries
+    where venue_id = p_venue_id
+      and kind = 'accrual'
+      and settlement = 'released'
+      and review_status is distinct from 'em_revisao'
+      and review_status is distinct from 'rejected'
+    order by available_at, created_at
+    for update
+  loop
+    v_open := v_row.amount_cents - v_row.applied_cents;
+    if v_open <= 0 or v_open > v_left then
+      continue;
+    end if;
+    if p_commit then
+      update public.venue_referral_entries
+      set applied_cents = amount_cents,
+          settlement = 'applied'
+      where id = v_row.id
+        and settlement = 'released';
+      if not found then
+        continue;
+      end if;
+      insert into public.venue_credit_applications (
+        entry_id, payment_charge_id, amount_cents
+      ) values (
+        v_row.id, p_charge_id, v_open
+      );
+    end if;
+    v_left := v_left - v_open;
+    v_taken := v_taken + v_open;
+    exit when v_left <= 0;
+  end loop;
+  return v_taken;
+end;
+$$;
+
+revoke all on function private.apply_venue_credit(uuid, uuid, integer, boolean) from public, anon, authenticated;
 
 create or replace function private.apply_share_adjustments(p_charge_id uuid)
 returns void
@@ -709,13 +904,24 @@ begin
   from public.payment_charges
   where id = p_charge_id
   for update;
-  if v_charge.id is null or v_charge.first_booking_discount_cents > 0 then
+  if v_charge.id is null then
     return;
   end if;
   v_gross := coalesce(
     v_charge.gross_amount_cents,
     v_charge.amount_cents + v_charge.subsidy_cents
   );
+  if v_charge.first_booking_discount_cents > 0
+    or v_charge.venue_credit_applied_cents > 0
+    or v_charge.empty_slot_offset_cents > 0
+  then
+    if v_charge.gross_amount_cents is null and v_charge.subsidy_cents > 0 then
+      update public.payment_charges
+      set gross_amount_cents = v_gross
+      where id = v_charge.id;
+    end if;
+    return;
+  end if;
   v_discount := private.first_booking_discount_for(
     v_charge.user_id, v_charge.venue_id, v_gross,
     v_charge.commission_bps, v_charge.subsidy_cents, v_charge.id
@@ -724,19 +930,44 @@ begin
   v_house := v_gross - v_fee;
   v_charged := v_gross - v_charge.subsidy_cents - v_discount;
   if v_charged <= 0 then
+    if v_charge.subsidy_cents > 0 then
+      update public.payment_charges
+      set gross_amount_cents = v_gross
+      where id = v_charge.id;
+    end if;
     return;
   end if;
   v_room := greatest(v_charged - v_house, 0);
-  v_credit := private.apply_venue_credit(v_charge.id, v_charge.venue_id, v_room);
+  v_credit := private.apply_venue_credit(
+    v_charge.id, v_charge.venue_id, v_room, false
+  );
   v_debit := private.apply_empty_slot_debit(
-    v_charge.id, v_charge.venue_id, greatest(v_house, 0)
+    v_charge.id, v_charge.venue_id, greatest(v_house, 0), false
   );
   v_for_house := greatest(v_house - v_debit, 0) + v_credit;
   if v_for_house > v_charged then
+    if v_charge.subsidy_cents > 0 and v_charge.gross_amount_cents is null then
+      update public.payment_charges
+      set gross_amount_cents = v_gross
+      where id = v_charge.id;
+    end if;
     return;
   end if;
   if v_discount = 0 and v_credit = 0 and v_debit = 0 then
+    if v_charge.gross_amount_cents is null and v_charge.subsidy_cents > 0 then
+      update public.payment_charges
+      set gross_amount_cents = v_gross
+      where id = v_charge.id;
+    end if;
     return;
+  end if;
+  if private.apply_venue_credit(v_charge.id, v_charge.venue_id, v_room, true)
+    is distinct from v_credit
+    or private.apply_empty_slot_debit(
+      v_charge.id, v_charge.venue_id, greatest(v_house, 0), true
+    ) is distinct from v_debit
+  then
+    raise exception 'ajuste mudou antes de gravar' using errcode = '40001';
   end if;
   v_split := ceil((v_for_house::numeric * 1000000) / v_charged) / 10000;
   update public.payment_charges
@@ -854,19 +1085,6 @@ as $$
 declare
   v_group public.groups%rowtype;
   v_bps integer;
-  v_quote jsonb;
-  v_discount integer;
-  v_fee integer;
-  v_subsidy integer;
-  v_points integer;
-  v_value integer;
-  v_min integer;
-  v_max_subsidy integer;
-  v_charged integer;
-  v_house integer;
-  v_split numeric;
-  v_cash_min integer;
-  v_cash_max integer;
 begin
   if auth.uid() is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -876,39 +1094,8 @@ begin
     raise exception 'group not found' using errcode = 'P0002';
   end if;
   v_bps := public.commission_bps_for_venue(v_group.venue_id);
-  v_discount := private.first_booking_discount_for(
-    auth.uid(), v_group.venue_id, v_group.price_cents, v_bps, 0, null
-  );
-  v_quote := private.subsidy_quote(
-    auth.uid(), v_group.price_cents, v_bps, p_points, false
-  );
-  v_fee := (v_quote ->> 'commission_cents')::integer;
-  v_value := greatest((v_quote ->> 'point_value_cents')::integer, 1);
-  v_min := coalesce((v_quote ->> 'redeem_min_points')::integer, 0);
-  v_house := (v_quote ->> 'house_net_cents')::integer;
-  v_max_subsidy := greatest(least(v_fee - v_discount, v_group.price_cents - v_discount - 1), 0);
-  v_points := least((v_quote ->> 'points')::integer, v_max_subsidy / v_value);
-  if v_points < v_min then
-    v_points := 0;
-  end if;
-  v_subsidy := v_points * v_value;
-  v_charged := v_group.price_cents - v_subsidy;
-  if v_subsidy = 0 then
-    v_split := null;
-  else
-    v_split := ceil((v_house::numeric * 1000000) / v_charged) / 10000;
-  end if;
-  select cashback_min_bps, cashback_max_bps into v_cash_min, v_cash_max
-  from public.referral_program_settings where id = 1;
-  return v_quote || pg_catalog.jsonb_build_object(
-    'points', v_points,
-    'subsidy_cents', v_subsidy,
-    'charged_cents', v_charged,
-    'split_percent', v_split,
-    'max_points', case when v_max_subsidy / v_value < v_min then 0 else v_max_subsidy / v_value end,
-    'first_booking_discount_cents', v_discount,
-    'cashback_min_bps', v_cash_min,
-    'cashback_max_bps', v_cash_max
+  return private.quote_redemption(
+    auth.uid(), v_group.venue_id, v_group.price_cents, v_bps, p_points
   );
 end;
 $$;
