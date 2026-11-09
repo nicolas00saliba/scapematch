@@ -32,7 +32,7 @@ Entrar deixa a parte pendente. O botão “Pagar minha parte” abre Pix ou cart
 
 ## Próxima fase
 
-O ScapeMatch Parceiro é um app à parte, em `apps/parceiro`, publicado em `https://parceiro.scapematch.com.br/` (demonstração em `https://parceiro-demo.scapematch.com.br/`; no Pages antigo, `/scapematch/parceiro/`). Login simulado da casa, saldo, extrato com bruto, comissão e líquido, reservas, grupos, salas, horários, preços e falta. O `PartnerRepository` lê o `PaymentBook` do banco que recebe. Cada app sobe o próprio livro de exemplo. O Supabase real fica para depois dessa demo e é o que vai unir jogador e casa.
+O EscapeMatch Parceiro é um app à parte, em `apps/parceiro`, publicado em `https://parceiro.escapematch.com.br/` (demonstração em `https://parceiro-demo.escapematch.com.br/`; no Pages antigo, `/scapematch/parceiro/`). Login simulado da casa, saldo, extrato com bruto, comissão e líquido, reservas, grupos, salas, horários, preços e falta. O `PartnerRepository` lê o `PaymentBook` do banco que recebe. Cada app sobe o próprio livro de exemplo. O Supabase real fica para depois dessa demo e é o que vai unir jogador e casa.
 
 ## O que falta
 

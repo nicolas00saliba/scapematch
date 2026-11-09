@@ -461,7 +461,7 @@ class _SplashCurtain extends StatelessWidget {
       child: RepaintBoundary(
         key: AppKeys.splash,
         child: Semantics(
-          label: 'ScapeMatch',
+          label: 'EscapeMatch',
           container: true,
           child: ExcludeSemantics(
             child: AnimatedBuilder(

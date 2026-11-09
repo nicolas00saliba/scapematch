@@ -231,7 +231,7 @@ void _expectBlackCurtain(WidgetTester tester) {
 Finder _splashWordmark(WidgetTester tester) {
   return find.descendant(
     of: find.byKey(AppKeys.splash),
-    matching: find.text('ScapeMatch'),
+    matching: find.text('EscapeMatch'),
   );
 }
 
@@ -504,7 +504,7 @@ void _expectLightWordmark(WidgetTester tester) {
   final text = tester.widget<Text>(
     find.descendant(
       of: find.byKey(AppKeys.splash),
-      matching: find.text('ScapeMatch'),
+      matching: find.text('EscapeMatch'),
     ),
   );
   final spans = (text.textSpan! as TextSpan).children!.cast<TextSpan>();

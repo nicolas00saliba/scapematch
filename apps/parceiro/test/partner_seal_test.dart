@@ -80,7 +80,7 @@ void main() {
 }
 
 void _expectLockupSeal(WidgetTester tester) {
-  expect(find.text('ScapeMatch Parceiro'), findsOneWidget);
+  expect(find.text('EscapeMatch Parceiro'), findsOneWidget);
   expect(find.text(PartnerSeal.label), findsOneWidget);
   final logo = tester.getRect(find.byType(ScapeLogo));
   final seal = tester.getRect(find.byKey(PartnerSeal.lockupKey));

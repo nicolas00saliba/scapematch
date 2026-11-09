@@ -6,7 +6,7 @@
 --
 -- O walletId da subconta sandbox NÃO entra neste arquivo. Depois de gravar
 -- ASAAS_API_KEY na função, chame provision-venue-wallet. Ela cria a subconta
--- da ScapeMatch Demo e salva venues.asaas_wallet_id.
+-- da EscapeMatch Demo e salva venues.asaas_wallet_id.
 
 do $$
 declare
@@ -22,8 +22,8 @@ begin
     raise exception 'Crie o admin antes do seed. Veja supabase/README.md.';
   end if;
 
-  if exists (select 1 from public.venues where name = 'ScapeMatch Demo') then
-    raise exception 'ScapeMatch Demo já existe.';
+  if exists (select 1 from public.venues where name = 'EscapeMatch Demo') then
+    raise exception 'EscapeMatch Demo já existe.';
   end if;
 
   insert into public.venues (
@@ -33,7 +33,7 @@ begin
   ) values (
     v_owner,
     'curitiba',
-    'ScapeMatch Demo',
+    'EscapeMatch Demo',
     'Centro',
     'Rua XV de Novembro',
     '100',

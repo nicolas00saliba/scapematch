@@ -54,10 +54,10 @@ python3 - "$tmp" <<'PY'
 import json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 want = {
-    "player-real": "https://app.scapematch.com.br/",
-    "player-demo": "https://demo.scapematch.com.br/",
-    "partner-real": "https://parceiro.scapematch.com.br/",
-    "partner-demo": "https://parceiro-demo.scapematch.com.br/",
+    "player-real": "https://app.escapematch.com.br/",
+    "player-demo": "https://demo.escapematch.com.br/",
+    "partner-real": "https://parceiro.escapematch.com.br/",
+    "partner-demo": "https://parceiro-demo.escapematch.com.br/",
     "legacy-player": "https://nicolas00saliba.github.io/scapematch/",
     "legacy-demo": "https://nicolas00saliba.github.io/scapematch/demo/",
 }
@@ -75,28 +75,28 @@ if len(set(ids)) != len(ids):
     raise SystemExit(f"identidades repetidas: {ids}")
 demo = json.loads((root / "player-demo" / "manifest.json").read_text())
 real = json.loads((root / "player-real" / "manifest.json").read_text())
-if demo["name"] != "ScapeMatch Demo" or demo["short_name"] != "Scape Demo":
+if demo["name"] != "EscapeMatch Demo" or demo["short_name"] != "Escape Demo":
     raise SystemExit(f"nome da demo: {demo['name']!r} / {demo['short_name']!r}")
 partner_demo = json.loads((root / "partner-demo" / "manifest.json").read_text())
-if partner_demo["name"] != "ScapeMatch Parceiro Demo" or partner_demo["short_name"] != "Parceiro Demo":
+if partner_demo["name"] != "EscapeMatch Parceiro Demo" or partner_demo["short_name"] != "Parceiro Demo":
     raise SystemExit(
         f"nome do Parceiro demo: {partner_demo['name']!r} / {partner_demo['short_name']!r}"
     )
-if partner_demo["id"] != "https://parceiro-demo.scapematch.com.br/":
+if partner_demo["id"] != "https://parceiro-demo.escapematch.com.br/":
     raise SystemExit("o Parceiro demo não ficou no host próprio")
-if real["name"] != "ScapeMatch":
+if real["name"] != "EscapeMatch":
     raise SystemExit("o app real mudou de nome")
-if "https://app.scapematch.com.br/" in (root / "player-demo" / "flutter_service_worker.js").read_text():
+if "https://app.escapematch.com.br/" in (root / "player-demo" / "flutter_service_worker.js").read_text():
     raise SystemExit("o worker da demo cita o app real")
-if "https://demo.scapematch.com.br/" in (root / "player-real" / "flutter_service_worker.js").read_text():
+if "https://demo.escapematch.com.br/" in (root / "player-real" / "flutter_service_worker.js").read_text():
     raise SystemExit("o worker do real cita a demo")
 real_index = (root / "player-real" / "index.html").read_text()
 demo_index = (root / "player-demo" / "index.html").read_text()
-if "<title>ScapeMatch Demo</title>" not in demo_index:
+if "<title>EscapeMatch Demo</title>" not in demo_index:
     raise SystemExit("título da demo ausente")
-if 'content="ScapeMatch Demo"' not in demo_index:
+if 'content="EscapeMatch Demo"' not in demo_index:
     raise SystemExit("atalho da Apple da demo ausente")
-if "<title>ScapeMatch</title>" not in real_index:
+if "<title>EscapeMatch</title>" not in real_index:
     raise SystemExit("título do real mudou")
 print("ok identidades distintas")
 PY
@@ -111,9 +111,9 @@ const api = new Function(
   code + '\nreturn { inThisInstall, ownsCache, CACHE_PREFIX };',
 )({
   addEventListener() {},
-  registration: {scope: 'https://demo.scapematch.com.br/'},
+  registration: {scope: 'https://demo.escapematch.com.br/'},
 });
-const partner = 'scapematch-cache:https://demo.scapematch.com.br/parceiro/|shell';
+const partner = 'scapematch-cache:https://demo.escapematch.com.br/parceiro/|shell';
 const mine = api.CACHE_PREFIX + 'shell';
 if (api.ownsCache(partner)) {
   throw new Error('o cache da demo do Parceiro cairia no worker do jogador');
@@ -121,13 +121,13 @@ if (api.ownsCache(partner)) {
 if (!api.ownsCache(mine) || !api.ownsCache('flutter-app-cache')) {
   throw new Error('o worker deixou de apagar o cache deste app');
 }
-if (api.inThisInstall('https://demo.scapematch.com.br/parceiro/')) {
+if (api.inThisInstall('https://demo.escapematch.com.br/parceiro/')) {
   throw new Error('o worker do jogador tomou o redirect do Parceiro');
 }
-if (api.inThisInstall('https://parceiro-demo.scapematch.com.br/')) {
+if (api.inThisInstall('https://parceiro-demo.escapematch.com.br/')) {
   throw new Error('o worker do jogador tomou o host do Parceiro demo');
 }
-if (!api.inThisInstall('https://demo.scapematch.com.br/')) {
+if (!api.inThisInstall('https://demo.escapematch.com.br/')) {
   throw new Error('o worker do jogador largou a própria página');
 }
 const legacy = new Function(
@@ -154,10 +154,10 @@ legacy = install_identity("partner", "demo", "/scapematch/parceiro/demo/")
 if legacy != "https://nicolas00saliba.github.io/scapematch/parceiro/demo/":
     raise SystemExit(f"legado do Parceiro demo mudou: {legacy}")
 own = install_identity("partner", "demo", "/")
-if own != "https://parceiro-demo.scapematch.com.br/":
+if own != "https://parceiro-demo.escapematch.com.br/":
     raise SystemExit(f"host do Parceiro demo: {own}")
 player = install_identity("player", "demo", "/")
-if player != "https://demo.scapematch.com.br/":
+if player != "https://demo.escapematch.com.br/":
     raise SystemExit(f"o PWA da demo do jogador mudou: {player}")
 print("ok legado e hosts")
 PY
@@ -168,29 +168,29 @@ const fs = require('fs');
 const path = require('path');
 const root = process.env.ROOT;
 const { partnerDemoRedirectTarget } = require(path.join(root, 'tool/parceiro_demo_redirect/redirect.js'));
-const origin = 'https://parceiro-demo.scapematch.com.br';
+const origin = 'https://parceiro-demo.escapematch.com.br';
 assert.strictEqual(
-  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/'),
+  partnerDemoRedirectTarget('https://demo.escapematch.com.br/parceiro/'),
   origin + '/',
 );
 assert.strictEqual(
-  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro'),
+  partnerDemoRedirectTarget('https://demo.escapematch.com.br/parceiro'),
   origin + '/',
 );
 assert.strictEqual(
-  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/agenda'),
+  partnerDemoRedirectTarget('https://demo.escapematch.com.br/parceiro/agenda'),
   origin + '/agenda',
 );
 assert.strictEqual(
-  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/agenda?x=1#token'),
+  partnerDemoRedirectTarget('https://demo.escapematch.com.br/parceiro/agenda?x=1#token'),
   origin + '/agenda?x=1#token',
 );
 assert.strictEqual(
-  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/index.html'),
+  partnerDemoRedirectTarget('https://demo.escapematch.com.br/parceiro/index.html'),
   origin + '/',
 );
 assert.strictEqual(
-  partnerDemoRedirectTarget('https://demo.scapematch.com.br/parceiro/404.html'),
+  partnerDemoRedirectTarget('https://demo.escapematch.com.br/parceiro/404.html'),
   origin + '/',
 );
 const page = fs.readFileSync(path.join(root, 'tool/parceiro_demo_redirect/index.html'), 'utf8');

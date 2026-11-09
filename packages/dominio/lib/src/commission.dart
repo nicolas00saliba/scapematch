@@ -38,7 +38,7 @@ class ShareQuote {
   /// O que o jogador paga.
   final int amountCents;
 
-  /// O que fica com o ScapeMatch.
+  /// O que fica com o EscapeMatch.
   final int commissionCents;
 
   /// O que entra na conta da casa.

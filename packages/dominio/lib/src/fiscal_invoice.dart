@@ -128,7 +128,7 @@ const demoHouseFiscal = VenueFiscalProfile(
   issPercent: 2,
 );
 
-/// NFS-e da intermediação, emitida pela conta raiz da ScapeMatch.
+/// NFS-e da intermediação, emitida pela conta raiz da EscapeMatch.
 class PlatformFiscalProfile {
   const PlatformFiscalProfile({
     this.serviceCode = '17.02',
@@ -222,7 +222,7 @@ class FiscalInvoiceView {
 enum InvoicePeriod { days30, thisMonth, all }
 
 /// Duas notas por parte paga: serviço (casa → jogador) e comissão
-/// (ScapeMatch → casa). Casa com CPF recebe e a nota de serviço fica
+/// (EscapeMatch → casa). Casa com CPF recebe e a nota de serviço fica
 /// sem emissão. A comissão continua.
 List<FiscalInvoiceView> planChargeInvoices({
   required PaidShare share,
@@ -275,7 +275,7 @@ String fiscalStatusLabel(FiscalInvoiceStatus status) {
 String fiscalKindLabel(FiscalInvoiceKind kind) {
   return switch (kind) {
     FiscalInvoiceKind.service => 'Serviço da casa',
-    FiscalInvoiceKind.commission => 'Comissão da ScapeMatch',
+    FiscalInvoiceKind.commission => 'Comissão da EscapeMatch',
   };
 }
 
@@ -302,7 +302,7 @@ String invoiceXml(FiscalInvoiceView invoice) {
   ${tag('tipo', invoice.kind.name)}
   ${tag('valor', reais)}
   ${tag('descricao', invoice.description)}
-  ${tag('prestador', invoice.kind == FiscalInvoiceKind.service ? invoice.venueName : 'ScapeMatch')}
+  ${tag('prestador', invoice.kind == FiscalInvoiceKind.service ? invoice.venueName : 'EscapeMatch')}
   ${tag('tomador', invoice.kind == FiscalInvoiceKind.service ? invoice.playerName : invoice.venueName)}
 </nfse>
 ''';

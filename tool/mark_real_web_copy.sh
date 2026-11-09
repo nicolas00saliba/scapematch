@@ -22,8 +22,8 @@ if role == "player":
     pairs = [
         (
             index,
-            "ScapeMatch ajuda a montar grupos para escape rooms. Esta versão usa dados de exemplo.",
-            "ScapeMatch ajuda a montar grupos para escape rooms.",
+            "EscapeMatch ajuda a montar grupos para escape rooms. Esta versão usa dados de exemplo.",
+            "EscapeMatch ajuda a montar grupos para escape rooms.",
         ),
         (
             manifest,
@@ -35,13 +35,13 @@ elif role == "partner":
     pairs = [
         (
             index,
-            "ScapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
-            "ScapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda.",
+            "EscapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
+            "EscapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda.",
         ),
         (
             manifest,
-            "Painel da casa no ScapeMatch. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
-            "Painel da casa no ScapeMatch. Saldo, reservas e agenda.",
+            "Painel da casa no EscapeMatch. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
+            "Painel da casa no EscapeMatch. Saldo, reservas e agenda.",
         ),
     ]
 else:

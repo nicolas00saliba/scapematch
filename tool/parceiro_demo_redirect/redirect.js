@@ -1,8 +1,8 @@
 'use strict';
 
-// Leva https://demo.scapematch.com.br/parceiro/… para o host próprio,
+// Leva https://demo.escapematch.com.br/parceiro/… para o host próprio,
 // com path, query e hash. index.html e 404.html não são rota do app.
-var PARTNER_DEMO_ORIGIN = 'https://parceiro-demo.scapematch.com.br';
+var PARTNER_DEMO_ORIGIN = 'https://parceiro-demo.escapematch.com.br';
 
 function partnerDemoRedirectTarget(pageUrl) {
   var current = new URL(pageUrl);

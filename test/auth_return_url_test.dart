@@ -34,19 +34,19 @@ void main() {
       'https://nicolas00saliba.github.io/scapematch/parceiro/demo/',
     );
     expect(
-      authReturnUrl(Uri.parse('https://app.scapematch.com.br/cadastro'), '/'),
-      'https://app.scapematch.com.br/',
+      authReturnUrl(Uri.parse('https://app.escapematch.com.br/cadastro'), '/'),
+      'https://app.escapematch.com.br/',
     );
     expect(
-      authReturnUrl(Uri.parse('https://parceiro.scapematch.com.br/login'), '/'),
-      'https://parceiro.scapematch.com.br/',
+      authReturnUrl(Uri.parse('https://parceiro.escapematch.com.br/login'), '/'),
+      'https://parceiro.escapematch.com.br/',
     );
     expect(
       authReturnUrl(
-        Uri.parse('https://parceiro-demo.scapematch.com.br/agenda'),
+        Uri.parse('https://parceiro-demo.escapematch.com.br/agenda'),
         '/',
       ),
-      'https://parceiro-demo.scapematch.com.br/',
+      'https://parceiro-demo.escapematch.com.br/',
     );
   });
 

@@ -17,7 +17,7 @@ import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/wallet/presentation/real_account_wallet.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
-/// Aba Conta. O desenho é do ScapeMatch: cartões claros, verde e cobre.
+/// Aba Conta. O desenho é do EscapeMatch: cartões claros, verde e cobre.
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
 
@@ -60,7 +60,7 @@ class AccountScreen extends ConsumerWidget {
           Text(
             ref.watch(backendPlanProvider).loadsSampleDatabase
                 ? 'Sua conta de exemplo nesta versão.'
-                : 'Sua conta no ScapeMatch.',
+                : 'Sua conta no EscapeMatch.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -258,7 +258,7 @@ class _WalletCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Carteira ScapeMatch',
+              'Carteira EscapeMatch',
               style: theme.textTheme.titleMedium?.copyWith(
                 color: scheme.onPrimary,
                 fontWeight: FontWeight.w800,

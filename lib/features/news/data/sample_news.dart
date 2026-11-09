@@ -61,7 +61,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       image: NewsImages.biblioteca,
       publishedAt: now.subtract(const Duration(hours: 2)),
       sourceKind: NewsSourceKind.website,
-      sourceUrl: 'https://exemplo.scapematch.invalid/batel/biblioteca',
+      sourceUrl: 'https://exemplo.escapematch.invalid/batel/biblioteca',
     ),
     _item(
       id: SampleNewsIds.cwbCofreHorario,
@@ -76,7 +76,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       image: NewsImages.grupo,
       publishedAt: now.subtract(const Duration(hours: 5)),
       sourceKind: NewsSourceKind.website,
-      sourceUrl: 'https://exemplo.scapematch.invalid/rua-xv/cofre-domingo',
+      sourceUrl: 'https://exemplo.escapematch.invalid/rua-xv/cofre-domingo',
     ),
     _item(
       id: SampleNewsIds.cwbOperaPromo,
@@ -120,7 +120,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       image: NewsImages.scifi,
       publishedAt: now.subtract(const Duration(minutes: 20)),
       sourceKind: NewsSourceKind.website,
-      sourceUrl: 'https://exemplo.scapematch.invalid/rua-xv/laboratorio',
+      sourceUrl: 'https://exemplo.escapematch.invalid/rua-xv/laboratorio',
     ),
     _item(
       id: SampleNewsIds.cwbGrade,
@@ -134,7 +134,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       cityName: curitiba,
       publishedAt: now.subtract(const Duration(hours: 8)),
       sourceKind: NewsSourceKind.website,
-      sourceUrl: 'https://exemplo.scapematch.invalid/batel/sexta',
+      sourceUrl: 'https://exemplo.escapematch.invalid/batel/sexta',
     ),
     _item(
       id: SampleNewsIds.cwbAniversario,
@@ -171,7 +171,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       title: 'Sala nova: a Câmara do Faraó',
       summary:
           'O Batel estreou, só nesta história, uma sala de areia e relógios '
-          'de sol. O nome não existe fora do ScapeMatch.',
+          'de sol. O nome não existe fora do EscapeMatch.',
       category: NewsCategory.newRoom,
       houseName: 'Portal do Batel',
       cityId: SampleIds.curitiba,
@@ -179,7 +179,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       image: NewsImages.egito,
       publishedAt: now.subtract(const Duration(days: 4)),
       sourceKind: NewsSourceKind.website,
-      sourceUrl: 'https://exemplo.scapematch.invalid/batel/farao',
+      sourceUrl: 'https://exemplo.escapematch.invalid/batel/farao',
     ),
     _item(
       id: SampleNewsIds.cwbCombo,
@@ -208,7 +208,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       image: NewsImages.scifi,
       publishedAt: now.subtract(const Duration(days: 1)),
       sourceKind: NewsSourceKind.website,
-      sourceUrl: 'https://exemplo.scapematch.invalid/augusta/linha',
+      sourceUrl: 'https://exemplo.escapematch.invalid/augusta/linha',
     ),
     _item(
       id: SampleNewsIds.spPromo,
@@ -252,7 +252,7 @@ List<NewsItem> buildSampleNews(DateTime now) {
       image: NewsImages.terror,
       publishedAt: now.subtract(const Duration(days: 2)),
       sourceKind: NewsSourceKind.website,
-      sourceUrl: 'https://exemplo.scapematch.invalid/santa-teresa/manha',
+      sourceUrl: 'https://exemplo.escapematch.invalid/santa-teresa/manha',
     ),
     _item(
       id: SampleNewsIds.bhPromo,

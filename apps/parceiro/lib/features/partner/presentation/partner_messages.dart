@@ -1,13 +1,13 @@
 import 'package:dominio/dominio.dart';
 
-/// Textos do ScapeMatch Parceiro.
+/// Textos do EscapeMatch Parceiro.
 abstract final class PartnerMessages {
   static const title = 'Parceiro';
   static const loginTitle = 'Entrar como casa';
   static const loginBody =
       'Conta de exemplo, separada do app do jogador. O saldo é o livro de exemplo desta casa.';
   static const loginBodyLive =
-      'Entre com a conta da casa. A senha é a do ScapeMatch, não um atalho fixo.';
+      'Entre com a conta da casa. A senha é a do EscapeMatch, não um atalho fixo.';
   static const signUp = 'Criar conta da casa';
   static const badLogin = 'E-mail ou senha não conferem neste exemplo.';
   static const badLoginLive = 'E-mail ou senha não conferem.';

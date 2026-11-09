@@ -73,7 +73,7 @@ Future<void> _flow(
   );
   await _resize(tester, size);
   await _waitForPhotos(tester);
-  await _shot(tester, dir, 'home-$suffix.png', size, find.text('ScapeMatch'));
+  await _shot(tester, dir, 'home-$suffix.png', size, find.text('EscapeMatch'));
 
   GoRouter.of(
     tester.element(find.byType(Scaffold).first),

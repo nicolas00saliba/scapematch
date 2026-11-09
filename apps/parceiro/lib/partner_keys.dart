@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// Chaves do ScapeMatch Parceiro. Ficam neste app para o bundle do jogador
+/// Chaves do EscapeMatch Parceiro. Ficam neste app para o bundle do jogador
 /// não carregar as telas da casa.
 abstract final class PartnerKeys {
   static const partnerEmail = Key('partner-email');

@@ -30,10 +30,10 @@ Uri partnerAppUri({Uri? page}) {
 
 /// A demo do jogador abre a demo da casa. O Pages antigo não entra aqui.
 bool _openPartnerDemo(Uri current) {
-  if (current.host == 'demo.scapematch.com.br') return true;
+  if (current.host == 'demo.escapematch.com.br') return true;
   if (kAppMode != AppMode.demo) return false;
-  if (current.host == 'app.scapematch.com.br' ||
-      current.host == 'parceiro.scapematch.com.br') {
+  if (current.host == 'app.escapematch.com.br' ||
+      current.host == 'parceiro.escapematch.com.br') {
     return false;
   }
   return true;
@@ -57,8 +57,8 @@ String playerHomeLink({Uri? page, String? baseHref}) {
     return path;
   }
   // Nos hosts do produto (app/demo) usa o host atual + base do build.
-  if (current.host == 'app.scapematch.com.br' ||
-      current.host == 'demo.scapematch.com.br') {
+  if (current.host == 'app.escapematch.com.br' ||
+      current.host == 'demo.escapematch.com.br') {
     return Uri(
       scheme: current.scheme.isEmpty ? 'https' : current.scheme,
       host: current.host,
@@ -69,10 +69,10 @@ String playerHomeLink({Uri? page, String? baseHref}) {
   return '$playerAppOrigin/';
 }
 
-/// Texto para mandar o ScapeMatch a alguém que ainda não tem o app.
+/// Texto para mandar o EscapeMatch a alguém que ainda não tem o app.
 String friendInviteText({Uri? page, String? baseHref}) {
   final link = playerHomeLink(page: page, baseHref: baseHref);
-  return 'Vem jogar no ScapeMatch comigo. '
+  return 'Vem jogar no EscapeMatch comigo. '
       'A gente monta o grupo e divide a sala.\n'
       '$link';
 }

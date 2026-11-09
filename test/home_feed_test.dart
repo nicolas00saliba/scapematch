@@ -321,7 +321,7 @@ void main() {
     expect(find.text('Sala nova: A Biblioteca Proibida'), findsOneWidget);
     expect(find.textContaining('Link de origem (fictício)'), findsOneWidget);
     expect(
-      find.textContaining('exemplo.scapematch.invalid/batel/biblioteca'),
+      find.textContaining('exemplo.escapematch.invalid/batel/biblioteca'),
       findsOneWidget,
     );
     expect(find.textContaining('há 2 h'), findsWidgets);
