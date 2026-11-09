@@ -46,6 +46,7 @@ type Store = {
   member: string;
   closed: boolean;
   detachMissing?: boolean;
+  releaseExpiredError?: boolean;
 };
 
 function expiredAt(): string {
@@ -255,6 +256,10 @@ function adminFor(store: Store) {
         if (name === "commission_bps_for_venue") {
           return { data: 1000, error: null };
         }
+        if (name === "cap_point_redemption") {
+          // A corrida não resgata. A regra de verdade está em cap_point_redemption no SQL.
+          return { data: Number(args.p_points ?? 0), error: null };
+        }
         if (name === "load_owned_card") {
           return {
             data: {
@@ -307,6 +312,12 @@ function adminFor(store: Store) {
           return { data: false, error: null };
         }
         if (name === "release_expired_pix_reservation") {
+          if (store.releaseExpiredError) {
+            return {
+              data: null,
+              error: { code: "23503", message: "venue_credit_applications_payment_charge_id_fkey" },
+            };
+          }
           const row = byId(String(args.p_charge_id));
           if (
             row && row.status === "creating" && row.provider_ref === null &&
@@ -981,4 +992,25 @@ Deno.test("Pix apagado sem detach_gone_pix ainda solta o QR", async () => {
   assertEquals(store.charges[0].billing_type, "PIX");
   assertEquals(store.charges[0].provider_ref === "pay_pix", false);
   assertEquals(store.charges[0].qr_code === "qr-antigo", false);
+});
+
+Deno.test("reserva vencida que não apaga ainda cancela a autorização", async () => {
+  const store = makeStore({
+    billing_type: "CREDIT_CARD",
+    status: "creating",
+    provider_ref: null,
+    idempotency_key: "idem-card-velho",
+  });
+  store.charges[0].reserved_at = expiredAt();
+  store.releaseExpiredError = true;
+  const response = await createCharge(
+    request("CREDIT_CARD", "idem-card-novo"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 500);
+  const authorized = store.payments.find((item) =>
+    item.billingType === "CREDIT_CARD"
+  );
+  assert(authorized?.status === "DELETED" || authorized?.status === "REFUNDED");
+  assertEquals(store.charges[0].provider_ref, null);
 });

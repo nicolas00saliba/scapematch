@@ -549,6 +549,7 @@ export async function createCharge(
           attemptId: attempt,
           billingType: "CREDIT_CARD",
         });
+      try {
       if (decision === "cancel_pix" && existing?.provider_ref) {
         const gone = await asaas.cancelPaymentConfirmed(existing.provider_ref);
         if (!gone) {
@@ -755,6 +756,18 @@ export async function createCharge(
       status = transition.status;
       providerRef = stored;
       savedId = cardChargeId;
+      } catch (error) {
+        try {
+          await loseCard(
+            cardChargeId || existing?.id ||
+              "00000000-0000-0000-0000-000000000000",
+            attemptId || null,
+          );
+        } catch (_loseError) {
+          // O erro original segue.
+        }
+        throw error;
+      }
     }
 
     return json({

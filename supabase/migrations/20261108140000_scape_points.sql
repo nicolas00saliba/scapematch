@@ -1556,6 +1556,9 @@ begin
     perform private.ledger_reverse_charge(v_charge.id);
     perform private.reverse_referral_rewards(v_charge.id);
   end if;
+  if v_charge.status in ('cancelled', 'failed') then
+    perform private.release_unpaid_components(v_charge.id);
+  end if;
 
   perform private.sync_charge_member(v_charge);
   return pg_catalog.jsonb_build_object(

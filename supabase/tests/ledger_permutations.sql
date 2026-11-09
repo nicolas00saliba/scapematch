@@ -3,6 +3,14 @@
 
 \set ON_ERROR_STOP on
 
+\set FULL_PERMUTATIONS ''
+\getenv FULL_PERMUTATIONS FULL_PERMUTATIONS
+select set_config(
+  'scapematch.full_permutations',
+  coalesce(nullif(:'FULL_PERMUTATIONS', ''), ''),
+  false
+);
+
 begin;
 
 select set_config('request.jwt.claim.sub', '', true);
@@ -111,6 +119,9 @@ declare
   v_i integer;
   v_same boolean;
   v_count integer := 0;
+  v_full boolean := coalesce(
+    current_setting('scapematch.full_permutations', true), ''
+  ) = '1';
   v_house integer;
   v_open_claw integer;
   v_open_credit integer;
@@ -141,6 +152,9 @@ begin
   loop
     v_n := v_case.n;
     v_same := v_case.same;
+    if v_n = 3 and not v_full then
+      continue;
+    end if;
     v_origins := '{}';
     v_consumers := '{}';
     v_groups := '{}';
@@ -439,8 +453,8 @@ begin
     delete from public.groups where venue_id = v_venue;
   end loop;
 
-  if v_count <> (120 + 720 + 720 + 40320) then
-    raise exception 'a matriz de creditos nao enumerou 41880 ordens: %', v_count;
+  if v_count <> (case when v_full then 120 + 720 + 720 + 40320 else 120 + 720 end) then
+    raise exception 'a matriz de creditos nao enumerou %', v_count;
   end if;
   raise notice 'permutacoes de credito conferidas: %', v_count;
 end;
