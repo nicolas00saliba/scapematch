@@ -6,6 +6,10 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 old_ref="70bbdd183dc2ded5e0f75faee8d0de5a0c62f0a5"
 
+if ! git -C "$root" cat-file -e "${old_ref}^{commit}" 2>/dev/null; then
+  git -C "$root" fetch --no-tags origin "$old_ref"
+fi
+
 admin_psql() {
   if [[ -n "${DATABASE_URL:-}" ]]; then
     psql "${DATABASE_URL%/*}/postgres" -v ON_ERROR_STOP=1 "$@"
@@ -32,9 +36,14 @@ make_db() {
 }
 
 make_db scapematch_upgrade
-while IFS= read -r path; do
-  git show "${old_ref}:${path}" | psql_db scapematch_upgrade -f - >/dev/null
-done < <(git ls-tree -r --name-only "$old_ref" supabase/migrations | sort)
+mapfile -t old_migrations < <(git -C "$root" ls-tree -r --name-only "$old_ref" supabase/migrations | sort)
+if [[ ${#old_migrations[@]} -eq 0 ]]; then
+  echo "o commit ${old_ref} nao tem migrations" >&2
+  exit 1
+fi
+for path in "${old_migrations[@]}"; do
+  git -C "$root" show "${old_ref}:${path}" | psql_db scapematch_upgrade -f - >/dev/null
+done
 psql_db scapematch_upgrade -f "$root/migrations/20261109120000_rewards_rules.sql" >/dev/null
 psql_db scapematch_upgrade -f "$root/migrations/20261109130000_reward_reversal.sql" >/dev/null
 
