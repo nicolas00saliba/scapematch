@@ -1,3 +1,25 @@
+-- Aborta se já existem linhas agregadas de recompensa. Produção não tem
+-- essas linhas; um banco de teste antigo não pode ganhar component_key ''
+-- e duplicar o valor no replay.
+do $$
+begin
+  if exists (
+    select 1
+    from public.ledger_entries
+    where kind in (
+      'venue_credit_applied',
+      'venue_credit_refund',
+      'venue_credit_clawback',
+      'venue_credit_clawback_refund',
+      'venue_credit_clawback_offset'
+    )
+  ) then
+    raise exception using
+      errcode = '55000',
+      message = 'lancamentos agregados de recompensa sem origem; 20261108190000 nao reescreve essas linhas';
+  end if;
+end $$;
+
 -- Um lançamento por componente. A chave é cobrança + kind + direção + origem.
 -- A main já tem o índice sem origem; esta migration só roda nos pacotes novos.
 -- Produção não aplicou o #84.
