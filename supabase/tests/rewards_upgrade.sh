@@ -1,5 +1,6 @@
 #!/bin/bash
-# main → migrations do #84 → dados financeiros gravados → migrations do #85.
+# main (já com o #84) → dados financeiros gravados → migrations do #85.
+# Arquivo que a main já registrou não roda de novo: o CREATE TABLE quebra.
 # 70bbdd1 nunca foi aplicado fora de teste e não é caminho suportado.
 # Não fala com o Asaas e não publica função.
 set -euo pipefail
@@ -38,6 +39,9 @@ while IFS= read -r path; do
 done < <(git ls-tree -r --name-only origin/main supabase/migrations | sort)
 
 for path in supabase/migrations/20261108*.sql; do
+  if git cat-file -e "origin/main:${path}" 2>/dev/null; then
+    continue
+  fi
   psql_db scapematch_rewards_upgrade -f "$root/$path" >/dev/null
 done
 
@@ -47,6 +51,9 @@ psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/ledger_permutations.
 psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/commit_84_offset.sql" >/dev/null
 
 for path in supabase/migrations/20261109*.sql; do
+  if git cat-file -e "origin/main:${path}" 2>/dev/null; then
+    continue
+  fi
   psql_db scapematch_rewards_upgrade -f "$root/$path" >/dev/null
 done
 
