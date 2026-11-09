@@ -471,12 +471,12 @@ begin
   end if;
   select payer_referred_account_cap into v_cap
   from public.referral_program_settings where id = 1;
-  if coalesce(v_cap, 0) > 0
-    and v_charge.payer_document_hash is null
+  if v_charge.payer_document_hash is null
     and v_charge.payer_card_key is null
   then
-    null;
-  elsif coalesce(v_cap, 0) > 0
+    return 'em_revisao';
+  end if;
+  if coalesce(v_cap, 0) > 0
     and not private.payer_subject_known(
       v_charge.payer_document_hash,
       v_charge.payer_card_key,

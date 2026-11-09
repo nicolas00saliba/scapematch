@@ -247,6 +247,29 @@ begin
   end;
   execute 'reset role';
   perform set_config('request.jwt.claim.sub', '', true);
+
+  insert into public.venue_cashback_debits (
+    venue_id, source_charge_id, amount_cents
+  ) values (
+    'aa200000-0000-4000-8000-000000000001',
+    'aa500000-0000-4000-8000-000000000001',
+    300
+  );
+  perform private.reverse_referral_rewards('aa500000-0000-4000-8000-000000000001');
+  perform private.apply_empty_slot_debit(
+    'aa500000-0000-4000-8000-000000000002',
+    'aa200000-0000-4000-8000-000000000001',
+    10000,
+    true
+  );
+  if exists (
+    select 1 from public.venue_cashback_debits
+    where source_charge_id = 'aa500000-0000-4000-8000-000000000001'
+      and amount_cents = 300
+      and (voided_at is null or applied_cents <> 0)
+  ) then
+    raise exception 'debito de horario vazio sobreviveu ao estorno';
+  end if;
 end $$;
 
 rollback;

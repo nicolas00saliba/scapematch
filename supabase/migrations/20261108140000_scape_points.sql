@@ -1278,6 +1278,32 @@ begin
       where r.relates_to = e.id and r.kind = 'reversal'
     );
 
+  update public.venue_referral_entries e
+  set settlement = 'reversed'
+  where e.kind = 'accrual'
+    and e.source_charge_id = p_charge_id
+    and e.settlement in ('pending', 'released')
+    and e.applied_cents = 0
+    and exists (
+      select 1 from public.venue_referral_entries r
+      where r.relates_to = e.id and r.kind = 'reversal'
+    );
+
+  insert into public.venue_credit_clawbacks (venue_id, entry_id, amount_cents)
+  select e.venue_id, e.id, e.applied_cents
+  from public.venue_referral_entries e
+  where e.kind = 'accrual'
+    and e.source_charge_id = p_charge_id
+    and e.applied_cents > 0
+    and exists (
+      select 1 from public.venue_referral_entries r
+      where r.relates_to = e.id and r.kind = 'reversal'
+    )
+    and not exists (
+      select 1 from public.venue_credit_clawbacks c
+      where c.entry_id = e.id and c.voided_at is null
+    );
+
   insert into public.scape_point_entries (
     user_id, kind, points, amount_cents, program,
     source_charge_id, payment_charge_id, relates_to, client_key, idempotency_key

@@ -35,6 +35,10 @@ alter table public.payment_charges
     check (empty_slot_offset_cents >= 0);
 
 alter table public.payment_charges
+  add column if not exists cashback_refund_cents integer not null default 0
+    check (cashback_refund_cents >= 0);
+
+alter table public.payment_charges
   drop constraint if exists payment_charges_subsidy_matches;
 
 alter table public.payment_charges
@@ -72,7 +76,12 @@ alter table public.ledger_entries
       'house_refund',
       'commission_refund',
       'venue_credit_applied',
-      'empty_slot_offset'
+      'venue_credit_refund',
+      'venue_credit_clawback',
+      'venue_credit_clawback_refund',
+      'empty_slot_offset',
+      'empty_slot_offset_refund',
+      'empty_slot_refund_reversal'
     )
   );
 
@@ -129,12 +138,30 @@ create table if not exists public.venue_cashback_debits (
     applied_cents >= 0 and applied_cents <= amount_cents
   ),
   applied_charge_id uuid references public.payment_charges (id),
+  voided_at timestamptz,
   created_at timestamptz not null default pg_catalog.now(),
   unique (source_charge_id)
 );
 
 alter table public.venue_cashback_debits enable row level security;
 revoke all on table public.venue_cashback_debits from public, anon, authenticated, service_role;
+
+create table if not exists public.venue_cashback_refunds (
+  id uuid primary key default gen_random_uuid(),
+  venue_id uuid not null references public.venues (id) on delete cascade,
+  debit_id uuid not null references public.venue_cashback_debits (id),
+  amount_cents integer not null check (amount_cents > 0),
+  applied_cents integer not null default 0 check (
+    applied_cents >= 0 and applied_cents <= amount_cents
+  ),
+  applied_charge_id uuid references public.payment_charges (id),
+  created_at timestamptz not null default pg_catalog.now(),
+  unique (debit_id)
+);
+
+alter table public.venue_cashback_refunds enable row level security;
+revoke all on table public.venue_cashback_refunds
+  from public, anon, authenticated, service_role;
 
 create or replace function private.referrer_active_count(p_user_id uuid)
 returns integer
@@ -412,6 +439,7 @@ begin
     from public.venue_cashback_debits
     where venue_id = p_venue_id
       and applied_cents < amount_cents
+      and voided_at is null
       and source_charge_id is distinct from p_charge_id
     order by created_at
     for update
@@ -849,6 +877,11 @@ begin
       and settlement = 'released'
       and review_status is distinct from 'em_revisao'
       and review_status is distinct from 'rejected'
+      and not exists (
+        select 1 from public.venue_referral_entries reversed
+        where reversed.relates_to = venue_referral_entries.id
+          and reversed.kind = 'reversal'
+      )
     order by available_at, created_at
     for update
   loop
@@ -881,6 +914,55 @@ $$;
 
 revoke all on function private.apply_venue_credit(uuid, uuid, integer, boolean) from public, anon, authenticated;
 
+create or replace function private.apply_cashback_refund(
+  p_charge_id uuid,
+  p_venue_id uuid,
+  p_room integer
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_left integer := greatest(coalesce(p_room, 0), 0);
+  v_taken integer := 0;
+  v_row public.venue_cashback_refunds%rowtype;
+  v_open integer;
+begin
+  if v_left <= 0 then
+    return 0;
+  end if;
+  for v_row in
+    select *
+    from public.venue_cashback_refunds
+    where venue_id = p_venue_id
+      and applied_cents < amount_cents
+    order by created_at
+    for update
+  loop
+    v_open := v_row.amount_cents - v_row.applied_cents;
+    if v_open <= 0 or v_open > v_left then
+      continue;
+    end if;
+    update public.venue_cashback_refunds
+    set applied_cents = amount_cents,
+        applied_charge_id = p_charge_id
+    where id = v_row.id
+      and applied_cents = v_row.applied_cents;
+    if not found then
+      continue;
+    end if;
+    v_left := v_left - v_open;
+    v_taken := v_taken + v_open;
+    exit when v_left <= 0;
+  end loop;
+  return v_taken;
+end;
+$$;
+
+revoke all on function private.apply_cashback_refund(uuid, uuid, integer) from public, anon, authenticated;
+
 create or replace function private.apply_share_adjustments(p_charge_id uuid)
 returns void
 language plpgsql
@@ -897,6 +979,8 @@ declare
   v_room integer;
   v_credit integer;
   v_debit integer;
+  v_claw integer;
+  v_refund integer;
   v_for_house integer;
   v_split numeric;
 begin
@@ -953,7 +1037,14 @@ begin
     end if;
     return;
   end if;
-  if v_discount = 0 and v_credit = 0 and v_debit = 0 then
+  v_claw := private.apply_venue_clawback(
+    v_charge.id, v_charge.venue_id, greatest(v_house, 0)
+  );
+  v_refund := private.apply_cashback_refund(
+    v_charge.id, v_charge.venue_id, greatest(v_room - v_credit, 0)
+  );
+  v_for_house := greatest(v_house - v_debit - v_claw, 0) + v_credit + v_refund;
+  if v_discount = 0 and v_credit = 0 and v_debit = 0 and v_claw = 0 and v_refund = 0 then
     if v_charge.gross_amount_cents is null and v_charge.subsidy_cents > 0 then
       update public.payment_charges
       set gross_amount_cents = v_gross
@@ -976,6 +1067,8 @@ begin
       first_booking_discount_cents = v_discount,
       venue_credit_applied_cents = v_credit,
       empty_slot_offset_cents = v_debit,
+      venue_credit_clawback_cents = v_claw,
+      cashback_refund_cents = v_refund,
       split_percent = v_split
   where id = v_charge.id;
 end;
@@ -1004,7 +1097,9 @@ begin
     - v_charge.subsidy_cents
     - v_charge.first_booking_discount_cents
     - v_charge.venue_credit_applied_cents
-    + v_charge.empty_slot_offset_cents;
+    + v_charge.empty_slot_offset_cents
+    + v_charge.venue_credit_clawback_cents
+    - v_charge.cashback_refund_cents;
   v_net := v_gross - v_fee_gross;
   if v_net < 0 or v_fee < 0 then
     raise exception 'comissao negativa' using errcode = '23514';
@@ -1026,6 +1121,26 @@ begin
       v_charge.venue_id, v_charge.group_id, v_charge.user_id,
       'house', 'credit', 'venue_credit_applied',
       v_charge.venue_credit_applied_cents, v_charge.id
+    ) on conflict (payment_charge_id, kind, direction) do nothing;
+  end if;
+  if v_charge.venue_credit_clawback_cents > 0 then
+    insert into public.ledger_entries (
+      venue_id, group_id, user_id, account, direction, kind,
+      amount_cents, payment_charge_id
+    ) values (
+      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+      'house', 'debit', 'venue_credit_clawback',
+      v_charge.venue_credit_clawback_cents, v_charge.id
+    ) on conflict (payment_charge_id, kind, direction) do nothing;
+  end if;
+  if v_charge.cashback_refund_cents > 0 then
+    insert into public.ledger_entries (
+      venue_id, group_id, user_id, account, direction, kind,
+      amount_cents, payment_charge_id
+    ) values (
+      v_charge.venue_id, v_charge.group_id, v_charge.user_id,
+      'house', 'credit', 'empty_slot_offset_refund',
+      v_charge.cashback_refund_cents, v_charge.id
     ) on conflict (payment_charge_id, kind, direction) do nothing;
   end if;
   if v_charge.empty_slot_offset_cents > 0 then
