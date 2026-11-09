@@ -49,6 +49,17 @@ export function paymentChargePatch(input: {
   return patch;
 }
 
+/// Bloqueio do split no recebimento. Não muda o status da cobrança.
+export function splitDivergenceEvent(event: string): string | null {
+  if (
+    event === "PAYMENT_SPLIT_DIVERGENCE_BLOCK" ||
+    event === "PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED"
+  ) {
+    return event;
+  }
+  return null;
+}
+
 /// O que o webhook pediu. null = evento que não move a cobrança.
 export function requestedChargeStatus(
   event: string,

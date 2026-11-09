@@ -42,7 +42,7 @@ export type CustomerInput = {
 
 export type ChargeSplit = {
   walletId: string;
-  percentualValue: number;
+  fixedValue: number;
 };
 
 export type PixPaymentRef = {
@@ -154,8 +154,15 @@ export function asaasPaymentGone(body: {
 /// Teto da comissão configurável: 30%. A fórmula ainda usa 10000 como 100%.
 const maxConfigurableCommissionBps = 3000;
 
-/// Percentual do líquido que vai para a casa. A ScapeMatch fica com o resto,
-/// que é a comissão em basis points (1000 = 10% → a casa recebe 90).
+/// Reais com duas casas, a partir dos centavos inteiros do líquido da casa.
+export function fixedReaisFromCents(cents: number): number {
+  if (!Number.isInteger(cents) || cents < 0) {
+    throw new Error("split");
+  }
+  return Number((cents / 100).toFixed(2));
+}
+
+/// Percentual do bruto que seria da casa. O pagamento usa fixedValue.
 export function houseSplitPercent(commissionBps: number): number {
   if (
     !Number.isInteger(commissionBps) || commissionBps < 0 ||
@@ -532,7 +539,7 @@ export class AsaasProvider implements PaymentProvider {
           customer: input.customer,
           valueCents: Math.round(input.value * 100),
           walletId: input.split.walletId,
-          percentualValue: input.split.percentualValue,
+          fixedValue: input.split.fixedValue,
         })
       ) {
         throw new PixReuseRejected();

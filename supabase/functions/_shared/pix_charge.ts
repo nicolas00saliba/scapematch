@@ -137,7 +137,7 @@ export type PixExpectation = {
   customer: string;
   valueCents: number;
   walletId: string;
-  percentualValue: number;
+  fixedValue: number;
 };
 
 /// Customer, valor, split e status precisam bater antes de reaproveitar.
@@ -169,11 +169,11 @@ export function pixMatchesCharge(
   const house = remote.split.find((item) => {
     if (!item || typeof item !== "object") return false;
     return (item as { walletId?: unknown }).walletId === expected.walletId;
-  }) as { percentualValue?: unknown } | undefined;
+  }) as { fixedValue?: unknown } | undefined;
   if (!house) return false;
-  const percent = Number(house.percentualValue);
-  return Number.isFinite(percent) &&
-    Math.abs(percent - expected.percentualValue) <= 0.001;
+  const fixed = Number(house.fixedValue);
+  return Number.isFinite(fixed) &&
+    Math.abs(fixed - expected.fixedValue) <= 0.001;
 }
 
 /// Pix pendente já criado no provedor, ainda sem o copia-e-cola.

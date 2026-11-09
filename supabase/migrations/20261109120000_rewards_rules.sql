@@ -604,7 +604,13 @@ begin
   v_value := greatest((v_quote ->> 'point_value_cents')::integer, 1);
   v_min := coalesce((v_quote ->> 'redeem_min_points')::integer, 0);
   v_house := (v_quote ->> 'house_net_cents')::integer;
-  v_room := greatest(least(v_fee - v_discount, p_gross - v_discount - 1), 0);
+  v_room := greatest(least(
+    v_fee - v_discount - greatest(
+      private.estimated_receipt_fee_cents('PIX', p_gross),
+      private.estimated_receipt_fee_cents('CREDIT_CARD', p_gross)
+    ),
+    p_gross - v_discount - 1
+  ), 0);
   v_cap_points := least(
     coalesce((v_quote ->> 'max_points')::integer, 0),
     v_room / v_value
@@ -1005,6 +1011,8 @@ declare
   v_house integer;
   v_discount integer;
   v_charged integer;
+  v_asaas integer;
+  v_net integer;
   v_room integer;
   v_credit integer;
   v_debit integer;
@@ -1064,15 +1072,34 @@ begin
   v_fee := private.reward_cents(v_gross, v_charge.commission_bps);
   v_house := v_gross - v_fee;
   v_charged := v_gross - v_charge.subsidy_cents - v_discount;
-  if v_charged <= 0 then
-    if v_charge.subsidy_cents > 0 then
+  if v_charged <= 0 or v_house > v_charged then
+    v_discount := 0;
+    v_charged := v_gross - v_charge.subsidy_cents;
+  end if;
+  v_asaas := private.estimated_receipt_fee_cents(
+    v_charge.billing_type, v_charged
+  );
+  v_net := v_charged - v_asaas;
+  if v_discount > 0 and v_house > v_net then
+    v_discount := 0;
+    v_charged := v_gross - v_charge.subsidy_cents;
+    v_asaas := private.estimated_receipt_fee_cents(
+      v_charge.billing_type, v_charged
+    );
+    v_net := v_charged - v_asaas;
+  end if;
+  if v_charged <= 0 or v_house > v_charged then
+    if v_charge.subsidy_cents > 0 and v_charge.gross_amount_cents is null then
       update public.payment_charges
       set gross_amount_cents = v_gross
       where id = v_charge.id;
     end if;
     return;
   end if;
-  v_room := greatest(v_charged - v_house, 0);
+  if v_house > v_net then
+    raise exception 'split_excede_liquido' using errcode = '23514';
+  end if;
+  v_room := greatest(v_net - v_house, 0);
   v_credit := private.apply_venue_credit(
     v_charge.id, v_charge.venue_id, v_room, false
   );
@@ -1080,7 +1107,7 @@ begin
     v_charge.id, v_charge.venue_id, greatest(v_house, 0), false
   );
   v_for_house := greatest(v_house - v_debit, 0) + v_credit;
-  if v_for_house > v_charged then
+  if v_for_house > v_net then
     if v_charge.subsidy_cents > 0 and v_charge.gross_amount_cents is null then
       update public.payment_charges
       set gross_amount_cents = v_gross
@@ -1124,6 +1151,55 @@ begin
   where id = v_charge.id;
 end;
 $$;
+
+create or replace function private.sync_house_fixed(p_charge_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_charge public.payment_charges%rowtype;
+  v_gross integer;
+  v_fixed integer;
+  v_net integer;
+begin
+  select * into v_charge
+  from public.payment_charges
+  where id = p_charge_id
+  for update;
+  if v_charge.id is null then
+    return 0;
+  end if;
+  v_gross := coalesce(
+    v_charge.gross_amount_cents,
+    v_charge.amount_cents + v_charge.subsidy_cents
+  );
+  v_fixed := v_gross
+    - private.reward_cents(v_gross, v_charge.commission_bps)
+    + v_charge.venue_credit_applied_cents
+    - v_charge.empty_slot_offset_cents
+    - v_charge.venue_credit_clawback_cents
+    + v_charge.cashback_refund_cents;
+  if v_fixed < 0 then
+    raise exception 'split_excede_liquido' using errcode = '23514';
+  end if;
+  v_net := v_charge.amount_cents
+    - private.estimated_receipt_fee_cents(
+      v_charge.billing_type, v_charge.amount_cents
+    );
+  if v_fixed > v_net then
+    raise exception 'split_excede_liquido' using errcode = '23514';
+  end if;
+  update public.payment_charges
+  set house_fixed_cents = v_fixed
+  where id = p_charge_id;
+  return v_fixed;
+end;
+$$;
+
+revoke all on function private.sync_house_fixed(uuid)
+  from public, anon, authenticated;
 
 create or replace function private.ledger_credit_charge(p_charge_id uuid)
 returns void
