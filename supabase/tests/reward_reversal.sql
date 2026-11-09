@@ -229,7 +229,7 @@ begin
   end if;
   perform private.ledger_reverse_charge('c5000000-0000-4000-8000-000000000006');
   if (
-    select amount_cents from public.ledger_entries
+    select coalesce(sum(amount_cents), 0) from public.ledger_entries
     where payment_charge_id = 'c5000000-0000-4000-8000-000000000006'
       and kind = 'venue_credit_clawback_offset'
   ) is distinct from 700 then
