@@ -495,15 +495,54 @@ begin
       where r.relates_to = e.id and r.kind = 'reversal'
     );
 
+  delete from public.venue_credit_applications a
+  using public.venue_referral_entries e, public.payment_charges ch
+  where a.entry_id = e.id
+    and e.kind = 'accrual'
+    and e.source_charge_id = p_charge_id
+    and a.reversed_at is null
+    and ch.id = a.payment_charge_id
+    and ch.status not in ('paid', 'refunded');
+
+  update public.venue_referral_entries e
+  set applied_cents = coalesce(paid.paid_cents, 0),
+      settlement = case
+        when coalesce(paid.paid_cents, 0) > 0 then e.settlement
+        else 'reversed'
+      end
+  from (
+    select e2.id as entry_id,
+      sum(a.amount_cents) filter (where ch.id is not null)::integer as paid_cents
+    from public.venue_referral_entries e2
+    left join public.venue_credit_applications a
+      on a.entry_id = e2.id
+     and a.reversed_at is null
+    left join public.payment_charges ch
+      on ch.id = a.payment_charge_id
+     and ch.status in ('paid', 'refunded')
+    where e2.kind = 'accrual'
+      and e2.source_charge_id = p_charge_id
+      and exists (
+        select 1 from public.venue_referral_entries r
+        where r.relates_to = e2.id and r.kind = 'reversal'
+      )
+    group by e2.id
+  ) paid
+  where e.id = paid.entry_id;
+
   insert into public.venue_credit_clawbacks (venue_id, entry_id, amount_cents)
   select e.venue_id, e.id, e.applied_cents
   from public.venue_referral_entries e
   where e.kind = 'accrual'
     and e.source_charge_id = p_charge_id
     and e.applied_cents > 0
-    and not exists (
-      select 1 from public.venue_credit_applications a
-      where a.entry_id = e.id and a.reversed_at is not null
+    and exists (
+      select 1
+      from public.venue_credit_applications a
+      join public.payment_charges ch on ch.id = a.payment_charge_id
+      where a.entry_id = e.id
+        and a.reversed_at is null
+        and ch.status in ('paid', 'refunded')
     )
     and exists (
       select 1 from public.venue_referral_entries r
@@ -514,18 +553,38 @@ begin
       where c.entry_id = e.id and c.voided_at is null
     );
 
+  update public.venue_cashback_debits d
+  set voided_at = pg_catalog.now(),
+      applied_cents = 0,
+      applied_charge_id = null
+  where d.source_charge_id = p_charge_id
+    and d.voided_at is null
+    and (
+      d.applied_cents = 0
+      or not exists (
+        select 1 from public.payment_charges ch
+        where ch.id = d.applied_charge_id
+          and ch.status in ('paid', 'refunded')
+      )
+    );
 
-  update public.venue_cashback_debits
+  update public.venue_cashback_refunds f
   set voided_at = pg_catalog.now()
-  where source_charge_id = p_charge_id
-    and voided_at is null
-    and applied_cents = 0;
+  from public.venue_cashback_debits d
+  where d.source_charge_id = p_charge_id
+    and f.debit_id = d.id
+    and d.voided_at is not null
+    and f.voided_at is null
+    and f.applied_cents = 0;
 
   insert into public.venue_cashback_refunds (venue_id, debit_id, amount_cents)
   select d.venue_id, d.id, d.applied_cents
   from public.venue_cashback_debits d
+  join public.payment_charges ch on ch.id = d.applied_charge_id
   where d.source_charge_id = p_charge_id
+    and d.voided_at is null
     and d.applied_cents > 0
+    and ch.status in ('paid', 'refunded')
     and not exists (
       select 1 from public.venue_cashback_refunds f where f.debit_id = d.id
     );

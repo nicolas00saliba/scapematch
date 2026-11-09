@@ -1,6 +1,7 @@
 -- Regras extras de Scape Points. Não aplicado no remoto.
 -- Resgate mínimo, teto de 30%, boas-vindas, cashback sorteado,
 -- horário vazio e níveis de quem indica. Tudo em referral_program_settings.
+-- A semente do sorteio é extensions.gen_random_bytes e fica em cashback_draws.
 
 alter table public.referral_program_settings
   add column if not exists redeem_min_points integer not null default 1000
@@ -313,8 +314,9 @@ declare
   v_settings public.referral_program_settings%rowtype;
   v_existing integer;
   v_seed text;
+  v_bytes bytea;
   v_total integer := 0;
-  v_roll integer;
+  v_roll bigint;
   v_bps integer;
   v_row record;
   v_cursor integer := 0;
@@ -337,6 +339,7 @@ begin
   select platform_cents into v_existing
   from public.cashback_draws
   where payment_charge_id = p_charge_id;
+  -- Replay de webhook e reconciliação devolve o sorteio gravado.
   if found then
     return v_existing;
   end if;
@@ -347,14 +350,14 @@ begin
   if v_total <= 0 then
     return 0;
   end if;
-  v_seed := pg_catalog.encode(
-    extensions.digest(
-      pg_catalog.convert_to(p_charge_id::text || ':' || pg_catalog.clock_timestamp()::text, 'UTF8'),
-      'sha256'
-    ),
-    'hex'
-  );
-  v_roll := ('x' || pg_catalog.substr(v_seed, 1, 8))::bit(32)::bigint % v_total;
+  v_bytes := extensions.gen_random_bytes(16);
+  v_seed := pg_catalog.encode(v_bytes, 'hex');
+  v_roll := (
+    pg_catalog.get_byte(v_bytes, 0)::bigint * 16777216
+    + pg_catalog.get_byte(v_bytes, 1)::bigint * 65536
+    + pg_catalog.get_byte(v_bytes, 2)::bigint * 256
+    + pg_catalog.get_byte(v_bytes, 3)::bigint
+  ) % v_total::bigint;
   v_bps := v_settings.cashback_min_bps;
   for v_row in select * from private.cashback_distribution() loop
     v_cursor := v_cursor + v_row.weight;
@@ -604,7 +607,13 @@ begin
   v_value := greatest((v_quote ->> 'point_value_cents')::integer, 1);
   v_min := coalesce((v_quote ->> 'redeem_min_points')::integer, 0);
   v_house := (v_quote ->> 'house_net_cents')::integer;
-  v_room := greatest(least(v_fee - v_discount, p_gross - v_discount - 1), 0);
+  v_room := greatest(least(
+    v_fee - v_discount - greatest(
+      private.estimated_receipt_fee_cents('PIX', p_gross),
+      private.estimated_receipt_fee_cents('CREDIT_CARD', p_gross)
+    ),
+    p_gross - v_discount - 1
+  ), 0);
   v_cap_points := least(
     coalesce((v_quote ->> 'max_points')::integer, 0),
     v_room / v_value
@@ -1005,6 +1014,8 @@ declare
   v_house integer;
   v_discount integer;
   v_charged integer;
+  v_asaas integer;
+  v_net integer;
   v_room integer;
   v_credit integer;
   v_debit integer;
@@ -1021,6 +1032,27 @@ begin
     return;
   end if;
   perform private.lock_venue_rewards(v_charge.venue_id);
+  with pairs as (
+    select d.id as debit_id, f.id as refund_id
+    from public.venue_cashback_debits d
+    join public.venue_cashback_refunds f on f.debit_id = d.id
+    where d.venue_id = v_charge.venue_id
+      and d.voided_at is null
+      and d.applied_cents = 0
+      and d.applied_charge_id is null
+      and f.voided_at is null
+      and f.applied_cents = 0
+  ),
+  void_refund as (
+    update public.venue_cashback_refunds f
+    set voided_at = pg_catalog.now()
+    from pairs
+    where f.id = pairs.refund_id
+    returning pairs.debit_id
+  )
+  update public.venue_cashback_debits d
+  set voided_at = pg_catalog.now()
+  where d.id in (select debit_id from void_refund);
   v_gross := coalesce(
     v_charge.gross_amount_cents,
     v_charge.amount_cents + v_charge.subsidy_cents
@@ -1043,15 +1075,34 @@ begin
   v_fee := private.reward_cents(v_gross, v_charge.commission_bps);
   v_house := v_gross - v_fee;
   v_charged := v_gross - v_charge.subsidy_cents - v_discount;
-  if v_charged <= 0 then
-    if v_charge.subsidy_cents > 0 then
+  if v_charged <= 0 or v_house > v_charged then
+    v_discount := 0;
+    v_charged := v_gross - v_charge.subsidy_cents;
+  end if;
+  v_asaas := private.estimated_receipt_fee_cents(
+    v_charge.billing_type, v_charged
+  );
+  v_net := v_charged - v_asaas;
+  if v_discount > 0 and v_house > v_net then
+    v_discount := 0;
+    v_charged := v_gross - v_charge.subsidy_cents;
+    v_asaas := private.estimated_receipt_fee_cents(
+      v_charge.billing_type, v_charged
+    );
+    v_net := v_charged - v_asaas;
+  end if;
+  if v_charged <= 0 or v_house > v_charged then
+    if v_charge.subsidy_cents > 0 and v_charge.gross_amount_cents is null then
       update public.payment_charges
       set gross_amount_cents = v_gross
       where id = v_charge.id;
     end if;
     return;
   end if;
-  v_room := greatest(v_charged - v_house, 0);
+  if v_house > v_net then
+    raise exception 'split_excede_liquido' using errcode = '23514';
+  end if;
+  v_room := greatest(v_net - v_house, 0);
   v_credit := private.apply_venue_credit(
     v_charge.id, v_charge.venue_id, v_room, false
   );
@@ -1059,7 +1110,7 @@ begin
     v_charge.id, v_charge.venue_id, greatest(v_house, 0), false
   );
   v_for_house := greatest(v_house - v_debit, 0) + v_credit;
-  if v_for_house > v_charged then
+  if v_for_house > v_net then
     if v_charge.subsidy_cents > 0 and v_charge.gross_amount_cents is null then
       update public.payment_charges
       set gross_amount_cents = v_gross
@@ -1103,6 +1154,55 @@ begin
   where id = v_charge.id;
 end;
 $$;
+
+create or replace function private.sync_house_fixed(p_charge_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_charge public.payment_charges%rowtype;
+  v_gross integer;
+  v_fixed integer;
+  v_net integer;
+begin
+  select * into v_charge
+  from public.payment_charges
+  where id = p_charge_id
+  for update;
+  if v_charge.id is null then
+    return 0;
+  end if;
+  v_gross := coalesce(
+    v_charge.gross_amount_cents,
+    v_charge.amount_cents + v_charge.subsidy_cents
+  );
+  v_fixed := v_gross
+    - private.reward_cents(v_gross, v_charge.commission_bps)
+    + v_charge.venue_credit_applied_cents
+    - v_charge.empty_slot_offset_cents
+    - v_charge.venue_credit_clawback_cents
+    + v_charge.cashback_refund_cents;
+  if v_fixed < 0 then
+    raise exception 'split_excede_liquido' using errcode = '23514';
+  end if;
+  v_net := v_charge.amount_cents
+    - private.estimated_receipt_fee_cents(
+      v_charge.billing_type, v_charge.amount_cents
+    );
+  if v_fixed > v_net then
+    raise exception 'split_excede_liquido' using errcode = '23514';
+  end if;
+  update public.payment_charges
+  set house_fixed_cents = v_fixed
+  where id = p_charge_id;
+  return v_fixed;
+end;
+$$;
+
+revoke all on function private.sync_house_fixed(uuid)
+  from public, anon, authenticated;
 
 create or replace function private.ledger_credit_charge(p_charge_id uuid)
 returns void

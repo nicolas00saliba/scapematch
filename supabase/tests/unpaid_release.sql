@@ -238,4 +238,196 @@ begin
   end if;
 end $$;
 
+do $$
+declare
+  v_offset integer;
+  v_refund integer;
+begin
+  if to_regprocedure('private.apply_empty_slot_debit(uuid,uuid,integer,boolean)') is null then
+    return;
+  end if;
+  update public.referral_program_settings
+  set first_booking_discount_bps = 0
+  where id = 1;
+  update public.venue_cashback_debits
+  set voided_at = pg_catalog.now()
+  where venue_id = 'ee200000-0000-4000-8000-0000000000aa'
+    and voided_at is null;
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values
+    ('ee400000-0000-4000-8000-0000000000b1', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-03-11 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+    ('ee400000-0000-4000-8000-0000000000b2', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-03-12 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+    ('ee400000-0000-4000-8000-0000000000b3', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-03-13 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa');
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values
+    ('ee400000-0000-4000-8000-0000000000b2', 'ee100000-0000-4000-8000-0000000000aa', 'Libera', true, 'pending', 'none', 'none'),
+    ('ee400000-0000-4000-8000-0000000000b3', 'ee100000-0000-4000-8000-0000000000aa', 'Libera', true, 'pending', 'none', 'none');
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps, paid_at
+  ) values (
+    'ee500000-0000-4000-8000-0000000000b1',
+    'ee400000-0000-4000-8000-0000000000b1',
+    'ee100000-0000-4000-8000-0000000000aa',
+    'ee200000-0000-4000-8000-0000000000aa',
+    10000, 'PIX', 'paid', 'idem-janela-origem', 'wal', 2500, now()
+  );
+  insert into public.venue_cashback_debits (
+    venue_id, source_charge_id, amount_cents
+  ) values (
+    'ee200000-0000-4000-8000-0000000000aa',
+    'ee500000-0000-4000-8000-0000000000b1',
+    4000
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps
+  ) values (
+    'ee500000-0000-4000-8000-0000000000b2',
+    'ee400000-0000-4000-8000-0000000000b2',
+    'ee100000-0000-4000-8000-0000000000aa',
+    'ee200000-0000-4000-8000-0000000000aa',
+    10000, 'PIX', 'creating', 'idem-janela-reserva', 'wal', 2500
+  );
+  perform private.apply_share_adjustments('ee500000-0000-4000-8000-0000000000b2');
+  perform private.reverse_referral_rewards('ee500000-0000-4000-8000-0000000000b1');
+  perform private.apply_payment_transition(
+    'ee500000-0000-4000-8000-0000000000b2', 'cancelled', false
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps
+  ) values (
+    'ee500000-0000-4000-8000-0000000000b3',
+    'ee400000-0000-4000-8000-0000000000b3',
+    'ee100000-0000-4000-8000-0000000000aa',
+    'ee200000-0000-4000-8000-0000000000aa',
+    10000, 'PIX', 'creating', 'idem-janela-seguinte', 'wal', 2500
+  );
+  perform private.apply_share_adjustments('ee500000-0000-4000-8000-0000000000b3');
+  select empty_slot_offset_cents, cashback_refund_cents
+    into v_offset, v_refund
+  from public.payment_charges
+  where id = 'ee500000-0000-4000-8000-0000000000b3';
+  if v_offset <> 0 or v_refund <> 0 or exists (
+    select 1 from public.venue_cashback_debits d
+    where d.source_charge_id = 'ee500000-0000-4000-8000-0000000000b1'
+      and d.voided_at is null
+  ) or exists (
+    select 1 from public.venue_cashback_refunds f
+    join public.venue_cashback_debits d on d.id = f.debit_id
+    where d.source_charge_id = 'ee500000-0000-4000-8000-0000000000b1'
+      and f.voided_at is null
+  ) then
+    raise exception 'reserva estornada ainda cobrou horario vazio % / %', v_offset, v_refund;
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values
+    ('ee400000-0000-4000-8000-0000000000b4', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-04 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+    ('ee400000-0000-4000-8000-0000000000b5', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-05 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa');
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps, paid_at
+  ) values
+    ('ee500000-0000-4000-8000-0000000000b4', 'ee400000-0000-4000-8000-0000000000b4', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'paid', 'idem-pago-origem', 'wal', 2500, now()),
+    ('ee500000-0000-4000-8000-0000000000b5', 'ee400000-0000-4000-8000-0000000000b5', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'paid', 'idem-pago-absorve', 'wal', 2500, now());
+  insert into public.venue_cashback_debits (venue_id, source_charge_id, amount_cents)
+  values (
+    'ee200000-0000-4000-8000-0000000000aa',
+    'ee500000-0000-4000-8000-0000000000b4',
+    4000
+  );
+  perform private.apply_share_adjustments('ee500000-0000-4000-8000-0000000000b5');
+  if (
+    select empty_slot_offset_cents from public.payment_charges
+    where id = 'ee500000-0000-4000-8000-0000000000b5'
+  ) <> 4000 then
+    raise exception 'debito pago nao foi lancado';
+  end if;
+  perform private.reverse_referral_rewards('ee500000-0000-4000-8000-0000000000b4');
+  if not exists (
+    select 1 from public.venue_cashback_refunds f
+    join public.venue_cashback_debits d on d.id = f.debit_id
+    where d.source_charge_id = 'ee500000-0000-4000-8000-0000000000b4'
+      and d.voided_at is null
+      and f.voided_at is null
+      and f.amount_cents = 4000
+      and f.applied_cents = 0
+  ) then
+    raise exception 'estorno de debito pago nao gerou devolucao';
+  end if;
+end $$;
+
+insert into public.groups (
+  id, city_id, venue_id, room_id, session_id, starts_at,
+  total_spots, minimum_spots, price_cents, created_by
+) values
+  ('ee400000-0000-4000-8000-0000000000c1', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-11 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+  ('ee400000-0000-4000-8000-0000000000c2', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-12 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+  ('ee400000-0000-4000-8000-0000000000c3', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-13 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+  ('ee400000-0000-4000-8000-0000000000c4', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-14 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+  ('ee400000-0000-4000-8000-0000000000c5', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-15 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa'),
+  ('ee400000-0000-4000-8000-0000000000c6', 'curitiba', 'ee200000-0000-4000-8000-0000000000aa', 'ee300000-0000-4000-8000-0000000000aa', 'ee310000-0000-4000-8000-0000000000aa', '2027-08-16 18:00:00+00', 4, 2, 10000, 'ee100000-0000-4000-8000-0000000000aa');
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  idempotency_key, wallet_id, commission_bps
+) values
+  ('ee500000-0000-4000-8000-0000000000c1', 'ee400000-0000-4000-8000-0000000000c1', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'paid', 'idem-split-origem', 'wal', 2500),
+  ('ee500000-0000-4000-8000-0000000000c2', 'ee400000-0000-4000-8000-0000000000c2', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'paid', 'idem-split-pago', 'wal', 2500),
+  ('ee500000-0000-4000-8000-0000000000c3', 'ee400000-0000-4000-8000-0000000000c3', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'creating', 'idem-split-reserva', 'wal', 2500),
+  ('ee500000-0000-4000-8000-0000000000c4', 'ee400000-0000-4000-8000-0000000000c4', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'paid', 'idem-split-origem-2', 'wal', 2500),
+  ('ee500000-0000-4000-8000-0000000000c5', 'ee400000-0000-4000-8000-0000000000c5', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'paid', 'idem-split-pago-2', 'wal', 2500),
+  ('ee500000-0000-4000-8000-0000000000c6', 'ee400000-0000-4000-8000-0000000000c6', 'ee100000-0000-4000-8000-0000000000aa', 'ee200000-0000-4000-8000-0000000000aa', 10000, 'PIX', 'creating', 'idem-split-reserva-2', 'wal', 2500);
+
+insert into public.venue_referral_entries (
+  id, venue_id, kind, amount_cents, program, settlement, source_charge_id,
+  idempotency_key, available_at, applied_cents
+) values
+  ('ee600000-0000-4000-8000-0000000000c1', 'ee200000-0000-4000-8000-0000000000aa', 'accrual', 700, 'b2c', 'applied', 'ee500000-0000-4000-8000-0000000000c1', 'idem-split-credito', now(), 700),
+  ('ee600000-0000-4000-8000-0000000000c2', 'ee200000-0000-4000-8000-0000000000aa', 'accrual', 700, 'b2c', 'applied', 'ee500000-0000-4000-8000-0000000000c4', 'idem-split-credito-2', now(), 700);
+
+insert into public.venue_credit_applications (entry_id, payment_charge_id, amount_cents)
+values
+  ('ee600000-0000-4000-8000-0000000000c1', 'ee500000-0000-4000-8000-0000000000c2', 400),
+  ('ee600000-0000-4000-8000-0000000000c1', 'ee500000-0000-4000-8000-0000000000c3', 300),
+  ('ee600000-0000-4000-8000-0000000000c2', 'ee500000-0000-4000-8000-0000000000c5', 400),
+  ('ee600000-0000-4000-8000-0000000000c2', 'ee500000-0000-4000-8000-0000000000c6', 300);
+
+do $$
+begin
+  perform private.reverse_referral_rewards('ee500000-0000-4000-8000-0000000000c1');
+  if (
+    select amount_cents from public.venue_credit_clawbacks
+    where entry_id = 'ee600000-0000-4000-8000-0000000000c1'
+      and voided_at is null
+  ) is distinct from 400 or exists (
+    select 1 from public.venue_credit_applications
+    where payment_charge_id = 'ee500000-0000-4000-8000-0000000000c3'
+  ) then
+    raise exception 'reserva de credito virou clawback';
+  end if;
+  perform private.release_unpaid_components('ee500000-0000-4000-8000-0000000000c6');
+  if (
+    select applied_cents from public.venue_referral_entries
+    where id = 'ee600000-0000-4000-8000-0000000000c2'
+  ) <> 400 or (
+    select settlement from public.venue_referral_entries
+    where id = 'ee600000-0000-4000-8000-0000000000c2'
+  ) is distinct from 'applied' or not exists (
+    select 1 from public.venue_credit_applications
+    where entry_id = 'ee600000-0000-4000-8000-0000000000c2'
+      and payment_charge_id = 'ee500000-0000-4000-8000-0000000000c5'
+      and amount_cents = 400
+  ) then
+    raise exception 'liberar a reserva apagou a parte paga do credito';
+  end if;
+end $$;
+
 rollback;

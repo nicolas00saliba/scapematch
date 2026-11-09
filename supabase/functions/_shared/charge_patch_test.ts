@@ -7,10 +7,24 @@ import {
   paymentRefForRead,
   paymentTransition,
   requestedChargeStatus,
+  splitDivergenceEvent,
 } from "./charge_patch.ts";
 
 const now = "2026-11-05T18:00:00.000Z";
 const earlier = "2026-11-05T12:00:00.000Z";
+
+Deno.test("divergência de split não muda o status", () => {
+  assertEquals(
+    splitDivergenceEvent("PAYMENT_SPLIT_DIVERGENCE_BLOCK"),
+    "PAYMENT_SPLIT_DIVERGENCE_BLOCK",
+  );
+  assertEquals(
+    splitDivergenceEvent("PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED"),
+    "PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED",
+  );
+  assertEquals(splitDivergenceEvent("PAYMENT_RECEIVED"), null);
+  assertEquals(requestedChargeStatus("PAYMENT_SPLIT_DIVERGENCE_BLOCK", ""), null);
+});
 
 Deno.test("RECEIVED depois de REFUNDED não volta para paid", () => {
   assertEquals(paymentTransition("refunded", "paid"), "refunded");
@@ -127,6 +141,8 @@ Deno.test("o webhook confirma no Asaas e usa a transição", async () => {
   assert(source.includes("getPayment"));
   assert(source.includes("paymentRefForRead"));
   assert(source.includes("applyPaymentTransition"));
+  assert(source.includes("note_split_divergence"));
+  assert(source.includes("split_divergence"));
   assert(source.includes("confirmedChargeStatus"));
   assertEquals(source.includes("paymentChargePatch"), false);
   assertEquals(source.includes("payment_status"), false);

@@ -1,6 +1,8 @@
 #!/bin/bash
-# main (com o #84) → migrations 20261108 que ainda não estão na main
-# → dados financeiros gravados → migrations do #85.
+# main até o #84 → dados financeiros gravados → migrations do #85
+# → o que este branch acrescenta. O #85 já está na main; se ele entrar
+# no primeiro passe, o cashback sorteado existe cedo demais e o teste
+# de upgrade não vê a passagem. Arquivo repetido quebra o CREATE.
 # 70bbdd1 nunca foi aplicado fora de teste e não é caminho suportado.
 # Não fala com o Asaas e não publica função.
 set -euo pipefail
@@ -35,11 +37,13 @@ admin_psql -c "create database scapematch_rewards_upgrade;" >/dev/null
 psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/local_harness.sql" >/dev/null
 
 while IFS= read -r path; do
+  case "$path" in
+    supabase/migrations/20261109*.sql) continue ;;
+  esac
   git show "origin/main:${path}" | psql_db scapematch_rewards_upgrade -f - >/dev/null
 done < <(git ls-tree -r --name-only origin/main supabase/migrations | sort)
 
 for path in supabase/migrations/20261108*.sql; do
-  # O #84 já entrou na main com estes arquivos. Reaplicar o CREATE quebra.
   if git cat-file -e "origin/main:${path}" 2>/dev/null; then
     continue
   fi
@@ -51,7 +55,18 @@ psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/reward_reversal.sql"
 psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/ledger_permutations.sql" >/dev/null
 psql_db scapematch_rewards_upgrade -f "$root/supabase/tests/commit_84_offset.sql" >/dev/null
 
+while IFS= read -r path; do
+  case "$path" in
+    supabase/migrations/20261109*.sql)
+      git show "origin/main:${path}" | psql_db scapematch_rewards_upgrade -f - >/dev/null
+      ;;
+  esac
+done < <(git ls-tree -r --name-only origin/main supabase/migrations | sort)
+
 for path in supabase/migrations/20261109*.sql; do
+  if git cat-file -e "origin/main:${path}" 2>/dev/null; then
+    continue
+  fi
   psql_db scapematch_rewards_upgrade -f "$root/$path" >/dev/null
 done
 

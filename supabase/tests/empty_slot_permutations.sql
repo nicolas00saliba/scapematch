@@ -406,4 +406,72 @@ begin
 end;
 $body$;
 
+do $$
+declare
+  v_venue uuid := 'ef200000-0000-4000-8000-000000000001';
+  v_room uuid := 'ef300000-0000-4000-8000-000000000001';
+  v_session uuid := 'ef310000-0000-4000-8000-000000000001';
+  v_user uuid := 'ef100000-0000-4000-8000-000000000001';
+  v_offset integer;
+  v_refund integer;
+begin
+  if to_regprocedure('private.apply_empty_slot_debit(uuid,uuid,integer,boolean)') is null then
+    return;
+  end if;
+  update public.referral_program_settings
+  set first_booking_discount_bps = 0
+  where id = 1;
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values
+    ('ef400000-0000-4000-8000-000000000091', 'curitiba', v_venue, v_room, v_session, '2027-09-01 18:00:00+00', 4, 2, 10000, v_user),
+    ('ef400000-0000-4000-8000-000000000092', 'curitiba', v_venue, v_room, v_session, '2027-09-02 18:00:00+00', 4, 2, 10000, v_user),
+    ('ef400000-0000-4000-8000-000000000093', 'curitiba', v_venue, v_room, v_session, '2027-09-03 18:00:00+00', 4, 2, 10000, v_user);
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values (
+    'ef400000-0000-4000-8000-000000000092', v_user, 'Vazio', true, 'pending', 'none', 'none'
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps, paid_at
+  ) values (
+    'ef500000-0000-4000-8000-000000000091',
+    'ef400000-0000-4000-8000-000000000091',
+    v_user, v_venue, 10000, 'PIX', 'paid', 'idem-matriz-origem', 'wal', 2500, now()
+  );
+  insert into public.venue_cashback_debits (venue_id, source_charge_id, amount_cents)
+  values (v_venue, 'ef500000-0000-4000-8000-000000000091', 4000);
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps
+  ) values (
+    'ef500000-0000-4000-8000-000000000092',
+    'ef400000-0000-4000-8000-000000000092',
+    v_user, v_venue, 10000, 'PIX', 'creating', 'idem-matriz-reserva', 'wal', 2500
+  );
+  perform private.apply_share_adjustments('ef500000-0000-4000-8000-000000000092');
+  perform private.reverse_referral_rewards('ef500000-0000-4000-8000-000000000091');
+  perform private.apply_payment_transition(
+    'ef500000-0000-4000-8000-000000000092', 'cancelled', false
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps
+  ) values (
+    'ef500000-0000-4000-8000-000000000093',
+    'ef400000-0000-4000-8000-000000000093',
+    v_user, v_venue, 10000, 'PIX', 'creating', 'idem-matriz-seguinte', 'wal', 2500
+  );
+  perform private.apply_share_adjustments('ef500000-0000-4000-8000-000000000093');
+  select empty_slot_offset_cents, cashback_refund_cents into v_offset, v_refund
+  from public.payment_charges
+  where id = 'ef500000-0000-4000-8000-000000000093';
+  if v_offset <> 0 or v_refund <> 0 then
+    raise exception 'matriz: estorno entre reserva e cancelamento cobrou % / %', v_offset, v_refund;
+  end if;
+  raise notice 'ordem reserva-estorno-cancelamento conferida';
+end $$;
+
 rollback;
