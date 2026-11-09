@@ -306,6 +306,84 @@ begin
   perform public.admin_save_reward_settings(
     jsonb_build_object('welcome_points', v_welcome)
   );
+  -- (a) Média acima do teto. As faixas cabem em [mínimo, máximo],
+  -- mas o sorteio jogaria tudo fora e usaria 0,5% fixo.
+  begin
+    perform public.admin_save_reward_settings(
+      jsonb_build_object(
+        'cashback_distribution',
+        '[{"bps":200,"weight":1},{"bps":400,"weight":1}]'::jsonb
+      )
+    );
+    raise exception 'media acima do teto gravou';
+  exception
+    when sqlstate '22023' then
+      if sqlerrm not ilike '%média ponderada%' then
+        raise exception 'mensagem da media: %', sqlerrm;
+      end if;
+  end;
+  -- (b) Min, máx ou teto mudam sem reenviar a distribuição.
+  begin
+    perform public.admin_save_reward_settings(
+      jsonb_build_object('cashback_min_bps', 100)
+    );
+    raise exception 'minimo novo deixou a faixa antiga';
+  exception
+    when sqlstate '22023' then
+      if sqlerrm not ilike '%média ponderada%' then
+        raise exception 'mensagem do minimo: %', sqlerrm;
+      end if;
+  end;
+  begin
+    perform public.admin_save_reward_settings(
+      jsonb_build_object('cashback_max_bps', 100)
+    );
+    raise exception 'maximo novo deixou a faixa antiga';
+  exception
+    when sqlstate '22023' then
+      if sqlerrm not ilike '%média ponderada%' then
+        raise exception 'mensagem do maximo: %', sqlerrm;
+      end if;
+  end;
+  begin
+    perform public.admin_save_reward_settings(
+      jsonb_build_object('cashback_ev_cap_bps', 80)
+    );
+    raise exception 'teto novo ignoraria a media';
+  exception
+    when sqlstate '22023' then
+      if sqlerrm not ilike '%média ponderada%' then
+        raise exception 'mensagem do teto: %', sqlerrm;
+      end if;
+  end;
+  if (public.admin_reward_settings() ->> 'cashback_min_bps')::integer <> 50
+    or (public.admin_reward_settings() ->> 'cashback_max_bps')::integer <> 500
+    or (public.admin_reward_settings() ->> 'cashback_ev_cap_bps')::integer <> 100
+    or (public.admin_reward_settings() -> 'cashback_distribution')
+      <> '[{"bps":50,"weight":700},{"bps":100,"weight":170},{"bps":200,"weight":90},{"bps":500,"weight":40}]'::jsonb
+  then
+    raise exception 'cashback rejeitado alterou o que estava gravado';
+  end if;
+  begin
+    perform public.admin_update_venue(
+      'ad311111-1111-4111-8111-111111111111',
+      jsonb_build_object('street_address', repeat('R', 201))
+    );
+    raise exception 'rua longa gravou';
+  exception
+    when sqlstate '22023' then
+      null;
+  end;
+  begin
+    perform public.admin_update_venue(
+      'ad311111-1111-4111-8111-111111111111',
+      jsonb_build_object('address_number', repeat('9', 31))
+    );
+    raise exception 'numero longo gravou';
+  exception
+    when sqlstate '22023' then
+      null;
+  end;
   v_fee := public.admin_earnings(
     null, null, 'ad311111-1111-4111-8111-111111111111'
   );

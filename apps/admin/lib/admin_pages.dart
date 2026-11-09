@@ -577,7 +577,14 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                   onPressed: _save,
                   child: const Text('Salvar regras'),
                 ),
-                if (_message != null) Text(_message!),
+                if (_message != null)
+                  Text(
+                    _message!,
+                    key: const Key('admin-regras-aviso'),
+                    style: _message == 'Regras gravadas.'
+                        ? null
+                        : TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
                 const SizedBox(height: 16),
                 Text('Histórico', style: Theme.of(context).textTheme.titleMedium),
                 if (_history.isEmpty) const Text('Nenhuma alteração ainda.'),
@@ -594,8 +601,15 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
         field.$1: int.tryParse(_fields[field.$1]!.text.trim()) ?? 0,
       'block_self_payer': _blockSelf,
     };
-    await ref.read(adminApiProvider).saveRewardSettings(patch);
+    try {
+      await ref.read(adminApiProvider).saveRewardSettings(patch);
+    } on AdminRejected catch (error) {
+      if (!mounted) return;
+      setState(() => _message = error.message);
+      return;
+    }
     await _load();
+    if (!mounted) return;
     setState(() => _message = 'Regras gravadas.');
   }
 }

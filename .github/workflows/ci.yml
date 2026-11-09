@@ -85,10 +85,29 @@ jobs:
           bash tool/check_web_service_worker.sh apps/admin/build/web admin
           bash tool/check_web_manifest.sh apps/admin/build/web admin real
           bash tool/check_security_meta.sh flutter apps/admin/build/web/index.html
-          if grep -R -F -q 'sb_secret_' apps/admin/build/web --include='*.js' --include='*.html'; then
-            echo 'O Admin não pode levar chave secreta.'
-            exit 1
-          fi
+          python3 - <<'PY'
+          import base64, json, pathlib, re, sys
+          root = pathlib.Path("apps/admin/build/web")
+          jwt = re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")
+          failed = False
+          for path in (*root.rglob("*.js"), *root.rglob("*.html")):
+              text = path.read_text(errors="ignore")
+              if "sb_secret_" in text:
+                  print(f"sb_secret_ em {path}")
+                  failed = True
+              for token in jwt.findall(text):
+                  payload = token.split(".")[1]
+                  pad = "=" * (-len(payload) % 4)
+                  try:
+                      data = json.loads(base64.urlsafe_b64decode(payload + pad))
+                  except (ValueError, json.JSONDecodeError):
+                      continue
+                  if isinstance(data, dict) and data.get("role") == "service_role":
+                      print(f"JWT service_role em {path}")
+                      failed = True
+          if failed:
+              sys.exit(1)
+          PY
 
       # --pwa-strategy=none continua de propósito no Flutter 3.47.8: o
       # bootstrap não registra worker e o arquivo gerado sai vazio. O Chrome

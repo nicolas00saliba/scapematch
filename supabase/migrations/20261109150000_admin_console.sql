@@ -778,8 +778,16 @@ begin
   );
   v_name := coalesce(p_patch ->> 'name', v_house.name);
   v_neighborhood := coalesce(p_patch ->> 'neighborhood', v_house.neighborhood);
-  v_street := coalesce(p_patch ->> 'street_address', v_house.street_address);
-  v_number := coalesce(p_patch ->> 'address_number', v_house.address_number);
+  v_street := case
+    when p_patch ? 'street_address'
+      then btrim(coalesce(p_patch ->> 'street_address', ''))
+    else v_house.street_address
+  end;
+  v_number := case
+    when p_patch ? 'address_number'
+      then btrim(coalesce(p_patch ->> 'address_number', ''))
+    else v_house.address_number
+  end;
   v_postal := coalesce(p_patch ->> 'postal_code', v_house.postal_code);
   v_phone := coalesce(p_patch ->> 'phone', v_house.phone);
   v_category := coalesce(p_patch ->> 'category', v_house.category);
@@ -790,6 +798,14 @@ begin
   v_city := coalesce(p_patch ->> 'city_id', v_house.city_id);
   if char_length(btrim(v_name)) not between 2 and 80
     or char_length(btrim(v_neighborhood)) not between 2 and 80
+    or (
+      p_patch ? 'street_address'
+      and char_length(v_street) not between 2 and 200
+    )
+    or (
+      p_patch ? 'address_number'
+      and char_length(v_number) not between 1 and 30
+    )
     or v_postal !~ '^[0-9]{8}$'
     or v_phone !~ '^[0-9]{10,13}$'
     or v_category not in ('escape-room', 'rpg', 'board-game', 'laser-tag', 'immersive')
@@ -1205,11 +1221,12 @@ declare
   v_before jsonb;
   v_after jsonb;
   v_key text;
-  v_dist jsonb;
   v_item jsonb;
   v_bps integer;
   v_weight integer;
   v_weights integer := 0;
+  v_ev numeric := 0;
+  v_dist_msg text := 'A distribuição de cashback não vale: cada faixa tem de ficar entre o mínimo e o máximo, o peso tem de ser um inteiro maior que zero, e a média ponderada não pode passar do teto.';
 begin
   if p_patch is null
     or pg_catalog.jsonb_typeof(p_patch) <> 'object'
@@ -1308,28 +1325,44 @@ begin
     raise exception 'faixa de cashback invalida' using errcode = '22023';
   end if;
   if p_patch ? 'cashback_distribution' then
-    v_dist := p_patch -> 'cashback_distribution';
-    if pg_catalog.jsonb_typeof(v_dist) <> 'array'
-      or pg_catalog.jsonb_array_length(v_dist) < 1
+    v_row.cashback_distribution := p_patch -> 'cashback_distribution';
+  end if;
+  -- O sorteio descarta faixa fora de [mínimo, máximo] e, se a média
+  -- passa do teto, volta para o mínimo fixo. O painel não pode gravar
+  -- uma configuração que esse sorteio ignoraria.
+  v_weights := 0;
+  v_ev := 0;
+  if pg_catalog.jsonb_typeof(v_row.cashback_distribution) <> 'array'
+    or pg_catalog.jsonb_array_length(v_row.cashback_distribution) < 1
+  then
+    raise exception '%', v_dist_msg using errcode = '22023';
+  end if;
+  for v_item in
+    select value from pg_catalog.jsonb_array_elements(v_row.cashback_distribution)
+  loop
+    if pg_catalog.jsonb_typeof(v_item) <> 'object'
+      or (v_item ->> 'bps') is null
+      or (v_item ->> 'weight') is null
+      or (v_item ->> 'bps') !~ '^[0-9]+$'
+      or (v_item ->> 'weight') !~ '^[0-9]+$'
     then
-      raise exception 'distribuicao invalida' using errcode = '22023';
+      raise exception '%', v_dist_msg using errcode = '22023';
     end if;
-    for v_item in select value from pg_catalog.jsonb_array_elements(v_dist)
-    loop
-      if pg_catalog.jsonb_typeof(v_item) <> 'object' then
-        raise exception 'distribuicao invalida' using errcode = '22023';
-      end if;
-      v_bps := private.admin_int(v_item, 'bps', -1, 0, 10000);
-      v_weight := private.admin_int(v_item, 'weight', -1, 1, 1000000);
-      if v_bps < v_row.cashback_min_bps or v_bps > v_row.cashback_max_bps then
-        raise exception 'faixa de cashback invalida' using errcode = '22023';
-      end if;
-      v_weights := v_weights + v_weight;
-    end loop;
-    if v_weights <= 0 then
-      raise exception 'distribuicao invalida' using errcode = '22023';
+    v_bps := (v_item ->> 'bps')::integer;
+    v_weight := (v_item ->> 'weight')::integer;
+    if v_weight <= 0
+      or v_bps < v_row.cashback_min_bps
+      or v_bps > v_row.cashback_max_bps
+    then
+      raise exception '%', v_dist_msg using errcode = '22023';
     end if;
-    v_row.cashback_distribution := v_dist;
+    v_weights := v_weights + v_weight;
+    v_ev := v_ev + (v_bps::numeric * v_weight);
+  end loop;
+  if v_weights <= 0
+    or v_ev / v_weights > v_row.cashback_ev_cap_bps
+  then
+    raise exception '%', v_dist_msg using errcode = '22023';
   end if;
   update public.referral_program_settings
   set c2c_bps = v_row.c2c_bps,

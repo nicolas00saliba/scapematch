@@ -40,6 +40,16 @@ abstract class AdminApi {
   Future<String?> provisionWallet(String venueId);
 }
 
+/// O banco recusou o pedido. A mensagem é a do `raise` (SQLSTATE 22023).
+class AdminRejected implements Exception {
+  const AdminRejected(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class AdminWho {
   const AdminWho({required this.name, required this.email});
   final String name;
@@ -545,9 +555,13 @@ class SupabaseAdminApi implements AdminApi {
   Future<Map<String, Object?>> saveRewardSettings(
     Map<String, Object?> patch,
   ) async {
-    return _map(
-      await _rpc('admin_save_reward_settings', {'p_patch': patch}),
-    );
+    try {
+      return _map(
+        await _rpc('admin_save_reward_settings', {'p_patch': patch}),
+      );
+    } on PostgrestException catch (error) {
+      throw AdminRejected(error.message);
+    }
   }
 
   @override
