@@ -38,13 +38,15 @@ begin
     and neutralized_at is null;
 
   update public.venue_referral_entries e
-  set settlement = 'released',
-      applied_cents = 0
+  set applied_cents = greatest(e.applied_cents - a.amount_cents, 0),
+      settlement = case
+        when e.applied_cents - a.amount_cents <= 0 then 'released'
+        else e.settlement
+      end
   from public.venue_credit_applications a
   where a.payment_charge_id = p_charge_id
     and a.reversed_at is null
     and a.entry_id = e.id
-    and e.settlement = 'applied'
     and not exists (
       select 1 from public.venue_referral_entries r
       where r.relates_to = e.id and r.kind = 'reversal'
@@ -52,6 +54,14 @@ begin
 
   delete from public.venue_credit_applications
   where payment_charge_id = p_charge_id;
+
+  update public.venue_cashback_refunds f
+  set voided_at = pg_catalog.now()
+  from public.venue_cashback_debits d
+  where d.applied_charge_id = p_charge_id
+    and f.debit_id = d.id
+    and f.voided_at is null
+    and f.applied_cents = 0;
 
   update public.venue_cashback_debits
   set applied_cents = 0,

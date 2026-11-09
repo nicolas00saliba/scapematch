@@ -1021,6 +1021,27 @@ begin
     return;
   end if;
   perform private.lock_venue_rewards(v_charge.venue_id);
+  with pairs as (
+    select d.id as debit_id, f.id as refund_id
+    from public.venue_cashback_debits d
+    join public.venue_cashback_refunds f on f.debit_id = d.id
+    where d.venue_id = v_charge.venue_id
+      and d.voided_at is null
+      and d.applied_cents = 0
+      and d.applied_charge_id is null
+      and f.voided_at is null
+      and f.applied_cents = 0
+  ),
+  void_refund as (
+    update public.venue_cashback_refunds f
+    set voided_at = pg_catalog.now()
+    from pairs
+    where f.id = pairs.refund_id
+    returning pairs.debit_id
+  )
+  update public.venue_cashback_debits d
+  set voided_at = pg_catalog.now()
+  where d.id in (select debit_id from void_refund);
   v_gross := coalesce(
     v_charge.gross_amount_cents,
     v_charge.amount_cents + v_charge.subsidy_cents
