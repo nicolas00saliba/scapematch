@@ -25,7 +25,9 @@ create trigger test_stamp_payer_hash
   for each row execute function private.test_stamp_payer_hash();
 
 update public.referral_program_settings
-set first_booking_discount_bps = 0
+set first_booking_discount_bps = 0,
+    redeem_min_points = 1,
+    redeem_max_bps = 10000
 where id = 1;
 
 insert into auth.users (id, email, raw_user_meta_data)
@@ -184,12 +186,8 @@ begin
   if v_count <> 2 then
     raise exception 'lancamento duplicou ou faltou o cashback: %', v_count;
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bb711111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
-    raise exception 'cashback de 1%% nao entrou';
+  if not private.cashback_points_ok('bb711111-1111-1111-1111-111111111111') then
+    raise exception 'cashback sorteado nao entrou';
   end if;
 
   select pending_points, available_points
@@ -337,11 +335,7 @@ begin
   ) then
     raise exception 'pagou fora da janela de um ano';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bb811111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bb811111-1111-1111-1111-111111111111') then
     raise exception 'cashback nao entrou fora da indicacao';
   end if;
 end $$;
@@ -464,11 +458,7 @@ begin
   ) is distinct from 250 then
     raise exception 'pagamento por terceiro nao liberou a indicacao';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bb911111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bb911111-1111-1111-1111-111111111111') then
     raise exception 'cashback nao entrou sem indicacao conferida';
   end if;
   if exists (
@@ -573,12 +563,8 @@ begin
   ) is distinct from 200 then
     raise exception 'cartao de terceiro nao liberou a indicacao';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bba11111-1111-1111-1111-111111111111'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 80 then
-    raise exception 'cashback de 1%% sobre 8000 nao entrou';
+  if not private.cashback_points_ok('bba11111-1111-1111-1111-111111111111') then
+    raise exception 'cashback de terceiro nao entrou';
   end if;
   if exists (
     select 1 from public.referral_withholdings
@@ -985,11 +971,7 @@ begin
   ) then
     raise exception 'pagador indicador ainda ganhou C2C';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bd711111-1111-4111-8111-111111111115'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bd711111-1111-4111-8111-111111111115') then
     raise exception 'cashback saiu junto com a trava do pagador';
   end if;
   if not exists (
@@ -1121,11 +1103,7 @@ begin
   ) then
     raise exception 'a quarta conta do mesmo pagador ainda premiou';
   end if;
-  if (
-    select points from public.scape_point_entries
-    where source_charge_id = 'bd844444-4444-4444-8444-444444444444'
-      and program = 'cashback' and kind = 'accrual'
-  ) is distinct from 100 then
+  if not private.cashback_points_ok('bd844444-4444-4444-8444-444444444444') then
     raise exception 'o teto do pagador comeu o cashback';
   end if;
   if not exists (
@@ -1562,6 +1540,550 @@ begin
   ) is distinct from 7500 then
     raise exception 'repasse do credito mudou o liquido da reserva';
   end if;
+end $$;
+
+update public.referral_program_settings
+set redeem_min_points = 1000,
+    redeem_max_bps = 3000,
+    welcome_points = 100
+where id = 1;
+
+do $$
+declare
+  v_quote jsonb;
+  v_bonus integer;
+begin
+  perform private.grant_welcome_points('be222222-2222-4222-8222-222222222222');
+  perform private.grant_welcome_points('be222222-2222-4222-8222-222222222222');
+  if (
+    select count(*) from public.scape_point_entries
+    where user_id = 'be222222-2222-4222-8222-222222222222'
+      and program = 'welcome'
+      and kind = 'release'
+  ) <> 1 then
+    raise exception 'boas-vindas duplicou ou nao entrou';
+  end if;
+  v_quote := private.subsidy_quote(
+    'be222222-2222-4222-8222-222222222222', 10000, 2500, 5000, false
+  );
+  if (v_quote ->> 'points')::integer <> 0 then
+    raise exception 'menos de 1000 pontos ainda resgata %', v_quote;
+  end if;
+  insert into public.scape_point_entries (
+    user_id, kind, points, amount_cents, program, idempotency_key
+  ) values (
+    'be222222-2222-4222-8222-222222222222',
+    'release', 4000, 4000, 'welcome', 'teste-saldo-resgate'
+  );
+  v_quote := private.subsidy_quote(
+    'be222222-2222-4222-8222-222222222222', 10000, 10000, 9000, false
+  );
+  if (v_quote ->> 'points')::integer <> 3000 then
+    raise exception 'teto de 30%% nao segurou o resgate %', v_quote;
+  end if;
+  if private.referrer_tier_bonus('be222222-2222-4222-8222-222222222222') <> 0 then
+    raise exception 'conta sem indicado nao ficou no bronze';
+  end if;
+  v_bonus := private.referrer_tier_bonus('bb111111-1111-1111-1111-111111111111');
+  if v_bonus not in (0, 50, 100) then
+    raise exception 'bonus de nivel inesperado %', v_bonus;
+  end if;
+end $$;
+
+-- Cotação e cap usam a mesma conta. Pontos, desconto, crédito e débito
+-- não se apagam quando a cobrança não consegue absorver.
+do $$
+declare
+  v_cap integer;
+  v_quote jsonb;
+  v_held jsonb;
+  v_reserved jsonb;
+  v_id uuid;
+  v_again integer;
+  v_c2c integer;
+  v_weekday integer;
+  v_paid timestamptz := timestamptz '2026-11-09 15:00:00+00';
+begin
+  insert into public.venue_commissions (venue_id, commission_bps, updated_by)
+  values (
+    'bb311111-1111-1111-1111-111111111111',
+    3000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+
+  update public.referral_program_settings
+  set cashback_distribution = '[{"bps":10000,"weight":100},{"bps":50,"weight":100}]'::jsonb
+  where id = 1;
+  if (
+    select count(*) from private.cashback_distribution()
+    where bps = 50 and weight = 100
+  ) <> 1 or exists (
+    select 1 from private.cashback_distribution() where bps <> 50
+  ) then
+    raise exception 'faixa fora de 0,5%% a 5%% entrou na media';
+  end if;
+  update public.referral_program_settings
+  set cashback_distribution = '[{"bps":500,"weight":1}]'::jsonb
+  where id = 1;
+  if (
+    select count(*) from private.cashback_distribution()
+    where bps = 50 and weight = 1
+  ) <> 1 then
+    raise exception 'media acima de 1%% nao caiu para a taxa minima';
+  end if;
+  update public.referral_program_settings
+  set cashback_distribution =
+    '[{"bps":50,"weight":700},{"bps":100,"weight":170},{"bps":200,"weight":90},{"bps":500,"weight":40}]'::jsonb
+  where id = 1;
+
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (
+    'be555555-5555-4555-8555-555555555555',
+    'sopontos@example.com',
+    '{"display_name":"So pontos"}'
+  );
+  update public.profiles
+  set cpf = '04153389056', phone = '41955550055'
+  where id = 'be555555-5555-4555-8555-555555555555';
+  insert into public.scape_point_entries (
+    user_id, kind, points, amount_cents, program, idempotency_key
+  ) values (
+    'be555555-5555-4555-8555-555555555555',
+    'release', 5000, 5000, 'welcome', 'saldo-so-pontos'
+  );
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be710000-0000-4000-8000-000000000001',
+    'curitiba',
+    'bb311111-1111-1111-1111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-12-01 18:00:00+00',
+    4, 2, 10000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values (
+    'be710000-0000-4000-8000-000000000001',
+    'be555555-5555-4555-8555-555555555555',
+    'So pontos', true, 'pending', 'none', 'none'
+  );
+  v_cap := public.cap_point_redemption(
+    'be710000-0000-4000-8000-000000000001',
+    'be555555-5555-4555-8555-555555555555',
+    9000
+  );
+  perform set_config(
+    'request.jwt.claim.sub',
+    'be555555-5555-4555-8555-555555555555',
+    true
+  );
+  v_quote := public.quote_my_point_subsidy(
+    'be710000-0000-4000-8000-000000000001',
+    9000
+  );
+  if v_cap <> 2652 or (v_quote ->> 'points')::integer <> v_cap
+    or (v_quote ->> 'first_booking_discount_cents')::integer <> 0
+  then
+    raise exception 'cap e cotacao divergiram sem desconto % / %', v_cap, v_quote;
+  end if;
+  perform set_config('request.jwt.claim.sub', '', true);
+  v_held := private.hold_point_redemption(
+    'be555555-5555-4555-8555-555555555555',
+    'idem-so-pontos-01',
+    10000,
+    3000,
+    v_cap
+  );
+  v_reserved := private.reserve_pix_charge(
+    'be710000-0000-4000-8000-000000000001',
+    'be555555-5555-4555-8555-555555555555',
+    'bb311111-1111-1111-1111-111111111111',
+    (v_held ->> 'charged_cents')::integer,
+    'idem-so-pontos-01',
+    'wal_house',
+    3000,
+    (v_held ->> 'gross_cents')::integer,
+    (v_held ->> 'subsidy_cents')::integer,
+    (v_held ->> 'points')::integer,
+    (v_held ->> 'split_percent')::numeric
+  );
+  v_id := (v_reserved ->> 'id')::uuid;
+  if (v_reserved ->> 'amount_cents')::integer <> 7348
+    or (v_reserved ->> 'gross_amount_cents')::integer <> 10000
+    or (v_reserved ->> 'subsidy_cents')::integer <> 2652
+  then
+    raise exception 'so pontos nao gravou o bruto %', v_reserved;
+  end if;
+  alter table public.payment_charges
+    drop constraint payment_charges_subsidy_matches;
+  update public.payment_charges
+  set gross_amount_cents = null
+  where id = v_id;
+  perform private.apply_share_adjustments(v_id);
+  if (
+    select gross_amount_cents from public.payment_charges where id = v_id
+  ) is distinct from 10000 then
+    raise exception 'saida sem desconto apagou o bruto dos pontos';
+  end if;
+  alter table public.payment_charges
+    add constraint payment_charges_subsidy_matches
+    check (
+      subsidy_cents = 0
+      or (
+        gross_amount_cents is not null
+        and points_redeemed > 0
+        and gross_amount_cents = amount_cents
+          + subsidy_cents
+          + first_booking_discount_cents
+      )
+    );
+  perform private.apply_payment_transition(v_id, 'paid', true);
+  if (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = v_id and kind = 'house_net'
+  ) is distinct from 7000 or (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = v_id and kind = 'commission'
+  ) is distinct from 348 then
+    raise exception 'livro usou o liquido como bruto na cobranca so com pontos';
+  end if;
+
+  insert into public.venue_cashback_debits (venue_id, source_charge_id, amount_cents)
+  values ('bb311111-1111-1111-1111-111111111111', v_id, 100);
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be710000-0000-4000-8000-000000000002',
+    'curitiba',
+    'bb311111-1111-1111-1111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-12-02 18:00:00+00',
+    4, 2, 10000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps,
+    gross_amount_cents, subsidy_cents, points_redeemed
+  ) values (
+    'be720000-0000-4000-8000-000000000002',
+    'be710000-0000-4000-8000-000000000002',
+    'be555555-5555-4555-8555-555555555555',
+    'bb311111-1111-1111-1111-111111111111',
+    5000, 'PIX', 'creating',
+    'idem-guarda-debito', 'wal_house', 1000,
+    10000, 5000, 5000
+  );
+  insert into public.venue_cashback_debits (venue_id, source_charge_id, amount_cents)
+  values (
+    'bb311111-1111-1111-1111-111111111111',
+    'be720000-0000-4000-8000-000000000002',
+    999999
+  );
+  perform private.apply_share_adjustments('be720000-0000-4000-8000-000000000002');
+  if (
+    select coalesce(sum(applied_cents), 0) from public.venue_cashback_debits
+    where venue_id = 'bb311111-1111-1111-1111-111111111111'
+  ) <> 0 or (
+    select empty_slot_offset_cents from public.payment_charges
+    where id = 'be720000-0000-4000-8000-000000000002'
+  ) <> 0 then
+    raise exception 'o guard consumiu debito sem gravar a cobranca';
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be710000-0000-4000-8000-000000000003',
+    'curitiba',
+    'bb311111-1111-1111-1111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-12-03 18:00:00+00',
+    4, 2, 10000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  v_reserved := private.reserve_pix_charge(
+    'be710000-0000-4000-8000-000000000003',
+    'be555555-5555-4555-8555-555555555555',
+    'bb311111-1111-1111-1111-111111111111',
+    10000,
+    'idem-absorve-debito',
+    'wal_house',
+    3000
+  );
+  if (
+    select empty_slot_offset_cents from public.payment_charges
+    where id = (v_reserved ->> 'id')::uuid
+  ) <> 100 or (
+    select applied_cents from public.venue_cashback_debits
+    where source_charge_id = v_id
+  ) <> 100 or (
+    select applied_cents from public.venue_cashback_debits
+    where source_charge_id = 'be720000-0000-4000-8000-000000000002'
+  ) <> 0 then
+    raise exception 'debito grande sumiu ou o pequeno nao ficou na cobranca seguinte';
+  end if;
+  perform private.apply_share_adjustments((v_reserved ->> 'id')::uuid);
+  if (
+    select applied_cents from public.venue_cashback_debits
+    where source_charge_id = v_id
+  ) <> 100 then
+    raise exception 'repetir o ajuste cobrou o debito de novo';
+  end if;
+
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (
+    'be444444-4444-4444-8444-444444444444',
+    'desconto-pontos@example.com',
+    jsonb_build_object(
+      'display_name', 'Desconto e pontos',
+      'phone', '41944440044',
+      'referral_code', (
+        select code from public.referral_codes
+        where owner_user_id = 'bb111111-1111-1111-1111-111111111111'
+      )
+    )
+  );
+  update public.profiles
+  set cpf = '11144477735'
+  where id = 'be444444-4444-4444-8444-444444444444'
+    and cpf is null;
+  insert into public.scape_point_entries (
+    user_id, kind, points, amount_cents, program, idempotency_key
+  ) values (
+    'be444444-4444-4444-8444-444444444444',
+    'release', 8000, 8000, 'welcome', 'saldo-desconto-pontos'
+  );
+  insert into public.venue_referral_entries (
+    venue_id, kind, amount_cents, program, idempotency_key, settlement, available_at
+  ) values (
+    'bb311111-1111-1111-1111-111111111111',
+    'accrual', 5000, 'b2c', 'credito-que-nao-cabe', 'released', pg_catalog.now()
+  );
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be710000-0000-4000-8000-000000000004',
+    'curitiba',
+    'bb311111-1111-1111-1111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-12-04 18:00:00+00',
+    4, 2, 20000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  v_cap := public.cap_point_redemption(
+    'be710000-0000-4000-8000-000000000004',
+    'be444444-4444-4444-8444-444444444444',
+    9000
+  );
+  perform set_config(
+    'request.jwt.claim.sub',
+    'be444444-4444-4444-8444-444444444444',
+    true
+  );
+  v_quote := public.quote_my_point_subsidy(
+    'be710000-0000-4000-8000-000000000004',
+    9000
+  );
+  if v_cap <> 1353
+    or (v_quote ->> 'points')::integer <> 1353
+    or (v_quote ->> 'subsidy_cents')::integer <> 1353
+    or (v_quote ->> 'first_booking_discount_cents')::integer <> 4000
+    or (v_quote ->> 'charged_cents')::integer <> 14647
+    or (v_quote ->> 'max_points')::integer <> 1353
+  then
+    raise exception 'cap nao descontou os 20%% como a cotacao % / %', v_cap, v_quote;
+  end if;
+  perform set_config('request.jwt.claim.sub', '', true);
+  v_held := private.hold_point_redemption(
+    'be444444-4444-4444-8444-444444444444',
+    'idem-desconto-pontos',
+    20000,
+    3000,
+    v_cap
+  );
+  v_reserved := private.reserve_pix_charge(
+    'be710000-0000-4000-8000-000000000004',
+    'be444444-4444-4444-8444-444444444444',
+    'bb311111-1111-1111-1111-111111111111',
+    (v_held ->> 'charged_cents')::integer,
+    'idem-desconto-pontos',
+    'wal_house',
+    3000,
+    20000,
+    (v_held ->> 'subsidy_cents')::integer,
+    (v_held ->> 'points')::integer,
+    (v_held ->> 'split_percent')::numeric
+  );
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status, refund_status, refund_reason
+  ) values (
+    'be710000-0000-4000-8000-000000000004',
+    'be444444-4444-4444-8444-444444444444',
+    'Desconto e pontos', true, 'pending', 'none', 'none'
+  );
+  if (v_reserved ->> 'amount_cents')::integer <> 14647
+    or (v_reserved ->> 'gross_amount_cents')::integer <> 20000
+    or (
+      select first_booking_discount_cents from public.payment_charges
+      where id = (v_reserved ->> 'id')::uuid
+    ) <> 4000
+    or (
+      select venue_credit_applied_cents from public.payment_charges
+      where id = (v_reserved ->> 'id')::uuid
+    ) <> 0
+    or (
+      select settlement from public.venue_referral_entries
+      where idempotency_key = 'credito-que-nao-cabe'
+    ) is distinct from 'released'
+  then
+    raise exception 'pontos e desconto comeram o credito ou o bruto %', v_reserved;
+  end if;
+  perform private.apply_payment_transition((v_reserved ->> 'id')::uuid, 'paid', true);
+  if (
+    select amount_cents from public.ledger_entries
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+      and kind = 'house_net'
+  ) is distinct from 14000 then
+    raise exception 'livro errou a casa na combinacao de pontos e desconto';
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be710000-0000-4000-8000-000000000005',
+    'curitiba',
+    'bb311111-1111-1111-1111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-12-05 18:00:00+00',
+    4, 2, 20000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  v_reserved := private.reserve_pix_charge(
+    'be710000-0000-4000-8000-000000000005',
+    'be444444-4444-4444-8444-444444444444',
+    'bb311111-1111-1111-1111-111111111111',
+    20000,
+    'idem-credito-depois',
+    'wal_house',
+    3000
+  );
+  if (
+    select venue_credit_applied_cents from public.payment_charges
+    where id = (v_reserved ->> 'id')::uuid
+  ) <> 5000 or (
+    select settlement from public.venue_referral_entries
+    where idempotency_key = 'credito-que-nao-cabe'
+  ) is distinct from 'applied' then
+    raise exception 'credito que nao cabia na primeira nao esperou a seguinte %', v_reserved;
+  end if;
+
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (
+    'be666666-6666-4666-8666-666666666666',
+    'replay-cashback@example.com',
+    jsonb_build_object(
+      'display_name', 'Replay',
+      'phone', '41966660066',
+      'referral_code', (
+        select code from public.referral_codes
+        where owner_user_id = 'bb111111-1111-1111-1111-111111111111'
+      )
+    )
+  );
+  update public.profiles
+  set cpf = '00240289838', phone = '41966660066'
+  where id = 'be666666-6666-4666-8666-666666666666';
+  update public.referral_program_settings
+  set cashback_distribution = '[{"bps":100,"weight":1}]'::jsonb
+  where id = 1;
+  v_weekday := extract(isodow from v_paid at time zone 'America/Sao_Paulo')::integer;
+  insert into public.venue_empty_slots (
+    venue_id, weekday, starts_minute, ends_minute
+  ) values (
+    'bb311111-1111-1111-1111-111111111111',
+    v_weekday, 0, 1440
+  );
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'be710000-0000-4000-8000-000000000006',
+    'curitiba',
+    'bb311111-1111-1111-1111-111111111111',
+    'bb411111-1111-1111-1111-111111111111',
+    'bb511111-1111-1111-1111-111111111111',
+    '2027-12-06 18:00:00+00',
+    4, 2, 10000,
+    'bb111111-1111-1111-1111-111111111111'
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps, paid_at
+  ) values (
+    'be720000-0000-4000-8000-000000000006',
+    'be710000-0000-4000-8000-000000000006',
+    'be666666-6666-4666-8666-666666666666',
+    'bb311111-1111-1111-1111-111111111111',
+    10000, 'PIX', 'paid',
+    'idem-replay-cashback', 'wal_house', 180, v_paid
+  );
+  v_again := private.post_player_cashback('be720000-0000-4000-8000-000000000006', 180);
+  if v_again <> 150
+    or private.post_player_cashback('be720000-0000-4000-8000-000000000006', 180) <> 150
+  then
+    raise exception 'replay do cashback nao devolveu a parte da plataforma %', v_again;
+  end if;
+  if (
+    select points from public.scape_point_entries
+    where source_charge_id = 'be720000-0000-4000-8000-000000000006'
+      and program = 'cashback' and kind = 'accrual'
+  ) <> 200 or (
+    select count(*) from public.scape_point_entries
+    where source_charge_id = 'be720000-0000-4000-8000-000000000006'
+      and program = 'cashback' and kind = 'accrual'
+  ) <> 1 or (
+    select applied_cents from public.venue_cashback_debits
+    where source_charge_id = 'be720000-0000-4000-8000-000000000006'
+  ) <> 0 or (
+    select amount_cents from public.venue_cashback_debits
+    where source_charge_id = 'be720000-0000-4000-8000-000000000006'
+  ) <> 50 then
+    raise exception 'dobro do horario vazio nao ficou como obrigacao da casa';
+  end if;
+  if not exists (
+    select 1 from public.referral_attributions
+    where subject_user_id = 'be666666-6666-4666-8666-666666666666'
+      and status = 'active'
+      and referrer_user_id = 'bb111111-1111-1111-1111-111111111111'
+  ) then
+    raise exception 'indicacao do replay nao entrou';
+  end if;
+  perform private.post_referral_rewards('be720000-0000-4000-8000-000000000006');
+  select amount_cents into v_c2c
+  from public.scape_point_entries
+  where source_charge_id = 'be720000-0000-4000-8000-000000000006'
+    and program = 'c2c' and kind = 'accrual';
+  if v_c2c is distinct from 30 then
+    raise exception 'replay do cashback encolheu a indicacao %', v_c2c;
+  end if;
+  update public.referral_program_settings
+  set cashback_distribution =
+    '[{"bps":50,"weight":700},{"bps":100,"weight":170},{"bps":200,"weight":90},{"bps":500,"weight":40}]'::jsonb
+  where id = 1;
 end $$;
 
 begin;

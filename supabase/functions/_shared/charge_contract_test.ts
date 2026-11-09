@@ -31,6 +31,11 @@ Deno.test("create-charge recusa número, CVV e validade", async () => {
   assertEquals(charge.includes("remote_ip"), false);
   assert(charge.includes("clientIp"));
   assert(charge.includes("loadOwnedCard"));
+  assert(charge.includes("cap_point_redemption"));
+  assert(charge.includes('if (capped.error) throw new Error("pontos")'));
+  const capAt = charge.indexOf("cap_point_redemption");
+  const holdAt = charge.indexOf("holdPointRedemption");
+  assert(capAt > 0 && holdAt > capAt);
 });
 
 Deno.test("tokenize-card não loga e a resposta não leva o token", async () => {

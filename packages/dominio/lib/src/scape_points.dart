@@ -18,6 +18,8 @@ class ReferralRates {
     this.holdDays = 30,
     this.cashbackBps = 100,
     this.firstBookingDiscountBps = 2000,
+    this.redeemMinPoints = 1000,
+    this.redeemMaxBps = 3000,
     this.blockSelfPayer = true,
     this.payerReferredAccountCap = 3,
     this.sameDeviceReviewThreshold = 2,
@@ -62,6 +64,12 @@ class ReferralRates {
   /// Contas do mesmo indicador no mesmo aparelho a partir deste número
   /// ficam em revisão. 0 desliga.
   final int sameDeviceReviewThreshold;
+
+  /// Mínimo de pontos para usar o saldo numa reserva.
+  final int redeemMinPoints;
+
+  /// Teto da reserva que pode ser pago com pontos, em basis points.
+  final int redeemMaxBps;
 
   static const official = ReferralRates();
 }
@@ -484,15 +492,25 @@ PointSubsidyQuote quotePointSubsidy({
   final commission = commissionCents(grossCents, commissionBps);
   final houseNet = grossCents - commission;
   final room = grossCents > 1 ? grossCents - 1 : 0;
-  final maxSubsidy = commission < room ? commission : room;
-  final maxPoints = pointsFromCents(
+  final percentCap = commissionCents(grossCents, rates.redeemMaxBps);
+  final maxSubsidy = [
+    commission,
+    room,
+    percentCap < 0 ? 0 : percentCap,
+  ].reduce((a, b) => a < b ? a : b);
+  var maxPoints = pointsFromCents(
     maxSubsidy < 0 ? 0 : maxSubsidy,
     rates.pointValueCents,
   );
+  if (availablePoints < rates.redeemMinPoints ||
+      maxPoints < rates.redeemMinPoints) {
+    maxPoints = 0;
+  }
   var points = requestedPoints;
   if (points < 0) points = 0;
   if (points > availablePoints) points = availablePoints;
   if (points > maxPoints) points = maxPoints;
+  if (points < rates.redeemMinPoints) points = 0;
   final subsidy = centsFromPoints(points, rates.pointValueCents);
   final charged = grossCents - subsidy;
   final split = subsidy == 0

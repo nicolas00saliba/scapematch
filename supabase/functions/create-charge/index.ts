@@ -17,6 +17,11 @@ import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
 import { detachGonePix } from "../_shared/detach_gone_pix.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import {
+  DbRpcError,
+  isSerializationConflict,
+  retrySerialization,
+} from "../_shared/serialization.ts";
+import {
   cardSwitchBlock,
   cardSwitchDecision,
   localChargeStatus,
@@ -177,7 +182,14 @@ export async function createCharge(
       venue.id as string,
     );
     const grossCents = group.price_cents as number;
-    const points = requestedPoints(body.points);
+    const requested = requestedPoints(body.points);
+    const capped = await admin.rpc("cap_point_redemption", {
+      p_group_id: groupId,
+      p_user_id: user.id,
+      p_points: requested,
+    });
+    if (capped.error) throw new Error("pontos");
+    const points = typeof capped.data === "number" ? capped.data : 0;
     const openExisting = Boolean(
       existing &&
         !["failed", "cancelled", "refunded"].includes(existing.status),
@@ -260,7 +272,9 @@ export async function createCharge(
     const mayCredit = await groupClosedForCredit(admin, group);
 
     if (billingType === "PIX") {
-      const reserved = await reservePixCharge(admin, {
+      let reserved;
+      try {
+        reserved = await reservePixCharge(admin, {
         groupId,
         userId: user.id,
         venueId: venue.id as string,
@@ -273,6 +287,12 @@ export async function createCharge(
         pointsRedeemed,
         splitPercent,
       });
+      } catch (error) {
+        if (isSerializationConflict(error)) {
+          return json({ error: "pagamento em andamento" }, 409);
+        }
+        throw error;
+      }
       amountCents = reserved.amount_cents || amountCents;
       if (reserved.house_fixed_cents >= 0) {
         split.fixedValue = fixedReaisFromCents(reserved.house_fixed_cents);
@@ -626,7 +646,9 @@ export async function createCharge(
         cardChargeId = "";
       }
       if (!attemptId) {
-        const reservedCard = await reserveCardCharge(admin, {
+        let reservedCard;
+        try {
+          reservedCard = await reserveCardCharge(admin, {
           groupId,
           userId: user.id,
           venueId: venue.id as string,
@@ -639,6 +661,16 @@ export async function createCharge(
           pointsRedeemed,
           splitPercent,
         });
+        } catch (error) {
+          if (isSerializationConflict(error)) {
+            await loseCard(
+              existing?.id ?? "00000000-0000-0000-0000-000000000000",
+              null,
+            );
+            return json({ error: "pagamento em andamento" }, 409);
+          }
+          throw error;
+        }
         await alignCardSplit(
           reservedCard.house_fixed_cents,
           reservedCard.amount_cents || amountCents,
@@ -677,7 +709,9 @@ export async function createCharge(
             });
             holdOpen = heldAgain.points > 0;
           }
-          const again = await reserveCardCharge(admin, {
+          let again;
+          try {
+            again = await reserveCardCharge(admin, {
             groupId,
             userId: user.id,
             venueId: venue.id as string,
@@ -690,6 +724,13 @@ export async function createCharge(
             pointsRedeemed,
             splitPercent,
           });
+          } catch (error) {
+            if (isSerializationConflict(error)) {
+              await loseCard(reservedCard.id, reservedCard.attempt_id);
+              return json({ error: "pagamento em andamento" }, 409);
+            }
+            throw error;
+          }
           holdOpen = false;
           await alignCardSplit(
             again.house_fixed_cents,
@@ -809,7 +850,10 @@ export async function createCharge(
             attemptId || null,
           );
         } catch (_loseError) {
-          // O erro original segue.
+          // O erro original segue. A autorização órfã fica no registro do Asaas.
+        }
+        if (isSerializationConflict(error)) {
+          return json({ error: "pagamento em andamento" }, 409);
         }
         throw error;
       }
@@ -902,19 +946,22 @@ async function reservePixCharge(
     commissionBps: number;
   } & SubsidyFields,
 ): Promise<ReservedPix> {
-  const { data, error } = await admin.rpc("reserve_pix_charge", {
-    p_group_id: input.groupId,
-    p_user_id: input.userId,
-    p_venue_id: input.venueId,
-    p_amount_cents: input.amountCents,
-    p_idempotency_key: input.idempotencyKey,
-    p_wallet_id: input.walletId,
-    p_commission_bps: input.commissionBps,
-    ...subsidyArgs(input),
+  return retrySerialization(async () => {
+    const { data, error } = await admin.rpc("reserve_pix_charge", {
+      p_group_id: input.groupId,
+      p_user_id: input.userId,
+      p_venue_id: input.venueId,
+      p_amount_cents: input.amountCents,
+      p_idempotency_key: input.idempotencyKey,
+      p_wallet_id: input.walletId,
+      p_commission_bps: input.commissionBps,
+      ...subsidyArgs(input),
+    });
+    if (isSplitExceeded(error)) throw new SplitExceedsNetError();
+    if (error) throw new DbRpcError(error.code ?? "");
+    if (!data || typeof data !== "object") throw new Error("erro");
+    return parseReserved(data as Record<string, unknown>);
   });
-  if (isSplitExceeded(error)) throw new SplitExceedsNetError();
-  if (error || !data || typeof data !== "object") throw new Error("erro");
-  return parseReserved(data as Record<string, unknown>);
 }
 
 function parseReserved(row: Record<string, unknown>): ReservedPix {
@@ -951,19 +998,22 @@ async function reserveCardCharge(
     commissionBps: number;
   } & SubsidyFields,
 ): Promise<ReservedPix> {
-  const { data, error } = await admin.rpc("reserve_card_charge", {
-    p_group_id: input.groupId,
-    p_user_id: input.userId,
-    p_venue_id: input.venueId,
-    p_amount_cents: input.amountCents,
-    p_idempotency_key: input.idempotencyKey,
-    p_wallet_id: input.walletId,
-    p_commission_bps: input.commissionBps,
-    ...subsidyArgs(input),
+  return retrySerialization(async () => {
+    const { data, error } = await admin.rpc("reserve_card_charge", {
+      p_group_id: input.groupId,
+      p_user_id: input.userId,
+      p_venue_id: input.venueId,
+      p_amount_cents: input.amountCents,
+      p_idempotency_key: input.idempotencyKey,
+      p_wallet_id: input.walletId,
+      p_commission_bps: input.commissionBps,
+      ...subsidyArgs(input),
+    });
+    if (isSplitExceeded(error)) throw new SplitExceedsNetError();
+    if (error) throw new DbRpcError(error.code ?? "");
+    if (!data || typeof data !== "object") throw new Error("erro");
+    return parseReserved(data as Record<string, unknown>);
   });
-  if (isSplitExceeded(error)) throw new SplitExceedsNetError();
-  if (error || !data || typeof data !== "object") throw new Error("erro");
-  return parseReserved(data as Record<string, unknown>);
 }
 
 class SplitExceedsNetError extends Error {

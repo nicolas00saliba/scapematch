@@ -23,6 +23,12 @@ type Admin = {
   ): PromiseLike<{ data: unknown; error: LedgerRpcError }>;
 };
 
+import {
+  DbRpcError,
+  isSerializationConflict,
+  retrySerialization,
+} from "./serialization.ts";
+
 const sqlState = /^[0-9A-Z]{5}$/;
 
 function throwLedgerError(error: { code?: string }): never {
@@ -52,15 +58,23 @@ export async function applyPaymentTransition(
   nextStatus: string,
   credit: boolean,
 ): Promise<TransitionResult> {
-  const { data, error } = await admin.rpc("apply_payment_transition", {
-    p_charge_id: chargeId,
-    p_next_status: nextStatus,
-    p_credit: credit,
+  return retrySerialization(async () => {
+    const { data, error } = await admin.rpc("apply_payment_transition", {
+      p_charge_id: chargeId,
+      p_next_status: nextStatus,
+      p_credit: credit,
+    });
+    if (error) {
+      const conflict = new DbRpcError(error.code ?? "");
+      if (isSerializationConflict(error) || isSerializationConflict(conflict)) {
+        throw conflict;
+      }
+      throwLedgerError(error);
+    }
+    const result = asTransition(data);
+    if (!result.status) throwLedgerError({});
+    return result;
   });
-  if (error) throwLedgerError(error);
-  const result = asTransition(data);
-  if (!result.status) throwLedgerError({});
-  return result;
 }
 
 export function creditLedger(

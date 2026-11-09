@@ -45,6 +45,7 @@ abstract final class AppKeys {
   static const scapeReferralClaim = Key('scape-referral-claim');
   static const payUsePoints = Key('pay-use-points');
   static const payFirstDiscount = Key('pay-first-discount');
+  static const payCashbackRange = Key('pay-cashback-range');
   static const accountDelete = Key('account-delete');
   static const accountDeleteConfirm = Key('account-delete-confirm');
   static const extraSpotsIncrement = Key('extra-spots-increment');

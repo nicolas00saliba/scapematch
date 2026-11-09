@@ -153,4 +153,49 @@ begin
   end if;
 end $$;
 
+do $$
+declare
+  v_fixed integer;
+begin
+  if to_regclass('public.venue_cashback_debits') is null then
+    return;
+  end if;
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'ff400000-0000-4000-8000-000000000005', 'curitiba',
+    'ff200000-0000-4000-8000-000000000001',
+    'ff300000-0000-4000-8000-000000000001',
+    'ff310000-0000-4000-8000-000000000001',
+    '2027-11-05 18:00:00+00', 4, 2, 10000,
+    'ff100000-0000-4000-8000-000000000001'
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, wallet_id, commission_bps, provider
+  ) values (
+    'ff500000-0000-4000-8000-000000000005',
+    'ff400000-0000-4000-8000-000000000005',
+    'ff100000-0000-4000-8000-000000000001',
+    'ff200000-0000-4000-8000-000000000001',
+    10000, 'PIX', 'creating', 'idem-fixo-debito', 'wal', 2500, 'asaas'
+  );
+  insert into public.venue_cashback_debits (
+    venue_id, source_charge_id, amount_cents
+  ) values (
+    'ff200000-0000-4000-8000-000000000001',
+    'ff500000-0000-4000-8000-000000000004',
+    400
+  );
+  perform private.apply_share_adjustments('ff500000-0000-4000-8000-000000000005');
+  v_fixed := private.sync_house_fixed('ff500000-0000-4000-8000-000000000005');
+  if v_fixed <> 7100 or (
+    select empty_slot_offset_cents from public.payment_charges
+    where id = 'ff500000-0000-4000-8000-000000000005'
+  ) <> 400 then
+    raise exception 'debito de horario vazio nao saiu do fixo %', v_fixed;
+  end if;
+end $$;
+
 rollback;

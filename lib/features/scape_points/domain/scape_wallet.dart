@@ -8,6 +8,11 @@ class ScapeWallet {
     required this.attributed,
     required this.canClaim,
     required this.entries,
+    this.redeemMinPoints = 1000,
+    this.tier = 'bronze',
+    this.activeReferrals = 0,
+    this.silverAt = 5,
+    this.goldAt = 15,
   });
 
   final String referralCode;
@@ -17,6 +22,29 @@ class ScapeWallet {
   final bool attributed;
   final bool canClaim;
   final List<ScapePointEntry> entries;
+  final int redeemMinPoints;
+  final String tier;
+  final int activeReferrals;
+  final int silverAt;
+  final int goldAt;
+
+  String get tierLabel => switch (tier) {
+    'prata' => 'Prata',
+    'ouro' => 'Ouro',
+    _ => 'Bronze',
+  };
+
+  String get tierProgress {
+    if (tier == 'ouro' || activeReferrals >= goldAt) {
+      return 'Ouro. Seus indicados ativos estão no teto deste nível.';
+    }
+    if (activeReferrals >= silverAt) {
+      final left = goldAt - activeReferrals;
+      return 'Prata. Faltam $left indicados ativos para Ouro.';
+    }
+    final left = silverAt - activeReferrals;
+    return 'Bronze. Faltam $left indicados ativos para Prata.';
+  }
 
   int get availableCents => availablePoints * pointValueCents;
   int get pendingCents => pendingPoints * pointValueCents;
@@ -71,6 +99,11 @@ class ScapeWallet {
             if (item is Map)
               ScapePointEntry.fromJson(Map<String, dynamic>.from(item)),
       ],
+      redeemMinPoints: _intOf(json['redeem_min_points'], fallback: 1000),
+      tier: json['tier']?.toString() ?? 'bronze',
+      activeReferrals: _intOf(json['active_referrals']),
+      silverAt: _intOf(json['silver_at'], fallback: 5),
+      goldAt: _intOf(json['gold_at'], fallback: 15),
     );
   }
 }
@@ -83,6 +116,8 @@ class ScapePointEntry {
     this.program,
     this.createdAt,
     this.reviewStatus,
+    this.drawnBps,
+    this.doubled = false,
   });
 
   final String kind;
@@ -91,6 +126,8 @@ class ScapePointEntry {
   final int amountCents;
   final DateTime? createdAt;
   final String? reviewStatus;
+  final int? drawnBps;
+  final bool doubled;
 
   factory ScapePointEntry.fromJson(Map<String, dynamic> json) {
     final rawDate = json['created_at']?.toString();
@@ -101,6 +138,8 @@ class ScapePointEntry {
       amountCents: _intOf(json['amount_cents']),
       createdAt: rawDate == null ? null : DateTime.tryParse(rawDate),
       reviewStatus: json['review_status']?.toString(),
+      drawnBps: json['drawn_bps'] == null ? null : _intOf(json['drawn_bps']),
+      doubled: json['doubled'] == true,
     );
   }
 
@@ -110,7 +149,11 @@ class ScapePointEntry {
       'accrual' => switch (program) {
         'c2c' => 'Indicação de jogador',
         'c2b' => 'Indicação de casa',
-        'cashback' => 'Cashback',
+        'cashback' =>
+          drawnBps == null
+              ? 'Cashback'
+              : 'Cashback ${formatBasisPoints(drawnBps!)}${doubled ? ' em dobro' : ''}',
+        'welcome' => 'Boas-vindas',
         _ => 'Pontos a liberar',
       },
       'release' => 'Pontos liberados',
@@ -147,12 +190,20 @@ class PointSpendChoice {
     required this.subsidyCents,
     required this.chargedCents,
     this.discountCents = 0,
+    this.cashbackMinBps = 50,
+    this.cashbackMaxBps = 500,
+    this.redeemMinPoints = 1000,
+    this.redeemMaxBps = 3000,
   });
 
   final int points;
   final int subsidyCents;
   final int chargedCents;
   final int discountCents;
+  final int cashbackMinBps;
+  final int cashbackMaxBps;
+  final int redeemMinPoints;
+  final int redeemMaxBps;
   var use = false;
 
   int get selected => use && points > 0 ? points : 0;
@@ -163,6 +214,10 @@ class PointSpendChoice {
       subsidyCents: _intOf(json['subsidy_cents']),
       chargedCents: _intOf(json['charged_cents']),
       discountCents: _intOf(json['first_booking_discount_cents']),
+      cashbackMinBps: _intOf(json['cashback_min_bps'], fallback: 50),
+      cashbackMaxBps: _intOf(json['cashback_max_bps'], fallback: 500),
+      redeemMinPoints: _intOf(json['redeem_min_points'], fallback: 1000),
+      redeemMaxBps: _intOf(json['redeem_max_bps'], fallback: 3000),
     );
   }
 }
@@ -231,6 +286,16 @@ int _intOf(Object? value, {int fallback = 0}) {
   if (value is int) return value;
   if (value is num) return value.round();
   return int.tryParse('$value') ?? fallback;
+}
+
+String formatBasisPoints(int bps) {
+  final whole = bps ~/ 100;
+  final frac = (bps.abs() % 100)
+      .toString()
+      .padLeft(2, '0')
+      .replaceFirst(RegExp(r'0+$'), '');
+  if (frac.isEmpty) return '$whole%';
+  return '$whole,$frac%';
 }
 
 String formatPoints(int points) {

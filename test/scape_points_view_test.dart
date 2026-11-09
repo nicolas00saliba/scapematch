@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch/features/scape_points/presentation/scape_points_view.dart';
 
 void main() {
@@ -38,8 +39,16 @@ void main() {
     expect(formatPoints(1800), '1.800');
   });
 
+  test('os termos explicam o sorteio, o mínimo e os níveis', () {
+    expect(LegalDocuments.termsBody, contains('0,5%'));
+    expect(LegalDocuments.termsBody, contains('1.000 pontos'));
+    expect(LegalDocuments.termsBody, contains('30%'));
+    expect(LegalDocuments.termsBody, contains('Prata'));
+    expect(LegalDocuments.termsBody, contains('Ouro'));
+  });
+
   testWidgets('a tela mostra disponível, pendente e o código', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 900));
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       const MaterialApp(
@@ -48,7 +57,8 @@ void main() {
     );
     expect(find.byKey(AppKeys.scapePointsBalance), findsOneWidget);
     expect(find.textContaining('disponíveis'), findsOneWidget);
-    expect(find.textContaining('250 pendentes'), findsOneWidget);
+    expect(find.textContaining('250 pontos chegando'), findsOneWidget);
+    expect(find.textContaining('Nível Bronze'), findsOneWidget);
     expect(find.textContaining('SCAPEDEMO'), findsOneWidget);
     expect(find.text('Cashback'), findsOneWidget);
     expect(find.text('Indicação de jogador'), findsOneWidget);

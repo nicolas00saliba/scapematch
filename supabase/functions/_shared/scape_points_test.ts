@@ -209,7 +209,7 @@ Deno.test("abatimento muda o percentual e preserva o líquido da casa", () => {
     requestedPoints: 9000,
     availablePoints: 100,
   });
-  assertEquals(capped.points, 100);
+  assertEquals(capped.points, 0);
   assertEquals(capped.houseNetCents, 7500);
 });
 
