@@ -1900,6 +1900,7 @@ begin
     or (v_quote ->> 'points')::integer <> 2000
     or (v_quote ->> 'subsidy_cents')::integer <> 2000
     or (v_quote ->> 'first_booking_discount_cents')::integer <> 4000
+    or (v_quote ->> 'charged_cents')::integer <> 14000
     or (v_quote ->> 'max_points')::integer <> 2000
   then
     raise exception 'cap nao descontou os 20%% como a cotacao % / %', v_cap, v_quote;

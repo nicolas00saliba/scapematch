@@ -617,8 +617,8 @@ begin
     v_points := 0;
   end if;
   v_subsidy := v_points * v_value;
-  v_charged := p_gross - v_subsidy;
-  if v_subsidy = 0 or v_charged <= 0 then
+  v_charged := greatest(p_gross - v_subsidy - coalesce(v_discount, 0), 0);
+  if v_charged <= 0 or (v_subsidy = 0 and coalesce(v_discount, 0) = 0) then
     v_split := null;
   else
     v_split := ceil((v_house::numeric * 1000000) / v_charged) / 10000;
@@ -1020,6 +1020,7 @@ begin
   if v_charge.id is null then
     return;
   end if;
+  perform private.lock_venue_rewards(v_charge.venue_id);
   v_gross := coalesce(
     v_charge.gross_amount_cents,
     v_charge.amount_cents + v_charge.subsidy_cents
@@ -1067,7 +1068,7 @@ begin
     return;
   end if;
   v_claw := private.apply_venue_clawback(
-    v_charge.id, v_charge.venue_id, greatest(v_house, 0)
+    v_charge.id, v_charge.venue_id, greatest(v_house - v_debit, 0)
   );
   v_refund := private.apply_cashback_refund(
     v_charge.id, v_charge.venue_id, greatest(v_room - v_credit, 0)

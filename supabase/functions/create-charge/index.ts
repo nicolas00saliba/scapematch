@@ -805,7 +805,10 @@ export async function createCharge(
             attemptId || null,
           );
         } catch (_loseError) {
-          // O erro original segue.
+          // O erro original segue. A autorização órfã fica no registro do Asaas.
+        }
+        if (isSerializationConflict(error)) {
+          return json({ error: "pagamento em andamento" }, 409);
         }
         throw error;
       }
