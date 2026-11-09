@@ -11,6 +11,9 @@ const playerAppOrigin = 'https://app.scapematch.com.br';
 /// Parceiro real.
 const partnerAppOrigin = 'https://parceiro.scapematch.com.br';
 
+/// Admin real. Não há link a partir dos outros apps.
+const adminAppOrigin = 'https://admin.scapematch.com.br';
+
 /// Demonstração do jogador. O caminho `/parceiro/` neste host só redireciona.
 const demoAppOrigin = 'https://demo.scapematch.com.br';
 
@@ -29,3 +32,6 @@ const legacyPlayerPath = '/scapematch/';
 
 /// Caminho do Parceiro real no Pages antigo.
 const legacyPartnerPath = '/scapematch/parceiro/';
+
+/// Caminho do Admin no Pages antigo, até existir o host próprio.
+const legacyAdminPath = '/scapematch/admin/';

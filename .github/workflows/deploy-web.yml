@@ -4,6 +4,10 @@
 # parceiro.scapematch.com.br       → repo nicolas00saliba/scapematch-parceiro
 # parceiro-demo.scapematch.com.br  → repo nicolas00saliba/scapematch-parceiro-demo
 # demo.scapematch.com.br           → repo nicolas00saliba/scapematch-demo
+# admin.scapematch.com.br          → proposto; o Pages antigo publica em
+#                                    /scapematch/admin/ até existir o repo
+#                                    e o DNS. Este workflow não cria nenhum
+#                                    dos dois.
 #                                    (jogador em /, /parceiro/ só redireciona)
 #
 # Transição: também republica o monorepo em
@@ -63,6 +67,10 @@ jobs:
         working-directory: apps/parceiro
         run: flutter pub get
 
+      - name: Install admin dependencies
+        working-directory: apps/admin
+        run: flutter pub get
+
       - name: Build player web (real, subdomain)
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/app-root
@@ -91,6 +99,21 @@ jobs:
           cp build/parceiro-root/index.html build/parceiro-root/404.html
           touch build/parceiro-root/.nojekyll
           printf 'parceiro.scapematch.com.br\n' > build/parceiro-root/CNAME
+
+      - name: Build admin web (real, subdomínio proposto)
+        working-directory: apps/admin
+        run: |
+          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/admin-root
+          bash ../../tool/install_cleanup_service_worker.sh build/admin-root
+          bash ../../tool/stamp_web_manifest.sh build/admin-root admin real
+          bash ../../tool/mark_real_web_copy.sh build/admin-root admin
+          bash ../../tool/check_web_service_worker.sh build/admin-root admin
+          bash ../../tool/check_web_manifest.sh build/admin-root admin real
+          bash ../../tool/check_security_meta.sh flutter build/admin-root/index.html
+          grep -F 'base href="/"' build/admin-root/index.html
+          cp build/admin-root/index.html build/admin-root/404.html
+          touch build/admin-root/.nojekyll
+          printf 'admin.scapematch.com.br\n' > build/admin-root/CNAME
 
       - name: Build player web (demo, subdomain root)
         run: |
@@ -182,17 +205,29 @@ jobs:
             bash ../../tool/check_web_manifest.sh build/legacy-parceiro-demo partner demo
             bash ../../tool/check_security_meta.sh flutter build/legacy-parceiro-demo/index.html
           )
-          mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/site
+          (
+            cd apps/admin
+            flutter build web --release --base-href /scapematch/admin/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-admin
+            bash ../../tool/install_cleanup_service_worker.sh build/legacy-admin
+            bash ../../tool/stamp_web_manifest.sh build/legacy-admin admin real
+            bash ../../tool/mark_real_web_copy.sh build/legacy-admin admin
+            bash ../../tool/check_web_service_worker.sh build/legacy-admin admin
+            bash ../../tool/check_web_manifest.sh build/legacy-admin admin real
+            bash ../../tool/check_security_meta.sh flutter build/legacy-admin/index.html
+          )
+          mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/admin build/legacy/site
           cp -a build/legacy-player/. build/legacy/
           cp -a apps/parceiro/build/legacy-parceiro/. build/legacy/parceiro/
           cp -a build/legacy-player-demo/. build/legacy/demo/
           cp -a apps/parceiro/build/legacy-parceiro-demo/. build/legacy/parceiro/demo/
+          cp -a apps/admin/build/legacy-admin/. build/legacy/admin/
           cp -a apps/landing/. build/legacy/site/
           bash tool/check_security_meta.sh landing build/legacy/site
           cp build/legacy/index.html build/legacy/404.html
           touch build/legacy/.nojekyll
           grep -F 'base href="/scapematch/"' build/legacy/index.html
           grep -F 'base href="/scapematch/parceiro/"' build/legacy/parceiro/index.html
+          grep -F 'base href="/scapematch/admin/"' build/legacy/admin/index.html
 
       - name: Upload subdomain artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -202,6 +237,7 @@ jobs:
             build/app-root
             apps/parceiro/build/parceiro-root
             apps/parceiro/build/parceiro-demo-root
+            apps/admin/build/admin-root
             build/demo-root
             build/legacy
           include-hidden-files: "true"

@@ -12,14 +12,17 @@ sair do escopo da demo do jogador.
 LEGACY_ORIGIN = "https://nicolas00saliba.github.io"
 PLAYER_ORIGIN = "https://app.scapematch.com.br"
 PARTNER_ORIGIN = "https://parceiro.scapematch.com.br"
+ADMIN_ORIGIN = "https://admin.scapematch.com.br"
 DEMO_ORIGIN = "https://demo.scapematch.com.br"
 PARTNER_DEMO_ORIGIN = "https://parceiro-demo.scapematch.com.br"
 
 
 def install_identity(role, mode, base_href):
     """URL absoluta de id, start_url e scope."""
-    if role not in ("player", "partner") or mode not in ("real", "demo"):
+    if role not in ("player", "partner", "admin") or mode not in ("real", "demo"):
         raise ValueError(f"papel ou modo desconhecido: {role} {mode}")
+    if role == "admin" and mode != "real":
+        raise ValueError("o Admin não tem demonstração")
     if not base_href.startswith("/") or not base_href.endswith("/"):
         raise ValueError(f"base href inválido: {base_href}")
 
@@ -32,6 +35,8 @@ def install_identity(role, mode, base_href):
             return PARTNER_ORIGIN + "/"
         if role == "partner" and mode == "demo":
             return PARTNER_DEMO_ORIGIN + "/"
+        if role == "admin":
+            return ADMIN_ORIGIN + "/"
     if base_href.startswith("/scapematch/"):
         path_is_demo = "/demo/" in base_href
         if mode == "demo" and not path_is_demo:
@@ -52,4 +57,6 @@ def install_names(role, mode):
         return "ScapeMatch Parceiro Demo", "Parceiro Demo"
     if role == "partner" and mode == "real":
         return "ScapeMatch Parceiro", "Parceiro"
+    if role == "admin" and mode == "real":
+        return "ScapeMatch Admin", "Admin"
     raise ValueError(f"papel ou modo desconhecido: {role} {mode}")

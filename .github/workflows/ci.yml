@@ -61,6 +61,35 @@ jobs:
         working-directory: apps/parceiro
         run: flutter test
 
+      - name: Install admin dependencies
+        working-directory: apps/admin
+        run: flutter pub get
+
+      - name: Analyze admin app
+        working-directory: apps/admin
+        run: flutter analyze
+
+      - name: Test admin app
+        working-directory: apps/admin
+        run: flutter test
+
+      - name: Build admin web (real)
+        working-directory: apps/admin
+        run: flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/web
+
+      - name: Check admin web install
+        run: |
+          bash tool/install_cleanup_service_worker.sh apps/admin/build/web
+          bash tool/stamp_web_manifest.sh apps/admin/build/web admin real
+          bash tool/mark_real_web_copy.sh apps/admin/build/web admin
+          bash tool/check_web_service_worker.sh apps/admin/build/web admin
+          bash tool/check_web_manifest.sh apps/admin/build/web admin real
+          bash tool/check_security_meta.sh flutter apps/admin/build/web/index.html
+          if grep -R -F -q 'sb_secret_' apps/admin/build/web --include='*.js' --include='*.html'; then
+            echo 'O Admin não pode levar chave secreta.'
+            exit 1
+          fi
+
       # --pwa-strategy=none continua de propósito no Flutter 3.47.8: o
       # bootstrap não registra worker e o arquivo gerado sai vazio. O Chrome
       # Android instala sem service worker (menu desde o 108; o Chrome atual

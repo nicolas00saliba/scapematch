@@ -5,12 +5,13 @@
 #   jogador demo     https://demo.scapematch.com.br/
 #   Parceiro real    https://parceiro.scapematch.com.br/
 #   Parceiro demo    https://parceiro-demo.scapematch.com.br/
+#   Admin            https://admin.scapematch.com.br/
 # O Pages antigo em /scapematch/… usa o host do github.io mais o base href.
 # Rode depois de install_cleanup_service_worker.sh.
 set -euo pipefail
 
 if [ "$#" -ne 3 ]; then
-  echo "uso: $0 <diretório do build web> <player|partner> <real|demo>" >&2
+  echo "uso: $0 <diretório do build web> <player|partner|admin> <real|demo>" >&2
   exit 1
 fi
 

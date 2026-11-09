@@ -42,6 +42,8 @@ prepare "$tmp/partner-real" apps/parceiro/web "/"
 prepare "$tmp/partner-demo" apps/parceiro/web "/"
 prepare "$tmp/legacy-player" web "/scapematch/"
 prepare "$tmp/legacy-demo" web "/scapematch/demo/"
+prepare "$tmp/admin-real" apps/admin/web "/"
+prepare "$tmp/legacy-admin" apps/admin/web "/scapematch/admin/"
 
 stamp "$tmp/player-real" player real
 stamp "$tmp/player-demo" player demo
@@ -49,6 +51,8 @@ stamp "$tmp/partner-real" partner real
 stamp "$tmp/partner-demo" partner demo
 stamp "$tmp/legacy-player" player real
 stamp "$tmp/legacy-demo" player demo
+stamp "$tmp/admin-real" admin real
+stamp "$tmp/legacy-admin" admin real
 
 python3 - "$tmp" <<'PY'
 import json, pathlib, sys
@@ -60,6 +64,8 @@ want = {
     "partner-demo": "https://parceiro-demo.scapematch.com.br/",
     "legacy-player": "https://nicolas00saliba.github.io/scapematch/",
     "legacy-demo": "https://nicolas00saliba.github.io/scapematch/demo/",
+    "admin-real": "https://admin.scapematch.com.br/",
+    "legacy-admin": "https://nicolas00saliba.github.io/scapematch/admin/",
 }
 ids = []
 for name, identity in want.items():
@@ -159,6 +165,18 @@ if own != "https://parceiro-demo.scapematch.com.br/":
 player = install_identity("player", "demo", "/")
 if player != "https://demo.scapematch.com.br/":
     raise SystemExit(f"o PWA da demo do jogador mudou: {player}")
+admin = install_identity("admin", "real", "/")
+if admin != "https://admin.scapematch.com.br/":
+    raise SystemExit(f"host do Admin: {admin}")
+legacy_admin = install_identity("admin", "real", "/scapematch/admin/")
+if legacy_admin != "https://nicolas00saliba.github.io/scapematch/admin/":
+    raise SystemExit(f"legado do Admin: {legacy_admin}")
+try:
+    install_identity("admin", "demo", "/")
+except ValueError:
+    pass
+else:
+    raise SystemExit("o Admin não pode ter demonstração")
 print("ok legado e hosts")
 PY
 
