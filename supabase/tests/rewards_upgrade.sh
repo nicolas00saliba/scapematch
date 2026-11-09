@@ -1,5 +1,6 @@
 #!/bin/bash
-# main → migrations do #84 → dados financeiros gravados → migrations do #85.
+# main (com o #84) → migrations 20261108 que ainda não estão na main
+# → dados financeiros gravados → migrations do #85.
 # 70bbdd1 nunca foi aplicado fora de teste e não é caminho suportado.
 # Não fala com o Asaas e não publica função.
 set -euo pipefail
@@ -38,6 +39,10 @@ while IFS= read -r path; do
 done < <(git ls-tree -r --name-only origin/main supabase/migrations | sort)
 
 for path in supabase/migrations/20261108*.sql; do
+  # O #84 já entrou na main com estes arquivos. Reaplicar o CREATE quebra.
+  if git cat-file -e "origin/main:${path}" 2>/dev/null; then
+    continue
+  fi
   psql_db scapematch_rewards_upgrade -f "$root/$path" >/dev/null
 done
 
