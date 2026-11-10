@@ -105,7 +105,7 @@ Segredos, no painel da função (nunca no repositório):
 | `ASAAS_API_KEY` | chave da conta raiz do sandbox |
 | `ASAAS_BASE_URL` | `https://api-sandbox.asaas.com/v3` |
 | `ASAAS_WEBHOOK_TOKEN` | string sua, de 32 a 255 caracteres, sem espaço. Não use a API key. |
-| `ASAAS_SUBACCOUNT_EMAIL_DOMAIN` | opcional. Domínio do alias da subconta (`parceiros+<venue_id>@domínio`). Sem a variável, usa `scapematch.app`. |
+| `ASAAS_SUBACCOUNT_EMAIL_DOMAIN` | opcional. Domínio do alias da subconta (`parceiros+<venue_id>@domínio`). Sem a variável, usa `escapematch.com.br` e registra um aviso no log. Um valor que não é domínio também cai nesse fallback, com aviso. |
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` a plataforma já injeta na função.
 
