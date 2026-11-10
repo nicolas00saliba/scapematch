@@ -5,6 +5,7 @@ import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch_admin/admin_api.dart';
 import 'package:scapematch_admin/admin_format.dart';
 import 'package:scapematch_admin/admin_place.dart';
+import 'package:scapematch_admin/admin_reward_fields.dart';
 import 'package:scapematch_admin/admin_theme.dart';
 
 class CasasPage extends ConsumerStatefulWidget {
@@ -34,10 +35,9 @@ class _CasasPageState extends ConsumerState<CasasPage> {
 
   Future<void> _load() async {
     try {
-      final board = await ref.read(adminApiProvider).venues(
-        status: _status.isEmpty ? null : _status,
-        query: _query.text,
-      );
+      final board = await ref
+          .read(adminApiProvider)
+          .venues(status: _status.isEmpty ? null : _status, query: _query.text);
       if (!mounted) return;
       setState(() {
         _board = board;
@@ -103,7 +103,8 @@ class _CasasPageState extends ConsumerState<CasasPage> {
                     '${house.hasWallet ? '' : ' · sem subconta'}',
                   ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => ref.read(adminPlaceProvider.notifier).open(house.id),
+                  onTap: () =>
+                      ref.read(adminPlaceProvider.notifier).open(house.id),
                 ),
               ),
         ],
@@ -189,10 +190,9 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                     if (house.status == 'approved')
                       OutlinedButton(
                         onPressed: () async {
-                          await ref.read(adminApiProvider).suspendVenue(
-                            house.id,
-                            !house.suspended,
-                          );
+                          await ref
+                              .read(adminApiProvider)
+                              .suspendVenue(house.id, !house.suspended);
                           await _load();
                         },
                         child: Text(house.suspended ? 'Reativar' : 'Suspender'),
@@ -265,7 +265,8 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     final bps = bpsFromPercent(_bps.text);
     if (bps == null) {
       setState(() {
-        _message = 'A comissão fica entre 0% e 30%, com até duas casas decimais.';
+        _message =
+            'A comissão fica entre 0% e 30%, com até duas casas decimais.';
       });
       return;
     }
@@ -292,7 +293,9 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     );
     if (confirmed != true || !mounted) return;
     try {
-      await ref.read(adminApiProvider).setCommission(venueId: widget.id, bps: bps);
+      await ref
+          .read(adminApiProvider)
+          .setCommission(venueId: widget.id, bps: bps);
     } on AdminRejected catch (error) {
       if (!mounted) return;
       setState(() => _message = error.message);
@@ -315,7 +318,8 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     await _load();
     setState(() {
       _message = result.needsSubaccount
-          ? (wallet ?? 'Aprovada. A subconta Asaas foi pedida no fluxo que já existe.')
+          ? (wallet ??
+                'Aprovada. A subconta Asaas foi pedida no fluxo que já existe.')
           : 'Decisão gravada: ${result.status}.';
     });
   }
@@ -371,7 +375,10 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Contas indicadas em revisão', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Contas indicadas em revisão',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           if (_queue.isEmpty) const Text('Nenhuma conta em revisão.'),
           for (final row in _queue)
             Card(
@@ -400,7 +407,9 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
           TextField(
             key: const Key('admin-jogadores-busca'),
             controller: _query,
-            decoration: const InputDecoration(labelText: 'Nome, e-mail ou usuário'),
+            decoration: const InputDecoration(
+              labelText: 'Nome, e-mail ou usuário',
+            ),
             onSubmitted: (_) => _load(),
           ),
           const SizedBox(height: 8),
@@ -412,7 +421,8 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
                 subtitle: Text(
                   '${player.email}${player.suspended ? ' · suspenso' : ''}',
                 ),
-                onTap: () => ref.read(adminPlaceProvider.notifier).open(player.id),
+                onTap: () =>
+                    ref.read(adminPlaceProvider.notifier).open(player.id),
               ),
             ),
         ],
@@ -421,11 +431,13 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
   }
 
   Future<void> _decide(ReviewRow row, String decision) async {
-    await ref.read(adminApiProvider).decideReferral(
-      userId: row.userId,
-      venueId: row.venueId,
-      decision: decision,
-    );
+    await ref
+        .read(adminApiProvider)
+        .decideReferral(
+          userId: row.userId,
+          venueId: row.venueId,
+          decision: decision,
+        );
     await _load();
   }
 }
@@ -473,7 +485,9 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
                 Text(
                   'Nível ${player.tier} · bônus ${percentBps(player.tierBonusBps)} · ${player.activeReferrals} indicações ativas',
                 ),
-                Text('Código ${player.referralCode.isEmpty ? '—' : player.referralCode}'),
+                Text(
+                  'Código ${player.referralCode.isEmpty ? '—' : player.referralCode}',
+                ),
                 Text(
                   'Saldo ${player.availablePoints} pontos (${reais(player.availablePoints * player.pointValueCents)}) · ${player.pendingPoints} a liberar',
                 ),
@@ -482,13 +496,14 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
                 const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: () async {
-                    await ref.read(adminApiProvider).suspendPlayer(
-                      player.id,
-                      !player.suspended,
-                    );
+                    await ref
+                        .read(adminApiProvider)
+                        .suspendPlayer(player.id, !player.suspended);
                     await _load();
                   },
-                  child: Text(player.suspended ? 'Reativar conta' : 'Suspender conta'),
+                  child: Text(
+                    player.suspended ? 'Reativar conta' : 'Suspender conta',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text('Reservas'),
@@ -519,32 +534,11 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
   bool _blockSelf = true;
   String? _message;
 
-  static const _numbers = <(String, String)>[
-    ('c2c_bps', 'Indicação jogador → jogador (pontos-base)'),
-    ('b2c_bps', 'Casa → jogador (pontos-base)'),
-    ('c2b_bps', 'Jogador → casa (pontos-base)'),
-    ('b2b_bps', 'Casa → casa (pontos-base)'),
-    ('cashback_bps', 'Cashback do pagador (pontos-base)'),
-    ('redeem_min_points', 'Mínimo de pontos para resgatar'),
-    ('redeem_max_bps', 'Teto do resgate (3000 = 30%)'),
-    ('welcome_points', 'Boas-vindas (pontos)'),
-    ('empty_slot_house_share_bps', 'Parte da casa no horário vazio'),
-    ('tier_silver_active', 'Indicações ativas para prata'),
-    ('tier_silver_bonus_bps', 'Bônus da prata'),
-    ('tier_gold_active', 'Indicações ativas para ouro'),
-    ('tier_gold_bonus_bps', 'Bônus do ouro'),
-    ('tier_active_days', 'Janela do nível, em dias'),
-    ('payer_referred_account_cap', 'Contas que um pagador pode premiar'),
-    ('same_device_review_threshold', 'Mesmo aparelho manda para revisão'),
-    ('point_value_cents', 'Centavos de cada ponto'),
-    ('hold_days', 'Dias de carência'),
-  ];
-
   @override
   void initState() {
     super.initState();
-    for (final field in _numbers) {
-      _fields[field.$1] = TextEditingController();
+    for (final field in rewardFields) {
+      _fields[field.id] = TextEditingController();
     }
     _load();
   }
@@ -562,8 +556,8 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
     final settings = await api.rewardSettings();
     final history = await api.rewardHistory();
     if (!mounted) return;
-    for (final field in _numbers) {
-      _fields[field.$1]!.text = '${settings[field.$1] ?? ''}';
+    for (final field in rewardFields) {
+      _fields[field.id]!.text = '${settings[field.id] ?? ''}';
     }
     setState(() {
       _settings = settings;
@@ -583,21 +577,39 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Estas regras já estão em referral_program_settings. Cada gravação fica no histórico.',
+                  'Estes números definem as recompensas do EscapeMatch. O campo guarda o valor da regra. Ao lado, a leitura em porcentagem, em pontos ou na unidade certa. O jogador vê pontos no app. Cada gravação fica no histórico.',
+                  key: Key('admin-regras-intro'),
                 ),
                 const SizedBox(height: 12),
-                for (final field in _numbers) ...[
-                  TextField(
-                    controller: _fields[field.$1],
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(labelText: field.$2),
+                for (final field in rewardFields) ...[
+                  if (field.section != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      field.section!,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: adminTeal,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  RewardRuleTile(
+                    field: field,
+                    controller: _fields[field.id]!,
+                    pointValueCents: int.tryParse(
+                      _fields['point_value_cents']!.text.trim(),
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
-                  const SizedBox(height: 8),
                 ],
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Travar quando o pagador é o próprio indicador'),
+                  title: const Text(
+                    'Travar quando o pagador é o próprio indicador',
+                  ),
+                  subtitle: const Text(
+                    'Se quem paga é quem indicou, aquela indicação não é lançada.',
+                  ),
                   value: _blockSelf,
                   onChanged: (value) => setState(() => _blockSelf = value),
                 ),
@@ -615,10 +627,15 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                         : TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
                 const SizedBox(height: 16),
-                Text('Histórico', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Histórico',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 if (_history.isEmpty) const Text('Nenhuma alteração ainda.'),
                 for (final row in _history.take(8))
-                  Text('${row['created_at'] ?? 'agora'} · alteração registrada'),
+                  Text(
+                    '${row['created_at'] ?? 'agora'} · alteração registrada',
+                  ),
               ],
             ),
     );
@@ -626,8 +643,8 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
 
   Future<void> _save() async {
     final patch = <String, Object?>{
-      for (final field in _numbers)
-        field.$1: int.tryParse(_fields[field.$1]!.text.trim()) ?? 0,
+      for (final field in rewardFields)
+        field.id: int.tryParse(_fields[field.id]!.text.trim()) ?? 0,
       'block_self_payer': _blockSelf,
     };
     try {
@@ -770,7 +787,10 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                     key: const Key('admin-taxa-asaas'),
                   ),
                 const SizedBox(height: 16),
-                Text('Por casa', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Por casa',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 for (final house in report.byVenue)
                   Text(
                     '${house.name}: comissão ${reais(house.grossCommissionCents)} · resgates ${reais(house.rewardsRedeemedCents)} · dívida ${reais(house.openDebtCents)}',
@@ -890,11 +910,9 @@ class _DestaquesPageState extends ConsumerState<DestaquesPage> {
 
   Future<void> _save(String kind, String id) async {
     final raw = _ranks[id]?.text.trim() ?? '';
-    await ref.read(adminApiProvider).setHighlight(
-      kind,
-      id,
-      raw.isEmpty ? null : int.tryParse(raw),
-    );
+    await ref
+        .read(adminApiProvider)
+        .setHighlight(kind, id, raw.isEmpty ? null : int.tryParse(raw));
     await _load();
   }
 }
@@ -977,10 +995,11 @@ class AdminFrame extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: adminTeal,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              color: adminTeal,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                     ),
                 ],
