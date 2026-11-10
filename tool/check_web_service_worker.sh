@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "uso: $0 <diretório do build web> <player|partner>" >&2
+  echo "uso: $0 <diretório do build web> <player|partner|admin>" >&2
   exit 1
 fi
 
@@ -43,13 +43,13 @@ if [ "$role" = "player" ]; then
   grep -F -q 'reg.unregister()' "$index"
   grep -F -q "marker + '/'" "$index"
   grep -F -q 'reg.update()' "$index"
-elif [ "$role" = "partner" ]; then
+elif [ "$role" = "partner" ] || [ "$role" = "admin" ]; then
   grep -F -q 'reg.update()' "$index"
   if grep -F -q 'scape-partner-shell' "$index"; then
-    echo 'O index do Parceiro não deve carregar o script do shell do jogador.' >&2
+    echo 'O index deste app não deve carregar o script do shell do jogador.' >&2
     exit 1
   fi
-elif [ "$role" != "partner" ]; then
+else
   echo "papel desconhecido: $role" >&2
   exit 1
 fi

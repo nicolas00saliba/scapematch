@@ -61,6 +61,57 @@ jobs:
         working-directory: apps/parceiro
         run: flutter test
 
+      - name: Install admin dependencies
+        working-directory: apps/admin
+        run: flutter pub get
+
+      - name: Analyze admin app
+        working-directory: apps/admin
+        run: flutter analyze
+
+      - name: Test admin app
+        working-directory: apps/admin
+        run: flutter test
+
+      - name: Build admin web (real)
+        working-directory: apps/admin
+        run: flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/web
+
+      - name: Check admin web install
+        run: |
+          bash tool/install_cleanup_service_worker.sh apps/admin/build/web
+          bash tool/stamp_web_manifest.sh apps/admin/build/web admin real
+          bash tool/mark_real_web_copy.sh apps/admin/build/web admin
+          bash tool/check_web_service_worker.sh apps/admin/build/web admin
+          bash tool/check_web_manifest.sh apps/admin/build/web admin real
+          bash tool/check_security_meta.sh admin apps/admin/build/web/index.html
+          python3 - <<'PY'
+          import base64, json, pathlib, re, sys
+          root = pathlib.Path("apps/admin/build/web")
+          jwt = re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")
+          failed = False
+          # O SDK cita o prefixo sb_secret_ para recusar a chave. Uma chave
+          # de verdade continua com mais caracteres depois do prefixo.
+          secret_key = re.compile(r"sb_secret_[A-Za-z0-9_-]{16,}")
+          for path in (*root.rglob("*.js"), *root.rglob("*.html")):
+              text = path.read_text(errors="ignore")
+              if secret_key.search(text):
+                  print(f"chave sb_secret_ em {path}")
+                  failed = True
+              for token in jwt.findall(text):
+                  payload = token.split(".")[1]
+                  pad = "=" * (-len(payload) % 4)
+                  try:
+                      data = json.loads(base64.urlsafe_b64decode(payload + pad))
+                  except (ValueError, json.JSONDecodeError):
+                      continue
+                  if isinstance(data, dict) and data.get("role") == "service_role":
+                      print(f"JWT service_role em {path}")
+                      failed = True
+          if failed:
+              sys.exit(1)
+          PY
+
       # --pwa-strategy=none continua de propósito no Flutter 3.47.8: o
       # bootstrap não registra worker e o arquivo gerado sai vazio. O Chrome
       # Android instala sem service worker (menu desde o 108; o Chrome atual

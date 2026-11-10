@@ -42,6 +42,8 @@ prepare "$tmp/partner-real" apps/parceiro/web "/"
 prepare "$tmp/partner-demo" apps/parceiro/web "/"
 prepare "$tmp/legacy-player" web "/scapematch/"
 prepare "$tmp/legacy-demo" web "/scapematch/demo/"
+prepare "$tmp/admin-real" apps/admin/web "/"
+prepare "$tmp/legacy-admin" apps/admin/web "/scapematch/admin/"
 
 stamp "$tmp/player-real" player real
 stamp "$tmp/player-demo" player demo
@@ -49,6 +51,8 @@ stamp "$tmp/partner-real" partner real
 stamp "$tmp/partner-demo" partner demo
 stamp "$tmp/legacy-player" player real
 stamp "$tmp/legacy-demo" player demo
+stamp "$tmp/admin-real" admin real
+stamp "$tmp/legacy-admin" admin real
 
 python3 - "$tmp" <<'PY'
 import json, pathlib, sys
@@ -60,6 +64,8 @@ want = {
     "partner-demo": "https://parceiro-demo.escapematch.com.br/",
     "legacy-player": "https://nicolas00saliba.github.io/scapematch/",
     "legacy-demo": "https://nicolas00saliba.github.io/scapematch/demo/",
+    "admin-real": "https://admin.escapematch.com.br/",
+    "legacy-admin": "https://nicolas00saliba.github.io/scapematch/admin/",
 }
 ids = []
 for name, identity in want.items():
@@ -86,6 +92,11 @@ if partner_demo["id"] != "https://parceiro-demo.escapematch.com.br/":
     raise SystemExit("o Parceiro demo não ficou no host próprio")
 if real["name"] != "EscapeMatch":
     raise SystemExit("o app real mudou de nome")
+admin_manifest = json.loads((root / "admin-real" / "manifest.json").read_text())
+if admin_manifest["name"] != "EscapeMatch Admin" or admin_manifest["short_name"] != "Admin":
+    raise SystemExit(
+        f"nome do Admin: {admin_manifest['name']!r} / {admin_manifest['short_name']!r}"
+    )
 if "https://app.escapematch.com.br/" in (root / "player-demo" / "flutter_service_worker.js").read_text():
     raise SystemExit("o worker da demo cita o app real")
 if "https://demo.escapematch.com.br/" in (root / "player-real" / "flutter_service_worker.js").read_text():
@@ -159,6 +170,18 @@ if own != "https://parceiro-demo.escapematch.com.br/":
 player = install_identity("player", "demo", "/")
 if player != "https://demo.escapematch.com.br/":
     raise SystemExit(f"o PWA da demo do jogador mudou: {player}")
+admin = install_identity("admin", "real", "/")
+if admin != "https://admin.escapematch.com.br/":
+    raise SystemExit(f"host do Admin: {admin}")
+legacy_admin = install_identity("admin", "real", "/scapematch/admin/")
+if legacy_admin != "https://nicolas00saliba.github.io/scapematch/admin/":
+    raise SystemExit(f"legado do Admin: {legacy_admin}")
+try:
+    install_identity("admin", "demo", "/")
+except ValueError:
+    pass
+else:
+    raise SystemExit("o Admin não pode ter demonstração")
 print("ok legado e hosts")
 PY
 

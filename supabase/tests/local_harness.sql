@@ -35,8 +35,20 @@ as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
 
+create or replace function auth.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select pg_catalog.jsonb_strip_nulls(pg_catalog.jsonb_build_object(
+    'sub', nullif(pg_catalog.current_setting('request.jwt.claim.sub', true), ''),
+    'aal', nullif(pg_catalog.current_setting('request.jwt.claim.aal', true), '')
+  ));
+$$;
+
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
+grant execute on function auth.jwt() to anon, authenticated, service_role;
 
 create table if not exists storage.buckets (
   id text primary key,

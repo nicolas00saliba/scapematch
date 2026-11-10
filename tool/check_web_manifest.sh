@@ -7,7 +7,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 3 ]; then
-  echo "uso: $0 <diretório do build web> <player|partner> <real|demo>" >&2
+  echo "uso: $0 <diretório do build web> <player|partner|admin> <real|demo>" >&2
   exit 1
 fi
 

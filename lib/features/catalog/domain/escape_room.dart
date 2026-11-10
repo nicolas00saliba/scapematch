@@ -23,6 +23,7 @@ class EscapeRoom {
     this.cancelWindow = const Duration(hours: 2),
     this.accent = 0,
     this.pictures = const [],
+    this.featuredRank,
   });
 
   final String id;
@@ -55,6 +56,9 @@ class EscapeRoom {
 
   /// Fotos da casa, nesta sessão. A primeira é a capa. Vazio usa o tema.
   final List<RoomPicture> pictures;
+
+  /// Ordem de destaque escolhida no Admin. Nulo fica na ordem comum.
+  final int? featuredRank;
 
   RoomPicture? get cover => pictures.isEmpty ? null : pictures.first;
 

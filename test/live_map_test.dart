@@ -576,7 +576,7 @@ Future<Map<String, Uint8List>> _downloadTiles(
           );
           request.headers.set(
             HttpHeaders.userAgentHeader,
-            'scapematch/0.1 (dev.scapematch.app)',
+            'scapematch/0.1 (app.escapematch.com.br)',
           );
           final response = await request.close().timeout(
             const Duration(seconds: 20),

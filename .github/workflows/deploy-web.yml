@@ -4,14 +4,16 @@
 # parceiro.escapematch.com.br       → repo nicolas00saliba/scapematch-parceiro
 # parceiro-demo.escapematch.com.br  → repo nicolas00saliba/scapematch-parceiro-demo
 # demo.escapematch.com.br           → repo nicolas00saliba/scapematch-demo
-#                                    (jogador em /, /parceiro/ só redireciona)
+# admin.escapematch.com.br          → repo nicolas00saliba/escapematch-admin
+#                                    (cópia também em /scapematch/admin/)
+# (demo: jogador em /, /parceiro/ só redireciona)
 #
 # Transição: também republica o monorepo em
 # https://nicolas00saliba.github.io/scapematch/… (base-href antigos) para
 # não quebrar quem ainda abre o endereço antigo.
 #
 # Segredo necessário no repo scapematch:
-#   PAGES_DEPLOY_TOKEN — PAT com escrita nos 4 repos de Pages.
+#   PAGES_DEPLOY_TOKEN — PAT com escrita nos 5 repos de Pages.
 #
 # --base-href must keep the leading and trailing slash.
 # APP_MODE=real|demo escolhe o repositório. O Parceiro continua outro app.
@@ -63,6 +65,10 @@ jobs:
         working-directory: apps/parceiro
         run: flutter pub get
 
+      - name: Install admin dependencies
+        working-directory: apps/admin
+        run: flutter pub get
+
       - name: Build player web (real, subdomain)
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/app-root
@@ -91,6 +97,21 @@ jobs:
           cp build/parceiro-root/index.html build/parceiro-root/404.html
           touch build/parceiro-root/.nojekyll
           printf 'parceiro.escapematch.com.br\n' > build/parceiro-root/CNAME
+
+      - name: Build admin web (real, subdomínio proposto)
+        working-directory: apps/admin
+        run: |
+          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/admin-root
+          bash ../../tool/install_cleanup_service_worker.sh build/admin-root
+          bash ../../tool/stamp_web_manifest.sh build/admin-root admin real
+          bash ../../tool/mark_real_web_copy.sh build/admin-root admin
+          bash ../../tool/check_web_service_worker.sh build/admin-root admin
+          bash ../../tool/check_web_manifest.sh build/admin-root admin real
+          bash ../../tool/check_security_meta.sh admin build/admin-root/index.html
+          grep -F 'base href="/"' build/admin-root/index.html
+          cp build/admin-root/index.html build/admin-root/404.html
+          touch build/admin-root/.nojekyll
+          printf 'admin.escapematch.com.br\n' > build/admin-root/CNAME
 
       - name: Build player web (demo, subdomain root)
         run: |
@@ -182,17 +203,29 @@ jobs:
             bash ../../tool/check_web_manifest.sh build/legacy-parceiro-demo partner demo
             bash ../../tool/check_security_meta.sh flutter build/legacy-parceiro-demo/index.html
           )
-          mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/site
+          (
+            cd apps/admin
+            flutter build web --release --base-href /scapematch/admin/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-admin
+            bash ../../tool/install_cleanup_service_worker.sh build/legacy-admin
+            bash ../../tool/stamp_web_manifest.sh build/legacy-admin admin real
+            bash ../../tool/mark_real_web_copy.sh build/legacy-admin admin
+            bash ../../tool/check_web_service_worker.sh build/legacy-admin admin
+            bash ../../tool/check_web_manifest.sh build/legacy-admin admin real
+            bash ../../tool/check_security_meta.sh admin build/legacy-admin/index.html
+          )
+          mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/admin build/legacy/site
           cp -a build/legacy-player/. build/legacy/
           cp -a apps/parceiro/build/legacy-parceiro/. build/legacy/parceiro/
           cp -a build/legacy-player-demo/. build/legacy/demo/
           cp -a apps/parceiro/build/legacy-parceiro-demo/. build/legacy/parceiro/demo/
+          cp -a apps/admin/build/legacy-admin/. build/legacy/admin/
           cp -a apps/landing/. build/legacy/site/
           bash tool/check_security_meta.sh landing build/legacy/site
           cp build/legacy/index.html build/legacy/404.html
           touch build/legacy/.nojekyll
           grep -F 'base href="/scapematch/"' build/legacy/index.html
           grep -F 'base href="/scapematch/parceiro/"' build/legacy/parceiro/index.html
+          grep -F 'base href="/scapematch/admin/"' build/legacy/admin/index.html
 
       - name: Upload subdomain artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -202,6 +235,7 @@ jobs:
             build/app-root
             apps/parceiro/build/parceiro-root
             apps/parceiro/build/parceiro-demo-root
+            apps/admin/build/admin-root
             build/demo-root
             build/legacy
           include-hidden-files: "true"
@@ -274,6 +308,18 @@ jobs:
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
           full_commit_message: Publish EscapeMatch demos (demo.escapematch.com.br)
+
+      - name: Publish admin.escapematch.com.br
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          personal_token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          external_repository: nicolas00saliba/escapematch-admin
+          publish_dir: ./_sites/apps/admin/build/admin-root
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish EscapeMatch Admin (admin.escapematch.com.br)
 
   publish-legacy:
     name: Push legacy monorepo gh-pages

@@ -1,4 +1,5 @@
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/features/catalog/domain/feature_order.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 
 /// Ordem fictícia de procura. Não é uma medição: é um ranking de exemplo.
@@ -18,6 +19,15 @@ const popularRoomRank = <String>[
 List<RoomListing> rankPopularRooms(List<RoomListing> rooms) {
   final ranked = [...rooms];
   ranked.sort((a, b) {
+    if (a.room.featuredRank != null || b.room.featuredRank != null) {
+      final featured = compareFeatured(
+        a.room.featuredRank,
+        b.room.featuredRank,
+        a.room.name,
+        b.room.name,
+      );
+      if (a.room.featuredRank != b.room.featuredRank) return featured;
+    }
     final aRank = popularRoomRank.indexOf(a.room.id);
     final bRank = popularRoomRank.indexOf(b.room.id);
     final aScore = aRank < 0 ? popularRoomRank.length : aRank;

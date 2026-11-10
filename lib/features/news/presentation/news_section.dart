@@ -23,7 +23,12 @@ final homeNewsProvider = FutureProvider.autoDispose<List<NewsItem>>((
   final cityId = ref.watch(selectedCityIdProvider);
   final gameTypeId = ref.watch(selectedGameTypeIdProvider);
   final items = await ref.watch(newsRepositoryProvider).list(cityId: cityId);
-  return filterNewsByGameType(items, gameTypeId);
+  final picked = [
+    for (final item in items)
+      if (item.carouselRank != null) item,
+  ]..sort((a, b) => a.carouselRank!.compareTo(b.carouselRank!));
+  final shown = picked.isEmpty ? items : picked;
+  return filterNewsByGameType(shown, gameTypeId);
 });
 
 /// Foto do cartão. O texto embaixo é que precisa ser lido.

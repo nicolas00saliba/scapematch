@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "uso: $0 <diretório do build web> <player|partner>" >&2
+  echo "uso: $0 <diretório do build web> <player|partner|admin>" >&2
   exit 1
 fi
 
@@ -42,6 +42,19 @@ elif role == "partner":
             manifest,
             "Painel da casa no EscapeMatch. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
             "Painel da casa no EscapeMatch. Saldo, reservas e agenda.",
+        ),
+    ]
+elif role == "admin":
+    pairs = [
+        (
+            index,
+            "EscapeMatch Admin é o painel do Nícolas. Casas, jogadores, regras e ganhos. Esta versão usa dados de exemplo.",
+            "EscapeMatch Admin é o painel do Nícolas. Casas, jogadores, regras e ganhos.",
+        ),
+        (
+            manifest,
+            "Painel do EscapeMatch. Casas, jogadores, regras e ganhos. Esta versão usa dados de exemplo.",
+            "Painel do EscapeMatch. Casas, jogadores, regras e ganhos.",
         ),
     ]
 else:

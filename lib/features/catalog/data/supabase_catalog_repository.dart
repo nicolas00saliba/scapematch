@@ -1,6 +1,7 @@
 import 'package:scapematch/core/supabase/row_values.dart';
 import 'package:scapematch/features/catalog/data/catalog_repository.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
+import 'package:scapematch/features/catalog/domain/feature_order.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
@@ -13,12 +14,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const venueVitrineColumns =
     'id, city_id, name, neighborhood, street_address, address_number, '
     'postal_code, latitude, longitude, category, badge, status, created_at, '
-    'receives_payments';
+    'receives_payments, featured_rank';
 
 const roomColumns =
     'id, venue_id, name, theme, category, game_type, capacity, '
     'minimum_players, duration_minutes, difficulty, price_cents, '
-    'cancel_window_minutes, accent';
+    'cancel_window_minutes, accent, featured_rank';
 
 const sessionColumns = 'id, room_id, starts_at, availability, cancelled_at';
 
@@ -35,7 +36,7 @@ class SupabaseCatalogRepository implements CatalogRepository {
     final houses = [
       for (final house in snap.houses.values)
         if (house.cityId == cityId) house,
-    ]..sort((a, b) => a.name.compareTo(b.name));
+    ]..sort((a, b) => compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name));
     return houses;
   }
 
@@ -45,7 +46,7 @@ class SupabaseCatalogRepository implements CatalogRepository {
     final rooms = [
       for (final room in snap.rooms.values)
         if (room.houseId == houseId) room,
-    ]..sort((a, b) => a.name.compareTo(b.name));
+    ]..sort((a, b) => compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name));
     return rooms;
   }
 
@@ -65,7 +66,14 @@ class SupabaseCatalogRepository implements CatalogRepository {
     final listings = [
       for (final room in snap.rooms.values)
         if (snap.houses[room.houseId]?.cityId == cityId) snap.listing(room.id)!,
-    ]..sort((a, b) => a.room.name.compareTo(b.room.name));
+    ]..sort(
+      (a, b) => compareFeatured(
+        a.room.featuredRank,
+        b.room.featuredRank,
+        a.room.name,
+        b.room.name,
+      ),
+    );
     return listings;
   }
 
@@ -148,6 +156,7 @@ class _CatalogSnap {
       houseName: house.name,
       cityId: house.cityId,
       cityName: city?.name ?? house.cityId,
+      houseFeaturedRank: house.featuredRank,
     );
   }
 }
@@ -174,6 +183,7 @@ EscapeHouse houseFromRow(Map<String, dynamic> row) {
       number: textOf(row['address_number']),
     ),
     receivesPayments: venueReceivesGroups(row),
+    featuredRank: optionalRank(row['featured_rank']),
   );
 }
 
@@ -197,6 +207,7 @@ EscapeRoom roomFromRow(Map<String, dynamic> row) {
       minutes: intOf(row['cancel_window_minutes'], fallback: 120),
     ),
     accent: intOf(row['accent']),
+    featuredRank: optionalRank(row['featured_rank']),
   );
 }
 

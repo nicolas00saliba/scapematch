@@ -1,4 +1,5 @@
 import 'package:scapematch/core/supabase/row_values.dart';
+import 'package:scapematch/features/catalog/domain/feature_order.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/news/data/news_repository.dart';
 import 'package:scapematch/features/news/domain/news_item.dart';
@@ -6,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 const _newsColumns =
     'id, venue_id, title, summary, category, game_type, image_url, '
-    'source_kind, source_url, published_at';
+    'source_kind, source_url, published_at, carousel_rank';
 
 class SupabaseNewsRepository implements NewsRepository {
   SupabaseNewsRepository(this._client);
@@ -103,6 +104,7 @@ class SupabaseNewsRepository implements NewsRepository {
       gameType: textOf(row['game_type']).isEmpty
           ? GameTypes.escapeRoom
           : textOf(row['game_type']),
+      carouselRank: optionalRank(row['carousel_rank']),
     );
   }
 }

@@ -809,7 +809,7 @@ class _ClearOfUser extends StatelessWidget {
 Widget _mapTiles({required bool dark, required TileProvider tiles}) {
   final layer = TileLayer(
     urlTemplate: liveMapTileUrl(dark: dark),
-    userAgentPackageName: 'dev.scapematch.app',
+    userAgentPackageName: 'app.escapematch.com.br',
     tileProvider: tiles,
     tileDisplay: const TileDisplay.fadeIn(reloadStartOpacity: 1),
   );
