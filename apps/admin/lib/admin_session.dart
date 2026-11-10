@@ -60,7 +60,7 @@ class AdminSessionController extends Notifier<AdminSession> {
   }
 
   Future<void> signIn(String email, String password) async {
-    state = const AdminSession(phase: AdminPhase.loading);
+    state = const AdminSession(phase: AdminPhase.signedOut, busy: true);
     if (!scapeUsesLiveBackend) {
       state = const AdminSession(
         phase: AdminPhase.signedOut,

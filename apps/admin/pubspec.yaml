@@ -29,6 +29,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/fonts/Poppins-Medium.ttf
+    - assets/brand/logo_admin_icone.svg
+    - assets/brand/logo_admin_simbolo.svg
   fonts:
     - family: Poppins
       fonts:

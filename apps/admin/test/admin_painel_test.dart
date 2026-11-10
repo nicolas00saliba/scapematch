@@ -47,12 +47,17 @@ void main() {
     await _frames(tester);
     expect(find.byKey(const Key('admin-login')), findsOneWidget);
     expect(find.text('EscapeMatch Admin'), findsOneWidget);
+    await _shot(tester, 'admin-login-desktop');
+    _size(tester, const Size(390, 844));
+    await _frames(tester);
+    await _shot(tester, 'admin-login-mobile');
+    _size(tester, const Size(1280, 900));
+    await _frames(tester);
     await tester.enterText(
       find.byKey(const Key('admin-email')),
       'admin@scapematch.exemplo',
     );
     await _frames(tester);
-    await _shot(tester, 'admin-login');
   });
 
   testWidgets('a verificação pede o código antes do painel', (tester) async {
@@ -76,11 +81,14 @@ void main() {
     await _shot(tester, 'admin-mfa');
   });
 
-  testWidgets('painel mostra casas, ganhos e a taxa só quando existe', (tester) async {
+  testWidgets('painel mostra casas, ganhos e a taxa só quando existe', (
+    tester,
+  ) async {
     final api = MemoryAdminApi();
     _size(tester, const Size(1280, 900));
     await _pump(tester, api);
     expect(find.byKey(const Key('admin-casas')), findsOneWidget);
+    await _shot(tester, 'admin-header-desktop');
     expect(find.text('Ninja Escape'), findsOneWidget);
     expect(find.text('Casa da Fila'), findsOneWidget);
     await _shot(tester, 'admin-casas');
@@ -122,8 +130,14 @@ void main() {
     await tester.tap(find.text('Ganhos'));
     await _frames(tester);
     expect(find.byKey(const Key('admin-passivo')), findsOneWidget);
-    expect(find.textContaining('2.000 pontos ainda não usados'), findsOneWidget);
-    expect(find.textContaining('Crédito de casa ainda pendente'), findsOneWidget);
+    expect(
+      find.textContaining('2.000 pontos ainda não usados'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Crédito de casa ainda pendente'),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('admin-taxa-asaas')), findsOneWidget);
     expect(find.textContaining('dívida tudo ou nada'), findsOneWidget);
     await _shot(tester, 'admin-ganhos');
@@ -142,7 +156,7 @@ void main() {
     _size(tester, const Size(390, 844));
     await _frames(tester);
     expect(find.byKey(const Key('admin-shell')), findsOneWidget);
-    await _shot(tester, 'admin-celular');
+    await _shot(tester, 'admin-header-mobile');
   });
 }
 
@@ -202,10 +216,13 @@ class ReadyAdminSession extends AdminSessionController {
 }
 
 Future<void> _shot(WidgetTester tester, String name) async {
-  await _frames(tester);
-  final boundary =
-      tester.renderObject(find.byType(RepaintBoundary).first)
-          as RenderRepaintBoundary;
+  await tester.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  });
+  await tester.pump();
+  final boundary = tester.renderObject(
+    find.byType(RepaintBoundary).first,
+  ) as RenderRepaintBoundary;
   await tester.runAsync(() async {
     final image = await boundary.toImage(pixelRatio: 1);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
