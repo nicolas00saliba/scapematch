@@ -94,6 +94,8 @@ Deno.test("os subdomínios próprios entram no padrão sem ALLOWED_ORIGINS", () 
   assertEquals(listed("https://demo.escapematch.com.br"), true);
   assertEquals(listed("https://parceiro-demo.escapematch.com.br"), true);
   assertEquals(listed("https://www.escapematch.com.br"), true);
+  assertEquals(listed("https://admin.escapematch.com.br"), true);
+  assertEquals(isAllowedOrigin("https://admin.escapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://app.escapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://parceiro.escapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://demo.escapematch.com.br", hosted), true);

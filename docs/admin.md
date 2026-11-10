@@ -5,9 +5,8 @@ Painel exclusivo do Nícolas. Não há link a partir do app do jogador, do Parce
 ## Onde fica
 
 - App: `apps/admin`
-- Host proposto: `https://admin.escapematch.com.br/`
-- Enquanto o repositório de Pages e o DNS não existem, o deploy também publica o mesmo build em `https://nicolas00saliba.github.io/scapematch/admin/`
-- Este repositório não cria o host, não mexe em DNS e não publica sozinho
+- Host: `https://admin.escapematch.com.br/` (repo de Pages `nicolas00saliba/escapematch-admin`, atrás da Cloudflare)
+- O deploy também publica o mesmo build em `https://nicolas00saliba.github.io/scapematch/admin/`
 
 O build usa `--pwa-strategy=none`, como os outros apps. A identidade de instalação é `https://admin.escapematch.com.br/` na raiz e a URL do Pages antigo no subcaminho.
 
@@ -29,7 +28,7 @@ Depois da senha, quem não tem TOTP cadastra o fator (`supabase.auth.mfa.enroll`
 
 Casa suspensa sai da vitrine porque `private.venue_is_visible` exige `suspended_at` nulo. Sala e notícia não deixam o dono mudar a ordem do destaque. Conta suspensa não entra em grupo novo.
 
-A migration nova é `supabase/migrations/20261109150000_admin_console.sql`. Ela não reaplica `20261105210000` e não foi aplicada no projeto remoto.
+A migration é `supabase/migrations/20261109160000_admin_console.sql` (a versão 20261109150000 já era a `escapematch_display_name`). Ela não reaplica `20261105210000`.
 
 ## Ordem para publicar
 

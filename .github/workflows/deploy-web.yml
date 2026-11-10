@@ -4,18 +4,16 @@
 # parceiro.escapematch.com.br       → repo nicolas00saliba/scapematch-parceiro
 # parceiro-demo.escapematch.com.br  → repo nicolas00saliba/scapematch-parceiro-demo
 # demo.escapematch.com.br           → repo nicolas00saliba/scapematch-demo
-# admin.escapematch.com.br         → proposto; o Pages antigo publica em
-#                                    /scapematch/admin/ até existir o repo
-#                                    e o DNS. Este workflow não cria nenhum
-#                                    dos dois.
-#                                    (jogador em /, /parceiro/ só redireciona)
+# admin.escapematch.com.br          → repo nicolas00saliba/escapematch-admin
+#                                    (cópia também em /scapematch/admin/)
+# (demo: jogador em /, /parceiro/ só redireciona)
 #
 # Transição: também republica o monorepo em
 # https://nicolas00saliba.github.io/scapematch/… (base-href antigos) para
 # não quebrar quem ainda abre o endereço antigo.
 #
 # Segredo necessário no repo scapematch:
-#   PAGES_DEPLOY_TOKEN — PAT com escrita nos 4 repos de Pages.
+#   PAGES_DEPLOY_TOKEN — PAT com escrita nos 5 repos de Pages.
 #
 # --base-href must keep the leading and trailing slash.
 # APP_MODE=real|demo escolhe o repositório. O Parceiro continua outro app.
@@ -310,6 +308,18 @@ jobs:
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
           full_commit_message: Publish EscapeMatch demos (demo.escapematch.com.br)
+
+      - name: Publish admin.escapematch.com.br
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          personal_token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          external_repository: nicolas00saliba/escapematch-admin
+          publish_dir: ./_sites/apps/admin/build/admin-root
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: Publish EscapeMatch Admin (admin.escapematch.com.br)
 
   publish-legacy:
     name: Push legacy monorepo gh-pages
