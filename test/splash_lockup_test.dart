@@ -141,6 +141,65 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(AppKeys.splash), findsNothing);
   });
+
+  testWidgets('a pin that arrives after the timeout still paints', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final bundle = _LatePinBundle(rootBundle);
+    addTearDown(bundle.release);
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: DefaultAssetBundle(
+          bundle: bundle,
+          child: const SplashGate(child: SizedBox.expand()),
+        ),
+      ),
+    );
+
+    await tester.pump(SplashGate.pinLoadTimeout);
+    expect(_wordmark(), findsOneWidget);
+    expect(
+      find.descendant(of: _pin(), matching: find.byType(RawImage)),
+      findsNothing,
+    );
+
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      tester.widget<Opacity>(find.byKey(SplashGate.logoOpacityKey)).opacity,
+      1,
+    );
+
+    bundle.release();
+    var painted = false;
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+      final raw = find.descendant(of: _pin(), matching: find.byType(RawImage));
+      if (raw.evaluate().isEmpty) {
+        continue;
+      }
+      painted = true;
+      final image = tester.widget<RawImage>(raw).image;
+      expect(image, isNotNull);
+      expect(
+        image!.width / image.height,
+        closeTo(ScapeLogo.markAspectWidth / ScapeLogo.markAspectHeight, 0.02),
+      );
+      expect(
+        tester.widget<Opacity>(find.byKey(SplashGate.logoOpacityKey)).opacity,
+        1,
+        reason: 'o relógio da abertura não recomeça quando o pin chega',
+      );
+      break;
+    }
+    expect(painted, isTrue);
+    expect(find.byKey(AppKeys.splash), findsOneWidget);
+  });
 }
 
 Offset _viewBox(Rect pin, double x, double y) {

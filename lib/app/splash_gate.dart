@@ -372,7 +372,20 @@ class _SplashGateState extends State<SplashGate>
   }
 
   void _mountPin(ScapePinArt art) {
-    if (!mounted || !_show || _pinSettled) {
+    if (!mounted || !_show) {
+      art.dispose();
+      return;
+    }
+    // O prazo de 1200ms só evita a cortina presa. Se o arquivo chega
+    // depois, o buraco do pin troca pela arte. O relógio de 2700ms, que
+    // já andou, não recomeça.
+    if (_pinSettled) {
+      final current = _pinArt;
+      if (art.image != null && current != null && current.image == null) {
+        setState(() => _pinArt = art);
+        current.dispose();
+        return;
+      }
       art.dispose();
       return;
     }

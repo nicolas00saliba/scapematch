@@ -77,6 +77,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/web player
           bash tool/check_web_manifest.sh build/web player real
           bash tool/check_security_meta.sh flutter build/web/index.html
+          bash tool/check_splash_pin.sh build/web player
 
       - name: Player bundle excludes the partner app
         run: |
@@ -113,6 +114,7 @@ jobs:
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
           bash tool/check_web_manifest.sh apps/parceiro/build/web partner real
           bash tool/check_security_meta.sh flutter apps/parceiro/build/web/index.html
+          bash tool/check_splash_pin.sh apps/parceiro/build/web partner
           if grep -R -F -q 'xv@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
             echo 'O bundle do Parceiro ainda tem o login de demonstração.'
             exit 1
@@ -144,6 +146,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/player-demo player
           bash tool/check_web_manifest.sh build/player-demo player demo
           bash tool/check_security_meta.sh flutter build/player-demo/index.html
+          bash tool/check_splash_pin.sh build/player-demo player
           grep -F -q 'base href="/"' build/player-demo/index.html
           bash tool/js_contains.sh build/player-demo 'Demonstração'
           bash tool/js_contains.sh build/player-demo 'O Cofre do Café'
@@ -171,6 +174,7 @@ jobs:
           bash tool/check_web_service_worker.sh apps/parceiro/build/parceiro-demo-root partner
           bash tool/check_web_manifest.sh apps/parceiro/build/parceiro-demo-root partner demo
           bash tool/check_security_meta.sh flutter apps/parceiro/build/parceiro-demo-root/index.html
+          bash tool/check_splash_pin.sh apps/parceiro/build/parceiro-demo-root partner
           grep -F -q 'base href="/"' apps/parceiro/build/parceiro-demo-root/index.html
           grep -F -q 'https://parceiro-demo.escapematch.com.br/' apps/parceiro/build/parceiro-demo-root/manifest.json
           bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'Demonstração'
