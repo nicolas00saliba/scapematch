@@ -9,6 +9,7 @@ class EscapeHouse {
     required this.longitude,
     this.streetAddress = 'Rua de exemplo, 100',
     this.receivesPayments = true,
+    this.featuredRank,
   });
 
   final String id;
@@ -26,6 +27,9 @@ class EscapeHouse {
   /// Falso quando a casa aprovada ainda não tem subconta. A demonstração
   /// segue verdadeira para não esconder sala de exemplo.
   final bool receivesPayments;
+
+  /// Ordem de destaque escolhida no Admin. Nulo fica na ordem comum.
+  final int? featuredRank;
 }
 
 /// A vitrine sem a coluna continua visível. `false` tira a casa da criação.

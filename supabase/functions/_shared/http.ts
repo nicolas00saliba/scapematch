@@ -12,6 +12,7 @@ export const productionWebOrigins = [
   "https://parceiro.escapematch.com.br",
   "https://demo.escapematch.com.br",
   "https://parceiro-demo.escapematch.com.br",
+  "https://admin.escapematch.com.br",
   "https://escapematch.com.br",
   "https://www.escapematch.com.br",
   "https://app.scapematch.com.br",
