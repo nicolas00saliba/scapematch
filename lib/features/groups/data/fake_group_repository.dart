@@ -207,18 +207,20 @@ class FakeGroupRepository implements GroupRepository {
     if (current.openSeats <= held) {
       return const JoinFailure(JoinFailureReason.seatReserved);
     }
-    final updated = current.copyWith(
-      filledSpots: current.filledSpots + 1,
-      participants: [
-        ...current.participants,
-        Participant(
-          id: _database.nextParticipantId(),
-          userId: participantUserId,
-          displayName: participantName,
-          isCreator: false,
-          isLocalUser: markAsLocalUser,
-        ),
-      ],
+    final updated = await _confirmIfReady(
+      current.copyWith(
+        filledSpots: current.filledSpots + 1,
+        participants: [
+          ...current.participants,
+          Participant(
+            id: _database.nextParticipantId(),
+            userId: participantUserId,
+            displayName: participantName,
+            isCreator: false,
+            isLocalUser: markAsLocalUser,
+          ),
+        ],
+      ),
     );
     _database.groups[index] = updated;
     board.removeWaitlist(groupId, participantUserId);
@@ -297,16 +299,18 @@ class FakeGroupRepository implements GroupRepository {
           kind: NoticeKind.partySeat,
           title: 'Vaga reservada',
           body:
-              '$leaderName reservou sua vaga em ${current.roomName}. Pague a sua parte para confirmar. Nada é cobrado se o grupo não fechar.',
+              '$leaderName reservou sua vaga em ${current.roomName}. Pague a sua parte para confirmar. Nada é cobrado se o grupo não confirmar.',
           at: clock.now(),
           groupId: current.id,
           scope: 'party-${current.id}-${person.id}',
         );
       }
     }
-    final updated = current.copyWith(
-      participants: people,
-      filledSpots: _occupied(people),
+    final updated = await _confirmIfReady(
+      current.copyWith(
+        participants: people,
+        filledSpots: _occupied(people),
+      ),
     );
     _database.groups[index] = updated;
     return JoinSuccess(updated);
@@ -483,9 +487,7 @@ class FakeGroupRepository implements GroupRepository {
             : PaymentStatus.reserved,
       ),
     );
-    if (updated.filledSpots >= updated.totalSpots) {
-      updated = await _captureClosed(updated);
-    }
+    updated = await _confirmIfReady(updated);
     _database.groups[index] = updated;
     return PayShareSuccess(updated);
   }
@@ -517,17 +519,7 @@ class FakeGroupRepository implements GroupRepository {
         CloseGroupFailureReason.alreadyPlannedSize,
       );
     }
-    if (!GroupRules.canCloseWithFewer(
-      seated: seated,
-      roomMinimum: current.minimumSpots,
-      planned: current.totalSpots,
-    )) {
-      return const CloseGroupFailure(CloseGroupFailureReason.belowRoomMinimum);
-    }
-    final resized = current.copyWith(totalSpots: seated);
-    final closed = await _captureClosed(resized);
-    _database.groups[index] = closed;
-    return CloseGroupSuccess(closed);
+    return const CloseGroupFailure(CloseGroupFailureReason.staysOpen);
   }
 
   @override
@@ -550,10 +542,13 @@ class FakeGroupRepository implements GroupRepository {
       );
     }
 
-    final validation = GroupRules.validateGroupSize(
-      extraSpots: request.extraSpots,
+    final maximumPlayers = 1 + request.extraSpots;
+    final minimumPlayers = request.minimumPlayers ?? maximumPlayers;
+    final validation = GroupRules.validatePlayerBand(
+      minimumPlayers: minimumPlayers,
+      maximumPlayers: maximumPlayers,
+      roomMinimum: room.minimumPlayers,
       roomCapacity: room.capacity,
-      minimumPlayers: room.minimumPlayers,
     );
     switch (validation) {
       case GroupSizeValidation.belowMinimum:
@@ -670,9 +665,10 @@ class FakeGroupRepository implements GroupRepository {
       slotId: slot.id,
       startsAt: slot.startsAt,
       filledSpots: seated.length,
-      totalSpots: 1 + request.extraSpots,
+      totalSpots: maximumPlayers,
       priceCents: room.priceCents,
-      minimumSpots: room.minimumPlayers,
+      minimumSpots: minimumPlayers,
+      confirmedAt: seated.length >= minimumPlayers ? now : null,
       cancelWindow: room.cancelWindow,
       streetAddress: house.streetAddress,
       coverAsset: roomCategoryImage(room.category),
@@ -917,6 +913,7 @@ class FakeGroupRepository implements GroupRepository {
     required String actorUserId,
     required int totalSpots,
     required String note,
+    int? minimumSpots,
   }) async {
     await _pause();
     final index = _indexOf(groupId);
@@ -938,11 +935,15 @@ class FakeGroupRepository implements GroupRepository {
       return const EditGroupFailure(EditGroupFailureReason.noteTooLong);
     }
     final occupied = current.occupiedSpots;
+    final minimum = minimumSpots ?? current.minimumSpots;
+    if (minimum < current.roomMinimum || minimum > current.roomCapacity) {
+      return const EditGroupFailure(EditGroupFailureReason.belowRoomMinimum);
+    }
     final validation = GroupRules.validateTotalSpots(
       totalSpots: totalSpots,
       occupiedSpots: occupied,
       roomCapacity: current.roomCapacity,
-      minimumPlayers: current.minimumSpots,
+      minimumPlayers: minimum,
     );
     switch (validation) {
       case TotalSpotsValidation.belowMinimum:
@@ -958,9 +959,12 @@ class FakeGroupRepository implements GroupRepository {
       case TotalSpotsValidation.valid:
         break;
     }
-    final updated = current.copyWith(
-      totalSpots: totalSpots,
-      note: GroupRules.normalizeNote(note),
+    final updated = await _confirmIfReady(
+      current.copyWith(
+        totalSpots: totalSpots,
+        minimumSpots: minimum,
+        note: GroupRules.normalizeNote(note),
+      ),
     );
     _database.groups[index] = updated;
     return EditGroupSuccess(updated);
@@ -988,6 +992,7 @@ class FakeGroupRepository implements GroupRepository {
         portalOwned: portal,
         filledSpots: group.filledSpots,
         minimumSpots: group.minimumSpots,
+        alreadyConfirmed: group.confirmedAt != null,
         closesAt: group.closesAtResolved,
         startsAt: group.startsAt,
         now: now,
@@ -1204,6 +1209,26 @@ class FakeGroupRepository implements GroupRepository {
       );
     }
     return reservation;
+  }
+
+  /// Captura quem já reservou quando o mínimo foi atingido.
+  ///
+  /// Quem entra depois paga e a parte dele é capturada na hora.
+  /// Quem pagou antes não é reajustado.
+  Future<Group> _confirmIfReady(Group group) async {
+    if (group.isCancelled) {
+      return group;
+    }
+    final ready =
+        group.confirmedAt != null || group.filledSpots >= group.minimumSpots;
+    if (!ready) {
+      return group;
+    }
+    final captured = await _captureClosed(group);
+    if (captured.confirmedAt != null) {
+      return captured;
+    }
+    return captured.copyWith(confirmedAt: clock.now());
   }
 
   Future<Group> _captureClosed(Group group) async {

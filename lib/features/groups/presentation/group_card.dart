@@ -50,7 +50,11 @@ class GroupCard extends StatelessWidget {
     assert(now.millisecondsSinceEpoch >= 0);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final spots = GroupMessages.seatCount(group.filledSpots, group.totalSpots);
+    final spots = GroupMessages.playerBand(
+      filled: group.filledSpots,
+      minimum: group.minimumSpots,
+      maximum: group.totalSpots,
+    );
     final seated = [
       for (final person in group.participants)
         if (person.occupiesSeat) person,
@@ -345,7 +349,7 @@ class _StatusPill extends StatelessWidget {
       group.isAlmostFull,
     )) {
       (true, _) => (
-        'Fechado',
+        'Lotado',
         scheme.surfaceContainerHighest,
         scheme.onSurfaceVariant,
         scheme.outline,

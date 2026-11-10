@@ -22,7 +22,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const groupColumns =
     'id, city_id, venue_id, room_id, session_id, starts_at, total_spots, '
     'minimum_spots, price_cents, note, cancel_window_minutes, created_by, '
-    'cancelled_at, cancel_reason, closed_at, closes_at, filled_spots, '
+    'cancelled_at, cancel_reason, confirmed_at, closed_at, closes_at, filled_spots, '
     'confirmed_count';
 
 const memberColumns =
@@ -128,7 +128,7 @@ class SupabaseGroupRepository implements GroupRepository {
     }
     final group = await getById(groupId);
     if (group == null) return const JoinFailure(JoinFailureReason.notFound);
-    if (group.isFull && !group.isCancelled) {
+    if (_shouldSettle(group)) {
       await _settleClosed(groupId);
     }
     return JoinSuccess(group);
@@ -156,7 +156,7 @@ class SupabaseGroupRepository implements GroupRepository {
     }
     final group = await getById(groupId);
     if (group == null) return const JoinFailure(JoinFailureReason.notFound);
-    if (group.isFull && !group.isCancelled) {
+    if (_shouldSettle(group)) {
       await _settleClosed(groupId);
     }
     return JoinSuccess(group);
@@ -262,6 +262,9 @@ class SupabaseGroupRepository implements GroupRepository {
           message: 'Não encontramos esse grupo.',
         );
       }
+      if (_shouldSettle(group)) {
+        await _settleClosed(groupId);
+      }
       return PayShareSuccess(group, charge: charge);
     } on FunctionException catch (error) {
       return PayShareFailure(
@@ -307,6 +310,7 @@ class SupabaseGroupRepository implements GroupRepository {
                 'p_session_id': request.slotId,
                 'p_total_spots': 1 + request.extraSpots,
                 'p_note': '',
+                'p_minimum_spots': request.minimumPlayers,
               },
             )
           : await client.rpc(
@@ -318,6 +322,7 @@ class SupabaseGroupRepository implements GroupRepository {
                 'p_companion_ids': [
                   for (final person in companions) person.userId,
                 ],
+                'p_minimum_spots': request.minimumPlayers,
               },
             );
       final group = await getById(id.toString());
@@ -456,6 +461,7 @@ class SupabaseGroupRepository implements GroupRepository {
     required String actorUserId,
     required int totalSpots,
     required String note,
+    int? minimumSpots,
   }) async {
     try {
       await client.rpc(
@@ -464,6 +470,7 @@ class SupabaseGroupRepository implements GroupRepository {
           'p_group_id': groupId,
           'p_total_spots': totalSpots,
           'p_note': note,
+          'p_minimum_spots': minimumSpots,
         },
       );
     } on PostgrestException catch (error) {
@@ -475,13 +482,17 @@ class SupabaseGroupRepository implements GroupRepository {
     if (group == null) {
       return const EditGroupFailure(EditGroupFailureReason.notFound);
     }
-    if (group.isFull && !group.isCancelled) {
+    if (_shouldSettle(group)) {
       await _settleClosed(groupId);
     }
     return EditGroupSuccess(group);
   }
 
-  /// Captura o cartão quando o grupo enche ou o host fecha com menos.
+  bool _shouldSettle(Group group) {
+    return !group.isCancelled && (group.isConfirmed || group.isFull);
+  }
+
+  /// Captura o cartão quando o grupo confirma ou lota.
   /// Se a chamada falhar, a rotina de reconcile tenta de novo.
   Future<void> _settleClosed(String groupId) async {
     try {
@@ -594,6 +605,7 @@ class SupabaseGroupRepository implements GroupRepository {
       cancelledAt: dateTimeOf(row['cancelled_at']),
       cancelReason: textOf(row['cancel_reason']),
       minimumSpots: intOf(row['minimum_spots'], fallback: 2),
+      confirmedAt: dateTimeOf(row['confirmed_at']),
       closesAt: dateTimeOf(row['closes_at']),
       cancelWindow: Duration(
         minutes: intOf(row['cancel_window_minutes'], fallback: 120),

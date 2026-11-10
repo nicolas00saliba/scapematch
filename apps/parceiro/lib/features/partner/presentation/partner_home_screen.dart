@@ -625,16 +625,18 @@ class _GroupCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final started = !snapshot.now.isBefore(group.startsAt);
-    final closed = group.isFull && !group.isCancelled;
+    final confirmed = group.isConfirmed && !group.isCancelled;
     final badge = group.isCancelled
         ? PartnerMessages.cancelled
-        : closed
+        : group.isFull
         ? PartnerMessages.closedGroup
+        : confirmed
+        ? PartnerMessages.confirmedGroup
         : PartnerMessages.openGroup;
-    final progress = closed
-        ? PartnerMessages.paidOf(group.paidSeats, group.totalSpots)
-        : group.isCancelled
+    final progress = group.isCancelled
         ? PartnerMessages.cancelled
+        : confirmed
+        ? PartnerMessages.paidOf(group.paidSeats, group.totalSpots)
         : PartnerMessages.reservedOf(group.reservedSeats, group.totalSpots);
     final money = snapshot.moneyFor(group.id);
     final people = [

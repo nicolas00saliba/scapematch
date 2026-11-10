@@ -5,6 +5,7 @@ import {
   isAsaasSandbox,
   tokensMatch,
 } from "../_shared/asaas_provider.ts";
+import { bandConfirmed } from "../_shared/group_band.ts";
 import { bindJson } from "../_shared/http.ts";
 import {
   cancelInvoicesForCharge,
@@ -130,16 +131,16 @@ async function groupIsClosed(
 ): Promise<boolean> {
   const { data: group } = await admin
     .from("groups")
-    .select("closed_at, total_spots, minimum_spots, cancelled_at")
+    .select(
+      "cancelled_at, confirmed_at, closed_at, total_spots, minimum_spots",
+    )
     .eq("id", groupId)
     .maybeSingle();
-  if (!group || group.cancelled_at) return false;
+  if (!group) return false;
   const { count } = await admin
     .from("group_members")
     .select("id", { count: "exact", head: true })
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
-  const filled = count ?? 0;
-  const closed = Boolean(group.closed_at) || filled >= group.total_spots;
-  return closed && filled >= group.minimum_spots;
+  return bandConfirmed(group, count ?? 0);
 }

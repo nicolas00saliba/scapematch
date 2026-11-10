@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
-/// Contador N/Z, faixa da sala e o que falta para o host fechar.
+/// Faixa do host e o status: falta confirmar, confirmado ou lotado.
 ///
-/// Na grade da Home no site ([dense]), ficam só o contador, a barra
-/// e o que falta para fechar.
+/// Na grade da Home no site ([dense]), ficam a faixa, a barra e o status.
 class GroupSeatFacts extends StatelessWidget {
   const GroupSeatFacts({
     super.key,
@@ -27,7 +26,17 @@ class GroupSeatFacts extends StatelessWidget {
     final progress = group.totalSpots == 0
         ? 0.0
         : (group.filledSpots / group.totalSpots).clamp(0, 1).toDouble();
-    final count = GroupMessages.seatCount(group.filledSpots, group.totalSpots);
+    final count = GroupMessages.playerBand(
+      filled: group.filledSpots,
+      minimum: group.minimumSpots,
+      maximum: group.totalSpots,
+    );
+    final status = GroupMessages.bandStatus(
+      filled: group.filledSpots,
+      minimum: group.minimumSpots,
+      maximum: group.totalSpots,
+      confirmed: group.isConfirmed,
+    );
     final bar = ClipRRect(
       borderRadius: BorderRadius.circular(99),
       child: LinearProgressIndicator(
@@ -38,34 +47,20 @@ class GroupSeatFacts extends StatelessWidget {
       ),
     );
     if (dense) {
+      final line = theme.textTheme.bodySmall?.copyWith(
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.2,
+        height: 1.15,
+      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                count,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  GroupMessages.spotsUntilClose(group.spotsUntilClose),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.secondary,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-            ],
+          Text(count, maxLines: 1, overflow: TextOverflow.ellipsis, style: line),
+          Text(
+            status,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: line?.copyWith(color: scheme.secondary),
           ),
           const SizedBox(height: 4),
           bar,
@@ -102,15 +97,9 @@ class GroupSeatFacts extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: secondary,
         ),
-        Text(
-          GroupMessages.hostTarget(group.totalSpots),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: secondary,
-        ),
         const SizedBox(height: 2),
         Text(
-          GroupMessages.spotsUntilClose(group.spotsUntilClose),
+          status,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodyMedium?.copyWith(

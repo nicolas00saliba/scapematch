@@ -131,7 +131,7 @@ void main() {
 
     expect(_cards, findsOneWidget);
     expect(find.byKey(AppKeys.groupCard(live.id)), findsOneWidget);
-    expect(find.text('Falta 1 para fechar'), findsWidgets);
+    expect(find.text('Falta 1 para confirmar'), findsWidgets);
     expect(find.text('Sessão já começou'), findsNothing);
     expect(find.byKey(AppKeys.groupCard(waiting.id)), findsNothing);
     expect(find.byKey(AppKeys.groupCard(crowded.id)), findsNothing);

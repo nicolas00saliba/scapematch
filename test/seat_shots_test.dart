@@ -60,6 +60,20 @@ void main() {
     await tester.pumpAndSettle();
     await _shot(tester, dir, 'grupo-aberto-412.png', size, find.text('Vagas'));
 
+    GoRouter.of(tester.element(find.byType(Scaffold).first))
+        .go('/groups/${SampleIds.groupSpMetroAlmost}');
+    await tester.pumpAndSettle();
+    expect(find.text('Confirmado — ainda cabe 1'), findsWidgets);
+    await tester.drag(find.text('Vagas'), const Offset(0, -240));
+    await tester.pumpAndSettle();
+    await _shot(
+      tester,
+      dir,
+      'grupo-confirmado-412.png',
+      size,
+      find.text('Vagas'),
+    );
+
     GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.createGroup));
@@ -77,12 +91,17 @@ void main() {
       200,
       scrollable: verticalScrollable,
     );
+    await tester.tap(find.byKey(AppKeys.extraSpotsIncrement));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.extraSpotsIncrement));
+    await tester.pumpAndSettle();
+    expect(find.text('6'), findsWidgets);
     await _shot(
       tester,
       dir,
       'criar-412.png',
       size,
-      find.text('Pessoas para fechar'),
+      find.text('Mínimo e máximo'),
     );
 
     GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/');
@@ -132,7 +151,7 @@ void main() {
     GoRouter.of(tester.element(find.byType(Scaffold).first))
         .go('/groups/${SampleIds.groupCwbCofreAlmost}');
     await tester.pumpAndSettle();
-    expect(find.text('Grupo fechado'), findsWidgets);
+    expect(find.text('Lotado'), findsWidgets);
     await tester.drag(find.text('Vagas'), const Offset(0, -240));
     await tester.pumpAndSettle();
     await _shot(tester, dir, 'grupo-fechado-412.png', size, find.text('Vagas'));

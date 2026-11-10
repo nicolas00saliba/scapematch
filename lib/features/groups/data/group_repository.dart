@@ -121,5 +121,6 @@ abstract class GroupRepository {
     required String actorUserId,
     required int totalSpots,
     required String note,
+    int? minimumSpots,
   });
 }

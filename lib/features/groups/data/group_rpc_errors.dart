@@ -132,6 +132,9 @@ CloseGroupFailureReason closeFailure(String text) {
   if (text.contains('already planned')) {
     return CloseGroupFailureReason.alreadyPlannedSize;
   }
+  if (text.contains('stays open')) {
+    return CloseGroupFailureReason.staysOpen;
+  }
   return CloseGroupFailureReason.notFound;
 }
 

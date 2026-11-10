@@ -1,5 +1,13 @@
 # Decisões provisórias
 
+## O host escolhe o mínimo e o máximo
+
+- **Data:** 2026-11-10
+- **Decisão:** o grupo deixa de ter um alvo exato Z. Na criação o host escolhe um mínimo e um máximo, os dois dentro da faixa da sala, com mínimo menor ou igual ao máximo. Os dois podem ser iguais. Ao atingir o mínimo o jogo confirma: a cobrança que antes acontecia ao lotar passa a acontecer aqui, com a mesma Pix, cartão, pré-autorização, reserva do horário e prazo. O grupo continua aberto até o máximo. Quem entra depois paga a própria parte na hora. O preço é por pessoa: quem já pagou não recebe reembolso nem reajuste. No máximo o grupo lota e a lista de espera vale a partir daí. Se o prazo vence sem o mínimo, o grupo não confirma: cancela, estorna e libera a pré-autorização. Não há mais “fechar com menos gente”.
+- **Migração:** grupos que já existiam tinham o alvo Z em `total_spots` e o mínimo da sala em `minimum_spots`. A opção segura é `minimum_spots = total_spots`. O grupo continua confirmando e lotando no mesmo número, sem abrir vaga nova e sem capturar antes. `confirmed_at` recebe `closed_at` quando o grupo já estava fechado. Efeito colateral: o prazo desses grupos passa a exigir Z, não só o mínimo da sala. Quem estava entre o mínimo da sala e Z−1 e perder o prazo é liberado, em vez de seguir aberto para um fechamento manual.
+- **Onde está no código:** `groups.confirmed_at`, `private.mark_group_bounds`, `create_group` / `edit_group` com `p_minimum_spots`, `supabase/functions/_shared/group_band.ts`. O app mostra “N jogadores · mín. A · máx. B” e os status “Faltam K para confirmar”, “Confirmado — ainda cabem K” e “Lotado”.
+- **Como trocar depois:** esta migração (`20261110180000_group_player_band.sql`) não foi aplicada no projeto remoto. As funções `settle-charges`, `reconcile-payments`, `create-charge` e `asaas-webhook` precisam ser publicadas junto com ela. O helper de nota em `_shared/issue_invoices.ts` vai junto, porque a nota também espera a confirmação. Sem isso o banco confirma e o servidor ainda espera o grupo lotar para capturar.
+
 ## Scape Points saem da comissão, 1 ponto = R$ 0,01
 
 - **Data:** 2026-11-08

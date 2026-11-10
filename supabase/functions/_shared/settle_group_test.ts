@@ -22,10 +22,12 @@ type Charge = {
 
 function adminFor(options: {
   closed?: boolean;
+  confirmed?: boolean;
   cancelled?: boolean;
   filled?: number;
   total?: number;
   minimum?: number;
+  closesAt?: string;
   charges: Charge[];
   claim?: () => boolean;
   member?: string | null;
@@ -68,8 +70,9 @@ function adminFor(options: {
               created_by: options.creator ?? userId,
               venue_id: venueId,
               cancelled_at: options.cancelled ? "2026-11-06T10:00:00Z" : null,
+              confirmed_at: options.confirmed ? "2026-11-06T10:00:00Z" : null,
               closed_at: options.closed ? "2026-11-06T10:00:00Z" : null,
-              closes_at: "2026-11-07T10:00:00Z",
+              closes_at: options.closesAt ?? "2026-11-07T10:00:00Z",
               total_spots: options.total ?? 4,
               minimum_spots: options.minimum ?? 2,
             },
@@ -230,6 +233,8 @@ Deno.test("grupo ainda aberto não captura", async () => {
     closed: false,
     filled: 2,
     total: 4,
+    minimum: 4,
+    closesAt: "2099-11-07T10:00:00Z",
     charges,
   });
   const captures: string[] = [];
@@ -301,6 +306,22 @@ Deno.test("migração não expõe a trava nem cria segredo novo", async () => {
   assert(sql.includes("revoke select (capture_claimed_at)"));
   assertEquals(sql.includes("service_role_key"), false);
   assertEquals(sql.includes("alter table vault"), false);
+});
+
+Deno.test("grupo confirmado captura mesmo sem lotar", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    confirmed: true,
+    closed: false,
+    filled: 2,
+    total: 4,
+    minimum: 2,
+    charges,
+  });
+  const captures: string[] = [];
+  await settleGroup(admin, provider("AUTHORIZED", captures), groupId);
+  assertEquals(captures.length, 1);
+  assertEquals(charges[0].status, "paid");
 });
 
 Deno.test("membro liquida grupo fechado e não o grupo aberto", async () => {

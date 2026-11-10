@@ -84,16 +84,16 @@ abstract final class PartnerMessages {
   static const noShows = 'Faltas';
   static const balanceTitle = 'Saldo da casa';
   static const balanceBody =
-      'O líquido é o que fica com a casa depois da comissão. O valor reservado só entra quando o grupo fecha.';
+      'O líquido é o que fica com a casa depois da comissão. O valor reservado só entra quando o grupo confirma.';
   static const netLabel = 'Líquido';
   static const grossLabel = 'Bruto';
   static const commissionLabel = 'Comissão';
   static const reservedLabel = 'Reservado';
   static const reservedBody =
-      'Ainda não entrou no saldo. Se o grupo não fechar, o valor é liberado e nada é cobrado.';
+      'Ainda não entrou no saldo. Se o grupo não confirmar, o valor é liberado e nada é cobrado.';
   static const statement = 'Extrato';
   static const statementEmpty =
-      'Nenhuma captura ainda. Quando um grupo fecha, o valor aparece aqui.';
+      'Nenhuma captura ainda. Quando um grupo confirma, o valor aparece aqui.';
   static const capture = 'Captura';
   static const refund = 'Estorno';
   static const reservationsTitle = 'Reservas e grupos';
@@ -121,7 +121,9 @@ abstract final class PartnerMessages {
   static const pastSlots = 'horários já encerrados';
   static const noFutureSlots = 'Nenhum horário futuro nesta sala.';
   static const openGroup = 'Aberto';
-  static const closedGroup = 'Fechado';
+  static const confirmedGroup = 'Confirmado';
+  static const fullGroup = 'Lotado';
+  static const closedGroup = 'Lotado';
   static const cancelled = 'Cancelado';
 
   static String reservedOf(int reserved, int total) {

@@ -375,7 +375,7 @@ class CommunityBoard {
           kind: NoticeKind.paymentDeadline,
           title: 'Prazo do grupo perto',
           body:
-              'O prazo para fechar ${group.roomName} está perto. Nada é cobrado nesta versão.',
+              'O prazo para confirmar ${group.roomName} está perto. Nada é cobrado nesta versão.',
           at: now,
           groupId: group.id,
         );

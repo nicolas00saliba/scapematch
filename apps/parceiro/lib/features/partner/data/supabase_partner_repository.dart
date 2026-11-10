@@ -575,6 +575,7 @@ Group _group(
     cancelledAt: dateTimeOf(row['cancelled_at']),
     cancelReason: textOf(row['cancel_reason']),
     minimumSpots: intOf(row['minimum_spots'], fallback: 2),
+    confirmedAt: dateTimeOf(row['confirmed_at']),
     closesAt: dateTimeOf(row['closes_at']),
     cancelWindow: Duration(
       minutes: intOf(row['cancel_window_minutes'], fallback: 120),

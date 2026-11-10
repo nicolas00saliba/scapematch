@@ -62,8 +62,8 @@ tool/apply_auth_email_templates.sh
 - O jogador anônimo lê cidade e o que é de casa aprovada. Em `venues`, não lê `document_number`, `phone`, `income_value`, `asaas_wallet_id`, `referred_by`, `reviewed_by`, `invite_id` nem `owner_id`. O catálogo usa a view `venues_vitrine` (o `select *` na tabela falha para o anon). Grupo, cadeira e falta não têm `insert` direto.
 - Quem está logado também não lê documento, telefone, renda, wallet nem quem indicou. O dono ou um admin lê isso em `venue_private`. A Edge Function lê a tabela com `service_role`. O logado continua vendo `owner_id`.
 - `delete_group` recusa quando falta menos de 2 horas para o início. No instante exato das 2 horas ainda exclui.
-- `close_group_with_fewer` só fecha se N ≥ mínimo da sala e N < tamanho planejado.
-- O Pix é cobrado na hora (`billingType PIX`) e estornado se o grupo não fechar. O cartão nasce com `authorizeOnly` e só é capturado quando o grupo fecha; se não fechar, a reserva é estornada.
+- `close_group_with_fewer` não encolhe mais o grupo. A confirmação é automática no mínimo do host e o grupo segue aberto até o máximo.
+- O Pix é cobrado na hora (`billingType PIX`) e estornado se o grupo não confirmar. O cartão nasce com `authorizeOnly` e só é capturado quando o grupo atinge o mínimo; se o prazo vence sem o mínimo, a reserva é estornada. Quem entra depois do mínimo paga a própria parte na hora.
 - O split manda `(100% − comissão)` para `venues.asaas_wallet_id`. A comissão é `platform_settings.commission_bps` (padrão 1000, 10%) e fica na conta Asaas que cria a cobrança.
 - Scape Points (`20261108140000_scape_points.sql`, `20261108150000_payer_cpf_gate.sql`, `20261108160000_referral_payer_antifraud.sql` e `20261108170000_modelo2_complete.sql`) lançam a indicação quando a cobrança fica paga. Pagamento por terceiro libera. O pagador que é o próprio indicador não gera a indicação dele. O mesmo pagador premia no máximo 3 contas. Contas do mesmo indicador no mesmo aparelho ficam `em_revisao`. O desconto de 20% da primeira reserva qualificada sai da comissão e abaixa só a parte do jogador. O crédito B2C/B2B libera em 30 dias e entra no split da próxima cobrança da casa. O cashback de 1% (`cashback_bps`) entra em toda reserva paga, sem as travas do pagador, e também sai da comissão. A casa não perde líquido. O cron de reconcile libera o que completou 30 dias e não está em revisão. O app não escreve no ledger.
 
@@ -76,9 +76,9 @@ A implementação é `AsaasProvider` em `supabase/functions/_shared/asaas_provid
 | `provision-venue-wallet` | admin | Cria a subconta (`POST /v3/accounts`) e grava só o `walletId`. A `apiKey` da subconta não é salva. |
 | `tokenize-card` | jogador autenticado | Única função que recebe número, CVV e validade. O IP sai do header da borda, nunca do body. Antes do Asaas, `private.claim_card_tokenize_attempt` (só service role) registra a tentativa e recusa com 429 no 6º cartão ou na 6ª tentativa da hora. Grava o token cifrado por `insert_saved_card` e devolve só `saved_card_id`, `last4` e a bandeira. |
 | `create-charge` | jogador do grupo | Pix com QR, ou cartão com `authorizeOnly` a partir de `saved_card_id`. O token é lido por `load_owned_card`. Recusa número, CVV e validade. O percentual do split sai da tabela de comissão, não do celular. `points` opcional abate a parte do jogador e reserva o saldo antes do Asaas. |
-| `settle-charges` | host, casa ou admin | Grupo fechado: captura o cartão e lança o extrato. Grupo que não fechou: estorna Pix pago e cancela a autorização do cartão. |
+| `settle-charges` | host, casa ou admin | Grupo confirmado no mínimo: captura o cartão e lança o extrato. Prazo sem o mínimo: estorna Pix pago e cancela a autorização do cartão. |
 | `cancel-house-group` | dono da casa ou admin | Cancela o grupo (`house_cancel_group`) e, com a service role, estorna o Pix ou cancela a autorização. `refunded` só depois da resposta da API ou do webhook. |
-| `asaas-webhook` | não | Exige o header `asaas-access-token` igual a `ASAAS_WEBHOOK_TOKEN`. Quando a cobrança fica paga e o grupo está fechado, emite as NFS-e. |
+| `asaas-webhook` | não | Exige o header `asaas-access-token` igual a `ASAAS_WEBHOOK_TOKEN`. Quando a cobrança fica paga e o grupo já confirmou, emite as NFS-e. |
 | `configure-venue-fiscal` | dono ou admin | Grava inscrição municipal, código de serviço e alíquota. Casa com CPF fica `sem_emissao`. Com a chave da subconta, chama `POST /v3/fiscalInfo`. A senha da prefeitura não é gravada. |
 | `invoice-document` | dono, jogador ou admin | Baixa PDF ou XML da nota que o RLS deixa ver. No sandbox o arquivo é de teste. Não usa service role. |
 
@@ -133,7 +133,7 @@ O Asaas não oferece SDK de navegador para tokenizar o cartão. Quem recebe núm
 
 ## NFS-e
 
-Por reserva paga e com o grupo fechado, nascem duas linhas em `fiscal_invoices`. A subconta da casa emite a NFS-e do serviço para o jogador (`POST /v3/invoices` e em seguida `/authorize`). A conta raiz emite só a NFS-e da comissão, contra a casa. Casa com CPF recebe o split e a nota de serviço fica `sem_emissao`. CNPJ ou MEI sem inscrição municipal, código de serviço ou alíquota de ISS também fica sem emissão.
+Por reserva paga e com o grupo confirmado, nascem duas linhas em `fiscal_invoices`. A subconta da casa emite a NFS-e do serviço para o jogador (`POST /v3/invoices` e em seguida `/authorize`). A conta raiz emite só a NFS-e da comissão, contra a casa. Casa com CPF recebe o split e a nota de serviço fica `sem_emissao`. CNPJ ou MEI sem inscrição municipal, código de serviço ou alíquota de ISS também fica sem emissão.
 
 No sandbox (`ASAAS_BASE_URL` com `api-sandbox.asaas.com`) a função não chama `/v3/invoices`. Ela grava status `simulated`, um número `TESTE-…` e links de PDF e XML. Em produção, troque `ASAAS_API_KEY` e `ASAAS_BASE_URL` para `https://api.asaas.com/v3`. A configuração fiscal da plataforma, se quiser outra que não o padrão, entra em `ASAAS_FISCAL_SERVICE_CODE`, `ASAAS_FISCAL_SERVICE_NAME` e `ASAAS_FISCAL_ISS`.
 

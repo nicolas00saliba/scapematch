@@ -93,6 +93,28 @@ class GroupRules {
     return needed;
   }
 
+  /// Mínimo e máximo do host, os dois dentro da faixa da sala.
+  static GroupSizeValidation validatePlayerBand({
+    required int minimumPlayers,
+    required int maximumPlayers,
+    required int roomMinimum,
+    required int roomCapacity,
+  }) {
+    if (minimumPlayers < minGroupSize || maximumPlayers < minGroupSize) {
+      return GroupSizeValidation.belowMinimum;
+    }
+    if (minimumPlayers > maximumPlayers) {
+      return GroupSizeValidation.belowMinimum;
+    }
+    if (minimumPlayers < roomMinimum || maximumPlayers < roomMinimum) {
+      return GroupSizeValidation.belowRoomMinimum;
+    }
+    if (minimumPlayers > roomCapacity || maximumPlayers > roomCapacity) {
+      return GroupSizeValidation.exceedsRoomCapacity;
+    }
+    return GroupSizeValidation.valid;
+  }
+
   static GroupSizeValidation validateGroupSize({
     required int extraSpots,
     required int roomCapacity,
@@ -247,11 +269,12 @@ class GroupRules {
     required bool portalOwned,
     required int filledSpots,
     required int minimumSpots,
+    bool alreadyConfirmed = false,
     required DateTime closesAt,
     required DateTime startsAt,
     required DateTime now,
   }) {
-    if (alreadyCancelled || portalOwned) {
+    if (alreadyCancelled || portalOwned || alreadyConfirmed) {
       return false;
     }
     // Sessão já começada não vira "não fechou": ela só não aceita mais gente.

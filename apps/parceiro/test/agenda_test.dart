@@ -120,7 +120,7 @@ void main() {
       isNotEmpty,
     );
     final missed = snap.groups.firstWhere((group) => group.id == 'grp-cwb-cofre-missed');
-    expect(missed.cancelReason, 'O grupo não fechou a tempo');
+    expect(missed.cancelReason, 'O grupo não confirmou a tempo');
     final clockOf = <String, DateTime>{};
     for (final group in snap.groups) {
       final key = '${group.roomId}|${group.startsAt.toIso8601String()}';

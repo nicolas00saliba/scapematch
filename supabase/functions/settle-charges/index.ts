@@ -37,7 +37,9 @@ Deno.serve(async (req) => {
       const { data: groups } = await admin
         .from("groups")
         .select("id")
-        .or("cancelled_at.not.is.null,closed_at.not.is.null");
+        .or(
+          "cancelled_at.not.is.null,confirmed_at.not.is.null,closed_at.not.is.null",
+        );
       for (const group of groups ?? []) ids.push(group.id as string);
     } else if (body.group_id) {
       ids.push(body.group_id);

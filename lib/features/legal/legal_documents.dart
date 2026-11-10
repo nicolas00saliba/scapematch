@@ -14,7 +14,7 @@ Ao criar a conta você confirma que leu este rascunho, a política de privacidad
 
 Menores de 18 anos não criam conta. Menores só jogam acompanhados de um responsável, em regra provisória.
 
-Você paga só a sua parte. A cobrança é confirmada quando o grupo fecha. Enquanto o grupo está aberto, o Pix ainda não é liquidado como receita da sessão e o cartão fica só autorizado. Se o grupo não fechar, o Pix pago é estornado e a autorização do cartão não é capturada.
+Você paga só a sua parte. A cobrança é confirmada quando o grupo atinge o mínimo. Enquanto o grupo não confirma, o Pix ainda não é liquidado como receita da sessão e o cartão fica só autorizado. Se o grupo não confirmar, o Pix pago é estornado e a autorização do cartão não é capturada. Quem entra depois paga a própria parte na hora, sem reajuste de quem já pagou.
 
 A nota fiscal do serviço, quando a casa emite, é da casa para você. A comissão da intermediação é uma nota à parte, da EscapeMatch para a casa, e não aparece como nota sua.
 
@@ -36,7 +36,7 @@ Esta política descreve, em rascunho, o tratamento de dados pessoais pelo Escape
 
 Dados coletados. Do jogador: nome, e-mail, senha (guardada pelo provedor de conta, não em texto puro no app), data de nascimento, cidade, participação em grupos e o estado do pagamento da parte (sem número completo de cartão, validade ou código de segurança). Da casa: nome, documento (CPF ou CNPJ), telefone, endereço, renda informada para a subconta de pagamento e, quando houver, inscrição municipal, código de serviço e alíquota de ISS. Também ficam o aceite dos termos (versão e data) e os identificadores das notas fiscais emitidas.
 
-Finalidade. Criar e manter a conta, formar o grupo, cobrar só a parte de cada pessoa quando o grupo fecha, estornar o que a política de cancelamento manda devolver, emitir ou registrar a nota fiscal, avisar sobre a sessão e cumprir obrigação legal.
+Finalidade. Criar e manter a conta, formar o grupo, cobrar só a parte de cada pessoa quando o grupo confirma, estornar o que a política de cancelamento manda devolver, emitir ou registrar a nota fiscal, avisar sobre a sessão e cumprir obrigação legal.
 
 Base. Execução do contrato de intermediação, obrigação legal (incluindo documento fiscal, quando couber) e, para avisos opcionais, o consentimento que você pode retirar.
 
@@ -50,15 +50,15 @@ Nesta demonstração, parte dos dados ainda fica só no aparelho. Quando a conta
 ''';
 
   static const refundBody = '''
-Você só é cobrado se o grupo fechar.
+Você só é cobrado se o grupo confirmar.
 
-Pix. Se o grupo não atingir o mínimo até o prazo, ou se for cancelado antes de fechar, o Pix que já tiver sido pago é estornado. A tela avisa que o valor foi liberado.
+Pix. Se o grupo não atingir o mínimo até o prazo, ou se for cancelado antes de confirmar, o Pix que já tiver sido pago é estornado. A tela avisa que o valor foi liberado.
 
-Cartão. A autorização não é capturada enquanto o grupo está aberto. Se o grupo não fechar, a autorização é cancelada e nada é cobrado no cartão. Se o grupo fechar, a captura acontece e a parte entra no extrato da casa, já com a comissão da intermediação separada.
+Cartão. A autorização não é capturada enquanto o grupo não confirma. Se o grupo não confirmar, a autorização é cancelada e nada é cobrado no cartão. Se o grupo confirmar, a captura acontece e a parte entra no extrato da casa, já com a comissão da intermediação separada.
 
 Cancelamento pelo jogador. Cada casa define a antecedência mínima. Sair dentro dessa janela, antes do início, devolve o que já tiver sido capturado. Sair depois da janela não devolve. O organizador pode excluir o grupo até 2 horas antes do início. No instante exato das 2 horas ainda pode. A exclusão libera a reserva ou reembolsa o que já foi capturado.
 
-Arrependimento. Nas compras feitas fora do estabelecimento, o Código de Defesa do Consumidor (art. 49) prevê o direito de arrependimento em 7 dias a contar da contratação, enquanto o serviço não tiver sido usufruído. Como a sessão tem data marcada, a aplicação desse prazo a um horário já reservado precisa da revisão do advogado. Até lá, a janela prática desta versão é a da casa e a regra de o grupo não fechar.
+Arrependimento. Nas compras feitas fora do estabelecimento, o Código de Defesa do Consumidor (art. 49) prevê o direito de arrependimento em 7 dias a contar da contratação, enquanto o serviço não tiver sido usufruído. Como a sessão tem data marcada, a aplicação desse prazo a um horário já reservado precisa da revisão do advogado. Até lá, a janela prática desta versão é a da casa e a regra de o grupo não confirmar.
 
 Não confirmar presença não conta como falta. A falta sem aviso é marcada pela casa. A primeira falta avisa. A terceira pode bloquear novas entradas por um tempo. Os dois números são configuração, não estão escritos neste texto.
 

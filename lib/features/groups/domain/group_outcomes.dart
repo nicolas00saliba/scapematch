@@ -171,6 +171,7 @@ enum CloseGroupFailureReason {
   sessionStarted,
   belowRoomMinimum,
   alreadyPlannedSize,
+  staysOpen,
 }
 
 enum DeleteGroupFailureReason {

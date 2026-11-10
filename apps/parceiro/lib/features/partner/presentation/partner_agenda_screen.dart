@@ -1106,7 +1106,11 @@ class _EventBlock extends StatelessWidget {
     final time = _hm(event.startsAt.hour, event.startsAt.minute);
     final detail = group == null
         ? PartnerMessages.free
-        : '${group.filledSpots}/${group.totalSpots}';
+        : GroupMessages.playerBand(
+            filled: group.filledSpots,
+            minimum: group.minimumSpots,
+            maximum: group.totalSpots,
+          );
     return Material(
       key: PartnerKeys.agendaBlock(event.id),
       color: background,
@@ -1526,7 +1530,7 @@ class _SessionSheet extends ConsumerWidget {
             Text(formatSession(group.startsAt)),
             const SizedBox(height: 8),
             Text(
-              '${_statusOf(group)} · ${group.filledSpots}/${group.totalSpots}',
+              '${_statusOf(group)} · ${GroupMessages.playerBand(filled: group.filledSpots, minimum: group.minimumSpots, maximum: group.totalSpots)}',
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             Text(
@@ -2001,7 +2005,10 @@ String _statusOf(Group group) {
     return PartnerMessages.cancelled;
   }
   if (group.isFull) {
-    return PartnerMessages.closedGroup;
+    return PartnerMessages.fullGroup;
+  }
+  if (group.isConfirmed) {
+    return PartnerMessages.confirmedGroup;
   }
   return PartnerMessages.openGroup;
 }

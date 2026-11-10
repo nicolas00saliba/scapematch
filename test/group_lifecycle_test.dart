@@ -47,8 +47,13 @@ void main() {
       expect(forming.phaseAt(now), GroupPhase.forming);
       expect(forming.spotsUntilClose, 6);
       expect(
-        GroupMessages.phaseLabel(forming.phaseAt(now), missing: 4),
-        'Faltam 4 para fechar',
+        GroupMessages.phaseLabel(
+          forming.phaseAt(now),
+          filled: forming.filledSpots,
+          minimum: forming.minimumSpots,
+          maximum: forming.totalSpots,
+        ),
+        'Faltam 4 para confirmar',
       );
 
       final ready = _group(
@@ -71,8 +76,14 @@ void main() {
         isFalse,
       );
       expect(
-        GroupMessages.phaseLabel(closed.phaseAt(now), missing: 0),
-        'Grupo fechado',
+        GroupMessages.phaseLabel(
+          closed.phaseAt(now),
+          filled: closed.filledSpots,
+          minimum: closed.minimumSpots,
+          maximum: closed.totalSpots,
+          confirmed: closed.isConfirmed,
+        ),
+        'Lotado',
       );
       expect(
         GroupRules.validateGroupSize(
@@ -243,7 +254,7 @@ void main() {
       tester,
       overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
     );
-    expect(find.text('Falta 1 para fechar'), findsWidgets);
+    expect(find.text('Falta 1 para confirmar'), findsWidgets);
     expect(find.text('Sessão já começou'), findsNothing);
     expect(find.text('Quase cheios'), findsNothing);
   });
@@ -311,8 +322,8 @@ void main() {
     expect(find.byKey(AppKeys.openMaps), findsOneWidget);
     expect(find.byKey(AppKeys.openWaze), findsOneWidget);
     expect(find.textContaining('Rua de exemplo'), findsOneWidget);
-    expect(find.text('Falta 1 para fechar'), findsOneWidget);
-    expect(find.textContaining('Prazo para fechar'), findsOneWidget);
+    expect(find.text('Falta 1 para confirmar'), findsOneWidget);
+    expect(find.textContaining('Prazo para confirmar'), findsOneWidget);
   });
 
   test('copyWith can clear the close deadline and the portal phase', () {
@@ -338,10 +349,12 @@ void main() {
     expect(
       GroupMessages.phaseLabel(
         forming.phaseAt(now),
-        missing: forming.spotsUntilClose,
+        filled: forming.filledSpots,
+        minimum: forming.minimumSpots,
+        maximum: forming.totalSpots,
         started: true,
       ),
-      GroupMessages.spotsUntilClose(forming.spotsUntilClose),
+      'Faltam 4 para confirmar',
     );
     expect(forming.showCloseDeadline(now), isFalse);
   });
@@ -797,7 +810,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(GroupMessages.missedCloseBanner), findsOneWidget);
       expect(find.text(GroupMessages.cancelledBanner), findsNothing);
-      expect(find.textContaining('Prazo para fechar'), findsNothing);
+      expect(find.textContaining('Prazo para confirmar'), findsNothing);
     },
   );
 

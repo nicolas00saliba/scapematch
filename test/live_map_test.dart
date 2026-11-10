@@ -104,7 +104,7 @@ void main() {
     );
     final rua = pins.singleWhere((pin) => pin.house.id == 'cwb-rua-xv');
     final batel = pins.singleWhere((pin) => pin.house.id == 'cwb-batel');
-    expect(rua.formingCount, 2);
+    expect(rua.formingCount, 3);
     expect(rua.isForming, isTrue);
     expect(batel.formingCount, 0);
     expect(batel.priceCents, isNotNull);

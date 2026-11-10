@@ -105,7 +105,7 @@ String _prefTitle(NoticeKind kind) {
     NoticeKind.reminder2h => 'Lembrete 2 h antes',
     NoticeKind.paymentDeadline => 'Prazo do grupo perto',
     NoticeKind.waitlistOffer => 'Vaga na lista de espera',
-    NoticeKind.groupClosed => 'Grupo que não fechou',
+    NoticeKind.groupClosed => 'Grupo que não confirmou',
     NoticeKind.noShowWarning => 'Aviso de falta',
     NoticeKind.friendRequest => 'Pedido de amizade',
     NoticeKind.friendAccepted => 'Amizade aceita',

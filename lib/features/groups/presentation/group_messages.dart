@@ -44,7 +44,7 @@ abstract final class GroupMessages {
   static const livePixHint = 'O código Pix vem do Asaas quando você confirma.';
 
   static const livePixNotice =
-      'O Pix é pago agora. Se o grupo não fechar, o valor volta.';
+      'O Pix é pago agora. Se o grupo não confirmar, o valor volta.';
 
   static const livePixReady = 'Pix do Asaas. Escaneie o QR ou copie o código.';
 
@@ -54,7 +54,7 @@ abstract final class GroupMessages {
 
   static const payWithCard = 'Pagar com cartão';
 
-  static const chargeOnlyIfCloses = 'Você só é cobrado se o grupo fechar.';
+  static const chargeOnlyIfCloses = 'Você só é cobrado se o grupo confirmar.';
 
   static const holdReleased = 'Valor liberado, nada foi cobrado';
 
@@ -99,7 +99,7 @@ abstract final class GroupMessages {
 
   static String paymentPolicy({required bool closed, required int hours}) {
     if (!closed) {
-      return 'Se o grupo não fechar, o valor reservado é liberado automaticamente.';
+      return 'Se o grupo não confirmar, o valor reservado é liberado automaticamente.';
     }
     return 'Cancelar com $hours h ou mais de antecedência devolve o pagamento.';
   }
@@ -108,7 +108,7 @@ abstract final class GroupMessages {
 
   static const yourSharePending = 'Sua parte está pendente';
   static const yourShareReserved =
-      'Valor reservado. Você só é cobrado se o grupo fechar.';
+      'Valor reservado. Você só é cobrado se o grupo confirmar.';
   static const yourSharePaid = 'Sua parte está paga';
   static const yourShareReleased = 'Valor liberado, nada foi cobrado';
 
@@ -150,7 +150,7 @@ abstract final class GroupMessages {
       RefundReason.groupDidNotClose =>
         person.payment == PaymentStatus.released
             ? holdReleased
-            : 'Reembolsado · o grupo não fechou até o prazo',
+            : 'Reembolsado · o grupo não confirmou até o prazo',
       RefundReason.holdReleased => holdReleased,
     };
   }
@@ -210,7 +210,7 @@ abstract final class GroupMessages {
       'Esse horário já passou. Escolha um horário que ainda não começou.';
 
   static const tooCloseToStart =
-      'Falta 1 h ou menos para o início. Escolha um horário com mais antecedência, para o grupo ter prazo de fechar.';
+      'Falta 1 h ou menos para o início. Escolha um horário com mais antecedência, para o grupo ter prazo de confirmar.';
 
   static String editFailure(EditGroupFailureReason reason) {
     return switch (reason) {
@@ -350,6 +350,39 @@ abstract final class GroupMessages {
 
   static String seatCount(int filled, int total) => '$filled/$total';
 
+  /// "N jogadores · mín. A · máx. B". Um jogador fica no singular.
+  static String playerBand({
+    required int filled,
+    required int minimum,
+    required int maximum,
+  }) {
+    final people = filled == 1 ? '1 jogador' : '$filled jogadores';
+    return '$people · mín. $minimum · máx. $maximum';
+  }
+
+  static String bandStatus({
+    required int filled,
+    required int minimum,
+    required int maximum,
+    bool confirmed = false,
+  }) {
+    if (filled >= maximum) {
+      return 'Lotado';
+    }
+    if (confirmed || filled >= minimum) {
+      final left = maximum - filled;
+      if (left == 1) {
+        return 'Confirmado — ainda cabe 1';
+      }
+      return 'Confirmado — ainda cabem $left';
+    }
+    final missing = minimum - filled;
+    if (missing <= 1) {
+      return 'Falta 1 para confirmar';
+    }
+    return 'Faltam $missing para confirmar';
+  }
+
   static String roomBounds({required int minimum, required int maximum}) {
     return 'Sala: mín. $minimum · máx. $maximum';
   }
@@ -357,40 +390,50 @@ abstract final class GroupMessages {
   static String hostTarget(int target) => 'Host quer $target para fechar';
 
   static String roomAccepts({
+    required int roomMinimum,
+    required int roomMaximum,
     required int minimum,
     required int maximum,
-    required int target,
   }) {
-    return 'A sala aceita de $minimum a $maximum pessoas. '
-        'O host quer $target; ao chegar em $target, o grupo fecha.';
+    return 'A sala aceita de $roomMinimum a $roomMaximum pessoas. '
+        'O grupo confirma com $minimum e segue aberto até $maximum.';
   }
 
   static String allowedTarget({required int minimum, required int maximum}) {
     return 'A sala aceita de $minimum a $maximum pessoas. '
-        'Escolha quantas fecham o grupo, contando você.';
+        'Escolha o mínimo para confirmar e o máximo, contando você. '
+        'Os dois podem ser iguais.';
   }
 
   static String spotsUntilClose(int missing) {
     if (missing <= 0) {
-      return 'Grupo fechado';
+      return 'Lotado';
     }
     if (missing == 1) {
-      return 'Falta 1 para fechar';
+      return 'Falta 1 para confirmar';
     }
-    return 'Faltam $missing para fechar';
+    return 'Faltam $missing para confirmar';
   }
 
   static String phaseLabel(
     GroupPhase phase, {
-    required int missing,
+    required int filled,
+    required int minimum,
+    required int maximum,
+    bool confirmed = false,
     bool started = false,
   }) {
-    if (phase == GroupPhase.forming && started) {
-      return spotsUntilClose(missing);
+    final status = bandStatus(
+      filled: filled,
+      minimum: minimum,
+      maximum: maximum,
+      confirmed: confirmed || phase == GroupPhase.readyToReserve,
+    );
+    if (started && phase == GroupPhase.forming) {
+      return status;
     }
     return switch (phase) {
-      GroupPhase.forming ||
-      GroupPhase.readyToReserve => spotsUntilClose(missing),
+      GroupPhase.forming || GroupPhase.readyToReserve => status,
       GroupPhase.awaitingHouse => 'Aguardando a casa',
       GroupPhase.confirmed => 'Reserva confirmada',
       GroupPhase.refused => 'A casa recusou',
@@ -399,7 +442,7 @@ abstract final class GroupMessages {
     };
   }
 
-  static String closesAtLabel(String when) => 'Prazo para fechar: $when';
+  static String closesAtLabel(String when) => 'Prazo para confirmar: $when';
 
   static String cancelWindowLabel(int hours) {
     return 'Cancelar com $hours h ou mais de antecedência devolve o pagamento simulado. Menos que isso, não.';
