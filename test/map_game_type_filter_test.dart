@@ -27,6 +27,14 @@ void main() {
     expect(_chip(tester, 'Todos').selected, isTrue);
     expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsOneWidget);
     expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-rpg')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(AppKeys.nearbyCard('grp-cwb-porao-rpg')),
+      200,
+      scrollable: find.descendant(
+        of: find.byKey(AppKeys.mapSheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
     expect(find.byKey(AppKeys.nearbyCard('grp-cwb-porao-rpg')), findsOneWidget);
 
     final map = tester.getRect(find.byType(FlutterMap));

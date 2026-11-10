@@ -182,10 +182,10 @@ void main() {
     expect(phoneCover.width, closeTo(groupCardCoverWidth, 1));
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Convidar'), findsWidgets);
-    expect(find.textContaining('para fechar'), findsWidgets);
+    expect(find.textContaining('para confirmar'), findsWidgets);
     expect(
       find.descendant(of: phoneCard, matching: find.textContaining('mín.')),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.descendant(of: phoneCard, matching: find.byType(PersonAvatar)),
@@ -212,13 +212,13 @@ void main() {
     expect(
       find.descendant(
         of: webCard,
-        matching: find.textContaining('para fechar'),
+        matching: find.textContaining('para confirmar'),
       ),
       findsWidgets,
     );
     expect(
       find.descendant(of: webCard, matching: find.textContaining('mín.')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.descendant(of: webCard, matching: find.textContaining('Host quer')),

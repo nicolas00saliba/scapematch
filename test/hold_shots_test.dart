@@ -74,7 +74,7 @@ Future<void> _flow(
   await tester.tap(find.byKey(AppKeys.payDone));
   await tester.pumpAndSettle();
   await tester.ensureVisible(
-    find.textContaining('reservaram').first,
+    find.textContaining('Confirmado').first,
   );
   await _waitForPhotos(tester);
   await _shot(
@@ -82,7 +82,7 @@ Future<void> _flow(
     dir,
     'grupo-$suffix.png',
     size,
-    find.text('Reservado'),
+    find.text('Pago'),
   );
   await tester.pump(const Duration(seconds: 5));
   await tester.pumpAndSettle();
@@ -111,7 +111,7 @@ Future<void> _flow(
     dir,
     'fechar-off-$suffix.png',
     size,
-    find.text(GroupMessages.roomMinimum(2)),
+    find.textContaining('Falta 1 para confirmar'),
   );
   await _shot(
     tester,
@@ -154,14 +154,15 @@ Future<void> _flow(
     dir,
     'fechar-on-$suffix.png',
     size,
-    find.textContaining('Fechar com'),
+    find.textContaining('Confirmado'),
   );
 
   final closed = await _call(
     tester,
     () => repo.closeWithFewer(withGuest, userId: 'user-local'),
   );
-  expect(closed, isA<CloseGroupSuccess>());
+  expect(closed, isA<CloseGroupFailure>());
+  expect((closed as CloseGroupFailure).reason, CloseGroupFailureReason.staysOpen);
   await _openGroup(tester, withGuest);
   await tester.ensureVisible(find.text('Pago').first);
   await _shot(tester, dir, 'pago-$suffix.png', size, find.text('Pago'));
@@ -187,6 +188,7 @@ Future<String> _create(WidgetTester tester, FakeGroupRepository repo) async {
         roomId: SampleIds.roomPoaEstufa,
         slotId: _openSlot(tester),
         extraSpots: 3,
+        minimumPlayers: 2,
         creatorUserId: 'user-local',
         creatorDisplayName: 'Nícolas',
       ),

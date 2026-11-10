@@ -196,6 +196,7 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
   Future<EditGroupFailureReason?> edit({
     required int totalSpots,
     required String note,
+    int? minimumSpots,
   }) async {
     final user = ref.read(currentUserProvider);
     final result = await ref
@@ -205,6 +206,7 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
           actorUserId: user.id,
           totalSpots: totalSpots,
           note: note,
+          minimumSpots: minimumSpots,
         );
     if (!ref.mounted) {
       return null;

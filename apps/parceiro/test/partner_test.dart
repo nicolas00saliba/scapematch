@@ -237,7 +237,7 @@ void main() {
 
     await tester.tap(find.text(PartnerMessages.done));
     await tester.pumpAndSettle();
-    expect(find.text('Fechado'), findsWidgets);
+    expect(find.text('Lotado'), findsWidgets);
     expect(find.textContaining('· Pago'), findsWidgets);
 
     final olga = '${SampleIds.groupCwbClosed}-p0';
@@ -279,6 +279,11 @@ void main() {
     expect(find.textContaining('Nota de teste'), findsWidgets);
     expect(find.text('Serviço da casa'), findsWidgets);
     expect(find.text('Comissão da EscapeMatch'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.textContaining('Nícolas'),
+      400,
+      scrollable: verticalScrollable,
+    );
     expect(find.textContaining('Nícolas'), findsWidgets);
   });
 

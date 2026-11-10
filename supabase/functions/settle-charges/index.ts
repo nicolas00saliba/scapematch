@@ -2,7 +2,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
-import { maySettle, settleGroup } from "../_shared/settle_group.ts";
+import {
+  expireUnconfirmedGroups,
+  maySettle,
+  settleGroup,
+} from "../_shared/settle_group.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -37,8 +41,13 @@ Deno.serve(async (req) => {
       const { data: groups } = await admin
         .from("groups")
         .select("id")
-        .or("cancelled_at.not.is.null,closed_at.not.is.null");
+        .or(
+          "cancelled_at.not.is.null,confirmed_at.not.is.null,closed_at.not.is.null",
+        );
       for (const group of groups ?? []) ids.push(group.id as string);
+      for (const id of await expireUnconfirmedGroups(admin)) {
+        if (!ids.includes(id)) ids.push(id);
+      }
     } else if (body.group_id) {
       ids.push(body.group_id);
     } else {

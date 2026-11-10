@@ -36,6 +36,7 @@ class Group {
     this.cancelledAt,
     this.cancelReason = '',
     this.minimumSpots = 2,
+    this.confirmedAt,
     this.closesAt,
     this.cancelWindow = GroupRules.refundDeadline,
     this.phaseOverride,
@@ -65,7 +66,7 @@ class Group {
   /// Cancelled seats are not included.
   final int filledSpots;
 
-  /// How many people the group wants. This can be lower than [roomCapacity].
+  /// Máximo escolhido pelo host. O grupo lota aqui e a fila começa.
   final int totalSpots;
   final List<Participant> participants;
 
@@ -85,9 +86,14 @@ class Group {
   /// Por que a casa ou a regra encerrou a sessão. Vazio enquanto está ativa.
   final String cancelReason;
 
-  /// Mínimo da sala copiado no grupo. O prazo de fechar ainda usa este
-  /// número. O host fecha o grupo em [totalSpots], não aqui.
+  /// Mínimo escolhido pelo host, dentro da faixa da sala.
+  ///
+  /// Ao chegar aqui o jogo confirma e a cobrança que antes esperava o
+  /// fechamento é capturada. O prazo sem atingir este número cancela.
   final int minimumSpots;
+
+  /// Quando o mínimo foi atingido. Não volta atrás se alguém sair depois.
+  final DateTime? confirmedAt;
 
   /// Prazo para atingir [minimumSpots]. Sem data, vale 1 h antes do início.
   final DateTime? closesAt;
@@ -132,26 +138,42 @@ class Group {
     if (isCancelled) {
       return GroupPhase.cancelled;
     }
-    if (GroupRules.missedMinimum(
-      alreadyCancelled: false,
-      portalOwned: false,
-      filledSpots: filledSpots,
-      minimumSpots: minimumSpots,
-      closesAt: closesAtResolved,
-      startsAt: startsAt,
-      now: now,
-    )) {
+    if (!isConfirmed &&
+        GroupRules.missedMinimum(
+          alreadyCancelled: false,
+          portalOwned: false,
+          filledSpots: filledSpots,
+          minimumSpots: minimumSpots,
+          closesAt: closesAtResolved,
+          startsAt: startsAt,
+          now: now,
+        )) {
       return GroupPhase.cancelled;
     }
-    if (filledSpots >= minimumSpots) {
+    if (isConfirmed) {
       return GroupPhase.readyToReserve;
     }
     return GroupPhase.forming;
   }
 
-  /// Pessoas que ainda faltam para o número que o host escolheu.
-  ///
-  /// [filledSpots] já conta o host. O grupo fecha quando este valor chega a 0.
+  /// O jogo já confirmou: no mínimo, ou porque [confirmedAt] ficou gravado.
+  bool get isConfirmed {
+    if (isCancelled) {
+      return false;
+    }
+    if (confirmedAt != null) {
+      return true;
+    }
+    return filledSpots >= minimumSpots;
+  }
+
+  /// Pessoas que ainda faltam para o mínimo do host.
+  int get spotsUntilConfirm {
+    final missing = minimumSpots - filledSpots;
+    return missing < 0 ? 0 : missing;
+  }
+
+  /// Vagas até o máximo. Zero quando o grupo está lotado.
   int get spotsUntilClose {
     final missing = totalSpots - filledSpots;
     return missing < 0 ? 0 : missing;
@@ -217,6 +239,7 @@ class Group {
     String? cancelReason,
     String? gameType,
     int? minimumSpots,
+    Object? confirmedAt = _absent,
     Object? closesAt = _absent,
     Duration? cancelWindow,
     Object? phaseOverride = _absent,
@@ -248,6 +271,9 @@ class Group {
       cancelledAt: cancelledAt ?? this.cancelledAt,
       cancelReason: cancelReason ?? this.cancelReason,
       minimumSpots: minimumSpots ?? this.minimumSpots,
+      confirmedAt: identical(confirmedAt, _absent)
+          ? this.confirmedAt
+          : confirmedAt as DateTime?,
       closesAt: identical(closesAt, _absent)
           ? this.closesAt
           : closesAt as DateTime?,

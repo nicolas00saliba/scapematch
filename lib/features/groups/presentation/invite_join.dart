@@ -39,6 +39,7 @@ Future<({String? groupId, String? notice})> consumePendingInvite(
         JoinFailureReason.full => GroupMessages.inviteBecameFull,
         JoinFailureReason.alreadyStarted => 'Este grupo já começou.',
         JoinFailureReason.alreadyJoined => null,
+        JoinFailureReason.deadlinePassed => 'O prazo deste grupo acabou.',
         _ => 'Não foi possível entrar neste grupo.',
       },
     ),

@@ -14,6 +14,7 @@ import {
   PixReuseRejected,
 } from "../_shared/asaas_provider.ts";
 import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
+import { bandConfirmed } from "../_shared/group_band.ts";
 import { detachGonePix } from "../_shared/detach_gone_pix.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import {
@@ -121,7 +122,7 @@ export async function createCharge(
     const { data: group } = await admin
       .from("groups")
       .select(
-        "id, venue_id, price_cents, cancelled_at, closed_at, starts_at, total_spots, minimum_spots",
+        "id, venue_id, price_cents, cancelled_at, confirmed_at, closed_at, closes_at, starts_at, total_spots, minimum_spots",
       )
       .eq("id", groupId)
       .maybeSingle();
@@ -1191,15 +1192,15 @@ async function groupClosedForCredit(
   group: {
     id: string;
     cancelled_at: string | null;
+    confirmed_at?: string | null;
     closed_at: string | null;
+    closes_at?: string | null;
     total_spots: number;
     minimum_spots: number;
   },
 ): Promise<boolean> {
-  if (group.cancelled_at) return false;
   const filled = await filledSpots(admin, group.id);
-  const closed = Boolean(group.closed_at) || filled >= group.total_spots;
-  return closed && filled >= group.minimum_spots;
+  return bandConfirmed(group, filled);
 }
 
 async function filledSpots(

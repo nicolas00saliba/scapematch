@@ -77,6 +77,9 @@ JoinFailureReason joinFailure(String text) {
     return JoinFailureReason.groupCancelled;
   }
   if (text.contains('session ended')) return JoinFailureReason.sessionEnded;
+  if (text.contains('prazo deste grupo') || text.contains('deadline passed')) {
+    return JoinFailureReason.deadlinePassed;
+  }
   if (text.contains('session started')) return JoinFailureReason.alreadyStarted;
   if (text.contains('overlap')) return JoinFailureReason.overlapsAnotherGroup;
   if (text.contains('not found') || text.contains('unknown')) {
@@ -131,6 +134,9 @@ CloseGroupFailureReason closeFailure(String text) {
   }
   if (text.contains('already planned')) {
     return CloseGroupFailureReason.alreadyPlannedSize;
+  }
+  if (text.contains('stays open')) {
+    return CloseGroupFailureReason.staysOpen;
   }
   return CloseGroupFailureReason.notFound;
 }

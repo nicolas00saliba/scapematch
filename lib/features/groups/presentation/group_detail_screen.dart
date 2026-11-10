@@ -256,9 +256,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      GroupMessages.seatCount(
-                        group.filledSpots,
-                        group.totalSpots,
+                      GroupMessages.playerBand(
+                        filled: group.filledSpots,
+                        minimum: group.minimumSpots,
+                        maximum: group.totalSpots,
                       ),
                       key: AppKeys.spotSummary,
                       style: theme.textTheme.titleMedium?.copyWith(
@@ -281,7 +282,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     Text(
                       GroupMessages.phaseLabel(
                         group.phaseAt(now),
-                        missing: group.spotsUntilClose,
+                        filled: group.filledSpots,
+                        minimum: group.minimumSpots,
+                        maximum: group.totalSpots,
+                        confirmed: group.isConfirmed,
                         started: started,
                       ),
                       key: AppKeys.groupPhase,
@@ -307,14 +311,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                         maximum: group.roomCapacity,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(GroupMessages.hostTarget(group.totalSpots)),
                     const SizedBox(height: 8),
                     Text(
                       GroupMessages.roomAccepts(
-                        minimum: group.roomMinimum,
-                        maximum: group.roomCapacity,
-                        target: group.totalSpots,
+                        roomMinimum: group.roomMinimum,
+                        roomMaximum: group.roomCapacity,
+                        minimum: group.minimumSpots,
+                        maximum: group.totalSpots,
                       ),
                       style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
                     ),
@@ -614,27 +617,8 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           ),
         );
       }
-      if (me.isCreator) {
-        final seated = group.occupiedSpots;
-        if (!group.isFull && !started) {
-          final allowed = GroupRules.canCloseWithFewer(
-            seated: seated,
-            roomMinimum: group.minimumSpots,
-            planned: group.totalSpots,
-          );
-          buttons.add(
-            FilledButton(
-              key: AppKeys.closeWithFewer,
-              onPressed: !allowed || _busy ? null : () => _closeEarly(group),
-              child: Text(
-                allowed
-                    ? GroupMessages.closeWith(seated)
-                    : GroupMessages.roomMinimum(group.minimumSpots),
-              ),
-            ),
-          );
-        }
-        if (started) {
+        if (me.isCreator) {
+          if (started) {
           buttons.add(
             Text(
               GroupMessages.sessionAlreadyStarted,
@@ -724,7 +708,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           const FilledButton(
             key: AppKeys.joinButton,
             onPressed: null,
-            child: Text('Grupo fechado'),
+            child: Text('Lotado'),
           ),
         );
         buttons.add(
@@ -989,29 +973,6 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       return GroupMessages.leavePreviewChanged(refunded: refunded);
     }
     return refunded ? GroupMessages.leaveRefunded : GroupMessages.leaveDenied;
-  }
-
-  Future<void> _closeEarly(Group group) async {
-    final accepted = await showCloseDialog(
-      context,
-      seated: group.occupiedSpots,
-    );
-    if (!accepted || !mounted) {
-      return;
-    }
-    await _run(() async {
-      final reason = await ref
-          .read(groupDetailViewModelProvider(widget.groupId).notifier)
-          .closeWithFewer();
-      if (!mounted) {
-        return;
-      }
-      _snack(
-        reason == null
-            ? 'Grupo fechado. A reserva virou cobrança.'
-            : 'Não foi possível fechar o grupo.',
-      );
-    });
   }
 
   Future<void> _delete() async {

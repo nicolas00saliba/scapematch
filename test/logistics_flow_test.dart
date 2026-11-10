@@ -24,7 +24,7 @@ void main() {
     );
 
     expect(find.byKey(AppKeys.deleteGroup), findsNothing);
-    expect(_spotSummary(tester), '1/4');
+    expect(_spotSummary(tester), '1 jogador · mín. 4 · máx. 4');
     expect(find.text('1 presença confirmada'), findsWidgets);
 
     await tester.tap(find.byKey(AppKeys.joinButton));
@@ -79,19 +79,19 @@ void main() {
     );
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '2/4');
+    expect(_spotSummary(tester), '2 jogadores · mín. 4 · máx. 4');
     await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
     await tester.pumpAndSettle();
 
     expect(find.text(GroupMessages.holdReleased), findsOneWidget);
-    expect(_spotSummary(tester), '2/4');
+    expect(_spotSummary(tester), '2 jogadores · mín. 4 · máx. 4');
 
     await tester.tap(find.byKey(AppKeys.dialogConfirm));
     await tester.pumpAndSettle();
 
-    expect(_spotSummary(tester), '1/4');
+    expect(_spotSummary(tester), '1 jogador · mín. 4 · máx. 4');
     expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
     expect(find.byKey(AppKeys.joinButton), findsNothing);
 
@@ -131,18 +131,18 @@ void main() {
     await _openGroup(tester, SampleIds.saoPaulo, SampleIds.groupSpMetroAlmost);
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '6/6');
+    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
     await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
     await tester.pumpAndSettle();
     expect(find.text(GroupMessages.leaveWithoutRefundBody), findsOneWidget);
-    expect(_spotSummary(tester), '6/6');
+    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
 
     await tester.tap(find.byKey(AppKeys.dialogConfirm));
     await tester.pumpAndSettle();
 
-    expect(_spotSummary(tester), '5/6');
+    expect(_spotSummary(tester), '5 jogadores · mín. 2 · máx. 6');
     expect(find.textContaining('Sem reembolso'), findsWidgets);
 
     await _home(tester);
@@ -188,7 +188,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(GroupMessages.joinedBanner), findsOneWidget);
-    expect(_spotSummary(tester), '1/3');
+    expect(_spotSummary(tester), '1 jogador · mín. 2 · máx. 3');
     expect(find.byKey(AppKeys.deleteGroup), findsOneWidget);
     expect(find.byKey(AppKeys.leaveGroup), findsNothing);
     await _pay(tester);
@@ -196,7 +196,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.deleteGroup));
     await tester.pumpAndSettle();
     expect(find.text(GroupMessages.deleteBody), findsOneWidget);
-    expect(_spotSummary(tester), '1/3');
+    expect(_spotSummary(tester), '1 jogador · mín. 2 · máx. 3');
 
     await tester.tap(find.byKey(AppKeys.dialogConfirm));
     await tester.pumpAndSettle();
@@ -208,12 +208,12 @@ void main() {
     await _home(tester);
     await tester.ensureVisible(find.byKey(AppKeys.groupSearch));
     await tester.pumpAndSettle();
-    expect(find.text('1/3'), findsNothing);
+    expect(find.text('1 jogador · mín. 2 · máx. 3'), findsNothing);
 
     await _home(tester);
     await tester.tap(find.byKey(AppKeys.myGroups));
     await tester.pumpAndSettle();
-    expect(find.text('1/3'), findsNothing);
+    expect(find.text('1 jogador · mín. 2 · máx. 3'), findsNothing);
     await tester.tap(find.text('Cancelados'));
     await tester.pumpAndSettle();
     expect(find.text('A Estufa'), findsWidgets);
@@ -314,7 +314,7 @@ void main() {
 
       expect(find.textContaining(GroupMessages.holdReleased), findsWidgets);
       expect(find.textContaining('Sem reembolso'), findsNothing);
-      expect(_spotSummary(tester), '1/4');
+      expect(_spotSummary(tester), '1 jogador · mín. 4 · máx. 4');
     },
   );
 

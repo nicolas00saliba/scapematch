@@ -66,7 +66,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           const ExampleDataBanner(),
           const SizedBox(height: 16),
           Text(
-            'Você entra como a primeira pessoa. O número abaixo é quantas pessoas fecham o grupo, contando você.',
+            'Você entra como a primeira pessoa. Escolha o mínimo para confirmar e o máximo do grupo, contando você.',
             style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
           ),
           const SizedBox(height: 16),
@@ -120,7 +120,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Pessoas para fechar',
+            'Mínimo e máximo',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -140,6 +140,49 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          Text(
+            'Mínimo para confirmar',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                key: AppKeys.minimumPlayersDecrement,
+                onPressed: state.canDecrementMinimum
+                    ? () => ref
+                          .read(createGroupViewModelProvider.notifier)
+                          .setMinimumPlayers(state.minimumPlayers - 1)
+                    : null,
+                icon: const Icon(Icons.remove),
+                tooltip: 'Diminuir o mínimo',
+              ),
+              Text(
+                '${state.minimumPlayers}',
+                key: AppKeys.minimumPlayersValue,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              IconButton(
+                key: AppKeys.minimumPlayersIncrement,
+                onPressed: state.canIncrementMinimum
+                    ? () => ref
+                          .read(createGroupViewModelProvider.notifier)
+                          .setMinimumPlayers(state.minimumPlayers + 1)
+                    : null,
+                icon: const Icon(Icons.add),
+                tooltip: 'Aumentar o mínimo',
+              ),
+            ],
+          ),
+          Text(
+            'Máximo do grupo',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           Row(
             children: [
               IconButton(
@@ -150,7 +193,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                           .setExtraSpots(state.extraSpots - 1)
                     : null,
                 icon: const Icon(Icons.remove),
-                tooltip: 'Diminuir pessoas',
+                tooltip: 'Diminuir o máximo',
               ),
               Text(
                 '${state.groupSize}',
@@ -167,14 +210,14 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                           .setExtraSpots(state.extraSpots + 1)
                     : null,
                 icon: const Icon(Icons.add),
-                tooltip: 'Aumentar pessoas',
+                tooltip: 'Aumentar o máximo',
               ),
             ],
           ),
           if (state.room != null) ...[
             const SizedBox(height: 8),
             Text(
-              'O host quer ${state.groupSize} para fechar. '
+              'Confirma com ${state.minimumPlayers} e segue aberto até ${state.groupSize}. '
               'A sala aceita de ${state.room!.minimumPlayers} a ${state.room!.capacity}.',
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
             ),

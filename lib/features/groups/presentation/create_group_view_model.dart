@@ -28,6 +28,7 @@ class CreateGroupState {
     this.slots = const [],
     this.slotId,
     this.extraSpots = 2,
+    this.minimumPlayers = 2,
     this.crewId,
     this.crewSeats = 0,
     this.loadingOptions = false,
@@ -43,6 +44,9 @@ class CreateGroupState {
   final List<TimeSlot> slots;
   final String? slotId;
   final int extraSpots;
+
+  /// Mínimo para confirmar, contando quem cria.
+  final int minimumPlayers;
 
   /// Turma que já senta na criação. Nulo quando a pessoa entra sozinha.
   final String? crewId;
@@ -64,10 +68,11 @@ class CreateGroupState {
     if (selected == null) {
       return GroupSizeValidation.valid;
     }
-    return GroupRules.validateGroupSize(
-      extraSpots: extraSpots,
+    return GroupRules.validatePlayerBand(
+      minimumPlayers: minimumPlayers,
+      maximumPlayers: groupSize,
+      roomMinimum: selected.minimumPlayers,
       roomCapacity: selected.capacity,
-      minimumPlayers: selected.minimumPlayers,
     );
   }
 
@@ -118,6 +123,13 @@ class CreateGroupState {
 
   /// No fixed ceiling. The room capacity, via [GroupRules], is the limit
   /// once a room is selected. Before that, the stepper stays open.
+  bool get canDecrementMinimum {
+    final floor = room?.minimumPlayers ?? GroupRules.minGroupSize;
+    return minimumPlayers > floor;
+  }
+
+  bool get canIncrementMinimum => minimumPlayers < groupSize;
+
   bool get canIncrementExtraSpots {
     final max = GroupRules.maxExtraSpots(roomCapacity: room?.capacity);
     if (max == null) {
@@ -141,6 +153,7 @@ class CreateGroupState {
     String? slotId,
     bool clearSlot = false,
     int? extraSpots,
+    int? minimumPlayers,
     String? crewId,
     bool clearCrew = false,
     int? crewSeats,
@@ -158,6 +171,7 @@ class CreateGroupState {
       slots: slots ?? this.slots,
       slotId: clearSlot ? null : (slotId ?? this.slotId),
       extraSpots: extraSpots ?? this.extraSpots,
+      minimumPlayers: minimumPlayers ?? this.minimumPlayers,
       crewId: clearCrew ? null : (crewId ?? this.crewId),
       crewSeats: clearCrew ? 0 : (crewSeats ?? this.crewSeats),
       loadingOptions: loadingOptions ?? this.loadingOptions,
@@ -285,9 +299,18 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     );
     final floor = state.crewSeats > roomFloor ? state.crewSeats : roomFloor;
     final spots = state.extraSpots < floor ? floor : state.extraSpots;
+    final roomMin = selected?.minimumPlayers ?? GroupRules.minGroupSize;
+    var minimum = state.minimumPlayers < roomMin
+        ? roomMin
+        : state.minimumPlayers;
+    final size = 1 + spots;
+    if (minimum > size) {
+      minimum = size;
+    }
     state = state.copyWith(
       slots: slots,
       extraSpots: spots,
+      minimumPlayers: minimum,
       loadingOptions: false,
     );
   }
@@ -305,7 +328,24 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     if (spots < state.extraFloor) {
       spots = state.extraFloor;
     }
-    state = state.copyWith(extraSpots: spots, clearFailure: true);
+    var minimum = state.minimumPlayers;
+    if (minimum > 1 + spots) {
+      minimum = 1 + spots;
+    }
+    state = state.copyWith(
+      extraSpots: spots,
+      minimumPlayers: minimum,
+      clearFailure: true,
+    );
+  }
+
+  void setMinimumPlayers(int value) {
+    final floor = state.room?.minimumPlayers ?? GroupRules.minGroupSize;
+    var minimum = value < floor ? floor : value;
+    if (minimum > state.groupSize) {
+      minimum = state.groupSize;
+    }
+    state = state.copyWith(minimumPlayers: minimum, clearFailure: true);
   }
 
   /// [seats] conta quem cria. Nulo tira a turma e volta ao piso da sala.
@@ -317,7 +357,12 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
       clearFailure: true,
     );
     if (state.extraSpots < state.extraFloor) {
-      state = state.copyWith(extraSpots: state.extraFloor);
+      final spots = state.extraFloor;
+      var minimum = state.minimumPlayers;
+      if (minimum > 1 + spots) {
+        minimum = 1 + spots;
+      }
+      state = state.copyWith(extraSpots: spots, minimumPlayers: minimum);
     }
   }
 
@@ -354,6 +399,7 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
             roomId: state.roomId!,
             slotId: state.slotId!,
             extraSpots: state.extraSpots,
+            minimumPlayers: state.minimumPlayers,
             creatorUserId: user.id,
             creatorDisplayName: user.displayName,
             companions: companions,

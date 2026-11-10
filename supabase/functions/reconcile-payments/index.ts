@@ -6,7 +6,11 @@ import {
   reconcileAsaasTimeoutMs,
   reconcilePayments,
 } from "../_shared/reconcile_payments.ts";
-import { settleAuthorizedCards, settleGroup } from "../_shared/settle_group.ts";
+import {
+  expireUnconfirmedGroups,
+  settleAuthorizedCards,
+  settleGroup,
+} from "../_shared/settle_group.ts";
 
 type Deps = {
   // deno-lint-ignore no-explicit-any
@@ -38,6 +42,14 @@ export async function handleReconcile(
       AsaasProvider.fromEnv(Deno.env, reconcileAsaasTimeoutMs);
     const groupId = await settleGroupId(req);
     const reconciled = await reconcilePayments(admin, asaas);
+    const expired = await expireUnconfirmedGroups(admin);
+    for (const id of expired) {
+      try {
+        await settleGroup(admin, asaas, id);
+      } catch (error) {
+        logCaught("settle-charges", error);
+      }
+    }
     if (groupId) {
       try {
         await settleGroup(admin, asaas, groupId);

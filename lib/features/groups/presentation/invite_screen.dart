@@ -91,7 +91,7 @@ class _InviteBody extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '${GroupMessages.seatCount(group.filledSpots, group.totalSpots)} · $spots',
+          '${GroupMessages.playerBand(filled: group.filledSpots, minimum: group.minimumSpots, maximum: group.totalSpots)} · $spots',
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w800,
           ),
@@ -140,7 +140,7 @@ class _InviteBody extends ConsumerWidget {
           const FilledButton(
             key: AppKeys.participate,
             onPressed: null,
-            child: Text('Grupo fechado'),
+            child: Text('Lotado'),
           )
         else
           FilledButton(
@@ -168,6 +168,7 @@ class _InviteBody extends ConsumerWidget {
       JoinFailureReason.full => GroupMessages.inviteBecameFull,
       JoinFailureReason.alreadyStarted => 'Este grupo já começou.',
       JoinFailureReason.alreadyJoined => null,
+      JoinFailureReason.deadlinePassed => 'O prazo deste grupo acabou.',
       _ => 'Não foi possível entrar neste grupo.',
     };
     router.go('/groups/${group.id}', extra: notice);

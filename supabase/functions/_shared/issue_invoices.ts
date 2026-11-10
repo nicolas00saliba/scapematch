@@ -20,6 +20,7 @@ import {
   testXmlUrl,
   type VenueFiscal,
 } from "./fiscal_plan.ts";
+import { bandConfirmed } from "./group_band.ts";
 import { todayInSaoPaulo } from "./http.ts";
 
 // O cliente do Supabase muda o genérico entre chamadas. A função só usa
@@ -350,20 +351,18 @@ async function ensureHouseCustomer(
 async function groupIsClosed(admin: Admin, groupId: string): Promise<boolean> {
   const { data: group } = await admin
     .from("groups")
-    .select("closed_at, total_spots, minimum_spots, cancelled_at")
+    .select(
+      "cancelled_at, confirmed_at, closed_at, closes_at, total_spots, minimum_spots",
+    )
     .eq("id", groupId)
     .maybeSingle();
-  if (!group || group.cancelled_at) return false;
-  if (group.closed_at) return true;
+  if (!group) return false;
   const { count } = await admin
     .from("group_members")
     .select("id", { count: "exact", head: true })
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
-  const filled = count ?? 0;
-  const total = Number(group.total_spots);
-  const minimum = Number(group.minimum_spots);
-  return filled >= total && filled >= minimum;
+  return bandConfirmed(group, count ?? 0);
 }
 
 async function loadVenue(admin: Admin, venueId: string): Promise<

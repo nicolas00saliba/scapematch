@@ -48,6 +48,9 @@ abstract final class AppKeys {
   static const payCashbackRange = Key('pay-cashback-range');
   static const accountDelete = Key('account-delete');
   static const accountDeleteConfirm = Key('account-delete-confirm');
+  static const minimumPlayersIncrement = Key('minimum-players-increment');
+  static const minimumPlayersDecrement = Key('minimum-players-decrement');
+  static const minimumPlayersValue = Key('minimum-players-value');
   static const extraSpotsIncrement = Key('extra-spots-increment');
   static const extraSpotsDecrement = Key('extra-spots-decrement');
   static const extraSpotsValue = Key('extra-spots-value');

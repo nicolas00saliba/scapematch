@@ -29,6 +29,7 @@ class _EditGroupSheet extends ConsumerStatefulWidget {
 }
 
 class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
+  late int _minimumSpots;
   late int _totalSpots;
   late final TextEditingController _note;
   var _saving = false;
@@ -37,6 +38,7 @@ class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
   @override
   void initState() {
     super.initState();
+    _minimumSpots = widget.group.minimumSpots;
     _totalSpots = widget.group.totalSpots;
     _note = TextEditingController(text: widget.group.note);
   }
@@ -51,9 +53,9 @@ class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final occupied = widget.group.occupiedSpots;
-    final minimum = math.max(
-      GroupRules.minimumTotalSpots(occupiedSpots: occupied),
-      widget.group.minimumSpots,
+    final roomFloor = math.max(
+      widget.group.roomMinimum,
+      GroupRules.minGroupSize,
     );
     final maximum = widget.group.roomCapacity;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
@@ -72,21 +74,57 @@ class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
           ),
           const SizedBox(height: 8),
           Text(
-            'O grupo pode ter de $minimum a $maximum pessoas. Não dá para ficar abaixo de quem já entrou.',
+            'A sala aceita de $roomFloor a $maximum. O mínimo confirma e o máximo lota. Não dá para ficar abaixo de quem já entrou.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
+          Text(
+            'Mínimo para confirmar',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: _minimumSpots > roomFloor
+                    ? () => setState(() => _minimumSpots -= 1)
+                    : null,
+                icon: const Icon(Icons.remove),
+                tooltip: 'Diminuir o mínimo',
+              ),
+              Text(
+                '$_minimumSpots',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              IconButton(
+                onPressed: _minimumSpots < _totalSpots
+                    ? () => setState(() => _minimumSpots += 1)
+                    : null,
+                icon: const Icon(Icons.add),
+                tooltip: 'Aumentar o mínimo',
+              ),
+            ],
+          ),
+          Text(
+            'Máximo do grupo',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           Row(
             children: [
               IconButton(
                 key: AppKeys.editSpotsDecrement,
-                onPressed: _totalSpots > minimum
+                onPressed: _totalSpots > math.max(occupied, _minimumSpots)
                     ? () => setState(() => _totalSpots -= 1)
                     : null,
                 icon: const Icon(Icons.remove),
-                tooltip: 'Diminuir vagas',
+                tooltip: 'Diminuir o máximo',
               ),
               Text(
                 '$_totalSpots',
@@ -101,10 +139,8 @@ class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
                     ? () => setState(() => _totalSpots += 1)
                     : null,
                 icon: const Icon(Icons.add),
-                tooltip: 'Aumentar vagas',
+                tooltip: 'Aumentar o máximo',
               ),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('pessoas no grupo')),
             ],
           ),
           const SizedBox(height: 8),
@@ -160,7 +196,11 @@ class _EditGroupSheetState extends ConsumerState<_EditGroupSheet> {
     try {
       final reason = await ref
           .read(groupDetailViewModelProvider(widget.group.id).notifier)
-          .edit(totalSpots: _totalSpots, note: _note.text);
+          .edit(
+            totalSpots: _totalSpots,
+            minimumSpots: _minimumSpots,
+            note: _note.text,
+          );
       if (!mounted) {
         return;
       }

@@ -154,7 +154,11 @@ class GroupPinSheet extends StatelessWidget {
                 Text(formatSession(group.startsAt)),
                 const SizedBox(height: 6),
                 Text(
-                  GroupMessages.seatCount(group.filledSpots, group.totalSpots),
+                  GroupMessages.playerBand(
+                    filled: group.filledSpots,
+                    minimum: group.minimumSpots,
+                    maximum: group.totalSpots,
+                  ),
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -166,10 +170,14 @@ class GroupPinSheet extends StatelessWidget {
                     maximum: group.roomCapacity,
                   ),
                 ),
-                Text(GroupMessages.hostTarget(group.totalSpots)),
                 const SizedBox(height: 4),
                 Text(
-                  GroupMessages.spotsUntilClose(group.spotsUntilClose),
+                  GroupMessages.bandStatus(
+                    filled: group.filledSpots,
+                    minimum: group.minimumSpots,
+                    maximum: group.totalSpots,
+                    confirmed: group.isConfirmed,
+                  ),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: scheme.secondary,
                     fontWeight: FontWeight.w800,

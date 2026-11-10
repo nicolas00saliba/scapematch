@@ -7,6 +7,7 @@ import {
   creditLedger,
 } from "./ledger.ts";
 import { syncPayerDocument } from "./payer_document.ts";
+import { bandConfirmed, bandMissed, bandSettlement } from "./group_band.ts";
 import { releaseCancelledCharges } from "./release_charges.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -19,6 +20,7 @@ type GroupRow = {
   created_by?: string;
   venue_id?: string;
   cancelled_at: string | null;
+  confirmed_at?: string | null;
   closed_at: string | null;
   closes_at: string | null;
   total_spots: number;
@@ -32,7 +34,7 @@ type ChargeView = ChargeRow & {
 };
 
 /// Admin, criador e dono da casa liquidam ou liberam.
-/// Quem só está no grupo liquida quando ele já fechou. Não estorna grupo aberto.
+/// Quem só está no grupo liquida quando ele confirma. Não estorna grupo aberto.
 export async function maySettle(
   admin: Admin,
   groupId: string,
@@ -43,7 +45,7 @@ export async function maySettle(
   const { data: group } = await admin
     .from("groups")
     .select(
-      "created_by, venue_id, cancelled_at, closed_at, total_spots, minimum_spots",
+      "created_by, venue_id, cancelled_at, confirmed_at, closed_at, closes_at, total_spots, minimum_spots",
     )
     .eq("id", groupId)
     .maybeSingle();
@@ -63,9 +65,8 @@ export async function maySettle(
     .eq("user_id", userId)
     .maybeSingle();
   if (!member || member.attendance === "cancelled") return false;
-  if (group.closed_at) return true;
   const filled = await filledSpots(admin, groupId);
-  return filled >= group.total_spots && filled >= group.minimum_spots;
+  return bandConfirmed(group, filled);
 }
 
 export async function settleGroup(
@@ -76,24 +77,30 @@ export async function settleGroup(
   const { data: group } = await admin
     .from("groups")
     .select(
-      "id, cancelled_at, closed_at, closes_at, starts_at, total_spots, minimum_spots",
+      "id, cancelled_at, confirmed_at, closed_at, closes_at, starts_at, total_spots, minimum_spots",
     )
     .eq("id", groupId)
     .maybeSingle();
   if (!group) return;
   const row = group as GroupRow;
   const filled = await filledSpots(admin, groupId);
-  const closed = Boolean(row.closed_at) ||
-    (filled >= row.total_spots && filled >= row.minimum_spots);
-  const missed = !row.cancelled_at && !closed && row.closes_at &&
-    new Date(row.closes_at).getTime() <= Date.now() &&
-    filled < row.minimum_spots;
-  const release = Boolean(row.cancelled_at) || missed;
-  if (release) {
+  const decision = bandSettlement(row, filled);
+  if (decision === "release") {
+    if (bandMissed(row, filled)) {
+      await admin
+        .from("groups")
+        .update({
+          cancelled_at: new Date().toISOString(),
+          cancel_reason: "O grupo não confirmou a tempo",
+        })
+        .eq("id", groupId)
+        .is("cancelled_at", null)
+        .is("confirmed_at", null);
+    }
     await releaseCancelledCharges(admin, asaas, groupId);
     return;
   }
-  if (!closed) return;
+  if (decision === "wait") return;
 
   // commission_bps é a taxa fotografada na cobrança por create-charge.
   const { data: charges } = await admin
@@ -124,6 +131,21 @@ export async function settleGroup(
       });
     }
   }
+}
+
+/// Cancela no banco os grupos cujo prazo venceu sem confirmação.
+/// O cron libera as cobranças desses ids em seguida.
+export async function expireUnconfirmedGroups(admin: Admin): Promise<string[]> {
+  if (typeof admin?.rpc !== "function") return [];
+  const { data, error } = await admin.rpc("expire_unconfirmed_groups");
+  if (error) {
+    if (!claimMissing.has(error.code)) logCaught("settle-charges", error);
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+  return data.filter((id): id is string =>
+    typeof id === "string" && id.length > 0
+  );
 }
 
 /// Varre autorizações ainda abertas. O cron de reconcile chama isto.

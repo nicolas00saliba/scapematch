@@ -602,6 +602,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slot: slotSotaoQuase,
       totalSpots: 5,
       names: ['Eva', 'Fábio', 'Gabi'],
+      minimumSpots: 5,
     ),
     _group(
       now: now,
@@ -692,6 +693,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slot: slotCoberturaFri,
       totalSpots: 4,
       names: ['Paula'],
+      minimumSpots: 4,
     ),
     _group(
       now: now,
@@ -765,7 +767,7 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       minimumSpots: 6,
       closesAt: now.subtract(const Duration(hours: 26)),
       cancelledAt: now.subtract(const Duration(hours: 20)),
-      cancelReason: 'O grupo não fechou a tempo',
+      cancelReason: 'O grupo não confirmou a tempo',
     ),
     // Sessão que já aconteceu e fechou. O extrato da casa nasce daqui.
     // Não entra na Home: a sessão já terminou.
@@ -1320,6 +1322,7 @@ Group _group({
     gameType: gameType,
     note: note,
     minimumSpots: minimum,
+    confirmedAt: cancelledAt == null && names.length >= minimum ? now : null,
     closesAt:
         closesAt ?? GroupRules.closeDeadline(startsAt: slot.startsAt, now: now),
     cancelReason: cancelReason,
@@ -1343,7 +1346,7 @@ Group _group({
               : AttendanceStatus.joined,
           payment: cancelledAt != null
               ? PaymentStatus.released
-              : names.length >= totalSpots
+              : names.length >= minimum
               ? PaymentStatus.paid
               : PaymentStatus.reserved,
           refundReason: cancelledAt != null

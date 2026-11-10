@@ -75,13 +75,13 @@ void main() {
         liveClosing(curitiba[1], missing: 2),
       ]),
       check: (tester) {
-        expect(find.text('Falta 1 para fechar'), findsWidgets);
-        expect(find.text('Faltam 2 para fechar'), findsWidgets);
+        expect(find.text('Falta 1 para confirmar'), findsWidgets);
+        expect(find.text('Confirmado — ainda cabem 2'), findsWidgets);
         expect(find.text('Sessão já começou'), findsNothing);
         expect(find.byKey(AppKeys.homeGridSlot(0)), findsNothing);
         final viewBottom = tester.view.physicalSize.height;
         expect(
-          tester.getBottomLeft(find.text('Faltam 2 para fechar').first).dy,
+          tester.getBottomLeft(find.text('Confirmado — ainda cabem 2').first).dy,
           lessThan(viewBottom),
         );
       },
