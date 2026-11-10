@@ -79,6 +79,12 @@ abstract final class PartnerKeys {
   static Key partnerSavePrice(String roomId) =>
       Key('partner-save-price-$roomId');
   static Key partnerAddSlot(String roomId) => Key('partner-add-slot-$roomId');
+  static Key partnerRemoveSlot(String slotId) =>
+      Key('partner-remove-slot-$slotId');
+  static Key partnerRemoveSlotIcon(String slotId) =>
+      Key('partner-remove-slot-icon-$slotId');
+  static const removeSlotDialog = Key('remove-slot-dialog');
+  static const confirmRemoveSlot = Key('confirm-remove-slot');
   static Key partnerAbsence(String groupId, String playerId) =>
       Key('partner-absence-$groupId-$playerId');
   static Key partnerAbsenceStanding(String groupId, String playerId) =>

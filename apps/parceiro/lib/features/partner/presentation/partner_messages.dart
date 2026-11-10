@@ -105,6 +105,18 @@ abstract final class PartnerMessages {
   static const priceSaved = 'Preço atualizado nesta sessão.';
   static const addSlot = 'Novo horário';
   static const slotOpened = 'Horário aberto nesta sessão.';
+  static const removeSlotTitle = 'Remover horário?';
+  static const removeSlotConfirm = 'Remover';
+  static const removeSlotCancel = 'Cancelar';
+  static const removeSlotTooltip = 'Remover horário';
+  static const slotRemoved = 'Horário removido.';
+  static const slotHasReservation = 'Esse horário já tem reserva';
+  static const slotRemoveFailed = 'Não foi possível remover o horário.';
+
+  static String removeSlotBody(String when) {
+    return 'Remover $when? O horário sai da busca, da sala e da reserva.';
+  }
+
   static const markAbsence = 'Marcar falta';
   static const pastSlots = 'horários já encerrados';
   static const noFutureSlots = 'Nenhum horário futuro nesta sala.';

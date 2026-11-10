@@ -1021,21 +1021,58 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
     ref.read(partnerRevisionProvider.notifier).bump();
   }
 
+  Future<void> _removeSlot(TimeSlot slot) async {
+    final label = formatSession(slot.startsAt);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          key: PartnerKeys.removeSlotDialog,
+          title: const Text(PartnerMessages.removeSlotTitle),
+          content: Text(PartnerMessages.removeSlotBody(label)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text(PartnerMessages.removeSlotCancel),
+            ),
+            FilledButton(
+              key: PartnerKeys.confirmRemoveSlot,
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text(PartnerMessages.removeSlotConfirm),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    setState(() => _busy = true);
+    final error = await ref
+        .read(partnerRepositoryProvider)
+        .removeSlot(roomId: widget.room.id, slotId: slot.id);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _busy = false);
+    _snack(context, error ?? PartnerMessages.slotRemoved);
+    if (error == null) {
+      ref.read(partnerRevisionProvider.notifier).bump();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final future = <String>[];
+    final future = <TimeSlot>[];
     var past = 0;
     for (final slot in widget.slots) {
-      final startsAt = slot.startsAt;
-      if (!startsAt.isAfter(widget.now)) {
+      if (!slot.startsAt.isAfter(widget.now)) {
         past += 1;
         continue;
       }
-      if (future.length < 4) {
-        future.add(formatSession(startsAt));
-      }
+      future.add(slot);
     }
     return Card(
       child: Padding(
@@ -1108,7 +1145,19 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (final label in future) Chip(label: Text(label)),
+                  for (final slot in future)
+                    InputChip(
+                      key: PartnerKeys.partnerRemoveSlot(slot.id),
+                      label: Text(formatSession(slot.startsAt)),
+                      deleteIcon: Icon(
+                        Icons.close,
+                        size: 18,
+                        key: PartnerKeys.partnerRemoveSlotIcon(slot.id),
+                      ),
+                      deleteButtonTooltipMessage:
+                          PartnerMessages.removeSlotTooltip,
+                      onDeleted: _busy ? null : () => _removeSlot(slot),
+                    ),
                 ],
               ),
             if (past > 0) ...[
