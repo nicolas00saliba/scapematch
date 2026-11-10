@@ -43,7 +43,9 @@ class FakeCatalogRepository implements CatalogRepository {
   Future<List<TimeSlot>> listSlotsByRoom(String roomId) async {
     await _pause();
     final slots =
-        _database.slots.where((slot) => slot.roomId == roomId).toList()
+        _database.slots
+            .where((slot) => slot.roomId == roomId && slot.active)
+            .toList()
           ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     return slots;
   }

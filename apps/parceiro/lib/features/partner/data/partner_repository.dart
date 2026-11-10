@@ -9,10 +9,12 @@ import 'package:scapematch/features/catalog/domain/room_picture.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 
 /// O que a tela da casa chama. A memória e o Supabase implementam isto.
@@ -37,6 +39,10 @@ abstract class PartnerDesk {
     required String roomId,
     required DateTime startsAt,
   });
+
+  /// Tira o horário da grade. Nulo quando saiu. A frase pronta quando
+  /// a reserva impede, ou quando a sala não tem esse horário.
+  Future<String?> removeSlot({required String roomId, required String slotId});
 
   Future<String?> openSession({
     required String houseId,
@@ -101,7 +107,7 @@ class PartnerRepository implements PartnerDesk {
     final roomIds = rooms.map((room) => room.id).toSet();
     final slotsByRoom = <String, List<TimeSlot>>{};
     for (final slot in database.slots) {
-      if (!roomIds.contains(slot.roomId)) {
+      if (!roomIds.contains(slot.roomId) || !slot.active) {
         continue;
       }
       slotsByRoom.putIfAbsent(slot.roomId, () => []).add(slot);
@@ -273,6 +279,41 @@ class PartnerRepository implements PartnerDesk {
     required DateTime startsAt,
   }) {
     return catalog.addSlot(roomId, startsAt);
+  }
+
+  @override
+  Future<String?> removeSlot({
+    required String roomId,
+    required String slotId,
+  }) async {
+    final slot = database.slotById(slotId);
+    if (slot == null || slot.roomId != roomId) {
+      return PartnerMessages.slotRemoveFailed;
+    }
+    if (!slot.active) {
+      return null;
+    }
+    for (final group in database.groups) {
+      if (group.slotId != slot.id || group.isCancelled) {
+        continue;
+      }
+      if (_seatHoldsSlot(group)) {
+        return PartnerMessages.slotHasReservation;
+      }
+    }
+    final now = clock.now();
+    for (var index = 0; index < database.groups.length; index++) {
+      final group = database.groups[index];
+      if (group.slotId != slot.id || group.isCancelled) {
+        continue;
+      }
+      database.groups[index] = group.copyWith(
+        cancelledAt: now,
+        cancelReason: 'Horário removido pela casa',
+      );
+    }
+    database.retireSlot(slot.id);
+    return null;
   }
 
   /// Abre uma sessão vazia. O jogador vê o grupo e o horário na sala.
@@ -474,6 +515,20 @@ GroupMoney _moneyFor(String groupId, List<Reservation> reservations) {
     commissionCents: commission,
     netCents: net,
   );
+}
+
+bool _seatHoldsSlot(Group group) {
+  for (final person in group.participants) {
+    if (!person.occupiesSeat) {
+      continue;
+    }
+    if (person.payment == PaymentStatus.pending ||
+        person.payment == PaymentStatus.reserved ||
+        person.payment == PaymentStatus.paid) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool isHouseHour(DateTime startsAt) {

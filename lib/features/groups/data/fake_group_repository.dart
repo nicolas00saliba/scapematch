@@ -543,7 +543,8 @@ class FakeGroupRepository implements GroupRepository {
         slot == null ||
         house.cityId != city.id ||
         room.houseId != house.id ||
-        slot.roomId != room.id) {
+        slot.roomId != room.id ||
+        !slot.active) {
       return const CreateGroupFailure(
         CreateGroupFailureReason.unknownSelection,
       );

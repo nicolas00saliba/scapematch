@@ -16,6 +16,7 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -227,8 +228,7 @@ class SupabasePartnerRepository implements PartnerDesk {
         .eq('venue_id', houseId)
         .order('created_at', ascending: false);
     return [
-      for (final row in rows)
-        _invoice(row, houseName: houseName, names: names),
+      for (final row in rows) _invoice(row, houseName: houseName, names: names),
     ];
   }
 
@@ -239,11 +239,12 @@ class SupabasePartnerRepository implements PartnerDesk {
   }) {
     final playerId = textOf(row['player_user_id']);
     final description = textOf(row['description']);
-    final fromDescription = RegExp(
-      r'para (.+)\.',
-    ).firstMatch(description)?.group(1);
+    final fromDescription = RegExp(r'para (.+)\.')
+        .firstMatch(description)
+        ?.group(1);
     final playerName = names[playerId] ?? fromDescription ?? 'Jogador';
-    final issued = dateTimeOf(row['issued_at']) ?? dateTimeOf(row['created_at']);
+    final issued =
+        dateTimeOf(row['issued_at']) ?? dateTimeOf(row['created_at']);
     return FiscalInvoiceView(
       id: textOf(row['id']),
       chargeId: textOf(row['payment_charge_id']),
@@ -355,6 +356,29 @@ class SupabasePartnerRepository implements PartnerDesk {
       roomId: row['room_id'] as String,
       startsAt: dateTimeOf(row['starts_at'])!,
     );
+  }
+
+  @override
+  Future<String?> removeSlot({
+    required String roomId,
+    required String slotId,
+  }) async {
+    if (roomId.isEmpty) {
+      return PartnerMessages.slotRemoveFailed;
+    }
+    try {
+      await scapeSupabase.rpc(
+        'remove_room_session',
+        params: {'p_session_id': slotId},
+      );
+    } on PostgrestException catch (error) {
+      final text = '${error.message} ${error.details ?? ''}';
+      if (text.contains(PartnerMessages.slotHasReservation)) {
+        return PartnerMessages.slotHasReservation;
+      }
+      return PartnerMessages.slotRemoveFailed;
+    }
+    return null;
   }
 
   @override

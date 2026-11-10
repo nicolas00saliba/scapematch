@@ -93,6 +93,25 @@ class FakeDatabase {
     slots.add(slot);
     return slot;
   }
+
+  /// Tira o horário da grade desta sessão. O objeto continua na lista,
+  /// inativo, para um grupo antigo ainda achar a data.
+  void retireSlot(String id) {
+    final index = slots.indexWhere((slot) => slot.id == id);
+    if (index < 0) {
+      throw StateError('Horário não encontrado.');
+    }
+    final current = slots[index];
+    if (!current.active) {
+      return;
+    }
+    slots[index] = TimeSlot(
+      id: current.id,
+      roomId: current.roomId,
+      startsAt: current.startsAt,
+      active: false,
+    );
+  }
 }
 
 T? _find<T>(List<T> items, String id, String Function(T item) idOf) {
