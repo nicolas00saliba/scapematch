@@ -64,7 +64,7 @@ want = {
     "partner-demo": "https://parceiro-demo.escapematch.com.br/",
     "legacy-player": "https://nicolas00saliba.github.io/scapematch/",
     "legacy-demo": "https://nicolas00saliba.github.io/scapematch/demo/",
-    "admin-real": "https://admin.scapematch.com.br/",
+    "admin-real": "https://admin.escapematch.com.br/",
     "legacy-admin": "https://nicolas00saliba.github.io/scapematch/admin/",
 }
 ids = []
@@ -92,6 +92,11 @@ if partner_demo["id"] != "https://parceiro-demo.escapematch.com.br/":
     raise SystemExit("o Parceiro demo não ficou no host próprio")
 if real["name"] != "EscapeMatch":
     raise SystemExit("o app real mudou de nome")
+admin_manifest = json.loads((root / "admin-real" / "manifest.json").read_text())
+if admin_manifest["name"] != "EscapeMatch Admin" or admin_manifest["short_name"] != "Admin":
+    raise SystemExit(
+        f"nome do Admin: {admin_manifest['name']!r} / {admin_manifest['short_name']!r}"
+    )
 if "https://app.escapematch.com.br/" in (root / "player-demo" / "flutter_service_worker.js").read_text():
     raise SystemExit("o worker da demo cita o app real")
 if "https://demo.escapematch.com.br/" in (root / "player-real" / "flutter_service_worker.js").read_text():
@@ -166,7 +171,7 @@ player = install_identity("player", "demo", "/")
 if player != "https://demo.escapematch.com.br/":
     raise SystemExit(f"o PWA da demo do jogador mudou: {player}")
 admin = install_identity("admin", "real", "/")
-if admin != "https://admin.scapematch.com.br/":
+if admin != "https://admin.escapematch.com.br/":
     raise SystemExit(f"host do Admin: {admin}")
 legacy_admin = install_identity("admin", "real", "/scapematch/admin/")
 if legacy_admin != "https://nicolas00saliba.github.io/scapematch/admin/":

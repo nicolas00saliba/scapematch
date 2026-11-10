@@ -48,13 +48,13 @@ elif role == "admin":
     pairs = [
         (
             index,
-            "ScapeMatch Admin é o painel do Nícolas. Casas, jogadores, regras e ganhos. Esta versão usa dados de exemplo.",
-            "ScapeMatch Admin é o painel do Nícolas. Casas, jogadores, regras e ganhos.",
+            "EscapeMatch Admin é o painel do Nícolas. Casas, jogadores, regras e ganhos. Esta versão usa dados de exemplo.",
+            "EscapeMatch Admin é o painel do Nícolas. Casas, jogadores, regras e ganhos.",
         ),
         (
             manifest,
-            "Painel do ScapeMatch. Casas, jogadores, regras e ganhos. Esta versão usa dados de exemplo.",
-            "Painel do ScapeMatch. Casas, jogadores, regras e ganhos.",
+            "Painel do EscapeMatch. Casas, jogadores, regras e ganhos. Esta versão usa dados de exemplo.",
+            "Painel do EscapeMatch. Casas, jogadores, regras e ganhos.",
         ),
     ]
 else:

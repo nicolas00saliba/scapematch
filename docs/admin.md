@@ -1,15 +1,15 @@
-# ScapeMatch Admin
+# EscapeMatch Admin
 
 Painel exclusivo do Nícolas. Não há link a partir do app do jogador, do Parceiro, das demos nem da landing.
 
 ## Onde fica
 
 - App: `apps/admin`
-- Host proposto: `https://admin.scapematch.com.br/`
+- Host proposto: `https://admin.escapematch.com.br/`
 - Enquanto o repositório de Pages e o DNS não existem, o deploy também publica o mesmo build em `https://nicolas00saliba.github.io/scapematch/admin/`
 - Este repositório não cria o host, não mexe em DNS e não publica sozinho
 
-O build usa `--pwa-strategy=none`, como os outros apps. A identidade de instalação é `https://admin.scapematch.com.br/` na raiz e a URL do Pages antigo no subcaminho.
+O build usa `--pwa-strategy=none`, como os outros apps. A identidade de instalação é `https://admin.escapematch.com.br/` na raiz e a URL do Pages antigo no subcaminho.
 
 ## O que o painel faz
 

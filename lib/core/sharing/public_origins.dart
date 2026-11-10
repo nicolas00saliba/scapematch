@@ -12,7 +12,7 @@ const playerAppOrigin = 'https://app.escapematch.com.br';
 const partnerAppOrigin = 'https://parceiro.escapematch.com.br';
 
 /// Admin real. Não há link a partir dos outros apps.
-const adminAppOrigin = 'https://admin.scapematch.com.br';
+const adminAppOrigin = 'https://admin.escapematch.com.br';
 
 /// Demonstração do jogador. O caminho `/parceiro/` neste host só redireciona.
 const demoAppOrigin = 'https://demo.escapematch.com.br';

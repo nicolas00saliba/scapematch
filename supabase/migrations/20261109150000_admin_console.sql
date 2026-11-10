@@ -1,4 +1,4 @@
--- Painel ScapeMatch Admin. Não aplica no projeto remoto por este agente.
+-- Painel EscapeMatch Admin. Não aplica no projeto remoto por este agente.
 -- Não reescreve 20261105210000.
 -- Toda leitura e escrita nova passa por RPC SECURITY DEFINER com
 -- search_path vazio e private.is_admin(). A taxa já cobrada fica em

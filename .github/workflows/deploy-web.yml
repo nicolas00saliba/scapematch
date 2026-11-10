@@ -4,7 +4,7 @@
 # parceiro.escapematch.com.br       → repo nicolas00saliba/scapematch-parceiro
 # parceiro-demo.escapematch.com.br  → repo nicolas00saliba/scapematch-parceiro-demo
 # demo.escapematch.com.br           → repo nicolas00saliba/scapematch-demo
-# admin.scapematch.com.br          → proposto; o Pages antigo publica em
+# admin.escapematch.com.br         → proposto; o Pages antigo publica em
 #                                    /scapematch/admin/ até existir o repo
 #                                    e o DNS. Este workflow não cria nenhum
 #                                    dos dois.
@@ -113,7 +113,7 @@ jobs:
           grep -F 'base href="/"' build/admin-root/index.html
           cp build/admin-root/index.html build/admin-root/404.html
           touch build/admin-root/.nojekyll
-          printf 'admin.scapematch.com.br\n' > build/admin-root/CNAME
+          printf 'admin.escapematch.com.br\n' > build/admin-root/CNAME
 
       - name: Build player web (demo, subdomain root)
         run: |

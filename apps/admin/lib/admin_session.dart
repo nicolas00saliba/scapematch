@@ -73,7 +73,7 @@ class AdminSessionController extends Notifier<AdminSession> {
     } on Object {
       state = const AdminSession(
         phase: AdminPhase.denied,
-        error: 'Esta conta não administra o ScapeMatch.',
+        error: 'Esta conta não administra o EscapeMatch.',
       );
     }
   }

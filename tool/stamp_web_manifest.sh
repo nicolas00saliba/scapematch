@@ -5,7 +5,7 @@
 #   jogador demo     https://demo.escapematch.com.br/
 #   Parceiro real    https://parceiro.escapematch.com.br/
 #   Parceiro demo    https://parceiro-demo.escapematch.com.br/
-#   Admin            https://admin.scapematch.com.br/
+#   Admin            https://admin.escapematch.com.br/
 # O Pages antigo em /scapematch/… usa o host do github.io mais o base href.
 # Rode depois de install_cleanup_service_worker.sh.
 set -euo pipefail

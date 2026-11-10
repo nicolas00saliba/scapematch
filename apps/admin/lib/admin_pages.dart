@@ -730,7 +730,7 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                   )
                 else
                   Text(
-                    'Taxa do Asaas, paga pela comissão do ScapeMatch: ${reais(report.asaasFeeCents!)} em ${report.asaasFeeRows} cobranças.',
+                    'Taxa do Asaas, paga pela comissão do EscapeMatch: ${reais(report.asaasFeeCents!)} em ${report.asaasFeeRows} cobranças.',
                     key: const Key('admin-taxa-asaas'),
                   ),
                 const SizedBox(height: 16),

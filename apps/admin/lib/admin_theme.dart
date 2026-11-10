@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 const adminTeal = Color(0xFF0F4C4A);
 const adminCopper = Color(0xFFD2642A);
 
-/// Marca do painel. O pin teal e o cobre são os da logo do ScapeMatch.
+/// Marca do painel. O pin teal e o cobre são os da logo do EscapeMatch.
 class AdminMark extends StatelessWidget {
   const AdminMark({super.key, this.height = 36, this.onDark = false});
 
@@ -19,7 +19,7 @@ class AdminMark extends StatelessWidget {
         Icon(Icons.place, color: adminCopper, size: height),
         const SizedBox(width: 4),
         Text(
-          'ScapeMatch',
+          'EscapeMatch',
           style: TextStyle(
             color: ink,
             fontFamily: 'Poppins',

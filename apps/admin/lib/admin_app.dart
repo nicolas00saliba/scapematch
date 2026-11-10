@@ -13,7 +13,7 @@ class AdminApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (kAppMode == AppMode.demo) {
       return MaterialApp(
-        title: 'ScapeMatch Admin',
+        title: 'EscapeMatch Admin',
         theme: adminTheme(),
         home: const Scaffold(
           body: Center(
@@ -24,7 +24,7 @@ class AdminApp extends ConsumerWidget {
     }
     final session = ref.watch(adminSessionProvider);
     return MaterialApp(
-      title: 'ScapeMatch Admin',
+      title: 'EscapeMatch Admin',
       debugShowCheckedModeBanner: false,
       theme: adminTheme(),
       home: session.phase == AdminPhase.ready
@@ -203,7 +203,7 @@ class _AdminLoginPageState extends ConsumerState<AdminLoginPage> {
                   const Center(child: AdminMark(height: 48)),
                   const SizedBox(height: 12),
                   Text(
-                    'ScapeMatch Admin',
+                    'EscapeMatch Admin',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),

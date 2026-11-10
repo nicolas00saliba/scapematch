@@ -12,7 +12,7 @@ sair do escopo da demo do jogador.
 LEGACY_ORIGIN = "https://nicolas00saliba.github.io"
 PLAYER_ORIGIN = "https://app.escapematch.com.br"
 PARTNER_ORIGIN = "https://parceiro.escapematch.com.br"
-ADMIN_ORIGIN = "https://admin.scapematch.com.br"
+ADMIN_ORIGIN = "https://admin.escapematch.com.br"
 DEMO_ORIGIN = "https://demo.escapematch.com.br"
 PARTNER_DEMO_ORIGIN = "https://parceiro-demo.escapematch.com.br"
 
@@ -58,5 +58,5 @@ def install_names(role, mode):
     if role == "partner" and mode == "real":
         return "EscapeMatch Parceiro", "Parceiro"
     if role == "admin" and mode == "real":
-        return "ScapeMatch Admin", "Admin"
+        return "EscapeMatch Admin", "Admin"
     raise ValueError(f"papel ou modo desconhecido: {role} {mode}")

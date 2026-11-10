@@ -32,6 +32,29 @@ void main() {
     expect(percentInput(2000), '20');
   });
 
+  testWidgets('login mostra o EscapeMatch Admin', (tester) async {
+    _size(tester, const Size(1280, 900));
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: noAutomaticRetry,
+        overrides: [
+          adminApiProvider.overrideWithValue(MemoryAdminApi()),
+          adminSessionProvider.overrideWith(SignedOutAdminSession.new),
+        ],
+        child: const AdminApp(),
+      ),
+    );
+    await _frames(tester);
+    expect(find.byKey(const Key('admin-login')), findsOneWidget);
+    expect(find.text('EscapeMatch Admin'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('admin-email')),
+      'admin@scapematch.exemplo',
+    );
+    await _frames(tester);
+    await _shot(tester, 'admin-login');
+  });
+
   testWidgets('painel mostra casas, ganhos e a taxa só quando existe', (tester) async {
     final api = MemoryAdminApi();
     _size(tester, const Size(1280, 900));
@@ -49,6 +72,8 @@ void main() {
     expect(find.byKey(const Key('admin-comissao')), findsOneWidget);
     await _shot(tester, 'admin-casa');
     await tester.enterText(find.byKey(const Key('admin-comissao')), '22,5');
+    await _frames(tester);
+    await _shot(tester, 'admin-comissao');
     await tester.tap(find.byKey(const Key('admin-gravar-comissao')));
     await _frames(tester);
     expect(find.text('Confirmar'), findsOneWidget);
@@ -122,6 +147,13 @@ Future<void> _frames(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
   await tester.pump(const Duration(milliseconds: 50));
+}
+
+class SignedOutAdminSession extends AdminSessionController {
+  @override
+  AdminSession build() {
+    return const AdminSession(phase: AdminPhase.signedOut);
+  }
 }
 
 class ReadyAdminSession extends AdminSessionController {
