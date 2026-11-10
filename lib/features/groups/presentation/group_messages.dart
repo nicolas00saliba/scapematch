@@ -177,6 +177,7 @@ abstract final class GroupMessages {
         'Só dá para entrar com quem já aceitou a mesma turma.',
       JoinFailureReason.companionUnavailable =>
         'Alguém da turma não pode entrar nesse horário. Ninguém entrou.',
+      JoinFailureReason.deadlinePassed => 'O prazo deste grupo acabou.',
     };
   }
 

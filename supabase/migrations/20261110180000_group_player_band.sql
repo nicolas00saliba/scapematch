@@ -38,13 +38,20 @@ declare
   v_filled integer;
 begin
   v_filled := private.group_filled_spots(p_group_id);
+  -- Prazo vencido sem confirmed_at não confirma, mesmo se o mínimo
+  -- for atingido depois. Grupo já confirmado segue até o máximo.
   update public.groups
   set confirmed_at = case
-        when v_filled >= minimum_spots then coalesce(confirmed_at, pg_catalog.now())
+        when confirmed_at is not null then confirmed_at
+        when closes_at is not null and closes_at <= pg_catalog.now() then confirmed_at
+        when v_filled >= minimum_spots then pg_catalog.now()
         else confirmed_at
       end,
       closed_at = case
         when cancelled_at is not null then closed_at
+        when confirmed_at is null
+          and closes_at is not null
+          and closes_at <= pg_catalog.now() then closed_at
         when v_filled >= total_spots then coalesce(closed_at, pg_catalog.now())
         else null
       end
@@ -392,8 +399,11 @@ begin
   end if;
   v_filled := private.group_filled_spots(p_group_id);
   v_minimum := coalesce(p_minimum_spots, v_group.minimum_spots);
-  if v_minimum < v_room.minimum_players or v_minimum > v_room.capacity then
+  if v_minimum < v_room.minimum_players then
     raise exception 'below room minimum' using errcode = '22023';
+  end if;
+  if v_minimum > v_room.capacity then
+    raise exception 'exceeds room capacity' using errcode = '22023';
   end if;
   if p_total_spots < 2 then
     raise exception 'below minimum' using errcode = '22023';
@@ -541,3 +551,335 @@ select
 from public.groups g;
 
 grant select on public.groups_with_counts to anon, authenticated, service_role;
+
+-- Prazo vencido sem confirmação recusa entrada. Grupo já confirmado
+-- continua aberto até o máximo, mesmo depois de closes_at.
+create or replace function public.join_group(p_group_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_group public.groups%rowtype;
+  v_room public.rooms%rowtype;
+  v_session_id uuid;
+  v_session public.room_sessions%rowtype;
+  v_filled integer;
+  v_name text;
+  v_existing public.group_members%rowtype;
+  v_member_id uuid;
+  v_offer integer;
+begin
+  if v_user is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+
+  select session_id
+    into v_session_id
+  from public.groups
+  where id = p_group_id;
+  if v_session_id is not null then
+    select * into v_session
+    from public.room_sessions
+    where id = v_session_id
+    for update;
+    if not found or v_session.cancelled_at is not null or v_session.starts_at is null then
+      raise sqlstate 'PT404' using message = 'unknown session';
+    end if;
+  end if;
+
+  select * into v_group from public.groups where id = p_group_id for update;
+  if not found then
+    raise exception 'group not found' using errcode = 'P0002';
+  end if;
+  if v_group.cancelled_at is not null then
+    raise exception 'group cancelled' using errcode = 'P0001';
+  end if;
+  if v_group.starts_at <= pg_catalog.now() then
+    raise exception 'session started' using errcode = 'P0001';
+  end if;
+  if v_group.confirmed_at is null
+     and v_group.closes_at is not null
+     and v_group.closes_at <= pg_catalog.now() then
+    raise exception 'O prazo deste grupo acabou' using errcode = 'P0001';
+  end if;
+  if v_group.closed_at is not null then
+    raise exception 'group full' using errcode = 'P0001';
+  end if;
+
+  select * into v_room from public.rooms where id = v_group.room_id;
+  if v_group.starts_at + make_interval(mins => v_room.duration_minutes) <= pg_catalog.now() then
+    raise exception 'session ended' using errcode = 'P0001';
+  end if;
+
+  select * into v_existing
+  from public.group_members
+  where group_id = p_group_id and user_id = v_user;
+  if found then
+    if v_existing.attendance = 'cancelled' then
+      raise exception 'membership closed' using errcode = 'P0001';
+    end if;
+    raise exception 'already joined' using errcode = '23505';
+  end if;
+
+  if private.user_has_overlap(
+    v_user, v_group.starts_at, v_room.duration_minutes, p_group_id
+  ) then
+    raise exception 'overlaps' using errcode = 'P0001';
+  end if;
+
+  v_filled := private.group_filled_spots(p_group_id);
+  if v_filled >= v_group.total_spots then
+    raise exception 'group full' using errcode = 'P0001';
+  end if;
+
+  select count(*)::integer into v_offer
+  from public.waitlist
+  where group_id = p_group_id
+    and offer_expires_at is not null
+    and offer_expires_at > pg_catalog.now()
+    and user_id <> v_user;
+  if v_filled + v_offer >= v_group.total_spots then
+    raise exception 'seat reserved' using errcode = 'P0001';
+  end if;
+
+  v_name := private.profile_display_name(v_user);
+  if v_name is null then
+    raise exception 'display name required' using errcode = '22023';
+  end if;
+
+  insert into public.group_members (
+    group_id, user_id, display_name, is_creator, payment_status
+  ) values (
+    p_group_id, v_user, v_name, false, 'pending'
+  )
+  returning id into v_member_id;
+
+  delete from public.waitlist
+  where group_id = p_group_id and user_id = v_user;
+
+  if private.group_filled_spots(p_group_id) >= v_group.total_spots then
+    update public.groups set closed_at = coalesce(closed_at, pg_catalog.now()) where id = p_group_id;
+  end if;
+
+  return v_member_id;
+end;
+$$;
+
+create or replace function public.join_group_with_party(
+  p_group_id uuid,
+  p_companion_ids uuid[]
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_group public.groups%rowtype;
+  v_room public.rooms%rowtype;
+  v_session_id uuid;
+  v_session public.room_sessions%rowtype;
+  v_party uuid[];
+  v_person uuid;
+  v_filled integer;
+  v_offers integer;
+  v_name text;
+  v_leader_member uuid;
+  v_count integer;
+begin
+  if v_user is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  if p_companion_ids is null or cardinality(p_companion_ids) = 0 then
+    raise exception 'party empty' using errcode = '22023';
+  end if;
+  if cardinality(p_companion_ids) > 11 then
+    raise exception 'party too large' using errcode = '22023';
+  end if;
+  select count(distinct id) into v_count from unnest(p_companion_ids) as t(id);
+  if v_count <> cardinality(p_companion_ids)
+    or v_user = any (p_companion_ids)
+    or exists (select 1 from unnest(p_companion_ids) as t(id) where t.id is null)
+  then
+    raise exception 'invalid companion' using errcode = '22023';
+  end if;
+
+  select session_id
+    into v_session_id
+  from public.groups
+  where id = p_group_id;
+  if v_session_id is not null then
+    select * into v_session
+    from public.room_sessions
+    where id = v_session_id
+    for update;
+    if not found or v_session.cancelled_at is not null or v_session.starts_at is null then
+      raise sqlstate 'PT404' using message = 'unknown session';
+    end if;
+  end if;
+
+  select * into v_group
+  from public.groups
+  where id = p_group_id
+  for update;
+  if not found then
+    raise exception 'group not found' using errcode = 'P0002';
+  end if;
+  if v_group.cancelled_at is not null then
+    raise exception 'group cancelled' using errcode = 'P0001';
+  end if;
+  if v_group.starts_at <= pg_catalog.now() then
+    raise exception 'session started' using errcode = 'P0001';
+  end if;
+  if v_group.confirmed_at is null
+     and v_group.closes_at is not null
+     and v_group.closes_at <= pg_catalog.now() then
+    raise exception 'O prazo deste grupo acabou' using errcode = 'P0001';
+  end if;
+
+  select * into v_room from public.rooms where id = v_group.room_id;
+  if v_group.starts_at + make_interval(mins => v_room.duration_minutes) <= pg_catalog.now() then
+    raise exception 'session ended' using errcode = 'P0001';
+  end if;
+
+  v_party := array[v_user] || p_companion_ids;
+
+  if exists (
+    select 1
+    from public.friendships blocked
+    where blocked.status = 'blocked'
+      and blocked.requester_id = any (v_party)
+      and blocked.addressee_id = any (v_party)
+  ) then
+    raise exception 'companion unavailable' using errcode = 'P0001';
+  end if;
+
+  foreach v_person in array p_companion_ids loop
+    if not exists (
+      select 1
+      from public.crew_members leader
+      join public.crews crew
+        on crew.id = leader.crew_id
+       and crew.deleted_at is null
+      join public.crew_members mate
+        on mate.crew_id = leader.crew_id
+       and mate.user_id = v_person
+       and mate.status = 'accepted'
+      where leader.user_id = v_user
+        and leader.status = 'accepted'
+    ) then
+      raise exception 'not crew mate' using errcode = '42501';
+    end if;
+  end loop;
+
+  foreach v_person in array v_party loop
+    if exists (
+      select 1 from public.group_members
+      where group_id = p_group_id and user_id = v_person
+    ) then
+      raise exception 'companion unavailable' using errcode = 'P0001';
+    end if;
+    if private.user_has_overlap(
+      v_person, v_group.starts_at, v_room.duration_minutes, p_group_id
+    ) then
+      raise exception 'companion unavailable' using errcode = 'P0001';
+    end if;
+    if exists (
+      select 1
+      from public.group_members seated
+      join public.friendships f
+        on f.status = 'blocked'
+       and (
+         (f.requester_id = seated.user_id and f.addressee_id = v_person)
+         or (f.addressee_id = seated.user_id and f.requester_id = v_person)
+       )
+      where seated.group_id = p_group_id
+        and seated.attendance <> 'cancelled'
+    ) then
+      raise exception 'companion unavailable' using errcode = 'P0001';
+    end if;
+  end loop;
+
+  v_filled := private.group_filled_spots(p_group_id);
+  select count(*)::integer into v_offers
+  from public.waitlist
+  where group_id = p_group_id
+    and offer_expires_at is not null
+    and offer_expires_at > pg_catalog.now()
+    and not (user_id = any (v_party));
+
+  if v_filled + coalesce(v_offers, 0) + cardinality(v_party) > v_group.total_spots then
+    raise exception 'party does not fit' using errcode = 'P0001';
+  end if;
+
+  foreach v_person in array v_party loop
+    v_name := private.profile_display_name(v_person);
+    if v_name is null then
+      raise exception 'display name required' using errcode = '22023';
+    end if;
+    insert into public.group_members (
+      group_id, user_id, display_name, is_creator, payment_status
+    ) values (
+      p_group_id, v_person, v_name, false, 'pending'
+    );
+    delete from public.waitlist
+    where group_id = p_group_id and user_id = v_person;
+    if v_person = v_user then
+      v_leader_member := (
+        select id from public.group_members
+        where group_id = p_group_id and user_id = v_user
+      );
+    else
+      perform private.post_app_notice(
+        v_person,
+        'party_seat',
+        'Vaga reservada',
+        'Sua turma reservou sua vaga. Pague a sua parte.',
+        p_group_id,
+        p_group_id::text || '-' || v_person::text
+      );
+    end if;
+  end loop;
+
+  if private.group_filled_spots(p_group_id) > v_group.total_spots then
+    raise exception 'party does not fit' using errcode = 'P0001';
+  end if;
+
+  if private.group_filled_spots(p_group_id) >= v_group.total_spots then
+    update public.groups
+      set closed_at = coalesce(closed_at, pg_catalog.now())
+      where id = p_group_id;
+  end if;
+
+  return v_leader_member;
+end;
+$$;
+
+
+create or replace function public.expire_unconfirmed_groups()
+returns setof uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return query
+  update public.groups
+  set cancelled_at = pg_catalog.now(),
+      cancel_reason = 'O grupo não confirmou a tempo'
+  where cancelled_at is null
+    and confirmed_at is null
+    and closed_at is null
+    and closes_at is not null
+    and closes_at <= pg_catalog.now()
+  returning id;
+end;
+$$;
+
+revoke all on function public.expire_unconfirmed_groups()
+  from public, anon, authenticated;
+grant execute on function public.expire_unconfirmed_groups() to service_role;

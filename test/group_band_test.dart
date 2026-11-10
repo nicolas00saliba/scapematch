@@ -9,6 +9,7 @@ import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
+import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
 import 'support/sample_clock.dart';
 
@@ -94,6 +95,10 @@ void main() {
       price,
     );
 
+    final stored = database.groups.indexWhere((group) => group.id == opened.id);
+    database.groups[stored] = database.groups[stored].copyWith(
+      closesAt: sampleNow.subtract(const Duration(hours: 1)),
+    );
     final third = await groups.join(
       opened.id,
       participantUserId: 'user-faixa-caio',
@@ -153,6 +158,17 @@ void main() {
     final index = database.groups.indexWhere((group) => group.id == opened.id);
     database.groups[index] = opened.copyWith(
       closesAt: now.subtract(const Duration(hours: 1)),
+    );
+    final late = await groups.join(
+      opened.id,
+      participantUserId: 'user-faixa-bia',
+      participantName: 'Bia',
+      markAsLocalUser: false,
+    );
+    expect((late as JoinFailure).reason, JoinFailureReason.deadlinePassed);
+    expect(
+      GroupMessages.joinFailure(JoinFailureReason.deadlinePassed),
+      'O prazo deste grupo acabou.',
     );
 
     final missed = await groups.getById(opened.id);

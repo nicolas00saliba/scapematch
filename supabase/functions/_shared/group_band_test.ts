@@ -32,8 +32,9 @@ Deno.test("prazo sem o mínimo libera", () => {
     total_spots: 6,
   };
   assertEquals(bandSettlement(group, 3, now), "release");
+  assertEquals(bandSettlement(group, 4, now), "release");
   assertEquals(
-    bandSettlement({ ...group, confirmed_at: past }, 3, now),
+    bandSettlement({ ...group, confirmed_at: past }, 5, now),
     "capture",
   );
 });

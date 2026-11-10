@@ -41,6 +41,14 @@ void main() {
     expect(joinFailure('offer expired'), JoinFailureReason.offerExpired);
     expect(joinFailure('seat reserved'), JoinFailureReason.seatReserved);
     expect(
+      joinFailure('O prazo deste grupo acabou'),
+      JoinFailureReason.deadlinePassed,
+    );
+    expect(
+      editFailure('exceeds room capacity'),
+      EditGroupFailureReason.exceedsRoomCapacity,
+    );
+    expect(
       deleteFailure('too close to delete'),
       DeleteGroupFailureReason.tooCloseToDelete,
     );

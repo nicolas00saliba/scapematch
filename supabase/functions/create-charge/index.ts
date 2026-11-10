@@ -122,7 +122,7 @@ export async function createCharge(
     const { data: group } = await admin
       .from("groups")
       .select(
-        "id, venue_id, price_cents, cancelled_at, confirmed_at, closed_at, starts_at, total_spots, minimum_spots",
+        "id, venue_id, price_cents, cancelled_at, confirmed_at, closed_at, closes_at, starts_at, total_spots, minimum_spots",
       )
       .eq("id", groupId)
       .maybeSingle();
@@ -1194,6 +1194,7 @@ async function groupClosedForCredit(
     cancelled_at: string | null;
     confirmed_at?: string | null;
     closed_at: string | null;
+    closes_at?: string | null;
     total_spots: number;
     minimum_spots: number;
   },

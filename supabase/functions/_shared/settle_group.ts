@@ -7,7 +7,7 @@ import {
   creditLedger,
 } from "./ledger.ts";
 import { syncPayerDocument } from "./payer_document.ts";
-import { bandConfirmed, bandSettlement } from "./group_band.ts";
+import { bandConfirmed, bandMissed, bandSettlement } from "./group_band.ts";
 import { releaseCancelledCharges } from "./release_charges.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -45,7 +45,7 @@ export async function maySettle(
   const { data: group } = await admin
     .from("groups")
     .select(
-      "created_by, venue_id, cancelled_at, confirmed_at, closed_at, total_spots, minimum_spots",
+      "created_by, venue_id, cancelled_at, confirmed_at, closed_at, closes_at, total_spots, minimum_spots",
     )
     .eq("id", groupId)
     .maybeSingle();
@@ -86,6 +86,17 @@ export async function settleGroup(
   const filled = await filledSpots(admin, groupId);
   const decision = bandSettlement(row, filled);
   if (decision === "release") {
+    if (bandMissed(row, filled)) {
+      await admin
+        .from("groups")
+        .update({
+          cancelled_at: new Date().toISOString(),
+          cancel_reason: "O grupo não confirmou a tempo",
+        })
+        .eq("id", groupId)
+        .is("cancelled_at", null)
+        .is("confirmed_at", null);
+    }
     await releaseCancelledCharges(admin, asaas, groupId);
     return;
   }
@@ -120,6 +131,21 @@ export async function settleGroup(
       });
     }
   }
+}
+
+/// Cancela no banco os grupos cujo prazo venceu sem confirmação.
+/// O cron libera as cobranças desses ids em seguida.
+export async function expireUnconfirmedGroups(admin: Admin): Promise<string[]> {
+  if (typeof admin?.rpc !== "function") return [];
+  const { data, error } = await admin.rpc("expire_unconfirmed_groups");
+  if (error) {
+    if (!claimMissing.has(error.code)) logCaught("settle-charges", error);
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+  return data.filter((id): id is string =>
+    typeof id === "string" && id.length > 0
+  );
 }
 
 /// Varre autorizações ainda abertas. O cron de reconcile chama isto.

@@ -132,7 +132,7 @@ async function groupIsClosed(
   const { data: group } = await admin
     .from("groups")
     .select(
-      "cancelled_at, confirmed_at, closed_at, total_spots, minimum_spots",
+      "cancelled_at, confirmed_at, closed_at, closes_at, total_spots, minimum_spots",
     )
     .eq("id", groupId)
     .maybeSingle();

@@ -172,6 +172,9 @@ class FakeGroupRepository implements GroupRepository {
     if (current.isCancelled) {
       return const JoinFailure(JoinFailureReason.groupCancelled);
     }
+    if (current.confirmedAt == null && !now.isBefore(current.closesAtResolved)) {
+      return const JoinFailure(JoinFailureReason.deadlinePassed);
+    }
     if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
       return const JoinFailure(JoinFailureReason.sessionEnded);
     }
@@ -326,6 +329,9 @@ class FakeGroupRepository implements GroupRepository {
     final now = clock.now();
     if (current.isCancelled) {
       return const JoinFailure(JoinFailureReason.groupCancelled);
+    }
+    if (current.confirmedAt == null && !now.isBefore(current.closesAtResolved)) {
+      return const JoinFailure(JoinFailureReason.deadlinePassed);
     }
     if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
       return const JoinFailure(JoinFailureReason.sessionEnded);
@@ -936,8 +942,11 @@ class FakeGroupRepository implements GroupRepository {
     }
     final occupied = current.occupiedSpots;
     final minimum = minimumSpots ?? current.minimumSpots;
-    if (minimum < current.roomMinimum || minimum > current.roomCapacity) {
+    if (minimum < current.roomMinimum) {
       return const EditGroupFailure(EditGroupFailureReason.belowRoomMinimum);
+    }
+    if (minimum > current.roomCapacity) {
+      return const EditGroupFailure(EditGroupFailureReason.exceedsRoomCapacity);
     }
     final validation = GroupRules.validateTotalSpots(
       totalSpots: totalSpots,
@@ -1217,6 +1226,10 @@ class FakeGroupRepository implements GroupRepository {
   /// Quem pagou antes não é reajustado.
   Future<Group> _confirmIfReady(Group group) async {
     if (group.isCancelled) {
+      return group;
+    }
+    final now = clock.now();
+    if (group.confirmedAt == null && !now.isBefore(group.closesAtResolved)) {
       return group;
     }
     final ready =

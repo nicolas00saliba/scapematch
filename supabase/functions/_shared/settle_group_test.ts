@@ -55,6 +55,14 @@ function adminFor(options: {
         limit() {
           return self;
         },
+        update(values: Record<string, unknown>) {
+          calls.push(`update:${table}`);
+          transitions.push(values);
+          return self;
+        },
+        is() {
+          return self;
+        },
         maybeSingle() {
           return Promise.resolve(row());
         },
@@ -306,6 +314,32 @@ Deno.test("migração não expõe a trava nem cria segredo novo", async () => {
   assert(sql.includes("revoke select (capture_claimed_at)"));
   assertEquals(sql.includes("service_role_key"), false);
   assertEquals(sql.includes("alter table vault"), false);
+});
+
+Deno.test("prazo vencido sem confirmação cancela e não captura", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    closed: false,
+    confirmed: false,
+    filled: 4,
+    total: 6,
+    minimum: 4,
+    closesAt: "2020-01-01T00:00:00Z",
+    charges,
+  });
+  const captures: string[] = [];
+  await settleGroup(admin, provider("AUTHORIZED", captures), groupId);
+  assertEquals(captures.length, 0);
+  assertEquals(charges[0].status, "authorized");
+  assert(
+    admin.calls.includes("update:groups"),
+    admin.calls.join(","),
+  );
+  assert(
+    admin.transitions.some((call) =>
+      call.cancel_reason === "O grupo não confirmou a tempo"
+    ),
+  );
 });
 
 Deno.test("grupo confirmado captura mesmo sem lotar", async () => {

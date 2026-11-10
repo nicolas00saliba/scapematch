@@ -46,6 +46,9 @@ enum JoinFailureReason {
 
   /// Alguém da turma não pode sentar (horário, bloqueio ou cadeira antiga).
   companionUnavailable,
+
+  /// O prazo de confirmar passou e o grupo não confirmou.
+  deadlinePassed,
 }
 
 sealed class CreateGroupResult {
