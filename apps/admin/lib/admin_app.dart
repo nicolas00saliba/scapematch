@@ -17,9 +17,7 @@ class AdminApp extends ConsumerWidget {
         title: 'EscapeMatch Admin',
         theme: adminTheme(),
         home: const Scaffold(
-          body: Center(
-            child: Text('O Admin não tem versão de demonstração.'),
-          ),
+          body: Center(child: Text('O Admin não tem versão de demonstração.')),
         ),
       );
     }
@@ -31,6 +29,7 @@ class AdminApp extends ConsumerWidget {
       home: switch (session.phase) {
         AdminPhase.ready => const AdminShell(),
         AdminPhase.enroll || AdminPhase.verify => const AdminMfaPage(),
+        AdminPhase.loading => const AdminSplash(),
         _ => const AdminLoginPage(),
       },
     );
@@ -58,12 +57,10 @@ class AdminShell extends ConsumerWidget {
     final wide = MediaQuery.sizeOf(context).width >= 960;
     final session = ref.watch(adminSessionProvider);
     final page = switch (place.section) {
-      AdminSection.casas => place.id == null
-          ? const CasasPage()
-          : CasaPage(id: place.id!),
-      AdminSection.jogadores => place.id == null
-          ? const JogadoresPage()
-          : JogadorPage(id: place.id!),
+      AdminSection.casas =>
+        place.id == null ? const CasasPage() : CasaPage(id: place.id!),
+      AdminSection.jogadores =>
+        place.id == null ? const JogadoresPage() : JogadorPage(id: place.id!),
       AdminSection.regras => const RegrasPage(),
       AdminSection.ganhos => const GanhosPage(),
       AdminSection.destaques => const DestaquesPage(),
@@ -78,11 +75,23 @@ class AdminShell extends ConsumerWidget {
       return Scaffold(
         key: const Key('admin-shell'),
         appBar: AppBar(
-          title: Text(destinations[selected].$2),
+          title: Row(
+            children: [
+              const AdminMark(height: 32),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  destinations[selected].$2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           actions: [
             IconButton(
               tooltip: 'Sair',
-              onPressed: () => ref.read(adminSessionProvider.notifier).signOut(),
+              onPressed: () =>
+                  ref.read(adminSessionProvider.notifier).signOut(),
               icon: const Icon(Icons.logout),
             ),
           ],
@@ -108,9 +117,15 @@ class AdminShell extends ConsumerWidget {
             extended: MediaQuery.sizeOf(context).width >= 1200,
             selectedIndex: selected,
             onDestinationSelected: go,
-            leading: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: AdminMark(onDark: true),
+            leading: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+              child: Center(
+                child: AdminMark(
+                  height: 44,
+                  onDark: true,
+                  wordmark: MediaQuery.sizeOf(context).width >= 1200,
+                ),
+              ),
             ),
             trailing: IconButton(
               tooltip: 'Sair',
@@ -151,7 +166,7 @@ class _RailList extends StatelessWidget {
     return ListView(
       children: [
         const SizedBox(height: 24),
-        const Center(child: AdminMark()),
+        const Center(child: AdminMark(height: 88)),
         if (name != null)
           Padding(
             padding: const EdgeInsets.all(16),
@@ -165,6 +180,19 @@ class _RailList extends StatelessWidget {
             onTap: () => onSelected(i),
           ),
       ],
+    );
+  }
+}
+
+class AdminSplash extends StatelessWidget {
+  const AdminSplash({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      key: Key('admin-splash'),
+      backgroundColor: Color(0xFF000000),
+      body: Center(child: AdminMark(height: 280, plate: false)),
     );
   }
 }
@@ -190,64 +218,56 @@ class _AdminLoginPageState extends ConsumerState<AdminLoginPage> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(adminSessionProvider);
-    final busy = session.phase == AdminPhase.loading;
+    final busy = session.busy;
     return Scaffold(
       key: const Key('admin-login'),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Center(child: AdminMark(height: 48)),
-                  const SizedBox(height: 12),
-                  Text(
-                    'EscapeMatch Admin',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Só entra quem está em admins. A autorização continua no servidor.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    key: const Key('admin-email'),
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'E-mail'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    key: const Key('admin-password'),
-                    controller: _password,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Senha'),
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  if (session.error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      session.error!,
-                      key: const Key('admin-login-error'),
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    key: const Key('admin-enter'),
-                    onPressed: busy ? null : _submit,
-                    child: Text(busy ? 'Entrando…' : 'Entrar'),
-                  ),
-                ],
-              ),
+      body: AdminAuthCard(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Center(child: AdminMark(height: 112)),
+            const SizedBox(height: 12),
+            Text(
+              'EscapeMatch Admin',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-          ),
+            const SizedBox(height: 8),
+            const Text(
+              'Só entra quem está em admins. A autorização continua no servidor.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              key: const Key('admin-email'),
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'E-mail'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('admin-password'),
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Senha'),
+              onSubmitted: (_) => _submit(),
+            ),
+            if (session.error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                session.error!,
+                key: const Key('admin-login-error'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FilledButton(
+              key: const Key('admin-enter'),
+              onPressed: busy ? null : _submit,
+              child: Text(busy ? 'Entrando…' : 'Entrar'),
+            ),
+          ],
         ),
       ),
     );
