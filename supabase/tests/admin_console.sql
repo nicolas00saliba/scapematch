@@ -246,6 +246,38 @@ rollback;
 
 begin;
 select set_config('request.jwt.claim.sub', 'ad111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.aal', 'aal1', true);
+set local role authenticated;
+do $$
+begin
+  perform public.admin_whoami();
+  raise exception 'aal1 abriu o console';
+exception
+  when sqlstate '42501' then
+    if sqlerrm not ilike '%mfa%' then
+      raise exception 'aal1 recebeu outro erro: %', sqlerrm;
+    end if;
+end $$;
+rollback;
+
+begin;
+select set_config('request.jwt.claim.sub', 'ad111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.aal', 'aal2', true);
+set local role authenticated;
+do $$
+declare
+  v_who jsonb;
+begin
+  v_who := public.admin_whoami();
+  if v_who ->> 'user_id' is distinct from 'ad111111-1111-4111-8111-111111111111' then
+    raise exception 'aal2 nao entrou: %', v_who;
+  end if;
+end $$;
+rollback;
+
+begin;
+select set_config('request.jwt.claim.sub', 'ad111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.aal', 'aal2', true);
 set local role authenticated;
 do $$
 declare
@@ -481,6 +513,7 @@ end $$;
 reset role;
 
 select set_config('request.jwt.claim.sub', 'ad111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.aal', 'aal2', true);
 set local role authenticated;
 do $$
 declare

@@ -55,6 +55,27 @@ void main() {
     await _shot(tester, 'admin-login');
   });
 
+  testWidgets('a verificação pede o código antes do painel', (tester) async {
+    _size(tester, const Size(1280, 900));
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: noAutomaticRetry,
+        overrides: [
+          adminApiProvider.overrideWithValue(MemoryAdminApi()),
+          adminSessionProvider.overrideWith(VerifyAdminSession.new),
+        ],
+        child: const AdminApp(),
+      ),
+    );
+    await _frames(tester);
+    expect(find.byKey(const Key('admin-mfa')), findsOneWidget);
+    expect(find.text('Código do autenticador'), findsOneWidget);
+    expect(find.byKey(const Key('admin-casas')), findsNothing);
+    await tester.enterText(find.byKey(const Key('admin-mfa-code')), '482193');
+    await _frames(tester);
+    await _shot(tester, 'admin-mfa');
+  });
+
   testWidgets('painel mostra casas, ganhos e a taxa só quando existe', (tester) async {
     final api = MemoryAdminApi();
     _size(tester, const Size(1280, 900));
@@ -153,6 +174,16 @@ class SignedOutAdminSession extends AdminSessionController {
   @override
   AdminSession build() {
     return const AdminSession(phase: AdminPhase.signedOut);
+  }
+}
+
+class VerifyAdminSession extends AdminSessionController {
+  @override
+  AdminSession build() {
+    return const AdminSession(
+      phase: AdminPhase.verify,
+      email: 'admin@scapematch.exemplo',
+    );
   }
 }
 

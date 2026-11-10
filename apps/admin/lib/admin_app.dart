@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
+import 'package:scapematch_admin/admin_mfa.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 import 'package:scapematch_admin/admin_place.dart';
 import 'package:scapematch_admin/admin_session.dart';
@@ -27,9 +28,11 @@ class AdminApp extends ConsumerWidget {
       title: 'EscapeMatch Admin',
       debugShowCheckedModeBanner: false,
       theme: adminTheme(),
-      home: session.phase == AdminPhase.ready
-          ? const AdminShell()
-          : const AdminLoginPage(),
+      home: switch (session.phase) {
+        AdminPhase.ready => const AdminShell(),
+        AdminPhase.enroll || AdminPhase.verify => const AdminMfaPage(),
+        _ => const AdminLoginPage(),
+      },
     );
   }
 }

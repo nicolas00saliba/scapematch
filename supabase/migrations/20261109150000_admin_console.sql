@@ -1,7 +1,9 @@
 -- Painel EscapeMatch Admin. Não aplica no projeto remoto por este agente.
 -- Não reescreve 20261105210000.
 -- Toda leitura e escrita nova passa por RPC SECURITY DEFINER com
--- search_path vazio e private.is_admin(). A taxa já cobrada fica em
+-- search_path vazio. admin_require exige admin e aal2. private.is_admin()
+-- continua só a lista de admins: as policies e as funções de fora do
+-- console usam essa versão. A taxa já cobrada fica em
 -- payment_charges.commission_bps: mudar a casa não mexe nessa coluna.
 -- asaas_fee_cents nasce nulo. O painel só mostra a taxa quando o dado existe.
 
@@ -110,6 +112,11 @@ begin
   end if;
   if not private.is_admin() then
     raise exception 'not admin' using errcode = '42501';
+  end if;
+  -- private.is_admin() não olha o aal: casa, jogador e policies seguem
+  -- valendo com a sessão comum. O console só abre com o segundo fator.
+  if coalesce(auth.jwt() ->> 'aal', '') is distinct from 'aal2' then
+    raise exception 'mfa obrigatorio' using errcode = '42501';
   end if;
   return v_uid;
 end;

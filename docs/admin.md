@@ -21,7 +21,9 @@ O build usa `--pwa-strategy=none`, como os outros apps. A identidade de instala�
 
 ## Segurança
 
-Toda leitura e escrita do painel passa por RPC `SECURITY DEFINER` com `search_path` vazio. Cada uma chama `private.is_admin()`. O grant de execução é só para `authenticated`. `anon` e `service_role` não executam. O app não carrega a chave `service_role`.
+Toda leitura e escrita do painel passa por RPC `SECURITY DEFINER` com `search_path` vazio. Cada uma chama `private.admin_require()`, que exige admin e sessão `aal2`. `private.is_admin()` continua só conferindo a tabela `admins`, porque policies e funções de fora do console também a usam. O grant de execução é só para `authenticated`. `anon` e `service_role` não executam. O app não carrega a chave `service_role`.
+
+Depois da senha, quem não tem TOTP cadastra o fator (`supabase.auth.mfa.enroll`) e quem já tem informa o código (`challenge` e `verify`). Sem o segundo fator o painel não abre.
 
 `admin_audit_log` e `reward_settings_changes` não têm policy de leitura e o privilégio foi revogado. O painel lê a auditoria pela função `admin_audit`.
 
