@@ -93,7 +93,7 @@ class _PartnerAdminScreenState extends ConsumerState<PartnerAdminScreen> {
               children: [
                 const CommissionAdminPanel(),
                 const SizedBox(height: 24),
-                const ScapeLiabilityPanel(),
+                const AdminConsoleNotice(),
                 const SizedBox(height: 24),
                 const VenuePayoutPanel(),
                 const SizedBox(height: 24),
