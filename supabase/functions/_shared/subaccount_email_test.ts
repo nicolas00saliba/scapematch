@@ -38,17 +38,69 @@ Deno.test("e-mail de contato ou fiscal da casa ganha do alias", () => {
 });
 
 Deno.test("domínio do alias vem do env e o inválido cai no fallback", () => {
-  const custom = subaccountEmailPlan({ id: venueId }, {
-    get: (name) =>
-      name === "ASAAS_SUBACCOUNT_EMAIL_DOMAIN"
-        ? "mail.scapematch.app"
-        : undefined,
-  });
-  assertEquals(custom.alias, venueAliasEmail(venueId, "mail.scapematch.app"));
-  const broken = subaccountEmailPlan({ id: venueId }, {
-    get: () => "não é domínio",
-  });
-  assertEquals(broken.alias.endsWith(`@${fallbackSubaccountDomain}`), true);
+  const logs: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    const custom = subaccountEmailPlan({ id: venueId }, {
+      get: (name) =>
+        name === "ASAAS_SUBACCOUNT_EMAIL_DOMAIN"
+          ? "mail.escapematch.com.br"
+          : undefined,
+    });
+    assertEquals(
+      custom.alias,
+      venueAliasEmail(venueId, "mail.escapematch.com.br"),
+    );
+    assertEquals(logs.length, 0);
+    const broken = subaccountEmailPlan({ id: venueId }, {
+      get: () => "não é domínio",
+    });
+    assertEquals(broken.alias.endsWith(`@${fallbackSubaccountDomain}`), true);
+    assertEquals(logs.length, 1);
+    const parsed = JSON.parse(logs[0]);
+    assertEquals(parsed.scope, "subaccount_email");
+    assertEquals(parsed.code, "invalid_email_domain");
+    assertEquals(parsed.fallback, "escapematch.com.br");
+    assertEquals(logs[0].includes("scapematch.app"), false);
+    assertEquals(logs[0].includes("não é domínio"), false);
+  } finally {
+    console.warn = original;
+  }
+});
+
+Deno.test("sem ASAAS_SUBACCOUNT_EMAIL_DOMAIN avisa e usa escapematch.com.br", () => {
+  const logs: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    const missing = subaccountEmailPlan({ id: venueId }, {
+      get: () => undefined,
+    });
+    const blank = subaccountEmailPlan({ id: venueId }, {
+      get: () => "  ",
+    });
+    assertEquals(
+      missing.alias,
+      `parceiros+${venueId}@escapematch.com.br`,
+    );
+    assertEquals(blank.alias, missing.alias);
+    assertEquals(fallbackSubaccountDomain, "escapematch.com.br");
+    assertEquals(logs.length, 2);
+    for (const line of logs) {
+      const parsed = JSON.parse(line);
+      assertEquals(parsed.scope, "subaccount_email");
+      assertEquals(parsed.code, "missing_email_domain");
+      assertEquals(parsed.fallback, "escapematch.com.br");
+      assertEquals(line.includes("scapematch.app"), false);
+    }
+  } finally {
+    console.warn = original;
+  }
 });
 
 Deno.test("e-mail duplicado no Asaas pede o alias; outro 400 não", () => {

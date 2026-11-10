@@ -1,6 +1,7 @@
 /// Para onde ir depois de entrar, quando não há convite pendente.
 ///
-/// Só aceita a Conta, Meus grupos e Criar grupo. O resto volta para a Home.
+/// Só aceita a Conta, Meus grupos, Criar grupo e o convite de amigo
+/// (`/amigos/c/:code`). O resto volta para a Home.
 String afterAuthLocation(String? next) {
   if (next == null || next.isEmpty) {
     return '/';
@@ -15,6 +16,12 @@ String afterAuthLocation(String? next) {
     }
     return uri.path;
   }
+  if (_friendInvitePath.hasMatch(uri.path)) {
+    if (uri.hasQuery) {
+      return '/';
+    }
+    return uri.path;
+  }
   if (uri.path != '/groups/new') {
     return '/';
   }
@@ -24,6 +31,9 @@ String afterAuthLocation(String? next) {
   }
   return uri.toString();
 }
+
+/// Um segmento só, como o código do convite. Sem query e sem outro host.
+final _friendInvitePath = RegExp(r'^/amigos/c/[A-Za-z0-9_-]+$');
 
 /// Login que, ao concluir, volta para [next] se ele for um destino seguro.
 String loginLocation(String next) {

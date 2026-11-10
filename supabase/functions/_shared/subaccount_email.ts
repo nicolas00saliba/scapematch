@@ -3,9 +3,9 @@ import {
   isDuplicateSubaccountEmail,
 } from "./asaas_client_error.ts";
 
-/// Domínio do alias quando `ASAAS_SUBACCOUNT_EMAIL_DOMAIN` não está definida.
-/// O app já usa este host em links públicos.
-export const fallbackSubaccountDomain = "scapematch.app";
+/// Domínio do alias quando `ASAAS_SUBACCOUNT_EMAIL_DOMAIN` não está definida
+/// ou não é um domínio. É um domínio nosso. O fallback avisa no log.
+export const fallbackSubaccountDomain = "escapematch.com.br";
 
 const domainPattern =
   /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
@@ -21,12 +21,31 @@ export type SubaccountEmailPlan = {
   alias: string;
 };
 
+function warnEmailDomainFallback(
+  code: "missing_email_domain" | "invalid_email_domain",
+): void {
+  console.warn(
+    JSON.stringify({
+      scope: "subaccount_email",
+      code,
+      fallback: fallbackSubaccountDomain,
+    }),
+  );
+}
+
 export function subaccountEmailDomain(
   env: { get(name: string): string | undefined },
 ): string {
   const raw = (env.get("ASAAS_SUBACCOUNT_EMAIL_DOMAIN") ?? "").trim()
     .toLowerCase();
-  if (!raw || !domainPattern.test(raw)) return fallbackSubaccountDomain;
+  if (!raw) {
+    warnEmailDomainFallback("missing_email_domain");
+    return fallbackSubaccountDomain;
+  }
+  if (!domainPattern.test(raw)) {
+    warnEmailDomainFallback("invalid_email_domain");
+    return fallbackSubaccountDomain;
+  }
   return raw;
 }
 

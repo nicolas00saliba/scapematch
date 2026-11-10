@@ -30,6 +30,18 @@ void main() {
     );
     expect(afterAuthLocation('https://example.invalid'), '/');
     expect(afterAuthLocation('/groups/other'), '/');
+    expect(
+      afterAuthLocation('/amigos/c/abc123def456'),
+      '/amigos/c/abc123def456',
+    );
+    expect(afterAuthLocation('/amigos/c/ana_demo'), '/amigos/c/ana_demo');
+    expect(afterAuthLocation('/amigos/c/ana_demo?x=1'), '/');
+    expect(afterAuthLocation('/amigos/c/'), '/');
+    expect(afterAuthLocation('/amigos/c/a/b'), '/');
+    expect(
+      afterAuthLocation('https://app.escapematch.com.br/amigos/c/abc123def456'),
+      '/',
+    );
   });
 
   testWidgets('sign out, open an invite, log in and land in the group', (

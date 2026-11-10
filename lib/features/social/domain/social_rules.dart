@@ -1,3 +1,4 @@
+import 'package:scapematch/core/sharing/public_origins.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 
 /// Regras de amigos e turmas que não dependem de Flutter nem do banco.
@@ -45,7 +46,7 @@ abstract final class SocialRules {
     return false;
   }
 
-  /// Link que o QR mostra. A rota do app é `/amigos/c/:code`.
-  static String inviteLink(String code) =>
-      'https://scapematch.app/amigos/c/$code';
+  /// Link que o QR mostra. A rota do app é `/amigos/c/:code`
+  /// em [playerAppOrigin].
+  static String inviteLink(String code) => '$playerAppOrigin/amigos/c/$code';
 }
