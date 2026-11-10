@@ -225,7 +225,7 @@ async function emitOnAsaas(
   const input: ScheduleInvoiceInput = {
     customer,
     serviceDescription: draft.description,
-    observations: "Nota emitida pelo ScapeMatch na confirmação da reserva.",
+    observations: "Nota emitida pelo EscapeMatch na confirmação da reserva.",
     value: centsToReais(draft.valueCents),
     deductions: 0,
     effectiveDate: todayInSaoPaulo(),
@@ -302,7 +302,7 @@ async function ensurePlayerCustomer(
   const customerId = await customerWithCpf(client, {
     customerId: (found?.asaas_customer_id as string | null) ?? null,
     name,
-    email: email ?? `jogador-${charge.user_id}@scapematch.invalid`,
+    email: email ?? `jogador-${charge.user_id}@escapematch.invalid`,
     externalReference: `player:${charge.venue_id}:${charge.user_id}`,
     cpf,
   });
@@ -334,7 +334,7 @@ async function ensureHouseCustomer(
   const ownerEmail = await emailOf(admin, venue.ownerId);
   const created = await client.createCustomer({
     name: venue.name,
-    email: ownerEmail ?? `casa-${venueId}@scapematch.invalid`,
+    email: ownerEmail ?? `casa-${venueId}@escapematch.invalid`,
     cpfCnpj: venue.documentNumber,
     externalReference: `house:${venueId}`,
   });

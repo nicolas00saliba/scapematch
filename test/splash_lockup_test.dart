@@ -182,7 +182,7 @@ Future<void> _saveFrame(WidgetTester tester, String name) async {
 Finder _wordmark() {
   return find.descendant(
     of: find.byKey(AppKeys.splash),
-    matching: find.text('ScapeMatch'),
+    matching: find.text('EscapeMatch'),
   );
 }
 

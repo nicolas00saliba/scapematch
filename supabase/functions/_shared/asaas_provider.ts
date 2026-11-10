@@ -763,7 +763,7 @@ export class AsaasProvider implements PaymentProvider {
   ): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = {
       access_token: this.apiKey,
-      "User-Agent": "ScapeMatch",
+      "User-Agent": "EscapeMatch",
       Accept: "application/json",
     };
     const init: RequestInit = { method, headers };

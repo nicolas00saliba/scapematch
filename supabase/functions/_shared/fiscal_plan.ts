@@ -1,5 +1,5 @@
 // Plano das duas NFS-e de uma cobrança paga. Sem rede e sem chave.
-// A casa emite o serviço para o jogador. A ScapeMatch emite só a comissão
+// A casa emite o serviço para o jogador. A EscapeMatch emite só a comissão
 // contra a casa. CPF não emite o serviço e mesmo assim recebe o split.
 
 export type DocumentKind = "cpf" | "cnpj";

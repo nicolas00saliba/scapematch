@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-/// A partir daqui o ScapeMatch vira site: navegação no topo e conteúdo largo.
+/// A partir daqui o EscapeMatch vira site: navegação no topo e conteúdo largo.
 /// Abaixo disso continua o app de celular, com a barra embaixo.
 const scapeDesktopMinWidth = 960.0;
 

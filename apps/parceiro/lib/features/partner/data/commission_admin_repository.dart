@@ -44,7 +44,7 @@ class MemoryCommissionAdminRepository implements CommissionAdminRepository {
     return [
       CommissionRow(
         venueId: null,
-        name: 'ScapeMatch',
+        name: 'EscapeMatch',
         commissionBps: settings.commissionBps,
       ),
       for (final house in houses.entries)

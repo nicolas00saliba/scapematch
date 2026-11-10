@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera os flyers de Promoções no desenho atual do ScapeMatch.
+"""Gera os flyers de Promoções no desenho atual do EscapeMatch.
 
 A fonte é a Poppins Medium do app (assets/fonts/Poppins-Medium.ttf). O texto
 vira contorno, então o PNG não depende da fonte instalada na máquina. O pin é
@@ -152,7 +152,7 @@ def lockup(face: Face, x: float, y: float, height: float, on_dark: bool) -> str:
     gap = height * 0.18
     scape_fill = PIN_ON_DARK if on_dark else PIN
     scape, end = face.draw(
-        "Scape",
+        "Escape",
         x + pin_width + gap,
         baseline,
         size,
@@ -355,7 +355,7 @@ def banner_dez(face: Face) -> str:
         phrase_track,
         "middle",
     )
-    # Cabeçalho largo: símbolo + ScapeMatch, como no topo do site.
+    # Cabeçalho largo: símbolo + EscapeMatch, como no topo do site.
     logo = lockup(face, 64, 48, 196, on_dark=False)
     return svg_document("10% no primeiro jogo", body + percent + label + logo)
 

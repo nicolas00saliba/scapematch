@@ -1,7 +1,7 @@
 import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// URL e chave publicável do projeto ScapeMatch.
+/// URL e chave publicável do projeto EscapeMatch.
 ///
 /// A chave publicável vai no app. A chave secreta e a service role não.
 const scapeSupabaseUrl = 'https://eujlhicairvksvmssruz.supabase.co';

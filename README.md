@@ -1,4 +1,4 @@
-# ScapeMatch
+# EscapeMatch
 
 App para juntar pessoas em grupos de experiências presenciais, começando por escape rooms. A dor é simples: querer jogar e não ter gente suficiente.
 
@@ -49,14 +49,14 @@ cd build/web && python3 -m http.server 8080
 10. **Excluir grupo**, só para quem criou. Isso cancela o evento para todo mundo e reembolsa integralmente, mesmo em cima da hora. Quem não criou não vê o botão. O criador não sai: ele exclui.
 11. **Editar** o tamanho desejado e uma observação, dentro de quem já entrou e da capacidade da sala. Dá para remover outra pessoa, com reembolso integral, e copiar o link do grupo.
 12. **Meus grupos**, na aba do meio, com as abas Próximos, Passados e Cancelados. Mostra presença, pagamento simulado e reembolso. O preço por pessoa é fictício. Nada é cobrado.
-13. **ScapeMatch Parceiro** é um app à parte, em `apps/parceiro`, publicado em `https://parceiro.scapematch.com.br/` (na transição ainda em `https://nicolas00saliba.github.io/scapematch/parceiro/`). A demonstração da casa fica em `https://parceiro-demo.scapematch.com.br/`. O endereço antigo `https://demo.scapematch.com.br/parceiro/` só redireciona para lá. Na demo do jogador, “Seja parceiro” abre essa demonstração; no app real, abre o Parceiro real. Login de exemplo `a` / `b`, ou `xv@scapematch.exemplo` / `demo`, da casa Mistério da Rua XV. Saldo, extrato (bruto, comissão, líquido), reservas, salas, agenda e falta. Cada app carrega o próprio livro de exemplo.
+13. **EscapeMatch Parceiro** é um app à parte, em `apps/parceiro`, publicado em `https://parceiro.escapematch.com.br/` (na transição ainda em `https://nicolas00saliba.github.io/scapematch/parceiro/`). A demonstração da casa fica em `https://parceiro-demo.escapematch.com.br/`. O endereço antigo `https://demo.escapematch.com.br/parceiro/` só redireciona para lá. Na demo do jogador, “Seja parceiro” abre essa demonstração; no app real, abre o Parceiro real. Login de exemplo `a` / `b`, ou `xv@scapematch.exemplo` / `demo`, da casa Mistério da Rua XV. Saldo, extrato (bruto, comissão, líquido), reservas, salas, agenda e falta. Cada app carrega o próprio livro de exemplo.
 
 A aba Conta existe, mas ainda não há login. A pessoa que usa o app é um usuário fictício (`currentUserProvider`), e o nome de exemplo é “Nícolas”. O repositório não tem esse nome escrito: ele recebe quem o provider entregar, para o login substituir o provider depois. A carteira lê `WalletRepository` (saldo de exemplo) e os cartões leem `PaymentMethodsRepository` (lista vazia). O plano do pagamento real está em [docs/PAGAMENTOS_PLANO.md](docs/PAGAMENTOS_PLANO.md).
 
 ## Estrutura de pastas
 
 ```text
-apps/parceiro/            # ScapeMatch Parceiro, build web próprio
+apps/parceiro/            # EscapeMatch Parceiro, build web próprio
 lib/
   main.dart                 # sobe o app
   app/                      # tema, rotas, retry do Riverpod

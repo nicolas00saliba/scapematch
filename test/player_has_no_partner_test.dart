@@ -21,7 +21,7 @@ void main() {
     GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/parceiro');
     await tester.pumpAndSettle();
     expect(find.text('Entrar como casa'), findsNothing);
-    expect(find.text('ScapeMatch Parceiro'), findsNothing);
+    expect(find.text('EscapeMatch Parceiro'), findsNothing);
     expect(find.text('xv@scapematch.exemplo'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -35,7 +35,7 @@ Future<void> _openAccount(WidgetTester tester, Size size) async {
   await tester.tap(find.byKey(AppKeys.accountTab));
   await tester.pumpAndSettle();
   expect(find.text('Conta'), findsWidgets);
-  expect(find.text('ScapeMatch Parceiro'), findsNothing);
+  expect(find.text('EscapeMatch Parceiro'), findsNothing);
   expect(find.text('xv@scapematch.exemplo'), findsNothing);
   expect(find.byKey(const Key('partner-entry')), findsNothing);
   expect(find.text('Meus parceiros de jogo'), findsOneWidget);

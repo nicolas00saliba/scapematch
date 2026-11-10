@@ -17,7 +17,7 @@ Future<bool> sharePlainText(String text) async {
     if (nav == null || share == null) {
       return false;
     }
-    final data = {'title': 'ScapeMatch', 'text': text}.jsify();
+    final data = {'title': 'EscapeMatch', 'text': text}.jsify();
     final result = (share as JSFunction).callAsFunction(nav, data);
     if (result != null && result.isA<JSPromise>()) {
       await (result as JSPromise).toDart;

@@ -180,7 +180,7 @@ void main() {
     ) as Map<String, Object?>;
     expect(partner['background_color'], '#111111');
     expect(partner['theme_color'], '#111111');
-    expect(partner['name'], 'ScapeMatch Parceiro');
+    expect(partner['name'], 'EscapeMatch Parceiro');
     expect(partner['short_name'], 'Parceiro');
     expect(partner['id'], '/');
     expect(partner['start_url'], '/');
@@ -195,7 +195,7 @@ void main() {
     ) as Map<String, Object?>;
     expect(player['background_color'], '#FFFFFF');
     expect(player['theme_color'], '#0F4C4A');
-    expect(player['name'], 'ScapeMatch');
+    expect(player['name'], 'EscapeMatch');
   });
 }
 

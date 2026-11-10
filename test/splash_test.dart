@@ -259,7 +259,7 @@ void main() {
     expect(find.byKey(AppKeys.splash), findsNothing);
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.byType(OnboardingScreen), findsNothing);
-    expect(find.text('ScapeMatch'), findsNothing);
+    expect(find.text('EscapeMatch'), findsNothing);
   });
 
   testWidgets(
@@ -522,7 +522,7 @@ Finder _splashPin(WidgetTester tester) {
 Finder _splashWordmark(WidgetTester tester) {
   return find.descendant(
     of: find.byKey(AppKeys.splash),
-    matching: find.text('ScapeMatch'),
+    matching: find.text('EscapeMatch'),
   );
 }
 

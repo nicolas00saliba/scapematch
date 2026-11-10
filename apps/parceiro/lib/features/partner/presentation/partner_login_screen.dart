@@ -62,7 +62,7 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
           const Center(child: PartnerLockup()),
           const SizedBox(height: 20),
           Text(
-            'ScapeMatch Parceiro',
+            'EscapeMatch Parceiro',
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,

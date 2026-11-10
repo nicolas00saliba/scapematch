@@ -107,7 +107,7 @@ class _PartnerBar extends ConsumerWidget {
                       children: [
                         if (wide)
                           Text(
-                            'ScapeMatch Parceiro',
+                            'EscapeMatch Parceiro',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),

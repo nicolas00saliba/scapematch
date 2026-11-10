@@ -1,6 +1,6 @@
 /// Percentual do valor que o Asaas manda para o walletId da casa.
 ///
-/// 1000 basis points são 10%. A casa recebe 90 e a ScapeMatch fica com o
+/// 1000 basis points são 10%. A casa recebe 90 e a EscapeMatch fica com o
 /// restante, na conta que criou a cobrança. A mesma conta está em
 /// `supabase/functions/_shared/asaas_provider.ts`.
 double houseSplitPercent(int commissionBps) {

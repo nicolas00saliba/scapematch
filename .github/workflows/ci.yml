@@ -131,7 +131,7 @@ jobs:
 
       - name: Player bundle excludes the partner app
         run: |
-          if grep -R -F -q 'ScapeMatch Parceiro' build/web --include='*.js' --include='*.html'; then
+          if grep -R -F -q 'EscapeMatch Parceiro' build/web --include='*.js' --include='*.html'; then
             echo 'O bundle do jogador ainda contém o Parceiro.'
             exit 1
           fi
@@ -202,7 +202,7 @@ jobs:
             echo 'A demonstração do jogador ainda aponta para o Supabase.'
             exit 1
           fi
-          if grep -R -F -q 'ScapeMatch Parceiro' build/player-demo --include='*.js' --include='*.html'; then
+          if grep -R -F -q 'EscapeMatch Parceiro' build/player-demo --include='*.js' --include='*.html'; then
             echo 'A demonstração do jogador contém o Parceiro.'
             exit 1
           fi
@@ -223,7 +223,7 @@ jobs:
           bash tool/check_web_manifest.sh apps/parceiro/build/parceiro-demo-root partner demo
           bash tool/check_security_meta.sh flutter apps/parceiro/build/parceiro-demo-root/index.html
           grep -F -q 'base href="/"' apps/parceiro/build/parceiro-demo-root/index.html
-          grep -F -q 'https://parceiro-demo.scapematch.com.br/' apps/parceiro/build/parceiro-demo-root/manifest.json
+          grep -F -q 'https://parceiro-demo.escapematch.com.br/' apps/parceiro/build/parceiro-demo-root/manifest.json
           bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'Demonstração'
           bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'xv@scapematch.exemplo'
           bash tool/js_contains.sh apps/parceiro/build/parceiro-demo-root 'Demo: a / b'
@@ -289,11 +289,11 @@ jobs:
           grep -F -q 'Quero jogar' apps/landing/index.html
           grep -F -q 'Tenho uma casa' apps/landing/index.html
           grep -F -q 'href="#casas"' apps/landing/index.html
-          grep -F -q 'href="https://app.scapematch.com.br/"' apps/landing/index.html
-          grep -F -q 'href="https://parceiro.scapematch.com.br/"' apps/landing/index.html
-          grep -F -q 'href="https://parceiro-demo.scapematch.com.br/"' apps/landing/index.html
-          grep -F -q 'canonical" href="https://scapematch.com.br/"' apps/landing/index.html
-          grep -F -q 'Acessar o ScapeMatch Parceiro' apps/landing/index.html
+          grep -F -q 'href="https://app.escapematch.com.br/"' apps/landing/index.html
+          grep -F -q 'href="https://parceiro.escapematch.com.br/"' apps/landing/index.html
+          grep -F -q 'href="https://parceiro-demo.escapematch.com.br/"' apps/landing/index.html
+          grep -F -q 'canonical" href="https://escapematch.com.br/"' apps/landing/index.html
+          grep -F -q 'Acessar o EscapeMatch Parceiro' apps/landing/index.html
           grep -F -q 'Placeholder' apps/landing/index.html
           grep -F -q 'og:image' apps/landing/index.html
           test -f apps/landing/termos.html

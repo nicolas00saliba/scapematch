@@ -18,10 +18,10 @@ void main() {
       expect(lowered, isNot(contains('http://')), reason: file.path);
       expect(
         html,
-        contains('O link leva a app.scapematch.com.br.'),
+        contains('O link leva a app.escapematch.com.br.'),
         reason: file.path,
       );
-      expect(html, contains('ScapeMatch'), reason: file.path);
+      expect(html, contains('EscapeMatch'), reason: file.path);
     }
   });
 }

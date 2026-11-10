@@ -125,7 +125,7 @@ class PartnerMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'ScapeMatch Parceiro',
+      label: 'EscapeMatch Parceiro',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -141,7 +141,7 @@ class PartnerMark extends StatelessWidget {
   }
 }
 
-/// Lockup pin + ScapeMatch com o selo centrado embaixo.
+/// Lockup pin + EscapeMatch com o selo centrado embaixo.
 class PartnerLockup extends StatelessWidget {
   const PartnerLockup({super.key, this.height = 64});
 
@@ -161,7 +161,7 @@ class PartnerLockup extends StatelessWidget {
         }
         final dark = Theme.of(context).brightness == Brightness.dark;
         return Semantics(
-          label: 'ScapeMatch Parceiro',
+          label: 'EscapeMatch Parceiro',
           child: ExcludeSemantics(
             child: Column(
               mainAxisSize: MainAxisSize.min,

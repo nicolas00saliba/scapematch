@@ -10,11 +10,11 @@ sair do escopo da demo do jogador.
 """
 
 LEGACY_ORIGIN = "https://nicolas00saliba.github.io"
-PLAYER_ORIGIN = "https://app.scapematch.com.br"
-PARTNER_ORIGIN = "https://parceiro.scapematch.com.br"
+PLAYER_ORIGIN = "https://app.escapematch.com.br"
+PARTNER_ORIGIN = "https://parceiro.escapematch.com.br"
 ADMIN_ORIGIN = "https://admin.scapematch.com.br"
-DEMO_ORIGIN = "https://demo.scapematch.com.br"
-PARTNER_DEMO_ORIGIN = "https://parceiro-demo.scapematch.com.br"
+DEMO_ORIGIN = "https://demo.escapematch.com.br"
+PARTNER_DEMO_ORIGIN = "https://parceiro-demo.escapematch.com.br"
 
 
 def install_identity(role, mode, base_href):
@@ -50,13 +50,13 @@ def install_identity(role, mode, base_href):
 def install_names(role, mode):
     """Nome longo e nome curto do atalho."""
     if role == "player" and mode == "demo":
-        return "ScapeMatch Demo", "Scape Demo"
+        return "EscapeMatch Demo", "Escape Demo"
     if role == "player" and mode == "real":
-        return "ScapeMatch", "ScapeMatch"
+        return "EscapeMatch", "EscapeMatch"
     if role == "partner" and mode == "demo":
-        return "ScapeMatch Parceiro Demo", "Parceiro Demo"
+        return "EscapeMatch Parceiro Demo", "Parceiro Demo"
     if role == "partner" and mode == "real":
-        return "ScapeMatch Parceiro", "Parceiro"
+        return "EscapeMatch Parceiro", "Parceiro"
     if role == "admin" and mode == "real":
         return "ScapeMatch Admin", "Admin"
     raise ValueError(f"papel ou modo desconhecido: {role} {mode}")

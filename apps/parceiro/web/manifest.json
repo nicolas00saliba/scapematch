@@ -1,13 +1,13 @@
 {
     "id": "/",
-    "name": "ScapeMatch Parceiro",
+    "name": "EscapeMatch Parceiro",
     "short_name": "Parceiro",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "background_color": "#111111",
     "theme_color": "#111111",
-    "description": "Painel da casa no ScapeMatch. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
+    "description": "Painel da casa no EscapeMatch. Saldo, reservas e agenda. Esta versão usa dados de exemplo.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

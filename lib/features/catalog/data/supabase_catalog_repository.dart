@@ -24,7 +24,7 @@ const roomColumns =
 const sessionColumns = 'id, room_id, starts_at, availability, cancelled_at';
 
 /// Casas aprovadas, salas e sessões. A casa de exemplo só aparece se o
-/// seed da ScapeMatch Demo estiver no banco.
+/// seed da EscapeMatch Demo estiver no banco.
 class SupabaseCatalogRepository implements CatalogRepository {
   SupabaseCatalogRepository(this._client);
 

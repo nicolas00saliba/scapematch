@@ -89,10 +89,24 @@ Deno.test("os subdomínios próprios entram no padrão sem ALLOWED_ORIGINS", () 
   const listed = (origin: string) =>
     productionWebOrigins.some((item) => item === origin);
   assertEquals(listed(productionWebOrigin), true);
+  assertEquals(listed("https://app.escapematch.com.br"), true);
+  assertEquals(listed("https://parceiro.escapematch.com.br"), true);
+  assertEquals(listed("https://demo.escapematch.com.br"), true);
+  assertEquals(listed("https://parceiro-demo.escapematch.com.br"), true);
+  assertEquals(listed("https://www.escapematch.com.br"), true);
+  assertEquals(isAllowedOrigin("https://app.escapematch.com.br", hosted), true);
+  assertEquals(isAllowedOrigin("https://parceiro.escapematch.com.br", hosted), true);
+  assertEquals(isAllowedOrigin("https://demo.escapematch.com.br", hosted), true);
+  assertEquals(
+    isAllowedOrigin("https://parceiro-demo.escapematch.com.br", hosted),
+    true,
+  );
+  assertEquals(isAllowedOrigin("https://escapematch.com.br", hosted), true);
   assertEquals(listed("https://app.scapematch.com.br"), true);
   assertEquals(listed("https://parceiro.scapematch.com.br"), true);
   assertEquals(listed("https://demo.scapematch.com.br"), true);
   assertEquals(listed("https://parceiro-demo.scapematch.com.br"), true);
+  assertEquals(listed("https://www.scapematch.com.br"), true);
   assertEquals(isAllowedOrigin("https://app.scapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://parceiro.scapematch.com.br", hosted), true);
   assertEquals(isAllowedOrigin("https://demo.scapematch.com.br", hosted), true);

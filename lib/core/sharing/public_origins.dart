@@ -1,4 +1,4 @@
-/// Origens públicas do ScapeMatch na web.
+/// Origens públicas do EscapeMatch na web.
 ///
 /// O Pages aceita um domínio customizado por repositório, então cada app
 /// mora num subdomínio próprio. O GitHub Pages antigo
@@ -6,23 +6,23 @@
 library;
 
 /// Jogador real.
-const playerAppOrigin = 'https://app.scapematch.com.br';
+const playerAppOrigin = 'https://app.escapematch.com.br';
 
 /// Parceiro real.
-const partnerAppOrigin = 'https://parceiro.scapematch.com.br';
+const partnerAppOrigin = 'https://parceiro.escapematch.com.br';
 
 /// Admin real. Não há link a partir dos outros apps.
 const adminAppOrigin = 'https://admin.scapematch.com.br';
 
 /// Demonstração do jogador. O caminho `/parceiro/` neste host só redireciona.
-const demoAppOrigin = 'https://demo.scapematch.com.br';
+const demoAppOrigin = 'https://demo.escapematch.com.br';
 
 /// Demonstração do Parceiro. Host próprio: o escopo não cabe dentro
 /// do PWA do jogador em [demoAppOrigin].
-const partnerDemoOrigin = 'https://parceiro-demo.scapematch.com.br';
+const partnerDemoOrigin = 'https://parceiro-demo.escapematch.com.br';
 
 /// Landing institucional.
-const landingOrigin = 'https://scapematch.com.br';
+const landingOrigin = 'https://escapematch.com.br';
 
 /// Host do GitHub Pages do monorepo (ainda servido na transição).
 const legacyPagesHost = 'nicolas00saliba.github.io';

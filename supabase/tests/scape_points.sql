@@ -2007,9 +2007,11 @@ begin
   update public.profiles
   set cpf = '00240289838', phone = '41966660066'
   where id = 'be666666-6666-4666-8666-666666666666';
-  -- A indicação começa agora. O horário fixo de 15:00 UTC ficava
-  -- antes da janela assim que o relógio passava desse instante.
-  v_paid := pg_catalog.clock_timestamp();
+  -- A janela da indicação abre no created_at do perfil. Um paid_at
+  -- cravado em 09/11 15:00 UTC fica fora dela depois desse horário.
+  select created_at into v_paid
+  from public.profiles
+  where id = 'be666666-6666-4666-8666-666666666666';
   update public.referral_program_settings
   set cashback_distribution = '[{"bps":100,"weight":1}]'::jsonb
   where id = 1;

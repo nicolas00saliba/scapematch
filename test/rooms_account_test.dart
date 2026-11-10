@@ -143,7 +143,7 @@ void main() {
     expect(find.byKey(AppKeys.accountGreeting), findsOneWidget);
     expect(find.text('Olá, Nícolas'), findsOneWidget);
     expect(find.byKey(AppKeys.accountWallet), findsOneWidget);
-    expect(find.text('Carteira ScapeMatch'), findsOneWidget);
+    expect(find.text('Carteira EscapeMatch'), findsOneWidget);
     expect(find.text('Meus parceiros de jogo'), findsOneWidget);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
