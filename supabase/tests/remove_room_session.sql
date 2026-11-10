@@ -1,6 +1,7 @@
 -- Dono desativa o horário. Outra casa não. Reserva pendente, paga ou
 -- cobrança em andamento seguram a linha. Horário desativado não entra
--- em create_group e some da leitura do jogador.
+-- em create_group nem em create_group_with_party, não aceita entrada
+-- e some da leitura do jogador.
 
 \set ON_ERROR_STOP on
 
@@ -450,3 +451,188 @@ begin
     raise exception 'apagar a sala não levou o horário junto';
   end if;
 end $$;
+
+insert into auth.users (id, email, raw_user_meta_data)
+values
+  (
+    'f3444444-4444-4444-8444-444444444444',
+    'amigo-remove@example.com',
+    '{"display_name":"Amigo Remove"}'
+  ),
+  (
+    'f3555555-5555-4555-8555-555555555555',
+    'outro-remove@example.com',
+    '{"display_name":"Outro Remove"}'
+  );
+
+insert into public.crews (id, name, created_by)
+values (
+  'f9000000-0000-4000-8000-000000000001',
+  'Turma do Chip',
+  'f3333333-3333-4333-8333-333333333333'
+);
+
+insert into public.crew_members (crew_id, user_id, status)
+values
+  (
+    'f9000000-0000-4000-8000-000000000001',
+    'f3333333-3333-4333-8333-333333333333',
+    'accepted'
+  ),
+  (
+    'f9000000-0000-4000-8000-000000000001',
+    'f3444444-4444-4444-8444-444444444444',
+    'accepted'
+  ),
+  (
+    'f9000000-0000-4000-8000-000000000001',
+    'f3555555-5555-4555-8555-555555555555',
+    'accepted'
+  );
+
+insert into public.room_sessions (id, room_id, starts_at, availability)
+values (
+  'f6666666-6666-4666-8666-666666666666',
+  'f5111111-1111-4111-8111-111111111111',
+  '2027-12-07 18:00:00+00',
+  'partner_grid'
+);
+
+insert into public.groups (
+  id, city_id, venue_id, room_id, session_id, starts_at,
+  total_spots, minimum_spots, price_cents, created_by
+) values (
+  'f7444444-4444-4444-8444-444444444444',
+  'curitiba',
+  'f4111111-1111-4111-8111-111111111111',
+  'f5111111-1111-4111-8111-111111111111',
+  'f6666666-6666-4666-8666-666666666666',
+  '2027-12-07 18:00:00+00',
+  4,
+  2,
+  9000,
+  'f3333333-3333-4333-8333-333333333333'
+);
+
+insert into public.group_members (
+  group_id, user_id, display_name, is_creator, attendance, payment_status
+) values (
+  'f7444444-4444-4444-8444-444444444444',
+  'f3333333-3333-4333-8333-333333333333',
+  'Jogador Remove',
+  true,
+  'joined',
+  'pending'
+);
+
+update public.room_sessions
+  set cancelled_at = pg_catalog.now()
+where id = 'f6666666-6666-4666-8666-666666666666';
+
+begin;
+select set_config(
+  'request.jwt.claim.sub',
+  'f3333333-3333-4333-8333-333333333333',
+  true
+);
+set local role authenticated;
+
+do $$
+begin
+  perform public.create_group_with_party(
+    'f6111111-1111-4111-8111-111111111111',
+    1,
+    '',
+    array['f3444444-4444-4444-8444-444444444444']::uuid[]
+  );
+  raise exception 'jogador criou grupo com amigos no horário removido';
+exception
+  when others then
+    if sqlstate <> 'PT404' or sqlerrm <> 'unknown session' then
+      raise;
+    end if;
+end $$;
+
+do $$
+begin
+  if exists (
+    select 1
+    from public.groups
+    where session_id = 'f6111111-1111-4111-8111-111111111111'
+  ) then
+    raise exception 'horário removido ganhou grupo com amigos';
+  end if;
+  if exists (
+    select 1
+    from public.group_members
+    where user_id = 'f3444444-4444-4444-8444-444444444444'
+  ) then
+    raise exception 'amigo ficou pendente no horário removido';
+  end if;
+end $$;
+
+rollback;
+
+begin;
+select set_config(
+  'request.jwt.claim.sub',
+  'f3555555-5555-4555-8555-555555555555',
+  true
+);
+set local role authenticated;
+
+do $$
+begin
+  perform public.join_group('f7444444-4444-4444-8444-444444444444');
+  raise exception 'jogador entrou no grupo da sessão desativada';
+exception
+  when others then
+    if sqlstate <> 'PT404' or sqlerrm <> 'unknown session' then
+      raise;
+    end if;
+end $$;
+
+do $$
+begin
+  perform public.join_group_with_party(
+    'f7444444-4444-4444-8444-444444444444',
+    array['f3444444-4444-4444-8444-444444444444']::uuid[]
+  );
+  raise exception 'turma entrou no grupo da sessão desativada';
+exception
+  when others then
+    if sqlstate <> 'PT404' or sqlerrm <> 'unknown session' then
+      raise;
+    end if;
+end $$;
+
+do $$
+begin
+  perform public.join_waitlist('f7444444-4444-4444-8444-444444444444');
+  raise exception 'jogador entrou na fila da sessão desativada';
+exception
+  when others then
+    if sqlstate <> 'PT404' or sqlerrm <> 'unknown session' then
+      raise;
+    end if;
+end $$;
+
+do $$
+begin
+  if (
+    select count(*)
+    from public.group_members
+    where group_id = 'f7444444-4444-4444-8444-444444444444'
+  ) <> 1 then
+    raise exception 'sessão desativada ganhou membro';
+  end if;
+  if exists (
+    select 1
+    from public.waitlist
+    where group_id = 'f7444444-4444-4444-8444-444444444444'
+  ) then
+    raise exception 'sessão desativada ganhou fila';
+  end if;
+end $$;
+
+rollback;
