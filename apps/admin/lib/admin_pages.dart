@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch_admin/admin_api.dart';
 import 'package:scapematch_admin/admin_format.dart';
 import 'package:scapematch_admin/admin_place.dart';
@@ -651,6 +652,8 @@ class GanhosPage extends ConsumerStatefulWidget {
 
 class _GanhosPageState extends ConsumerState<GanhosPage> {
   EarningsReport? _report;
+  ScapeLiability? _liability;
+  String? _liabilityError;
   String _period = 'tudo';
 
   @override
@@ -664,14 +667,27 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
     DateTime? from;
     if (_period == '30') from = now.subtract(const Duration(days: 30));
     if (_period == 'mes') from = DateTime.utc(now.year, now.month);
-    final report = await ref.read(adminApiProvider).earnings(from: from);
+    final api = ref.read(adminApiProvider);
+    final report = await api.earnings(from: from);
+    ScapeLiability? liability;
+    String? liabilityError;
+    try {
+      liability = await api.scapeLiability();
+    } on Object {
+      liabilityError = 'Não foi possível ler o passivo de pontos.';
+    }
     if (!mounted) return;
-    setState(() => _report = report);
+    setState(() {
+      _report = report;
+      _liability = liability;
+      _liabilityError = liabilityError;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final report = _report;
+    final liability = _liability;
     return AdminFrame(
       key: const Key('admin-ganhos'),
       title: 'Ganhos',
@@ -722,6 +738,26 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  'Passivo de pontos',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                if (liability == null)
+                  Text(_liabilityError ?? 'Carregando passivo…')
+                else ...[
+                  Text(
+                    '${formatPoints(liability.unusedPoints)} pontos ainda não usados · ${reais(liability.unusedCents)}.',
+                    key: const Key('admin-passivo'),
+                  ),
+                  Text(
+                    '${formatPoints(liability.pendingPoints)} pendentes e ${formatPoints(liability.availablePoints)} disponíveis.',
+                  ),
+                  Text(
+                    'Crédito de casa ainda pendente: ${reais(liability.venueCreditPendingCents)}.',
+                  ),
+                ],
                 const SizedBox(height: 16),
                 if (report.asaasFeeCents == null)
                   const Text(

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final adminApiProvider = Provider<AdminApi>((ref) {
@@ -34,6 +35,7 @@ abstract class AdminApi {
     DateTime? to,
     String? venueId,
   });
+  Future<ScapeLiability> scapeLiability();
   Future<HighlightsBoard> highlights();
   Future<void> setHighlight(String kind, String id, int? rank);
   Future<List<AuditRow>> audit();
@@ -586,6 +588,11 @@ class SupabaseAdminApi implements AdminApi {
     return _earnings(row);
   }
 
+  @override
+  Future<ScapeLiability> scapeLiability() async {
+    return ScapeLiability.fromJson(_map(await _rpc('admin_scape_liability')));
+  }
+
   EarningsReport _earnings(Map<String, dynamic> row) {
     return EarningsReport(
       grossCommissionCents: _int(row['gross_commission_cents']),
@@ -1059,6 +1066,17 @@ class MemoryAdminApi implements AdminApi {
           allOrNothing: true,
         ),
       ],
+    );
+  }
+
+  @override
+  Future<ScapeLiability> scapeLiability() async {
+    return const ScapeLiability(
+      unusedPoints: 2000,
+      unusedCents: 2000,
+      pendingPoints: 200,
+      availablePoints: 1800,
+      venueCreditPendingCents: 4500,
     );
   }
 

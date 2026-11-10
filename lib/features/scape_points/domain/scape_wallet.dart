@@ -222,40 +222,6 @@ class PointSpendChoice {
   }
 }
 
-class ReferralReview {
-  const ReferralReview({
-    required this.id,
-    required this.entryKind,
-    required this.program,
-    required this.amountCents,
-    this.points,
-  });
-
-  final String id;
-  final String entryKind;
-  final String program;
-  final int? points;
-  final int amountCents;
-
-  String get label => switch (program) {
-    'c2c' => 'Indicação de jogador',
-    'c2b' => 'Indicação de casa',
-    'b2c' => 'Crédito da casa',
-    'b2b' => 'Crédito entre casas',
-    _ => 'Indicação',
-  };
-
-  factory ReferralReview.fromJson(Map<String, dynamic> json) {
-    return ReferralReview(
-      id: json['id']?.toString() ?? '',
-      entryKind: json['entry_kind']?.toString() ?? 'points',
-      program: json['program']?.toString() ?? '',
-      points: json['points'] == null ? null : _intOf(json['points']),
-      amountCents: _intOf(json['amount_cents']),
-    );
-  }
-}
-
 class ScapeLiability {
   const ScapeLiability({
     required this.unusedPoints,

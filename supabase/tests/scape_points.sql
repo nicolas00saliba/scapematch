@@ -1283,6 +1283,7 @@ begin
     'bb111111-1111-1111-1111-111111111111',
     true
   );
+  perform set_config('request.jwt.claim.aal', 'aal2', true);
   perform public.admin_decide_referral_review(v_review, 'points', 'approve');
   perform public.admin_decide_referral_review(v_second, 'points', 'reject');
   if (

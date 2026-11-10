@@ -121,6 +121,9 @@ void main() {
 
     await tester.tap(find.text('Ganhos'));
     await _frames(tester);
+    expect(find.byKey(const Key('admin-passivo')), findsOneWidget);
+    expect(find.textContaining('2.000 pontos ainda não usados'), findsOneWidget);
+    expect(find.textContaining('Crédito de casa ainda pendente'), findsOneWidget);
     expect(find.byKey(const Key('admin-taxa-asaas')), findsOneWidget);
     expect(find.textContaining('dívida tudo ou nada'), findsOneWidget);
     await _shot(tester, 'admin-ganhos');

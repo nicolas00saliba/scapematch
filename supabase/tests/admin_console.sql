@@ -87,6 +87,9 @@ begin
     'admin_player(uuid)',
     'admin_suspend_player(uuid,boolean)',
     'admin_referral_queue()',
+    'admin_referral_reviews()',
+    'admin_decide_referral_review(uuid,text,text)',
+    'admin_scape_liability()',
     'admin_decide_referral_account(uuid,uuid,text)',
     'admin_reward_settings()',
     'admin_save_reward_settings(jsonb)',
@@ -257,6 +260,96 @@ exception
     if sqlerrm not ilike '%mfa%' then
       raise exception 'aal1 recebeu outro erro: %', sqlerrm;
     end if;
+end $$;
+do $$
+begin
+  begin
+    perform public.admin_scape_liability();
+    raise exception 'aal1 leu o passivo';
+  exception
+    when sqlstate '42501' then
+      if sqlerrm not ilike '%mfa%' then
+        raise exception 'passivo aal1: %', sqlerrm;
+      end if;
+  end;
+  begin
+    perform public.admin_referral_reviews();
+    raise exception 'aal1 listou revisoes';
+  exception
+    when sqlstate '42501' then
+      if sqlerrm not ilike '%mfa%' then
+        raise exception 'revisoes aal1: %', sqlerrm;
+      end if;
+  end;
+  begin
+    perform public.admin_decide_referral_review(
+      'ad811111-aaaa-4111-8111-111111111111', 'points', 'approve'
+    );
+    raise exception 'aal1 decidiu a revisao';
+  exception
+    when sqlstate '42501' then
+      if sqlerrm not ilike '%mfa%' then
+        raise exception 'decisao aal1: %', sqlerrm;
+      end if;
+  end;
+end $$;
+rollback;
+
+begin;
+insert into public.scape_point_entries (
+  id, user_id, kind, points, amount_cents, program,
+  idempotency_key, review_status, available_at
+) values (
+  'ad811111-aaaa-4111-8111-111111111111',
+  'ad222222-2222-4222-8222-222222222222',
+  'accrual', 4, 4, 'c2c', 'idem-admin-aal2-review', 'em_revisao',
+  pg_catalog.now() + interval '2 days'
+);
+select set_config('request.jwt.claim.sub', 'ad111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.aal', 'aal2', true);
+set local role authenticated;
+do $$
+declare
+  v_liability jsonb;
+  v_reviews jsonb;
+  v_earnings jsonb;
+begin
+  v_liability := public.admin_scape_liability();
+  v_earnings := public.admin_earnings(null, null, null);
+  if v_liability ->> 'unused_points' is null
+    or v_liability ->> 'pending_points' is null
+    or v_liability ->> 'available_points' is null
+    or v_liability ->> 'venue_credit_pending_cents' is null
+  then
+    raise exception 'passivo incompleto: %', v_liability;
+  end if;
+  if (v_earnings ->> 'open_points')::integer
+      is distinct from (v_liability ->> 'available_points')::integer
+    or (v_earnings ->> 'pending_points')::integer
+      is distinct from (v_liability ->> 'pending_points')::integer
+  then
+    raise exception 'ganhos deixou de ler o passivo: % vs %',
+      v_earnings, v_liability;
+  end if;
+  v_reviews := public.admin_referral_reviews();
+  if not exists (
+    select 1
+    from jsonb_array_elements(v_reviews) item
+    where item ->> 'id' = 'ad811111-aaaa-4111-8111-111111111111'
+      and item ->> 'entry_kind' = 'points'
+  ) then
+    raise exception 'revisao direta sumiu: %', v_reviews;
+  end if;
+  perform public.admin_decide_referral_review(
+    'ad811111-aaaa-4111-8111-111111111111', 'points', 'approve'
+  );
+  if (
+    select review_status
+    from public.scape_point_entries
+    where id = 'ad811111-aaaa-4111-8111-111111111111'
+  ) is distinct from 'approved' then
+    raise exception 'aal2 nao aprovou a revisao';
+  end if;
 end $$;
 rollback;
 
