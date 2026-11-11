@@ -282,22 +282,22 @@ export async function createCharge(
         houseWalletId: venue.asaas_wallet_id as string,
         referralCents: data,
       });
-      if (!line) return [];
+      if (!line || !chargeId) return line ? [line] : [];
       const cashback = await admin.rpc("cashback_reserve_split_cents", {
         p_gross: gross,
       });
       if (
-        !cashback.error &&
-        typeof cashback.data === "number" &&
-        cashback.data > 0
+        cashback.error ||
+        typeof cashback.data !== "number" ||
+        cashback.data <= 0
       ) {
-        const noted = await admin.rpc("note_cashback_reserve", {
-          p_charge_id: chargeId,
-          p_cents: cashback.data,
-        });
-        if (noted.error) return [];
+        return [line];
       }
-      return [line];
+      const noted = await admin.rpc("note_cashback_reserve", {
+        p_charge_id: chargeId,
+        p_cents: cashback.data,
+      });
+      return noted.error ? [] : [line];
     };
 
     const { data: profile } = await admin
@@ -658,7 +658,7 @@ export async function createCharge(
           split,
           extraSplits: await reserveSplitsFor(
             Math.round(split.fixedValue * 100),
-            reservedCard.id,
+            "",
           ),
           remoteIp,
           creditCardToken: owned.creditCardToken,
@@ -774,6 +774,10 @@ export async function createCharge(
           reservedCard.amount_cents || amountCents,
           reservedCard.id,
           reservedCard.attempt_id,
+        );
+        await reserveSplitsFor(
+          reservedCard.house_fixed_cents,
+          reservedCard.id,
         );
         amountCents = reservedCard.amount_cents || amountCents;
         holdOpen = false;
