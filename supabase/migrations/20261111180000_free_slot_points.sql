@@ -1,22 +1,19 @@
 -- Vaga grátis com pontos de indicação. Não aplicar no projeto remoto.
 -- Não cria transferência no Asaas e não mexe em subconta de produção.
 -- A flag nasce desligada. Pontos sem lastro continuam no teto antigo.
+-- O impacto final no caixa é zero: os 2,5% da indicação já entraram na
+-- comissão. Esse valor fica no saldo reservado e paga a casa depois.
 
 alter table public.referral_program_settings
   add column if not exists backed_full_slot_enabled boolean not null default false,
   add column if not exists free_slot_monthly_limit integer not null default 1
-    check (free_slot_monthly_limit >= 0),
-  add column if not exists platform_reserve_cents integer not null default 0
-    check (platform_reserve_cents >= 0);
+    check (free_slot_monthly_limit >= 0);
 
 comment on column public.referral_program_settings.backed_full_slot_enabled is
-  'Desligada por padrão. Ligada, pontos de indicação já liberados podem cobrir a vaga inteira. O que passar da comissão vira crédito da casa no próximo repasse.';
+  'Desligada por padrão. Ligada, pontos de indicação já liberados podem cobrir a vaga inteira, até o saldo reservado. O que passar da comissão vira crédito da casa no próximo repasse.';
 
 comment on column public.referral_program_settings.free_slot_monthly_limit is
   'Vagas em que a plataforma completa o líquido da casa, por jogador e por mês. Zero desliga a extensão.';
-
-comment on column public.referral_program_settings.platform_reserve_cents is
-  'Lastro de indicação, em centavos, que precisa sobrar depois de comprometer um crédito de vaga grátis.';
 
 alter table public.scape_point_entries
   add column if not exists backed_points integer not null default 0
@@ -103,9 +100,31 @@ alter table public.ledger_entries
       'venue_credit_clawback_offset',
       'empty_slot_offset', 'empty_slot_offset_refund',
       'empty_slot_offset_undo', 'empty_slot_refund_reversal',
-      'free_slot_topup', 'free_slot_clawback'
+      'free_slot_topup', 'free_slot_clawback',
+      'point_reserve'
     )
   );
+
+alter table public.ledger_entries
+  drop constraint if exists ledger_entries_account_check;
+
+alter table public.ledger_entries
+  add constraint ledger_entries_account_check
+  check (account in ('house', 'platform', 'platform_reserve'));
+
+alter table public.ledger_entries
+  alter column venue_id drop not null;
+
+alter table public.ledger_entries
+  drop constraint if exists ledger_entries_venue_reserve_check;
+
+alter table public.ledger_entries
+  add constraint ledger_entries_venue_reserve_check
+  check (venue_id is not null or account = 'platform_reserve');
+
+create unique index if not exists ledger_point_reserve_component
+  on public.ledger_entries (direction, component_key)
+  where account = 'platform_reserve';
 
 create table if not exists public.free_slot_topups (
   id uuid primary key default gen_random_uuid(),
@@ -603,12 +622,10 @@ begin
         'reserve_cut', v_cut
       );
     end if;
-    if v_topup > v_backed * v_point then
-      exit when v_backed = 0;
-      v_backed := v_backed - 1;
-      continue;
-    end if;
-    if v_topup > 0 and v_topup > v_room then
+    if v_topup > v_backed * v_point
+      or v_backed * v_point > v_room
+      or (v_topup > 0 and v_topup > v_room)
+    then
       v_cut := true;
       exit when v_backed = 0;
       v_backed := v_backed - 1;
@@ -680,8 +697,8 @@ begin
   end if;
   select
     point_value_cents, redeem_min_points, redeem_max_bps,
-    backed_full_slot_enabled, free_slot_monthly_limit, platform_reserve_cents
-  into v_point, v_min, v_max_bps, v_enabled, v_limit, v_reserve
+    backed_full_slot_enabled, free_slot_monthly_limit
+  into v_point, v_min, v_max_bps, v_enabled, v_limit
   from public.referral_program_settings where id = 1;
   v_point := greatest(coalesce(v_point, 1), 1);
   v_min := coalesce(v_min, 0);
@@ -729,13 +746,15 @@ begin
     end if;
   else
     if v_enabled then
+      perform pg_catalog.pg_advisory_xact_lock(814201);
       perform 1 from public.referral_program_settings where id = 1 for update;
     end if;
+    v_reserve := private.point_reserve_cents();
     v_full := p_gross / v_point;
     v_ceiling := private.allocate_backed_slot(
       least(v_available, v_full), p_gross, v_fee, v_house, v_max_points,
       v_backed, v_unbacked, v_point,
-      private.platform_backed_cents(), private.open_free_slot_cents(), v_reserve
+      v_reserve, 0, 0
     );
     if v_available < v_min or coalesce((v_ceiling ->> 'points')::integer, 0) < v_min then
       v_max_points := 0;
@@ -746,7 +765,7 @@ begin
       least(greatest(coalesce(p_points, 0), 0), v_available),
       p_gross, v_fee, v_house, v_max_points,
       v_backed, v_unbacked, v_point,
-      private.platform_backed_cents(), private.open_free_slot_cents(), v_reserve
+      v_reserve, 0, 0
     );
     v_points := coalesce((v_applied ->> 'points')::integer, 0);
     v_backed_spend := coalesce((v_applied ->> 'backed_points')::integer, 0);
@@ -1000,8 +1019,8 @@ begin
       p_user_id, p_idempotency_key, v_gross, v_subsidy,
       v_backed, v_unbacked, v_topup,
       coalesce((v_quote ->> 'points_only')::boolean, false),
-      private.platform_backed_cents(),
-      s.platform_reserve_cents,
+      private.point_reserve_cents(),
+      private.point_reserve_cents(),
       private.free_slots_used_this_month(p_user_id),
       s.free_slot_monthly_limit,
       v_decision
@@ -1995,8 +2014,7 @@ begin
       'tier_gold_active', 'tier_gold_bonus_bps', 'tier_active_days',
       'block_self_payer', 'payer_referred_account_cap',
       'same_device_review_threshold',
-      'backed_full_slot_enabled', 'free_slot_monthly_limit',
-      'platform_reserve_cents'
+      'backed_full_slot_enabled', 'free_slot_monthly_limit'
     ) then
       raise exception 'campo % nao editavel', v_key using errcode = '22023';
     end if;
@@ -2073,9 +2091,6 @@ begin
   end if;
   v_row.free_slot_monthly_limit := private.admin_int(
     p_patch, 'free_slot_monthly_limit', v_row.free_slot_monthly_limit, 0, 100
-  );
-  v_row.platform_reserve_cents := private.admin_int(
-    p_patch, 'platform_reserve_cents', v_row.platform_reserve_cents, 0, 2000000000
   );
   if p_patch ? 'backed_full_slot_enabled' then
     if pg_catalog.jsonb_typeof(p_patch -> 'backed_full_slot_enabled') <> 'boolean' then
@@ -2154,7 +2169,6 @@ begin
       same_device_review_threshold = v_row.same_device_review_threshold,
       backed_full_slot_enabled = v_row.backed_full_slot_enabled,
       free_slot_monthly_limit = v_row.free_slot_monthly_limit,
-      platform_reserve_cents = v_row.platform_reserve_cents,
       updated_at = pg_catalog.now()
   where id = 1;
   select pg_catalog.to_jsonb(s) into v_after
@@ -2165,6 +2179,245 @@ begin
     v_uid, 'save_reward_settings', 'referral_program_settings', '1', v_before, v_after
   );
   return v_after - 'id';
+end;
+$$;
+
+-- Saldo reservado da plataforma. Cresce quando a indicação é creditada
+-- e diminui quando esses pontos pagam a casa ou são desfeitos. Os pontos
+-- não vencem hoje; o estorno da reserva é o mesmo lançamento que um
+-- vencimento futuro usa. A trava é não deixar o saldo negativo.
+
+create or replace function private.point_reserve_cents()
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum(
+    case direction
+      when 'credit' then amount_cents
+      else -amount_cents
+    end
+  ), 0)::integer
+  from public.ledger_entries
+  where account = 'platform_reserve'
+    and kind = 'point_reserve';
+$$;
+
+create or replace function private.post_point_reserve(
+  p_direction text,
+  p_component text,
+  p_cents integer,
+  p_user uuid,
+  p_strict boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_balance integer;
+  v_cents integer;
+begin
+  v_cents := coalesce(p_cents, 0);
+  if v_cents <= 0 or p_component is null then
+    return;
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(814201);
+  v_balance := private.point_reserve_cents();
+  if p_direction = 'debit' then
+    if p_strict and v_balance < v_cents then
+      raise exception 'saldo reservado insuficiente'
+        using errcode = '23514';
+    end if;
+    v_cents := least(v_cents, greatest(v_balance, 0));
+  end if;
+  if v_cents <= 0 then
+    return;
+  end if;
+  insert into public.ledger_entries (
+    user_id, account, direction, kind, amount_cents, component_key
+  ) values (
+    p_user, 'platform_reserve', p_direction, 'point_reserve',
+    v_cents, p_component
+  )
+  on conflict (direction, component_key)
+    where account = 'platform_reserve'
+  do nothing;
+end;
+$$;
+
+create or replace function private.sync_point_reserve()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cents integer;
+  v_point integer;
+  v_parent_key text;
+begin
+  if new.kind = 'accrual' and new.program in ('c2c', 'c2b')
+    and new.review_status is distinct from 'rejected'
+  then
+    v_cents := new.amount_cents;
+    if v_cents is null or v_cents <= 0 then
+      select point_value_cents into v_point
+      from public.referral_program_settings
+      where id = 1;
+      v_cents := new.points * greatest(coalesce(v_point, 1), 1);
+    end if;
+    perform private.post_point_reserve(
+      'credit', new.id::text, v_cents, new.user_id, false
+    );
+    return new;
+  end if;
+
+  if new.kind = 'release' and new.program in ('c2c', 'c2b') then
+    v_parent_key := new.relates_to::text;
+    if v_parent_key is not null and exists (
+      select 1 from public.ledger_entries
+      where account = 'platform_reserve'
+        and direction = 'credit'
+        and component_key = v_parent_key
+    ) then
+      return new;
+    end if;
+    v_cents := new.amount_cents;
+    if v_cents is null or v_cents <= 0 then
+      select point_value_cents into v_point
+      from public.referral_program_settings
+      where id = 1;
+      v_cents := new.points * greatest(coalesce(v_point, 1), 1);
+    end if;
+    perform private.post_point_reserve(
+      'credit', new.id::text, v_cents, new.user_id, false
+    );
+    return new;
+  end if;
+
+  if new.kind = 'reversal' and new.program in ('c2c', 'c2b') then
+    v_parent_key := new.relates_to::text;
+    if v_parent_key is null or not exists (
+      select 1 from public.ledger_entries
+      where account = 'platform_reserve'
+        and direction = 'credit'
+        and component_key = v_parent_key
+    ) then
+      return new;
+    end if;
+    v_cents := new.amount_cents;
+    perform private.post_point_reserve(
+      'debit', new.id::text, v_cents, new.user_id, false
+    );
+    return new;
+  end if;
+
+  if new.kind = 'redemption' and coalesce(new.backed_points, 0) > 0
+    and coalesce(new.points, 0) > 0
+  then
+    v_cents := (
+      new.backed_points::bigint * coalesce(new.amount_cents, 0) / new.points
+    )::integer;
+    perform private.post_point_reserve(
+      'debit', new.id::text, v_cents, new.user_id, true
+    );
+    return new;
+  end if;
+
+  if new.kind = 'redemption_reversal' and coalesce(new.backed_points, 0) > 0
+    and coalesce(new.points, 0) > 0
+  then
+    v_cents := (
+      new.backed_points::bigint * coalesce(new.amount_cents, 0) / new.points
+    )::integer;
+    perform private.post_point_reserve(
+      'credit', new.id::text, v_cents, new.user_id, false
+    );
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists sync_point_reserve on public.scape_point_entries;
+
+create trigger sync_point_reserve
+  after insert on public.scape_point_entries
+  for each row
+  execute function private.sync_point_reserve();
+
+revoke all on function private.point_reserve_cents() from public, anon, authenticated;
+revoke all on function private.post_point_reserve(text, text, integer, uuid, boolean)
+  from public, anon, authenticated;
+revoke all on function private.sync_point_reserve() from public, anon, authenticated;
+
+create or replace function private.ledger_reverse_charge(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id, component_key
+  )
+  select
+    credit.venue_id,
+    credit.group_id,
+    credit.user_id,
+    credit.account,
+    'debit',
+    case credit.kind
+      when 'commission' then 'commission_refund'
+      when 'venue_credit_applied' then 'venue_credit_refund'
+      when 'empty_slot_offset_refund' then 'empty_slot_refund_reversal'
+      when 'empty_slot_offset_undo' then 'empty_slot_refund_reversal'
+      else 'house_refund'
+    end,
+    credit.amount_cents,
+    credit.payment_charge_id,
+    credit.component_key
+  from public.ledger_entries as credit
+  where credit.payment_charge_id = p_charge_id
+    and credit.direction = 'credit'
+    and credit.account is distinct from 'platform_reserve'
+    and credit.kind not in (
+      'venue_credit_clawback_offset',
+      'venue_credit_clawback_refund',
+      'empty_slot_offset_undo',
+      'point_reserve'
+    )
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
+
+  insert into public.ledger_entries (
+    venue_id, group_id, user_id, account, direction, kind,
+    amount_cents, payment_charge_id, component_key
+  )
+  select
+    debit.venue_id,
+    debit.group_id,
+    debit.user_id,
+    debit.account,
+    'credit',
+    'venue_credit_clawback_refund',
+    debit.amount_cents,
+    debit.payment_charge_id,
+    debit.component_key
+  from public.ledger_entries as debit
+  join public.venue_credit_clawbacks c
+    on c.id::text = debit.component_key
+  where debit.payment_charge_id = p_charge_id
+    and debit.direction = 'debit'
+    and debit.kind = 'venue_credit_clawback'
+    and c.neutralized_at is null
+    and c.voided_at is null
+  on conflict (payment_charge_id, kind, direction, component_key) do nothing;
+
+  perform private.restore_applied_venue_credits(p_charge_id);
 end;
 $$;
 

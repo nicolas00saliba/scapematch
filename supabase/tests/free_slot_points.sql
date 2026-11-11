@@ -179,16 +179,15 @@ declare
   v_confirmed jsonb;
   v_reserved jsonb;
   v_cash integer;
+  v_reserve integer;
 begin
   select * into v_before from public.referral_program_settings where id = 1;
   if v_before.backed_full_slot_enabled
     or v_before.free_slot_monthly_limit <> 1
-    or v_before.platform_reserve_cents <> 0
   then
-    raise exception 'a flag da vaga gratis nao nasceu desligada % % %',
+    raise exception 'a flag da vaga gratis nao nasceu desligada % %',
       v_before.backed_full_slot_enabled,
-      v_before.free_slot_monthly_limit,
-      v_before.platform_reserve_cents;
+      v_before.free_slot_monthly_limit;
   end if;
 
   select pix_receipt_fee_cents, card_receipt_fee_cents, card_receipt_fee_bps
@@ -206,10 +205,10 @@ begin
       redeem_min_points = 1000,
       redeem_max_bps = 3000,
       backed_full_slot_enabled = false,
-      free_slot_monthly_limit = 1,
-      platform_reserve_cents = 0
+      free_slot_monthly_limit = 1
   where id = 1;
 
+  select private.point_reserve_cents() into v_reserve;
   insert into public.scape_point_entries (
     user_id, kind, points, amount_cents, program, idempotency_key
   ) values (
@@ -221,6 +220,10 @@ begin
     where idempotency_key = 'vaga-c2c-liberado'
   ) is distinct from 'backed' then
     raise exception 'indicacao nao ficou com lastro';
+  end if;
+  if private.point_reserve_cents() <> v_reserve + 20000 then
+    raise exception 'o saldo reservado nao cresceu com a indicacao %',
+      private.point_reserve_cents();
   end if;
 
   v_quote := private.subsidy_quote(
@@ -376,6 +379,10 @@ begin
   ) <> 20000 then
     raise exception 'o estorno nao devolveu os pontos';
   end if;
+  if private.point_reserve_cents() <> v_reserve + 20000 then
+    raise exception 'desfazer a vaga nao devolveu o saldo reservado %',
+      private.point_reserve_cents();
+  end if;
   if (
     select amount_cents from public.free_slot_clawbacks
     where venue_id = 'e7b11111-1111-4111-8111-111111111111'
@@ -420,19 +427,26 @@ begin
     'e7a33333-3333-4333-8333-333333333333',
     'release', 20000, 20000, 'c2c', 'vaga-parcial-liberado'
   );
-  select private.platform_backed_cents() into v_cash;
-  update public.referral_program_settings
-  set platform_reserve_cents = greatest(v_cash - 7000, 0)
-  where id = 1;
+  select private.point_reserve_cents() into v_cash;
+  if v_cash > 7000 then
+    insert into public.ledger_entries (
+      user_id, account, direction, kind, amount_cents, component_key
+    ) values (
+      'e7a33333-3333-4333-8333-333333333333',
+      'platform_reserve', 'debit', 'point_reserve',
+      v_cash - 7000, 'teste-reserva-aperta'
+    );
+  end if;
   v_quote := private.subsidy_quote(
     'e7a33333-3333-4333-8333-333333333333', 10000, 2500, 20000, false
   );
-  if (v_quote ->> 'points')::integer <> 9500
-    or (v_quote ->> 'charged_cents')::integer <> 500
-    or (v_quote ->> 'topup_cents')::integer <> 7000
+  if (v_quote ->> 'points')::integer <> 7000
+    or (v_quote ->> 'charged_cents')::integer <> 3000
+    or (v_quote ->> 'topup_cents')::integer <> 4500
     or v_quote ->> 'limit_reason' is distinct from 'reserve'
   then
-    raise exception 'a reserva de caixa nao encolheu a vaga % caixa %', v_quote, v_cash;
+    raise exception 'o saldo reservado ficou negativo ou nao travou a vaga % saldo %',
+      v_quote, private.point_reserve_cents();
   end if;
 
   perform private.hold_point_redemption(
@@ -444,18 +458,18 @@ begin
     'e7e33333-3333-4333-8333-333333333333',
     'e7a33333-3333-4333-8333-333333333333',
     'e7b11111-1111-4111-8111-111111111111',
-    500,
+    3000,
     'vaga-hold-parcial',
     'wallet-vaga',
     2500,
     'PIX',
     10000,
-    9500,
-    9500,
+    7000,
+    7000,
     null
   );
-  if (v_reserved ->> 'house_fixed_cents')::integer <> 500
-    or (v_reserved ->> 'amount_cents')::integer <> 500
+  if (v_reserved ->> 'house_fixed_cents')::integer <> 3000
+    or (v_reserved ->> 'amount_cents')::integer <> 3000
   then
     raise exception 'o pix parcial nao guardou o liquido %', v_reserved;
   end if;
@@ -463,8 +477,11 @@ begin
     select amount_cents from public.free_slot_topups
     where user_id = 'e7a33333-3333-4333-8333-333333333333'
       and voided_at is null
-  ) <> 7000 then
-    raise exception 'o complemento parcial nao ficou em 70 reais';
+  ) <> 4500 then
+    raise exception 'o complemento parcial nao ficou em 45 reais';
+  end if;
+  if private.point_reserve_cents() < 0 then
+    raise exception 'o saldo reservado ficou negativo';
   end if;
 
   perform private.apply_payment_transition(
@@ -494,7 +511,6 @@ begin
       redeem_min_points = v_before.redeem_min_points,
       redeem_max_bps = v_before.redeem_max_bps,
       backed_full_slot_enabled = v_before.backed_full_slot_enabled,
-      free_slot_monthly_limit = v_before.free_slot_monthly_limit,
-      platform_reserve_cents = v_before.platform_reserve_cents
+      free_slot_monthly_limit = v_before.free_slot_monthly_limit
   where id = 1;
 end $$;

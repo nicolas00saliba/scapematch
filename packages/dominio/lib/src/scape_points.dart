@@ -22,7 +22,6 @@ class ReferralRates {
     this.redeemMaxBps = 3000,
     this.backedFullSlotEnabled = false,
     this.freeSlotMonthlyLimit = 1,
-    this.platformReserveCents = 0,
     this.blockSelfPayer = true,
     this.payerReferredAccountCap = 3,
     this.sameDeviceReviewThreshold = 2,
@@ -82,10 +81,6 @@ class ReferralRates {
   /// Vagas em que a EscapeMatch completa o líquido da casa, por jogador
   /// e por mês. Zero desliga essa extensão mesmo com a flag ligada.
   final int freeSlotMonthlyLimit;
-
-  /// Centavos de lastro de indicação que permanecem depois de um crédito
-  /// de vaga grátis. Zero não exige folga além do próprio lastro.
-  final int platformReserveCents;
 
   static const official = ReferralRates();
 }
@@ -539,10 +534,13 @@ int referralBookingsForPoints({
 /// cobrança; ele é arredondado para cima em 4 casas, que é o limite do Asaas.
 ///
 /// Com [ReferralRates.backedFullSlotEnabled], pontos de indicação já
-/// liberados ([availableBackedPoints]) podem cobrir a vaga inteira. O que
-/// passar da comissão não aumenta o split acima de 100%: vira [PointSubsidyQuote.topupCents]
-/// e espera o próximo repasse da casa. Boas-vindas e promoções continuam
-/// no teto de sempre. [availableBackedPoints] nulo conta tudo como sem lastro.
+/// liberados ([availableBackedPoints]) podem cobrir a vaga inteira, até o
+/// [reservedBalanceCents]. Esse saldo já entrou na comissão; a trava é não
+/// deixá-lo negativo. O que passar da comissão não aumenta o split acima de
+/// 100%: vira [PointSubsidyQuote.topupCents] e espera o próximo repasse da
+/// casa. Boas-vindas e promoções continuam no teto de sempre.
+/// [availableBackedPoints] nulo conta tudo como sem lastro.
+/// [reservedBalanceCents] nulo usa o valor dos pontos de indicação do jogador.
 PointSubsidyQuote quotePointSubsidy({
   required int grossCents,
   required int commissionBps,
@@ -551,8 +549,7 @@ PointSubsidyQuote quotePointSubsidy({
   int? availableBackedPoints,
   ReferralRates rates = ReferralRates.official,
   int receiptFeeCents = 0,
-  int openTopupCents = 0,
-  int? platformBackedCents,
+  int? reservedBalanceCents,
   int freeSlotsUsedThisMonth = 0,
   bool backedFraudHold = false,
 }) {
@@ -560,8 +557,8 @@ PointSubsidyQuote quotePointSubsidy({
   if (grossCents <= 0) {
     throw ArgumentError('A reserva precisa de um valor.');
   }
-  if (receiptFeeCents < 0 || openTopupCents < 0) {
-    throw ArgumentError('A taxa e o crédito em aberto não podem ser negativos.');
+  if (receiptFeeCents < 0 || (reservedBalanceCents != null && reservedBalanceCents < 0)) {
+    throw ArgumentError('A taxa e o saldo reservado não podem ser negativos.');
   }
   final commission = commissionCents(grossCents, commissionBps);
   final houseNet = grossCents - commission;
@@ -597,7 +594,7 @@ PointSubsidyQuote quotePointSubsidy({
   }
 
   final fullPoints = pointsFromCents(grossCents, rates.pointValueCents);
-  final platformCash = platformBackedCents ??
+  final reserved = reservedBalanceCents ??
       centsFromPoints(backedPool, rates.pointValueCents);
   final ceiling = _allocateFullSlot(
     want: availablePoints > fullPoints ? fullPoints : availablePoints,
@@ -609,9 +606,9 @@ PointSubsidyQuote quotePointSubsidy({
     unbackedPool: unbackedPool,
     pointValue: rates.pointValueCents,
     receiptFeeCents: receiptFeeCents,
-    openTopupCents: openTopupCents,
-    platformCash: platformCash,
-    reserveCents: rates.platformReserveCents,
+    openTopupCents: 0,
+    platformCash: reserved,
+    reserveCents: 0,
   );
   var maxPoints = ceiling.points;
   if (availablePoints < rates.redeemMinPoints ||
@@ -628,9 +625,9 @@ PointSubsidyQuote quotePointSubsidy({
     unbackedPool: unbackedPool,
     pointValue: rates.pointValueCents,
     receiptFeeCents: receiptFeeCents,
-    openTopupCents: openTopupCents,
-    platformCash: platformCash,
-    reserveCents: rates.platformReserveCents,
+    openTopupCents: 0,
+    platformCash: reserved,
+    reserveCents: 0,
   );
   var points = applied.points;
   var backedSpend = applied.backedSpend;
@@ -810,7 +807,8 @@ _FullAllocation _allocateFullSlot({
         reserveCut: reserveCut,
       );
     }
-    if (topup > backedSpend * pointValue) {
+    if (topup > backedSpend * pointValue || backedSpend * pointValue > room) {
+      reserveCut = true;
       if (backedSpend == 0) break;
       backedSpend -= 1;
       continue;

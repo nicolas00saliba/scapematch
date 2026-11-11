@@ -811,7 +811,6 @@ class MemoryAdminApi implements AdminApi {
         'cashback_ev_cap_bps': 100,
         'backed_full_slot_enabled': false,
         'free_slot_monthly_limit': 1,
-        'platform_reserve_cents': 0,
       };
 
   final List<VenueProfile> houses;

@@ -322,24 +322,24 @@ void main() {
     expect(quote.topupCents, 7500);
   });
 
-  test('a reserva de caixa encolhe a vaga grátis', () {
-    const rates = ReferralRates(
-      backedFullSlotEnabled: true,
-      platformReserveCents: 3000,
-    );
+  test('o saldo reservado não fica negativo', () {
+    const rates = ReferralRates(backedFullSlotEnabled: true);
     final quote = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 2500,
       requestedPoints: 10000,
       availablePoints: 10000,
       availableBackedPoints: 10000,
+      reservedBalanceCents: 7000,
       rates: rates,
     );
     expect(quote.limitReason, 'reserve');
     expect(quote.pointsOnly, isFalse);
-    expect(quote.topupCents, 7000);
-    expect(quote.subsidyCents, 9500);
-    expect(quote.chargedCents, 500);
+    expect(quote.points, 7000);
+    expect(quote.backedPoints, 7000);
+    expect(quote.subsidyCents, 7000);
+    expect(quote.topupCents, 4500);
+    expect(quote.chargedCents, 3000);
     expect(quote.chargedCents + quote.topupCents, quote.houseNetCents);
   });
 

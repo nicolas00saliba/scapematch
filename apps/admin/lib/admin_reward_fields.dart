@@ -196,12 +196,6 @@ const rewardFields = <RewardField>[
     many: 'vagas',
     zeroMeansOff: true,
   ),
-  RewardField(
-    id: 'platform_reserve_cents',
-    label: 'Reserva de caixa',
-    help: 'Lastro de indicação, em centavos, que precisa sobrar depois de comprometer o crédito da casa de uma vaga grátis.',
-    kind: RewardKind.cents,
-  ),
 ];
 
 RewardField rewardFieldById(String id) {

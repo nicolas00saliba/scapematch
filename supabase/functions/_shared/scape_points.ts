@@ -291,10 +291,8 @@ export function quotePointSubsidy(input: {
   redeemMaxBps?: number;
   backedFullSlotEnabled?: boolean;
   freeSlotMonthlyLimit?: number;
-  platformReserveCents?: number;
   receiptFeeCents?: number;
-  openTopupCents?: number;
-  platformBackedCents?: number;
+  reservedBalanceCents?: number;
   freeSlotsUsedThisMonth?: number;
   backedFraudHold?: boolean;
 }): PointSubsidyQuote {
@@ -302,9 +300,7 @@ export function quotePointSubsidy(input: {
   const minPoints = input.redeemMinPoints ?? 1000;
   const maxBps = input.redeemMaxBps ?? 3000;
   const monthlyLimit = input.freeSlotMonthlyLimit ?? 1;
-  const reserve = input.platformReserveCents ?? 0;
   const feeFlat = input.receiptFeeCents ?? 0;
-  const openTopup = input.openTopupCents ?? 0;
   const usedFreeSlots = input.freeSlotsUsedThisMonth ?? 0;
   const commission = commissionCents(input.grossCents, input.commissionBps);
   const houseNet = input.grossCents - commission;
@@ -342,7 +338,7 @@ export function quotePointSubsidy(input: {
     });
   }
   const fullPoints = Math.floor(input.grossCents / pointValue);
-  const platformCash = input.platformBackedCents ?? backedPool * pointValue;
+  const reserved = input.reservedBalanceCents ?? backedPool * pointValue;
   const ceiling = allocateFullSlot({
     want: Math.min(input.availablePoints, fullPoints),
     grossCents: input.grossCents,
@@ -353,9 +349,9 @@ export function quotePointSubsidy(input: {
     unbackedPool,
     pointValue,
     receiptFeeCents: feeFlat,
-    openTopupCents: openTopup,
-    platformCash,
-    reserveCents: reserve,
+    openTopupCents: 0,
+    platformCash: reserved,
+    reserveCents: 0,
   });
   let maxPoints = ceiling.points;
   if (input.availablePoints < minPoints || maxPoints < minPoints) maxPoints = 0;
@@ -369,9 +365,9 @@ export function quotePointSubsidy(input: {
     unbackedPool,
     pointValue,
     receiptFeeCents: feeFlat,
-    openTopupCents: openTopup,
-    platformCash,
-    reserveCents: reserve,
+    openTopupCents: 0,
+    platformCash: reserved,
+    reserveCents: 0,
   });
   let points = applied.points;
   let backedSpend = applied.backedSpend;
@@ -530,7 +526,11 @@ function allocateFullSlot(input: {
         reserveCut,
       };
     }
-    if (topup > backedSpend * input.pointValue) {
+    if (
+      topup > backedSpend * input.pointValue ||
+      backedSpend * input.pointValue > room
+    ) {
+      reserveCut = true;
       if (backedSpend === 0) break;
       backedSpend -= 1;
       continue;
