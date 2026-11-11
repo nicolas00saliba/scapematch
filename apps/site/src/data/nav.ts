@@ -13,7 +13,6 @@ export const jogarLinks: Link[] = [
   { rotulo: 'Como funciona', href: '/como-funciona' },
   { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
   { rotulo: 'Experiências', href: '/experiencias' },
-  { rotulo: 'Cidades', href: '/cidades/curitiba' },
   { rotulo: 'Segurança', href: '/seguranca' },
 ];
 
@@ -41,7 +40,6 @@ export const casaParceiraLinks: Link[] = [
 
 export const empresaLinks: Link[] = [
   { rotulo: 'Sobre', href: '/sobre' },
-  { rotulo: 'Contato', href: '/contato' },
 ];
 
 export const rodape: Coluna[] = [
@@ -51,7 +49,6 @@ export const rodape: Coluna[] = [
       { rotulo: 'Como funciona', href: '/como-funciona' },
       { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
       { rotulo: 'Experiências', href: '/experiencias' },
-      { rotulo: 'Cidades', href: '/cidades/curitiba' },
       { rotulo: 'Segurança', href: '/seguranca' },
       { rotulo: 'Baixar o app', href: '/app' },
     ],
@@ -82,7 +79,6 @@ export const rodape: Coluna[] = [
     titulo: 'Ajuda e empresa',
     links: [
       { rotulo: 'Central de ajuda', href: '/ajuda' },
-      { rotulo: 'Contato', href: '/contato' },
       { rotulo: 'Sobre', href: '/sobre' },
     ],
   },

@@ -17,7 +17,6 @@ ROTAS = [
     "/como-funciona/pagamento",
     "/experiencias",
     "/experiencias/escape-room",
-    "/cidades/curitiba",
     "/seguranca",
     "/app",
     "/convite",
@@ -42,7 +41,6 @@ ROTAS = [
     "/ajuda/pontos",
     "/ajuda/casas",
     "/sobre",
-    "/contato",
     "/termos",
     "/termos/parceiro",
     "/privacidade",
@@ -52,6 +50,14 @@ ROTAS = [
 ]
 
 NOINDEX = {"/convite", "/404"}
+FORA_DO_BUILD = ("/contato", "/cidades/curitiba")
+EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+CANCELAMENTO = (
+    "Não há reembolso depois que o grupo é confirmado.",
+    "se o grupo não fechar, nada é cobrado",
+    "O Pix é estornado e o cartão não é capturado.",
+    "Se a casa cancelar, o valor é devolvido integralmente.",
+)
 COMISSAO_OK = (
     "/para-casas",
     "/termos/parceiro",
@@ -202,9 +208,44 @@ def main() -> None:
         arq = DIST / nome
         if arq.is_file():
             sitemap += arq.read_text()
-    for rota in ("/convite", "/404"):
+    for rota in ("/convite", "/404", *FORA_DO_BUILD):
         if f"{SITE}{rota}<" in sitemap or f"{SITE}{rota}/" in sitemap:
             falha(f"{rota} entrou no sitemap")
+    for rota in ("/termos", "/privacidade", "/cancelamento"):
+        if f"{SITE}{rota}<" not in sitemap and f"{SITE}{rota}/" not in sitemap:
+            falha(f"{rota} saiu do sitemap")
+
+    for rota in FORA_DO_BUILD:
+        path = arquivo(rota)
+        if path.exists():
+            falha(f"{rota} entrou no build")
+    fontes = (
+        ROOT / "apps/site/src/pages/_contato.astro",
+        ROOT / "apps/site/src/pages/_cidades/[cidade].astro",
+    )
+    for fonte in fontes:
+        if not fonte.is_file():
+            falha(f"página saiu do código: {fonte.relative_to(ROOT)}")
+
+    for html in DIST.rglob("*.html"):
+        texto = html.read_text()
+        if "mailto:" in texto or EMAIL.search(texto):
+            falha(f"{html.relative_to(DIST)} mostra e-mail")
+        for rota in FORA_DO_BUILD:
+            if f'href="{rota}"' in texto or f"href='{rota}'" in texto:
+                falha(f"{html.relative_to(DIST)} aponta para {rota}")
+    for js in (DIST / "scripts").glob("*.js"):
+        texto = js.read_text()
+        for rota in FORA_DO_BUILD:
+            if rota in texto:
+                falha(f"{js.relative_to(DIST)} aponta para {rota}")
+
+    cancelamento = (DIST / "cancelamento.html").read_text()
+    for trecho in CANCELAMENTO:
+        if trecho not in cancelamento:
+            falha(f"cancelamento sem a regra: {trecho}")
+    if re.search(r"janela|anteced[eê]ncia|sete dias", cancelamento, re.I):
+        falha("cancelamento voltou à regra antiga")
 
     print(f"site ok: {len(ROTAS)} rotas")
 

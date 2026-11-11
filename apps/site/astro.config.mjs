@@ -16,7 +16,7 @@ export default defineConfig({
     sitemap({
       filter: (page) => {
         const path = new URL(page).pathname.replace(/\/$/, '') || '/';
-        return path !== '/convite' && path !== '/404';
+        return path !== '/convite' && path !== '/404' && path !== '/contato' && path !== '/cidades/curitiba';
       },
     }),
   ],
