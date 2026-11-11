@@ -298,6 +298,29 @@ html.js .menu-abre {
   box-shadow: inset 0 -2px 0 var(--petroleo);
 }
 
+.menu > a:not(.btn),
+.menu summary {
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.menu > a:not(.btn):hover,
+.menu > a:not(.btn):focus-visible,
+.menu summary:hover,
+.menu summary:focus-visible,
+.menu details[open] > summary {
+  background: var(--creme-2);
+  box-shadow: 0 1px 2px rgb(22 21 19 / 8%);
+  color: var(--tinta);
+}
+
+.menu > a.is-atual:not(.btn):hover,
+.menu > a.is-atual:not(.btn):focus-visible,
+.menu summary.is-atual:hover,
+.menu summary.is-atual:focus-visible,
+.menu details[open] > summary.is-atual {
+  box-shadow: inset 0 -2px 0 var(--petroleo), 0 1px 2px rgb(22 21 19 / 8%);
+}
+
 .menu-parceiro {
   color: var(--petroleo);
 }
@@ -382,8 +405,18 @@ html.js .menu-abre {
   border-radius: 8px;
 }
 
-.mega-curto a:hover {
+.mega-curto a,
+.mega-links a {
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.mega-curto a:hover,
+.mega-curto a:focus-visible,
+.mega-links a:hover,
+.mega-links a:focus-visible {
   background: var(--creme-2);
+  box-shadow: 0 1px 2px rgb(22 21 19 / 8%);
+  color: var(--tinta);
 }
 
 .mega-links {
@@ -404,7 +437,8 @@ html.js .menu-abre {
 
 .mega-links a {
   display: flex;
-  padding: 0.35rem 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
   text-decoration: none;
   font-weight: 600;
 }
@@ -1320,6 +1354,14 @@ main {
     display: none;
   }
 
+  html.js.is-menu-open .mega-links a:hover,
+  html.js.is-menu-open .mega-links a:focus-visible,
+  html.js.is-menu-open .mega-curto a:hover,
+  html.js.is-menu-open .mega-curto a:focus-visible {
+    background: var(--papel);
+    box-shadow: 0 1px 2px rgb(22 21 19 / 12%);
+  }
+
   .hero-grade,
   .passos-tela,
   .grade-3,
@@ -1366,6 +1408,13 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mega-curto a,
+  .mega-links a,
+  .menu > a:not(.btn),
+  .menu summary {
+    transition: none;
+  }
+
   .vaga.enche,
   .status-antes,
   .status-depois,
