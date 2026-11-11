@@ -1,0 +1,29 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import { rodape } from '../data/nav';
+---
+
+<Base
+  title="Mapa do site | EscapeMatch"
+  description="Todas as páginas do site."
+  path="/mapa-do-site"
+>
+  <PageTop titulo="Mapa do site" frase="As páginas, nos mesmos grupos do rodapé." />
+  <div class="miolo pagina">
+    {rodape.map((coluna) => (
+      <section class="mapa-grupo">
+        <h2>{coluna.titulo}</h2>
+        <ul>
+          {coluna.links.map((link) => (
+            <li>
+              <a href={link.href} {...(link.externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                {link.rotulo}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </div>
+</Base>

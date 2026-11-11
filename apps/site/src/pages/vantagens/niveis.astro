@@ -1,0 +1,35 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import ProgramCard from '../../components/ProgramCard.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { programaPorId } from '../../data/programas';
+
+const programa = programaPorId('niveis');
+---
+
+<Base title={programa.seoTitulo} description={programa.seoDescricao} path={programa.rota} ogImage={programa.og}>
+  <PageTop titulo="Níveis Bronze, Prata e Ouro" frase={programa.apoio} />
+  <div class="miolo pagina">
+    <div class="niveis">
+      <article class="nivel">
+        <h2>Bronze</h2>
+        <p>O começo. Você indica e ganha os pontos da indicação, sem o extra de nível.</p>
+      </article>
+      <article class="nivel">
+        <h2>Prata</h2>
+        <p>5 indicados jogando. Mais 50 pontos a cada R$ 100 que eles pagarem.</p>
+      </article>
+      <article class="nivel">
+        <h2>Ouro</h2>
+        <p>15 indicados jogando. Mais 100 pontos a cada R$ 100 que eles pagarem.</p>
+      </article>
+    </div>
+    <section class="leitura">
+      <h2>Como subir</h2>
+      <p>Conta como jogando quem pagou uma reserva nos últimos 90 dias. O extra vale para amigos e casas indicados.</p>
+    </section>
+    <ProgramCard programa={programa} />
+  </div>
+  <CtaBlock titulo={programa.cta.rotulo} acoes={[programa.cta]} />
+</Base>

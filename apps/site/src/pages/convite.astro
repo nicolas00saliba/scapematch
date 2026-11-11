@@ -1,0 +1,36 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  title="Você foi convidado | EscapeMatch"
+  description="Você ganhou 20% na primeira reserva. Copie o código e crie a sua conta."
+  path="/convite"
+  noindex
+  convite
+>
+  <article class="miolo pagina leitura">
+    <h1>Você ganhou 20% na primeira reserva</h1>
+    <p class="hero-apoio">O desconto é só para conta nova. Cole o código no cadastro ou nas primeiras 24 horas.</p>
+    <ol class="passos">
+      <li>Copie o código</li>
+      <li>Crie a conta e cole o código</li>
+      <li>Entre num grupo e pague a sua vaga</li>
+    </ol>
+    <div class="codigo" data-codigo hidden>
+      <p>Seu código</p>
+      <strong data-codigo-valor></strong>
+      <button class="btn" type="button" data-copiar>Copiar código</button>
+      <p data-codigo-aviso aria-live="polite"></p>
+    </div>
+    <noscript>
+      <p>O código está no link, depois de codigo=. São 8 letras ou números. Cole no cadastro.</p>
+    </noscript>
+  </article>
+  <aside class="cta">
+    <div class="miolo cta-miolo">
+      <h2>Criar conta</h2>
+      <a class="btn btn-noite" href="https://app.escapematch.com.br/cadastro" target="_blank" rel="noopener noreferrer">Criar conta</a>
+    </div>
+  </aside>
+</Base>

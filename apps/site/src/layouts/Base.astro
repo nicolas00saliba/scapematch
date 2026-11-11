@@ -1,0 +1,108 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Breadcrumb from '../components/Breadcrumb.astro';
+import { semTrilha, trilha } from '../data/nav';
+
+interface Props {
+  title: string;
+  description: string;
+  path: string;
+  ogImage?: string;
+  noindex?: boolean;
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  publico?: boolean;
+  convite?: boolean;
+  hash?: boolean;
+}
+
+const {
+  title,
+  description,
+  path,
+  ogImage = '/assets/og.png',
+  noindex = false,
+  jsonLd,
+  publico = false,
+  convite = false,
+  hash = false,
+} = Astro.props;
+
+const canonical = path === '/'
+  ? 'https://escapematch.com.br/'
+  : `https://escapematch.com.br${path}`;
+const image = `https://escapematch.com.br${ogImage}`;
+const mostrarTrilha = !semTrilha(path);
+const itens = mostrarTrilha ? trilha(path) : [];
+
+const blocos: Record<string, unknown>[] = [];
+if (mostrarTrilha) {
+  blocos.push({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: itens.map((item, indice) => ({
+      '@type': 'ListItem',
+      position: indice + 1,
+      name: item.nome,
+      item: item.href === '/'
+        ? 'https://escapematch.com.br/'
+        : `https://escapematch.com.br${item.href}`,
+    })),
+  });
+}
+if (jsonLd) {
+  blocos.push(...(Array.isArray(jsonLd) ? jsonLd : [jsonLd]));
+}
+const json = JSON.stringify(blocos).replace(/</g, '\\u003c');
+---
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'none'; frame-src 'none'; manifest-src 'self'; form-action 'self'">
+    <script is:inline src="/frame-guard.js"></script>
+    <title>{title}</title>
+    <meta name="description" content={description}>
+    {noindex && <meta name="robots" content="noindex">}
+    <link rel="canonical" href={canonical}>
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:site_name" content="EscapeMatch">
+    <meta property="og:title" content={title}>
+    <meta property="og:description" content={description}>
+    <meta property="og:url" content={canonical}>
+    <meta property="og:image" content={image}>
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="EscapeMatch">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content={title}>
+    <meta name="twitter:description" content={description}>
+    <meta name="twitter:image" content={image}>
+    <meta name="theme-color" content="#0F4C4A">
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/assets/favicon-32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/assets/apple-touch.png">
+    {blocos.length > 0 && <script type="application/ld+json" set:html={json} />}
+  </head>
+  <body>
+    <Header />
+    <main id="conteudo">
+      {mostrarTrilha && (
+        <div class="miolo">
+          <Breadcrumb itens={itens} />
+        </div>
+      )}
+      <slot />
+    </main>
+    <Footer itens={itens} />
+    <script is:inline src="/scripts/menu.js"></script>
+    {publico && <script is:inline src="/scripts/publico.js"></script>}
+    {convite && <script is:inline src="/scripts/convite.js"></script>}
+    {hash && <script is:inline src="/scripts/hash-rotas.js"></script>}
+  </body>
+</html>

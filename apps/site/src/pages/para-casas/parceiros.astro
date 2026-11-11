@@ -1,0 +1,28 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import { regrasCasa } from '../../data/programas';
+---
+
+<Base
+  title="Área do parceiro | EscapeMatch"
+  description="Atalhos para casas parceiras: Parceiro, indicações, horário vazio e ajuda."
+  path="/para-casas/parceiros"
+>
+  <PageTop titulo="Área do parceiro" frase="Atalhos para quem já é casa parceira." />
+  <div class="miolo pagina leitura">
+    <ul class="lista-simples">
+      <li><a href="https://parceiro.escapematch.com.br/" target="_blank" rel="noopener noreferrer">Entrar no Parceiro</a></li>
+      <li><a href="/para-casas/indique-uma-casa">Indique uma casa</a></li>
+      <li><a href="/para-casas/indique-jogadores">Indique jogadores</a></li>
+      <li><a href="/para-casas/horario-vazio">Horário vazio</a></li>
+      <li><a href="/ajuda/casas">Ajuda para casas</a></li>
+    </ul>
+    <section class="regras-comuns">
+      <h2>Regras comuns dos créditos</h2>
+      <ul class="lista-simples">
+        {regrasCasa.map((regra) => <li>{regra}</li>)}
+      </ul>
+    </section>
+  </div>
+</Base>

@@ -1,0 +1,43 @@
+---
+import Base from '../../../layouts/Base.astro';
+import PageTop from '../../../components/PageTop.astro';
+import { temaPorSlug, temas } from '../../../data/ajuda';
+
+export function getStaticPaths() {
+  return temas.map((tema) => ({ params: { tema: tema.slug }, props: { slug: tema.slug } }));
+}
+
+const tema = temaPorSlug(Astro.props.slug);
+const relacionados = tema.relacionados.map((slug) => temaPorSlug(slug));
+const faq = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: tema.perguntas.map((item) => ({
+    '@type': 'Question',
+    name: item.pergunta,
+    acceptedAnswer: { '@type': 'Answer', text: item.resposta },
+  })),
+};
+---
+
+<Base title={tema.seoTitulo} description={tema.seoDescricao} path={`/ajuda/${tema.slug}`} jsonLd={faq}>
+  <PageTop titulo={tema.nome} frase={tema.frase} />
+  <div class="miolo pagina">
+    <div class="faq leitura">
+      {tema.perguntas.map((item) => (
+        <details>
+          <summary>{item.pergunta}</summary>
+          <p>{item.resposta}</p>
+        </details>
+      ))}
+    </div>
+    <section>
+      <h2>Temas relacionados</h2>
+      <ul class="destinos">
+        {relacionados.map((item) => (
+          <li><a href={`/ajuda/${item.slug}`}>{item.nome}</a></li>
+        ))}
+      </ul>
+    </section>
+  </div>
+</Base>

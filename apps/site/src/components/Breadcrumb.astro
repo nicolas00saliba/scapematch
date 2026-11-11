@@ -1,0 +1,23 @@
+---
+import type { Migalha } from '../data/nav';
+
+interface Props {
+  itens: Migalha[];
+}
+
+const { itens } = Astro.props;
+---
+
+<nav class="trilha" aria-label="Trilha">
+  <ol>
+    {itens.map((item, indice) => (
+      <li>
+        {indice === itens.length - 1 ? (
+          <span aria-current="page">{item.nome}</span>
+        ) : (
+          <a href={item.href}>{item.nome}</a>
+        )}
+      </li>
+    ))}
+  </ol>
+</nav>

@@ -1,0 +1,24 @@
+---
+import type { Programa } from '../data/programas';
+import Icon from './Icon.astro';
+
+interface Props {
+  programa: Programa;
+}
+
+const { programa } = Astro.props;
+---
+
+<article class="programa">
+  <div class="icone"><Icon nome={programa.icone} /></div>
+  <h3>{programa.titulo}</h3>
+  <p class="beneficio">{programa.beneficio}</p>
+  <p class="apoio">{programa.apoio}</p>
+  <ol class="passos">
+    {programa.passos.map((passo) => <li>{passo}</li>)}
+  </ol>
+  <details class="regras">
+    <summary>Ver regras</summary>
+    <p>{programa.regras}</p>
+  </details>
+</article>

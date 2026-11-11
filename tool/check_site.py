@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""Confere o build estático de apps/site/dist."""
+
+import pathlib
+import re
+import sys
+from html.parser import HTMLParser
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+DIST = ROOT / "apps" / "site" / "dist"
+SITE = "https://escapematch.com.br"
+DOMINIO_ANTIGO = re.compile(r"(?<![A-Za-z])scapematch\.com\.br")
+
+ROTAS = [
+    "/",
+    "/como-funciona",
+    "/como-funciona/pagamento",
+    "/experiencias",
+    "/experiencias/escape-room",
+    "/cidades/curitiba",
+    "/seguranca",
+    "/app",
+    "/convite",
+    "/vantagens",
+    "/vantagens/indique-amigos",
+    "/vantagens/indique-uma-casa",
+    "/vantagens/niveis",
+    "/vantagens/regulamento",
+    "/para-casas",
+    "/para-casas/como-funciona",
+    "/para-casas/precos",
+    "/para-casas/cadastro",
+    "/para-casas/parceiros",
+    "/para-casas/indique-uma-casa",
+    "/para-casas/indique-jogadores",
+    "/para-casas/horario-vazio",
+    "/ajuda",
+    "/ajuda/grupo",
+    "/ajuda/pagamento",
+    "/ajuda/cancelamento",
+    "/ajuda/conta",
+    "/ajuda/pontos",
+    "/ajuda/casas",
+    "/sobre",
+    "/contato",
+    "/termos",
+    "/termos/parceiro",
+    "/privacidade",
+    "/cancelamento",
+    "/mapa-do-site",
+    "/404",
+]
+
+NOINDEX = {"/convite", "/404"}
+COMISSAO_OK = (
+    "/para-casas",
+    "/termos/parceiro",
+    "/vantagens/regulamento",
+    "/ajuda/casas",
+)
+EXTERNOS = {
+    "https://app.escapematch.com.br/",
+    "https://app.escapematch.com.br/login",
+    "https://app.escapematch.com.br/cadastro",
+    "https://parceiro.escapematch.com.br/",
+}
+
+
+class Links(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.hrefs = []
+        self.title = []
+        self.in_title = False
+        self.metas = []
+        self.canonical = ""
+
+    def handle_starttag(self, tag, attrs):
+        data = dict(attrs)
+        if tag == "a" and "href" in data:
+            self.hrefs.append(data["href"])
+        if tag == "title":
+            self.in_title = True
+            self.title = []
+        if tag == "meta":
+            self.metas.append(data)
+        if tag == "link" and data.get("rel") == "canonical":
+            self.canonical = data.get("href", "")
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self.in_title = False
+
+    def handle_data(self, data):
+        if self.in_title:
+            self.title.append(data)
+
+
+def arquivo(rota: str) -> pathlib.Path:
+    if rota == "/":
+        return DIST / "index.html"
+    return DIST / f"{rota.lstrip('/')}.html"
+
+
+def falha(msg: str) -> None:
+    print(msg, file=sys.stderr)
+    raise SystemExit(1)
+
+
+def main() -> None:
+    if not DIST.is_dir():
+        falha("dist ausente. Rode o build em apps/site.")
+    cname = (DIST / "CNAME").read_text().strip()
+    if cname != "escapematch.com.br" or DOMINIO_ANTIGO.search(cname):
+        falha(f"CNAME é {cname!r}")
+
+    home = (DIST / "index.html").read_text()
+    if "<title>EscapeMatch: ninguém pra jogar? Agora tem.</title>" not in home:
+        falha("título da home ausente")
+    if 'class="hero-badge"' not in home:
+        falha("selo sem a classe hero-badge")
+    if "Escape rooms, jogos de tabuleiro, laser tag e muito mais!" not in home:
+        falha("texto do selo ausente")
+    if home.find("<h1>") > home.find("hero-badge"):
+        falha("o selo ficou antes do título")
+
+    vistos = set()
+    for rota in ROTAS:
+        path = arquivo(rota)
+        if not path.is_file():
+            falha(f"rota sem HTML: {rota} ({path.relative_to(DIST)})")
+        vistos.add(path.resolve())
+        texto = path.read_text()
+        parser = Links()
+        parser.feed(texto)
+        titulo = "".join(parser.title).strip()
+        if not titulo:
+            falha(f"{rota} sem título")
+        if len(titulo) > 60:
+            falha(f"{rota} título com {len(titulo)} caracteres: {titulo}")
+        descricao = ""
+        for meta in parser.metas:
+            if meta.get("name") == "description":
+                descricao = meta.get("content", "")
+        if not descricao:
+            falha(f"{rota} sem descrição")
+        if len(descricao) > 155:
+            falha(f"{rota} descrição com {len(descricao)} caracteres")
+        esperado = SITE + ("/" if rota == "/" else rota)
+        if parser.canonical != esperado:
+            falha(f"{rota} canonical {parser.canonical!r} != {esperado}")
+        noindex = any(m.get("name") == "robots" and "noindex" in m.get("content", "") for m in parser.metas)
+        if (rota in NOINDEX) != noindex:
+            falha(f"{rota} noindex={noindex}")
+        if DOMINIO_ANTIGO.search(texto):
+            falha(f"{rota} cita o domínio antigo")
+        if re.search(r"divid\w* a reserva", texto, re.I):
+            falha(f"{rota} usa a promessa antiga")
+        if "exemplo.invalid" in texto or "Placeholder" in texto:
+            falha(f"{rota} tem placeholder")
+        if re.search(r"\b(C2C|B2B|B2C|C2B|bps)\b", texto):
+            falha(f"{rota} usa sigla interna")
+        sem_selo = re.sub(r"<!doctype html>", "", texto, flags=re.I)
+        sem_selo = sem_selo.replace(
+            "Escape rooms, jogos de tabuleiro, laser tag e muito mais!", ""
+        )
+        if "!" in sem_selo:
+            falha(f"{rota} tem exclamação fora do selo")
+        if "comissão" in texto.lower() or "comissao" in texto.lower():
+            permitida = rota == "/ajuda" or any(
+                rota == ok or rota.startswith(ok + "/") for ok in COMISSAO_OK
+            )
+            if not permitida:
+                falha(f"{rota} fala em comissão para o jogador")
+        for href in parser.hrefs:
+            if href.startswith(("#", "mailto:")):
+                continue
+            if href.startswith("http://") or href.startswith("https://"):
+                base = href.split("#")[0]
+                if not any(base == item or base.startswith(item) for item in EXTERNOS):
+                    if "escapematch.com.br" not in base and "parceiro.escapematch.com.br" not in base:
+                        falha(f"{rota} link externo não previsto: {href}")
+                if DOMINIO_ANTIGO.search(href) or "parceiro-demo" in href or "demo.escapematch" in href:
+                    falha(f"{rota} link proibido: {href}")
+                continue
+            if not href.startswith("/"):
+                falha(f"{rota} link relativo: {href}")
+            limpo = href.split("#")[0].split("?")[0]
+            if limpo in ("", "/"):
+                alvo = DIST / "index.html"
+            elif limpo.endswith(".html"):
+                alvo = DIST / limpo.lstrip("/")
+            else:
+                alvo = DIST / f"{limpo.lstrip('/')}.html"
+            if not alvo.is_file():
+                falha(f"{rota} aponta para {href}, sem {alvo.relative_to(DIST)}")
+
+    if not (DIST / "sitemap-index.xml").is_file() and not (DIST / "sitemap.xml").is_file():
+        falha("sitemap ausente")
+    sitemap = ""
+    for nome in ("sitemap-index.xml", "sitemap-0.xml", "sitemap.xml"):
+        arq = DIST / nome
+        if arq.is_file():
+            sitemap += arq.read_text()
+    for rota in ("/convite", "/404"):
+        if f"{SITE}{rota}<" in sitemap or f"{SITE}{rota}/" in sitemap:
+            falha(f"{rota} entrou no sitemap")
+
+    print(f"site ok: {len(ROTAS)} rotas")
+
+
+if __name__ == "__main__":
+    main()

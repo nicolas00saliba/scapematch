@@ -1,0 +1,52 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+---
+
+<Base
+  title="Experiências para jogar em grupo | EscapeMatch"
+  description="Escape rooms, jogos de tabuleiro, laser tag e muito mais. Ache um time mesmo sem ter com quem ir."
+  path="/experiencias"
+>
+  <PageTop
+    titulo="Experiências"
+    frase="Escape room é o que está disponível. As outras modalidades entram quando houver casa parceira."
+  />
+  <div class="miolo pagina">
+    <div class="modalidades">
+      <a class="modalidade" href="/experiencias/escape-room">
+        <div>
+          <h3>Escape room</h3>
+          <p>Você chega sozinho, entra num grupo e paga só a sua vaga.</p>
+        </div>
+        <span class="etiqueta">Disponível</span>
+      </a>
+      <article class="modalidade modalidade-espera">
+        <div>
+          <h3>Jogos de tabuleiro</h3>
+          <p>Em breve.</p>
+        </div>
+        <span class="etiqueta">Em breve</span>
+      </article>
+      <article class="modalidade modalidade-espera">
+        <div>
+          <h3>Laser tag</h3>
+          <p>Em breve.</p>
+        </div>
+        <span class="etiqueta">Em breve</span>
+      </article>
+      <article class="modalidade modalidade-espera">
+        <div>
+          <h3>Outras modalidades</h3>
+          <p>Em breve.</p>
+        </div>
+        <span class="etiqueta">Em breve</span>
+      </article>
+    </div>
+  </div>
+  <CtaBlock
+    titulo="Ver salas no app"
+    acoes={[{ rotulo: 'Ver salas no app', href: 'https://app.escapematch.com.br/', externo: true }]}
+  />
+</Base>

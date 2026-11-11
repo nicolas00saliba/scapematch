@@ -1,0 +1,31 @@
+---
+interface Acao {
+  rotulo: string;
+  href: string;
+  externo?: boolean;
+}
+
+interface Props {
+  titulo: string;
+  acoes: Acao[];
+}
+
+const { titulo, acoes } = Astro.props;
+---
+
+<aside class="cta">
+  <div class="miolo cta-miolo">
+    <h2>{titulo}</h2>
+    <div class="cta-acoes">
+      {acoes.map((acao) => (
+        <a
+          class="btn btn-noite"
+          href={acao.href}
+          {...(acao.externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+        >
+          {acao.rotulo}
+        </a>
+      ))}
+    </div>
+  </div>
+</aside>

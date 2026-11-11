@@ -359,3 +359,43 @@ jobs:
             echo 'A landing cita percentual de comissão.'
             exit 1
           fi
+
+  site:
+    name: Site Astro
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/site/package-lock.json
+
+      - name: Build the site
+        working-directory: apps/site
+        run: npm ci && npm run build
+
+      - name: Check routes, title and badge
+        run: |
+          python3 tool/check_site.py
+          bash tool/check_security_meta.sh landing apps/site/dist
+          test ! -e apps/site/dist/_headers
+          test ! -e apps/site/public/_headers
+          test -f apps/site/public/CNAME
+          grep -F -x -q 'escapematch.com.br' apps/site/dist/CNAME
+          if grep -R -E -q '(^|[^A-Za-z])scapematch\.com\.br' apps/site/dist; then
+            echo 'O build cita o domínio antigo.'
+            exit 1
+          fi
+
+      - name: Upload the site preview
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: site-dist
+          path: apps/site/dist
+          if-no-files-found: error

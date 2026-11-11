@@ -1,0 +1,33 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+---
+
+<Base
+  title="Pagamento e regras do grupo | EscapeMatch"
+  description="Você paga só a sua vaga, por Pix ou cartão. Veja quando a cobrança acontece."
+  path="/como-funciona/pagamento"
+>
+  <PageTop
+    titulo="Pagamento e regras do grupo"
+    frase="Você paga só a sua vaga. A cobrança acontece quando o grupo confirma."
+  />
+  <article class="miolo pagina leitura">
+    <h2>Preço por pessoa</h2>
+    <p>A vaga tem o preço de uma pessoa. Você não paga a reserva inteira.</p>
+
+    <h2>Pix e cartão</h2>
+    <p>Os dois são processados pela Asaas. O app não guarda o número do cartão.</p>
+
+    <h2>Quando a cobrança acontece</h2>
+    <p>Quando o grupo bate o mínimo, o jogo confirma e a cobrança da sua vaga acontece. Quem entra depois paga a própria vaga na hora, até o grupo lotar.</p>
+
+    <h2>Se o grupo não confirmar</h2>
+    <p>Nada é cobrado. O Pix é estornado e o cartão não é capturado.</p>
+
+    <h2>Cancelamento</h2>
+    <p>Depois que o grupo confirma, não há reembolso. Se a casa cancelar, o valor é devolvido integralmente. A regra única está em <a href="/cancelamento">Regras de cancelamento</a>.</p>
+  </article>
+  <CtaBlock titulo="Entrar num time" acoes={[{ rotulo: 'Entrar num time', href: '/app' }]} />
+</Base>

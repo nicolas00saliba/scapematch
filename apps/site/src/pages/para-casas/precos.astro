@@ -1,0 +1,36 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { comissaoPadrao } from '../../data/programas';
+
+const casa = comissaoPadrao.exemploReais - (comissaoPadrao.exemploReais * comissaoPadrao.percentual) / 100;
+---
+
+<Base
+  title="Preços para casas | EscapeMatch"
+  description="Você só paga sobre o que o EscapeMatch vender."
+  path="/para-casas/precos"
+>
+  <PageTop
+    titulo="Preços para casas"
+    frase={`A comissão padrão é ${comissaoPadrao.percentual}%, só sobre o que o app vender.`}
+  />
+  <article class="miolo pagina leitura">
+    <h2>Comissão padrão</h2>
+    <p>O percentual incide sobre a reserva feita pelo app. O que a casa vende por fora não entra.</p>
+    <dl class="conta">
+      <dt>Exemplo de conta</dt>
+      <dd>Uma vaga de R$ {comissaoPadrao.exemploReais}</dd>
+      <dt>Comissão</dt>
+      <dd>R$ {(comissaoPadrao.exemploReais * comissaoPadrao.percentual) / 100}</dd>
+      <dt>Casa</dt>
+      <dd>R$ {casa}</dd>
+    </dl>
+    <p class="nota">{comissaoPadrao.nota}</p>
+    <h2>Prazos de repasse</h2>
+    <p>O líquido da reserva feita pelo app entra no recebimento processado pela Asaas quando a cobrança é paga, na confirmação do grupo.</p>
+    <p>O crédito de indicação fica 30 dias pendente e depois entra no repasse das próximas reservas pelo app.</p>
+  </article>
+  <CtaBlock titulo="Seja parceiro" acoes={[{ rotulo: 'Seja parceiro', href: '/para-casas/cadastro' }]} />
+</Base>

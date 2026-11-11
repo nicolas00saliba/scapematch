@@ -1,0 +1,113 @@
+---
+import PhoneShot from './PhoneShot.astro';
+import {
+  casaNovaLinks,
+  casaParceiraLinks,
+  empresaLinks,
+  jogarLinks,
+  vantagensLinks,
+} from '../data/nav';
+
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+
+function atual(prefixos: string[]) {
+  return prefixos.some((item) => path === item || path.startsWith(`${item}/`));
+}
+
+const grupos = [
+  { nome: 'Quero jogar', atual: atual(['/como-funciona', '/experiencias', '/cidades', '/seguranca', '/app']) },
+  { nome: 'Vantagens', atual: atual(['/vantagens']) },
+  { nome: 'Para casas', atual: atual(['/para-casas']) },
+  { nome: 'Ajuda', atual: atual(['/ajuda']), href: '/ajuda' },
+  { nome: 'Empresa', atual: atual(['/sobre', '/contato']) },
+];
+---
+
+<a class="pula" href="#conteudo">Ir para o conteúdo</a>
+<header class="topo" data-topo>
+  <div class="barra">
+    <a class="logo" href="/">
+      <img src="/assets/logo-simbolo.svg" alt="" width="31" height="40">
+      <span class="marca">Escape<span>Match</span></span>
+    </a>
+    <button class="menu-abre" type="button" data-menu-botao aria-expanded="false" aria-controls="menu">
+      Menu
+    </button>
+    <nav id="menu" class="menu" aria-label="Seções" data-menu>
+      <details data-mega>
+        <summary class={grupos[0].atual ? 'is-atual' : undefined}>Quero jogar</summary>
+        <div class="mega">
+          <div class="mega-miolo">
+            <ul class="mega-links">
+              {jogarLinks.map((link) => (
+                <li><a href={link.href}>{link.rotulo}</a></li>
+              ))}
+            </ul>
+            <div>
+              <PhoneShot cena="grupo" />
+              <a class="btn" href="/app">Entrar num time</a>
+            </div>
+          </div>
+        </div>
+      </details>
+      <details data-mega>
+        <summary class={grupos[1].atual ? 'is-atual' : undefined}>Vantagens</summary>
+        <div class="mega">
+          <div class="mega-miolo">
+            <ul class="mega-links">
+              {vantagensLinks.map((link) => (
+                <li><a href={link.href}>{link.rotulo}</a></li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </details>
+      <details data-mega>
+        <summary class={grupos[2].atual ? 'is-atual' : undefined}>Para casas</summary>
+        <div class="mega">
+          <div class="mega-miolo mega-duas">
+            <div class="mega-col">
+              <h3>Quero ser parceiro</h3>
+              <ul class="mega-links">
+                {casaNovaLinks.map((link) => (
+                  <li><a href={link.href}>{link.rotulo}</a></li>
+                ))}
+              </ul>
+            </div>
+            <div class="mega-col">
+              <h3>Já sou parceiro</h3>
+              <ul class="mega-links">
+                {casaParceiraLinks.map((link) => (
+                  <li>
+                    <a href={link.href} {...(link.externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                      {link.rotulo}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <PhoneShot cena="parceiro" />
+          </div>
+        </div>
+      </details>
+      <a class={grupos[3].atual ? 'is-atual' : undefined} href="/ajuda">Ajuda</a>
+      <details data-mega>
+        <summary class={grupos[4].atual ? 'is-atual' : undefined}>Empresa</summary>
+        <div class="mega mega-curto">
+          {empresaLinks.map((link) => (
+            <a href={link.href}>{link.rotulo}</a>
+          ))}
+        </div>
+      </details>
+      <a class="menu-parceiro" href="/para-casas/cadastro">Seja parceiro</a>
+      <details data-mega>
+        <summary>Entrar</summary>
+        <div class="mega mega-curto">
+          <a href="https://app.escapematch.com.br/login" target="_blank" rel="noopener noreferrer">Sou jogador</a>
+          <a href="https://parceiro.escapematch.com.br/" target="_blank" rel="noopener noreferrer">Sou casa parceira</a>
+        </div>
+      </details>
+      <a class="btn menu-baixar" href="/app">Baixar o app</a>
+    </nav>
+  </div>
+</header>

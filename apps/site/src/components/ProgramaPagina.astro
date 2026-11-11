@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from './PageTop.astro';
+import ProgramCard from './ProgramCard.astro';
+import CtaBlock from './CtaBlock.astro';
+import { programaPorId } from '../data/programas';
+
+interface Props {
+  id: string;
+}
+
+const programa = programaPorId(Astro.props.id);
+---
+
+<Base
+  title={programa.seoTitulo}
+  description={programa.seoDescricao}
+  path={programa.rota}
+  ogImage={programa.og}
+>
+  <PageTop titulo={programa.titulo} frase={programa.apoio} />
+  <div class="miolo pagina">
+    <div class="programa-solo">
+      <ProgramCard programa={programa} />
+    </div>
+  </div>
+  <CtaBlock titulo={programa.cta.rotulo} acoes={[programa.cta]} />
+</Base>

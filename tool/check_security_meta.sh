@@ -95,7 +95,7 @@ def check_flutter(path, csp):
 def check_landing(directory):
     if (directory / "_headers").exists():
         raise SystemExit(f"{directory}/_headers não é aplicado pelo GitHub Pages")
-    pages = sorted(directory.glob("*.html"))
+    pages = sorted(directory.rglob("*.html"))
     if len(pages) < 5:
         raise SystemExit(f"esperava as páginas da landing em {directory}")
     guard = directory / "frame-guard.js"
@@ -103,11 +103,16 @@ def check_landing(directory):
         raise SystemExit("frame-guard.js ausente")
     if "window.top === window.self" not in guard.read_text():
         raise SystemExit("frame-guard.js não testa o iframe")
+    guard_tags = (
+        '<script src="frame-guard.js"></script>',
+        '<script src="/frame-guard.js"></script>',
+    )
     for path in pages:
         text = path.read_text()
         require(text, referrer, path)
         require(text, f'<meta http-equiv="Content-Security-Policy" content="{landing_csp}">', path)
-        require(text, '<script src="frame-guard.js"></script>', path)
+        if not any(tag in text for tag in guard_tags):
+            raise SystemExit(f"ausente em {path}: frame-guard.js")
         if "unsafe-eval" in text or "gstatic" in text or "supabase.co" in text:
             raise SystemExit(f"CSP da landing folgada em {path}")
         reject(text, path)

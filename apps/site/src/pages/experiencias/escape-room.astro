@@ -1,0 +1,49 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+---
+
+<Base
+  title="Escape room sem ter com quem ir | EscapeMatch"
+  description="Quer jogar escape room e não tem time? Entre num grupo e pague só a sua vaga."
+  path="/experiencias/escape-room"
+>
+  <PageTop
+    titulo="Escape room"
+    frase="Uma sala, um tempo e um grupo. Você pode chegar sozinho."
+  />
+  <article class="miolo pagina leitura">
+    <h2>O que é um escape room</h2>
+    <p>O grupo entra numa sala e resolve os desafios juntos para sair antes do tempo acabar. A casa monta a sala e conduz a sessão.</p>
+
+    <h2>Por que dá para ir sozinho</h2>
+    <p>O jogo pede um grupo, e o grupo não precisa ser o seu. O EscapeMatch junta quem está sozinho até bater o mínimo.</p>
+
+    <h2>Como o time se forma</h2>
+    <p>Você escolhe a sala e o horário, entra no grupo e paga a sua vaga. O jogo confirma no mínimo. Depois disso, quem chega paga na hora, até lotar.</p>
+
+    <h2>Salas disponíveis</h2>
+    <p>As salas abertas estão no app. O EscapeMatch começa por Curitiba.</p>
+
+    <h2>Perguntas da modalidade</h2>
+    <div class="faq">
+      <details>
+        <summary>Preciso conhecer o grupo antes?</summary>
+        <p>Não. Vocês se encontram na casa, no horário.</p>
+      </details>
+      <details>
+        <summary>Eu pago a sala inteira?</summary>
+        <p>Não. Você paga só a sua vaga.</p>
+      </details>
+      <details>
+        <summary>E se o mínimo não bater?</summary>
+        <p>O jogo não confirma e nada é cobrado.</p>
+      </details>
+    </div>
+  </article>
+  <CtaBlock
+    titulo="Ver salas no app"
+    acoes={[{ rotulo: 'Ver salas no app', href: 'https://app.escapematch.com.br/', externo: true }]}
+  />
+</Base>

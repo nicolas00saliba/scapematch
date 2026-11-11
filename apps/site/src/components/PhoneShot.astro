@@ -1,0 +1,71 @@
+---
+interface Props {
+  cena: 'escolhe' | 'grupo' | 'confirmado' | 'parceiro';
+}
+
+const { cena } = Astro.props;
+
+const alt = {
+  escolhe: 'Ilustração da escolha de horário, com dois horários de exemplo e vagas abertas.',
+  grupo: 'Ilustração de um grupo de exemplo. As vagas preenchem até o mínimo e o jogo confirma.',
+  confirmado: 'Ilustração de um grupo de exemplo já confirmado.',
+  parceiro: 'Ilustração da agenda do Parceiro, com um horário aberto e um horário vazio.',
+}[cena];
+---
+
+<figure class="telefone" aria-label={alt}>
+  <div class="telefone-tela">
+    {cena === 'escolhe' && (
+      <>
+        <p class="telefone-app">EscapeMatch</p>
+        <h3>Hoje</h3>
+        <p class="sub">Escolha o horário. Você entra sozinho.</p>
+        <div class="linha-hora"><span>19:00</span><strong>Vagas abertas</strong></div>
+        <div class="linha-hora"><span>21:00</span><strong>Vagas abertas</strong></div>
+      </>
+    )}
+    {cena === 'grupo' && (
+      <>
+        <p class="telefone-app">EscapeMatch</p>
+        <p class="status status-antes">Faltam 2 para confirmar</p>
+        <p class="status status-depois">Confirmado — ainda cabem&nbsp;2</p>
+        <p class="sub">Grupo de exemplo, com jogadores que não se conheciam.</p>
+        <div class="vagas" aria-hidden="true">
+          <span class="vaga cheia">A</span>
+          <span class="vaga cheia">L</span>
+          <span class="vaga enche">M</span>
+          <span class="vaga enche">R</span>
+          <span class="vaga"></span>
+          <span class="vaga"></span>
+        </div>
+        <div class="regua" aria-hidden="true"><span></span></div>
+        <p class="sub">Você paga só a sua vaga.</p>
+      </>
+    )}
+    {cena === 'confirmado' && (
+      <>
+        <p class="telefone-app">EscapeMatch</p>
+        <h3>O jogo está confirmado</h3>
+        <p class="sub">O grupo bateu o mínimo.</p>
+        <div class="vagas" aria-hidden="true">
+          <span class="vaga cheia">A</span>
+          <span class="vaga cheia">L</span>
+          <span class="vaga cheia">M</span>
+          <span class="vaga cheia">R</span>
+          <span class="vaga"></span>
+          <span class="vaga"></span>
+        </div>
+        <p class="sub">Quem chega depois paga na hora, até lotar.</p>
+      </>
+    )}
+    {cena === 'parceiro' && (
+      <>
+        <p class="telefone-app">Parceiro</p>
+        <h3>Agenda de hoje</h3>
+        <div class="linha-hora"><span>19:00</span><strong>Aberto</strong></div>
+        <div class="linha-hora"><span>21:00</span><strong>Horário vazio</strong></div>
+        <p class="sub">Salas, grupos e o extrato ficam no Parceiro.</p>
+      </>
+    )}
+  </div>
+</figure>

@@ -1,0 +1,51 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+import PhoneShot from '../components/PhoneShot.astro';
+---
+
+<Base
+  title="Como funciona | EscapeMatch"
+  description="Escolha a sala, entre num grupo com outros jogadores e jogue quando o grupo bater o mínimo."
+  path="/como-funciona"
+>
+  <PageTop
+    titulo="Como funciona"
+    frase="Você chega sozinho. O app te coloca num grupo. O jogo confirma quando o grupo bate o mínimo."
+  />
+  <article class="miolo pagina leitura">
+    <h2>Você chega sozinho</h2>
+    <p>Escolha a sala e o horário. Não precisa levar um time pronto.</p>
+    <PhoneShot cena="escolhe" />
+
+    <h2>O app te coloca num grupo</h2>
+    <p>As vagas vão sendo preenchidas por jogadores que não se conheciam. Você paga só a sua vaga.</p>
+    <PhoneShot cena="grupo" />
+
+    <h2>Mínimo e máximo</h2>
+    <p>Bateu o mínimo, está confirmado. Quem chega depois paga na hora, até lotar.</p>
+    <div class="barra-leitura">
+      <div class="trilho" aria-hidden="true">
+        <i class="min"></i>
+        <i class="max"></i>
+      </div>
+      <div class="marcas">
+        <span>Grupo aberto</span>
+        <span>Mínimo: confirmado</span>
+        <span>Máximo: lotado</span>
+      </div>
+    </div>
+
+    <h2>Jogar com desconhecidos</h2>
+    <p>Vocês se encontram na casa, no horário marcado. A casa conduz a sessão. Cada pessoa pagou a própria vaga, então o grupo existe de verdade.</p>
+    <p>As regras são simples: respeito com todos, nada de discriminação ou assédio, chegar no horário e seguir o que a casa pedir. O detalhe está em <a href="/seguranca">Segurança</a>.</p>
+
+    <h2>Já tem turma?</h2>
+    <p>Complete as vagas no app. Esse caminho existe, e o preço continua por pessoa.</p>
+
+    <h2>Se o grupo não fechar</h2>
+    <p>Se o mínimo não bater, o jogo não confirma. Nada é cobrado: o Pix é estornado e o cartão não é capturado. O horário volta a ficar livre.</p>
+  </article>
+  <CtaBlock titulo="Entrar num time" acoes={[{ rotulo: 'Entrar num time', href: '/app' }]} />
+</Base>
