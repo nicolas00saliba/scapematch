@@ -41,7 +41,7 @@ export const programas: Programa[] = [
     apoio: 'Só por criar a sua conta.',
     passos: ['Crie a conta', 'Ganhe 100 pontos', 'Junte e use'],
     regras:
-      'Uma vez por conta. Os pontos entram no saldo e viram desconto na vaga quando ele chegar a 1.000. Uma barra no app mostra quanto falta.',
+      'Uma vez por conta. Esses pontos dão desconto na vaga. Uma barra no app mostra quanto falta para usar.',
     seoTitulo: 'Vantagens e pontos | EscapeMatch',
     seoDescricao:
       'Ganhe pontos ao criar a conta, em toda reserva e indicando amigos. Use os pontos na próxima sala.',
@@ -128,9 +128,9 @@ export const programas: Programa[] = [
     passos: ['Indique', 'Eles jogam', 'Você sobe'],
     regras:
       'Conta como jogando quem pagou uma reserva nos últimos 90 dias. O extra vale para amigos e casas indicados.',
-    seoTitulo: 'Níveis e o desconto dos pontos | EscapeMatch',
+    seoTitulo: 'Níveis para jogar de graça | EscapeMatch',
     seoDescricao:
-      'Bronze, Prata e Ouro. Os pontos ganhos viram desconto: 1 ponto vale R$ 0,01 e 100 pontos valem R$ 1,00.',
+      'Indique amigos, junte pontos e jogue de graça. 1 ponto vale R$ 0,01. A indicação paga a vaga inteira.',
     og: '/assets/og/niveis.png',
     cta: {
       rotulo: 'Ver meu nível no app',
@@ -214,12 +214,17 @@ export function programaPorId(id: string): Programa {
   return achado;
 }
 
+export const regrasVagaGratis = [
+  'Dá para usar a partir de 1.000 pontos.',
+  'O limite mensal de vagas grátis é definido pela plataforma.',
+  'Se a reserva for cancelada, os pontos usados são devolvidos.',
+];
+
 export const regrasJogador = [
-  '1 ponto vale R$ 0,01. 100 pontos valem R$ 1,00 de desconto na sua vaga. Os pontos não vencem e não viram dinheiro para saque.',
+  '1 ponto vale R$ 0,01. Os pontos de indicação pagam a vaga inteira. Os de boas-vindas e de cashback dão desconto. Não viram dinheiro para saque.',
   'Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.',
-  'Dá para usar a partir de 1.000 pontos, com desconto de até 25% do valor da sua vaga.',
   'O código de quem indicou entra no cadastro ou nas primeiras 24 horas. Uma indicação vale por 1 ano.',
-  'Se a reserva for cancelada ou estornada, os pontos dela saem da conta.',
+  'Se a reserva for cancelada, os pontos ganhos nela também saem da conta.',
 ];
 
 export const regrasCasa = [

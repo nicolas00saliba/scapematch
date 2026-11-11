@@ -249,12 +249,14 @@ def main() -> None:
         falha("cancelamento voltou à regra antiga")
 
     home_html = (DIST / "index.html").read_text()
-    if "100 pontos valem R$ 1,00" not in home_html:
-        falha("a home não mostra que 100 pontos valem R$ 1,00")
+    if "Indique amigos, junte pontos e jogue de graça." not in home_html:
+        falha("a home não mostra a vaga grátis")
     for rota in ("/vantagens", "/vantagens/niveis", "/vantagens/regulamento", "/ajuda"):
         texto = arquivo(rota).read_text()
-        if "R$ 0,01" not in texto or "R$ 1,00" not in texto:
-            falha(f"{rota} não mostra a conversão dos pontos")
+        if "jogue de graça" not in texto or "R$ 0,01" not in texto:
+            falha(f"{rota} não mostra a vaga grátis")
+        if "até 25%" in texto or "até 30%" in texto:
+            falha(f"{rota} ainda promete um teto percentual")
     if '"@type":"Organization"' not in home_html or '"@type":"WebSite"' not in home_html:
         falha("a home saiu sem Organization ou WebSite")
     if '"@type":"FAQPage"' not in home_html:

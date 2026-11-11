@@ -132,14 +132,14 @@ export const temas: Tema[] = [
     slug: 'pontos',
     nome: 'Pontos',
     frase: 'Como ganhar, quando liberam e como usar.',
-    seoTitulo: 'Pontos que viram desconto | EscapeMatch',
-    seoDescricao: '1 ponto vale R$ 0,01. 100 pontos são R$ 1,00 de desconto na vaga, a partir de 1.000 pontos.',
+    seoTitulo: 'Pontos para jogar de graça | EscapeMatch',
+    seoDescricao: '1 ponto vale R$ 0,01. A indicação paga a vaga inteira. Boas-vindas e cashback dão desconto.',
     relacionados: ['conta', 'pagamento'],
     perguntas: [
       {
         pergunta: 'Quanto vale 1 ponto?',
         resposta:
-          'R$ 0,01. 100 pontos valem R$ 1,00 de desconto na sua vaga. Os pontos não vencem e não viram dinheiro para saque.',
+          'R$ 0,01. Os pontos de indicação pagam a vaga inteira. Os de boas-vindas e de cashback dão desconto. Não viram dinheiro para saque.',
       },
       {
         pergunta: 'Quando os pontos liberam?',
@@ -147,7 +147,8 @@ export const temas: Tema[] = [
       },
       {
         pergunta: 'A partir de quando dá para usar?',
-        resposta: 'A partir de 1.000 pontos, com desconto de até 25% do valor da sua vaga.',
+        resposta:
+          'A partir de 1.000 pontos. O limite mensal de vagas grátis é definido pela plataforma. Se a reserva for cancelada, os pontos usados são devolvidos.',
       },
       {
         pergunta: 'Quantos pontos eu ganho ao criar a conta?',
