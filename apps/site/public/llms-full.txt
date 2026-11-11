@@ -1,0 +1,76 @@
+# EscapeMatch
+
+> Plataforma brasileira criada para quem quer jogar e não tem grupo. O lançamento começa em Curitiba. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
+
+Este arquivo descreve o que o site e as regras publicadas afirmam. Não há perfil oficial de Instagram, TikTok, LinkedIn ou outra rede publicado no repositório.
+
+## O que é
+
+O EscapeMatch junta pessoas que querem jogar e não têm um grupo. O uso principal é chegar sozinho e entrar num time. Quem já tem turma pode completar as vagas que faltam. Esse uso é secundário.
+
+A modalidade disponível é escape room. Jogos de tabuleiro, laser tag e outras modalidades estão marcados como em breve, quando houver casa parceira. O lançamento começa por Curitiba. As salas abertas aparecem no app.
+
+A casa realiza a sessão. O EscapeMatch forma o grupo e cobra a vaga de cada pessoa. O pagamento passa pela Asaas, em Pix ou cartão. O app não guarda o número do cartão.
+
+## Como funciona
+
+1. A pessoa escolhe a sala e o horário. Não precisa levar um time pronto.
+2. O app coloca essa pessoa num grupo com jogadores que não se conheciam. Cada um paga a própria vaga.
+3. Quando o grupo bate o mínimo, o jogo confirma. Quem chega depois paga a própria vaga na hora, até lotar.
+4. Se o mínimo não bater, o jogo não confirma. Nada é cobrado: o Pix é estornado e o cartão não é capturado.
+5. Depois da confirmação não há reembolso. Se a casa cancelar, o valor é devolvido integralmente.
+
+As pessoas se encontram na casa, no horário marcado. A casa conduz a sessão.
+
+## Preços
+
+Não há tabela única de ingresso. O preço é por pessoa e é o da sala, mostrado no app no momento do grupo.
+
+Para a casa, a comissão padrão é 25% e incide só sobre o que o app vender. O que a casa vende por fora não entra. Exemplo publicado no site: uma vaga de R$ 100, comissão de R$ 25, casa com R$ 75. Casas podem ter condição combinada. O líquido entra no recebimento processado pela Asaas quando a cobrança é paga, na confirmação do grupo.
+
+## Pontos e vaga grátis
+
+Jogue e ganhe pontos. Indique amigos e ganhe a cada jogo deles. Junte pontos e jogue de graça. Cashback de até 5% em pontos a cada jogo. 1 ponto vale R$ 0,01. Os pontos não vencem e não viram dinheiro para saque.
+
+Cashback e indicação se somam no perfil e pagam a vaga inteira. Quem mais indica, mais joga de graça. Só as boas-vindas dão desconto. A indicação vale 2,5% em pontos de cada reserva do amigo indicado.
+
+Dá para usar a partir de 1.000 pontos. Se a reserva for cancelada, os pontos usados são devolvidos. Os pontos ganhos nessa reserva saem da conta. Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.
+
+Formas de ganhar, com os valores publicados no site:
+
+- Boas-vindas: 100 pontos, uma vez por conta.
+- Pontos de volta: cashback de até 5% em pontos a cada jogo. O valor é sorteado a cada reserva paga: 0,5% (70% das vezes), 1% (17%), 2% (9%) e 5% (4%). A média desta tabela é 0,9%. Em horário vazio marcado pela casa, o resultado vale em dobro. O custo do dobro é dividido: metade fica com a casa e metade com o EscapeMatch.
+- Indique amigos: o amigo ganha 20% na primeira reserva. Quem indicou ganha 2,5% em pontos de cada reserva do amigo, por 1 ano.
+- Indique uma casa: 2,5% em pontos do que a casa indicada vender pelo app, por 1 ano. Dono ou sócio não indica a própria casa.
+- Níveis: Bronze começa nos 2,5%. Prata, com 5 indicados que pagaram uma reserva nos últimos 90 dias, soma 0,5%. Ouro, com 15, soma 1%. O extra vale para amigos e casas indicados.
+
+O código de quem indicou entra no cadastro ou nas primeiras 24 horas. O desconto de 20% da primeira reserva é só para conta nova.
+
+Contas da mesma pessoa não geram indicação: mesmo CPF, mesmo telefone ou mesmo cartão. Se quem paga é o próprio indicador, aquela indicação não vale. Um mesmo pagador gera prêmio para no máximo 3 contas indicadas. Contas criadas no mesmo aparelho pelo mesmo indicador passam por revisão antes de liberar os pontos.
+
+Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no repasse das próximas reservas pelo app. Indicar outra casa rende 5% em crédito do que ela vender pelo app, por 1 ano, fora a reserva que teve os 20% de desconto. Indicar jogadores rende 2,5% em crédito do que o cliente pagar em outras casas, por 1 ano.
+
+## Páginas principais
+
+- [Início](https://escapematch.com.br/): proposta para quem está sozinho e quer jogar.
+- [Guia: escape room sozinho](https://escapematch.com.br/guia/escape-room-sozinho): dá para jogar sozinho, como achar grupo e o que é o EscapeMatch.
+- [Como funciona](https://escapematch.com.br/como-funciona): formação do grupo.
+- [Pagamento e regras](https://escapematch.com.br/como-funciona/pagamento): quando a cobrança acontece.
+- [Experiências](https://escapematch.com.br/experiencias): escape room disponível, tabuleiro e laser tag em breve.
+- [Escape room](https://escapematch.com.br/experiencias/escape-room): a modalidade e por que dá para ir sozinho.
+- [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo e vaga grátis indicando amigos.
+- [Níveis](https://escapematch.com.br/vantagens/niveis): Bronze, Prata e Ouro.
+- [Regulamento dos pontos](https://escapematch.com.br/vantagens/regulamento): versão única das regras.
+- [Indique amigos](https://escapematch.com.br/vantagens/indique-amigos): desconto do amigo e pontos de quem indica.
+- [Ajuda](https://escapematch.com.br/ajuda): perguntas frequentes.
+- [Segurança](https://escapematch.com.br/seguranca): convivência no grupo.
+- [Baixar o app](https://escapematch.com.br/app): abrir no navegador ou instalar no celular.
+- [Sobre](https://escapematch.com.br/sobre): por que a plataforma existe.
+- [Para casas](https://escapematch.com.br/para-casas): encher horário que ficaria vazio.
+- [Preços para casas](https://escapematch.com.br/para-casas/precos): comissão padrão de 25%.
+- [Termos de uso](https://escapematch.com.br/termos): regras de uso.
+- [Privacidade](https://escapematch.com.br/privacidade): tratamento de dados.
+- [Cancelamento](https://escapematch.com.br/cancelamento): o que acontece se o grupo ou a casa cancelar.
+- [Mapa do site](https://escapematch.com.br/mapa-do-site): lista das páginas.
+
+Versão curta: https://escapematch.com.br/llms.txt

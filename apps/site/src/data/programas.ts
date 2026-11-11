@@ -41,7 +41,7 @@ export const programas: Programa[] = [
     apoio: 'Só por criar a sua conta.',
     passos: ['Crie a conta', 'Ganhe 100 pontos', 'Junte e use'],
     regras:
-      'Uma vez por conta. Os pontos podem ser usados quando o saldo chegar a 1.000. Uma barra no app mostra quanto falta.',
+      'Uma vez por conta. Só esses pontos dão desconto. Uma barra no app mostra quanto falta para usar.',
     seoTitulo: 'Vantagens e pontos | EscapeMatch',
     seoDescricao:
       'Ganhe pontos ao criar a conta, em toda reserva e indicando amigos. Use os pontos na próxima sala.',
@@ -58,11 +58,11 @@ export const programas: Programa[] = [
     publico: 'jogador',
     icone: 'moeda',
     titulo: 'Pontos de volta',
-    beneficio: 'Pontos em toda reserva',
-    apoio: 'De 50 a 500 pontos a cada R$ 100, por sorteio. Em horário vazio, em dobro.',
+    beneficio: 'Até 5% em pontos',
+    apoio: 'Cashback de até 5% em pontos a cada jogo.',
     passos: ['Reserve', 'Pague sua vaga', 'Ganhe pontos'],
     regras:
-      'O sorteio acontece no pagamento de cada reserva. Vale em toda reserva paga, com ou sem indicação.',
+      'Vale em toda reserva paga. Esses pontos se somam aos de indicação e pagam a vaga inteira. O sorteio e as faixas estão no regulamento.',
     seoTitulo: 'Vantagens e pontos | EscapeMatch',
     seoDescricao:
       'Ganhe pontos ao criar a conta, em toda reserva e indicando amigos. Use os pontos na próxima sala.',
@@ -81,7 +81,7 @@ export const programas: Programa[] = [
     titulo: 'Indique amigos',
     beneficio: '20% para ele, pontos para você',
     apoio:
-      'Seu amigo ganha 20% na primeira reserva. Você ganha 250 pontos a cada R$ 100 que ele pagar, por 1 ano.',
+      'Seu amigo ganha 20% na primeira reserva. Você ganha 2,5% em pontos de cada reserva dele, por 1 ano.',
     passos: ['Mande seu código', 'Amigo entra e joga', 'Vocês ganham'],
     regras:
       'O amigo usa o seu código no cadastro. Conta da mesma pessoa não vale: mesmo CPF, telefone ou cartão.',
@@ -101,8 +101,8 @@ export const programas: Programa[] = [
     publico: 'jogador',
     icone: 'casa',
     titulo: 'Indique uma casa',
-    beneficio: '250 pontos a cada R$ 100',
-    apoio: 'Que a casa indicada vender pelo app, por 1 ano.',
+    beneficio: '2,5% em pontos',
+    apoio: 'Do que a casa indicada vender pelo app, por 1 ano.',
     passos: ['Indique a casa', 'A casa entra', 'Você ganha'],
     regras:
       'A casa usa o seu código no cadastro. Dono ou sócio não indica a própria casa.',
@@ -124,13 +124,13 @@ export const programas: Programa[] = [
     titulo: 'Bronze, Prata e Ouro',
     beneficio: 'Indique mais, ganhe mais',
     apoio:
-      'Prata com 5 indicados jogando: +50 pontos a cada R$ 100 que eles pagarem. Ouro com 15: +100.',
+      'Quem mais indica, mais joga de graça. A base é 2,5% em pontos. Prata soma 0,5%. Ouro soma 1%.',
     passos: ['Indique', 'Eles jogam', 'Você sobe'],
     regras:
       'Conta como jogando quem pagou uma reserva nos últimos 90 dias. O extra vale para amigos e casas indicados.',
-    seoTitulo: 'Níveis Bronze, Prata e Ouro | EscapeMatch',
+    seoTitulo: 'Níveis para jogar de graça | EscapeMatch',
     seoDescricao:
-      'Quanto mais amigos jogando, mais pontos você ganha em cada indicação.',
+      'Quem mais indica, mais joga de graça. A base é 2,5% em pontos. 1 ponto vale R$ 0,01.',
     og: '/assets/og/niveis.png',
     cta: {
       rotulo: 'Ver meu nível no app',
@@ -214,12 +214,16 @@ export function programaPorId(id: string): Programa {
   return achado;
 }
 
+export const regrasVagaGratis = [
+  'Dá para usar a partir de 1.000 pontos.',
+  'Se a reserva for cancelada, os pontos usados são devolvidos.',
+];
+
 export const regrasJogador = [
-  '1 ponto vale R$ 0,01. Os pontos não vencem e não viram dinheiro: servem para pagar salas.',
+  '1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Só as boas-vindas dão desconto. Não viram dinheiro para saque.',
   'Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.',
-  'Dá para usar a partir de 1.000 pontos, pagando até 30% de uma reserva.',
   'O código de quem indicou entra no cadastro ou nas primeiras 24 horas. Uma indicação vale por 1 ano.',
-  'Se a reserva for cancelada ou estornada, os pontos dela saem da conta.',
+  'Se a reserva for cancelada, os pontos ganhos nela também saem da conta.',
 ];
 
 export const regrasCasa = [
@@ -247,4 +251,4 @@ export const regrasFraude = [
 ];
 
 export const sorteioPontos =
-  'O sorteio usa quatro faixas: 50, 100, 200 e 500 pontos a cada R$ 100. A média fica em até 100 pontos a cada R$ 100. Em horário vazio, o resultado vale em dobro.';
+  'O cashback é sorteado a cada reserva paga, sobre o valor pago. As faixas são 0,5% (70% das vezes), 1% (17%), 2% (9%) e 5% (4%). A média desta tabela é 0,9%. Em horário vazio, o resultado vale em dobro.';

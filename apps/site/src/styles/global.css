@@ -239,7 +239,8 @@ a:hover {
 }
 
 .marca span {
-  color: var(--cobre);
+  /* Cobre mais escuro: o destaque do logo é texto pequeno e precisa de contraste no creme. */
+  color: #9a3f16;
 }
 
 .menu-abre {
@@ -450,6 +451,15 @@ main {
   max-width: 36ch;
   font-size: 1.15rem;
   color: var(--tinta);
+}
+
+.hero-ganho {
+  margin: 0.85rem 0 0;
+  max-width: 28rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--petroleo);
 }
 
 .faixa {
@@ -889,8 +899,10 @@ main {
   height: 1.35rem;
 }
 
-.programa h3 {
+.programa h2 {
   font-size: 1.05rem;
+  max-width: none;
+  margin: 0;
 }
 
 .beneficio {
@@ -974,9 +986,15 @@ main {
   border-top: 1px solid var(--linha);
 }
 
-.regras-comuns h2 {
+.regras-comuns h2,
+.secao-interna {
   font-size: 1.35rem;
   margin-bottom: 0.8rem;
+  max-width: none;
+}
+
+.secao-interna {
+  margin-top: 1.75rem;
 }
 
 .regras-comuns li + li {
@@ -1171,6 +1189,76 @@ main {
 .versao {
   color: var(--suave);
   font-size: 0.92rem;
+}
+
+.desconto-pontos {
+  margin: 1.25rem 0 0;
+  padding: 1.1rem 1.2rem 1.15rem;
+  border: 1px solid var(--linha);
+  border-left: 4px solid var(--cobre);
+  border-radius: var(--raio);
+  background: var(--papel);
+}
+
+.desconto-olho {
+  margin: 0 0 0.85rem;
+  font-family: "Bricolage Grotesque", Inter, sans-serif;
+  font-weight: 600;
+  color: var(--petroleo);
+  letter-spacing: -0.02em;
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
+.desconto-valores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.desconto-valores div {
+  background: var(--creme);
+  border-radius: 8px;
+  padding: 0.8rem 0.95rem;
+}
+
+.desconto-valores dt {
+  color: var(--suave);
+  font-size: 0.95rem;
+}
+
+.desconto-valores dd {
+  margin: 0.15rem 0 0;
+  font-family: "Bricolage Grotesque", Inter, sans-serif;
+  font-size: clamp(1.7rem, 3vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--petroleo);
+  line-height: 1.05;
+}
+
+.desconto-nota {
+  margin: 0.85rem 0 0;
+  max-width: 46rem;
+}
+
+.desconto-pontos .lista-simples {
+  margin-top: 0.7rem;
+}
+
+.desconto-nota a {
+  font-weight: 600;
+}
+
+.resposta-direta {
+  margin-top: 1.25rem;
+  max-width: 42rem;
+  padding: 1rem 1.15rem;
+  background: var(--papel);
+  border-left: 4px solid var(--petroleo);
+  border-radius: 0 var(--raio) var(--raio) 0;
+  font-size: 1.15rem;
 }
 
 @media (max-width: 1079px) {

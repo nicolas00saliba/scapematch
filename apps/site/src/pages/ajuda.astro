@@ -1,27 +1,24 @@
 ---
 import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
+import DescontoPontos from '../components/DescontoPontos.astro';
 import { perguntasVistas, temas } from '../data/ajuda';
+import { faqPage } from '../data/seo';
 
-const faq = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: perguntasVistas.map(({ pergunta }) => ({
-    '@type': 'Question',
-    name: pergunta.pergunta,
-    acceptedAnswer: { '@type': 'Answer', text: pergunta.resposta },
-  })),
-};
+const faq = faqPage(perguntasVistas.map(({ pergunta }) => pergunta));
 ---
 
 <Base
-  title="Central de ajuda | EscapeMatch"
-  description="Respostas sobre grupos, pagamento, cancelamento, conta, pontos e casas parceiras."
+  title="Ajuda para jogar sem grupo | EscapeMatch"
+  description="Como achar um grupo de escape room e jogar de graça indicando amigos. 1 ponto vale R$ 0,01."
   path="/ajuda"
   jsonLd={faq}
 >
   <PageTop titulo="Central de ajuda" frase="Grupo, pagamento, cancelamento, conta, pontos e casas." />
   <div class="miolo pagina">
+    <p>Está sozinho e quer jogar escape room? O <a href="/guia/escape-room-sozinho">guia de escape room sozinho</a> responde direto.</p>
+    <DescontoPontos />
+    <h2 class="secao-interna">Temas</h2>
     <div class="modalidades">
       {temas.map((tema) => (
         <a class="modalidade" href={`/ajuda/${tema.slug}`}>
