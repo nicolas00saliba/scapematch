@@ -259,7 +259,22 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install psql
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+        run: |
+          if command -v psql >/dev/null 2>&1; then
+            psql --version
+            exit 0
+          fi
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update -o Acquire::Retries=5 \
+              && sudo apt-get install -y -o Acquire::Retries=5 postgresql-client; then
+              psql --version
+              exit 0
+            fi
+            echo "apt falhou na tentativa ${attempt}"
+            sleep $((attempt * 10))
+          done
+          echo "não foi possível instalar o psql"
+          exit 1
 
       - name: Apply migrations and test duplicates
         env:
