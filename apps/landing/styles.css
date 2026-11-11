@@ -250,6 +250,21 @@ h3 {
   align-items: center;
 }
 
+.hero-badge {
+  width: fit-content;
+  max-width: min(100%, 40rem);
+  margin-top: 16px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--copper-ink);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--copper-ink);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  text-wrap: balance;
+}
+
 .lead {
   margin-top: 16px;
   font-size: 1.15rem;
