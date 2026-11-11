@@ -139,7 +139,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'Quanto vale 1 ponto?',
         resposta:
-          'R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Só as boas-vindas dão desconto. Não viram dinheiro para saque.',
+          'R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Boas-vindas e passaporte dão desconto, até o teto. Não viram dinheiro para saque.',
       },
       {
         pergunta: 'Quando os pontos liberam?',
@@ -158,6 +158,16 @@ export const temas: Tema[] = [
         pergunta: 'Quanto é o cashback?',
         resposta:
           'Até 5% em pontos a cada jogo. O valor é sorteado e se soma aos pontos de indicação. Os dois pagam a vaga inteira. As faixas estão no regulamento.',
+      },
+      {
+        pergunta: 'O que é o passaporte de salas?',
+        resposta:
+          'Cada sala ganha um carimbo quando a reserva está paga e a casa confirma o comparecimento. Jogar de novo conta a visita. Nos marcos entram pontos bônus, que dão desconto e não pagam a vaga inteira. Se a reserva for estornada, o carimbo sai.',
+      },
+      {
+        pergunta: 'Como avalio uma sala?',
+        resposta:
+          'É um toque por item: História, Enigmas, Cenário e imersão, Atendimento, Limpeza e conforto e Custo-benefício. Os rankings de cidade, país e mundo mostram as casas mais bem avaliadas. Sem avaliação, não há nota.',
       },
     ],
   },
@@ -183,6 +193,16 @@ export const temas: Tema[] = [
         pergunta: 'Quem paga o ponto em dobro do horário vazio?',
         resposta:
           'O custo é dividido: metade fica com a casa e metade com o EscapeMatch.',
+      },
+      {
+        pergunta: 'O que eu vejo nas avaliações?',
+        resposta:
+          'A nota por categoria e os pontos fortes e fracos em relação à cidade, conforme as avaliações chegam. Também há rankings de cidade, país e mundo. Não há nota antes de alguém avaliar.',
+      },
+      {
+        pergunta: 'O mimo do passaporte é obrigatório?',
+        resposta:
+          'Não. A casa cadastra se quiser, liga e desliga no Parceiro, e o custo é dela. O jogador mostra o código e a casa marca como entregue.',
       },
     ],
   },

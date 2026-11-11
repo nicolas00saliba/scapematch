@@ -32,7 +32,7 @@ Para a casa, a comissão padrão é 25% e incide só sobre o que o app vender. O
 
 Jogue e ganhe pontos. Indique amigos e ganhe a cada jogo deles. Junte pontos e jogue de graça. Cashback de até 5% em pontos a cada jogo. 1 ponto vale R$ 0,01. Os pontos não vencem e não viram dinheiro para saque.
 
-Cashback e indicação se somam no perfil e pagam a vaga inteira. Quem mais indica, mais joga de graça. Só as boas-vindas dão desconto. A indicação vale 2,5% em pontos de cada reserva do amigo indicado.
+Cashback e indicação se somam no perfil e pagam a vaga inteira. Quem mais indica, mais joga de graça. Boas-vindas e passaporte dão desconto, até o teto. A indicação vale 2,5% em pontos de cada reserva do amigo indicado.
 
 Dá para usar a partir de 1.000 pontos. Se a reserva for cancelada, os pontos usados são devolvidos. Os pontos ganhos nessa reserva saem da conta. Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.
 
@@ -43,12 +43,16 @@ Formas de ganhar, com os valores publicados no site:
 - Indique amigos: o amigo ganha 20% na primeira reserva. Quem indicou ganha 2,5% em pontos de cada reserva do amigo, por 1 ano.
 - Indique uma casa: 2,5% em pontos do que a casa indicada vender pelo app, por 1 ano. Dono ou sócio não indica a própria casa.
 - Níveis: Bronze começa nos 2,5%. Prata, com 5 indicados que pagaram uma reserva nos últimos 90 dias, soma 0,5%. Ouro, com 15, soma 1%. O extra vale para amigos e casas indicados.
+- Passaporte de salas: um carimbo por sala quando a reserva está paga e a casa confirma o comparecimento, a partir do horário da sessão. Sem essa confirmação não há carimbo. Jogar de novo conta a visita e não abre outro carimbo. Nos marcos entram pontos bônus, que são desconto até o teto e não pagam a vaga inteira. Estorno desfaz o carimbo e o marco. Enquanto o programa estiver desligado, não há carimbo. Fechar uma casa com mais de uma sala também é um marco. A casa não paga esses pontos.
+- Avaliar a sala: um toque por item, nas categorias História, Enigmas, Cenário e imersão, Atendimento, Limpeza e conforto e Custo-benefício. Os rankings de cidade, país e mundo reúnem as casas mais bem avaliadas. Sem avaliação recebida, não há nota nem posição publicada.
 
 O código de quem indicou entra no cadastro ou nas primeiras 24 horas. O desconto de 20% da primeira reserva é só para conta nova.
 
 Contas da mesma pessoa não geram indicação: mesmo CPF, mesmo telefone ou mesmo cartão. Se quem paga é o próprio indicador, aquela indicação não vale. Um mesmo pagador gera prêmio para no máximo 3 contas indicadas. Contas criadas no mesmo aparelho pelo mesmo indicador passam por revisão antes de liberar os pontos.
 
 Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no repasse das próximas reservas pelo app. Indicar outra casa rende 5% em crédito do que ela vender pelo app, por 1 ano, fora a reserva que teve os 20% de desconto. Indicar jogadores rende 2,5% em crédito do que o cliente pagar em outras casas, por 1 ano.
+
+A casa vê avaliações por categoria e a comparação de pontos fortes e fracos com a cidade, conforme as avaliações chegam, além dos rankings de cidade, país e mundo. O passaporte dá ao jogador um motivo para voltar até carimbar as salas da casa. A casa confirma o comparecimento no Parceiro, a partir do horário da sessão. A casa pode cadastrar um mimo opcional, por sala ou ao fechar a casa. O custo do mimo é dela. O jogador mostra um código e a casa marca a entrega. Nada disso é obrigatório.
 
 ## Páginas principais
 
@@ -58,7 +62,11 @@ Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no r
 - [Pagamento e regras](https://escapematch.com.br/como-funciona/pagamento): quando a cobrança acontece.
 - [Experiências](https://escapematch.com.br/experiencias): escape room disponível, tabuleiro e laser tag em breve.
 - [Escape room](https://escapematch.com.br/experiencias/escape-room): a modalidade e por que dá para ir sozinho.
-- [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo e vaga grátis indicando amigos.
+- [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo, passaporte de salas e vaga grátis indicando amigos.
+- [Passaporte de salas](https://escapematch.com.br/vantagens/passaporte): um carimbo por sala e pontos bônus nos marcos.
+- [Avalie a sala](https://escapematch.com.br/vantagens/avaliacoes): um toque por item e rankings das casas.
+- [Avaliações para casas](https://escapematch.com.br/para-casas/avaliacoes): nota por categoria e comparação com a cidade.
+- [Mimos do passaporte](https://escapematch.com.br/para-casas/mimos): brinde opcional cadastrado pela casa.
 - [Níveis](https://escapematch.com.br/vantagens/niveis): Bronze, Prata e Ouro.
 - [Regulamento dos pontos](https://escapematch.com.br/vantagens/regulamento): versão única das regras.
 - [Indique amigos](https://escapematch.com.br/vantagens/indique-amigos): desconto do amigo e pontos de quem indica.
