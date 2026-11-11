@@ -387,6 +387,7 @@ jobs:
           test ! -e apps/site/dist/_headers
           test ! -e apps/site/public/_headers
           test -f apps/site/public/CNAME
+          test -f apps/site/dist/.nojekyll
           grep -F -x -q 'escapematch.com.br' apps/site/dist/CNAME
           if grep -R -E -q '(^|[^A-Za-z])scapematch\.com\.br' apps/site/dist; then
             echo 'O build cita o domínio antigo.'

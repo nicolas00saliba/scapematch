@@ -7,6 +7,10 @@
 # O CNAME publicado sai de apps/site/dist e tem de ser escapematch.com.br.
 # Se o dist ou o CNAME já existente no Pages divergir, o script aborta.
 # Ele não grava outro domínio no lugar.
+#
+# O Pages de scapematch-site é Jekyll na raiz da main. Sem .nojekyll ele
+# descarta dist/_astro e o site sobe sem CSS. O arquivo é preservado no
+# destino e recriado se faltar. O script nunca o apaga.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -34,6 +38,10 @@ if [ "$cname" != "$ESPERADO" ]; then
   echo "dist/CNAME é '$cname'. O esperado é $ESPERADO." >&2
   exit 1
 fi
+if [ ! -f dist/.nojekyll ]; then
+  echo "dist/.nojekyll ausente. O Jekyll do Pages descartaria _astro." >&2
+  exit 1
+fi
 
 if [ -z "$DESTINO" ]; then
   echo "Build pronto em apps/site/dist, com CNAME $ESPERADO."
@@ -56,12 +64,25 @@ fi
 
 tmp="$(mktemp -d)"
 cp -a "$DESTINO/CNAME" "$tmp/CNAME" 2>/dev/null || cp -a "$ROOT/apps/site/dist/CNAME" "$tmp/CNAME"
+if [ -f "$DESTINO/.nojekyll" ]; then
+  cp -a "$DESTINO/.nojekyll" "$tmp/.nojekyll"
+else
+  cp -a "$ROOT/apps/site/dist/.nojekyll" "$tmp/.nojekyll"
+fi
 find "$DESTINO" -mindepth 1 -maxdepth 1 \
-  ! -name '.git' ! -name '.github' ! -name 'README.md' ! -name 'sync.sh' ! -name 'CNAME' \
+  ! -name '.git' ! -name '.github' ! -name 'README.md' ! -name 'sync.sh' ! -name 'CNAME' ! -name '.nojekyll' \
   -exec rm -rf {} +
 cp -a "$ROOT/apps/site/dist/." "$DESTINO/"
 cp -a "$tmp/CNAME" "$DESTINO/CNAME"
+if [ ! -f "$DESTINO/.nojekyll" ]; then
+  cp -a "$tmp/.nojekyll" "$DESTINO/.nojekyll"
+fi
 rm -rf "$tmp"
+
+if [ ! -f "$DESTINO/.nojekyll" ]; then
+  echo ".nojekyll ausente no destino. Abortado, sem commit." >&2
+  exit 1
+fi
 
 publicado="$(tr -d '[:space:]' < "$DESTINO/CNAME")"
 if [ "$publicado" != "$ESPERADO" ]; then
