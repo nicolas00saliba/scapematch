@@ -30,6 +30,7 @@ abstract final class PartnerMessages {
   static const balance = 'Saldo';
   static const reservations = 'Reservas';
   static const invoices = 'Notas fiscais';
+  static const gifts = 'Mimos';
   static const rooms = 'Salas';
   static const agenda = 'Agenda';
   static const agendaList = 'Lista';

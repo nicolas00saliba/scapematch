@@ -154,11 +154,16 @@ class ScapePointEntry {
               ? 'Cashback'
               : 'Cashback ${formatBasisPoints(drawnBps!)}${doubled ? ' em dobro' : ''}',
         'welcome' => 'Boas-vindas',
+        'passport' => 'Passaporte de salas',
         _ => 'Pontos a liberar',
       },
-      'release' => 'Pontos liberados',
-      'reversal' =>
-        program == 'cashback' ? 'Estorno do cashback' : 'Estorno da indicação',
+      'release' =>
+        program == 'passport' ? 'Passaporte liberado' : 'Pontos liberados',
+      'reversal' => switch (program) {
+        'cashback' => 'Estorno do cashback',
+        'passport' => 'Estorno do passaporte',
+        _ => 'Estorno da indicação',
+      },
       'redemption' => 'Pagamento de sala',
       'redemption_reversal' => 'Devolução de pontos',
       _ => 'Lançamento',
@@ -172,8 +177,13 @@ class ScapePointEntry {
             ? 'Aguardando conferência. Ainda não fica disponível.'
             : program == 'cashback'
             ? 'Do que você pagou nesta reserva. Fica pendente por 30 dias.'
+            : program == 'passport'
+            ? 'Marco do passaporte. Vira desconto, até o teto. Não paga a vaga inteira.'
             : 'Ficam pendentes por 30 dias.',
-      'release' => 'Disponíveis para pagar sala.',
+      'release' =>
+        program == 'passport'
+            ? 'Disponíveis como desconto, até o teto do resgate.'
+            : 'Disponíveis para pagar sala.',
       'reversal' => 'O pagamento da reserva foi estornado.',
       'redemption' => 'Abatidos da sua parte. A casa recebe o valor cheio.',
       'redemption_reversal' => 'A cobrança não foi concluída.',

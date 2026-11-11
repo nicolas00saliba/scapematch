@@ -20,6 +20,7 @@ abstract final class PartnerKeys {
   static const scapeLiability = Key('scape-liability');
   static const adminConsole = Key('admin-console-link');
   static const venueReferralCode = Key('venue-referral-code');
+  static const passportDesk = Key('passport-desk');
   static const emptySlot = Key('empty-slot');
   static const partnerApprove = Key('partner-approve');
   static const venueName = Key('venue-name');

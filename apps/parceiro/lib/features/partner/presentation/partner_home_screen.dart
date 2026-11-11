@@ -19,6 +19,7 @@ import 'package:scapematch_parceiro/features/partner/data/partner_repository.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/passport_desk.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/empty_slot_card.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_referral_code.dart';
@@ -46,6 +47,14 @@ class PartnerHome extends ConsumerWidget {
       PartnerSection.agenda => PartnerAgenda(snapshot: snapshot),
       PartnerSection.rooms => _RoomsSection(snapshot: snapshot),
       PartnerSection.invoices => PartnerInvoices(snapshot: snapshot),
+      PartnerSection.gifts => PassportDesk(
+        venueId: snapshot.house.id,
+        rooms: [
+          for (final room in snapshot.rooms)
+            PassportRoomChoice(id: room.id, name: room.name),
+        ],
+        preview: scapeUsesLiveBackend ? null : PassportDeskData.sample,
+      ),
     };
     return Scaffold(
       body: Column(
@@ -172,6 +181,7 @@ String _sectionLabel(PartnerSection section) {
     PartnerSection.agenda => PartnerMessages.agenda,
     PartnerSection.rooms => PartnerMessages.rooms,
     PartnerSection.invoices => PartnerMessages.invoices,
+    PartnerSection.gifts => PartnerMessages.gifts,
   };
 }
 
@@ -236,6 +246,11 @@ class _PartnerRail extends ConsumerWidget {
           icon: Icon(Icons.receipt_long_outlined),
           selectedIcon: Icon(Icons.receipt_long),
           label: Text(PartnerMessages.invoices),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.card_giftcard_outlined),
+          selectedIcon: Icon(Icons.card_giftcard),
+          label: Text(PartnerMessages.gifts),
         ),
       ],
     );

@@ -484,6 +484,12 @@ PointSubsidyQuote quotePointSubsidy({
   required int requestedPoints,
   required int availablePoints,
   ReferralRates rates = ReferralRates.official,
+
+  /// Pontos de desconto dentro de [availablePoints]: boas-vindas e
+  /// passaporte. Ficam no teto [ReferralRates.redeemMaxBps] e não
+  /// pagam a vaga. Nulo trata o saldo inteiro como desconto, que é
+  /// a conta antiga. O que sobra do saldo paga a vaga até a comissão.
+  int? discountPoints,
 }) {
   _requirePointValue(rates.pointValueCents);
   if (grossCents <= 0) {
@@ -493,15 +499,39 @@ PointSubsidyQuote quotePointSubsidy({
   final houseNet = grossCents - commission;
   final room = grossCents > 1 ? grossCents - 1 : 0;
   final percentCap = commissionCents(grossCents, rates.redeemMaxBps);
-  final maxSubsidy = [
-    commission,
-    room,
-    percentCap < 0 ? 0 : percentCap,
-  ].reduce((a, b) => a < b ? a : b);
-  var maxPoints = pointsFromCents(
-    maxSubsidy < 0 ? 0 : maxSubsidy,
-    rates.pointValueCents,
-  );
+  var maxPoints = 0;
+  if (discountPoints == null) {
+    final maxSubsidy = [
+      commission,
+      room,
+      percentCap < 0 ? 0 : percentCap,
+    ].reduce((a, b) => a < b ? a : b);
+    maxPoints = pointsFromCents(
+      maxSubsidy < 0 ? 0 : maxSubsidy,
+      rates.pointValueCents,
+    );
+  } else {
+    if (discountPoints < 0 || discountPoints > availablePoints) {
+      throw ArgumentError('Os pontos de desconto não cabem no saldo.');
+    }
+    final slotPool = availablePoints - discountPoints;
+    final hard = commission < room ? commission : room;
+    final hardPoints = pointsFromCents(
+      hard < 0 ? 0 : hard,
+      rates.pointValueCents,
+    );
+    final capPoints = pointsFromCents(
+      percentCap < 0 ? 0 : percentCap,
+      rates.pointValueCents,
+    );
+    final slotMax = slotPool < hardPoints ? slotPool : hardPoints;
+    final discountRoom = hardPoints - slotMax;
+    var discountMax = discountPoints;
+    if (discountMax > capPoints) discountMax = capPoints;
+    if (discountMax > discountRoom) discountMax = discountRoom;
+    if (discountMax < 0) discountMax = 0;
+    maxPoints = slotMax + discountMax;
+  }
   if (availablePoints < rates.redeemMinPoints ||
       maxPoints < rates.redeemMinPoints) {
     maxPoints = 0;
