@@ -11,9 +11,10 @@ void main() {
     expect(commissionCents(5, 1000), 1);
   });
 
-  test('the rate is an argument, including the opening ten percent', () {
+  test('the rate is an argument, and the opening rate is 25 percent', () {
     expect(commissionCents(10000, 0), 0);
     expect(commissionCents(10000, 1000), 1000);
+    expect(commissionCents(10000, PlatformSettings.openingCommissionBps), 2500);
     expect(commissionCents(10000, 1234), 1234);
     expect(commissionCents(10000, 10000), 10000);
     expect(commissionCents(100000000, 1000), 10000000);

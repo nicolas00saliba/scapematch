@@ -535,7 +535,7 @@ begin
   from public.commission_changes
   where actor_id = 'f3333333-3333-3333-3333-333333333333'
     and venue_id is null
-    and before_bps = 1000
+    and before_bps = 2500
     and after_bps = 1500;
   if v_changes <> 1 then
     raise exception 'auditoria da plataforma: %', v_changes;

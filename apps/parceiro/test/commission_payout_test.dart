@@ -39,7 +39,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('EscapeMatch'), findsOneWidget);
     expect(find.text('Casa Sem Subconta'), findsOneWidget);
-    expect(find.text('10%'), findsNWidgets(2));
+    expect(find.text('25%'), findsNWidgets(2));
 
     await tester.enterText(
       find.byKey(const Key('commission-field-platform')),
@@ -49,7 +49,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(book.settings.commissionBps, 1500);
     expect(book.audit.single.actorId, 'admin');
-    expect(book.audit.single.beforeBps, 1000);
+    expect(book.audit.single.beforeBps, 2500);
     expect(book.audit.single.afterBps, 1500);
     expect(find.text('15%'), findsNWidgets(2));
 

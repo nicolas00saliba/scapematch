@@ -6,7 +6,7 @@ const maxCommissionBps = 10000;
 /// Comissão de [amountCents] à taxa [basisPoints], em centavos.
 ///
 /// O meio centavo sobe. 7,5 centavos viram 8. A taxa entra como argumento:
-/// esta conta não conhece os 10% iniciais da plataforma.
+/// esta conta não conhece a taxa inicial da plataforma.
 int commissionCents(int amountCents, int basisPoints) {
   _requireAmount(amountCents);
   _requireBps(basisPoints);
