@@ -36,6 +36,8 @@ import 'package:scapematch/features/payments/data/fake_payment_methods_repositor
 import 'package:scapematch/features/payments/data/payment_methods_repository.dart';
 import 'package:scapematch/features/payments/data/player_payments_repository.dart';
 import 'package:scapematch/features/payments/data/supabase_payment_methods_repository.dart';
+import 'package:scapematch/features/reviews/data/room_review_gateway.dart';
+import 'package:scapematch/features/reviews/data/venue_staff_gateway.dart';
 import 'package:scapematch/features/wallet/data/fake_wallet_repository.dart';
 import 'package:scapematch/features/wallet/data/wallet_repository.dart';
 import 'package:scapematch/features/wallet/domain/wallet_transaction.dart';
@@ -195,6 +197,34 @@ final playerPaymentsRepositoryProvider = Provider<PlayerPaymentsRepository>((
     }
   }
   return SupabasePlayerPaymentsRepository(ref.watch(supabaseClientProvider));
+});
+
+/// A demonstração deixa a flag desligada. No app real a função do banco
+/// devolve o interruptor do Admin, que nasce falso.
+final reviewsEnabledProvider = FutureProvider<bool>((ref) async {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) return false;
+  final value = await ref.watch(supabaseClientProvider).rpc('reviews_enabled');
+  return value == true;
+});
+
+final roomReviewGatewayProvider = Provider<RoomReviewGateway>((ref) {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) {
+    return MemoryRoomReviewGateway();
+  }
+  return SupabaseRoomReviewGateway(ref.watch(supabaseClientProvider));
+});
+
+/// Convites de equipe da conta. A demonstração não tem convite pendente.
+final venueStaffGatewayProvider = Provider<VenueStaffGateway>((ref) {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) {
+    return MemoryVenueStaffGateway();
+  }
+  return SupabaseVenueStaffGateway(ref.watch(supabaseClientProvider));
+});
+
+final venueInvitesProvider = FutureProvider<List<VenueInvite>>((ref) async {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) return const [];
+  return ref.watch(venueStaffGatewayProvider).mine();
 });
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {

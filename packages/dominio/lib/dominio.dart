@@ -12,5 +12,6 @@ export 'src/payment_exception.dart';
 export 'src/payment_provider.dart';
 export 'src/platform_settings.dart';
 export 'src/reservation.dart';
+export 'src/room_review.dart';
 export 'src/scape_points.dart';
 export 'src/simulated_payment_provider.dart';

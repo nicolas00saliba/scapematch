@@ -126,4 +126,6 @@ abstract final class PartnerKeys {
   static const agendaCancelled = Key('agenda-cancelled');
   static Key agendaBlock(String id) => Key('agenda-block-$id');
   static Key agendaTime(String label) => Key('agenda-time-$label');
+  static const partnerReviews = Key('partner-reviews');
+  static const partnerReviewReply = Key('partner-review-reply');
 }

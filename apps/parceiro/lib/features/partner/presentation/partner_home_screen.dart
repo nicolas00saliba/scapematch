@@ -23,6 +23,7 @@ import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_p
 import 'package:scapematch_parceiro/features/partner/presentation/empty_slot_card.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_referral_code.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_invoices_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_reviews_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
@@ -46,6 +47,9 @@ class PartnerHome extends ConsumerWidget {
       PartnerSection.agenda => PartnerAgenda(snapshot: snapshot),
       PartnerSection.rooms => _RoomsSection(snapshot: snapshot),
       PartnerSection.invoices => PartnerInvoices(snapshot: snapshot),
+      PartnerSection.reviews => PartnerReviewsSection(
+        houseName: snapshot.house.name,
+      ),
     };
     return Scaffold(
       body: Column(
@@ -172,6 +176,7 @@ String _sectionLabel(PartnerSection section) {
     PartnerSection.agenda => PartnerMessages.agenda,
     PartnerSection.rooms => PartnerMessages.rooms,
     PartnerSection.invoices => PartnerMessages.invoices,
+    PartnerSection.reviews => PartnerMessages.reviews,
   };
 }
 
@@ -236,6 +241,11 @@ class _PartnerRail extends ConsumerWidget {
           icon: Icon(Icons.receipt_long_outlined),
           selectedIcon: Icon(Icons.receipt_long),
           label: Text(PartnerMessages.invoices),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.star_outline),
+          selectedIcon: Icon(Icons.star),
+          label: Text(PartnerMessages.reviews),
         ),
       ],
     );
