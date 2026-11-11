@@ -18,6 +18,10 @@ export default defineConfig({
         const path = new URL(page).pathname.replace(/\/$/, '') || '/';
         return path !== '/convite' && path !== '/404' && path !== '/contato' && path !== '/cidades/curitiba';
       },
+      serialize(item) {
+        item.lastmod = new Date('2026-11-11T00:00:00.000Z');
+        return item;
+      },
     }),
   ],
   redirects: {

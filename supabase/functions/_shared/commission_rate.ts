@@ -6,7 +6,7 @@ type CommissionDb = {
 };
 
 /// Taxa vigente da casa: override, senão o padrão de platform_settings.
-/// Quem cobra não inventa 10% no código.
+/// Quem cobra não inventa a taxa no código.
 export async function commissionBpsForVenue(
   admin: CommissionDb,
   venueId: string,

@@ -1,0 +1,28 @@
+# EscapeMatch
+
+> Plataforma brasileira criada para quem quer jogar e não tem grupo. O lançamento começa em Curitiba, com escape room. O site é https://escapematch.com.br e o app do jogador é https://app.escapematch.com.br/
+
+O EscapeMatch junta pessoas sozinhas em grupos de escape room. A pessoa escolhe a sala e o horário, entra num grupo com outros jogadores e paga só a própria vaga. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado. Jogos de tabuleiro e laser tag estão previstos e ainda não estão disponíveis.
+
+Não há perfil oficial de Instagram, TikTok ou LinkedIn publicado neste repositório.
+
+## Preços
+
+- O preço da vaga é o da sala, por pessoa, mostrado no app. Não há um ingresso único do EscapeMatch.
+- Jogue e ganhe pontos. Indique amigos e ganhe a cada jogo deles. Junte pontos e jogue de graça. Cashback de até 5% em pontos a cada jogo. 1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Quem mais indica, mais joga de graça. Só as boas-vindas dão desconto. Não viram saque. A indicação vale 2,5% em pontos de cada reserva do amigo.
+- Dá para usar a partir de 1.000 pontos. Se a reserva for cancelada, os pontos usados são devolvidos.
+- Comissão da casa: 25% só sobre o que o app vender. Exemplo publicado: vaga de R$ 100, comissão de R$ 25, casa com R$ 75.
+
+## Páginas
+
+- [Início](https://escapematch.com.br/): achar gente para jogar quando se está sozinho.
+- [Escape room sozinho](https://escapematch.com.br/guia/escape-room-sozinho): respostas diretas sobre jogar sem grupo.
+- [Como funciona](https://escapematch.com.br/como-funciona): como o grupo se forma e quando o jogo confirma.
+- [Escape room](https://escapematch.com.br/experiencias/escape-room): a modalidade disponível.
+- [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo e vaga grátis indicando amigos.
+- [Regulamento dos pontos](https://escapematch.com.br/vantagens/regulamento): regras completas dos pontos.
+- [Ajuda](https://escapematch.com.br/ajuda): perguntas frequentes.
+- [Para casas](https://escapematch.com.br/para-casas): casas parceiras e preços.
+- [Sobre](https://escapematch.com.br/sobre): o que a plataforma é.
+
+Texto completo: https://escapematch.com.br/llms-full.txt

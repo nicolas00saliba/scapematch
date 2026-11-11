@@ -2,12 +2,29 @@
 import Base from '../../layouts/Base.astro';
 import PageTop from '../../components/PageTop.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
+import { faqPage } from '../../data/seo';
+
+const perguntas = [
+  {
+    pergunta: 'Preciso conhecer o grupo antes?',
+    resposta: 'Não. Vocês se encontram na casa, no horário.',
+  },
+  {
+    pergunta: 'Eu pago a sala inteira?',
+    resposta: 'Não. Você paga só a sua vaga.',
+  },
+  {
+    pergunta: 'E se o mínimo não bater?',
+    resposta: 'O jogo não confirma e nada é cobrado.',
+  },
+];
 ---
 
 <Base
   title="Escape room sem ter com quem ir | EscapeMatch"
-  description="Quer jogar escape room e não tem time? Entre num grupo e pague só a sua vaga."
+  description="Dá para jogar escape room sozinho. O EscapeMatch acha o grupo em Curitiba. Você paga só a sua vaga."
   path="/experiencias/escape-room"
+  jsonLd={faqPage(perguntas)}
 >
   <PageTop
     titulo="Escape room"
@@ -18,7 +35,7 @@ import CtaBlock from '../../components/CtaBlock.astro';
     <p>O grupo entra numa sala e resolve os desafios juntos para sair antes do tempo acabar. A casa monta a sala e conduz a sessão.</p>
 
     <h2>Por que dá para ir sozinho</h2>
-    <p>O jogo pede um grupo, e o grupo não precisa ser o seu. O EscapeMatch junta quem está sozinho até bater o mínimo.</p>
+    <p>O jogo pede um grupo, e o grupo não precisa ser o seu. O EscapeMatch junta quem está sozinho até bater o mínimo. O <a href="/guia/escape-room-sozinho">guia de escape room sozinho</a> responde isso em poucas linhas.</p>
 
     <h2>Como o time se forma</h2>
     <p>Você escolhe a sala e o horário, entra no grupo e paga a sua vaga. O jogo confirma no mínimo. Depois disso, quem chega paga na hora, até lotar.</p>
@@ -28,18 +45,12 @@ import CtaBlock from '../../components/CtaBlock.astro';
 
     <h2>Perguntas da modalidade</h2>
     <div class="faq">
-      <details>
-        <summary>Preciso conhecer o grupo antes?</summary>
-        <p>Não. Vocês se encontram na casa, no horário.</p>
-      </details>
-      <details>
-        <summary>Eu pago a sala inteira?</summary>
-        <p>Não. Você paga só a sua vaga.</p>
-      </details>
-      <details>
-        <summary>E se o mínimo não bater?</summary>
-        <p>O jogo não confirma e nada é cobrado.</p>
-      </details>
+      {perguntas.map((item) => (
+        <details>
+          <summary>{item.pergunta}</summary>
+          <p>{item.resposta}</p>
+        </details>
+      ))}
     </div>
   </article>
   <CtaBlock

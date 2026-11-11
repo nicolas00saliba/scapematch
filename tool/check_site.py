@@ -17,6 +17,7 @@ ROTAS = [
     "/como-funciona/pagamento",
     "/experiencias",
     "/experiencias/escape-room",
+    "/guia/escape-room-sozinho",
     "/seguranca",
     "/app",
     "/convite",
@@ -246,6 +247,61 @@ def main() -> None:
             falha(f"cancelamento sem a regra: {trecho}")
     if re.search(r"janela|anteced[eê]ncia|sete dias", cancelamento, re.I):
         falha("cancelamento voltou à regra antiga")
+
+    home_html = (DIST / "index.html").read_text()
+    if "Jogue e ganhe pontos." not in home_html or "Junte pontos e jogue de graça." not in home_html:
+        falha("a home não mostra a mensagem dos pontos")
+    if "Cashback de até 5% em pontos a cada jogo." not in home_html:
+        falha("a home não mostra o teto do cashback")
+    if "limite mensal" in home_html:
+        falha("a home ainda cita limite mensal")
+    for rota in ("/vantagens", "/vantagens/niveis", "/vantagens/regulamento", "/ajuda"):
+        texto = arquivo(rota).read_text()
+        if "jogue de graça" not in texto or "R$ 0,01" not in texto or "vaga inteira" not in texto:
+            falha(f"{rota} não mostra a vaga grátis")
+        if "limite mensal" in texto:
+            falha(f"{rota} ainda cita limite mensal")
+        if "até 25%" in texto or "até 30%" in texto:
+            falha(f"{rota} ainda promete um teto percentual")
+    if '"@type":"Organization"' not in home_html or '"@type":"WebSite"' not in home_html:
+        falha("a home saiu sem Organization ou WebSite")
+    if '"@type":"FAQPage"' not in home_html:
+        falha("a home saiu sem FAQPage")
+    if "sameAs" in home_html:
+        falha("Organization com sameAs sem perfil publicado no repositório")
+    if 'rel="preload"' not in home_html or "woff2" not in home_html:
+        falha("fonte sem preload")
+    como = arquivo("/como-funciona").read_text()
+    if '"@type":"HowTo"' not in como or '"@type":"Service"' not in como:
+        falha("como funciona saiu sem HowTo ou Service")
+    if '"@type":"BreadcrumbList"' not in como:
+        falha("como funciona saiu sem BreadcrumbList")
+    guia = arquivo("/guia/escape-room-sozinho").read_text()
+    if '"@type":"FAQPage"' not in guia:
+        falha("o guia saiu sem FAQPage")
+    if "<lastmod>" not in sitemap:
+        falha("sitemap sem lastmod")
+    for nome in ("llms.txt", "llms-full.txt"):
+        texto = (DIST / nome).read_text()
+        if "Curitiba" not in texto or "R$ 0,01" not in texto:
+            falha(f"{nome} incompleto")
+        if "limite mensal" in texto:
+            falha(f"{nome} ainda cita limite mensal")
+    robots = (DIST / "robots.txt").read_text()
+    for bot in (
+        "Googlebot",
+        "Bingbot",
+        "GPTBot",
+        "OAI-SearchBot",
+        "ChatGPT-User",
+        "ClaudeBot",
+        "Claude-SearchBot",
+        "PerplexityBot",
+        "Google-Extended",
+        "Applebot",
+    ):
+        if f"User-agent: {bot}\nAllow: /" not in robots:
+            falha(f"robots.txt não libera {bot}")
 
     print(f"site ok: {len(ROTAS)} rotas")
 

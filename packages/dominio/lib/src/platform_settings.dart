@@ -11,8 +11,8 @@ class PlatformSettings {
     this.houseOverrides = const {},
   });
 
-  /// 10% na primeira configuração. Quem cobra lê [rateFor], não esta constante.
-  static const openingCommissionBps = 1000;
+  /// 25% na primeira configuração. Quem cobra lê [rateFor], não esta constante.
+  static const openingCommissionBps = 2500;
 
   /// Teto da tela de admin: 30%. A fórmula continua até 100%.
   static const maxConfigurableCommissionBps = 3000;

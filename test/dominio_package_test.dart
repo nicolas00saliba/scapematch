@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('the app reads the domain package and its opening commission', () {
-    expect(PlatformSettings.openingCommissionBps, 1000);
+    expect(PlatformSettings.openingCommissionBps, 2500);
     final book = PaymentBook(provider: SimulatedPaymentProvider());
-    expect(book.settings.rateFor('casa'), 1000);
+    expect(book.settings.rateFor('casa'), 2500);
 
     final reservation = book.createReservation(
       id: 'res-app',
@@ -14,7 +14,7 @@ void main() {
       totalCents: 100,
       playerIds: const ['ana'],
     );
-    expect(reservation.commissionCents, 10);
-    expect(reservation.netCents, 90);
+    expect(reservation.commissionCents, 25);
+    expect(reservation.netCents, 75);
   });
 }

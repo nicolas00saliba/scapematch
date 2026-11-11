@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:scapematch_admin/admin_otp_field.dart';
@@ -63,7 +64,7 @@ class _AdminMfaPageState extends ConsumerState<AdminMfaPage> {
               if (enroll && session.secret != null) ...[
                 const SizedBox(height: 12),
                 const Text(
-                  'Se o QR não abrir, copie a chave.',
+                  'No celular, copie a chave se não der para escanear o próprio QR.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
@@ -72,6 +73,21 @@ class _AdminMfaPageState extends ConsumerState<AdminMfaPage> {
                   key: const Key('admin-mfa-secret'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontFamily: 'monospace'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const Key('admin-mfa-copy-secret'),
+                  onPressed: session.busy
+                      ? null
+                      : () => _copySecret(session.secret!),
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                  label: const Text('Copiar chave'),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'O relógio do celular precisa estar em hora automática.',
+                  key: Key('admin-mfa-clock-hint'),
+                  textAlign: TextAlign.center,
                 ),
               ],
               const SizedBox(height: 16),
@@ -111,6 +127,23 @@ class _AdminMfaPageState extends ConsumerState<AdminMfaPage> {
   void _submit() {
     if (ref.read(adminSessionProvider).busy) return;
     ref.read(adminSessionProvider.notifier).confirmCode(_code.text);
+  }
+
+  Future<void> _copySecret(String secret) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: secret));
+    } on Object {
+      if (!mounted) return;
+      _snack('Não foi possível copiar a chave.');
+      return;
+    }
+    if (!mounted) return;
+    _snack('Chave copiada.');
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

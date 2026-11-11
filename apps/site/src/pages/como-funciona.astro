@@ -3,20 +3,65 @@ import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import CtaBlock from '../components/CtaBlock.astro';
 import PhoneShot from '../components/PhoneShot.astro';
+
+const servico = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name: 'Grupo de escape room para quem está sozinho',
+  serviceType: 'Formação de grupos para escape room',
+  description:
+    'O EscapeMatch junta pessoas que querem jogar escape room e não têm grupo. Cada pessoa paga a própria vaga. O lançamento começa em Curitiba.',
+  provider: {
+    '@type': 'Organization',
+    name: 'EscapeMatch',
+    url: 'https://escapematch.com.br/',
+  },
+  areaServed: { '@type': 'City', name: 'Curitiba' },
+  url: 'https://escapematch.com.br/como-funciona',
+};
+
+const como = {
+  '@context': 'https://schema.org',
+  '@type': 'HowTo',
+  name: 'Como achar um grupo de escape room quando se está sozinho',
+  description:
+    'Escolha a sala, entre num grupo e jogue quando o grupo bater o mínimo. Você paga só a sua vaga.',
+  step: [
+    {
+      '@type': 'HowToStep',
+      position: 1,
+      name: 'Você chega sozinho',
+      text: 'Escolha a sala e o horário. Não precisa levar um time pronto.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 2,
+      name: 'O app te coloca num grupo',
+      text: 'As vagas vão sendo preenchidas por jogadores que não se conheciam. Você paga só a sua vaga.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 3,
+      name: 'Mínimo e máximo',
+      text: 'Bateu o mínimo, está confirmado. Quem chega depois paga na hora, até lotar.',
+    },
+  ],
+};
 ---
 
 <Base
-  title="Como funciona | EscapeMatch"
-  description="Escolha a sala, entre num grupo com outros jogadores e jogue quando o grupo bater o mínimo."
+  title="Como achar grupo de escape room | EscapeMatch"
+  description="Não tem com quem jogar escape room? Escolha a sala, entre num grupo e jogue no mínimo. Lançamento em Curitiba."
   path="/como-funciona"
+  jsonLd={[servico, como]}
 >
   <PageTop
-    titulo="Como funciona"
+    titulo="Como achar um grupo de escape room"
     frase="Você chega sozinho. O app te coloca num grupo. O jogo confirma quando o grupo bate o mínimo."
   />
   <article class="miolo pagina leitura">
     <h2>Você chega sozinho</h2>
-    <p>Escolha a sala e o horário. Não precisa levar um time pronto.</p>
+    <p>Escolha a sala e o horário. Não precisa levar um time pronto. O <a href="/guia/escape-room-sozinho">guia de escape room sozinho</a> responde as dúvidas mais diretas.</p>
     <PhoneShot cena="escolhe" />
 
     <h2>O app te coloca num grupo</h2>

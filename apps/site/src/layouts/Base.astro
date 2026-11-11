@@ -4,12 +4,14 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Breadcrumb from '../components/Breadcrumb.astro';
 import { semTrilha, trilha } from '../data/nav';
+import { organizacao, website } from '../data/seo';
 
 interface Props {
   title: string;
   description: string;
   path: string;
   ogImage?: string;
+  imageAlt?: string;
   noindex?: boolean;
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   publico?: boolean;
@@ -22,6 +24,7 @@ const {
   description,
   path,
   ogImage = '/assets/og.png',
+  imageAlt = 'EscapeMatch, plataforma para jogar escape room quando se está sozinho.',
   noindex = false,
   jsonLd,
   publico = false,
@@ -36,7 +39,7 @@ const image = `https://escapematch.com.br${ogImage}`;
 const mostrarTrilha = !semTrilha(path);
 const itens = mostrarTrilha ? trilha(path) : [];
 
-const blocos: Record<string, unknown>[] = [];
+const blocos: Record<string, unknown>[] = [organizacao, website];
 if (mostrarTrilha) {
   blocos.push({
     '@context': 'https://schema.org',
@@ -78,12 +81,16 @@ const json = JSON.stringify(blocos).replace(/</g, '\\u003c');
     <meta property="og:image" content={image}>
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="EscapeMatch">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:alt" content={imageAlt}>
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content={title}>
     <meta name="twitter:description" content={description}>
     <meta name="twitter:image" content={image}>
+    <meta name="twitter:image:alt" content={imageAlt}>
     <meta name="theme-color" content="#0F4C4A">
+    <link rel="preload" href="/assets/fonts/inter-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/fonts/bricolage-grotesque-latin-700.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="/assets/favicon-32.png" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/assets/apple-touch.png">

@@ -3,27 +3,30 @@ import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import ProgramCard from '../components/ProgramCard.astro';
 import CtaBlock from '../components/CtaBlock.astro';
-import { programasJogador, regrasJogador } from '../data/programas';
+import DescontoPontos from '../components/DescontoPontos.astro';
+import { programasJogador, regrasVagaGratis } from '../data/programas';
 ---
 
 <Base
-  title="Vantagens e pontos | EscapeMatch"
-  description="Ganhe pontos ao criar a conta, em toda reserva e indicando amigos. Use os pontos na próxima sala."
+  title="Jogue e ganhe pontos | EscapeMatch"
+  description="Jogue e ganhe pontos. Indique amigos e ganhe a cada jogo deles. Junte pontos e jogue de graça."
   path="/vantagens"
   ogImage="/assets/og/vantagens.png"
 >
   <PageTop
-    titulo="Vantagens e pontos"
-    frase="Tudo em pontos. 1 ponto vale R$ 0,01 e serve para pagar salas."
+    titulo="Jogue e ganhe pontos."
+    frase="Indique amigos e ganhe a cada jogo deles. Junte pontos e jogue de graça."
   />
   <div class="miolo pagina">
+    <DescontoPontos />
+    <h2 class="secao-interna">Como ganhar</h2>
     <div class="grade-3">
       {programasJogador.map((programa) => <ProgramCard programa={programa} />)}
     </div>
     <section class="regras-comuns leitura">
       <h2>Como usar os pontos</h2>
       <ul class="lista-simples">
-        {regrasJogador.map((regra) => <li>{regra}</li>)}
+        {regrasVagaGratis.map((regra) => <li>{regra}</li>)}
       </ul>
       <p><a href="/vantagens/regulamento">Regulamento dos pontos</a></p>
     </section>

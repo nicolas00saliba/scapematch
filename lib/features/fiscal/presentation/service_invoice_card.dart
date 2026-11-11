@@ -136,7 +136,10 @@ FiscalInvoiceView? serviceInvoiceFor({
       playerId: playerId,
       playerName: seat.displayName,
       amountCents: group.priceCents,
-      commissionCents: commissionOfShare(group.priceCents, 1000),
+      commissionCents: commissionOfShare(
+        group.priceCents,
+        PlatformSettings.openingCommissionBps,
+      ),
       paidAt: group.startsAt,
     ),
     venue: demoHouseFiscal,

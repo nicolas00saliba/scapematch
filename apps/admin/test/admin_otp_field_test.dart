@@ -220,12 +220,63 @@ void main() {
     expect(find.text('Cadastre o autenticador'), findsOneWidget);
     expect(find.byKey(const Key('admin-mfa-qr')), findsOneWidget);
     expect(find.byKey(const Key('admin-mfa-secret')), findsOneWidget);
+    expect(find.byKey(const Key('admin-mfa-copy-secret')), findsOneWidget);
+    expect(find.text('Copiar chave'), findsOneWidget);
+    expect(
+      find.text('O relógio do celular precisa estar em hora automática.'),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('admin-mfa-code')), findsOneWidget);
     await _shot(tester, 'admin-mfa-cadastro-desktop');
 
     _size(tester, const Size(390, 844));
     await _frames(tester);
+    expect(find.byKey(const Key('admin-mfa-copy-secret')), findsOneWidget);
     await _shot(tester, 'admin-mfa-cadastro-celular');
+  });
+
+  testWidgets('botão copia a chave do autenticador sem sair da tela', (
+    tester,
+  ) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          final args = call.arguments;
+          if (args is Map) copied = args['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    _size(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: noAutomaticRetry,
+        overrides: [
+          adminApiProvider.overrideWithValue(MemoryAdminApi()),
+          adminSessionProvider.overrideWith(EnrollAdminSession.new),
+        ],
+        child: const AdminApp(),
+      ),
+    );
+    await _frames(tester);
+    await tester.ensureVisible(find.byKey(const Key('admin-mfa-copy-secret')));
+    await tester.tap(find.byKey(const Key('admin-mfa-copy-secret')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(copied, 'JBSWY3DPEHPK3PXP');
+    expect(find.text('Chave copiada.'), findsOneWidget);
+    expect(find.text('Cadastre o autenticador'), findsOneWidget);
+    expect(find.byKey(const Key('admin-login')), findsNothing);
   });
 }
 
@@ -275,8 +326,7 @@ class EnrollAdminSession extends AdminSessionController {
     return const AdminSession(
       phase: AdminPhase.enroll,
       email: 'admin@scapematch.exemplo',
-      qrCode:
-          'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21"><rect width="21" height="21" fill="white"/><rect width="7" height="7" fill="#0F4C4A"/><rect x="1" y="1" width="5" height="5" fill="white"/><rect x="2" y="2" width="3" height="3" fill="#0F4C4A"/><rect x="14" width="7" height="7" fill="#0F4C4A"/><rect x="15" y="1" width="5" height="5" fill="white"/><rect x="16" y="2" width="3" height="3" fill="#0F4C4A"/><rect y="14" width="7" height="7" fill="#0F4C4A"/><rect x="1" y="15" width="5" height="5" fill="white"/><rect x="2" y="16" width="3" height="3" fill="#0F4C4A"/><rect x="9" y="9" width="3" height="3" fill="#0F4C4A"/><rect x="14" y="14" width="3" height="3" fill="#0F4C4A"/></svg>',
+      qrCode: 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21"><rect width="21" height="21" fill="white"/><rect width="7" height="7" fill="#0F4C4A"/><rect x="1" y="1" width="5" height="5" fill="white"/><rect x="2" y="2" width="3" height="3" fill="#0F4C4A"/><rect x="14" width="7" height="7" fill="#0F4C4A"/><rect x="15" y="1" width="5" height="5" fill="white"/><rect x="16" y="2" width="3" height="3" fill="#0F4C4A"/><rect y="14" width="7" height="7" fill="#0F4C4A"/><rect x="1" y="15" width="5" height="5" fill="white"/><rect x="2" y="16" width="3" height="3" fill="#0F4C4A"/><rect x="9" y="9" width="3" height="3" fill="#0F4C4A"/><rect x="14" y="14" width="3" height="3" fill="#0F4C4A"/></svg>',
       secret: 'JBSWY3DPEHPK3PXP',
     );
   }
