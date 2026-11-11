@@ -6,12 +6,15 @@ interface Props {
 const { curto = false } = Astro.props;
 ---
 
-<aside class:list={['desconto-pontos', { 'desconto-curto': curto }]} aria-label="Jogue de graça com pontos">
-  <p class="desconto-olho">Indique amigos, junte pontos e jogue de graça.</p>
-  <p class="desconto-nota">1 ponto vale R$ 0,01.</p>
+<aside class:list={['desconto-pontos', { 'desconto-curto': curto }]} aria-label="Pontos a cada jogo">
+  <p class="desconto-olho">
+    Toda vez que você joga, ganha pontos.<br>
+    Toda vez que um amigo indicado joga, você ganha também.
+  </p>
+  <p class="desconto-nota">Cashback de até 5% em pontos a cada jogo. 1 ponto vale R$ 0,01.</p>
   <ul class="lista-simples">
     <li>Os pontos de indicação pagam a vaga inteira.</li>
-    <li>Os pontos de boas-vindas e de cashback dão desconto.</li>
+    <li>Os de cashback e de boas-vindas dão desconto.</li>
   </ul>
   {curto && (
     <p class="desconto-nota"><a href="/vantagens">Ver as vantagens</a></p>

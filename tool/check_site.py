@@ -249,12 +249,14 @@ def main() -> None:
         falha("cancelamento voltou à regra antiga")
 
     home_html = (DIST / "index.html").read_text()
-    if "Indique amigos, junte pontos e jogue de graça." not in home_html:
-        falha("a home não mostra a vaga grátis")
+    if "Toda vez que você joga, ganha pontos." not in home_html:
+        falha("a home não mostra o cashback")
+    if "Cashback de até 5% em pontos a cada jogo." not in home_html:
+        falha("a home não mostra o teto do cashback")
     for rota in ("/vantagens", "/vantagens/niveis", "/vantagens/regulamento", "/ajuda"):
         texto = arquivo(rota).read_text()
-        if "jogue de graça" not in texto or "R$ 0,01" not in texto:
-            falha(f"{rota} não mostra a vaga grátis")
+        if "ganha pontos" not in texto or "R$ 0,01" not in texto or "até 5%" not in texto:
+            falha(f"{rota} não mostra o cashback")
         if "até 25%" in texto or "até 30%" in texto:
             falha(f"{rota} ainda promete um teto percentual")
     if '"@type":"Organization"' not in home_html or '"@type":"WebSite"' not in home_html:

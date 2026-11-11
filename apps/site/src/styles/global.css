@@ -453,6 +453,15 @@ main {
   color: var(--tinta);
 }
 
+.hero-ganho {
+  margin: 0.85rem 0 0;
+  max-width: 28rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--petroleo);
+}
+
 .faixa {
   padding: 1.25rem 0 0.25rem;
 }
@@ -1198,7 +1207,7 @@ main {
   color: var(--petroleo);
   letter-spacing: -0.02em;
   font-size: 1.25rem;
-  line-height: 1.2;
+  line-height: 1.35;
 }
 
 .desconto-valores {
