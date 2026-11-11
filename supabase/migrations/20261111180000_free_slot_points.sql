@@ -1,19 +1,20 @@
--- Vaga grátis com pontos de indicação. Não aplicar no projeto remoto.
--- Não cria transferência no Asaas e não mexe em subconta de produção.
--- A flag nasce desligada. Pontos sem lastro continuam no teto antigo.
--- O impacto final no caixa é zero: os 2,5% da indicação já entraram na
+-- Vaga grátis com pontos que já têm lastro: indicação e cashback.
+-- Não aplicar no projeto remoto. Não cria transferência no Asaas e não
+-- mexe em subconta de produção. A flag nasce desligada.
+-- Boas-vindas e promoção continuam no teto antigo. Não há limite mensal.
+-- O impacto final no caixa é zero: indicação e cashback já saíram da
 -- comissão. Esse valor fica no saldo reservado e paga a casa depois.
 
 alter table public.referral_program_settings
   add column if not exists backed_full_slot_enabled boolean not null default false,
-  add column if not exists free_slot_monthly_limit integer not null default 1
+  add column if not exists free_slot_monthly_limit integer not null default 0
     check (free_slot_monthly_limit >= 0);
 
 comment on column public.referral_program_settings.backed_full_slot_enabled is
-  'Desligada por padrão. Ligada, pontos de indicação já liberados podem cobrir a vaga inteira, até o saldo reservado. O que passar da comissão vira crédito da casa no próximo repasse.';
+  'Desligada por padrão. Ligada, pontos de indicação e de cashback já liberados podem cobrir a vaga inteira, até o saldo reservado. O que passar da comissão vira crédito da casa no próximo repasse.';
 
 comment on column public.referral_program_settings.free_slot_monthly_limit is
-  'Vagas em que a plataforma completa o líquido da casa, por jogador e por mês. Zero desliga a extensão.';
+  'Não trava a vaga. Não há limite mensal: quem indica pode usar a extensão sempre que o saldo reservado cobrir. O padrão é zero.';
 
 alter table public.scape_point_entries
   add column if not exists backed_points integer not null default 0
@@ -43,7 +44,7 @@ alter table public.scape_point_entries
   );
 
 comment on column public.scape_point_entries.funding is
-  'backed: indicação c2c ou c2b, já entrou como comissão. unbacked: boas-vindas, cashback e promoção. mixed: um resgate dos dois.';
+  'backed: indicação c2c ou c2b e cashback, já saíram da comissão. unbacked: boas-vindas e promoção. mixed: um resgate dos dois.';
 
 alter table public.payment_charges
   add column if not exists free_slot_topup_cents integer not null default 0
@@ -254,7 +255,7 @@ begin
       select funding into new.funding
       from public.scape_point_entries
       where id = new.relates_to;
-    elsif new.program in ('c2c', 'c2b') then
+    elsif new.program in ('c2c', 'c2b', 'cashback') then
       new.funding := 'backed';
     elsif new.kind in ('redemption', 'redemption_reversal') then
       if new.backed_points > 0 and new.unbacked_points > 0 then
@@ -360,7 +361,7 @@ begin
   left join public.scape_point_entries a on a.id = r.relates_to
   where r.user_id = p_user_id
     and r.kind = 'release'
-    and coalesce(a.program, r.program) in ('c2c', 'c2b')
+    and coalesce(a.program, r.program) in ('c2c', 'c2b', 'cashback')
     and coalesce(a.review_status, r.review_status) is distinct from 'rejected'
     and coalesce(a.review_status, r.review_status) is distinct from 'em_revisao';
 
@@ -370,7 +371,7 @@ begin
     left join public.scape_point_entries a on a.id = v.relates_to
     where v.user_id = p_user_id
       and v.kind = 'reversal'
-      and coalesce(a.program, v.program) in ('c2c', 'c2b')
+      and coalesce(a.program, v.program) in ('c2c', 'c2b', 'cashback')
       and exists (
         select 1 from public.scape_point_entries rel
         where rel.relates_to = coalesce(a.id, v.relates_to)
@@ -384,7 +385,8 @@ begin
   where r.user_id = p_user_id
     and r.kind = 'release'
     and coalesce(a.program, r.program) is distinct from 'c2c'
-    and coalesce(a.program, r.program) is distinct from 'c2b';
+    and coalesce(a.program, r.program) is distinct from 'c2b'
+    and coalesce(a.program, r.program) is distinct from 'cashback';
 
   v_unbacked := v_unbacked - coalesce((
     select sum(v.points)::integer
@@ -394,6 +396,7 @@ begin
       and v.kind = 'reversal'
       and coalesce(a.program, v.program) is distinct from 'c2c'
       and coalesce(a.program, v.program) is distinct from 'c2b'
+      and coalesce(a.program, v.program) is distinct from 'cashback'
       and exists (
         select 1 from public.scape_point_entries rel
         where rel.relates_to = coalesce(a.id, v.relates_to)
@@ -677,11 +680,9 @@ declare
   v_charged integer;
   v_split numeric;
   v_enabled boolean;
-  v_limit integer;
   v_reserve integer;
   v_backed integer;
   v_unbacked integer;
-  v_used integer;
   v_fraud boolean;
   v_reason text;
   v_backed_spend integer := 0;
@@ -697,8 +698,8 @@ begin
   end if;
   select
     point_value_cents, redeem_min_points, redeem_max_bps,
-    backed_full_slot_enabled, free_slot_monthly_limit
-  into v_point, v_min, v_max_bps, v_enabled, v_limit
+    backed_full_slot_enabled
+  into v_point, v_min, v_max_bps, v_enabled
   from public.referral_program_settings where id = 1;
   v_point := greatest(coalesce(v_point, 1), 1);
   v_min := coalesce(v_min, 0);
@@ -719,17 +720,11 @@ begin
   if v_available < v_min or v_max_points < v_min then
     v_max_points := 0;
   end if;
-  v_used := private.free_slots_used_this_month(p_user_id);
   v_fraud := private.backed_extension_blocked(p_user_id);
-  if not coalesce(v_enabled, false)
-    or v_fraud
-    or coalesce(v_limit, 0) <= 0
-    or v_used >= v_limit
-  then
+  if not coalesce(v_enabled, false) or v_fraud then
     v_reason := case
       when not coalesce(v_enabled, false) then null
-      when v_fraud then 'antifraud'
-      else 'monthly_limit'
+      else 'antifraud'
     end;
     v_points := least(greatest(coalesce(p_points, 0), 0), v_available, v_max_points);
     if v_points < v_min then
@@ -2182,10 +2177,11 @@ begin
 end;
 $$;
 
--- Saldo reservado da plataforma. Cresce quando a indicação é creditada
--- e diminui quando esses pontos pagam a casa ou são desfeitos. Os pontos
--- não vencem hoje; o estorno da reserva é o mesmo lançamento que um
--- vencimento futuro usa. A trava é não deixar o saldo negativo.
+-- Saldo reservado da plataforma. Cresce quando a indicação ou o cashback
+-- são creditados e diminui quando esses pontos pagam a casa ou são
+-- desfeitos. Os pontos não vencem hoje; o estorno da reserva é o mesmo
+-- lançamento que um vencimento futuro usa. A trava é não deixar o saldo
+-- negativo.
 
 create or replace function private.point_reserve_cents()
 returns integer
@@ -2212,7 +2208,7 @@ create or replace function private.post_point_reserve(
   p_user uuid,
   p_strict boolean
 )
-returns void
+returns integer
 language plpgsql
 security definer
 set search_path = ''
@@ -2220,10 +2216,11 @@ as $$
 declare
   v_balance integer;
   v_cents integer;
+  v_inserted integer;
 begin
   v_cents := coalesce(p_cents, 0);
   if v_cents <= 0 or p_component is null then
-    return;
+    return 0;
   end if;
   perform pg_catalog.pg_advisory_xact_lock(814201);
   v_balance := private.point_reserve_cents();
@@ -2235,7 +2232,7 @@ begin
     v_cents := least(v_cents, greatest(v_balance, 0));
   end if;
   if v_cents <= 0 then
-    return;
+    return 0;
   end if;
   insert into public.ledger_entries (
     user_id, account, direction, kind, amount_cents, component_key
@@ -2246,6 +2243,11 @@ begin
   on conflict (direction, component_key)
     where account = 'platform_reserve'
   do nothing;
+  get diagnostics v_inserted = row_count;
+  if v_inserted = 0 then
+    return 0;
+  end if;
+  return v_cents;
 end;
 $$;
 
@@ -2257,10 +2259,11 @@ set search_path = ''
 as $$
 declare
   v_cents integer;
+  v_posted integer;
   v_point integer;
   v_parent_key text;
 begin
-  if new.kind = 'accrual' and new.program in ('c2c', 'c2b')
+  if new.kind = 'accrual' and new.program in ('c2c', 'c2b', 'cashback')
     and new.review_status is distinct from 'rejected'
   then
     v_cents := new.amount_cents;
@@ -2270,13 +2273,18 @@ begin
       where id = 1;
       v_cents := new.points * greatest(coalesce(v_point, 1), 1);
     end if;
-    perform private.post_point_reserve(
+    v_posted := private.post_point_reserve(
       'credit', new.id::text, v_cents, new.user_id, false
     );
+    if new.program = 'cashback' and v_posted > 0 then
+      perform private.queue_cashback_reserve(
+        new.payment_charge_id, 'cashback_in', v_posted
+      );
+    end if;
     return new;
   end if;
 
-  if new.kind = 'release' and new.program in ('c2c', 'c2b') then
+  if new.kind = 'release' and new.program in ('c2c', 'c2b', 'cashback') then
     v_parent_key := new.relates_to::text;
     if v_parent_key is not null and exists (
       select 1 from public.ledger_entries
@@ -2293,13 +2301,19 @@ begin
       where id = 1;
       v_cents := new.points * greatest(coalesce(v_point, 1), 1);
     end if;
-    perform private.post_point_reserve(
+    v_posted := private.post_point_reserve(
       'credit', new.id::text, v_cents, new.user_id, false
     );
+    if new.program = 'cashback' and v_posted > 0 then
+      perform private.queue_cashback_reserve(
+        coalesce(new.payment_charge_id, new.source_charge_id),
+        'cashback_in', v_posted
+      );
+    end if;
     return new;
   end if;
 
-  if new.kind = 'reversal' and new.program in ('c2c', 'c2b') then
+  if new.kind = 'reversal' and new.program in ('c2c', 'c2b', 'cashback') then
     v_parent_key := new.relates_to::text;
     if v_parent_key is null or not exists (
       select 1 from public.ledger_entries
@@ -2310,9 +2324,15 @@ begin
       return new;
     end if;
     v_cents := new.amount_cents;
-    perform private.post_point_reserve(
+    v_posted := private.post_point_reserve(
       'debit', new.id::text, v_cents, new.user_id, false
     );
+    if new.program = 'cashback' and v_posted > 0 then
+      perform private.queue_cashback_reserve(
+        coalesce(new.payment_charge_id, new.source_charge_id),
+        'cashback_out', v_posted
+      );
+    end if;
     return new;
   end if;
 

@@ -2,6 +2,7 @@ import { assertEquals, assertRejects } from "jsr:@std/assert";
 import { asaasProductionBaseUrl, asaasSandboxBaseUrl } from "./asaas_provider.ts";
 import {
   backedCentsOf,
+  fundCashbackReserve,
   pointsReserveMoves,
   pointsReserveSplitLine,
   postSandboxTransfer,
@@ -135,4 +136,65 @@ Deno.test("produção não move a reserva nem anula o crédito", async () => {
   });
   assertEquals(paid, false);
   assertEquals(calls, 0);
+});
+
+Deno.test("cashback entra na subconta pela conta raiz, só no sandbox", async () => {
+  let calls = 0;
+  await fundCashbackReserve(
+    { rpc: () => {
+      calls += 1;
+      return Promise.resolve({ data: [], error: null });
+    } },
+    {
+      get: (name) => name === "ASAAS_BASE_URL" ? asaasProductionBaseUrl : "x",
+    },
+    "charge-1",
+  );
+  assertEquals(calls, 0);
+
+  const seen: { key?: string; body?: string } = {};
+  const rpc = (fn: string, args: Record<string, unknown>) => {
+    calls += 1;
+    if (fn === "cashback_reserve_pending") {
+      return Promise.resolve({
+        data: [{ purpose: "cashback_in", amount_cents: 250 }],
+        error: null,
+      });
+    }
+    if (fn === "claim_points_reserve_transfer") {
+      assertEquals(args.p_purpose, "cashback_in");
+      assertEquals(args.p_amount_cents, 250);
+      assertEquals(args.p_wallet_id, "wal_reserva");
+      return Promise.resolve({ data: "send", error: null });
+    }
+    return Promise.resolve({ data: null, error: null });
+  };
+  await fundCashbackReserve(
+    { rpc },
+    {
+      get: (name) => {
+        if (name === "ASAAS_BASE_URL") return asaasSandboxBaseUrl;
+        if (name === "ASAAS_API_KEY") return "chave-raiz";
+        if (name === "ASAAS_POINTS_RESERVE_WALLET_ID") return "wal_reserva";
+        if (name === "ASAAS_ROOT_WALLET_ID") return "wal_raiz";
+        return "";
+      },
+    },
+    "charge-2",
+    (url, init) => {
+      seen.key = new Headers(init?.headers).get("access_token") ?? "";
+      seen.body = String(init?.body);
+      assertEquals(String(url), `${asaasSandboxBaseUrl}/transfers`);
+      return Promise.resolve(new Response(JSON.stringify({ id: "tr_cb" })));
+    },
+  );
+  assertEquals(seen.key, "chave-raiz");
+  assertEquals(
+    seen.body,
+    JSON.stringify({
+      value: 2.5,
+      walletId: "wal_reserva",
+      externalReference: "reserve:charge-2:cashback_in",
+    }),
+  );
 });

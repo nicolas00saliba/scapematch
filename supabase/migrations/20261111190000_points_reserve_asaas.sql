@@ -1,11 +1,16 @@
 -- Subconta Asaas "Reserva de pontos". Não aplicar no remoto.
 -- Não cria subconta e não chama o Asaas. A flag continua desligada.
--- O split e a transferência só rodam no sandbox, no backend.
+-- O split da indicação e a transferência do cashback só rodam no sandbox.
+-- O cashback não entra no split: o valor só existe depois do sorteio.
+-- Quando o ponto é creditado, o backend transfere esse valor da conta
+-- raiz para a mesma subconta. No estorno, devolve o que ainda estava lá.
 
 create table if not exists public.point_reserve_transfers (
   id uuid primary key default gen_random_uuid(),
   payment_charge_id uuid not null references public.payment_charges (id),
-  purpose text not null check (purpose in ('house', 'platform_return')),
+  purpose text not null check (purpose in (
+    'house', 'platform_return', 'cashback_in', 'cashback_out'
+  )),
   amount_cents integer not null check (amount_cents > 0),
   destination_wallet_id text not null,
   status text not null default 'pending' check (
@@ -126,7 +131,7 @@ as $$
 declare
   v_status text;
 begin
-  if p_purpose not in ('house', 'platform_return') then
+  if p_purpose not in ('house', 'platform_return', 'cashback_in', 'cashback_out') then
     raise exception 'finalidade invalida' using errcode = '22023';
   end if;
   if p_amount_cents is null or p_amount_cents <= 0 or p_wallet_id is null then
@@ -222,4 +227,56 @@ grant execute on function public.claim_points_reserve_transfer(uuid, text, integ
 grant execute on function public.complete_points_reserve_transfer(uuid, text, text, boolean)
   to service_role;
 grant execute on function public.void_unapplied_points_reserve(uuid)
+  to service_role;
+
+-- Fila do lastro de cashback. O trigger grava a linha; o backend, só no
+-- sandbox, transfere entre a conta raiz e a subconta Reserva de pontos.
+create or replace function private.queue_cashback_reserve(
+  p_charge_id uuid,
+  p_purpose text,
+  p_cents integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_charge_id is null or p_cents is null or p_cents <= 0 then
+    return;
+  end if;
+  if p_purpose not in ('cashback_in', 'cashback_out') then
+    return;
+  end if;
+  insert into public.point_reserve_transfers (
+    payment_charge_id, purpose, amount_cents, destination_wallet_id, status
+  ) values (
+    p_charge_id, p_purpose, p_cents, 'points-reserve', 'pending'
+  )
+  on conflict (payment_charge_id, purpose) do nothing;
+end;
+$$;
+
+create or replace function public.cashback_reserve_pending(p_charge_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'purpose', purpose,
+    'amount_cents', amount_cents
+  )), '[]'::jsonb)
+  from public.point_reserve_transfers
+  where payment_charge_id = p_charge_id
+    and purpose in ('cashback_in', 'cashback_out')
+    and status in ('pending', 'failed');
+$$;
+
+revoke all on function private.queue_cashback_reserve(uuid, text, integer)
+  from public, anon, authenticated;
+revoke all on function public.cashback_reserve_pending(uuid)
+  from public, anon, authenticated;
+grant execute on function public.cashback_reserve_pending(uuid)
   to service_role;

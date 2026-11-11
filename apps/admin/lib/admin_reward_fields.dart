@@ -186,16 +186,6 @@ const rewardFields = <RewardField>[
     one: 'dia',
     many: 'dias',
   ),
-  RewardField(
-    id: 'free_slot_monthly_limit',
-    section: 'Vaga grátis',
-    label: 'Vagas grátis por mês',
-    help: 'Quantas vezes no mês um jogador pode usar pontos de indicação além da comissão da reserva. Zero desliga essa extensão.',
-    kind: RewardKind.count,
-    one: 'vaga',
-    many: 'vagas',
-    zeroMeansOff: true,
-  ),
 ];
 
 RewardField rewardFieldById(String id) {

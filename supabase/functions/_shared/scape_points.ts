@@ -299,9 +299,7 @@ export function quotePointSubsidy(input: {
   const pointValue = input.pointValueCents ?? officialPointValueCents;
   const minPoints = input.redeemMinPoints ?? 1000;
   const maxBps = input.redeemMaxBps ?? 3000;
-  const monthlyLimit = input.freeSlotMonthlyLimit ?? 1;
   const feeFlat = input.receiptFeeCents ?? 0;
-  const usedFreeSlots = input.freeSlotsUsedThisMonth ?? 0;
   const commission = commissionCents(input.grossCents, input.commissionBps);
   const houseNet = input.grossCents - commission;
   const classicCeiling = classicMaxPoints(
@@ -315,15 +313,11 @@ export function quotePointSubsidy(input: {
   const backedPool = clampBacked(input.availableBackedPoints, input.availablePoints);
   const unbackedPool = input.availablePoints - backedPool;
   const extensionOff = input.backedFullSlotEnabled !== true ||
-    input.backedFraudHold === true ||
-    monthlyLimit <= 0 ||
-    usedFreeSlots >= monthlyLimit;
+    input.backedFraudHold === true;
   if (extensionOff) {
     const reason = input.backedFullSlotEnabled !== true
       ? null
-      : input.backedFraudHold === true
-      ? "antifraud" as const
-      : "monthly_limit" as const;
+      : "antifraud" as const;
     return classicQuote({
       grossCents: input.grossCents,
       commission,

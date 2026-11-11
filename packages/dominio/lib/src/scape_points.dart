@@ -21,7 +21,7 @@ class ReferralRates {
     this.redeemMinPoints = 1000,
     this.redeemMaxBps = 3000,
     this.backedFullSlotEnabled = false,
-    this.freeSlotMonthlyLimit = 1,
+    this.freeSlotMonthlyLimit = 0,
     this.blockSelfPayer = true,
     this.payerReferredAccountCap = 3,
     this.sameDeviceReviewThreshold = 2,
@@ -74,12 +74,12 @@ class ReferralRates {
   /// Vale para pontos sem lastro e, com a flag desligada, para todos.
   final int redeemMaxBps;
 
-  /// Pontos de indicação já liberados podem cobrir a vaga inteira.
-  /// Nasce desligado. Boas-vindas, cashback e promoção continuam no teto.
+  /// Pontos com lastro (indicação e cashback) já liberados podem cobrir
+  /// a vaga inteira. Nasce desligado. Boas-vindas e promoção ficam no teto.
   final bool backedFullSlotEnabled;
 
-  /// Vagas em que a EscapeMatch completa o líquido da casa, por jogador
-  /// e por mês. Zero desliga essa extensão mesmo com a flag ligada.
+  /// Não trava a vaga. A coluna antiga fica no tipo para clientes que
+  /// ainda leem a configuração; o valor não entra na cotação.
   final int freeSlotMonthlyLimit;
 
   static const official = ReferralRates();
@@ -226,10 +226,10 @@ class PointSubsidyQuote {
   final double? splitPercent;
   final int maxPoints;
 
-  /// Pontos de indicação (c2c, c2b) usados nesta cotação.
+  /// Pontos com lastro (indicação e cashback) usados nesta cotação.
   final int backedPoints;
 
-  /// Boas-vindas, cashback e o restante sem lastro.
+  /// Boas-vindas, promoção e o restante sem lastro.
   final int unbackedPoints;
 
   /// Centavos do líquido da casa que não cabem na cobrança.
@@ -239,8 +239,9 @@ class PointSubsidyQuote {
   /// A vaga inteira foi coberta. Não há cobrança no Asaas.
   final bool pointsOnly;
 
-  /// `monthly_limit`, `antifraud` ou `reserve` quando a extensão não
-  /// coube inteira. Nulo quando não houve corte da vaga grátis.
+  /// `antifraud` ou `reserve` quando a extensão não coube inteira.
+  /// `monthly_limit` permanece no tipo para auditorias antigas.
+  /// Nulo quando não houve corte da vaga grátis.
   final String? limitReason;
 }
 
@@ -533,14 +534,15 @@ int referralBookingsForPoints({
 /// preço cheio. O percentual novo só existe quando o líquido cabe na
 /// cobrança; ele é arredondado para cima em 4 casas, que é o limite do Asaas.
 ///
-/// Com [ReferralRates.backedFullSlotEnabled], pontos de indicação já
-/// liberados ([availableBackedPoints]) podem cobrir a vaga inteira, até o
-/// [reservedBalanceCents]. Esse saldo já entrou na comissão; a trava é não
-/// deixá-lo negativo. O que passar da comissão não aumenta o split acima de
-/// 100%: vira [PointSubsidyQuote.topupCents] e espera o próximo repasse da
-/// casa. Boas-vindas e promoções continuam no teto de sempre.
+/// Com [ReferralRates.backedFullSlotEnabled], pontos com lastro já
+/// liberados ([availableBackedPoints], indicação e cashback) podem cobrir
+/// a vaga inteira, até o [reservedBalanceCents]. Esse saldo já entrou na
+/// comissão; a trava é não deixá-lo negativo. O que passar da comissão não
+/// aumenta o split acima de 100%: vira [PointSubsidyQuote.topupCents] e
+/// espera o próximo repasse da casa. Boas-vindas e promoções continuam no
+/// teto de sempre. Não há limite mensal.
 /// [availableBackedPoints] nulo conta tudo como sem lastro.
-/// [reservedBalanceCents] nulo usa o valor dos pontos de indicação do jogador.
+/// [reservedBalanceCents] nulo usa o valor dos pontos com lastro do jogador.
 PointSubsidyQuote quotePointSubsidy({
   required int grossCents,
   required int commissionBps,
@@ -570,16 +572,12 @@ PointSubsidyQuote quotePointSubsidy({
   );
   final backedPool = _clampBacked(availableBackedPoints, availablePoints);
   final unbackedPool = availablePoints - backedPool;
-  final extensionOff = !rates.backedFullSlotEnabled ||
-      backedFraudHold ||
-      rates.freeSlotMonthlyLimit <= 0 ||
-      freeSlotsUsedThisMonth >= rates.freeSlotMonthlyLimit;
+  final extensionOff =
+      !rates.backedFullSlotEnabled || backedFraudHold;
   if (extensionOff) {
     final reason = !rates.backedFullSlotEnabled
         ? null
-        : backedFraudHold
-        ? 'antifraud'
-        : 'monthly_limit';
+        : 'antifraud';
     return _classicQuote(
       grossCents: grossCents,
       commission: commission,

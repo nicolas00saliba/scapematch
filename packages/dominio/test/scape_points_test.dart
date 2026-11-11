@@ -343,23 +343,25 @@ void main() {
     expect(quote.chargedCents + quote.topupCents, quote.houseNetCents);
   });
 
-  test('limite mensal e indicação em revisão ficam no teto antigo', () {
+  test('não há limite mensal e indicação em revisão fica no teto antigo', () {
     const rates = ReferralRates(
       backedFullSlotEnabled: true,
-      freeSlotMonthlyLimit: 1,
+      freeSlotMonthlyLimit: 0,
     );
-    final monthly = quotePointSubsidy(
+    final again = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 2500,
       requestedPoints: 10000,
       availablePoints: 10000,
       availableBackedPoints: 10000,
       rates: rates,
-      freeSlotsUsedThisMonth: 1,
+      reservedBalanceCents: 10000,
+      freeSlotsUsedThisMonth: 5,
     );
-    expect(monthly.limitReason, 'monthly_limit');
-    expect(monthly.points, 2500);
-    expect(monthly.topupCents, 0);
+    expect(again.limitReason, isNull);
+    expect(again.points, 10000);
+    expect(again.pointsOnly, isTrue);
+    expect(again.topupCents, 7500);
     final fraud = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 2500,

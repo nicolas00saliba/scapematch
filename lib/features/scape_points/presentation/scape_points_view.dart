@@ -187,7 +187,7 @@ class ScapePointsView extends StatelessWidget {
                 if (wallet.freeSlotEnabled) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '${formatPoints(wallet.backedPoints)} pontos de indicação podem cobrir a vaga. ${formatPoints(wallet.unbackedPoints)} pontos de promoção ficam no teto atual.',
+                    '${formatPoints(wallet.backedPoints)} pontos de indicação e de cashback podem cobrir a vaga. ${formatPoints(wallet.unbackedPoints)} pontos de boas-vindas e promoção ficam no teto atual.',
                   ),
                 ],
                 const SizedBox(height: 8),

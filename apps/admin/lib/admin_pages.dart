@@ -607,10 +607,10 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text(
-                    'Permitir vaga grátis com pontos de indicação',
+                    'Permitir vaga grátis com pontos',
                   ),
                   subtitle: const Text(
-                    'Desligada por padrão. Ligada, pontos de indicação já liberados podem cobrir a vaga. O que passar da comissão vira crédito da casa no próximo repasse. Pontos de promoção continuam no teto.',
+                    'Desligada por padrão. Ligada, pontos de indicação e de cashback já liberados podem cobrir a vaga, sem limite mensal. O que passar da comissão vira crédito da casa no próximo repasse. Boas-vindas e promoção continuam no teto.',
                   ),
                   value: _freeSlot,
                   onChanged: (value) => setState(() => _freeSlot = value),

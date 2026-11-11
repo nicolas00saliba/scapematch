@@ -246,6 +246,20 @@ Deno.test("vaga grátis usa só ponto de indicação e gera crédito da casa", (
   });
   assertEquals(promo.points, 3000);
   assertEquals(promo.topupCents, 0);
+  const again = quotePointSubsidy({
+    grossCents: 10000,
+    commissionBps: 2500,
+    requestedPoints: 10000,
+    availablePoints: 10000,
+    availableBackedPoints: 10000,
+    backedFullSlotEnabled: true,
+    freeSlotMonthlyLimit: 0,
+    freeSlotsUsedThisMonth: 8,
+    reservedBalanceCents: 10000,
+  });
+  assertEquals(again.pointsOnly, true);
+  assertEquals(again.limitReason, null);
+  assertEquals(again.topupCents, 7500);
   assertEquals(referralBookingsForPoints({
     targetPoints: 10000,
     grossCents: 10000,

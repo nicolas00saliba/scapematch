@@ -183,7 +183,7 @@ declare
 begin
   select * into v_before from public.referral_program_settings where id = 1;
   if v_before.backed_full_slot_enabled
-    or v_before.free_slot_monthly_limit <> 1
+    or v_before.free_slot_monthly_limit <> 0
   then
     raise exception 'a flag da vaga gratis nao nasceu desligada % %',
       v_before.backed_full_slot_enabled,
@@ -305,6 +305,33 @@ begin
     raise exception 'promocao comeu a comissao %', v_quote;
   end if;
 
+  select private.point_reserve_cents() into v_cash;
+  insert into public.scape_point_entries (
+    user_id, kind, points, amount_cents, program, idempotency_key
+  ) values (
+    'e7a22222-2222-4222-8222-222222222222',
+    'release', 10000, 10000, 'cashback', 'vaga-cashback'
+  );
+  if (
+    select funding from public.scape_point_entries
+    where idempotency_key = 'vaga-cashback'
+  ) is distinct from 'backed' then
+    raise exception 'cashback ficou sem lastro';
+  end if;
+  if private.point_reserve_cents() <> v_cash + 10000 then
+    raise exception 'lastro do cashback nao entrou na reserva';
+  end if;
+  v_quote := private.subsidy_quote(
+    'e7a22222-2222-4222-8222-222222222222', 10000, 2500, 10000, false
+  );
+  if (v_quote ->> 'points')::integer <> 10000
+    or (v_quote ->> 'charged_cents')::integer <> 0
+    or (v_quote ->> 'topup_cents')::integer <> 7500
+    or v_quote ->> 'limit_reason' is not null
+  then
+    raise exception 'cashback nao cobriu a vaga %', v_quote;
+  end if;
+
   v_held := private.hold_point_redemption(
     'e7a11111-1111-4111-8111-111111111111',
     'vaga-hold-cheia',
@@ -355,11 +382,12 @@ begin
   v_quote := private.subsidy_quote(
     'e7a11111-1111-4111-8111-111111111111', 10000, 2500, 20000, false
   );
-  if (v_quote ->> 'points')::integer <> 2500
-    or v_quote ->> 'limit_reason' is distinct from 'monthly_limit'
-    or (v_quote ->> 'topup_cents')::integer <> 0
+  if (v_quote ->> 'points')::integer <> 10000
+    or (v_quote ->> 'charged_cents')::integer <> 0
+    or (v_quote ->> 'topup_cents')::integer <> 7500
+    or v_quote ->> 'limit_reason' is not null
   then
-    raise exception 'segunda vaga do mes nao voltou ao teto %', v_quote;
+    raise exception 'segunda vaga do mes foi barrada %', v_quote;
   end if;
 
   insert into public.payment_charges (
@@ -399,7 +427,7 @@ begin
   ) <> 20000 then
     raise exception 'o estorno nao devolveu os pontos';
   end if;
-  if private.point_reserve_cents() <> v_reserve + 20000 then
+  if private.point_reserve_cents() <> v_reserve + 30000 then
     raise exception 'desfazer a vaga nao devolveu o saldo reservado %',
       private.point_reserve_cents();
   end if;

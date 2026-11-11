@@ -145,7 +145,11 @@ export async function settlePointsReservePayout(
 
 async function sendLeg(
   input: ReservePayoutInput,
-  leg: { purpose: "house" | "platform_return"; cents: number; walletId: string },
+  leg: {
+    purpose: "house" | "platform_return" | "cashback_in" | "cashback_out";
+    cents: number;
+    walletId: string;
+  },
 ): Promise<boolean> {
   const claim = await input.rpc("claim_points_reserve_transfer", {
     p_charge_id: input.chargeId,
@@ -223,6 +227,61 @@ export async function postSandboxTransfer(input: {
     throw new Error("Resposta do Asaas sem id");
   }
   return body.id;
+}
+
+/// Move o lastro do cashback para a mesma subconta, e devolve no estorno.
+/// O valor só existe depois do sorteio, então não entra no split da cobrança.
+/// Sem sandbox ou sem as chaves, não chama a rede nem o banco.
+export async function fundCashbackReserve(
+  admin: unknown,
+  env: { get(name: string): string | undefined },
+  chargeId: string,
+  fetchFn: AsaasFetch = fetch,
+): Promise<void> {
+  const baseUrl = (readEnv(env, "ASAAS_BASE_URL") || asaasSandboxBaseUrl)
+    .replace(/\/$/, "");
+  const rootKey = readEnv(env, "ASAAS_API_KEY");
+  const reserveKey = readEnv(env, "ASAAS_POINTS_RESERVE_API_KEY");
+  const reserveWallet = readEnv(env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
+  const rootWallet = readEnv(env, "ASAAS_ROOT_WALLET_ID").trim();
+  if (!isAsaasSandbox(baseUrl) || !chargeId) return;
+  if (!reserveWallet || !rootWallet || reserveWallet === rootWallet) return;
+  if (!rootKey.trim() && !reserveKey.trim()) return;
+  const client = admin as { rpc: ReserveRpc };
+  const listed = await client.rpc("cashback_reserve_pending", {
+    p_charge_id: chargeId,
+  });
+  if (listed.error || !Array.isArray(listed.data)) return;
+  const payout = {
+    rpc: client.rpc,
+    baseUrl,
+    reserveApiKey: reserveKey,
+    rootWalletId: rootWallet,
+    houseWalletId: reserveWallet,
+    chargeId,
+    backedCents: 0,
+    houseOwedCents: 0,
+    fetchFn,
+  };
+  for (const row of listed.data) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as { purpose?: unknown; amount_cents?: unknown };
+    const cents = Number(item.amount_cents);
+    if (!Number.isInteger(cents) || cents <= 0) continue;
+    if (item.purpose === "cashback_in" && rootKey.trim()) {
+      await sendLeg(
+        { ...payout, reserveApiKey: rootKey },
+        { purpose: "cashback_in", cents, walletId: reserveWallet },
+      );
+    }
+    if (item.purpose === "cashback_out" && reserveKey.trim()) {
+      await sendLeg(payout, {
+        purpose: "cashback_out",
+        cents,
+        walletId: rootWallet,
+      });
+    }
+  }
 }
 
 type ReserveQuery = {
