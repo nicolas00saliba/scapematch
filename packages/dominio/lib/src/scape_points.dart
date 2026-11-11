@@ -20,6 +20,9 @@ class ReferralRates {
     this.firstBookingDiscountBps = 2000,
     this.redeemMinPoints = 1000,
     this.redeemMaxBps = 3000,
+    this.backedFullSlotEnabled = false,
+    this.freeSlotMonthlyLimit = 1,
+    this.platformReserveCents = 0,
     this.blockSelfPayer = true,
     this.payerReferredAccountCap = 3,
     this.sameDeviceReviewThreshold = 2,
@@ -69,7 +72,20 @@ class ReferralRates {
   final int redeemMinPoints;
 
   /// Teto da reserva que pode ser pago com pontos, em basis points.
+  /// Vale para pontos sem lastro e, com a flag desligada, para todos.
   final int redeemMaxBps;
+
+  /// Pontos de indicação já liberados podem cobrir a vaga inteira.
+  /// Nasce desligado. Boas-vindas, cashback e promoção continuam no teto.
+  final bool backedFullSlotEnabled;
+
+  /// Vagas em que a EscapeMatch completa o líquido da casa, por jogador
+  /// e por mês. Zero desliga essa extensão mesmo com a flag ligada.
+  final int freeSlotMonthlyLimit;
+
+  /// Centavos de lastro de indicação que permanecem depois de um crédito
+  /// de vaga grátis. Zero não exige folga além do próprio lastro.
+  final int platformReserveCents;
 
   static const official = ReferralRates();
 }
@@ -193,6 +209,11 @@ class PointSubsidyQuote {
     required this.commissionCents,
     required this.splitPercent,
     required this.maxPoints,
+    this.backedPoints = 0,
+    this.unbackedPoints = 0,
+    this.topupCents = 0,
+    this.pointsOnly = false,
+    this.limitReason,
   });
 
   final int grossCents;
@@ -203,10 +224,29 @@ class PointSubsidyQuote {
   final int commissionCents;
 
   /// Nulo quando não há abatimento: o split percentual antigo continua.
-  /// Com abatimento, é o percentual (até 4 casas) que devolve o líquido
-  /// cheio da casa sobre o valor menor cobrado do jogador.
+  /// Com abatimento que ainda cabe na cobrança, é o percentual (até 4 casas)
+  /// que devolve o líquido cheio da casa sobre o valor menor.
+  /// Nulo também na vaga grátis e quando o líquido não cabe: o que falta
+  /// vai para [topupCents], no crédito da casa, e não para um split acima de 100%.
   final double? splitPercent;
   final int maxPoints;
+
+  /// Pontos de indicação (c2c, c2b) usados nesta cotação.
+  final int backedPoints;
+
+  /// Boas-vindas, cashback e o restante sem lastro.
+  final int unbackedPoints;
+
+  /// Centavos do líquido da casa que não cabem na cobrança.
+  /// Saem do lastro da EscapeMatch e esperam o próximo repasse da casa.
+  final int topupCents;
+
+  /// A vaga inteira foi coberta. Não há cobrança no Asaas.
+  final bool pointsOnly;
+
+  /// `monthly_limit`, `antifraud` ou `reserve` quando a extensão não
+  /// coube inteira. Nulo quando não houve corte da vaga grátis.
+  final String? limitReason;
 }
 
 /// Fim da janela. O instante final não entra (`paidAt < fim`).
@@ -475,22 +515,158 @@ List<RewardLine> quoteReferralRewards(
   return lines;
 }
 
+/// Quantas reservas de [grossCents] um indicado precisa pagar para quem
+/// indicou juntar [targetPoints]. A taxa é a de jogador para jogador.
+int referralBookingsForPoints({
+  required int targetPoints,
+  required int grossCents,
+  int c2cBps = 250,
+  int pointValueCents = 1,
+}) {
+  final each = pointsFromCents(
+    commissionCents(grossCents, c2cBps),
+    pointValueCents,
+  );
+  if (each <= 0) {
+    throw ArgumentError('A indicação não gera ponto.');
+  }
+  if (targetPoints <= 0) return 0;
+  return (targetPoints + each - 1) ~/ each;
+}
+
 /// Abate pontos do valor cobrado do jogador. O líquido da casa fica o do
-/// preço cheio. O percentual novo só existe quando há abatimento; ele é
-/// arredondado para cima em 4 casas, que é o limite do Asaas.
+/// preço cheio. O percentual novo só existe quando o líquido cabe na
+/// cobrança; ele é arredondado para cima em 4 casas, que é o limite do Asaas.
+///
+/// Com [ReferralRates.backedFullSlotEnabled], pontos de indicação já
+/// liberados ([availableBackedPoints]) podem cobrir a vaga inteira. O que
+/// passar da comissão não aumenta o split acima de 100%: vira [PointSubsidyQuote.topupCents]
+/// e espera o próximo repasse da casa. Boas-vindas e promoções continuam
+/// no teto de sempre. [availableBackedPoints] nulo conta tudo como sem lastro.
 PointSubsidyQuote quotePointSubsidy({
   required int grossCents,
   required int commissionBps,
   required int requestedPoints,
   required int availablePoints,
+  int? availableBackedPoints,
   ReferralRates rates = ReferralRates.official,
+  int receiptFeeCents = 0,
+  int openTopupCents = 0,
+  int? platformBackedCents,
+  int freeSlotsUsedThisMonth = 0,
+  bool backedFraudHold = false,
 }) {
   _requirePointValue(rates.pointValueCents);
   if (grossCents <= 0) {
     throw ArgumentError('A reserva precisa de um valor.');
   }
+  if (receiptFeeCents < 0 || openTopupCents < 0) {
+    throw ArgumentError('A taxa e o crédito em aberto não podem ser negativos.');
+  }
   final commission = commissionCents(grossCents, commissionBps);
   final houseNet = grossCents - commission;
+  final classicCeiling = _classicMaxPoints(
+    grossCents: grossCents,
+    commission: commission,
+    availablePoints: availablePoints,
+    rates: rates,
+  );
+  final backedPool = _clampBacked(availableBackedPoints, availablePoints);
+  final unbackedPool = availablePoints - backedPool;
+  final extensionOff = !rates.backedFullSlotEnabled ||
+      backedFraudHold ||
+      rates.freeSlotMonthlyLimit <= 0 ||
+      freeSlotsUsedThisMonth >= rates.freeSlotMonthlyLimit;
+  if (extensionOff) {
+    final reason = !rates.backedFullSlotEnabled
+        ? null
+        : backedFraudHold
+        ? 'antifraud'
+        : 'monthly_limit';
+    return _classicQuote(
+      grossCents: grossCents,
+      commission: commission,
+      houseNet: houseNet,
+      requestedPoints: requestedPoints,
+      availablePoints: availablePoints,
+      maxPoints: classicCeiling,
+      unbackedPool: unbackedPool,
+      rates: rates,
+      limitReason: reason,
+    );
+  }
+
+  final fullPoints = pointsFromCents(grossCents, rates.pointValueCents);
+  final platformCash = platformBackedCents ??
+      centsFromPoints(backedPool, rates.pointValueCents);
+  final ceiling = _allocateFullSlot(
+    want: availablePoints > fullPoints ? fullPoints : availablePoints,
+    grossCents: grossCents,
+    commission: commission,
+    houseNet: houseNet,
+    classicCeiling: classicCeiling,
+    backedPool: backedPool,
+    unbackedPool: unbackedPool,
+    pointValue: rates.pointValueCents,
+    receiptFeeCents: receiptFeeCents,
+    openTopupCents: openTopupCents,
+    platformCash: platformCash,
+    reserveCents: rates.platformReserveCents,
+  );
+  var maxPoints = ceiling.points;
+  if (availablePoints < rates.redeemMinPoints ||
+      maxPoints < rates.redeemMinPoints) {
+    maxPoints = 0;
+  }
+  final applied = _allocateFullSlot(
+    want: requestedPoints,
+    grossCents: grossCents,
+    commission: commission,
+    houseNet: houseNet,
+    classicCeiling: classicCeiling,
+    backedPool: backedPool,
+    unbackedPool: unbackedPool,
+    pointValue: rates.pointValueCents,
+    receiptFeeCents: receiptFeeCents,
+    openTopupCents: openTopupCents,
+    platformCash: platformCash,
+    reserveCents: rates.platformReserveCents,
+  );
+  var points = applied.points;
+  var backedSpend = applied.backedSpend;
+  var unbackedSpend = applied.unbackedSpend;
+  var topup = applied.topup;
+  if (points > maxPoints || points < rates.redeemMinPoints) {
+    points = 0;
+    backedSpend = 0;
+    unbackedSpend = 0;
+    topup = 0;
+  }
+  final subsidy = centsFromPoints(points, rates.pointValueCents);
+  final charged = grossCents - subsidy;
+  return PointSubsidyQuote(
+    grossCents: grossCents,
+    chargedCents: charged,
+    subsidyCents: subsidy,
+    points: points,
+    houseNetCents: houseNet,
+    commissionCents: commission,
+    splitPercent: _splitFor(houseNet, charged, subsidy, topup),
+    maxPoints: maxPoints,
+    backedPoints: backedSpend,
+    unbackedPoints: unbackedSpend,
+    topupCents: topup,
+    pointsOnly: charged == 0 && subsidy > 0,
+    limitReason: applied.reserveCut ? 'reserve' : null,
+  );
+}
+
+int _classicMaxPoints({
+  required int grossCents,
+  required int commission,
+  required int availablePoints,
+  required ReferralRates rates,
+}) {
   final room = grossCents > 1 ? grossCents - 1 : 0;
   final percentCap = commissionCents(grossCents, rates.redeemMaxBps);
   final maxSubsidy = [
@@ -506,19 +682,30 @@ PointSubsidyQuote quotePointSubsidy({
       maxPoints < rates.redeemMinPoints) {
     maxPoints = 0;
   }
+  return maxPoints;
+}
+
+PointSubsidyQuote _classicQuote({
+  required int grossCents,
+  required int commission,
+  required int houseNet,
+  required int requestedPoints,
+  required int availablePoints,
+  required int maxPoints,
+  required int unbackedPool,
+  required ReferralRates rates,
+  required String? limitReason,
+}) {
   var points = requestedPoints;
   if (points < 0) points = 0;
   if (points > availablePoints) points = availablePoints;
   if (points > maxPoints) points = maxPoints;
   if (points < rates.redeemMinPoints) points = 0;
+  var unbackedSpend = points > unbackedPool ? unbackedPool : points;
+  if (unbackedSpend < 0) unbackedSpend = 0;
+  final backedSpend = points - unbackedSpend;
   final subsidy = centsFromPoints(points, rates.pointValueCents);
   final charged = grossCents - subsidy;
-  final split = subsidy == 0
-      ? null
-      : subsidizedHouseSplitPercent(
-          houseNetCents: houseNet,
-          chargedCents: charged,
-        );
   return PointSubsidyQuote(
     grossCents: grossCents,
     chargedCents: charged,
@@ -526,8 +713,128 @@ PointSubsidyQuote quotePointSubsidy({
     points: points,
     houseNetCents: houseNet,
     commissionCents: commission,
-    splitPercent: split,
+    splitPercent: subsidy == 0
+        ? null
+        : subsidizedHouseSplitPercent(
+            houseNetCents: houseNet,
+            chargedCents: charged,
+          ),
     maxPoints: maxPoints,
+    backedPoints: backedSpend,
+    unbackedPoints: unbackedSpend,
+    limitReason: limitReason,
+  );
+}
+
+int _clampBacked(int? availableBackedPoints, int availablePoints) {
+  var backed = availableBackedPoints ?? 0;
+  if (backed < 0) backed = 0;
+  if (backed > availablePoints) backed = availablePoints;
+  return backed;
+}
+
+double? _splitFor(int houseNet, int charged, int subsidy, int topup) {
+  if (subsidy == 0 || charged <= 0 || topup > 0) return null;
+  return subsidizedHouseSplitPercent(
+    houseNetCents: houseNet,
+    chargedCents: charged,
+  );
+}
+
+class _FullAllocation {
+  const _FullAllocation({
+    required this.points,
+    required this.backedSpend,
+    required this.unbackedSpend,
+    required this.topup,
+    required this.reserveCut,
+  });
+
+  final int points;
+  final int backedSpend;
+  final int unbackedSpend;
+  final int topup;
+  final bool reserveCut;
+}
+
+_FullAllocation _allocateFullSlot({
+  required int want,
+  required int grossCents,
+  required int commission,
+  required int houseNet,
+  required int classicCeiling,
+  required int backedPool,
+  required int unbackedPool,
+  required int pointValue,
+  required int receiptFeeCents,
+  required int openTopupCents,
+  required int platformCash,
+  required int reserveCents,
+}) {
+  if (want < 0) want = 0;
+  final pool = backedPool + unbackedPool;
+  if (want > pool) want = pool;
+  final unbackedCap = classicCeiling < unbackedPool
+      ? classicCeiling
+      : unbackedPool;
+  var unbackedSpend = want < unbackedCap ? want : unbackedCap;
+  if (unbackedSpend < 0) unbackedSpend = 0;
+  var backedSpend = want - unbackedSpend;
+  if (backedSpend > backedPool) backedSpend = backedPool;
+  if (backedSpend < 0) backedSpend = 0;
+  var reserveCut = false;
+  final room = platformCash - openTopupCents - reserveCents;
+  while (backedSpend >= 0) {
+    final subsidy = centsFromPoints(unbackedSpend + backedSpend, pointValue);
+    final charged = grossCents - subsidy;
+    if (charged < 0) {
+      backedSpend -= 1;
+      continue;
+    }
+    final fee = charged == 0
+        ? 0
+        : (receiptFeeCents > charged ? charged : receiptFeeCents);
+    final net = charged - fee;
+    if (charged > 0 && net <= 0) {
+      if (backedSpend == 0) break;
+      backedSpend -= 1;
+      continue;
+    }
+    final topup = charged == 0 ? houseNet : (houseNet > net ? houseNet - net : 0);
+    if (backedSpend == 0) {
+      return _FullAllocation(
+        points: unbackedSpend,
+        backedSpend: 0,
+        unbackedSpend: unbackedSpend,
+        topup: 0,
+        reserveCut: reserveCut,
+      );
+    }
+    if (topup > backedSpend * pointValue) {
+      if (backedSpend == 0) break;
+      backedSpend -= 1;
+      continue;
+    }
+    if (topup > 0 && topup > room) {
+      reserveCut = true;
+      if (backedSpend == 0) break;
+      backedSpend -= 1;
+      continue;
+    }
+    return _FullAllocation(
+      points: unbackedSpend + backedSpend,
+      backedSpend: backedSpend,
+      unbackedSpend: unbackedSpend,
+      topup: topup,
+      reserveCut: reserveCut,
+    );
+  }
+  return _FullAllocation(
+    points: unbackedSpend,
+    backedSpend: 0,
+    unbackedSpend: unbackedSpend,
+    topup: 0,
+    reserveCut: reserveCut,
   );
 }
 

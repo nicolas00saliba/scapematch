@@ -9,6 +9,7 @@ import {
   postRewardsOnce,
   quotePointSubsidy,
   quoteReferralRewards,
+  referralBookingsForPoints,
   referralFraudReason,
   splitMatchesSubsidy,
 } from "./scape_points.ts";
@@ -211,6 +212,44 @@ Deno.test("abatimento muda o percentual e preserva o líquido da casa", () => {
   });
   assertEquals(capped.points, 0);
   assertEquals(capped.houseNetCents, 7500);
+});
+
+Deno.test("vaga grátis usa só ponto de indicação e gera crédito da casa", () => {
+  const off = quotePointSubsidy({
+    grossCents: 10000,
+    commissionBps: 2500,
+    requestedPoints: 10000,
+    availablePoints: 10000,
+    availableBackedPoints: 10000,
+  });
+  assertEquals(off.points, 2500);
+  assertEquals(off.topupCents, 0);
+  const full = quotePointSubsidy({
+    grossCents: 10000,
+    commissionBps: 2500,
+    requestedPoints: 10000,
+    availablePoints: 10000,
+    availableBackedPoints: 10000,
+    backedFullSlotEnabled: true,
+  });
+  assertEquals(full.pointsOnly, true);
+  assertEquals(full.chargedCents, 0);
+  assertEquals(full.topupCents, 7500);
+  assertEquals(full.splitPercent, null);
+  const promo = quotePointSubsidy({
+    grossCents: 10000,
+    commissionBps: 10000,
+    requestedPoints: 10000,
+    availablePoints: 10000,
+    availableBackedPoints: 0,
+    backedFullSlotEnabled: true,
+  });
+  assertEquals(promo.points, 3000);
+  assertEquals(promo.topupCents, 0);
+  assertEquals(referralBookingsForPoints({
+    targetPoints: 10000,
+    grossCents: 10000,
+  }), 40);
 });
 
 Deno.test("pagador indicador e teto não tiram o cashback", () => {

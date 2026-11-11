@@ -184,6 +184,12 @@ class ScapePointsView extends StatelessWidget {
                 Text(formatPrice(wallet.availableCents)),
                 const SizedBox(height: 8),
                 Text('${formatPoints(wallet.pendingPoints)} pontos chegando'),
+                if (wallet.freeSlotEnabled) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${formatPoints(wallet.backedPoints)} pontos de indicação podem cobrir a vaga. ${formatPoints(wallet.unbackedPoints)} pontos de promoção ficam no teto atual.',
+                  ),
+                ],
                 const SizedBox(height: 8),
                 if (wallet.availablePoints < wallet.redeemMinPoints) ...[
                   LinearProgressIndicator(

@@ -6,7 +6,7 @@ import 'package:scapematch_admin/admin_theme.dart';
 
 /// Como o número salvo em referral_program_settings aparece no formulário.
 /// O valor gravado não muda: pontos-base continuam com 10000 = 100%.
-enum RewardKind { basisPoints, playerPoints, pointValue, count }
+enum RewardKind { basisPoints, playerPoints, pointValue, count, cents }
 
 class RewardField {
   const RewardField({
@@ -186,6 +186,22 @@ const rewardFields = <RewardField>[
     one: 'dia',
     many: 'dias',
   ),
+  RewardField(
+    id: 'free_slot_monthly_limit',
+    section: 'Vaga grátis',
+    label: 'Vagas grátis por mês',
+    help: 'Quantas vezes no mês um jogador pode usar pontos de indicação além da comissão da reserva. Zero desliga essa extensão.',
+    kind: RewardKind.count,
+    one: 'vaga',
+    many: 'vagas',
+    zeroMeansOff: true,
+  ),
+  RewardField(
+    id: 'platform_reserve_cents',
+    label: 'Reserva de caixa',
+    help: 'Lastro de indicação, em centavos, que precisa sobrar depois de comprometer o crédito da casa de uma vaga grátis.',
+    kind: RewardKind.cents,
+  ),
 ];
 
 RewardField rewardFieldById(String id) {
@@ -219,6 +235,8 @@ String rewardEquivalence({
       final number = formatPoints(value);
       if (value == 1) return '$number ${field.one}';
       return '$number ${field.many}';
+    case RewardKind.cents:
+      return reais(value);
   }
 }
 

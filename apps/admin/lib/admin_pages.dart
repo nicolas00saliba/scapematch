@@ -532,6 +532,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
   List<Map<String, Object?>> _history = const [];
   final _fields = <String, TextEditingController>{};
   bool _blockSelf = true;
+  bool _freeSlot = false;
   String? _message;
 
   @override
@@ -563,6 +564,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
       _settings = settings;
       _history = history;
       _blockSelf = settings['block_self_payer'] == true;
+      _freeSlot = settings['backed_full_slot_enabled'] == true;
     });
   }
 
@@ -602,6 +604,17 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ],
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Permitir vaga grátis com pontos de indicação',
+                  ),
+                  subtitle: const Text(
+                    'Desligada por padrão. Ligada, pontos de indicação já liberados podem cobrir a vaga. O que passar da comissão vira crédito da casa no próximo repasse. Pontos de promoção continuam no teto.',
+                  ),
+                  value: _freeSlot,
+                  onChanged: (value) => setState(() => _freeSlot = value),
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text(
@@ -646,6 +659,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
       for (final field in rewardFields)
         field.id: int.tryParse(_fields[field.id]!.text.trim()) ?? 0,
       'block_self_payer': _blockSelf,
+      'backed_full_slot_enabled': _freeSlot,
     };
     try {
       await ref.read(adminApiProvider).saveRewardSettings(patch);

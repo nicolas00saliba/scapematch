@@ -13,6 +13,11 @@ class ScapeWallet {
     this.activeReferrals = 0,
     this.silverAt = 5,
     this.goldAt = 15,
+    this.backedPoints = 0,
+    this.unbackedPoints = 0,
+    this.freeSlotEnabled = false,
+    this.freeSlotMonthlyLimit = 1,
+    this.freeSlotsUsedThisMonth = 0,
   });
 
   final String referralCode;
@@ -27,6 +32,11 @@ class ScapeWallet {
   final int activeReferrals;
   final int silverAt;
   final int goldAt;
+  final int backedPoints;
+  final int unbackedPoints;
+  final bool freeSlotEnabled;
+  final int freeSlotMonthlyLimit;
+  final int freeSlotsUsedThisMonth;
 
   String get tierLabel => switch (tier) {
     'prata' => 'Prata',
@@ -104,6 +114,14 @@ class ScapeWallet {
       activeReferrals: _intOf(json['active_referrals']),
       silverAt: _intOf(json['silver_at'], fallback: 5),
       goldAt: _intOf(json['gold_at'], fallback: 15),
+      backedPoints: _intOf(json['backed_points']),
+      unbackedPoints: _intOf(json['unbacked_points']),
+      freeSlotEnabled: json['backed_full_slot_enabled'] == true,
+      freeSlotMonthlyLimit: _intOf(
+        json['free_slot_monthly_limit'],
+        fallback: 1,
+      ),
+      freeSlotsUsedThisMonth: _intOf(json['free_slots_used_this_month']),
     );
   }
 }
