@@ -16,7 +16,7 @@ class ScapeWallet {
     this.backedPoints = 0,
     this.unbackedPoints = 0,
     this.freeSlotEnabled = false,
-    this.freeSlotMonthlyLimit = 1,
+    this.freeSlotMonthlyLimit = 0,
     this.freeSlotsUsedThisMonth = 0,
   });
 
@@ -119,7 +119,6 @@ class ScapeWallet {
       freeSlotEnabled: json['backed_full_slot_enabled'] == true,
       freeSlotMonthlyLimit: _intOf(
         json['free_slot_monthly_limit'],
-        fallback: 1,
       ),
       freeSlotsUsedThisMonth: _intOf(json['free_slots_used_this_month']),
     );

@@ -182,12 +182,8 @@ declare
   v_reserve integer;
 begin
   select * into v_before from public.referral_program_settings where id = 1;
-  if v_before.backed_full_slot_enabled
-    or v_before.free_slot_monthly_limit <> 0
-  then
-    raise exception 'a flag da vaga gratis nao nasceu desligada % %',
-      v_before.backed_full_slot_enabled,
-      v_before.free_slot_monthly_limit;
+  if v_before.backed_full_slot_enabled then
+    raise exception 'a flag da vaga gratis nao nasceu desligada';
   end if;
 
   select pix_receipt_fee_cents, card_receipt_fee_cents, card_receipt_fee_bps
@@ -204,8 +200,7 @@ begin
   set first_booking_discount_bps = 0,
       redeem_min_points = 1000,
       redeem_max_bps = 3000,
-      backed_full_slot_enabled = false,
-      free_slot_monthly_limit = 1
+      backed_full_slot_enabled = false
   where id = 1;
 
   insert into public.referral_attributions (
@@ -550,6 +545,18 @@ begin
   end if;
 
   if public.points_reserve_split_cents(
+    'e7a33333-3333-4333-8333-333333333333',
+    'e7b11111-1111-4111-8111-111111111111',
+    10000, 10000, 7500, 'PIX'
+  ) <> public.cashback_reserve_split_cents(10000) then
+    raise exception 'o split sem indicacao nao reservou o teto do cashback';
+  end if;
+  if public.cashback_reserve_split_cents(10000) <> private.reward_cents(10000, (
+    select cashback_max_bps from public.referral_program_settings where id = 1
+  )) then
+    raise exception 'o teto do cashback no split nao e o maximo configurado';
+  end if;
+  if public.points_reserve_split_cents(
     'e7a22222-2222-4222-8222-222222222222',
     'e7b11111-1111-4111-8111-111111111111',
     10000, 10000, 7500, 'PIX'
@@ -559,8 +566,8 @@ begin
     )
     from public.referral_program_settings
     where id = 1
-  )) then
-    raise exception 'o split da reserva nao ficou no percentual da indicacao';
+  )) + public.cashback_reserve_split_cents(10000) then
+    raise exception 'o split da reserva nao somou indicacao e cashback';
   end if;
   if public.points_reserve_split_cents(
     'e7a22222-2222-4222-8222-222222222222',
@@ -592,7 +599,6 @@ begin
   set first_booking_discount_bps = v_before.first_booking_discount_bps,
       redeem_min_points = v_before.redeem_min_points,
       redeem_max_bps = v_before.redeem_max_bps,
-      backed_full_slot_enabled = v_before.backed_full_slot_enabled,
-      free_slot_monthly_limit = v_before.free_slot_monthly_limit
+      backed_full_slot_enabled = v_before.backed_full_slot_enabled
   where id = 1;
 end $$;

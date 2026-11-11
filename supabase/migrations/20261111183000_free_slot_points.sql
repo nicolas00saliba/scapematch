@@ -2,19 +2,14 @@
 -- Não aplicar no projeto remoto. Não cria transferência no Asaas e não
 -- mexe em subconta de produção. A flag nasce desligada.
 -- Boas-vindas e promoção continuam no teto antigo. Não há limite mensal.
--- O impacto final no caixa é zero: indicação e cashback já saíram da
--- comissão. Esse valor fica no saldo reservado e paga a casa depois.
+-- O recurso só liga pela flag. O impacto final no caixa é zero: indicação
+-- e cashback já saíram da comissão e ficam no saldo reservado.
 
 alter table public.referral_program_settings
-  add column if not exists backed_full_slot_enabled boolean not null default false,
-  add column if not exists free_slot_monthly_limit integer not null default 0
-    check (free_slot_monthly_limit >= 0);
+  add column if not exists backed_full_slot_enabled boolean not null default false;
 
 comment on column public.referral_program_settings.backed_full_slot_enabled is
-  'Desligada por padrão. Ligada, pontos de indicação e de cashback já liberados podem cobrir a vaga inteira, até o saldo reservado. O que passar da comissão vira crédito da casa no próximo repasse.';
-
-comment on column public.referral_program_settings.free_slot_monthly_limit is
-  'Não trava a vaga. Não há limite mensal: quem indica pode usar a extensão sempre que o saldo reservado cobrir. O padrão é zero.';
+  'Desligada por padrão. Ligada, pontos de indicação e de cashback já liberados podem cobrir a vaga inteira, até o saldo reservado. O que passar da comissão vira crédito da casa no próximo repasse. Não há limite mensal.';
 
 alter table public.scape_point_entries
   add column if not exists backed_points integer not null default 0
@@ -187,11 +182,10 @@ create table if not exists public.free_slot_audits (
   platform_cash_cents integer not null,
   reserve_cents integer not null,
   monthly_count integer not null,
-  monthly_limit integer not null,
   decision text not null check (
     decision in (
       'points_only', 'topup', 'capped', 'reserve',
-      'monthly_limit', 'antifraud', 'reversed'
+      'antifraud', 'reversed'
     )
   ),
   created_at timestamptz not null default pg_catalog.now()
@@ -313,12 +307,12 @@ begin
   insert into public.free_slot_audits (
     user_id, idempotency_key, payment_charge_id, gross_cents, subsidy_cents,
     backed_points, unbacked_points, topup_cents, points_only,
-    platform_cash_cents, reserve_cents, monthly_count, monthly_limit, decision
+    platform_cash_cents, reserve_cents, monthly_count, decision
   )
   select
     v_row.user_id, null, v_row.payment_charge_id, v_row.amount_cents, v_row.amount_cents,
     0, 0, v_row.applied_cents, false,
-    0, 0, 0, 0, 'reversed';
+    0, 0, 0, 'reversed';
 end;
 $$;
 
@@ -999,7 +993,6 @@ begin
   if v_enabled then
     v_decision := case
       when v_quote ->> 'limit_reason' = 'antifraud' then 'antifraud'
-      when v_quote ->> 'limit_reason' = 'monthly_limit' then 'monthly_limit'
       when v_quote ->> 'limit_reason' = 'reserve' then 'reserve'
       when coalesce((v_quote ->> 'points_only')::boolean, false) then 'points_only'
       when v_topup > 0 then 'topup'
@@ -1008,7 +1001,7 @@ begin
     insert into public.free_slot_audits (
       user_id, idempotency_key, gross_cents, subsidy_cents,
       backed_points, unbacked_points, topup_cents, points_only,
-      platform_cash_cents, reserve_cents, monthly_count, monthly_limit, decision
+      platform_cash_cents, reserve_cents, monthly_count, decision
     )
     select
       p_user_id, p_idempotency_key, v_gross, v_subsidy,
@@ -1017,7 +1010,6 @@ begin
       private.point_reserve_cents(),
       private.point_reserve_cents(),
       private.free_slots_used_this_month(p_user_id),
-      s.free_slot_monthly_limit,
       v_decision
     from public.referral_program_settings s
     where s.id = 1;
@@ -1872,7 +1864,6 @@ declare
   v_backed integer;
   v_unbacked integer;
   v_enabled boolean;
-  v_limit integer;
 begin
   if v_uid is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -1882,8 +1873,8 @@ begin
   v_active := private.referrer_active_count(v_uid);
   v_bonus := private.referrer_tier_bonus(v_uid);
   select redeem_min_points, tier_silver_active, tier_gold_active,
-         backed_full_slot_enabled, free_slot_monthly_limit
-    into v_min, v_silver, v_gold, v_enabled, v_limit
+         backed_full_slot_enabled
+    into v_min, v_silver, v_gold, v_enabled
   from public.referral_program_settings where id = 1;
   select b.backed_points, b.unbacked_points into v_backed, v_unbacked
   from private.scape_funding_balances(v_uid) b;
@@ -1901,7 +1892,6 @@ begin
     'backed_points', coalesce(v_backed, 0),
     'unbacked_points', coalesce(v_unbacked, 0),
     'backed_full_slot_enabled', coalesce(v_enabled, false),
-    'free_slot_monthly_limit', coalesce(v_limit, 1),
     'free_slots_used_this_month', private.free_slots_used_this_month(v_uid)
   );
 end;
@@ -1944,7 +1934,6 @@ begin
     'backed_points', v_summary -> 'backed_points',
     'unbacked_points', v_summary -> 'unbacked_points',
     'backed_full_slot_enabled', v_summary -> 'backed_full_slot_enabled',
-    'free_slot_monthly_limit', v_summary -> 'free_slot_monthly_limit',
     'free_slots_used_this_month', v_summary -> 'free_slots_used_this_month',
     'attributed', exists (
       select 1 from public.referral_attributions where subject_user_id = v_uid
@@ -2009,7 +1998,7 @@ begin
       'tier_gold_active', 'tier_gold_bonus_bps', 'tier_active_days',
       'block_self_payer', 'payer_referred_account_cap',
       'same_device_review_threshold',
-      'backed_full_slot_enabled', 'free_slot_monthly_limit'
+      'backed_full_slot_enabled'
     ) then
       raise exception 'campo % nao editavel', v_key using errcode = '22023';
     end if;
@@ -2084,9 +2073,6 @@ begin
     end if;
     v_row.block_self_payer := (p_patch ->> 'block_self_payer')::boolean;
   end if;
-  v_row.free_slot_monthly_limit := private.admin_int(
-    p_patch, 'free_slot_monthly_limit', v_row.free_slot_monthly_limit, 0, 100
-  );
   if p_patch ? 'backed_full_slot_enabled' then
     if pg_catalog.jsonb_typeof(p_patch -> 'backed_full_slot_enabled') <> 'boolean' then
       raise exception 'trava invalida' using errcode = '22023';
@@ -2163,7 +2149,6 @@ begin
       payer_referred_account_cap = v_row.payer_referred_account_cap,
       same_device_review_threshold = v_row.same_device_review_threshold,
       backed_full_slot_enabled = v_row.backed_full_slot_enabled,
-      free_slot_monthly_limit = v_row.free_slot_monthly_limit,
       updated_at = pg_catalog.now()
   where id = 1;
   select pg_catalog.to_jsonb(s) into v_after
@@ -2277,8 +2262,8 @@ begin
       'credit', new.id::text, v_cents, new.user_id, false
     );
     if new.program = 'cashback' and v_posted > 0 then
-      perform private.queue_cashback_reserve(
-        new.payment_charge_id, 'cashback_in', v_posted
+      perform private.reconcile_cashback_reserve(
+        new.payment_charge_id, v_posted
       );
     end if;
     return new;
@@ -2305,9 +2290,8 @@ begin
       'credit', new.id::text, v_cents, new.user_id, false
     );
     if new.program = 'cashback' and v_posted > 0 then
-      perform private.queue_cashback_reserve(
-        coalesce(new.payment_charge_id, new.source_charge_id),
-        'cashback_in', v_posted
+      perform private.reconcile_cashback_reserve(
+        coalesce(new.payment_charge_id, new.source_charge_id), v_posted
       );
     end if;
     return new;

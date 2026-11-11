@@ -1,15 +1,14 @@
 -- Subconta Asaas "Reserva de pontos". Não aplicar no remoto.
 -- Não cria subconta e não chama o Asaas. A flag continua desligada.
--- O split da indicação e a transferência do cashback só rodam no sandbox.
--- O cashback não entra no split: o valor só existe depois do sorteio.
--- Quando o ponto é creditado, o backend transfere esse valor da conta
--- raiz para a mesma subconta. No estorno, devolve o que ainda estava lá.
+-- O split reserva a indicação e o teto do cashback. O sorteio só existe
+-- depois do pagamento: o que não virar ponto volta para a conta raiz.
+-- Tudo isso só no sandbox.
 
 create table if not exists public.point_reserve_transfers (
   id uuid primary key default gen_random_uuid(),
   payment_charge_id uuid not null references public.payment_charges (id),
   purpose text not null check (purpose in (
-    'house', 'platform_return', 'cashback_in', 'cashback_out'
+    'house', 'platform_return', 'cashback_in', 'cashback_out', 'cashback_excess'
   )),
   amount_cents integer not null check (amount_cents > 0),
   destination_wallet_id text not null,
@@ -34,9 +33,44 @@ create policy point_reserve_transfers_select
 revoke all on public.point_reserve_transfers from public, anon, authenticated;
 grant select on public.point_reserve_transfers to authenticated, service_role;
 
--- Centavos de indicação (c2c e c2b) que esta cobrança deve separar.
--- Zero com a flag desligada, sem indicação de jogador, ou quando a soma
--- não cabe no líquido depois da taxa e do repasse da casa.
+-- Centavos de indicação (c2c e c2b) mais o teto do cashback que esta
+-- cobrança deve separar. O cashback entra mesmo sem indicação: toda
+-- reserva paga pode sortear ponto com lastro. Zero com a flag desligada,
+-- ou quando a soma não cabe no líquido depois da taxa e do repasse da casa.
+
+alter table public.payment_charges
+  add column if not exists cashback_reserve_cents integer not null default 0
+    check (cashback_reserve_cents >= 0);
+
+comment on column public.payment_charges.cashback_reserve_cents is
+  'Teto de cashback que o split da Reserva de pontos já separou nesta cobrança. Zero quando o split não levou o cashback.';
+
+create or replace function public.cashback_reserve_split_cents(p_gross integer)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_settings public.referral_program_settings%rowtype;
+  v_point integer;
+  v_raw integer;
+begin
+  if p_gross is null or p_gross <= 0 then
+    return 0;
+  end if;
+  select * into v_settings
+  from public.referral_program_settings
+  where id = 1;
+  if not coalesce(v_settings.backed_full_slot_enabled, false) then
+    return 0;
+  end if;
+  v_point := greatest(coalesce(v_settings.point_value_cents, 1), 1);
+  v_raw := private.reward_cents(p_gross, coalesce(v_settings.cashback_max_bps, 0));
+  return (v_raw / v_point) * v_point;
+end;
+$$;
 create or replace function public.points_reserve_split_cents(
   p_user_id uuid,
   p_venue_id uuid,
@@ -72,6 +106,7 @@ begin
     return 0;
   end if;
   v_point := greatest(coalesce(v_settings.point_value_cents, 1), 1);
+  v_cents := public.cashback_reserve_split_cents(p_gross);
 
   select * into v_player
   from public.referral_attributions
@@ -131,7 +166,9 @@ as $$
 declare
   v_status text;
 begin
-  if p_purpose not in ('house', 'platform_return', 'cashback_in', 'cashback_out') then
+  if p_purpose not in (
+    'house', 'platform_return', 'cashback_in', 'cashback_out', 'cashback_excess'
+  ) then
     raise exception 'finalidade invalida' using errcode = '22023';
   end if;
   if p_amount_cents is null or p_amount_cents <= 0 or p_wallet_id is null then
@@ -245,7 +282,7 @@ begin
   if p_charge_id is null or p_cents is null or p_cents <= 0 then
     return;
   end if;
-  if p_purpose not in ('cashback_in', 'cashback_out') then
+  if p_purpose not in ('cashback_in', 'cashback_out', 'cashback_excess') then
     return;
   end if;
   insert into public.point_reserve_transfers (
@@ -270,13 +307,75 @@ as $$
   )), '[]'::jsonb)
   from public.point_reserve_transfers
   where payment_charge_id = p_charge_id
-    and purpose in ('cashback_in', 'cashback_out')
+    and purpose in ('cashback_in', 'cashback_out', 'cashback_excess')
     and status in ('pending', 'failed');
+$$;
+
+-- O split já separou o teto. Aqui só entra o que o sorteio passou do teto,
+-- ou sai o que o teto passou do sorteio. Sem split, o valor inteiro entra.
+create or replace function private.reconcile_cashback_reserve(
+  p_charge_id uuid,
+  p_posted integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_reserved integer := 0;
+begin
+  if p_charge_id is null or p_posted is null or p_posted <= 0 then
+    return;
+  end if;
+  select cashback_reserve_cents into v_reserved
+  from public.payment_charges
+  where id = p_charge_id;
+  v_reserved := coalesce(v_reserved, 0);
+  if p_posted > v_reserved then
+    perform private.queue_cashback_reserve(
+      p_charge_id, 'cashback_in', p_posted - v_reserved
+    );
+  elsif v_reserved > p_posted then
+    perform private.queue_cashback_reserve(
+      p_charge_id, 'cashback_excess', v_reserved - p_posted
+    );
+  end if;
+end;
+$$;
+
+create or replace function public.note_cashback_reserve(
+  p_charge_id uuid,
+  p_cents integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_charge_id is null or p_cents is null or p_cents <= 0 then
+    return;
+  end if;
+  update public.payment_charges
+  set cashback_reserve_cents = p_cents
+  where id = p_charge_id;
+end;
 $$;
 
 revoke all on function private.queue_cashback_reserve(uuid, text, integer)
   from public, anon, authenticated;
+revoke all on function private.reconcile_cashback_reserve(uuid, integer)
+  from public, anon, authenticated;
+revoke all on function public.cashback_reserve_split_cents(integer)
+  from public, anon, authenticated;
+revoke all on function public.note_cashback_reserve(uuid, integer)
+  from public, anon, authenticated;
 revoke all on function public.cashback_reserve_pending(uuid)
   from public, anon, authenticated;
+grant execute on function public.cashback_reserve_split_cents(integer)
+  to service_role;
+grant execute on function public.note_cashback_reserve(uuid, integer)
+  to service_role;
 grant execute on function public.cashback_reserve_pending(uuid)
   to service_role;

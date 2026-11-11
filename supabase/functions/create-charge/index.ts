@@ -258,14 +258,18 @@ export async function createCharge(
       walletId: venue.asaas_wallet_id as string,
       fixedValue: 0,
     };
-    const reserveSplitsFor = async (houseFixedCents: number) => {
+    const reserveSplitsFor = async (
+      houseFixedCents: number,
+      chargeId: string,
+    ) => {
       if (!asaas.sandbox) return [];
       const wallet = readEnv(Deno.env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
       if (!wallet) return [];
+      const gross = grossForReserve ?? grossCents;
       const { data, error } = await admin.rpc("points_reserve_split_cents", {
         p_user_id: user.id,
         p_venue_id: venue.id,
-        p_gross: grossForReserve ?? grossCents,
+        p_gross: gross,
         p_charged: amountCents,
         p_house_fixed: houseFixedCents,
         p_billing_type: billingType,
@@ -278,7 +282,22 @@ export async function createCharge(
         houseWalletId: venue.asaas_wallet_id as string,
         referralCents: data,
       });
-      return line ? [line] : [];
+      if (!line) return [];
+      const cashback = await admin.rpc("cashback_reserve_split_cents", {
+        p_gross: gross,
+      });
+      if (
+        !cashback.error &&
+        typeof cashback.data === "number" &&
+        cashback.data > 0
+      ) {
+        const noted = await admin.rpc("note_cashback_reserve", {
+          p_charge_id: chargeId,
+          p_cents: cashback.data,
+        });
+        if (noted.error) return [];
+      }
+      return [line];
     };
 
     const { data: profile } = await admin
@@ -512,6 +531,7 @@ export async function createCharge(
             split,
             extraSplits: await reserveSplitsFor(
               Math.round(split.fixedValue * 100),
+              reserved.id,
             ),
             onCreated: async (payment) => {
               const stored = await attachPixProvider(
@@ -638,6 +658,7 @@ export async function createCharge(
           split,
           extraSplits: await reserveSplitsFor(
             Math.round(split.fixedValue * 100),
+            reservedCard.id,
           ),
           remoteIp,
           creditCardToken: owned.creditCardToken,
@@ -676,7 +697,7 @@ export async function createCharge(
           description,
           externalReference: idempotencyKey,
           split,
-          extraSplits: await reserveSplitsFor(fixedCents),
+          extraSplits: await reserveSplitsFor(fixedCents, chargeId),
           remoteIp,
           creditCardToken: owned.creditCardToken,
         });

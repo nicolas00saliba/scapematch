@@ -146,7 +146,12 @@ export async function settlePointsReservePayout(
 async function sendLeg(
   input: ReservePayoutInput,
   leg: {
-    purpose: "house" | "platform_return" | "cashback_in" | "cashback_out";
+    purpose:
+      | "house"
+      | "platform_return"
+      | "cashback_in"
+      | "cashback_out"
+      | "cashback_excess";
     cents: number;
     walletId: string;
   },
@@ -274,9 +279,12 @@ export async function fundCashbackReserve(
         { purpose: "cashback_in", cents, walletId: reserveWallet },
       );
     }
-    if (item.purpose === "cashback_out" && reserveKey.trim()) {
+    if (
+      (item.purpose === "cashback_out" || item.purpose === "cashback_excess") &&
+      reserveKey.trim()
+    ) {
       await sendLeg(payout, {
-        purpose: "cashback_out",
+        purpose: item.purpose,
         cents,
         walletId: rootWallet,
       });
