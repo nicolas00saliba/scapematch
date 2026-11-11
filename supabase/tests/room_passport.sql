@@ -39,11 +39,10 @@ begin
           'confirm_session_attendance'
         ))
         or (n.nspname = 'private' and p.proname in (
-          'passport_apply_charge', 'passport_sync_user', 'point_pools',
-          'subsidy_quote'
+          'passport_apply_charge', 'passport_sync_user', 'subsidy_quote'
         ))
       )
-  ) <> 12 then
+  ) <> 11 then
     raise exception 'funcao do passaporte sem security definer ou search_path vazio';
   end if;
   if public.passport_program_enabled() then
@@ -413,13 +412,24 @@ select set_config('request.jwt.claim.sub', 'd0444444-4444-4444-8444-444444444444
 set local role authenticated;
 do $$
 begin
-  perform public.deliver_passport_gift((select code from pp_gift_code));
-  raise exception 'estranho entregou o mimo';
-exception
-  when others then
-    if sqlerrm <> 'not owner' then
-      raise exception 'entrega alheia: %', sqlerrm;
-    end if;
+  begin
+    perform public.deliver_passport_gift((select code from pp_gift_code));
+    raise exception 'estranho entregou o mimo';
+  exception
+    when others then
+      if sqlerrm <> 'codigo nao encontrado' then
+        raise exception 'entrega alheia: %', sqlerrm;
+      end if;
+  end;
+  begin
+    perform public.deliver_passport_gift('NAOEXISTE');
+    raise exception 'codigo inventado passou';
+  exception
+    when others then
+      if sqlerrm <> 'codigo nao encontrado' then
+        raise exception 'codigo inventado: %', sqlerrm;
+      end if;
+  end;
 end $$;
 rollback;
 
@@ -694,10 +704,16 @@ begin
     'd0222222-2222-4222-8222-222222222222',
     true
   );
-  perform public.confirm_session_attendance(
+  insert into public.session_checkins (
+    venue_id, group_id, user_id, room_id, marked_by
+  ) values (
+    'd0511111-1111-4111-8111-111111111111',
     'd0766666-6666-4666-8666-666666666666',
-    'd0777777-7777-4777-8777-777777777777'
+    'd0777777-7777-4777-8777-777777777777',
+    'd0611111-1111-4111-8111-111111111111',
+    'd0222222-2222-4222-8222-222222222222'
   );
+  perform private.passport_catch_up();
   select play_count into v_count
   from public.passport_stamps
   where user_id = 'd0777777-7777-4777-8777-777777777777'
@@ -705,8 +721,12 @@ begin
   select available_points into v_points
   from private.scape_balances('d0777777-7777-4777-8777-777777777777');
   if v_count is distinct from 1 or v_points is distinct from 500 then
-    raise exception 'confirmacao depois da sessao ficou % visitas e % pontos', v_count, v_points;
+    raise exception 'catch-up da reserva paga antes ficou % visitas e % pontos', v_count, v_points;
   end if;
+  perform public.confirm_session_attendance(
+    'd0766666-6666-4666-8666-666666666666',
+    'd0777777-7777-4777-8777-777777777777'
+  );
   perform private.passport_catch_up();
   select play_count into v_count
   from public.passport_stamps
@@ -752,32 +772,65 @@ begin
 end $$;
 
 insert into public.scape_point_entries (
-  user_id, kind, points, amount_cents, program, idempotency_key
+  user_id, kind, points, amount_cents, program, funding,
+  backed_points, unbacked_points, idempotency_key
 ) values
-  ('d0555555-5555-4555-8555-555555555555', 'release', 9000, 9000, 'passport', 'pp-so-desconto'),
-  ('d0666666-6666-4666-8666-666666666666', 'release', 9000, 9000, 'cashback', 'pp-so-vaga');
+  ('d0555555-5555-4555-8555-555555555555', 'release', 9000, 9000, 'passport', 'unbacked', 0, 9000, 'pp-so-desconto'),
+  ('d0666666-6666-4666-8666-666666666666', 'release', 9000, 9000, 'cashback', 'backed', 9000, 0, 'pp-so-vaga');
 
 update public.referral_program_settings
-set redeem_min_points = 1, redeem_max_bps = 3000
+set passport_enabled = true,
+    backed_full_slot_enabled = false,
+    redeem_min_points = 1,
+    redeem_max_bps = 3000
 where id = 1;
 
 do $$
 declare
-  v_discount jsonb;
-  v_slot jsonb;
+  v_on jsonb;
+  v_off jsonb;
+  v_passport jsonb;
+  v_cash jsonb;
 begin
-  v_discount := private.subsidy_quote(
-    'd0555555-5555-4555-8555-555555555555', 10000, 10000, 9000, false
-  );
-  v_slot := private.subsidy_quote(
+  v_on := private.subsidy_quote(
     'd0666666-6666-4666-8666-666666666666', 10000, 10000, 9000, false
   );
-  if (v_discount ->> 'points')::integer is distinct from 3000 then
-    raise exception 'passaporte pagou alem do teto %', v_discount;
+  update public.referral_program_settings
+  set passport_enabled = false
+  where id = 1;
+  v_off := private.subsidy_quote(
+    'd0666666-6666-4666-8666-666666666666', 10000, 10000, 9000, false
+  );
+  if v_on <> v_off then
+    raise exception 'flag do passaporte desligada mudou a cotacao % vs %', v_on, v_off;
   end if;
-  if (v_slot ->> 'points')::integer is distinct from 9000 then
-    raise exception 'cashback nao pagou a vaga %', v_slot;
+  if (v_off ->> 'points')::integer is distinct from 3000 then
+    raise exception 'sem a vaga gratis o cashback saiu do teto %', v_off;
   end if;
+  update public.referral_program_settings
+  set passport_enabled = true,
+      backed_full_slot_enabled = true
+  where id = 1;
+  v_passport := private.subsidy_quote(
+    'd0555555-5555-4555-8555-555555555555', 10000, 10000, 9000, false
+  );
+  v_cash := private.subsidy_quote(
+    'd0666666-6666-4666-8666-666666666666', 10000, 10000, 9000, false
+  );
+  if (v_passport ->> 'points')::integer is distinct from 3000
+    or (v_passport ->> 'unbacked_points')::integer is distinct from 3000
+    or (v_passport ->> 'backed_points')::integer is distinct from 0
+  then
+    raise exception 'passaporte nao ficou sem lastro %', v_passport;
+  end if;
+  if (v_cash ->> 'points')::integer is distinct from 9000
+    or (v_cash ->> 'backed_points')::integer is distinct from 9000
+  then
+    raise exception 'cashback com lastro nao pagou a vaga %', v_cash;
+  end if;
+  update public.referral_program_settings
+  set backed_full_slot_enabled = false
+  where id = 1;
 end $$;
 
 begin;

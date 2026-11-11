@@ -6,7 +6,7 @@ import 'package:scapematch_admin/admin_theme.dart';
 
 /// Como o número salvo em referral_program_settings aparece no formulário.
 /// O valor gravado não muda: pontos-base continuam com 10000 = 100%.
-enum RewardKind { basisPoints, playerPoints, pointValue, count }
+enum RewardKind { basisPoints, playerPoints, pointValue, count, cents }
 
 class RewardField {
   const RewardField({
@@ -219,6 +219,8 @@ String rewardEquivalence({
       final number = formatPoints(value);
       if (value == 1) return '$number ${field.one}';
       return '$number ${field.many}';
+    case RewardKind.cents:
+      return reais(value);
   }
 }
 

@@ -9,12 +9,16 @@ class LiveCharge {
     required this.billingType,
     required this.qrCode,
     this.qrImageBase64,
+    this.pointsOnly = false,
   });
 
   final String status;
   final String billingType;
   final String qrCode;
   final String? qrImageBase64;
+
+  /// Vaga paga só com pontos. Não existe cobrança nem QR no Asaas.
+  final bool pointsOnly;
 
   bool get isPix => billingType == 'PIX';
 
@@ -31,6 +35,7 @@ class LiveCharge {
     if (billingType != 'PIX' && billingType != 'CREDIT_CARD') {
       return liveChargeFailed;
     }
+    if (pointsOnly && settlesPaid) return null;
     if (isPix && !hasPixCode) return livePixMissing;
     if (status == 'failed' || status == 'cancelled' || status == 'refunded') {
       return liveChargeRejected;
@@ -45,6 +50,7 @@ class LiveCharge {
       billingType: _text(body['billing_type']).toUpperCase(),
       qrCode: _text(body['qr_code']),
       qrImageBase64: _optional(body['qr_code_base64']),
+      pointsOnly: body['points_only'] == true,
     );
   }
 }

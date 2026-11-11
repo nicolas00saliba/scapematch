@@ -206,34 +206,49 @@ void main() {
     expect(plan.reverse, ['count:5']);
   });
 
-  test('pontos do passaporte param no teto e o cashback paga a vaga', () {
-    final discount = quotePointSubsidy(
+  test('pontos do passaporte são sem lastro e param no teto', () {
+    const off = ReferralRates(redeemMinPoints: 1, redeemMaxBps: 3000);
+    final passport = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 10000,
       requestedPoints: 9000,
       availablePoints: 9000,
-      discountPoints: 9000,
-      rates: const ReferralRates(redeemMinPoints: 1, redeemMaxBps: 3000),
+      availableBackedPoints: 0,
+      rates: const ReferralRates(
+        redeemMinPoints: 1,
+        redeemMaxBps: 3000,
+        backedFullSlotEnabled: true,
+      ),
+      reservedBalanceCents: 9000,
     );
-    expect(discount.points, 3000);
+    expect(passport.points, 3000);
+    expect(passport.unbackedPoints, 3000);
+    expect(passport.backedPoints, 0);
 
-    final slot = quotePointSubsidy(
+    final cashback = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 10000,
       requestedPoints: 9000,
       availablePoints: 9000,
-      discountPoints: 0,
-      rates: const ReferralRates(redeemMinPoints: 1, redeemMaxBps: 3000),
+      availableBackedPoints: 9000,
+      rates: const ReferralRates(
+        redeemMinPoints: 1,
+        redeemMaxBps: 3000,
+        backedFullSlotEnabled: true,
+      ),
+      reservedBalanceCents: 9000,
     );
-    expect(slot.points, 9000);
+    expect(cashback.points, 9000);
+    expect(cashback.backedPoints, 9000);
 
-    final legacy = quotePointSubsidy(
+    final unchanged = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 10000,
-      requestedPoints: 5000,
-      availablePoints: 5000,
-      rates: const ReferralRates(redeemMinPoints: 1000, redeemMaxBps: 3000),
+      requestedPoints: 9000,
+      availablePoints: 9000,
+      availableBackedPoints: 9000,
+      rates: off,
     );
-    expect(legacy.points, 3000);
+    expect(unchanged.points, 3000);
   });
 }

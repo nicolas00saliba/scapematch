@@ -52,6 +52,26 @@ void main() {
     expect(view.message, livePixMissing);
   });
 
+  test('vaga paga só com pontos confirma sem QR', () {
+    final charge = LiveCharge.fromBody({
+      'status': 'paid',
+      'billing_type': 'PIX',
+      'qr_code': '',
+      'points_only': true,
+      'amount_cents': 0,
+    });
+
+    expect(charge.pointsOnly, isTrue);
+    expect(charge.rejectionMessage, isNull);
+    expect(charge.settlesPaid, isTrue);
+    final view = ShareChargeView.fromResult(
+      PayShareSuccess(_group(), charge: charge),
+    );
+    expect(view.confirms, isTrue);
+    expect(view.hasError, isFalse);
+    expect(view.pixCode, isNull);
+  });
+
   test('cartão autorizado reserva e cartão pago confirma', () {
     final reserved = ShareChargeView.fromResult(
       PayShareSuccess(

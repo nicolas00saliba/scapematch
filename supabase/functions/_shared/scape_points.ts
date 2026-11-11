@@ -259,32 +259,120 @@ export type PointSubsidyQuote = {
   commissionCents: number;
   splitPercent: number | null;
   maxPoints: number;
+  backedPoints: number;
+  unbackedPoints: number;
+  topupCents: number;
+  pointsOnly: boolean;
+  limitReason: "monthly_limit" | "antifraud" | "reserve" | null;
 };
 
+export function referralBookingsForPoints(input: {
+  targetPoints: number;
+  grossCents: number;
+  c2cBps?: number;
+  pointValueCents?: number;
+}): number {
+  const pointValue = input.pointValueCents ?? officialPointValueCents;
+  const each = Math.floor(commissionCents(input.grossCents, input.c2cBps ?? officialC2cBps) / pointValue);
+  if (each <= 0) throw new Error("indicação sem ponto");
+  if (input.targetPoints <= 0) return 0;
+  return Math.ceil(input.targetPoints / each);
+}
+
+/// Mesma conta de quotePointSubsidy no domínio Dart.
 export function quotePointSubsidy(input: {
   grossCents: number;
   commissionBps: number;
   requestedPoints: number;
   availablePoints: number;
+  availableBackedPoints?: number;
   pointValueCents?: number;
   redeemMinPoints?: number;
   redeemMaxBps?: number;
+  backedFullSlotEnabled?: boolean;
+  freeSlotMonthlyLimit?: number;
+  receiptFeeCents?: number;
+  reservedBalanceCents?: number;
+  freeSlotsUsedThisMonth?: number;
+  backedFraudHold?: boolean;
 }): PointSubsidyQuote {
   const pointValue = input.pointValueCents ?? officialPointValueCents;
   const minPoints = input.redeemMinPoints ?? 1000;
   const maxBps = input.redeemMaxBps ?? 3000;
+  const feeFlat = input.receiptFeeCents ?? 0;
   const commission = commissionCents(input.grossCents, input.commissionBps);
   const houseNet = input.grossCents - commission;
-  const room = input.grossCents > 1 ? input.grossCents - 1 : 0;
-  const percentCap = commissionCents(input.grossCents, maxBps);
-  const maxSubsidy = Math.min(commission, room, Math.max(percentCap, 0));
-  let maxPoints = Math.floor(Math.max(maxSubsidy, 0) / pointValue);
+  const classicCeiling = classicMaxPoints(
+    input.grossCents,
+    commission,
+    input.availablePoints,
+    pointValue,
+    minPoints,
+    maxBps,
+  );
+  const backedPool = clampBacked(input.availableBackedPoints, input.availablePoints);
+  const unbackedPool = input.availablePoints - backedPool;
+  const extensionOff = input.backedFullSlotEnabled !== true ||
+    input.backedFraudHold === true;
+  if (extensionOff) {
+    const reason = input.backedFullSlotEnabled !== true
+      ? null
+      : "antifraud" as const;
+    return classicQuote({
+      grossCents: input.grossCents,
+      commission,
+      houseNet,
+      requestedPoints: input.requestedPoints,
+      availablePoints: input.availablePoints,
+      maxPoints: classicCeiling,
+      unbackedPool,
+      minPoints,
+      pointValue,
+      limitReason: reason,
+    });
+  }
+  const fullPoints = Math.floor(input.grossCents / pointValue);
+  const reserved = input.reservedBalanceCents ?? backedPool * pointValue;
+  const ceiling = allocateFullSlot({
+    want: Math.min(input.availablePoints, fullPoints),
+    grossCents: input.grossCents,
+    commission,
+    houseNet,
+    classicCeiling,
+    backedPool,
+    unbackedPool,
+    pointValue,
+    receiptFeeCents: feeFlat,
+    openTopupCents: 0,
+    platformCash: reserved,
+    reserveCents: 0,
+  });
+  let maxPoints = ceiling.points;
   if (input.availablePoints < minPoints || maxPoints < minPoints) maxPoints = 0;
-  let points = input.requestedPoints;
-  if (points < 0) points = 0;
-  if (points > input.availablePoints) points = input.availablePoints;
-  if (points > maxPoints) points = maxPoints;
-  if (points < minPoints) points = 0;
+  const applied = allocateFullSlot({
+    want: input.requestedPoints,
+    grossCents: input.grossCents,
+    commission,
+    houseNet,
+    classicCeiling,
+    backedPool,
+    unbackedPool,
+    pointValue,
+    receiptFeeCents: feeFlat,
+    openTopupCents: 0,
+    platformCash: reserved,
+    reserveCents: 0,
+  });
+  let points = applied.points;
+  let backedSpend = applied.backedSpend;
+  let unbackedSpend = applied.unbackedSpend;
+  let topup = applied.topup;
+  if (points > maxPoints || points < minPoints) {
+    points = 0;
+    backedSpend = 0;
+    unbackedSpend = 0;
+    topup = 0;
+  }
   const subsidy = points * pointValue;
   const charged = input.grossCents - subsidy;
   return {
@@ -294,10 +382,173 @@ export function quotePointSubsidy(input: {
     points,
     houseNetCents: houseNet,
     commissionCents: commission,
-    splitPercent: subsidy === 0
-      ? null
-      : subsidizedHouseSplitPercent(houseNet, charged),
+    splitPercent: splitFor(houseNet, charged, subsidy, topup),
     maxPoints,
+    backedPoints: backedSpend,
+    unbackedPoints: unbackedSpend,
+    topupCents: topup,
+    pointsOnly: charged === 0 && subsidy > 0,
+    limitReason: applied.reserveCut ? "reserve" : null,
+  };
+}
+
+function classicMaxPoints(
+  grossCents: number,
+  commission: number,
+  availablePoints: number,
+  pointValue: number,
+  minPoints: number,
+  maxBps: number,
+): number {
+  const room = grossCents > 1 ? grossCents - 1 : 0;
+  const percentCap = commissionCents(grossCents, maxBps);
+  const maxSubsidy = Math.min(commission, room, Math.max(percentCap, 0));
+  let maxPoints = Math.floor(Math.max(maxSubsidy, 0) / pointValue);
+  if (availablePoints < minPoints || maxPoints < minPoints) maxPoints = 0;
+  return maxPoints;
+}
+
+function classicQuote(input: {
+  grossCents: number;
+  commission: number;
+  houseNet: number;
+  requestedPoints: number;
+  availablePoints: number;
+  maxPoints: number;
+  unbackedPool: number;
+  minPoints: number;
+  pointValue: number;
+  limitReason: "monthly_limit" | "antifraud" | null;
+}): PointSubsidyQuote {
+  let points = input.requestedPoints;
+  if (points < 0) points = 0;
+  if (points > input.availablePoints) points = input.availablePoints;
+  if (points > input.maxPoints) points = input.maxPoints;
+  if (points < input.minPoints) points = 0;
+  const unbackedSpend = Math.max(0, Math.min(points, input.unbackedPool));
+  const subsidy = points * input.pointValue;
+  const charged = input.grossCents - subsidy;
+  return {
+    grossCents: input.grossCents,
+    chargedCents: charged,
+    subsidyCents: subsidy,
+    points,
+    houseNetCents: input.houseNet,
+    commissionCents: input.commission,
+    splitPercent: subsidy === 0 ? null : subsidizedHouseSplitPercent(input.houseNet, charged),
+    maxPoints: input.maxPoints,
+    backedPoints: points - unbackedSpend,
+    unbackedPoints: unbackedSpend,
+    topupCents: 0,
+    pointsOnly: false,
+    limitReason: input.limitReason,
+  };
+}
+
+function clampBacked(availableBackedPoints: number | undefined, availablePoints: number): number {
+  let backed = availableBackedPoints ?? 0;
+  if (backed < 0) backed = 0;
+  if (backed > availablePoints) backed = availablePoints;
+  return backed;
+}
+
+function splitFor(
+  houseNet: number,
+  charged: number,
+  subsidy: number,
+  topup: number,
+): number | null {
+  if (subsidy === 0 || charged <= 0 || topup > 0) return null;
+  return subsidizedHouseSplitPercent(houseNet, charged);
+}
+
+function allocateFullSlot(input: {
+  want: number;
+  grossCents: number;
+  commission: number;
+  houseNet: number;
+  classicCeiling: number;
+  backedPool: number;
+  unbackedPool: number;
+  pointValue: number;
+  receiptFeeCents: number;
+  openTopupCents: number;
+  platformCash: number;
+  reserveCents: number;
+}): {
+  points: number;
+  backedSpend: number;
+  unbackedSpend: number;
+  topup: number;
+  reserveCut: boolean;
+} {
+  let want = input.want;
+  if (want < 0) want = 0;
+  const pool = input.backedPool + input.unbackedPool;
+  if (want > pool) want = pool;
+  const unbackedCap = Math.min(input.classicCeiling, input.unbackedPool);
+  let unbackedSpend = Math.min(want, Math.max(unbackedCap, 0));
+  let backedSpend = Math.min(want - unbackedSpend, input.backedPool);
+  if (backedSpend < 0) backedSpend = 0;
+  let reserveCut = false;
+  const room = input.platformCash - input.openTopupCents - input.reserveCents;
+  while (backedSpend >= 0) {
+    const subsidy = (unbackedSpend + backedSpend) * input.pointValue;
+    const charged = input.grossCents - subsidy;
+    if (charged < 0) {
+      backedSpend -= 1;
+      continue;
+    }
+    const fee = charged === 0
+      ? 0
+      : Math.min(input.receiptFeeCents, charged);
+    const net = charged - fee;
+    if (charged > 0 && net <= 0) {
+      if (backedSpend === 0) break;
+      backedSpend -= 1;
+      continue;
+    }
+    const topup = charged === 0
+      ? input.houseNet
+      : Math.max(0, input.houseNet - net);
+    if (backedSpend === 0) {
+      return {
+        points: unbackedSpend,
+        backedSpend: 0,
+        unbackedSpend,
+        topup: 0,
+        reserveCut,
+      };
+    }
+    if (
+      topup > backedSpend * input.pointValue ||
+      backedSpend * input.pointValue > room
+    ) {
+      reserveCut = true;
+      if (backedSpend === 0) break;
+      backedSpend -= 1;
+      continue;
+    }
+    if (topup > 0 && topup > room) {
+      reserveCut = true;
+      if (backedSpend === 0) break;
+      backedSpend -= 1;
+      continue;
+    }
+    return {
+      points: unbackedSpend + backedSpend,
+      backedSpend,
+      unbackedSpend,
+      topup,
+      reserveCut,
+    };
+  }
+  return {
+    points: unbackedSpend,
+    backedSpend: 0,
+    unbackedSpend,
+    topup: 0,
+    reserveCut,
   };
 }
 

@@ -117,7 +117,7 @@ void main() {
     tester,
   ) async {
     final api = MemoryAdminApi();
-    _size(tester, const Size(1280, 3600));
+    _size(tester, const Size(1280, 4600));
     await _pump(tester, api);
     expect(find.textContaining('referral_program_settings'), findsNothing);
     expect(find.byKey(const Key('admin-regras-intro')), findsOneWidget);
@@ -184,7 +184,7 @@ void main() {
     expect(api.settings['payer_referred_account_cap'], 0);
     expect(find.text('Regras gravadas.'), findsOneWidget);
 
-    _size(tester, const Size(390, 4200));
+    _size(tester, const Size(390, 5200));
     await tester.pumpWidget(const SizedBox.shrink());
     await _pump(tester, MemoryAdminApi());
     expect(_equiv(tester, 'c2c_bps'), '250 pontos-base = 2,5% da reserva');

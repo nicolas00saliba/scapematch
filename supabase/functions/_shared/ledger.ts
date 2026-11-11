@@ -23,6 +23,7 @@ type Admin = {
   ): PromiseLike<{ data: unknown; error: LedgerRpcError }>;
 };
 
+import { fundCashbackReserve } from "./points_reserve_asaas.ts";
 import {
   DbRpcError,
   isSerializationConflict,
@@ -73,6 +74,9 @@ export async function applyPaymentTransition(
     }
     const result = asTransition(data);
     if (!result.status) throwLedgerError({});
+    if (result.status === "paid" || result.status === "refunded") {
+      await fundCashbackReserve(admin, Deno.env, chargeId).catch(() => undefined);
+    }
     return result;
   });
 }

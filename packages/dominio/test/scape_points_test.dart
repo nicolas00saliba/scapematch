@@ -251,6 +251,142 @@ void main() {
     expect(capped.chargedCents, 7000);
   });
 
+  test('com a flag desligada o lastro continua no teto da comissão', () {
+    final quote = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 2500,
+      requestedPoints: 10000,
+      availablePoints: 10000,
+      availableBackedPoints: 10000,
+    );
+    expect(quote.points, 2500);
+    expect(quote.backedPoints, 2500);
+    expect(quote.topupCents, 0);
+    expect(quote.pointsOnly, isFalse);
+    expect(quote.chargedCents, 7500);
+    expect(quote.splitPercent, 100);
+  });
+
+  test('pontos de indicação cobrem a vaga e o resto vira crédito da casa', () {
+    const rates = ReferralRates(backedFullSlotEnabled: true);
+    final quote = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 2500,
+      requestedPoints: 10000,
+      availablePoints: 10000,
+      availableBackedPoints: 10000,
+      rates: rates,
+    );
+    expect(quote.points, 10000);
+    expect(quote.backedPoints, 10000);
+    expect(quote.unbackedPoints, 0);
+    expect(quote.chargedCents, 0);
+    expect(quote.pointsOnly, isTrue);
+    expect(quote.splitPercent, isNull);
+    expect(quote.houseNetCents, 7500);
+    expect(quote.topupCents, 7500);
+    expect(quote.subsidyCents, 10000);
+  });
+
+  test('boas-vindas e promoção não passam do teto mesmo com a flag ligada', () {
+    const rates = ReferralRates(backedFullSlotEnabled: true);
+    final quote = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 10000,
+      requestedPoints: 10000,
+      availablePoints: 10000,
+      availableBackedPoints: 0,
+      rates: rates,
+    );
+    expect(quote.points, 3000);
+    expect(quote.unbackedPoints, 3000);
+    expect(quote.topupCents, 0);
+    expect(quote.pointsOnly, isFalse);
+    expect(quote.chargedCents, 7000);
+  });
+
+  test('o lastro completa o que a promoção não pode passar da comissão', () {
+    const rates = ReferralRates(backedFullSlotEnabled: true);
+    final quote = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 2500,
+      requestedPoints: 10000,
+      availablePoints: 10000,
+      availableBackedPoints: 8000,
+      rates: rates,
+    );
+    expect(quote.unbackedPoints, 2000);
+    expect(quote.backedPoints, 8000);
+    expect(quote.points, 10000);
+    expect(quote.pointsOnly, isTrue);
+    expect(quote.topupCents, 7500);
+  });
+
+  test('o saldo reservado não fica negativo', () {
+    const rates = ReferralRates(backedFullSlotEnabled: true);
+    final quote = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 2500,
+      requestedPoints: 10000,
+      availablePoints: 10000,
+      availableBackedPoints: 10000,
+      reservedBalanceCents: 7000,
+      rates: rates,
+    );
+    expect(quote.limitReason, 'reserve');
+    expect(quote.pointsOnly, isFalse);
+    expect(quote.points, 7000);
+    expect(quote.backedPoints, 7000);
+    expect(quote.subsidyCents, 7000);
+    expect(quote.topupCents, 4500);
+    expect(quote.chargedCents, 3000);
+    expect(quote.chargedCents + quote.topupCents, quote.houseNetCents);
+  });
+
+  test('não há limite mensal e indicação em revisão fica no teto antigo', () {
+    const rates = ReferralRates(
+      backedFullSlotEnabled: true,
+      freeSlotMonthlyLimit: 0,
+    );
+    final again = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 2500,
+      requestedPoints: 10000,
+      availablePoints: 10000,
+      availableBackedPoints: 10000,
+      rates: rates,
+      reservedBalanceCents: 10000,
+      freeSlotsUsedThisMonth: 5,
+    );
+    expect(again.limitReason, isNull);
+    expect(again.points, 10000);
+    expect(again.pointsOnly, isTrue);
+    expect(again.topupCents, 7500);
+    final fraud = quotePointSubsidy(
+      grossCents: 10000,
+      commissionBps: 2500,
+      requestedPoints: 10000,
+      availablePoints: 10000,
+      availableBackedPoints: 10000,
+      rates: rates,
+      backedFraudHold: true,
+    );
+    expect(fraud.limitReason, 'antifraud');
+    expect(fraud.points, 2500);
+    expect(fraud.topupCents, 0);
+  });
+
+  test('dez mil pontos de indicação pedem quarenta reservas de R\$ 100', () {
+    expect(
+      referralBookingsForPoints(targetPoints: 10000, grossCents: 10000),
+      40,
+    );
+    expect(
+      pointsFromCents(commissionCents(10000, 250), 1),
+      250,
+    );
+  });
+
   test('carência de 30 dias e desconto só com o CPF de quem pagou', () {
     expect(
       pointsAvailableAt(DateTime.utc(2026, 6, 1), 30),

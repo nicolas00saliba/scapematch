@@ -534,6 +534,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
   final _passportInputs = <String, TextEditingController>{};
   bool _blockSelf = true;
   bool _passportOn = false;
+  bool _freeSlot = false;
   String? _message;
   String? _passportMessage;
 
@@ -577,6 +578,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
       _history = history;
       _blockSelf = settings['block_self_payer'] == true;
       _passportOn = passport['passport_enabled'] == true;
+      _freeSlot = settings['backed_full_slot_enabled'] == true;
     });
   }
 
@@ -619,6 +621,17 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text(
+                    'Permitir vaga grátis com pontos',
+                  ),
+                  subtitle: const Text(
+                    'Desligada por padrão. Ligada, pontos de indicação e de cashback já liberados podem cobrir a vaga, sem limite mensal. O que passar da comissão vira crédito da casa no próximo repasse. Boas-vindas e promoção continuam no teto.',
+                  ),
+                  value: _freeSlot,
+                  onChanged: (value) => setState(() => _freeSlot = value),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
                     'Travar quando o pagador é o próprio indicador',
                   ),
                   subtitle: const Text(
@@ -650,7 +663,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'A flag nasce desligada. Os pontos são promoção: só desconto, até o teto do resgate. Não pagam a vaga inteira. Casa com uma sala não ganha o marco de fechar a casa.',
+                  'A flag nasce desligada. Os pontos do marco são sem lastro, como boas-vindas e promoção: só desconto, até o teto. Não pagam a vaga inteira. Casa com uma sala não ganha o marco de fechar a casa.',
                   key: Key('admin-passaporte-intro'),
                 ),
                 SwitchListTile(
@@ -700,6 +713,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
       for (final field in rewardFields)
         field.id: int.tryParse(_fields[field.id]!.text.trim()) ?? 0,
       'block_self_payer': _blockSelf,
+      'backed_full_slot_enabled': _freeSlot,
     };
     try {
       await ref.read(adminApiProvider).saveRewardSettings(patch);

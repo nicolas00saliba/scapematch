@@ -265,175 +265,8 @@ grant select on table public.passport_milestones to authenticated;
 grant select on table public.passport_gifts to authenticated;
 grant select on table public.passport_gift_claims to authenticated;
 
-create or replace function private.point_pools(p_user_id uuid)
-returns table (slot_points integer, discount_points integer)
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_slot integer := 0;
-  v_discount integer := 0;
-  v_redeemed integer := 0;
-begin
-  select
-    coalesce(sum(r.points) filter (
-      where r.program in ('welcome', 'passport')
-    ), 0)::integer,
-    coalesce(sum(r.points) filter (
-      where r.program is null or r.program not in ('welcome', 'passport')
-    ), 0)::integer
-  into v_discount, v_slot
-  from public.scape_point_entries r
-  where r.user_id = p_user_id
-    and r.kind = 'release';
-
-  v_discount := v_discount - coalesce((
-    select sum(v.points)::integer
-    from public.scape_point_entries v
-    join public.scape_point_entries a on a.id = v.relates_to
-    where v.user_id = p_user_id
-      and v.kind = 'reversal'
-      and a.program in ('welcome', 'passport')
-      and exists (
-        select 1
-        from public.scape_point_entries rel
-        where rel.relates_to = a.id
-          and rel.kind = 'release'
-      )
-  ), 0);
-
-  v_slot := v_slot - coalesce((
-    select sum(v.points)::integer
-    from public.scape_point_entries v
-    join public.scape_point_entries a on a.id = v.relates_to
-    where v.user_id = p_user_id
-      and v.kind = 'reversal'
-      and (a.program is null or a.program not in ('welcome', 'passport'))
-      and exists (
-        select 1
-        from public.scape_point_entries rel
-        where rel.relates_to = a.id
-          and rel.kind = 'release'
-      )
-  ), 0);
-
-  select coalesce(sum(s.points), 0)::integer
-  into v_redeemed
-  from public.scape_point_entries s
-  where s.user_id = p_user_id
-    and s.kind = 'redemption'
-    and not exists (
-      select 1
-      from public.scape_point_entries back
-      where back.relates_to = s.id
-        and back.kind = 'redemption_reversal'
-    );
-
-  v_slot := greatest(v_slot, 0);
-  v_discount := greatest(v_discount, 0);
-  slot_points := greatest(v_slot - v_redeemed, 0);
-  discount_points := greatest(
-    v_discount - greatest(v_redeemed - v_slot, 0),
-    0
-  );
-  return next;
-end;
-$$;
-
-create or replace function private.subsidy_quote(
-  p_user_id uuid,
-  p_gross integer,
-  p_commission_bps integer,
-  p_points integer,
-  p_lock boolean
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_point integer;
-  v_available integer;
-  v_fee integer;
-  v_house integer;
-  v_room integer;
-  v_cap_cents integer;
-  v_max_points integer;
-  v_min integer;
-  v_max_bps integer;
-  v_points integer;
-  v_subsidy integer;
-  v_charged integer;
-  v_split numeric;
-  v_slot integer;
-  v_discount integer;
-  v_hard integer;
-  v_hard_points integer;
-  v_cap_points integer;
-  v_slot_max integer;
-  v_discount_max integer;
-begin
-  if p_lock then
-    perform 1 from public.profiles where id = p_user_id for update;
-  end if;
-  select point_value_cents, redeem_min_points, redeem_max_bps
-    into v_point, v_min, v_max_bps
-  from public.referral_program_settings where id = 1;
-  select available_points into v_available
-  from private.scape_balances(p_user_id);
-  v_available := greatest(coalesce(v_available, 0), 0);
-  v_fee := private.reward_cents(p_gross, p_commission_bps);
-  v_house := p_gross - v_fee;
-  v_room := case when p_gross > 1 then p_gross - 1 else 0 end;
-  v_cap_cents := private.reward_cents(p_gross, coalesce(v_max_bps, 10000));
-  select p.slot_points, p.discount_points
-    into v_slot, v_discount
-  from private.point_pools(p_user_id) p;
-  v_hard := least(greatest(v_fee, 0), v_room);
-  v_hard_points := v_hard / v_point;
-  v_cap_points := greatest(v_cap_cents, 0) / v_point;
-  v_slot_max := least(greatest(coalesce(v_slot, 0), 0), v_hard_points);
-  v_discount_max := least(
-    greatest(coalesce(v_discount, 0), 0),
-    v_cap_points,
-    greatest(v_hard_points - v_slot_max, 0)
-  );
-  v_max_points := least(v_slot_max + v_discount_max, v_available);
-  if v_available < coalesce(v_min, 0) or v_max_points < coalesce(v_min, 0) then
-    v_max_points := 0;
-  end if;
-  v_points := least(greatest(coalesce(p_points, 0), 0), v_available, v_max_points);
-  if v_points < coalesce(v_min, 0) then
-    v_points := 0;
-  end if;
-  v_subsidy := v_points * v_point;
-  v_charged := p_gross - v_subsidy;
-  if v_subsidy = 0 then
-    v_split := null;
-  else
-    v_split := ceil((v_house::numeric * 1000000) / v_charged) / 10000;
-  end if;
-  return pg_catalog.jsonb_build_object(
-    'gross_cents', p_gross,
-    'charged_cents', v_charged,
-    'subsidy_cents', v_subsidy,
-    'points', v_points,
-    'house_net_cents', v_house,
-    'commission_cents', v_fee,
-    'split_percent', v_split,
-    'max_points', v_max_points,
-    'available_points', v_available,
-    'point_value_cents', v_point,
-    'redeem_min_points', v_min,
-    'redeem_max_bps', v_max_bps,
-    'slot_points', greatest(coalesce(v_slot, 0), 0),
-    'discount_points', greatest(coalesce(v_discount, 0), 0)
-  );
-end;
-$$;
+comment on column public.scape_point_entries.funding is
+  'backed: indicação c2c ou c2b e cashback, já saíram da comissão. unbacked: boas-vindas, promoção e passaporte. mixed: um resgate dos dois.';
 
 create or replace function private.passport_grant_milestone(
   p_user_id uuid,
@@ -472,10 +305,11 @@ begin
   v_cents := p_points * v_value;
   v_idem := 'passport:' || p_user_id::text || ':' || p_key || ':' || v_seq::text;
   insert into public.scape_point_entries (
-    user_id, kind, points, amount_cents, program, idempotency_key, available_at
+    user_id, kind, points, amount_cents, program, funding,
+    backed_points, unbacked_points, idempotency_key, available_at
   ) values (
-    p_user_id, 'accrual', p_points, v_cents, 'passport',
-    v_idem, pg_catalog.now()
+    p_user_id, 'accrual', p_points, v_cents, 'passport', 'unbacked',
+    0, p_points, v_idem, pg_catalog.now()
   )
   on conflict (idempotency_key) do nothing
   returning id into v_accrual;
@@ -483,10 +317,11 @@ begin
     return;
   end if;
   insert into public.scape_point_entries (
-    user_id, kind, points, amount_cents, program, relates_to, idempotency_key
+    user_id, kind, points, amount_cents, program, funding,
+    backed_points, unbacked_points, relates_to, idempotency_key
   ) values (
-    p_user_id, 'release', p_points, v_cents, 'passport', v_accrual,
-    'release:' || v_idem
+    p_user_id, 'release', p_points, v_cents, 'passport', 'unbacked',
+    0, p_points, v_accrual, 'release:' || v_idem
   )
   on conflict (idempotency_key) do nothing;
   if v_row.id is null then
@@ -525,11 +360,12 @@ begin
     return;
   end if;
   insert into public.scape_point_entries (
-    user_id, kind, points, amount_cents, program, relates_to, idempotency_key
+    user_id, kind, points, amount_cents, program, funding,
+    backed_points, unbacked_points, relates_to, idempotency_key
   )
   select
-    e.user_id, 'reversal', e.points, e.amount_cents, e.program, e.id,
-    'reversal:' || e.id::text
+    e.user_id, 'reversal', e.points, e.amount_cents, e.program, 'unbacked',
+    0, e.points, e.id, 'reversal:' || e.id::text
   from public.scape_point_entries e
   where e.id = v_row.entry_id
     and e.kind = 'accrual'
@@ -1290,6 +1126,10 @@ declare
   v_room_venue uuid;
   v_id uuid;
   v_user uuid;
+  v_before_room uuid;
+  v_before_trigger text;
+  v_before_active boolean;
+  v_sync boolean := false;
 begin
   if auth.uid() is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -1320,6 +1160,11 @@ begin
     raise exception 'texto do mimo invalido' using errcode = '22023';
   end if;
   if p_gift_id is not null then
+    select room_id, trigger_kind, active
+      into v_before_room, v_before_trigger, v_before_active
+    from public.passport_gifts
+    where id = p_gift_id
+      and venue_id = p_venue_id;
     update public.passport_gifts
     set room_id = p_room_id,
         trigger_kind = p_trigger,
@@ -1333,40 +1178,54 @@ begin
     if v_id is null then
       raise exception 'mimo nao encontrado' using errcode = '22023';
     end if;
-  elsif p_room_id is null then
-    insert into public.passport_gifts (
-      venue_id, room_id, trigger_kind, title, details, active
-    ) values (
-      p_venue_id, null, p_trigger, v_title, v_details, coalesce(p_active, true)
-    )
-    on conflict (venue_id, trigger_kind) where room_id is null
-    do update set
-      title = excluded.title,
-      details = excluded.details,
-      active = excluded.active,
-      updated_at = pg_catalog.now()
-    returning id into v_id;
+    v_sync := v_before_room is distinct from p_room_id
+      or v_before_trigger is distinct from p_trigger
+      or v_before_active is distinct from coalesce(p_active, true);
   else
-    insert into public.passport_gifts (
-      venue_id, room_id, trigger_kind, title, details, active
-    ) values (
-      p_venue_id, p_room_id, p_trigger, v_title, v_details, coalesce(p_active, true)
-    )
-    on conflict (venue_id, room_id, trigger_kind) where room_id is not null
-    do update set
-      title = excluded.title,
-      details = excluded.details,
-      active = excluded.active,
-      updated_at = pg_catalog.now()
-    returning id into v_id;
+    select g.active into v_before_active
+    from public.passport_gifts g
+    where g.venue_id = p_venue_id
+      and g.trigger_kind = p_trigger
+      and g.room_id is not distinct from p_room_id;
+    v_sync := v_before_active is null
+      or v_before_active is distinct from coalesce(p_active, true);
+    if p_room_id is null then
+      insert into public.passport_gifts (
+        venue_id, room_id, trigger_kind, title, details, active
+      ) values (
+        p_venue_id, null, p_trigger, v_title, v_details, coalesce(p_active, true)
+      )
+      on conflict (venue_id, trigger_kind) where room_id is null
+      do update set
+        title = excluded.title,
+        details = excluded.details,
+        active = excluded.active,
+        updated_at = pg_catalog.now()
+      returning id into v_id;
+    else
+      insert into public.passport_gifts (
+        venue_id, room_id, trigger_kind, title, details, active
+      ) values (
+        p_venue_id, p_room_id, p_trigger, v_title, v_details, coalesce(p_active, true)
+      )
+      on conflict (venue_id, room_id, trigger_kind) where room_id is not null
+      do update set
+        title = excluded.title,
+        details = excluded.details,
+        active = excluded.active,
+        updated_at = pg_catalog.now()
+      returning id into v_id;
+    end if;
   end if;
-  for v_user in
-    select distinct s.user_id
-    from public.passport_stamps s
-    where s.venue_id = p_venue_id
-  loop
-    perform private.passport_sync_user(v_user);
-  end loop;
+  if v_sync then
+    for v_user in
+      select distinct s.user_id
+      from public.passport_stamps s
+      where s.venue_id = p_venue_id
+    loop
+      perform private.passport_sync_gifts(v_user);
+    end loop;
+  end if;
   return v_id;
 end;
 $$;
@@ -1440,14 +1299,11 @@ begin
   from public.passport_gift_claims c
   where c.code = v_code
   for update;
-  if v_claim.id is null then
-    raise exception 'codigo nao encontrado' using errcode = '22023';
-  end if;
   select g.venue_id into v_venue
   from public.passport_gifts g
   where g.id = v_claim.gift_id;
-  if not private.owns_venue(v_venue) then
-    raise exception 'not owner' using errcode = '42501';
+  if v_claim.id is null or not private.owns_venue(v_venue) then
+    raise exception 'codigo nao encontrado' using errcode = '22023';
   end if;
   if v_claim.status <> 'available' then
     raise exception 'mimo ja tratado' using errcode = '55000';
@@ -1703,9 +1559,6 @@ begin
 end;
 $$;
 
-revoke all on function private.point_pools(uuid) from public, anon, authenticated, service_role;
-revoke all on function private.subsidy_quote(uuid, integer, integer, integer, boolean)
-  from public, anon, authenticated, service_role;
 revoke all on function private.passport_grant_milestone(uuid, text, integer, uuid[])
   from public, anon, authenticated, service_role;
 revoke all on function private.passport_reverse_milestone(uuid)
@@ -1764,3 +1617,26 @@ grant execute on function public.deliver_passport_gift(text) to authenticated;
 grant execute on function public.admin_passport_settings() to authenticated;
 grant execute on function public.admin_save_passport_settings(jsonb) to authenticated;
 grant execute on function public.confirm_session_attendance(uuid, uuid) to authenticated;
+
+-- O carimbo da reserva paga antes da sessão sai quando a casa confirma,
+-- depois que o horário chegou. O catch-up é idempotente: não carimba
+-- quem a casa ainda não confirmou. A leitura (my_passport) faz o mesmo.
+do $cron$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
+    create extension if not exists pg_cron;
+    if exists (
+      select 1 from cron.job where jobname = 'passport-catch-up'
+    ) then
+      perform cron.unschedule('passport-catch-up');
+    end if;
+    perform cron.schedule(
+      'passport-catch-up',
+      '*/5 * * * *',
+      'select private.passport_catch_up()'
+    );
+  else
+    raise notice 'pg_cron ausente; passport-catch-up não foi agendado';
+  end if;
+end
+$cron$;
