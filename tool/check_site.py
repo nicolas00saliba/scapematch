@@ -249,14 +249,18 @@ def main() -> None:
         falha("cancelamento voltou à regra antiga")
 
     home_html = (DIST / "index.html").read_text()
-    if "Toda vez que você joga, ganha pontos." not in home_html:
-        falha("a home não mostra o cashback")
+    if "Jogue e ganhe pontos." not in home_html or "Junte pontos e jogue de graça." not in home_html:
+        falha("a home não mostra a mensagem dos pontos")
     if "Cashback de até 5% em pontos a cada jogo." not in home_html:
         falha("a home não mostra o teto do cashback")
+    if "limite mensal" in home_html:
+        falha("a home ainda cita limite mensal")
     for rota in ("/vantagens", "/vantagens/niveis", "/vantagens/regulamento", "/ajuda"):
         texto = arquivo(rota).read_text()
-        if "ganha pontos" not in texto or "R$ 0,01" not in texto or "até 5%" not in texto:
-            falha(f"{rota} não mostra o cashback")
+        if "jogue de graça" not in texto or "R$ 0,01" not in texto or "vaga inteira" not in texto:
+            falha(f"{rota} não mostra a vaga grátis")
+        if "limite mensal" in texto:
+            falha(f"{rota} ainda cita limite mensal")
         if "até 25%" in texto or "até 30%" in texto:
             falha(f"{rota} ainda promete um teto percentual")
     if '"@type":"Organization"' not in home_html or '"@type":"WebSite"' not in home_html:
@@ -281,6 +285,8 @@ def main() -> None:
         texto = (DIST / nome).read_text()
         if "Curitiba" not in texto or "R$ 0,01" not in texto:
             falha(f"{nome} incompleto")
+        if "limite mensal" in texto:
+            falha(f"{nome} ainda cita limite mensal")
     robots = (DIST / "robots.txt").read_text()
     for bot in (
         "Googlebot",

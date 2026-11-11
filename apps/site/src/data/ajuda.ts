@@ -133,13 +133,13 @@ export const temas: Tema[] = [
     nome: 'Pontos',
     frase: 'Como ganhar, quando liberam e como usar.',
     seoTitulo: 'Pontos para jogar de graça | EscapeMatch',
-    seoDescricao: 'Cashback de até 5% em pontos a cada jogo. 1 ponto vale R$ 0,01. A indicação paga a vaga inteira.',
+    seoDescricao: 'Junte pontos e jogue de graça. 1 ponto vale R$ 0,01. Cashback e indicação pagam a vaga inteira.',
     relacionados: ['conta', 'pagamento'],
     perguntas: [
       {
         pergunta: 'Quanto vale 1 ponto?',
         resposta:
-          'R$ 0,01. Os pontos de indicação pagam a vaga inteira. Os de cashback e de boas-vindas dão desconto. Não viram dinheiro para saque.',
+          'R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Só as boas-vindas dão desconto. Não viram dinheiro para saque.',
       },
       {
         pergunta: 'Quando os pontos liberam?',
@@ -148,7 +148,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'A partir de quando dá para usar?',
         resposta:
-          'A partir de 1.000 pontos. O limite mensal de vagas grátis é definido pela plataforma. Se a reserva for cancelada, os pontos usados são devolvidos.',
+          'A partir de 1.000 pontos. Se a reserva for cancelada, os pontos usados são devolvidos.',
       },
       {
         pergunta: 'Quantos pontos eu ganho ao criar a conta?',
@@ -157,7 +157,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'Quanto é o cashback?',
         resposta:
-          'Até 5% em pontos a cada jogo. O valor é sorteado. As faixas estão no regulamento dos pontos. Esse cashback dá desconto.',
+          'Até 5% em pontos a cada jogo. O valor é sorteado e se soma aos pontos de indicação. Os dois pagam a vaga inteira. As faixas estão no regulamento.',
       },
     ],
   },

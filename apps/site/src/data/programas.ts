@@ -41,7 +41,7 @@ export const programas: Programa[] = [
     apoio: 'Só por criar a sua conta.',
     passos: ['Crie a conta', 'Ganhe 100 pontos', 'Junte e use'],
     regras:
-      'Uma vez por conta. Esses pontos dão desconto na vaga. Uma barra no app mostra quanto falta para usar.',
+      'Uma vez por conta. Só esses pontos dão desconto. Uma barra no app mostra quanto falta para usar.',
     seoTitulo: 'Vantagens e pontos | EscapeMatch',
     seoDescricao:
       'Ganhe pontos ao criar a conta, em toda reserva e indicando amigos. Use os pontos na próxima sala.',
@@ -62,7 +62,7 @@ export const programas: Programa[] = [
     apoio: 'Cashback de até 5% em pontos a cada jogo.',
     passos: ['Reserve', 'Pague sua vaga', 'Ganhe pontos'],
     regras:
-      'Vale em toda reserva paga. O sorteio e as faixas estão no regulamento.',
+      'Vale em toda reserva paga. Esses pontos se somam aos de indicação e pagam a vaga inteira. O sorteio e as faixas estão no regulamento.',
     seoTitulo: 'Vantagens e pontos | EscapeMatch',
     seoDescricao:
       'Ganhe pontos ao criar a conta, em toda reserva e indicando amigos. Use os pontos na próxima sala.',
@@ -124,13 +124,13 @@ export const programas: Programa[] = [
     titulo: 'Bronze, Prata e Ouro',
     beneficio: 'Indique mais, ganhe mais',
     apoio:
-      'A indicação vale 2,5% em pontos. Prata, com 5 indicados jogando, soma 0,5%. Ouro, com 15, soma 1%.',
+      'Quem mais indica, mais joga de graça. A base é 2,5% em pontos. Prata soma 0,5%. Ouro soma 1%.',
     passos: ['Indique', 'Eles jogam', 'Você sobe'],
     regras:
       'Conta como jogando quem pagou uma reserva nos últimos 90 dias. O extra vale para amigos e casas indicados.',
     seoTitulo: 'Níveis para jogar de graça | EscapeMatch',
     seoDescricao:
-      'Toda vez que um amigo indicado joga, você ganha 2,5% em pontos. Prata e Ouro somam um extra. 1 ponto vale R$ 0,01.',
+      'Quem mais indica, mais joga de graça. A base é 2,5% em pontos. 1 ponto vale R$ 0,01.',
     og: '/assets/og/niveis.png',
     cta: {
       rotulo: 'Ver meu nível no app',
@@ -216,12 +216,11 @@ export function programaPorId(id: string): Programa {
 
 export const regrasVagaGratis = [
   'Dá para usar a partir de 1.000 pontos.',
-  'O limite mensal de vagas grátis é definido pela plataforma.',
   'Se a reserva for cancelada, os pontos usados são devolvidos.',
 ];
 
 export const regrasJogador = [
-  '1 ponto vale R$ 0,01. Os pontos de indicação pagam a vaga inteira. Os de boas-vindas e de cashback dão desconto. Não viram dinheiro para saque.',
+  '1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Só as boas-vindas dão desconto. Não viram dinheiro para saque.',
   'Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.',
   'O código de quem indicou entra no cadastro ou nas primeiras 24 horas. Uma indicação vale por 1 ano.',
   'Se a reserva for cancelada, os pontos ganhos nela também saem da conta.',
