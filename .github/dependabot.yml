@@ -4,15 +4,29 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
   - package-ecosystem: pub
     directory: /apps/parceiro
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
   - package-ecosystem: pub
     directory: /packages/dominio
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
+  - package-ecosystem: pub
+    directory: /apps/admin
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
