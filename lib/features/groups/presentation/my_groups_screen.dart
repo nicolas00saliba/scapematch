@@ -13,8 +13,11 @@ import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:dominio/dominio.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
+import 'package:scapematch/features/reviews/presentation/room_review_form.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class MyGroupsScreen extends ConsumerWidget {
@@ -39,6 +42,8 @@ class MyGroupsScreen extends ConsumerWidget {
     final groups = ref.watch(myGroupsViewModelProvider);
     final now = ref.watch(clockProvider).now();
     final userId = session.id;
+    final reviewsOn =
+        ref.watch(reviewsEnabledProvider).asData?.value ?? false;
 
     return AppScaffold(
       appBar: AppBar(title: const Text('Meus grupos')),
@@ -76,6 +81,8 @@ class MyGroupsScreen extends ConsumerWidget {
                       _GroupList(
                         groups: split.past,
                         userId: userId,
+                        now: now,
+                        reviewsOn: reviewsOn,
                         emptyTitle: 'Nenhuma sessão passada',
                         emptyMessage: 'Quando uma sessão terminar sem ser cancelada, ela aparece aqui.',
                       ),
@@ -97,21 +104,39 @@ class MyGroupsScreen extends ConsumerWidget {
   }
 }
 
-class _GroupList extends StatelessWidget {
+class _GroupList extends ConsumerWidget {
   const _GroupList({
     required this.groups,
     required this.userId,
     required this.emptyTitle,
     required this.emptyMessage,
+    this.now,
+    this.reviewsOn = false,
   });
 
   final List<Group> groups;
   final String userId;
   final String emptyTitle;
   final String emptyMessage;
+  final DateTime? now;
+  final bool reviewsOn;
+
+  bool _canReview(Group group) {
+    final moment = now;
+    final member = group.participantForUser(userId);
+    if (!reviewsOn || moment == null || member == null) return false;
+    return reviewInviteOpen(
+      groupCancelled: group.isCancelled,
+      seatActive: member.occupiesSeat,
+      paid: member.payment == PaymentStatus.paid,
+      refunded: member.refund == RefundStatus.refunded,
+      endsAt: group.endsAt,
+      now: moment,
+    );
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (groups.isEmpty) {
       return EmptyView(title: emptyTitle, message: emptyMessage);
     }
@@ -129,6 +154,15 @@ class _GroupList extends StatelessWidget {
                 member: group.participantForUser(userId),
                 onTap: () => context.push('/groups/${group.id}'),
                 onInvite: () => showInviteSheet(context, group),
+                onReview: _canReview(group)
+                    ? () => showRoomReviewSheet(
+                        context: context,
+                        ref: ref,
+                        groupId: group.id,
+                        roomName: group.roomName,
+                        houseName: group.houseName,
+                      )
+                    : null,
               ),
           ],
         ),
@@ -143,12 +177,14 @@ class _MyGroupCard extends StatelessWidget {
     required this.member,
     required this.onTap,
     required this.onInvite,
+    this.onReview,
   });
 
   final Group group;
   final Participant? member;
   final VoidCallback onTap;
   final VoidCallback onInvite;
+  final VoidCallback? onReview;
 
   @override
   Widget build(BuildContext context) {
@@ -225,14 +261,29 @@ class _MyGroupCard extends StatelessWidget {
               ],
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton(
-                  key: AppKeys.inviteOnCard(group.id),
-                  onPressed: onInvite,
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('Convidar'),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      key: AppKeys.inviteOnCard(group.id),
+                      onPressed: onInvite,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Convidar'),
+                    ),
+                    if (onReview != null)
+                      TextButton(
+                        key: AppKeys.reviewInvite(group.id),
+                        onPressed: onReview,
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Avaliar'),
+                      ),
+                  ],
                 ),
               ),
             ],
