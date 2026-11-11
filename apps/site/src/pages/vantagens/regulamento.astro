@@ -1,0 +1,62 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import {
+  programas,
+  regrasCasa,
+  regrasFraude,
+  regrasJogador,
+  regrasVersao,
+  sorteioPontos,
+} from '../../data/programas';
+---
+
+<Base
+  title="Regulamento dos pontos | EscapeMatch"
+  description="Regras completas dos pontos e das indicações do EscapeMatch."
+  path="/vantagens/regulamento"
+>
+  <PageTop
+    titulo="Regulamento dos pontos"
+    frase="A versão única das regras de pontos e de crédito, com a data."
+  />
+  <article class="miolo pagina leitura">
+    <p class="versao">Versão {regrasVersao}.</p>
+
+    <h2>Jogador</h2>
+    {programas.filter((item) => item.publico === 'jogador').map((item) => (
+      <section>
+        <h3>{item.titulo}</h3>
+        <p>{item.beneficio}. {item.apoio}</p>
+        <p>{item.regras}</p>
+      </section>
+    ))}
+    <p>{sorteioPontos}</p>
+    <ul class="lista-simples">
+      {regrasJogador.map((regra) => <li>{regra}</li>)}
+    </ul>
+
+    <h2>Casa</h2>
+    {programas.filter((item) => item.publico === 'casa').map((item) => (
+      <section>
+        <h3>{item.titulo}</h3>
+        <p>{item.beneficio}. {item.apoio}</p>
+        <p>{item.regras}</p>
+      </section>
+    ))}
+    <ul class="lista-simples">
+      {regrasCasa.map((regra) => <li>{regra}</li>)}
+    </ul>
+
+    <h2>Segurança contra fraude</h2>
+    {regrasFraude.map((item) => (
+      <section>
+        <h3>{item.titulo}</h3>
+        <p>{item.texto}</p>
+      </section>
+    ))}
+
+    <h2>Histórico de versões</h2>
+    <p>{regrasVersao}: primeira versão no site, com os valores padrão do app nesta data.</p>
+  </article>
+</Base>

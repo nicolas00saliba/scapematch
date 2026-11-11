@@ -1,0 +1,27 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+---
+
+<Base
+  title="Como funciona para casas | EscapeMatch"
+  description="Cadastre suas salas, acompanhe os grupos e receba pelo app."
+  path="/para-casas/como-funciona"
+>
+  <PageTop
+    titulo="Como funciona para a casa"
+    frase="Salas e horários no Parceiro. Grupos se formando. Recebimento pelo app."
+  />
+  <article class="miolo pagina leitura">
+    <h2>Salas e horários</h2>
+    <p>Você publica a sala, o mínimo, o máximo e os horários. O jogador vê a vaga com o preço por pessoa.</p>
+    <h2>Grupos se formando</h2>
+    <p>Quem está sozinho entra no grupo. Você acompanha o grupo aberto no Parceiro.</p>
+    <h2>Confirmação</h2>
+    <p>No mínimo, o jogo confirma e a cobrança da vaga acontece. Quem chega depois paga na hora, até lotar. Se o mínimo não bater, nada é cobrado.</p>
+    <h2>Repasse e extrato</h2>
+    <p>O extrato separa bruto, comissão e líquido. A comissão fica registrada na reserva. O crédito de indicação espera 30 dias e entra no repasse das próximas reservas pelo app.</p>
+  </article>
+  <CtaBlock titulo="Seja parceiro" acoes={[{ rotulo: 'Seja parceiro', href: '/para-casas/cadastro' }]} />
+</Base>

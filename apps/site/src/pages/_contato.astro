@@ -1,0 +1,32 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+---
+
+<Base
+  title="Contato | EscapeMatch"
+  description="Fale com o EscapeMatch: jogadores, casas e privacidade."
+  path="/contato"
+>
+  <PageTop titulo="Contato" frase="O canal é o e-mail." />
+  <div class="miolo pagina modalidades">
+    <article class="modalidade">
+      <div>
+        <h2>Jogador</h2>
+        <p><a href="mailto:contato@escapematch.com.br">contato@escapematch.com.br</a></p>
+      </div>
+    </article>
+    <article class="modalidade">
+      <div>
+        <h2>Casa parceira</h2>
+        <p><a href="mailto:contato@escapematch.com.br">contato@escapematch.com.br</a></p>
+      </div>
+    </article>
+    <article class="modalidade">
+      <div>
+        <h2>Dados pessoais</h2>
+        <p><a href="mailto:privacidade@escapematch.com.br">privacidade@escapematch.com.br</a></p>
+      </div>
+    </article>
+  </div>
+</Base>

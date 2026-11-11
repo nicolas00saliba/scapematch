@@ -1,0 +1,51 @@
+---
+import type { Icone } from '../data/programas';
+
+interface Props {
+  nome: Icone;
+}
+
+const { nome } = Astro.props;
+---
+
+<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  {nome === 'presente' && (
+    <>
+      <rect x="3.5" y="8" width="17" height="12" rx="1.5" />
+      <path d="M12 8v12M3.5 12.5h17" />
+      <path d="M12 8c0-2.5-1.4-4-3.2-4S6 6.2 7.4 8" />
+      <path d="M12 8c0-2.5 1.4-4 3.2-4S18 6.2 16.6 8" />
+    </>
+  )}
+  {nome === 'moeda' && (
+    <>
+      <circle cx="12" cy="12" r="7.5" />
+      <path d="M9 12h6M13 9.5 15.5 12 13 14.5" />
+    </>
+  )}
+  {nome === 'pessoas' && (
+    <>
+      <circle cx="8" cy="8" r="2.2" />
+      <circle cx="16" cy="8.5" r="2" />
+      <path d="M4.5 18.5c.4-2.6 2.1-4 3.7-4s3.3 1.4 3.7 4" />
+      <path d="M13 18.5c.3-2.2 1.6-3.4 3-3.4 1.5 0 2.8 1.2 3.2 3.4" />
+    </>
+  )}
+  {nome === 'casa' && (
+    <>
+      <path d="M4 11.5 12 4.5l8 7" />
+      <path d="M7 10.5V19h10v-8.5" />
+    </>
+  )}
+  {nome === 'niveis' && (
+    <>
+      <path d="M5 18V13M12 18V8M19 18V5" />
+    </>
+  )}
+  {nome === 'relogio' && (
+    <>
+      <circle cx="12" cy="12" r="7.5" />
+      <path d="M12 8.5V12l2.5 2" />
+    </>
+  )}
+</svg>

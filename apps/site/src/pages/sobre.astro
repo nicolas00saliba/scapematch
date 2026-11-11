@@ -1,0 +1,23 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+---
+
+<Base
+  title="Sobre o EscapeMatch"
+  description="A plataforma que junta quem está sozinho a um time para jogar."
+  path="/sobre"
+>
+  <PageTop
+    titulo="Sobre o EscapeMatch"
+    frase="Ninguém deveria ficar sem jogar por não ter time."
+  />
+  <article class="miolo pagina leitura">
+    <h2>Por que existimos</h2>
+    <p>Tem gente que quer jogar e para porque o grupo não fecha. O EscapeMatch junta essa pessoa a um time. O jogo confirma quando o grupo bate o mínimo, e cada um paga a própria vaga.</p>
+    <h2>Missão</h2>
+    <p>Colocar quem está sozinho num time e confirmar o jogo no mínimo. Quem já tem turma pode completar as vagas que faltam. Esse é o uso secundário.</p>
+  </article>
+  <CtaBlock titulo="Conheça o app" acoes={[{ rotulo: 'Conheça o app', href: '/app' }]} />
+</Base>

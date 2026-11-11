@@ -1,0 +1,35 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+---
+
+<Base
+  title="Segurança e convivência | EscapeMatch"
+  description="Como protegemos o seu pagamento e as regras para jogar bem com quem você ainda não conhece."
+  path="/seguranca"
+>
+  <PageTop
+    titulo="Segurança e convivência"
+    frase="O pagamento passa pela Asaas. O grupo tem regra de convivência."
+  />
+  <article class="miolo pagina leitura">
+    <h2>Pagamento seguro</h2>
+    <p>Pix e cartão são processados pela Asaas. O app não guarda o número do cartão.</p>
+
+    <h2>Regras de convivência</h2>
+    <ul class="lista-simples">
+      <li>Respeito com todos.</li>
+      <li>Nada de discriminação ou assédio.</li>
+      <li>Chegar no horário.</li>
+      <li>Seguir as regras da casa.</li>
+    </ul>
+
+    <h2>Como relatar um problema</h2>
+    <p>Conduta grave pode levar à suspensão da conta.</p>
+
+    <h2>No primeiro jogo com desconhecidos</h2>
+    <p>Chegue no horário. A casa explica a sessão. Você paga só a sua vaga, e o jogo só confirma quando o grupo bate o mínimo.</p>
+  </article>
+  <CtaBlock titulo="Entrar num time" acoes={[{ rotulo: 'Entrar num time', href: '/app' }]} />
+</Base>

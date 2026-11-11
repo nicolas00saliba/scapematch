@@ -1,0 +1,35 @@
+---
+import Breadcrumb from './Breadcrumb.astro';
+import { rodape, type Migalha } from '../data/nav';
+
+interface Props {
+  itens: Migalha[];
+}
+
+const { itens } = Astro.props;
+---
+
+<footer class="rodape">
+  <div class="miolo">
+    <div class="rodape-grade">
+      {rodape.map((coluna) => (
+        <section>
+          <h2>{coluna.titulo}</h2>
+          <ul>
+            {coluna.links.map((link) => (
+              <li>
+                <a href={link.href} {...(link.externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                  {link.rotulo}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+    <div class="rodape-fim">
+      {itens.length > 1 && <Breadcrumb itens={itens} />}
+      <p>Pagamentos processados pela Asaas.</p>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,32 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+
+export function getStaticPaths() {
+  return [
+    {
+      params: { cidade: 'curitiba' },
+      props: {
+        nome: 'Curitiba',
+        titulo: 'Escape room em Curitiba em grupo | EscapeMatch',
+        descricao: 'Salas em Curitiba com grupos abertos. Entre num time e jogue quando o grupo bater o mínimo.',
+      },
+    },
+  ];
+}
+
+const { nome, titulo, descricao } = Astro.props;
+---
+
+<Base title={titulo} description={descricao} path={`/cidades/${Astro.params.cidade}`}>
+  <PageTop titulo={`Escape room em ${nome}`} frase="Os grupos abertos da cidade estão no app." />
+  <article class="miolo pagina leitura">
+    <p>O EscapeMatch começa por {nome}. Você escolhe a sala e o horário, entra num grupo e paga só a sua vaga. O jogo confirma quando o grupo bate o mínimo.</p>
+    <p>Os horários e o preço por pessoa estão no app.</p>
+  </article>
+  <CtaBlock
+    titulo="Ver horários no app"
+    acoes={[{ rotulo: 'Ver horários no app', href: 'https://app.escapematch.com.br/', externo: true }]}
+  />
+</Base>

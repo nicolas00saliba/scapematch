@@ -1,0 +1,50 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import PhoneShot from '../components/PhoneShot.astro';
+import ProgramCard from '../components/ProgramCard.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+import { programasCasa } from '../data/programas';
+---
+
+<Base
+  title="Para casas de escape room e lazer | EscapeMatch"
+  description="Venda os horários vazios da sua casa para jogadores que procuram um time."
+  path="/para-casas"
+  ogImage="/assets/og/para-casas.png"
+>
+  <PageTop
+    titulo="Encha o horário que ficaria vazio"
+    frase="Jogadores que procuram um time reservam pelo app. Você recebe em crédito, em reais."
+  />
+  <article class="miolo pagina">
+    <div class="duas">
+      <div class="leitura">
+        <h2>Como a casa recebe</h2>
+        <p>A comissão incide só sobre o que o app vender. O que a casa vende por fora fica de fora. O extrato mostra bruto, comissão e líquido.</p>
+        <p>O crédito de indicação fica 30 dias pendente e depois entra no repasse das próximas reservas pelo app.</p>
+        <p><a href="/para-casas/precos">Ver preços</a></p>
+      </div>
+      <PhoneShot cena="parceiro" />
+    </div>
+    <h2>Programas da casa</h2>
+    <div class="grade-3">
+      {programasCasa.map((programa) => <ProgramCard programa={programa} />)}
+    </div>
+    <div class="faq leitura">
+      <details>
+        <summary>A comissão vale para a agenda inteira?</summary>
+        <p>Não. Só para o que o app vender.</p>
+      </details>
+      <details>
+        <summary>O jogador paga a sala inteira?</summary>
+        <p>Não. Cada pessoa paga a própria vaga. O jogo confirma quando o grupo bate o mínimo.</p>
+      </details>
+      <details>
+        <summary>Quando o horário vazio dá pontos em dobro?</summary>
+        <p>Quando você marca o horário no Parceiro. O custo do dobro é dividido, metade para cada lado.</p>
+      </details>
+    </div>
+  </article>
+  <CtaBlock titulo="Seja parceiro" acoes={[{ rotulo: 'Seja parceiro', href: '/para-casas/cadastro' }]} />
+</Base>

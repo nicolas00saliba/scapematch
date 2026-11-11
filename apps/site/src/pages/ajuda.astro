@@ -1,0 +1,48 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import { perguntasVistas, temas } from '../data/ajuda';
+
+const faq = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: perguntasVistas.map(({ pergunta }) => ({
+    '@type': 'Question',
+    name: pergunta.pergunta,
+    acceptedAnswer: { '@type': 'Answer', text: pergunta.resposta },
+  })),
+};
+---
+
+<Base
+  title="Central de ajuda | EscapeMatch"
+  description="Respostas sobre grupos, pagamento, cancelamento, conta, pontos e casas parceiras."
+  path="/ajuda"
+  jsonLd={faq}
+>
+  <PageTop titulo="Central de ajuda" frase="Grupo, pagamento, cancelamento, conta, pontos e casas." />
+  <div class="miolo pagina">
+    <div class="modalidades">
+      {temas.map((tema) => (
+        <a class="modalidade" href={`/ajuda/${tema.slug}`}>
+          <div>
+            <h3>{tema.nome}</h3>
+            <p>{tema.frase}</p>
+          </div>
+        </a>
+      ))}
+    </div>
+    <section>
+      <h2>Perguntas mais vistas</h2>
+      <div class="faq">
+        {perguntasVistas.map(({ tema, pergunta }) => (
+          <details>
+            <summary>{pergunta.pergunta}</summary>
+            <p>{pergunta.resposta}</p>
+            <p><a href={`/ajuda/${tema}`}>Ver o tema</a></p>
+          </details>
+        ))}
+      </div>
+    </section>
+  </div>
+</Base>

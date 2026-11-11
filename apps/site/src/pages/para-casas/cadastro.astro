@@ -1,0 +1,36 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageTop from '../../components/PageTop.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+---
+
+<Base
+  title="Cadastre sua casa | EscapeMatch"
+  description="Comece a vender vagas no EscapeMatch em poucos passos."
+  path="/para-casas/cadastro"
+>
+  <PageTop
+    titulo="Cadastre sua casa"
+    frase="O cadastro acontece no app Parceiro. Esta página não tem formulário."
+  />
+  <article class="miolo pagina leitura">
+    <h2>O que ter em mãos</h2>
+    <ul class="lista-simples">
+      <li>Nome da casa, cidade, bairro, rua, número e CEP.</li>
+      <li>Telefone.</li>
+      <li>CPF ou CNPJ de quem cadastra.</li>
+      <li>A categoria da casa e a renda mensal, que o Parceiro pede.</li>
+    </ul>
+    <h2>Passos de entrada</h2>
+    <ol class="lista-simples">
+      <li>Abra o Parceiro e crie a conta da casa.</li>
+      <li>Informe os dados do espaço.</li>
+      <li>Publique salas e horários.</li>
+    </ol>
+    <p>Tem um código de quem te indicou? Use no cadastro.</p>
+  </article>
+  <CtaBlock
+    titulo="Cadastrar minha casa"
+    acoes={[{ rotulo: 'Cadastrar minha casa', href: 'https://parceiro.escapematch.com.br/', externo: true }]}
+  />
+</Base>

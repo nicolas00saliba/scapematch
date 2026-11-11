@@ -1,0 +1,45 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+import PhoneShot from '../components/PhoneShot.astro';
+---
+
+<Base
+  title="Baixe o app | EscapeMatch"
+  description="Instale o EscapeMatch no celular e entre no próximo time."
+  path="/app"
+>
+  <PageTop
+    titulo="Baixe o app"
+    frase="Abra no navegador ou instale na tela inicial do celular."
+  />
+  <article class="miolo pagina leitura">
+    <h2>Abrir no navegador</h2>
+    <p>O app do jogador está em <a href="https://app.escapematch.com.br/" target="_blank" rel="noopener noreferrer">app.escapematch.com.br</a>.</p>
+
+    <h2>Instalar no Android</h2>
+    <ol class="lista-simples">
+      <li>Abra o endereço no Chrome.</li>
+      <li>Toque no menu do navegador.</li>
+      <li>Escolha Instalar app ou Adicionar à tela inicial.</li>
+    </ol>
+
+    <h2>Instalar no iPhone</h2>
+    <ol class="lista-simples">
+      <li>Abra o endereço no Safari.</li>
+      <li>Toque em Compartilhar.</li>
+      <li>Escolha Adicionar à Tela de Início.</li>
+    </ol>
+
+    <h2>Telas do app</h2>
+    <div class="duas">
+      <PhoneShot cena="escolhe" />
+      <PhoneShot cena="grupo" />
+    </div>
+  </article>
+  <CtaBlock
+    titulo="Abrir o app"
+    acoes={[{ rotulo: 'Abrir o app', href: 'https://app.escapematch.com.br/', externo: true }]}
+  />
+</Base>

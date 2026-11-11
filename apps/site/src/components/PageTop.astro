@@ -1,0 +1,13 @@
+---
+interface Props {
+  titulo: string;
+  frase: string;
+}
+
+const { titulo, frase } = Astro.props;
+---
+
+<header class="miolo pagina-topo">
+  <h1>{titulo}</h1>
+  <p class="hero-apoio">{frase}</p>
+</header>
