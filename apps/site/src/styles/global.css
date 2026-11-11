@@ -382,8 +382,18 @@ html.js .menu-abre {
   border-radius: 8px;
 }
 
-.mega-curto a:hover {
+.mega-curto a,
+.mega-links a {
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.mega-curto a:hover,
+.mega-curto a:focus-visible,
+.mega-links a:hover,
+.mega-links a:focus-visible {
   background: var(--creme-2);
+  box-shadow: 0 1px 2px rgb(22 21 19 / 8%);
+  color: var(--tinta);
 }
 
 .mega-links {
@@ -404,7 +414,8 @@ html.js .menu-abre {
 
 .mega-links a {
   display: flex;
-  padding: 0.35rem 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
   text-decoration: none;
   font-weight: 600;
 }
@@ -1320,6 +1331,14 @@ main {
     display: none;
   }
 
+  html.js.is-menu-open .mega-links a:hover,
+  html.js.is-menu-open .mega-links a:focus-visible,
+  html.js.is-menu-open .mega-curto a:hover,
+  html.js.is-menu-open .mega-curto a:focus-visible {
+    background: var(--papel);
+    box-shadow: 0 1px 2px rgb(22 21 19 / 12%);
+  }
+
   .hero-grade,
   .passos-tela,
   .grade-3,
@@ -1366,6 +1385,11 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mega-curto a,
+  .mega-links a {
+    transition: none;
+  }
+
   .vaga.enche,
   .status-antes,
   .status-depois,
