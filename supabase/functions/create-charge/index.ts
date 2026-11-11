@@ -37,6 +37,11 @@ import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
 import { syncPayerDocument } from "../_shared/payer_document.ts";
 import { splitMatchesSubsidy } from "../_shared/scape_points.ts";
+import {
+  pointsReserveSplitLine,
+  readEnv,
+  settlePaidChargeReserve,
+} from "../_shared/points_reserve_asaas.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import {
   bindJson,
@@ -253,6 +258,28 @@ export async function createCharge(
       walletId: venue.asaas_wallet_id as string,
       fixedValue: 0,
     };
+    const reserveSplitsFor = async (houseFixedCents: number) => {
+      if (!asaas.sandbox) return [];
+      const wallet = readEnv(Deno.env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
+      if (!wallet) return [];
+      const { data, error } = await admin.rpc("points_reserve_split_cents", {
+        p_user_id: user.id,
+        p_venue_id: venue.id,
+        p_gross: grossForReserve ?? grossCents,
+        p_charged: amountCents,
+        p_house_fixed: houseFixedCents,
+        p_billing_type: billingType,
+      });
+      if (error || typeof data !== "number" || data <= 0) return [];
+      const line = pointsReserveSplitLine({
+        sandbox: true,
+        reserveWalletId: wallet,
+        rootWalletId: readEnv(Deno.env, "ASAAS_ROOT_WALLET_ID"),
+        houseWalletId: venue.asaas_wallet_id as string,
+        referralCents: data,
+      });
+      return line ? [line] : [];
+    };
 
     const { data: profile } = await admin
       .from("profiles")
@@ -274,6 +301,9 @@ export async function createCharge(
       if (confirmed.error || !confirmed.data) throw new Error("erro");
       holdOpen = false;
       const row = confirmed.data as Record<string, unknown>;
+      await settlePaidChargeReserve(admin, Deno.env, String(row.id)).catch(
+        () => undefined,
+      );
       return json({
         charge_id: row.id,
         status: "paid",
@@ -480,6 +510,9 @@ export async function createCharge(
             description,
             externalReference: pixExternalReference(groupId, user.id),
             split,
+            extraSplits: await reserveSplitsFor(
+              Math.round(split.fixedValue * 100),
+            ),
             onCreated: async (payment) => {
               const stored = await attachPixProvider(
                 admin,
@@ -603,6 +636,9 @@ export async function createCharge(
           description,
           externalReference: idempotencyKey,
           split,
+          extraSplits: await reserveSplitsFor(
+            Math.round(split.fixedValue * 100),
+          ),
           remoteIp,
           creditCardToken: owned.creditCardToken,
         });
@@ -640,6 +676,7 @@ export async function createCharge(
           description,
           externalReference: idempotencyKey,
           split,
+          extraSplits: await reserveSplitsFor(fixedCents),
           remoteIp,
           creditCardToken: owned.creditCardToken,
         });

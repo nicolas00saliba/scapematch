@@ -57,6 +57,8 @@ export type PixInput = {
   description: string;
   externalReference: string;
   split: ChargeSplit;
+  /// Segunda linha, só a subconta Reserva de pontos. Vazio no caminho normal.
+  extraSplits?: ChargeSplit[];
   /// Chamado assim que o id da cobrança existe, antes do QR.
   onCreated?: (
     payment: PixPaymentRef & { created: boolean },
@@ -155,6 +157,17 @@ export function asaasPaymentGone(body: {
 const maxConfigurableCommissionBps = 3000;
 
 /// Reais com duas casas, a partir dos centavos inteiros do líquido da casa.
+/// A casa continua na primeira linha. Linhas extras entram só quando existem.
+export function paymentSplitList(
+  house: ChargeSplit,
+  extra?: ChargeSplit[] | null,
+): ChargeSplit[] {
+  const more = (extra ?? []).filter((item) =>
+    item.fixedValue > 0 && item.walletId !== house.walletId
+  );
+  return more.length === 0 ? [house] : [house, ...more];
+}
+
 export function fixedReaisFromCents(cents: number): number {
   if (!Number.isInteger(cents) || cents < 0) {
     throw new Error("split");
@@ -557,7 +570,7 @@ export class AsaasProvider implements PaymentProvider {
       dueDate: input.dueDate,
       description: input.description,
       externalReference: reference,
-      split: [input.split],
+      split: paymentSplitList(input.split, input.extraSplits),
     });
     return {
       id: stringField(body, "id"),
@@ -694,7 +707,7 @@ export class AsaasProvider implements PaymentProvider {
       dueDate: input.dueDate,
       description: input.description,
       externalReference: input.externalReference,
-      split: [input.split],
+      split: paymentSplitList(input.split, input.extraSplits),
       creditCardToken: input.creditCardToken,
     };
     if (input.remoteIp) payload.remoteIp = input.remoteIp;

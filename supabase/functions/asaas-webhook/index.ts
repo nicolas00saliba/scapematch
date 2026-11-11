@@ -20,6 +20,7 @@ import {
 } from "../_shared/charge_patch.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import { syncPayerDocument } from "../_shared/payer_document.ts";
+import { settlePaidChargeReserve } from "../_shared/points_reserve_asaas.ts";
 
 Deno.serve(async (req) => {
   // Servidor a servidor: a resposta segue mesmo sem o header de navegador.
@@ -96,6 +97,11 @@ Deno.serve(async (req) => {
     );
     const asaas = sandbox ? undefined : safeAsaas();
     if (status === "paid") {
+      await settlePaidChargeReserve(admin, Deno.env, charge.id).catch(
+        (error) => {
+          logCaught("asaas-webhook", error);
+        },
+      );
       await issuePaidInvoices(admin, charge, { sandbox, asaas }).catch(
         (error) => {
           logCaught("asaas-webhook", error);

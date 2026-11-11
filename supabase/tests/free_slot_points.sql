@@ -208,6 +208,26 @@ begin
       free_slot_monthly_limit = 1
   where id = 1;
 
+  insert into public.referral_attributions (
+    subject_kind, subject_user_id, referrer_kind, referrer_user_id,
+    code, starts_at, ends_at
+  ) values (
+    'player',
+    'e7a22222-2222-4222-8222-222222222222',
+    'player',
+    'e7a55555-5555-4555-8555-555555555555',
+    'vaga-reserva',
+    pg_catalog.now() - interval '1 day',
+    pg_catalog.now() + interval '300 days'
+  );
+  if public.points_reserve_split_cents(
+    'e7a22222-2222-4222-8222-222222222222',
+    'e7b11111-1111-4111-8111-111111111111',
+    10000, 10000, 7500, 'PIX'
+  ) <> 0 then
+    raise exception 'flag desligada separou lastro no split';
+  end if;
+
   select private.point_reserve_cents() into v_reserve;
   insert into public.scape_point_entries (
     user_id, kind, points, amount_cents, program, idempotency_key
@@ -499,6 +519,40 @@ begin
     where user_id = 'e7a33333-3333-4333-8333-333333333333'
   ) is null then
     raise exception 'o credito nao pago continuou em aberto';
+  end if;
+
+  if public.points_reserve_split_cents(
+    'e7a22222-2222-4222-8222-222222222222',
+    'e7b11111-1111-4111-8111-111111111111',
+    10000, 10000, 7500, 'PIX'
+  ) <> private.reward_cents(10000, (
+    select c2c_bps + private.referrer_tier_bonus(
+      'e7a55555-5555-4555-8555-555555555555'
+    )
+    from public.referral_program_settings
+    where id = 1
+  )) then
+    raise exception 'o split da reserva nao ficou no percentual da indicacao';
+  end if;
+  if public.points_reserve_split_cents(
+    'e7a22222-2222-4222-8222-222222222222',
+    'e7b11111-1111-4111-8111-111111111111',
+    10000, 10000, 9900, 'PIX'
+  ) <> 0 then
+    raise exception 'o lastro passou do liquido';
+  end if;
+  if public.claim_points_reserve_transfer(
+    'e7f11111-1111-4111-8111-111111111111', 'house', 7500, 'wallet-casa'
+  ) is distinct from 'send' then
+    raise exception 'a transferencia da reserva nao foi reservada';
+  end if;
+  perform public.complete_points_reserve_transfer(
+    'e7f11111-1111-4111-8111-111111111111', 'house', 'tr_sandbox', true
+  );
+  if public.claim_points_reserve_transfer(
+    'e7f11111-1111-4111-8111-111111111111', 'house', 7500, 'wallet-casa'
+  ) is distinct from 'done' then
+    raise exception 'a transferencia da reserva repetiu';
   end if;
 
   update public.platform_settings
