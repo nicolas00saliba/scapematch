@@ -11,6 +11,7 @@ export type Tema = {
   seoDescricao: string;
   perguntas: Pergunta[];
   relacionados: string[];
+  saibaMais?: { rotulo: string; href: string };
 };
 
 export const temas: Tema[] = [
@@ -18,8 +19,9 @@ export const temas: Tema[] = [
     slug: 'grupo',
     nome: 'Grupo',
     frase: 'Como o time se forma e quando o jogo confirma.',
-    seoTitulo: 'Grupo: dúvidas frequentes | EscapeMatch',
-    seoDescricao: 'Como entrar num grupo, quando o jogo confirma e o que acontece se o mínimo não bater.',
+    seoTitulo: 'Grupo para quem está sozinho | EscapeMatch',
+    seoDescricao: 'Dá para jogar escape room sozinho. O app te coloca num grupo e o jogo confirma no mínimo.',
+    saibaMais: { rotulo: 'Guia: escape room sozinho', href: '/guia/escape-room-sozinho' },
     relacionados: ['pagamento', 'cancelamento'],
     perguntas: [
       {
@@ -45,6 +47,11 @@ export const temas: Tema[] = [
         pergunta: 'E se o grupo não bater o mínimo?',
         resposta:
           'O jogo não confirma. Nada é cobrado: o Pix é estornado e o cartão não é capturado.',
+      },
+      {
+        pergunta: 'Como achar gente para jogar escape room sozinho?',
+        resposta:
+          'Pelo app: escolha a sala e o horário e entre no grupo. O guia de escape room sozinho descreve o caminho.',
       },
     ],
   },
@@ -125,13 +132,14 @@ export const temas: Tema[] = [
     slug: 'pontos',
     nome: 'Pontos',
     frase: 'Como ganhar, quando liberam e como usar.',
-    seoTitulo: 'Pontos: dúvidas frequentes | EscapeMatch',
-    seoDescricao: 'Como ganhar, quando liberam e como usar os seus pontos.',
+    seoTitulo: 'Pontos que viram desconto | EscapeMatch',
+    seoDescricao: '1 ponto vale R$ 0,01. 100 pontos são R$ 1,00 de desconto na vaga, a partir de 1.000 pontos.',
     relacionados: ['conta', 'pagamento'],
     perguntas: [
       {
         pergunta: 'Quanto vale 1 ponto?',
-        resposta: 'R$ 0,01. Os pontos não vencem e não viram dinheiro. Servem para pagar salas.',
+        resposta:
+          'R$ 0,01. 100 pontos valem R$ 1,00 de desconto na sua vaga. Os pontos não vencem e não viram dinheiro para saque.',
       },
       {
         pergunta: 'Quando os pontos liberam?',
@@ -139,7 +147,7 @@ export const temas: Tema[] = [
       },
       {
         pergunta: 'A partir de quando dá para usar?',
-        resposta: 'A partir de 1.000 pontos, pagando até 30% de uma reserva.',
+        resposta: 'A partir de 1.000 pontos, com desconto de até 30% do valor da sua vaga.',
       },
       {
         pergunta: 'Quantos pontos eu ganho ao criar a conta?',
@@ -184,7 +192,7 @@ export const perguntasVistas: { tema: string; pergunta: Pergunta }[] = [
   { tema: 'grupo', pergunta: temas[0].perguntas[1] },
   { tema: 'pagamento', pergunta: temas[1].perguntas[2] },
   { tema: 'cancelamento', pergunta: temas[2].perguntas[0] },
-  { tema: 'pontos', pergunta: temas[4].perguntas[2] },
+  { tema: 'pontos', pergunta: temas[4].perguntas[0] },
   { tema: 'conta', pergunta: temas[3].perguntas[1] },
   { tema: 'casas', pergunta: temas[5].perguntas[0] },
 ];

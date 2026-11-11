@@ -2,25 +2,42 @@
 import Base from '../layouts/Base.astro';
 import PhoneShot from '../components/PhoneShot.astro';
 import ProgramCard from '../components/ProgramCard.astro';
+import DescontoPontos from '../components/DescontoPontos.astro';
 import { programaPorId } from '../data/programas';
+import { faqPage } from '../data/seo';
 
 const cartoes = ['boas-vindas', 'pontos-de-volta', 'indique-amigos'].map(programaPorId);
 
-const organizacao = {
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: 'EscapeMatch',
-  url: 'https://escapematch.com.br/',
-  logo: 'https://escapematch.com.br/assets/logo-simbolo.svg',
-};
+const perguntas = [
+  {
+    pergunta: 'Eu pago a reserva inteira?',
+    resposta: 'Não. O preço é por pessoa. Você paga só a sua vaga.',
+  },
+  {
+    pergunta: 'Quando a cobrança acontece?',
+    resposta: 'Quando o grupo bate o mínimo e o jogo confirma. Quem entra depois paga a própria vaga na hora, até lotar.',
+  },
+  {
+    pergunta: 'E se o grupo não confirmar?',
+    resposta: 'Nada é cobrado. O Pix é estornado e o cartão não é capturado.',
+  },
+  {
+    pergunta: 'Dá para jogar sem conhecer ninguém?',
+    resposta: 'Dá. O app te coloca num grupo. O guia de escape room sozinho descreve o caminho. As regras de convivência estão em Segurança.',
+  },
+  {
+    pergunta: 'Só tem escape room?',
+    resposta: 'Escape room é o que está disponível. Jogos de tabuleiro, laser tag e outras modalidades estão em breve.',
+  },
+];
 ---
 
 <Base
   title="EscapeMatch: ninguém pra jogar? Agora tem."
-  description="Está sozinho e quer jogar? O EscapeMatch te coloca num time com outros jogadores. Escape rooms, jogos de tabuleiro, laser tag e muito mais."
+  description="Plataforma criada para achar gente e jogar escape room quando se está sozinho. Lançamento em Curitiba. Você paga só a sua vaga."
   path="/"
   ogImage="/assets/og/home.png"
-  jsonLd={organizacao}
+  jsonLd={faqPage(perguntas)}
   publico
   hash
 >
@@ -46,6 +63,7 @@ const organizacao = {
       <div class="painel" role="tabpanel" id="painel-jogar" aria-labelledby="tab-jogar">
         <p class="painel-frase">Para quem ainda não jogou: entender, escolher e criar a conta.</p>
         <ul class="destinos">
+          <li><a href="/guia/escape-room-sozinho">Escape room sozinho</a></li>
           <li><a href="/como-funciona">Como funciona</a></li>
           <li><a href="/experiencias">O que jogar</a></li>
           <li><a href="/vantagens">Ganhe 100 pontos</a></li>
@@ -131,6 +149,7 @@ const organizacao = {
       <div class="grade-3">
         {cartoes.map((programa) => <ProgramCard programa={programa} />)}
       </div>
+      <DescontoPontos curto />
     </div>
   </section>
 
@@ -193,26 +212,15 @@ const organizacao = {
         <a href="/ajuda">Central de ajuda</a>
       </div>
       <div class="faq leitura">
-        <details>
-          <summary>Eu pago a reserva inteira?</summary>
-          <p>Não. O preço é por pessoa. Você paga só a sua vaga.</p>
-        </details>
-        <details>
-          <summary>Quando a cobrança acontece?</summary>
-          <p>Quando o grupo bate o mínimo e o jogo confirma. Quem entra depois paga a própria vaga na hora, até lotar.</p>
-        </details>
-        <details>
-          <summary>E se o grupo não confirmar?</summary>
-          <p>Nada é cobrado. O Pix é estornado e o cartão não é capturado.</p>
-        </details>
-        <details>
-          <summary>Dá para jogar sem conhecer ninguém?</summary>
-          <p>Dá. O app te coloca num grupo. As regras de convivência estão em Segurança.</p>
-        </details>
-        <details>
-          <summary>Só tem escape room?</summary>
-          <p>Escape room é o que está disponível. Jogos de tabuleiro, laser tag e outras modalidades estão em breve.</p>
-        </details>
+        {perguntas.map((item) => (
+          <details>
+            <summary>{item.pergunta}</summary>
+            <p>{item.resposta}</p>
+            {item.pergunta === 'Dá para jogar sem conhecer ninguém?' && (
+              <p><a href="/guia/escape-room-sozinho">Guia: escape room sozinho</a></p>
+            )}
+          </details>
+        ))}
       </div>
     </div>
   </section>

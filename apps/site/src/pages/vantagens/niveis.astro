@@ -3,6 +3,7 @@ import Base from '../../layouts/Base.astro';
 import PageTop from '../../components/PageTop.astro';
 import ProgramCard from '../../components/ProgramCard.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
+import DescontoPontos from '../../components/DescontoPontos.astro';
 import { programaPorId } from '../../data/programas';
 
 const programa = programaPorId('niveis');
@@ -11,6 +12,7 @@ const programa = programaPorId('niveis');
 <Base title={programa.seoTitulo} description={programa.seoDescricao} path={programa.rota} ogImage={programa.og}>
   <PageTop titulo="Níveis Bronze, Prata e Ouro" frase={programa.apoio} />
   <div class="miolo pagina">
+    <DescontoPontos />
     <div class="niveis">
       <article class="nivel">
         <h2>Bronze</h2>

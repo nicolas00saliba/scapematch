@@ -1,0 +1,64 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { faqPage } from '../../data/seo';
+
+const respostas = [
+  {
+    pergunta: 'Dá para jogar escape room sozinho?',
+    resposta:
+      'Dá. O escape room pede um grupo, e esse grupo não precisa ser o seu. O EscapeMatch junta quem chegou sozinho até o jogo confirmar. Você paga só a sua vaga.',
+  },
+  {
+    pergunta: 'Como achar um grupo de escape room?',
+    resposta:
+      'Escolha a sala e o horário no app. O EscapeMatch te coloca num grupo com outras pessoas. O jogo confirma quando o grupo bate o mínimo. Quem chega depois paga a própria vaga, até lotar.',
+  },
+  {
+    pergunta: 'O que é o EscapeMatch?',
+    resposta:
+      'É uma plataforma brasileira criada para quem quer jogar e não tem grupo. O lançamento começa em Curitiba, com escape room. Jogos de tabuleiro e laser tag estão previstos e ainda não estão disponíveis.',
+  },
+];
+---
+
+<Base
+  title="Escape room sozinho: como achar grupo | EscapeMatch"
+  description="Dá para jogar escape room sozinho. O EscapeMatch junta quem não tem grupo. Veja como achar um time. Lançamento em Curitiba."
+  path="/guia/escape-room-sozinho"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+>
+  <header class="miolo pagina-topo">
+    <h1>{respostas[0].pergunta}</h1>
+    <p class="resposta-direta">{respostas[0].resposta}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    <section>
+      <h2>{respostas[1].pergunta}</h2>
+      <p>{respostas[1].resposta}</p>
+      <p>O passo a passo completo está em <a href="/como-funciona">Como funciona</a>.</p>
+    </section>
+    <section>
+      <h2>{respostas[2].pergunta}</h2>
+      <p>{respostas[2].resposta}</p>
+      <p>A modalidade disponível está em <a href="/experiencias/escape-room">Escape room</a>.</p>
+    </section>
+    <section>
+      <h2>Preço e pontos</h2>
+      <p>O preço é por pessoa e é o da sala, mostrado no app. Não existe um ingresso único do EscapeMatch.</p>
+      <p>
+        Os pontos da conta viram desconto nessa vaga: 1 ponto vale R$ 0,01 e 100 pontos valem R$ 1,00.
+        As regras estão em <a href="/vantagens">Vantagens</a>.
+      </p>
+    </section>
+    <section>
+      <h2>Onde tirar dúvidas</h2>
+      <p>
+        A <a href="/ajuda">central de ajuda</a> responde grupo, pagamento, cancelamento e pontos.
+        Para abrir o app, a página é <a href="/app">Baixar o app</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock titulo="Entrar num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
+</Base>

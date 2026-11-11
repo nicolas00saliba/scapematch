@@ -10,6 +10,7 @@ export type Coluna = {
 };
 
 export const jogarLinks: Link[] = [
+  { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
   { rotulo: 'Como funciona', href: '/como-funciona' },
   { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
   { rotulo: 'Experiências', href: '/experiencias' },
@@ -46,6 +47,7 @@ export const rodape: Coluna[] = [
   {
     titulo: 'Quero jogar',
     links: [
+      { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
       { rotulo: 'Como funciona', href: '/como-funciona' },
       { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
       { rotulo: 'Experiências', href: '/experiencias' },
@@ -95,6 +97,7 @@ export const rodape: Coluna[] = [
 ];
 
 const nomes: Record<string, string> = {
+  '/guia/escape-room-sozinho': 'Escape room sozinho',
   '/como-funciona': 'Como funciona',
   '/como-funciona/pagamento': 'Pagamento e regras',
   '/experiencias': 'Experiências',

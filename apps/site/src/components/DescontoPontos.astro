@@ -1,0 +1,32 @@
+---
+interface Props {
+  curto?: boolean;
+}
+
+const { curto = false } = Astro.props;
+---
+
+<aside class:list={['desconto-pontos', { 'desconto-curto': curto }]} aria-label="Pontos como desconto">
+  <p class="desconto-olho">Pontos viram desconto na sala</p>
+  <dl class="desconto-valores">
+    <div>
+      <dt>1 ponto</dt>
+      <dd>R$ 0,01</dd>
+    </div>
+    <div>
+      <dt>100 pontos</dt>
+      <dd>R$ 1,00</dd>
+    </div>
+  </dl>
+  {curto ? (
+    <p class="desconto-nota">
+      100 pontos valem R$ 1,00 de desconto na sua vaga.
+      <a href="/vantagens">Ver as vantagens</a>
+    </p>
+  ) : (
+    <p class="desconto-nota">
+      1 ponto vale R$ 0,01. 100 pontos valem R$ 1,00 de desconto na sua vaga.
+      Dá para usar a partir de 1.000 pontos, com desconto de até 30% do valor da sua vaga.
+    </p>
+  )}
+</aside>

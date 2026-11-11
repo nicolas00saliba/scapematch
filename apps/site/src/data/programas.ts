@@ -41,7 +41,7 @@ export const programas: Programa[] = [
     apoio: 'Só por criar a sua conta.',
     passos: ['Crie a conta', 'Ganhe 100 pontos', 'Junte e use'],
     regras:
-      'Uma vez por conta. Os pontos podem ser usados quando o saldo chegar a 1.000. Uma barra no app mostra quanto falta.',
+      'Uma vez por conta. Os pontos entram no saldo e viram desconto na vaga quando ele chegar a 1.000. Uma barra no app mostra quanto falta.',
     seoTitulo: 'Vantagens e pontos | EscapeMatch',
     seoDescricao:
       'Ganhe pontos ao criar a conta, em toda reserva e indicando amigos. Use os pontos na próxima sala.',
@@ -128,9 +128,9 @@ export const programas: Programa[] = [
     passos: ['Indique', 'Eles jogam', 'Você sobe'],
     regras:
       'Conta como jogando quem pagou uma reserva nos últimos 90 dias. O extra vale para amigos e casas indicados.',
-    seoTitulo: 'Níveis Bronze, Prata e Ouro | EscapeMatch',
+    seoTitulo: 'Níveis e o desconto dos pontos | EscapeMatch',
     seoDescricao:
-      'Quanto mais amigos jogando, mais pontos você ganha em cada indicação.',
+      'Bronze, Prata e Ouro. Os pontos ganhos viram desconto: 1 ponto vale R$ 0,01 e 100 pontos valem R$ 1,00.',
     og: '/assets/og/niveis.png',
     cta: {
       rotulo: 'Ver meu nível no app',
@@ -215,9 +215,9 @@ export function programaPorId(id: string): Programa {
 }
 
 export const regrasJogador = [
-  '1 ponto vale R$ 0,01. Os pontos não vencem e não viram dinheiro: servem para pagar salas.',
+  '1 ponto vale R$ 0,01. 100 pontos valem R$ 1,00 de desconto na sua vaga. Os pontos não vencem e não viram dinheiro para saque.',
   'Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.',
-  'Dá para usar a partir de 1.000 pontos, pagando até 30% de uma reserva.',
+  'Dá para usar a partir de 1.000 pontos, com desconto de até 30% do valor da sua vaga.',
   'O código de quem indicou entra no cadastro ou nas primeiras 24 horas. Uma indicação vale por 1 ano.',
   'Se a reserva for cancelada ou estornada, os pontos dela saem da conta.',
 ];
