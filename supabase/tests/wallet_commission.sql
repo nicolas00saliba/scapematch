@@ -477,6 +477,7 @@ commit;
 
 begin;
 select set_config('request.jwt.claim.sub', 'f3333333-3333-3333-3333-333333333333', true);
+select set_config('request.jwt.claim.aal', 'aal2', true);
 set local role authenticated;
 
 do $$
