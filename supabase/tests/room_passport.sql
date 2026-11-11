@@ -18,6 +18,10 @@ begin
     or has_function_privilege('authenticated', 'private.passport_apply_charge(uuid)', 'execute')
     or not has_function_privilege('authenticated', 'public.my_passport()', 'execute')
     or not has_function_privilege('authenticated', 'public.deliver_passport_gift(text)', 'execute')
+    or not has_function_privilege('authenticated', 'public.confirm_session_attendance(uuid,uuid)', 'execute')
+    or has_function_privilege('anon', 'public.confirm_session_attendance(uuid,uuid)', 'execute')
+    or has_table_privilege('authenticated', 'public.session_checkins', 'insert')
+    or not has_table_privilege('authenticated', 'public.session_checkins', 'select')
   then
     raise exception 'execute do passaporte saiu do combinado';
   end if;
@@ -31,14 +35,15 @@ begin
         (n.nspname = 'public' and p.proname in (
           'my_passport', 'passport_program_enabled', 'save_passport_gift',
           'my_passport_desk', 'deliver_passport_gift',
-          'admin_passport_settings', 'admin_save_passport_settings'
+          'admin_passport_settings', 'admin_save_passport_settings',
+          'confirm_session_attendance'
         ))
         or (n.nspname = 'private' and p.proname in (
           'passport_apply_charge', 'passport_sync_user', 'point_pools',
           'subsidy_quote'
         ))
       )
-  ) <> 11 then
+  ) <> 12 then
     raise exception 'funcao do passaporte sem security definer ou search_path vazio';
   end if;
   if public.passport_program_enabled() then
@@ -139,6 +144,22 @@ where id = 1;
 select private.passport_catch_up();
 
 do $$
+begin
+  if exists (
+    select 1 from public.passport_stamps
+    where user_id = 'd0111111-1111-4111-8111-111111111111'
+  ) then
+    raise exception 'catch-up carimbou sem comparecimento da casa';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd0222222-2222-4222-8222-222222222222', false);
+select public.confirm_session_attendance(
+  'd0711111-1111-4111-8111-111111111111',
+  'd0111111-1111-4111-8111-111111111111'
+);
+
+do $$
 declare
   v_count integer;
   v_points integer;
@@ -151,6 +172,34 @@ begin
   from private.scape_balances('d0111111-1111-4111-8111-111111111111');
   if v_count is distinct from 1 or v_points is distinct from 500 then
     raise exception 'primeiro carimbo ficou % visitas e % pontos', v_count, v_points;
+  end if;
+  if (
+    select count(*) from public.admin_audit_log
+    where actor_id = 'd0222222-2222-4222-8222-222222222222'
+      and action = 'confirm_session_attendance'
+  ) <> 1 then
+    raise exception 'o comparecimento nao ficou na auditoria';
+  end if;
+  perform public.confirm_session_attendance(
+    'd0711111-1111-4111-8111-111111111111',
+    'd0111111-1111-4111-8111-111111111111'
+  );
+  perform private.passport_catch_up();
+  select play_count into v_count
+  from public.passport_stamps
+  where user_id = 'd0111111-1111-4111-8111-111111111111'
+    and room_id = 'd0611111-1111-4111-8111-111111111111';
+  select available_points into v_points
+  from private.scape_balances('d0111111-1111-4111-8111-111111111111');
+  if v_count is distinct from 1 or v_points is distinct from 500 then
+    raise exception 'repetir o comparecimento duplicou o carimbo % %', v_count, v_points;
+  end if;
+  if (
+    select count(*) from public.admin_audit_log
+    where actor_id = 'd0222222-2222-4222-8222-222222222222'
+      and action = 'confirm_session_attendance'
+  ) <> 1 then
+    raise exception 'repetir o comparecimento gravou outra auditoria';
   end if;
   if (
     select count(*) from public.scape_point_entries
@@ -201,6 +250,19 @@ begin
     and room_id = 'd0611111-1111-4111-8111-111111111111';
   select available_points into v_points
   from private.scape_balances('d0111111-1111-4111-8111-111111111111');
+  if v_count is distinct from 1 or v_points is distinct from 500 then
+    raise exception 'pagamento sem comparecimento carimbou % %', v_count, v_points;
+  end if;
+  perform public.confirm_session_attendance(
+    'd0722222-2222-4222-8222-222222222222',
+    'd0111111-1111-4111-8111-111111111111'
+  );
+  select play_count into v_count
+  from public.passport_stamps
+  where user_id = 'd0111111-1111-4111-8111-111111111111'
+    and room_id = 'd0611111-1111-4111-8111-111111111111';
+  select available_points into v_points
+  from private.scape_balances('d0111111-1111-4111-8111-111111111111');
   if v_count is distinct from 2 or v_points is distinct from 500 then
     raise exception 'segunda visita nao contou ou duplicou pontos % %', v_count, v_points;
   end if;
@@ -209,6 +271,24 @@ begin
     where payment_charge_id = 'd0844444-4444-4444-8444-444444444444'
   ) then
     raise exception 'horario futuro ganhou carimbo';
+  end if;
+  begin
+    perform public.confirm_session_attendance(
+      'd0744444-4444-4444-8444-444444444444',
+      'd0111111-1111-4111-8111-111111111111'
+    );
+    raise exception 'a casa confirmou antes da sessao';
+  exception
+    when others then
+      if sqlerrm <> 'session not started' then
+        raise exception 'antes da hora: %', sqlerrm;
+      end if;
+  end;
+  if exists (
+    select 1 from public.session_checkins
+    where group_id = 'd0744444-4444-4444-8444-444444444444'
+  ) then
+    raise exception 'confirmacao antecipada gravou comparecimento';
   end if;
 end $$;
 
@@ -378,6 +458,11 @@ insert into public.payment_charges (
   10000, 'PIX', 'paid', 2500, 'pp-charge-beta', '2026-10-10 12:00:00+00'
 );
 
+select public.confirm_session_attendance(
+  'd0733333-3333-4333-8333-333333333333',
+  'd0111111-1111-4111-8111-111111111111'
+);
+
 do $$
 declare
   v_points integer;
@@ -478,6 +563,11 @@ insert into public.payment_charges (
   8000, 'PIX', 'paid', 2500, 'pp-charge-solo', '2026-10-18 12:00:00+00'
 );
 
+select public.confirm_session_attendance(
+  'd0755555-5555-4555-8555-555555555555',
+  'd0111111-1111-4111-8111-111111111111'
+);
+
 do $$
 declare
   v_points integer;
@@ -492,6 +582,172 @@ begin
     and reversed_at is null;
   if v_solo <> 0 or v_points is distinct from 1500 then
     raise exception 'casa de uma sala pagou marco ou o saldo nao voltou a 1500: % %', v_solo, v_points;
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', '', false);
+
+insert into auth.users (id, email, raw_user_meta_data) values (
+  'd0777777-7777-4777-8777-777777777777',
+  'pp-antes@example.com',
+  '{"display_name":"Pago Antes"}'
+);
+
+insert into public.groups (
+  id, city_id, venue_id, room_id, starts_at, total_spots, minimum_spots,
+  price_cents, created_by
+) values (
+  'd0766666-6666-4666-8666-666666666666',
+  'curitiba',
+  'd0511111-1111-4111-8111-111111111111',
+  'd0611111-1111-4111-8111-111111111111',
+  pg_catalog.now() + interval '2 days',
+  4, 2, 10000,
+  'd0777777-7777-4777-8777-777777777777'
+);
+
+insert into public.group_members (
+  group_id, user_id, display_name, payment_status, attendance
+) values (
+  'd0766666-6666-4666-8666-666666666666',
+  'd0777777-7777-4777-8777-777777777777',
+  'Pago Antes', 'paid', 'confirmed'
+);
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  commission_bps, idempotency_key, paid_at
+) values (
+  'd0866666-6666-4666-8666-666666666666',
+  'd0766666-6666-4666-8666-666666666666',
+  'd0777777-7777-4777-8777-777777777777',
+  'd0511111-1111-4111-8111-111111111111',
+  10000, 'PIX', 'paid', 2500, 'pp-charge-antes', pg_catalog.now()
+);
+
+do $$
+declare
+  v_count integer;
+  v_points integer;
+begin
+  if exists (
+    select 1 from public.passport_plays
+    where payment_charge_id = 'd0866666-6666-4666-8666-666666666666'
+  ) then
+    raise exception 'reserva paga antes da sessao ja carimbou';
+  end if;
+  begin
+    perform set_config(
+      'request.jwt.claim.sub',
+      'd0222222-2222-4222-8222-222222222222',
+      true
+    );
+    perform public.confirm_session_attendance(
+      'd0766666-6666-4666-8666-666666666666',
+      'd0777777-7777-4777-8777-777777777777'
+    );
+    raise exception 'confirmou a reserva antes da sessao';
+  exception
+    when others then
+      if sqlerrm <> 'session not started' then
+        raise exception 'paga antes da hora: %', sqlerrm;
+      end if;
+  end;
+end $$;
+
+update public.groups
+set starts_at = pg_catalog.now() - interval '30 minutes'
+where id = 'd0766666-6666-4666-8666-666666666666';
+
+select private.passport_catch_up();
+
+do $$
+declare
+  v_count integer;
+  v_points integer;
+begin
+  if exists (
+    select 1 from public.passport_plays
+    where payment_charge_id = 'd0866666-6666-4666-8666-666666666666'
+  ) then
+    raise exception 'catch-up carimbou a sessao paga sem confirmacao';
+  end if;
+  begin
+    perform set_config(
+      'request.jwt.claim.sub',
+      'd0777777-7777-4777-8777-777777777777',
+      true
+    );
+    perform public.confirm_session_attendance(
+      'd0766666-6666-4666-8666-666666666666',
+      'd0777777-7777-4777-8777-777777777777'
+    );
+    raise exception 'o jogador confirmou o proprio comparecimento';
+  exception
+    when others then
+      if sqlerrm <> 'not owner' then
+        raise exception 'jogador no check-in: %', sqlerrm;
+      end if;
+  end;
+  perform set_config(
+    'request.jwt.claim.sub',
+    'd0222222-2222-4222-8222-222222222222',
+    true
+  );
+  perform public.confirm_session_attendance(
+    'd0766666-6666-4666-8666-666666666666',
+    'd0777777-7777-4777-8777-777777777777'
+  );
+  select play_count into v_count
+  from public.passport_stamps
+  where user_id = 'd0777777-7777-4777-8777-777777777777'
+    and room_id = 'd0611111-1111-4111-8111-111111111111';
+  select available_points into v_points
+  from private.scape_balances('d0777777-7777-4777-8777-777777777777');
+  if v_count is distinct from 1 or v_points is distinct from 500 then
+    raise exception 'confirmacao depois da sessao ficou % visitas e % pontos', v_count, v_points;
+  end if;
+  perform private.passport_catch_up();
+  select play_count into v_count
+  from public.passport_stamps
+  where user_id = 'd0777777-7777-4777-8777-777777777777'
+    and room_id = 'd0611111-1111-4111-8111-111111111111';
+  if v_count is distinct from 1 then
+    raise exception 'catch-up duplicou o carimbo ja confirmado %', v_count;
+  end if;
+end $$;
+
+update public.payment_charges
+set status = 'refunded', refunded_at = pg_catalog.now()
+where id = 'd0866666-6666-4666-8666-666666666666';
+
+update public.group_members
+set refund_status = 'refunded'
+where group_id = 'd0766666-6666-4666-8666-666666666666'
+  and user_id = 'd0777777-7777-4777-8777-777777777777';
+
+do $$
+declare
+  v_points integer;
+begin
+  if exists (
+    select 1 from public.passport_stamps
+    where user_id = 'd0777777-7777-4777-8777-777777777777'
+  ) then
+    raise exception 'estorno nao reverteu o carimbo da confirmacao';
+  end if;
+  select available_points into v_points
+  from private.scape_balances('d0777777-7777-4777-8777-777777777777');
+  if v_points is distinct from 0 then
+    raise exception 'estorno deixou pontos do passaporte %', v_points;
+  end if;
+  if not exists (
+    select 1 from public.session_checkins
+    where group_id = 'd0766666-6666-4666-8666-666666666666'
+      and user_id = 'd0777777-7777-4777-8777-777777777777'
+      and marked_by = 'd0222222-2222-4222-8222-222222222222'
+  ) then
+    raise exception 'o estorno apagou a auditoria do comparecimento';
   end if;
 end $$;
 

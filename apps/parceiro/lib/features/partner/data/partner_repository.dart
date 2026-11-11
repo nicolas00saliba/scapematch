@@ -30,6 +30,12 @@ abstract class PartnerDesk {
     required String playerId,
   });
 
+  Future<SessionCheckin> confirmAttendance({
+    required String houseId,
+    required String groupId,
+    required String playerId,
+  });
+
   Future<String?> updatePrice({
     required String roomId,
     required int priceCents,
@@ -86,6 +92,7 @@ class PartnerRepository implements PartnerDesk {
   final FakeCatalogRepository catalog;
   final FakeDatabase database;
   final Clock clock;
+  final Set<String> _attendance = {};
 
   @override
   Future<PartnerSnapshot> load(
@@ -153,6 +160,10 @@ class PartnerRepository implements PartnerDesk {
       slotsByRoom: slotsByRoom,
       absenceCounts: counts,
       absenceMarks: marks,
+      attendanceMarks: {
+        for (final key in _attendance)
+          if (houseGroups.any((group) => key.startsWith('${group.id}|'))) key,
+      },
       standings: standings,
       invoices: _invoices(
         houseId: houseId,
@@ -259,6 +270,40 @@ class PartnerRepository implements PartnerDesk {
       houseId: houseId,
     );
     return AbsenceMarked(standing, groups.absences.countOf(playerId));
+  }
+
+  /// A casa confirma o comparecimento a partir do horário da sessão.
+  /// Repetir a mesma pessoa não cria outro registro.
+  @override
+  Future<SessionCheckin> confirmAttendance({
+    required String houseId,
+    required String groupId,
+    required String playerId,
+  }) async {
+    final group = _group(houseId, groupId);
+    if (group == null) {
+      return const SessionCheckinRejected('Grupo não encontrado nesta casa.');
+    }
+    Participant? person;
+    for (final candidate in group.participants) {
+      if (_playerId(candidate) == playerId) {
+        person = candidate;
+        break;
+      }
+    }
+    final block = sessionCheckinBlock(
+      now: clock.now(),
+      startsAt: group.startsAt,
+      paid: person?.payment == PaymentStatus.paid,
+      refunded: person != null && person.refund != RefundStatus.none,
+      seatCancelled: person == null || !person.occupiesSeat,
+      groupCancelled: group.isCancelled,
+    );
+    if (block != null) {
+      return SessionCheckinRejected(block);
+    }
+    final already = !_attendance.add('$groupId|$playerId');
+    return SessionCheckinRecorded(already: already);
   }
 
   @override
@@ -582,6 +627,22 @@ class AbsenceMarked extends AbsenceMark {
 
 class AbsenceRejected extends AbsenceMark {
   const AbsenceRejected(this.message);
+
+  final String message;
+}
+
+sealed class SessionCheckin {
+  const SessionCheckin();
+}
+
+class SessionCheckinRecorded extends SessionCheckin {
+  const SessionCheckinRecorded({required this.already});
+
+  final bool already;
+}
+
+class SessionCheckinRejected extends SessionCheckin {
+  const SessionCheckinRejected(this.message);
 
   final String message;
 }

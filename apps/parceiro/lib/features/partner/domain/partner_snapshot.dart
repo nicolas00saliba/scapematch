@@ -43,6 +43,7 @@ class PartnerSnapshot {
     required this.standings,
     required this.invoices,
     required this.fiscal,
+    this.attendanceMarks = const {},
   });
 
   final EscapeHouse house;
@@ -75,6 +76,9 @@ class PartnerSnapshot {
   /// Chaves `grupo|jogador` já marcadas.
   final Set<String> absenceMarks;
 
+  /// Chaves `grupo|jogador` com comparecimento confirmado pela casa.
+  final Set<String> attendanceMarks;
+
   /// Resultado da [AbsencePolicy] para cada pessoa que já tem falta.
   final Map<String, AbsenceStanding> standings;
 
@@ -88,6 +92,10 @@ class PartnerSnapshot {
 
   bool markedAbsent(String groupId, String playerId) {
     return absenceMarks.contains('$groupId|$playerId');
+  }
+
+  bool checkedIn(String groupId, String playerId) {
+    return attendanceMarks.contains('$groupId|$playerId');
   }
 
   AbsenceStanding standingOf(String playerId) {

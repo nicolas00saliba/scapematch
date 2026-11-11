@@ -68,7 +68,9 @@ class PassportCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               if (book.stamps.isEmpty)
-                const Text('O primeiro carimbo entra quando a reserva paga termina.')
+                const Text(
+                  'O carimbo entra quando a casa confirma o comparecimento da reserva paga.',
+                )
               else
                 Wrap(
                   spacing: 12,

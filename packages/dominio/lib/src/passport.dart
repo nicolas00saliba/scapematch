@@ -1,7 +1,8 @@
 /// Passaporte de salas. Um carimbo por sala, marcos em pontos de
-/// desconto e o fechamento de uma casa. A versão provisória usa os
-/// números de [PassportRules.provisional]. O banco guarda os mesmos
-/// campos e pode mudá-los sem recompilar o app.
+/// desconto e o fechamento de uma casa. O carimbo sai quando a reserva
+/// está paga e a casa confirma o comparecimento. A versão provisória
+/// usa os números de [PassportRules.provisional]. O banco guarda os
+/// mesmos campos e pode mudá-los sem recompilar o app.
 class PassportRules {
   const PassportRules({
     required this.countMilestones,
@@ -166,4 +167,29 @@ PassportMilestonePlan planPassportMilestones({
         if (!desired.containsKey(milestone.key)) milestone.key,
     ],
   );
+}
+
+/// A casa confirma o comparecimento a partir do horário da sessão,
+/// só de quem pagou e não foi estornado. Nulo quando a confirmação pode seguir.
+String? sessionCheckinBlock({
+  required DateTime now,
+  required DateTime startsAt,
+  required bool paid,
+  required bool refunded,
+  required bool seatCancelled,
+  required bool groupCancelled,
+}) {
+  if (groupCancelled) {
+    return 'Grupo cancelado não confirma comparecimento.';
+  }
+  if (now.isBefore(startsAt)) {
+    return 'A sessão ainda não começou.';
+  }
+  if (seatCancelled) {
+    return 'Essa pessoa não está no grupo.';
+  }
+  if (!paid || refunded) {
+    return 'Só confirma quem pagou e não foi estornado.';
+  }
+  return null;
 }

@@ -180,6 +180,7 @@ class SupabasePartnerRepository implements PartnerDesk {
       slotsByRoom: slotsByRoom,
       absenceCounts: counts,
       absenceMarks: marks,
+      attendanceMarks: await _attendanceMarks(houseId),
       standings: standings,
       invoices: invoices,
       fiscal: storedFiscal,
@@ -320,6 +321,54 @@ class SupabasePartnerRepository implements PartnerDesk {
         .eq('user_id', playerId);
     final count = rows.length;
     return AbsenceMarked(const _Standing().of(count), count);
+  }
+
+  Future<Set<String>> _attendanceMarks(String houseId) async {
+    final rows = await scapeSupabase
+        .from('session_checkins')
+        .select('group_id, user_id')
+        .eq('venue_id', houseId);
+    return {
+      for (final row in rows) '${row['group_id']}|${textOf(row['user_id'])}',
+    };
+  }
+
+  @override
+  Future<SessionCheckin> confirmAttendance({
+    required String houseId,
+    required String groupId,
+    required String playerId,
+  }) async {
+    try {
+      final raw = await scapeSupabase.rpc(
+        'confirm_session_attendance',
+        params: {'p_group_id': groupId, 'p_user_id': playerId},
+      );
+      final already = raw is Map && raw['already'] == true;
+      return SessionCheckinRecorded(already: already);
+    } on PostgrestException catch (error) {
+      final text = error.message.toLowerCase();
+      if (text.contains('session not started')) {
+        return const SessionCheckinRejected('A sessão ainda não começou.');
+      }
+      if (text.contains('group cancelled')) {
+        return const SessionCheckinRejected(
+          'Grupo cancelado não confirma comparecimento.',
+        );
+      }
+      if (text.contains('not member')) {
+        return const SessionCheckinRejected('Essa pessoa não está no grupo.');
+      }
+      if (text.contains('reserva estornada') ||
+          text.contains('reserva nao paga')) {
+        return const SessionCheckinRejected(
+          'Só confirma quem pagou e não foi estornado.',
+        );
+      }
+      return const SessionCheckinRejected(
+        'Não foi possível confirmar o comparecimento.',
+      );
+    }
   }
 
   @override

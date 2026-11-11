@@ -131,7 +131,45 @@ create index passport_gift_claims_by_user
   on public.passport_gift_claims (user_id, created_at desc);
 
 comment on table public.passport_stamps is
-  'Um carimbo por sala e jogador. play_count é quantas reservas pagas e concluídas continuam valendo.';
+  'Um carimbo por sala e jogador. Só entra com reserva paga e comparecimento confirmado pela casa.';
+
+create table public.session_checkins (
+  id uuid primary key default gen_random_uuid(),
+  venue_id uuid not null references public.venues (id) on delete cascade,
+  group_id uuid not null references public.groups (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  room_id uuid not null references public.rooms (id) on delete cascade,
+  marked_by uuid not null references auth.users (id),
+  marked_at timestamptz not null default pg_catalog.now(),
+  unique (group_id, user_id)
+);
+
+create index session_checkins_by_venue
+  on public.session_checkins (venue_id, marked_at desc);
+
+create index session_checkins_by_user
+  on public.session_checkins (user_id, marked_at desc);
+
+create index session_checkins_by_marked_by
+  on public.session_checkins (marked_by);
+
+comment on table public.session_checkins is
+  'Comparecimento confirmado pela casa, um por jogador na sessão. A auditoria fica em admin_audit_log.';
+
+alter table public.session_checkins enable row level security;
+
+revoke all on table public.session_checkins
+  from public, anon, authenticated, service_role;
+
+create policy session_checkins_select on public.session_checkins
+  for select to authenticated
+  using (
+    user_id = (select auth.uid())
+    or private.owns_venue(venue_id)
+    or private.is_admin_aal2()
+  );
+
+grant select on table public.session_checkins to authenticated;
 
 comment on table public.passport_gifts is
   'Mimo opcional da casa. O custo é dela. Nada é obrigatório.';
@@ -884,6 +922,8 @@ declare
   v_play public.passport_plays%rowtype;
   v_on boolean;
   v_bad boolean;
+  v_checked boolean;
+  v_at timestamptz;
   v_inserted uuid;
 begin
   select * into v_charge from public.payment_charges where id = p_charge_id;
@@ -913,17 +953,32 @@ begin
     or v_member.payment_status is distinct from 'paid'
     or v_member.refund_status is distinct from 'none'
     or v_member.attendance = 'cancelled';
+  v_checked := exists (
+    select 1
+    from public.session_checkins k
+    where k.group_id = v_charge.group_id
+      and k.user_id = v_charge.user_id
+  );
 
   if v_play.id is not null and v_play.reversed_at is null and v_bad then
     perform private.passport_reverse_play(v_play.id);
     return;
   end if;
-  if v_bad or not coalesce(v_on, false) or v_group.starts_at > pg_catalog.now() then
+  if v_bad
+    or not coalesce(v_on, false)
+    or not v_checked
+    or v_group.starts_at > pg_catalog.now()
+  then
     return;
   end if;
   if v_play.id is not null and v_play.reversed_at is null then
     return;
   end if;
+
+  select k.marked_at into v_at
+  from public.session_checkins k
+  where k.group_id = v_charge.group_id
+    and k.user_id = v_charge.user_id;
 
   perform 1 from public.profiles where id = v_charge.user_id for update;
   if v_play.id is null then
@@ -931,7 +986,7 @@ begin
       user_id, room_id, venue_id, payment_charge_id, completed_at
     ) values (
       v_charge.user_id, v_group.room_id, v_group.venue_id,
-      v_charge.id, v_group.starts_at
+      v_charge.id, v_at
     )
     on conflict (payment_charge_id) do nothing
     returning id into v_inserted;
@@ -948,7 +1003,7 @@ begin
     end if;
   end if;
   perform private.passport_bump_stamp(
-    v_charge.user_id, v_group.room_id, v_group.venue_id, v_group.starts_at
+    v_charge.user_id, v_group.room_id, v_group.venue_id, v_at
   );
   perform private.passport_sync_user(v_charge.user_id);
 end;
@@ -974,9 +1029,18 @@ begin
   for v_id in
     select c.id
     from public.payment_charges c
-    join public.groups g on g.id = c.group_id
-    where c.status = 'paid'
-      and g.starts_at <= pg_catalog.now()
+    where exists (
+      select 1
+      from public.session_checkins k
+      where k.group_id = c.group_id
+        and k.user_id = c.user_id
+    )
+    or exists (
+      select 1
+      from public.passport_plays p
+      where p.payment_charge_id = c.id
+        and p.reversed_at is null
+    )
   loop
     perform private.passport_apply_charge(v_id);
     v_n := v_n + 1;
@@ -1095,10 +1159,14 @@ begin
   for v_id in
     select c.id
     from public.payment_charges c
-    join public.groups g on g.id = c.group_id
     where c.user_id = v_uid
       and (
-        (c.status = 'paid' and g.starts_at <= pg_catalog.now())
+        exists (
+          select 1
+          from public.session_checkins k
+          where k.group_id = c.group_id
+            and k.user_id = c.user_id
+        )
         or exists (
           select 1
           from public.passport_plays p
@@ -1511,6 +1579,130 @@ begin
 end;
 $$;
 
+create or replace function public.confirm_session_attendance(
+  p_group_id uuid,
+  p_user_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_group public.groups%rowtype;
+  v_member public.group_members%rowtype;
+  v_id uuid;
+  v_charge uuid;
+  v_had boolean;
+  v_has boolean;
+  v_already boolean;
+begin
+  if v_uid is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  select * into v_group from public.groups where id = p_group_id;
+  if v_group.id is null then
+    raise exception 'group not found' using errcode = 'P0002';
+  end if;
+  if not private.owns_venue(v_group.venue_id) then
+    if not private.is_admin() then
+      raise exception 'not owner' using errcode = '42501';
+    end if;
+    perform private.admin_require();
+  end if;
+  if v_group.cancelled_at is not null then
+    raise exception 'group cancelled' using errcode = 'P0001';
+  end if;
+  if v_group.starts_at > pg_catalog.now() then
+    raise exception 'session not started' using errcode = 'P0001';
+  end if;
+  select * into v_member
+  from public.group_members
+  where group_id = p_group_id
+    and user_id = p_user_id
+    and attendance <> 'cancelled';
+  if v_member.id is null then
+    raise exception 'not member' using errcode = 'P0002';
+  end if;
+  if v_member.refund_status is distinct from 'none' then
+    raise exception 'reserva estornada' using errcode = 'P0001';
+  end if;
+  if v_member.payment_status is distinct from 'paid' then
+    raise exception 'reserva nao paga' using errcode = 'P0001';
+  end if;
+  if not exists (
+    select 1
+    from public.payment_charges c
+    where c.group_id = p_group_id
+      and c.user_id = p_user_id
+      and c.status = 'paid'
+      and c.refunded_at is null
+  ) then
+    raise exception 'reserva nao paga' using errcode = 'P0001';
+  end if;
+
+  insert into public.session_checkins (
+    venue_id, group_id, user_id, room_id, marked_by
+  ) values (
+    v_group.venue_id, p_group_id, p_user_id, v_group.room_id, v_uid
+  )
+  on conflict (group_id, user_id) do nothing
+  returning id into v_id;
+  v_already := v_id is null;
+  if v_already then
+    select id into v_id
+    from public.session_checkins
+    where group_id = p_group_id
+      and user_id = p_user_id;
+  else
+    perform private.admin_audit(
+      v_uid,
+      'confirm_session_attendance',
+      'session_checkins',
+      v_id::text,
+      null,
+      pg_catalog.jsonb_build_object(
+        'group_id', p_group_id,
+        'user_id', p_user_id,
+        'venue_id', v_group.venue_id,
+        'room_id', v_group.room_id
+      )
+    );
+  end if;
+
+  select exists (
+    select 1
+    from public.passport_plays p
+    join public.payment_charges c on c.id = p.payment_charge_id
+    where c.group_id = p_group_id
+      and c.user_id = p_user_id
+      and p.reversed_at is null
+  ) into v_had;
+  for v_charge in
+    select c.id
+    from public.payment_charges c
+    where c.group_id = p_group_id
+      and c.user_id = p_user_id
+  loop
+    perform private.passport_apply_charge(v_charge);
+  end loop;
+  select exists (
+    select 1
+    from public.passport_plays p
+    join public.payment_charges c on c.id = p.payment_charge_id
+    where c.group_id = p_group_id
+      and c.user_id = p_user_id
+      and p.reversed_at is null
+  ) into v_has;
+
+  return pg_catalog.jsonb_build_object(
+    'already', v_already,
+    'stamped', v_has and not v_had
+  );
+end;
+$$;
+
 revoke all on function private.point_pools(uuid) from public, anon, authenticated, service_role;
 revoke all on function private.subsidy_quote(uuid, integer, integer, integer, boolean)
   from public, anon, authenticated, service_role;
@@ -1560,6 +1752,8 @@ revoke all on function public.deliver_passport_gift(text) from public, anon, ser
 revoke all on function public.admin_passport_settings() from public, anon, service_role;
 revoke all on function public.admin_save_passport_settings(jsonb)
   from public, anon, service_role;
+revoke all on function public.confirm_session_attendance(uuid, uuid)
+  from public, anon, service_role;
 
 grant execute on function public.passport_program_enabled() to authenticated;
 grant execute on function public.my_passport() to authenticated;
@@ -1569,3 +1763,4 @@ grant execute on function public.my_passport_desk(uuid) to authenticated;
 grant execute on function public.deliver_passport_gift(text) to authenticated;
 grant execute on function public.admin_passport_settings() to authenticated;
 grant execute on function public.admin_save_passport_settings(jsonb) to authenticated;
+grant execute on function public.confirm_session_attendance(uuid, uuid) to authenticated;

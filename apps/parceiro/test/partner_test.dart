@@ -74,17 +74,13 @@ void main() {
     expect(
       cpf.invoices
           .where((invoice) => invoice.kind == FiscalInvoiceKind.service)
-          .every(
-            (invoice) => invoice.status == FiscalInvoiceStatus.semEmissao,
-          ),
+          .every((invoice) => invoice.status == FiscalInvoiceStatus.semEmissao),
       isTrue,
     );
     expect(
       cpf.invoices
           .where((invoice) => invoice.kind == FiscalInvoiceKind.commission)
-          .every(
-            (invoice) => invoice.status == FiscalInvoiceStatus.simulated,
-          ),
+          .every((invoice) => invoice.status == FiscalInvoiceStatus.simulated),
       isTrue,
     );
 
@@ -110,6 +106,38 @@ void main() {
       playerId: 'grp-cwb-lab-quase-p0',
     );
     expect(early, isA<AbsenceRejected>());
+
+    final tooEarly = await partner.confirmAttendance(
+      houseId: SampleIds.houseCwbRuaXv,
+      groupId: 'grp-cwb-lab-quase',
+      playerId: 'grp-cwb-lab-quase-p0',
+    );
+    expect(tooEarly, isA<SessionCheckinRejected>());
+    expect(
+      (tooEarly as SessionCheckinRejected).message,
+      'A sessão ainda não começou.',
+    );
+    final olgaCheck = await partner.confirmAttendance(
+      houseId: SampleIds.houseCwbRuaXv,
+      groupId: SampleIds.groupCwbClosed,
+      playerId: '${SampleIds.groupCwbClosed}-p0',
+    );
+    expect(olgaCheck, isA<SessionCheckinRecorded>());
+    expect((olgaCheck as SessionCheckinRecorded).already, isFalse);
+    final repeated = await partner.confirmAttendance(
+      houseId: SampleIds.houseCwbRuaXv,
+      groupId: SampleIds.groupCwbClosed,
+      playerId: '${SampleIds.groupCwbClosed}-p0',
+    );
+    expect((repeated as SessionCheckinRecorded).already, isTrue);
+    final afterCheck = await partner.load(SampleIds.houseCwbRuaXv);
+    expect(
+      afterCheck.checkedIn(
+        SampleIds.groupCwbClosed,
+        '${SampleIds.groupCwbClosed}-p0',
+      ),
+      isTrue,
+    );
 
     expect(parseReais('80,00'), 8000);
     expect(parseReais('80'), 8000);
@@ -294,7 +322,10 @@ void main() {
     await tester.tap(find.byKey(PartnerKeys.partnerTermsDemo));
     await tester.pumpAndSettle();
     expect(find.text(LegalDocuments.reviewBanner), findsOneWidget);
-    await tester.enterText(find.byKey(PartnerKeys.partnerSignupName), 'Casa Nova');
+    await tester.enterText(
+      find.byKey(PartnerKeys.partnerSignupName),
+      'Casa Nova',
+    );
     await tester.enterText(
       find.byKey(PartnerKeys.partnerSignupEmail),
       'casa@exemplo.invalid',

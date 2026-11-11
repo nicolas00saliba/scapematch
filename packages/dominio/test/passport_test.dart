@@ -2,6 +2,55 @@ import 'package:dominio/dominio.dart';
 import 'package:test/test.dart';
 
 void main() {
+  final start = DateTime.utc(2026, 11, 11, 19);
+
+  test('comparecimento só depois da sessão paga', () {
+    expect(
+      sessionCheckinBlock(
+        now: start.subtract(const Duration(minutes: 1)),
+        startsAt: start,
+        paid: true,
+        refunded: false,
+        seatCancelled: false,
+        groupCancelled: false,
+      ),
+      'A sessão ainda não começou.',
+    );
+    expect(
+      sessionCheckinBlock(
+        now: start,
+        startsAt: start,
+        paid: true,
+        refunded: false,
+        seatCancelled: false,
+        groupCancelled: false,
+      ),
+      isNull,
+    );
+    expect(
+      sessionCheckinBlock(
+        now: start.add(const Duration(hours: 1)),
+        startsAt: start,
+        paid: false,
+        refunded: false,
+        seatCancelled: false,
+        groupCancelled: false,
+      ),
+      'Só confirma quem pagou e não foi estornado.',
+    );
+    expect(
+      sessionCheckinBlock(
+        now: start.add(const Duration(hours: 1)),
+        startsAt: start,
+        paid: true,
+        refunded: true,
+        seatCancelled: false,
+        groupCancelled: false,
+      ),
+      'Só confirma quem pagou e não foi estornado.',
+    );
+  });
+
   const rules = PassportRules.provisional;
 
   test('os padrões provisórios são 5, 10, 25 e 300 na casa', () {
