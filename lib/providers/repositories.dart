@@ -37,6 +37,7 @@ import 'package:scapematch/features/payments/data/payment_methods_repository.dar
 import 'package:scapematch/features/payments/data/player_payments_repository.dart';
 import 'package:scapematch/features/payments/data/supabase_payment_methods_repository.dart';
 import 'package:scapematch/features/reviews/data/room_review_gateway.dart';
+import 'package:scapematch/features/reviews/data/venue_staff_gateway.dart';
 import 'package:scapematch/features/wallet/data/fake_wallet_repository.dart';
 import 'package:scapematch/features/wallet/data/wallet_repository.dart';
 import 'package:scapematch/features/wallet/domain/wallet_transaction.dart';
@@ -211,6 +212,19 @@ final roomReviewGatewayProvider = Provider<RoomReviewGateway>((ref) {
     return MemoryRoomReviewGateway();
   }
   return SupabaseRoomReviewGateway(ref.watch(supabaseClientProvider));
+});
+
+/// Convites de equipe da conta. A demonstração não tem convite pendente.
+final venueStaffGatewayProvider = Provider<VenueStaffGateway>((ref) {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) {
+    return MemoryVenueStaffGateway();
+  }
+  return SupabaseVenueStaffGateway(ref.watch(supabaseClientProvider));
+});
+
+final venueInvitesProvider = FutureProvider<List<VenueInvite>>((ref) async {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) return const [];
+  return ref.watch(venueStaffGatewayProvider).mine();
 });
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {

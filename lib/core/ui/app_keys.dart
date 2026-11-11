@@ -269,6 +269,11 @@ abstract final class AppKeys {
   static Key reviewScore(String category, int score) =>
       Key('review-$category-$score');
   static Key reviewInvite(String groupId) => Key('review-invite-$groupId');
+  static Key venueInvite(String venueId) => Key('venue-invite-$venueId');
+  static Key venueInviteAccept(String venueId) =>
+      Key('venue-invite-accept-$venueId');
+  static Key venueInviteDecline(String venueId) =>
+      Key('venue-invite-decline-$venueId');
   static const installBanner = Key('install-banner');
   static const installBannerAction = Key('install-banner-action');
   static const installBannerDismiss = Key('install-banner-dismiss');

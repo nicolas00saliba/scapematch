@@ -91,7 +91,11 @@ begin
         'admin_save_review_settings',
         'admin_hide_review',
         'admin_review_audit',
-        'reviews_enabled'
+        'reviews_enabled',
+        'accept_venue_staff',
+        'decline_venue_staff',
+        'my_venue_invites',
+        'set_venue_staff'
       )
       and (
         not proc.prosecdef
@@ -101,12 +105,23 @@ begin
     raise exception 'função de avaliação sem security definer ou search_path vazio';
   end if;
 
-  if pg_get_function_result('public.room_review_comments(uuid)'::regprocedure)
-    ilike '%author%'
-    or pg_get_function_result('public.room_review_comments(uuid)'::regprocedure)
-      ilike '%story%'
+  if pg_get_function_result(
+      'public.room_review_comments(uuid, integer, integer)'::regprocedure
+    ) ilike '%author%'
+    or pg_get_function_result(
+      'public.room_review_comments(uuid, integer, integer)'::regprocedure
+    ) ilike '%story%'
   then
     raise exception 'comentário público devolve identidade ou nota por categoria';
+  end if;
+  if pg_get_functiondef('private.rebuild_room_rollup(uuid)'::regprocedure)
+      not like '%pg_advisory_xact_lock%'
+    or pg_get_functiondef('private.rebuild_room_rollup(uuid)'::regprocedure)
+      not like '%room_review_rollup%'
+    or pg_get_functiondef('private.rebuild_room_rollup(uuid)'::regprocedure)
+      not like '%venue_review_rollup%'
+  then
+    raise exception 'agregado recalcula sem trava de sala e de casa';
   end if;
 end $$;
 
@@ -119,7 +134,9 @@ values
   ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5', 'review-cpf@example.com', '{"display_name":"Gemeo Cpf"}'),
   ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6', 'review-phone@example.com', '{"display_name":"Gemeo Fone"}'),
   ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7', 'review-card@example.com', '{"display_name":"Gemeo Cartao"}'),
-  ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8', 'review-report@example.com', '{"display_name":"Denuncia"}');
+  ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8', 'review-report@example.com', '{"display_name":"Denuncia"}'),
+  ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9', 'review-late@example.com', '{"display_name":"Tarde Silva"}'),
+  ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab', 'review-direct@example.com', '{"display_name":"Direto Admin"}');
 
 insert into public.admins (user_id)
 values ('c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
@@ -224,13 +241,16 @@ values
   ('c0dddddd-dddd-4ddd-8ddd-ddddddddddd1', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5', 'Gemeo Cpf', 'paid'),
   ('c0dddddd-dddd-4ddd-8ddd-ddddddddddd1', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6', 'Gemeo Fone', 'paid'),
   ('c0dddddd-dddd-4ddd-8ddd-ddddddddddd1', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7', 'Gemeo Cartao', 'paid'),
-  ('c0dddddd-dddd-4ddd-8ddd-ddddddddddd2', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', 'Ana Souza', 'paid');
+  ('c0dddddd-dddd-4ddd-8ddd-ddddddddddd2', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', 'Ana Souza', 'paid'),
+  ('c0dddddd-dddd-4ddd-8ddd-ddddddddddd1', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9', 'Tarde Silva', 'paid');
 
-insert into public.venue_staff (venue_id, user_id, role)
+insert into public.venue_staff (venue_id, user_id, role, status, accepted_at)
 values (
   'c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
   'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3',
-  'staff'
+  'staff',
+  'accepted',
+  pg_catalog.now() - interval '30 days'
 );
 
 update public.profiles
@@ -386,6 +406,103 @@ exception
     end if;
 end $$;
 reset role;
+
+select set_config('request.jwt.claim.sub', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', true);
+set local role authenticated;
+select public.set_venue_staff(
+  'c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+  'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9',
+  'staff'
+);
+reset role;
+
+do $$
+declare
+  v_status text;
+  v_accepted timestamptz;
+  v_reason text;
+begin
+  select status, accepted_at
+    into v_status, v_accepted
+  from public.venue_staff
+  where user_id = 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9';
+  if v_status is distinct from 'pending' or v_accepted is not null then
+    raise exception 'dono gravou equipe sem aceite: %', v_status;
+  end if;
+  v_reason := private.review_block_reason(
+    'c0dddddd-dddd-4ddd-8ddd-ddddddddddd1',
+    'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9'
+  );
+  if v_reason is not null then
+    raise exception 'convite pendente bloqueou avaliação: %', v_reason;
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9', true);
+set local role authenticated;
+do $$
+begin
+  if public.my_venue_invites()::text not like '%Casa da Avaliação%' then
+    raise exception 'convite não apareceu no app';
+  end if;
+  perform public.accept_venue_staff('c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1');
+  if public.my_venue_invites()::text like '%Casa da Avaliação%' then
+    raise exception 'convite aceito continuou pendente';
+  end if;
+end $$;
+reset role;
+
+do $$
+declare
+  v_reason text;
+begin
+  v_reason := private.review_block_reason(
+    'c0dddddd-dddd-4ddd-8ddd-ddddddddddd1',
+    'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9'
+  );
+  if v_reason is not null then
+    raise exception 'aceite depois da sessão bloqueou quem já jogou: %', v_reason;
+  end if;
+  update public.venue_staff
+  set accepted_at = pg_catalog.now() - interval '30 days'
+  where user_id = 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9';
+  v_reason := private.review_block_reason(
+    'c0dddddd-dddd-4ddd-8ddd-ddddddddddd1',
+    'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9'
+  );
+  if v_reason is distinct from 'house_insider' then
+    raise exception 'equipe aceita antes da sessão passou: %', v_reason;
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', true);
+select set_config('request.jwt.claim.aal', 'aal2', true);
+set local role authenticated;
+select public.set_venue_staff(
+  'c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+  'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab',
+  'partner'
+);
+reset role;
+
+do $$
+declare
+  v_status text;
+begin
+  select status into v_status
+  from public.venue_staff
+  where user_id = 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab';
+  if v_status is distinct from 'accepted' then
+    raise exception 'admin aal2 não cadastrou direto: %', v_status;
+  end if;
+  if (
+    select count(*)
+    from public.admin_audit_log
+    where action in ('invite_venue_staff', 'accept_venue_staff', 'grant_venue_staff')
+  ) < 3 then
+    raise exception 'auditoria do convite não gravou';
+  end if;
+end $$;
 
 select set_config('request.jwt.claim.sub', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5', true);
 set local role authenticated;
@@ -629,6 +746,109 @@ begin
 end $$;
 
 reset role;
+
+update public.room_reviews
+set comment = 'Comentário ' || id::text
+where room_id = 'c0cccccc-cccc-4ccc-8ccc-ccccccccccc1'
+  and hidden_at is null
+  and comment = ''
+  and id in (
+    select id
+    from public.room_reviews
+    where room_id = 'c0cccccc-cccc-4ccc-8ccc-ccccccccccc1'
+      and hidden_at is null
+      and comment = ''
+    order by id
+    limit 3
+  );
+
+do $$
+declare
+  v_page integer;
+  v_total bigint;
+  v_insights jsonb;
+begin
+  select count(*)::integer, max(total_count)
+    into v_page, v_total
+  from public.room_review_comments(
+    'c0cccccc-cccc-4ccc-8ccc-ccccccccccc1',
+    1,
+    0
+  );
+  if v_page is distinct from 1 or v_total is distinct from 3 then
+    raise exception 'página de comentários saiu % de %', v_page, v_total;
+  end if;
+  select count(*)::integer into v_page
+  from public.room_review_comments(
+    'c0cccccc-cccc-4ccc-8ccc-ccccccccccc1',
+    1,
+    1
+  );
+  if v_page is distinct from 1 then
+    raise exception 'segunda página não veio';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', true);
+  perform set_config('request.jwt.claim.aal', 'aal1', true);
+  execute 'set local role authenticated';
+  v_insights := public.venue_review_insights(
+    'c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+    1,
+    0
+  );
+  execute 'reset role';
+  if pg_catalog.jsonb_array_length(v_insights -> 'comments') <> 1
+    or (v_insights ->> 'comment_count')::integer <> 3
+  then
+    raise exception 'página do painel saiu %', v_insights ->> 'comment_count';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claim.aal', '', true);
+
+update public.venues
+set suspended_at = pg_catalog.now()
+where id = 'c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+
+do $$
+declare
+  v_rows integer;
+begin
+  select count(*) into v_rows
+  from public.review_rankings('room', 'world', null, null);
+  if v_rows <> 0 then
+    raise exception 'casa suspensa ficou no ranking';
+  end if;
+  select count(*) into v_rows
+  from public.room_rating('c0cccccc-cccc-4ccc-8ccc-ccccccccccc1');
+  if v_rows <> 0 then
+    raise exception 'casa suspensa ainda publica nota da sala';
+  end if;
+  select count(*) into v_rows
+  from public.venue_rating('c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1');
+  if v_rows <> 0 then
+    raise exception 'casa suspensa ainda publica nota da casa';
+  end if;
+end $$;
+
+update public.venues
+set suspended_at = null,
+    status = 'pending'
+where id = 'c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+
+do $$
+begin
+  if (
+    select count(*) from public.review_rankings('venue', 'world', null, null)
+  ) <> 0 then
+    raise exception 'casa pendente ficou no ranking';
+  end if;
+end $$;
+
+update public.venues
+set status = 'approved'
+where id = 'c0bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 
 select set_config('request.jwt.claim.sub', 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', true);
 select set_config('request.jwt.claim.aal', 'aal2', true);

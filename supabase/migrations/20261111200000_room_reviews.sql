@@ -50,12 +50,19 @@ create table public.venue_staff (
   venue_id uuid not null references public.venues (id) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
   role text not null check (role in ('partner', 'staff')),
+  status text not null default 'pending' check (status in ('pending', 'accepted')),
+  invited_by uuid references auth.users (id),
+  accepted_at timestamptz,
   created_at timestamptz not null default pg_catalog.now(),
-  primary key (venue_id, user_id)
+  primary key (venue_id, user_id),
+  check (
+    (status = 'pending' and accepted_at is null)
+    or (status = 'accepted' and accepted_at is not null)
+  )
 );
 
 comment on table public.venue_staff is
-  'Sócio (partner) e equipe (staff). O dono continua em venues.owner_id. Nenhum dos três avalia a própria casa.';
+  'Sócio (partner) e equipe (staff). O dono continua em venues.owner_id. O convite do dono fica pendente até a pessoa aceitar. Só o vínculo aceito conta, e a avaliação da própria casa só bloqueia quem já era equipe aceita antes do horário da sessão.';
 
 create index venue_staff_by_user on public.venue_staff (user_id);
 
@@ -347,11 +354,18 @@ begin
   ) then
     return 'already_reviewed';
   end if;
-  if v_owner = p_user or exists (
+  if v_owner = p_user then
+    return 'house_insider';
+  end if;
+  -- Convite pendente não conta. Aceite depois da sessão também não:
+  -- a casa não bloqueia quem já jogou convidando a pessoa depois.
+  if exists (
     select 1
     from public.venue_staff staff
     where staff.venue_id = v_venue
       and staff.user_id = p_user
+      and staff.status = 'accepted'
+      and staff.accepted_at < v_starts
   ) then
     return 'house_insider';
   end if;
@@ -367,6 +381,8 @@ begin
     from public.venue_staff staff
     where staff.venue_id = v_venue
       and staff.user_id is distinct from p_user
+      and staff.status = 'accepted'
+      and staff.accepted_at < v_starts
   loop
     v_related := array_append(v_related, v_staff);
     v_conflict := private.identity_conflict(p_user, v_staff, null, null);
@@ -412,6 +428,13 @@ declare
   v_country text;
   v_count integer;
 begin
+  -- Duas avaliações da mesma sala não podem ler o agregado e gravar por cima
+  -- uma da outra. A trava da casa serializa as salas dessa casa.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtext('room_review_rollup'),
+    pg_catalog.hashtext(p_room::text)
+  );
+
   select r.venue_id, v.city_id, c.country_code
     into v_venue, v_city, v_country
   from public.rooms r
@@ -423,6 +446,11 @@ begin
     delete from public.room_rating_rollups where room_id = p_room;
     return;
   end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtext('venue_review_rollup'),
+    pg_catalog.hashtext(v_venue::text)
+  );
 
   select count(*)::integer
     into v_count
@@ -667,6 +695,7 @@ begin
       from public.venue_staff staff
       where staff.venue_id = v_venue
         and staff.user_id = v_user
+        and staff.status = 'accepted'
     )
   ) then
     raise exception 'not owner' using errcode = '42501';
@@ -733,7 +762,11 @@ revoke all on function public.report_room_review(uuid, text)
   from public, anon, authenticated, service_role;
 grant execute on function public.report_room_review(uuid, text) to authenticated;
 
-create or replace function public.room_review_comments(p_room_id uuid)
+create or replace function public.room_review_comments(
+  p_room_id uuid,
+  p_limit integer default 20,
+  p_offset integer default 0
+)
 returns table (
   id uuid,
   first_name text,
@@ -741,13 +774,22 @@ returns table (
   overall numeric,
   created_at timestamptz,
   reply text,
-  reply_at timestamptz
+  reply_at timestamptz,
+  total_count bigint
 )
-language sql
+language plpgsql
 stable
 security definer
 set search_path = ''
 as $$
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 50
+    or p_offset is null or p_offset < 0
+  then
+    raise exception 'página inválida' using errcode = '22023';
+  end if;
+
+  return query
   select
     review.id,
     pg_catalog.split_part(profile.display_name, ' ', 1),
@@ -755,7 +797,8 @@ as $$
     review.overall,
     review.created_at,
     reply.body,
-    reply.created_at
+    reply.created_at,
+    count(*) over ()
   from public.room_reviews review
   join public.profiles profile on profile.id = review.author_id
   left join public.review_replies reply on reply.review_id = review.id
@@ -763,15 +806,19 @@ as $$
     and review.room_id = p_room_id
     and review.hidden_at is null
     and review.comment <> ''
-  order by review.created_at desc;
+  order by review.created_at desc, review.id
+  limit p_limit
+  offset p_offset;
+end;
 $$;
 
-comment on function public.room_review_comments(uuid) is
-  'Comentário visível com o primeiro nome e a nota geral. Sem nota por categoria e sem o id de quem avaliou.';
+comment on function public.room_review_comments(uuid, integer, integer) is
+  'Comentário visível com o primeiro nome e a nota geral. Página de até 50. Sem nota por categoria e sem o id de quem avaliou.';
 
-revoke all on function public.room_review_comments(uuid)
+revoke all on function public.room_review_comments(uuid, integer, integer)
   from public, anon, authenticated, service_role;
-grant execute on function public.room_review_comments(uuid) to anon, authenticated;
+grant execute on function public.room_review_comments(uuid, integer, integer)
+  to anon, authenticated;
 
 create or replace function public.room_rating(p_room_id uuid)
 returns table (
@@ -801,10 +848,13 @@ as $$
     rollup.sum_value::numeric / rollup.review_count,
     rollup.review_count >= settings.ranking_min
   from public.room_rating_rollups rollup
+  join public.venues venue on venue.id = rollup.venue_id
   cross join public.review_settings settings
   where settings.id = 1
     and settings.enabled
-    and rollup.room_id = p_room_id;
+    and rollup.room_id = p_room_id
+    and venue.status = 'approved'
+    and venue.suspended_at is null;
 $$;
 
 revoke all on function public.room_rating(uuid)
@@ -839,10 +889,13 @@ as $$
     sum(rollup.sum_value)::numeric / sum(rollup.review_count),
     sum(rollup.review_count) >= min(settings.ranking_min)
   from public.room_rating_rollups rollup
+  join public.venues venue on venue.id = rollup.venue_id
   cross join public.review_settings settings
   where settings.id = 1
     and settings.enabled
     and rollup.venue_id = p_venue_id
+    and venue.status = 'approved'
+    and venue.suspended_at is null
   group by settings.ranking_min;
 $$;
 
@@ -853,7 +906,11 @@ revoke all on function public.venue_rating(uuid)
   from public, anon, authenticated, service_role;
 grant execute on function public.venue_rating(uuid) to anon, authenticated;
 
-create or replace function public.venue_review_insights(p_venue_id uuid)
+create or replace function public.venue_review_insights(
+  p_venue_id uuid,
+  p_limit integer default 20,
+  p_offset integer default 0
+)
 returns jsonb
 language plpgsql
 stable
@@ -879,9 +936,16 @@ begin
       from public.venue_staff staff
       where staff.venue_id = p_venue_id
         and staff.user_id = v_user
+        and staff.status = 'accepted'
     )
   ) then
     raise exception 'not owner' using errcode = '42501';
+  end if;
+
+  if p_limit is null or p_limit < 1 or p_limit > 50
+    or p_offset is null or p_offset < 0
+  then
+    raise exception 'página inválida' using errcode = '22023';
   end if;
 
   select v.city_id into v_city from public.venues v where v.id = p_venue_id;
@@ -967,35 +1031,49 @@ begin
       from public.room_rating_rollups rollup
       where rollup.venue_id = p_venue_id
     ),
-    'comments', coalesce((
-      select pg_catalog.jsonb_agg(
-        pg_catalog.jsonb_build_object(
-          'id', review.id,
-          'first_name', pg_catalog.split_part(profile.display_name, ' ', 1),
-          'comment', review.comment,
-          'overall', review.overall,
-          'reply', reply.body,
-          'created_at', review.created_at
-        )
-        order by review.created_at desc
-      )
+    'comment_count', (
+      select count(*)
       from public.room_reviews review
-      join public.profiles profile on profile.id = review.author_id
-      left join public.review_replies reply on reply.review_id = review.id
       where review.venue_id = p_venue_id
         and review.hidden_at is null
         and review.comment <> ''
+    ),
+    'comments', coalesce((
+      select pg_catalog.jsonb_agg(page.item order by page.created_at desc, page.id)
+      from (
+        select
+          review.id,
+          review.created_at,
+          pg_catalog.jsonb_build_object(
+            'id', review.id,
+            'first_name', pg_catalog.split_part(profile.display_name, ' ', 1),
+            'comment', review.comment,
+            'overall', review.overall,
+            'reply', reply.body,
+            'created_at', review.created_at
+          ) as item
+        from public.room_reviews review
+        join public.profiles profile on profile.id = review.author_id
+        left join public.review_replies reply on reply.review_id = review.id
+        where review.venue_id = p_venue_id
+          and review.hidden_at is null
+          and review.comment <> ''
+        order by review.created_at desc, review.id
+        limit p_limit
+        offset p_offset
+      ) page
     ), '[]'::jsonb)
   );
 end;
 $$;
 
-comment on function public.venue_review_insights(uuid) is
-  'Painel da casa. Agregados e o primeiro nome no comentário. Sem a nota de cada categoria ligada a uma pessoa.';
+comment on function public.venue_review_insights(uuid, integer, integer) is
+  'Painel da casa. Agregados e o primeiro nome no comentário, em páginas de até 50. Sem a nota de cada categoria ligada a uma pessoa.';
 
-revoke all on function public.venue_review_insights(uuid)
+revoke all on function public.venue_review_insights(uuid, integer, integer)
   from public, anon, authenticated, service_role;
-grant execute on function public.venue_review_insights(uuid) to authenticated;
+grant execute on function public.venue_review_insights(uuid, integer, integer)
+  to authenticated;
 
 create or replace function public.review_rankings(
   p_kind text,
@@ -1044,7 +1122,10 @@ begin
 
   select sum(rollup.sum_overall) / nullif(sum(rollup.review_count), 0)
     into v_mean
-  from public.room_rating_rollups rollup;
+  from public.room_rating_rollups rollup
+  join public.venues venue on venue.id = rollup.venue_id
+  where venue.status = 'approved'
+    and venue.suspended_at is null;
 
   if v_mean is null then
     return;
@@ -1078,6 +1159,8 @@ begin
       join public.rooms room on room.id = rollup.room_id
       join public.venues venue on venue.id = rollup.venue_id
       where rollup.review_count >= v_min
+        and venue.status = 'approved'
+        and venue.suspended_at is null
         and (
           p_scope = 'world'
           or (p_scope = 'city' and rollup.city_id = p_city_id)
@@ -1113,10 +1196,13 @@ begin
         / (v_m + sum(rollup.review_count)) as bayesian
     from public.room_rating_rollups rollup
     join public.venues venue on venue.id = rollup.venue_id
-    where
-      p_scope = 'world'
-      or (p_scope = 'city' and rollup.city_id = p_city_id)
-      or (p_scope = 'country' and rollup.country_code = p_country_code)
+    where venue.status = 'approved'
+      and venue.suspended_at is null
+      and (
+        p_scope = 'world'
+        or (p_scope = 'city' and rollup.city_id = p_city_id)
+        or (p_scope = 'country' and rollup.country_code = p_country_code)
+      )
     group by rollup.venue_id, venue.name
     having sum(rollup.review_count) >= v_min
   ) scored;
@@ -1420,32 +1506,216 @@ set search_path = ''
 as $$
 declare
   v_user uuid := auth.uid();
+  v_direct boolean := false;
+  v_role text := pg_catalog.btrim(coalesce(p_role, ''));
+  v_before jsonb;
+  v_action text;
 begin
   if v_user is null then
     raise exception 'not authenticated' using errcode = '28000';
   end if;
-  if not private.owns_venue(p_venue_id) then
-    perform private.admin_require();
+  if p_user_id is null or p_venue_id is null then
+    raise exception 'convite inválido' using errcode = '22023';
   end if;
-  if p_role is null or pg_catalog.btrim(p_role) = '' then
+
+  begin
+    perform private.admin_require();
+    v_direct := true;
+  exception
+    when insufficient_privilege then
+      if not private.owns_venue(p_venue_id) then
+        raise;
+      end if;
+  end;
+
+  select pg_catalog.jsonb_build_object(
+    'role', staff.role,
+    'status', staff.status,
+    'accepted_at', staff.accepted_at
+  )
+    into v_before
+  from public.venue_staff staff
+  where staff.venue_id = p_venue_id
+    and staff.user_id = p_user_id;
+
+  if v_role = '' then
     delete from public.venue_staff
     where venue_id = p_venue_id
       and user_id = p_user_id;
+    perform private.admin_audit(
+      v_user,
+      'remove_venue_staff',
+      'venue_staff',
+      p_venue_id::text || ':' || p_user_id::text,
+      v_before,
+      null
+    );
     return;
   end if;
-  if p_role not in ('partner', 'staff') then
+  if v_role not in ('partner', 'staff') then
     raise exception 'papel inválido' using errcode = '22023';
   end if;
-  insert into public.venue_staff (venue_id, user_id, role)
-  values (p_venue_id, p_user_id, p_role)
-  on conflict (venue_id, user_id) do update
-  set role = excluded.role;
+
+  if v_direct then
+    insert into public.venue_staff (
+      venue_id, user_id, role, status, invited_by, accepted_at
+    ) values (
+      p_venue_id, p_user_id, v_role, 'accepted', v_user, pg_catalog.now()
+    )
+    on conflict (venue_id, user_id) do update
+    set role = excluded.role,
+        status = 'accepted',
+        invited_by = coalesce(public.venue_staff.invited_by, excluded.invited_by),
+        accepted_at = coalesce(public.venue_staff.accepted_at, excluded.accepted_at);
+    v_action := 'grant_venue_staff';
+  else
+    insert into public.venue_staff (
+      venue_id, user_id, role, status, invited_by, accepted_at
+    ) values (
+      p_venue_id, p_user_id, v_role, 'pending', v_user, null
+    )
+    on conflict (venue_id, user_id) do update
+    set role = excluded.role;
+    v_action := 'invite_venue_staff';
+  end if;
+
+  perform private.admin_audit(
+    v_user,
+    v_action,
+    'venue_staff',
+    p_venue_id::text || ':' || p_user_id::text,
+    v_before,
+    (
+      select pg_catalog.jsonb_build_object(
+        'role', staff.role,
+        'status', staff.status,
+        'accepted_at', staff.accepted_at
+      )
+      from public.venue_staff staff
+      where staff.venue_id = p_venue_id
+        and staff.user_id = p_user_id
+    )
+  );
 end;
 $$;
 
 revoke all on function public.set_venue_staff(uuid, uuid, text)
   from public, anon, authenticated, service_role;
 grant execute on function public.set_venue_staff(uuid, uuid, text) to authenticated;
+
+create or replace function public.accept_venue_staff(p_venue_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_status text;
+begin
+  if v_user is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  select staff.status
+    into v_status
+  from public.venue_staff staff
+  where staff.venue_id = p_venue_id
+    and staff.user_id = v_user;
+  if v_status is null then
+    raise exception 'convite inexistente' using errcode = 'P0002';
+  end if;
+  if v_status = 'accepted' then
+    return;
+  end if;
+  update public.venue_staff
+  set status = 'accepted',
+      accepted_at = pg_catalog.now()
+  where venue_id = p_venue_id
+    and user_id = v_user
+    and status = 'pending';
+  perform private.admin_audit(
+    v_user,
+    'accept_venue_staff',
+    'venue_staff',
+    p_venue_id::text || ':' || v_user::text,
+    pg_catalog.jsonb_build_object('status', 'pending'),
+    pg_catalog.jsonb_build_object('status', 'accepted')
+  );
+end;
+$$;
+
+revoke all on function public.accept_venue_staff(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.accept_venue_staff(uuid) to authenticated;
+
+create or replace function public.decline_venue_staff(p_venue_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_status text;
+begin
+  if v_user is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  select staff.status
+    into v_status
+  from public.venue_staff staff
+  where staff.venue_id = p_venue_id
+    and staff.user_id = v_user;
+  if v_status is distinct from 'pending' then
+    raise exception 'só um convite pendente pode ser recusado' using errcode = 'P0001';
+  end if;
+  delete from public.venue_staff
+  where venue_id = p_venue_id
+    and user_id = v_user
+    and status = 'pending';
+  perform private.admin_audit(
+    v_user,
+    'decline_venue_staff',
+    'venue_staff',
+    p_venue_id::text || ':' || v_user::text,
+    pg_catalog.jsonb_build_object('status', 'pending'),
+    null
+  );
+end;
+$$;
+
+revoke all on function public.decline_venue_staff(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.decline_venue_staff(uuid) to authenticated;
+
+create or replace function public.my_venue_invites()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(pg_catalog.jsonb_agg(
+    pg_catalog.jsonb_build_object(
+      'venue_id', staff.venue_id,
+      'venue_name', venue.name,
+      'role', staff.role,
+      'created_at', staff.created_at
+    )
+    order by staff.created_at desc
+  ), '[]'::jsonb)
+  from public.venue_staff staff
+  join public.venues venue on venue.id = staff.venue_id
+  where staff.user_id = auth.uid()
+    and staff.status = 'pending';
+$$;
+
+comment on function public.my_venue_invites() is
+  'Convites de equipe ainda pendentes da conta atual. Sem o id de quem convidou.';
+
+revoke all on function public.my_venue_invites()
+  from public, anon, authenticated, service_role;
+grant execute on function public.my_venue_invites() to authenticated;
 
 alter table public.room_rating_rollups replica identity full;
 

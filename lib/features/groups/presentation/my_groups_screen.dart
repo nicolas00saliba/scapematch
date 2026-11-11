@@ -17,8 +17,23 @@ import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
+import 'package:scapematch/features/reviews/data/venue_staff_gateway.dart';
 import 'package:scapematch/features/reviews/presentation/room_review_form.dart';
+import 'package:scapematch/features/reviews/presentation/venue_invite_banner.dart';
 import 'package:scapematch/providers/repositories.dart';
+
+Future<String?> _answerInvite(
+  WidgetRef ref,
+  VenueInvite invite, {
+  required bool accept,
+}) async {
+  final gateway = ref.read(venueStaffGatewayProvider);
+  final failure = accept
+      ? await gateway.accept(invite.venueId)
+      : await gateway.decline(invite.venueId);
+  ref.invalidate(venueInvitesProvider);
+  return failure;
+}
 
 class MyGroupsScreen extends ConsumerWidget {
   const MyGroupsScreen({super.key});
@@ -44,6 +59,8 @@ class MyGroupsScreen extends ConsumerWidget {
     final userId = session.id;
     final reviewsOn =
         ref.watch(reviewsEnabledProvider).asData?.value ?? false;
+    final invites =
+        ref.watch(venueInvitesProvider).asData?.value ?? const <VenueInvite>[];
 
     return AppScaffold(
       appBar: AppBar(title: const Text('Meus grupos')),
@@ -60,6 +77,12 @@ class MyGroupsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                VenueInviteBanner(
+                  invites: invites,
+                  onAccept: (invite) => _answerInvite(ref, invite, accept: true),
+                  onDecline: (invite) =>
+                      _answerInvite(ref, invite, accept: false),
+                ),
                 const TabBar(
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
