@@ -17,8 +17,8 @@ void main() {
     );
 
     expect(book.reservation(reservation.id).status, ReservationStatus.paid);
-    expect(book.houseBalance('house-1'), 90);
-    expect(book.platformBalance, 10);
+    expect(book.houseBalance('house-1'), 75);
+    expect(book.platformBalance, 25);
   });
 
   test('a group that does not close releases every hold', () async {
@@ -83,7 +83,7 @@ void main() {
       book.reservation(reservation.id).shares.map((share) => share.amountCents),
       before,
     );
-    expect(book.houseBalance('house-1'), 270);
+    expect(book.houseBalance('house-1'), 225);
   });
 
   test('a fixed group price waits for confirmation before capture', () async {
@@ -130,7 +130,7 @@ void main() {
     expect(closed.shares[0].amountCents, 150);
     expect(closed.shares[1].amountCents, 150);
     expect(closed.shares[2].status, ShareStatus.reserved);
-    expect(book.houseBalance('house-1'), 270);
+    expect(book.houseBalance('house-1'), 225);
   });
 
   test('the host can delete until two hours before the start', () {

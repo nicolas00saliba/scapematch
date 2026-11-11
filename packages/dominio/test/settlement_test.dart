@@ -14,10 +14,10 @@ void main() {
         playerIds: const ['ana', 'bia', 'caio'],
       );
 
-      expect(reservation.commissionBps, 1000);
+      expect(reservation.commissionBps, 2500);
       expect(reservation.grossCents, 100);
-      expect(reservation.commissionCents, 10);
-      expect(reservation.netCents, 90);
+      expect(reservation.commissionCents, 25);
+      expect(reservation.netCents, 75);
 
       for (final share in reservation.shares) {
         await book.payShare(
@@ -37,8 +37,8 @@ void main() {
 
       final paid = book.reservation(reservation.id);
       expect(paid.status, ReservationStatus.paid);
-      expect(book.houseBalance('house-1'), 90);
-      expect(book.platformBalance, 10);
+      expect(book.houseBalance('house-1'), 75);
+      expect(book.platformBalance, 25);
       expect(
         book.entries.where((entry) => entry.kind == LedgerKind.houseNet).length,
         3,
@@ -76,8 +76,8 @@ void main() {
       reservationId: reservation.id,
       idempotencyKey: 'capture-card',
     );
-    expect(book.houseBalance('house-1'), 180);
-    expect(book.platformBalance, 20);
+    expect(book.houseBalance('house-1'), 150);
+    expect(book.platformBalance, 50);
   });
 
   test('a refund adds new ledger lines and leaves the payment lines', () async {
@@ -115,8 +115,8 @@ void main() {
     expect(book.entries.last.kind, LedgerKind.commissionRefund);
     expect(book.entries[book.entries.length - 2].kind, LedgerKind.houseRefund);
     expect(book.entries.last.direction, LedgerDirection.debit);
-    expect(book.houseBalance('house-1'), 60);
-    expect(book.platformBalance, 6);
+    expect(book.houseBalance('house-1'), 50);
+    expect(book.platformBalance, 16);
     expect(
       book.reservation(reservation.id).shares.first.status,
       ShareStatus.refunded,
@@ -158,10 +158,10 @@ void main() {
       );
 
       final again = book.reservation(first.id);
-      expect(again.commissionBps, 1000);
-      expect(again.commissionCents, 10);
-      expect(again.netCents, 90);
-      expect(audit.beforeBps, 1000);
+      expect(again.commissionBps, 2500);
+      expect(again.commissionCents, 25);
+      expect(again.netCents, 75);
+      expect(audit.beforeBps, 2500);
       expect(audit.afterBps, 2000);
       expect(audit.action, 'set_platform_commission');
       expect(audit.houseId, isNull);
@@ -177,7 +177,7 @@ void main() {
       expect(second.commissionBps, 2000);
       expect(second.commissionCents, 20);
       expect(second.netCents, 80);
-      expect(book.reservation(first.id).commissionBps, 1000);
+      expect(book.reservation(first.id).commissionBps, 2500);
     },
   );
 
@@ -214,8 +214,8 @@ void main() {
 
     expect(pinned.commissionBps, 2500);
     expect(book.reservation(pinned.id).commissionCents, 25);
-    expect(other.commissionBps, 1000);
-    expect(book.reservation(other.id).commissionCents, 10);
+    expect(other.commissionBps, 2500);
+    expect(book.reservation(other.id).commissionCents, 25);
     expect(book.settings.rateFor('house-a'), 2500);
     expect(book.settings.rateFor('house-b'), 500);
     expect(book.audit.first.action, 'set_house_commission');
@@ -246,7 +246,7 @@ void main() {
         throwsA(isA<PlatformPermissionException>()),
       );
     }
-    expect(book.settings.rateFor('house-1'), 1000);
+    expect(book.settings.rateFor('house-1'), 2500);
     expect(book.audit, isEmpty);
   });
 
@@ -368,8 +368,8 @@ void main() {
         idempotencyKey: 'capture-fail',
       );
       expect(book.reservation(reservation.id).status, ReservationStatus.paid);
-      expect(book.houseBalance('house-1'), 72);
-      expect(book.platformBalance, 8);
+      expect(book.houseBalance('house-1'), 60);
+      expect(book.platformBalance, 20);
     },
   );
 
@@ -427,12 +427,12 @@ void main() {
       amountCents: 100,
     );
 
-    expect(grown.shares.first.commissionCents, 10);
+    expect(grown.shares.first.commissionCents, 25);
     expect(grown.shares.last.playerId, 'bia');
     expect(grown.shares.last.amountCents, 100);
-    expect(grown.shares.last.commissionCents, 10);
-    expect(grown.shares.last.netCents, 90);
-    expect(grown.commissionBps, 1000);
+    expect(grown.shares.last.commissionCents, 25);
+    expect(grown.shares.last.netCents, 75);
+    expect(grown.commissionBps, 2500);
     expect(
       book
           .addShare(reservationId: first.id, playerId: 'bia', amountCents: 100)
