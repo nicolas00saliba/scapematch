@@ -32,7 +32,7 @@ Para a casa, a comissão padrão é 25% e incide só sobre o que o app vender. O
 
 1 ponto vale R$ 0,01. 100 pontos valem R$ 1,00 de desconto na vaga. Os pontos não vencem e não viram dinheiro para saque. Servem para abater a vaga de quem joga.
 
-Dá para usar a partir de 1.000 pontos. O teto configurado no programa é 30% do valor da vaga. Na cobrança, o desconto também não passa da comissão do EscapeMatch naquela reserva, para a casa receber o líquido combinado. A comissão padrão é 25%. Uma casa pode ter outra taxa. Com a comissão padrão, o desconto para em 25%, porque 25% é menor que o teto de 30%.
+Dá para usar a partir de 1.000 pontos, com desconto de até 25% do valor da vaga. O desconto vai até o valor da comissão da reserva. Hoje a comissão padrão é 25% da vaga. Uma casa pode ter outra taxa.
 
 Os pontos ganhos ficam disponíveis 30 dias depois do pagamento. Se a reserva for cancelada ou estornada, os pontos dela saem da conta.
 

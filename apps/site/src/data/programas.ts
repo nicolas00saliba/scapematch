@@ -217,7 +217,7 @@ export function programaPorId(id: string): Programa {
 export const regrasJogador = [
   '1 ponto vale R$ 0,01. 100 pontos valem R$ 1,00 de desconto na sua vaga. Os pontos não vencem e não viram dinheiro para saque.',
   'Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.',
-  'Dá para usar a partir de 1.000 pontos, com desconto de até 30% do valor da sua vaga.',
+  'Dá para usar a partir de 1.000 pontos, com desconto de até 25% do valor da sua vaga.',
   'O código de quem indicou entra no cadastro ou nas primeiras 24 horas. Uma indicação vale por 1 ano.',
   'Se a reserva for cancelada ou estornada, os pontos dela saem da conta.',
 ];

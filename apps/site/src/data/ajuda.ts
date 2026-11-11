@@ -147,7 +147,7 @@ export const temas: Tema[] = [
       },
       {
         pergunta: 'A partir de quando dá para usar?',
-        resposta: 'A partir de 1.000 pontos, com desconto de até 30% do valor da sua vaga.',
+        resposta: 'A partir de 1.000 pontos, com desconto de até 25% do valor da sua vaga.',
       },
       {
         pergunta: 'Quantos pontos eu ganho ao criar a conta?',
