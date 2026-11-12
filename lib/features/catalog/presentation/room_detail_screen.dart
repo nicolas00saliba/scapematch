@@ -17,6 +17,7 @@ import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/presentation/room_catalog_view_model.dart';
 import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
+import 'package:scapematch/features/ranking/presentation/room_time_view.dart';
 
 /// Sala aberta a partir do cartão. A capa continua o voo do Hero.
 class RoomDetailScreen extends ConsumerWidget {
@@ -202,6 +203,7 @@ class _RoomDetailState extends State<_RoomDetail> {
                   color: scheme.onSurfaceVariant,
                 ),
               ),
+              RoomTimeSlot(roomId: room.id),
               const SizedBox(height: 18),
               Text(
                 'Fotos',

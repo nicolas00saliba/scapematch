@@ -22,6 +22,7 @@ import 'package:scapematch/features/cities/data/supabase_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/data/supabase_group_repository.dart';
 import 'package:scapematch/features/groups/data/group_repository.dart';
+import 'package:scapematch/features/ranking/data/room_time_gateway.dart';
 import 'package:scapematch/features/social/data/memory_social_repository.dart';
 import 'package:scapematch/features/social/data/social_repository.dart';
 import 'package:scapematch/features/social/data/supabase_social_repository.dart';
@@ -205,6 +206,23 @@ final reviewsEnabledProvider = FutureProvider<bool>((ref) async {
   if (!ref.watch(backendPlanProvider).connectsSupabase) return false;
   final value = await ref.watch(supabaseClientProvider).rpc('reviews_enabled');
   return value == true;
+});
+
+/// A demonstração deixa o ranking desligado. No app real a função
+/// do banco devolve o interruptor do Admin, que nasce falso.
+final roomTimeRankingEnabledProvider = FutureProvider<bool>((ref) async {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) return false;
+  final value = await ref
+      .watch(supabaseClientProvider)
+      .rpc('room_time_ranking_enabled');
+  return value == true;
+});
+
+final roomTimeGatewayProvider = Provider<RoomTimeGateway>((ref) {
+  if (!ref.watch(backendPlanProvider).connectsSupabase) {
+    return MemoryRoomTimeGateway();
+  }
+  return SupabaseRoomTimeGateway(ref.watch(supabaseClientProvider));
 });
 
 final roomReviewGatewayProvider = Provider<RoomReviewGateway>((ref) {

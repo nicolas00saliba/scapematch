@@ -8,6 +8,7 @@ enum AdminSection {
   destaques,
   auditoria,
   avaliacoes,
+  ranking,
 }
 
 class AdminPlace {

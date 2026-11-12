@@ -14,6 +14,7 @@ import 'package:scapematch/features/auth/presentation/password_change_dialog.dar
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_messages.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_control.dart';
+import 'package:scapematch/features/ranking/presentation/room_time_view.dart';
 import 'package:scapematch/features/scape_points/presentation/scape_points_view.dart';
 import 'package:scapematch/features/wallet/presentation/payment_methods_body.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -73,9 +74,13 @@ class AccountDestinationScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Sem login nesta versão. Este perfil é fictício e não sai deste aparelho.',
+        Text(
+          sample
+              ? 'Sem login nesta versão. Este perfil é fictício e não sai deste aparelho.'
+              : 'Nome e os tempos que a casa lançou para você.',
         ),
+        const RoomTimeVisibilitySlot(),
+        const MyRoomTimesSlot(),
       ],
       AccountDestination.partners =>
         sample
