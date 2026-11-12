@@ -29,6 +29,8 @@ jobs:
         run: npm ci && npm run build
 
       - name: Lighthouse
+        # Três amostras. O orçamento compara a mediana, para um pico de CPU
+        # do runner não derrubar a home numa única passagem.
         uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
         with:
           configPath: ./apps/site/lighthouserc.json
