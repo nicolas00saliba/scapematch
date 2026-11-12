@@ -18,6 +18,7 @@ ROTAS = [
     "/experiencias",
     "/experiencias/escape-room",
     "/guia/escape-room-sozinho",
+    "/escape-room-curitiba",
     "/seguranca",
     "/app",
     "/convite",
@@ -42,6 +43,7 @@ ROTAS = [
     "/ajuda/pontos",
     "/ajuda/casas",
     "/sobre",
+    "/contato",
     "/termos",
     "/termos/parceiro",
     "/privacidade",
@@ -51,8 +53,15 @@ ROTAS = [
 ]
 
 NOINDEX = {"/convite", "/404"}
-FORA_DO_BUILD = ("/contato", "/cidades/curitiba")
+FORA_DO_BUILD = ("/cidades/curitiba",)
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+EMAIL_CONTATO = "contato@escapematch.com.br"
+TOKEN_BUSCADOR = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+TOKEN_BLOQUEADO = re.compile(
+    r"(example|exemplo|changeme|placeholder|fake|teste|sample|your[-_]?token)",
+    re.I,
+)
+ARQUIVO_GOOGLE = re.compile(r"google[A-Za-z0-9]{16,}\.html")
 CANCELAMENTO = (
     "Não há reembolso depois que o grupo é confirmado.",
     "se o grupo não fechar, nada é cobrado",
@@ -112,6 +121,22 @@ def arquivo(rota: str) -> pathlib.Path:
 def falha(msg: str) -> None:
     print(msg, file=sys.stderr)
     raise SystemExit(1)
+
+
+def token_ok(valor: str) -> bool:
+    if not TOKEN_BUSCADOR.fullmatch(valor) or TOKEN_BLOQUEADO.search(valor):
+        return False
+    if re.fullmatch(r"(todo|test|x+)", valor, re.I):
+        return False
+    return len(set(valor)) > 1
+
+
+def arquivo_google_ok(path: pathlib.Path, texto: str) -> bool:
+    if not ARQUIVO_GOOGLE.fullmatch(path.name):
+        return False
+    if re.search(r"(example|exemplo|placeholder|changeme|fake)", path.name, re.I):
+        return False
+    return texto.strip() == f"google-site-verification: {path.name}"
 
 
 def main() -> None:
@@ -212,7 +237,7 @@ def main() -> None:
     for rota in ("/convite", "/404", *FORA_DO_BUILD):
         if f"{SITE}{rota}<" in sitemap or f"{SITE}{rota}/" in sitemap:
             falha(f"{rota} entrou no sitemap")
-    for rota in ("/termos", "/privacidade", "/cancelamento"):
+    for rota in ("/termos", "/privacidade", "/cancelamento", "/contato", "/escape-room-curitiba"):
         if f"{SITE}{rota}<" not in sitemap and f"{SITE}{rota}/" not in sitemap:
             falha(f"{rota} saiu do sitemap")
 
@@ -221,7 +246,8 @@ def main() -> None:
         if path.exists():
             falha(f"{rota} entrou no build")
     fontes = (
-        ROOT / "apps/site/src/pages/_contato.astro",
+        ROOT / "apps/site/src/pages/contato.astro",
+        ROOT / "apps/site/src/pages/escape-room-curitiba.astro",
         ROOT / "apps/site/src/pages/_cidades/[cidade].astro",
     )
     for fonte in fontes:
@@ -230,7 +256,37 @@ def main() -> None:
 
     for html in DIST.rglob("*.html"):
         texto = html.read_text()
-        if "mailto:" in texto or EMAIL.search(texto):
+        if html.name.startswith("google") and html.suffix == ".html":
+            if not arquivo_google_ok(html, texto):
+                falha(f"arquivo de verificação do Google inválido: {html.name}")
+            continue
+        parser_meta = Links()
+        parser_meta.feed(texto)
+        for meta in parser_meta.metas:
+            if meta.get("name") in ("google-site-verification", "msvalidate.01"):
+                if not token_ok(meta.get("content", "")):
+                    falha(f"{html.relative_to(DIST)} tem verificação inválida")
+        if html.name == "contato.html":
+            resto = texto.replace(f"mailto:{EMAIL_CONTATO}", "").replace(EMAIL_CONTATO, "")
+            if f"mailto:{EMAIL_CONTATO}" not in texto or EMAIL_CONTATO not in texto:
+                falha("contato sem o e-mail publicado")
+            if "mailto:" in resto or EMAIL.search(resto):
+                falha("contato mostra outro e-mail")
+            for trecho in (
+                "ESCAPEMATCH TECNOLOGIA LTDA",
+                "70.100.608/0001-73",
+                "Curitiba-PR",
+                'href="/app"',
+                'href="https://app.escapematch.com.br/"',
+                'href="/para-casas/cadastro"',
+                'href="https://parceiro.escapematch.com.br/"',
+                '"@type":"ContactPage"',
+            ):
+                if trecho not in texto:
+                    falha(f"contato sem {trecho}")
+            if "<form" in texto.lower() or "tel:" in texto.lower():
+                falha("contato tem formulário ou telefone")
+        elif "mailto:" in texto or EMAIL.search(texto):
             falha(f"{html.relative_to(DIST)} mostra e-mail")
         for rota in FORA_DO_BUILD:
             if f'href="{rota}"' in texto or f"href='{rota}'" in texto:
@@ -279,6 +335,40 @@ def main() -> None:
     guia = arquivo("/guia/escape-room-sozinho").read_text()
     if '"@type":"FAQPage"' not in guia:
         falha("o guia saiu sem FAQPage")
+    cidade = arquivo("/escape-room-curitiba").read_text()
+    for trecho in (
+        '"@type":"WebPage"',
+        '"@type":"FAQPage"',
+        '"@type":"Service"',
+        '"@type":"City"',
+        "Curitiba",
+        "ranking",
+        "avalia",
+        'property="og:title"',
+        'property="og:description"',
+        'property="og:url"',
+    ):
+        if trecho not in cidade:
+            falha(f"escape room em Curitiba sem {trecho}")
+    if re.search(r"R\$\s*\d", cidade) or "<form" in cidade.lower():
+        falha("a página de Curitiba publica preço ou formulário")
+    contato = arquivo("/contato").read_text()
+    for trecho in ('property="og:title"', 'property="og:description"', 'property="og:url"'):
+        if trecho not in contato:
+            falha(f"contato sem {trecho}")
+    bing = DIST / "BingSiteAuth.xml"
+    if bing.is_file():
+        miolo = re.fullmatch(
+            r"<\?xml version=\"1.0\"\?>\n<users>\n  <user>([^<]+)</user>\n</users>\n",
+            bing.read_text(),
+        )
+        if not miolo or not token_ok(miolo.group(1)):
+            falha("BingSiteAuth.xml inválido")
+    base = (ROOT / "apps/site/src/layouts/Base.astro").read_text()
+    if re.search(r'name="google-site-verification" content="[^"]+"', base):
+        falha("token do Google foi parar no código")
+    if re.search(r'name="msvalidate\.01" content="[^"]+"', base):
+        falha("token do Bing foi parar no código")
     if "<lastmod>" not in sitemap:
         falha("sitemap sem lastmod")
     for nome in ("llms.txt", "llms-full.txt"):
@@ -302,6 +392,8 @@ def main() -> None:
     ):
         if f"User-agent: {bot}\nAllow: /" not in robots:
             falha(f"robots.txt não libera {bot}")
+    if "Sitemap: https://escapematch.com.br/sitemap-index.xml" not in robots:
+        falha("robots.txt sem o sitemap")
 
     print(f"site ok: {len(ROTAS)} rotas")
 

@@ -2,13 +2,19 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
   clientFailure,
   logAsaasFailure,
+  logCaught,
 } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { isPointsReserve } from "../_shared/asaas_transfers.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import {
   nextSubaccountEmail,
   subaccountEmailPlan,
 } from "../_shared/subaccount_email.ts";
+import {
+  ensureTransferWebhook,
+  transferClient,
+} from "../_shared/venue_payouts.ts";
 
 type VenueRow = {
   id: string;
@@ -86,6 +92,16 @@ Deno.serve(async (req) => {
         p_api_key: created.apiKey,
       });
       if (keyError) return json({ error: "erro" }, 400);
+      if (!isPointsReserve(Deno.env, created.walletId, created.apiKey)) {
+        try {
+          await ensureTransferWebhook(
+            transferClient(asaas.withKey(created.apiKey)),
+            Deno.env,
+          );
+        } catch (error) {
+          logCaught("provision-venue-wallet", error);
+        }
+      }
       provisioned.push({ venue_id: venue.id });
     }
     return json({ provisioned });

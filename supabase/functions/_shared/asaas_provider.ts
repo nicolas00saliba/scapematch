@@ -7,6 +7,20 @@
 // a cobrança seguinte manda creditCardToken.
 
 import { asaasStatus } from "./asaas_client_error.ts";
+import {
+  balanceCents,
+  findTransferInList,
+  parseFinancialTransactions,
+  parsePaymentReceivables,
+  parseTransfer,
+  parseWebhookList,
+  transferPayload,
+  type WebhookView,
+  type FinancialMovement,
+  type Receivable,
+  type TransferRequest,
+  type TransferResult,
+} from "./asaas_transfers.ts";
 import { localChargeStatus, pixMatchesCharge } from "./pix_charge.ts";
 import { redactSensitive } from "./redact.ts";
 
@@ -747,6 +761,63 @@ export class AsaasProvider implements PaymentProvider {
         ? body.status
         : "REFUNDED",
     }));
+  }
+
+  financeBalanceCents(): Promise<number> {
+    return this.#send("/finance/balance", undefined, "GET").then(balanceCents);
+  }
+
+  confirmedReceivables(): Promise<Receivable[]> {
+    return this.#send(
+      "/payments?status=CONFIRMED&limit=100",
+      undefined,
+      "GET",
+    ).then(parsePaymentReceivables);
+  }
+
+  financialTransactions(): Promise<FinancialMovement[]> {
+    return this.#send(
+      "/financialTransactions?limit=100",
+      undefined,
+      "GET",
+    ).then(parseFinancialTransactions);
+  }
+
+  createTransfer(input: TransferRequest): Promise<TransferResult> {
+    return this.#send("/transfers", transferPayload(input)).then(parseTransfer);
+  }
+
+  findTransfer(externalReference: string): Promise<TransferResult | null> {
+    const query = encodeURIComponent(externalReference);
+    return this.#send(
+      `/transfers?externalReference=${query}&limit=10`,
+      undefined,
+      "GET",
+    ).then((body) => findTransferInList(body, externalReference));
+  }
+
+  readTransfer(id: string): Promise<TransferResult> {
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(id)) throw new Error("valor");
+    return this.#send(
+      `/transfers/${encodeURIComponent(id)}`,
+      undefined,
+      "GET",
+    ).then(parseTransfer);
+  }
+
+  /// Webhooks da conta desta apiKey. Na subconta, a chave tem de ser a dela.
+  listWebhooks(): Promise<WebhookView[]> {
+    return this.#send("/webhooks?limit=100", undefined, "GET").then(
+      parseWebhookList,
+    );
+  }
+
+  saveWebhook(body: Record<string, unknown>, id?: string): Promise<void> {
+    if (id !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
+      throw new Error("valor");
+    }
+    const path = id ? `/webhooks/${encodeURIComponent(id)}` : "/webhooks";
+    return this.#send(path, body, id ? "PUT" : "POST").then(() => undefined);
   }
 
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
