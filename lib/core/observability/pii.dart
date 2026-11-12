@@ -3,10 +3,10 @@
 /// O DSN não entra aqui. Sem DSN no build, o SDK nem chega a ser iniciado.
 String redigirPii(String texto) {
   var saida = texto;
-  saida = saida.replaceAll(_email, '[email]');
   saida = saida.replaceAllMapped(_parametroSensivel, (match) {
-    return '${match.group(1)}[redigido]';
+    return '${match.group(1)}${match.group(2)}[redigido]';
   });
+  saida = saida.replaceAll(_email, '[email]');
   saida = saida.replaceAll(_cpfFormatado, '[cpf]');
   saida = saida.replaceAll(_telefoneFormatado, '[telefone]');
   saida = saida.replaceAllMapped(_onzeDigitos, (match) {
@@ -69,8 +69,13 @@ final _email = RegExp(
 );
 
 final _parametroSensivel = RegExp(
-  r'([?&](?:email|e-mail|cpf|telefone|phone|celular)=)[^&#\s]+',
+  '([?&#]|^)('
+  '(?:access_token|refresh_token|provider_refresh_token|provider_token|'
+  'id_token|token_type|token|code|type|email|e-mail|cpf|telefone|phone|'
+  'celular)=)'
+  r'[^&#\s]*',
   caseSensitive: false,
+  multiLine: true,
 );
 
 final _cpfFormatado = RegExp(r'\b\d{3}\.\d{3}\.\d{3}-\d{2}\b');

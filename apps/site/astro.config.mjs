@@ -6,10 +6,12 @@ const dsnSentry = process.env.PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN || '';
 if (dsnSentry.startsWith('https://') && !process.env.PUBLIC_SENTRY_DSN) {
   process.env.PUBLIC_SENTRY_DSN = dsnSentry;
 }
+// O HTML publicado nasce no tool/sync-site.sh. CF_PAGES_COMMIT_SHA só
+// entra se essa variável ainda estiver no ambiente.
 const releaseSentry =
   process.env.PUBLIC_SENTRY_RELEASE ||
-  process.env.CF_PAGES_COMMIT_SHA ||
   process.env.GITHUB_SHA ||
+  process.env.CF_PAGES_COMMIT_SHA ||
   '';
 if (releaseSentry && !process.env.PUBLIC_SENTRY_RELEASE) {
   process.env.PUBLIC_SENTRY_RELEASE = releaseSentry;

@@ -2,8 +2,8 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:scapematch/core/observability/pii.dart';
 
-/// Erros continuam amostrados: o volume é baixo e o plano gratuito cabe.
-const double taxaAmostragemErros = 0.25;
+/// Todo erro é enviado. O traço de performance fica em 5%.
+const double taxaAmostragemErros = 1;
 
 /// Performance fica bem abaixo da captura de erros.
 const double taxaAmostragemTraces = 0.05;

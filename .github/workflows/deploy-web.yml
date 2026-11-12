@@ -17,8 +17,10 @@
 #
 # Segredos opcionais do Sentry. Sem eles o SDK fica inerte:
 #   SENTRY_DSN_APP, SENTRY_DSN_PARCEIRO, SENTRY_DSN_ADMIN
-# O release é o SHA do commit. O site lê PUBLIC_SENTRY_DSN
-# no build da Cloudflare Pages, fora deste workflow.
+# O release é o SHA do commit. O site institucional não passa por este
+# workflow: tool/sync-site.sh compila apps/site e envia o dist ao
+# repositório scapematch-site. O DSN desse build é PUBLIC_SENTRY_DSN
+# no ambiente do script.
 #
 # --base-href must keep the leading and trailing slash.
 # APP_MODE=real|demo escolhe o repositório. O Parceiro continua outro app.

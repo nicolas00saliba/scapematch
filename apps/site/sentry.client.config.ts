@@ -1,6 +1,10 @@
 import * as Sentry from '@sentry/astro';
 
 import { redigirBreadcrumb, redigirEvento } from './src/scripts/redigir-pii';
+import {
+  taxaAmostragemErros,
+  taxaAmostragemTraces,
+} from './src/scripts/sentry-taxas';
 
 const dsn = import.meta.env.PUBLIC_SENTRY_DSN;
 
@@ -11,8 +15,8 @@ if (typeof dsn === 'string' && dsn.startsWith('https://')) {
     environment: import.meta.env.PUBLIC_SENTRY_ENVIRONMENT || 'production',
     release: release || undefined,
     sendDefaultPii: false,
-    sampleRate: 0.25,
-    tracesSampleRate: 0.05,
+    sampleRate: taxaAmostragemErros,
+    tracesSampleRate: taxaAmostragemTraces,
     beforeSend(evento) {
       return redigirEvento(evento);
     },

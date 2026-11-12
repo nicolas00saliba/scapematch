@@ -9,12 +9,11 @@ const chavesSensiveis = new Set([
 ]);
 
 export function redigirTexto(texto: string): string {
+  const parametroSensivel =
+    /([?&#]|^)((?:access_token|refresh_token|provider_refresh_token|provider_token|id_token|token_type|token|code|type|email|e-mail|cpf|telefone|phone|celular)=)[^&#\s]*/gi;
   return texto
+    .replace(parametroSensivel, '$1$2[redigido]')
     .replace(/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/gi, '[email]')
-    .replace(
-      /([?&](?:email|e-mail|cpf|telefone|phone|celular)=)[^&#\s]+/gi,
-      '$1[redigido]',
-    )
     .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, '[cpf]')
     .replace(/(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]\d{4}\b/g, '[telefone]')
     .replace(/\b\d{11}\b/g, (digitos) =>
