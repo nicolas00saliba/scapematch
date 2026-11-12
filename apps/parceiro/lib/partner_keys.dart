@@ -139,6 +139,8 @@ abstract final class PartnerKeys {
   static const withdrawals = Key('venue-withdrawals');
   static const withdrawalBalance = Key('venue-withdrawal-balance');
   static const withdrawalAmount = Key('venue-withdrawal-amount');
+  static const withdrawalAll = Key('venue-withdrawal-all');
+  static const withdrawalRetry = Key('venue-withdrawal-retry');
   static const withdrawalSubmit = Key('venue-withdrawal-submit');
   static const withdrawalReceipt = Key('venue-withdrawal-receipt');
   static const withdrawalBank = Key('venue-withdrawal-bank');

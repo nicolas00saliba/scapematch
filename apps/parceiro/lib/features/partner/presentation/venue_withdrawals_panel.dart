@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repository.dart';
@@ -85,6 +87,14 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
     if (snapshot.schedule.minAmountCents > 0) {
       _minimum.text = _reais(snapshot.schedule.minAmountCents);
     }
+  }
+
+  bool _canRetry(VenuePayoutSnapshot snapshot, VenueWithdrawal item) {
+    return item.status == 'failed' &&
+        snapshot.canWithdraw &&
+        !snapshot.withdrawalsBlocked &&
+        item.amountCents > 0 &&
+        item.amountCents <= snapshot.availableCents;
   }
 
   Future<void> _withdraw() async {
@@ -203,99 +213,179 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
         Text(PartnerMessages.withdrawalsBody),
         const SizedBox(height: 16),
         if (staff)
-          Text(PartnerMessages.withdrawalStaff)
+          const _PayoutCard(child: Text(PartnerMessages.withdrawalStaff))
         else ...[
           _BalanceCard(snapshot: snapshot),
           if (snapshot.withdrawalsBlocked) ...[
             const SizedBox(height: 12),
-            Text(PartnerMessages.withdrawalBlocked),
+            Text(
+              PartnerMessages.withdrawalBlocked,
+              style: TextStyle(
+                color:
+                    Theme.of(context).extension<ScapeStatusColors>()?.alert ??
+                    theme.colorScheme.tertiary,
+              ),
+            ),
           ],
           const SizedBox(height: 16),
-          Text(
-            PartnerMessages.receivableLabel,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+          _PayoutCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  PartnerMessages.receivableLabel,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (snapshot.receivables.isEmpty)
+                  const Text(PartnerMessages.receivableEmpty)
+                else
+                  for (final item in snapshot.receivables)
+                    Text(
+                      '${formatPrice(item.cents)} · ${_day(item.creditDate)} · ${item.description}',
+                    ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: PartnerKeys.withdrawalAmount,
+                  controller: _amount,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: const [_ReaisMaskFormatter()],
+                  decoration: const InputDecoration(
+                    labelText: PartnerMessages.withdrawalAmount,
+                    prefixText: r'R$ ',
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: PartnerKeys.withdrawalAll,
+                    style: _tapTarget(),
+                    onPressed: _busy || snapshot.availableCents <= 0
+                        ? null
+                        : () => _amount.text = _reais(snapshot.availableCents),
+                    child: const Text(PartnerMessages.withdrawalAll),
+                  ),
+                ),
+                FilledButton(
+                  key: PartnerKeys.withdrawalSubmit,
+                  onPressed: _busy || snapshot.withdrawalsBlocked
+                      ? null
+                      : _withdraw,
+                  child: const Text(PartnerMessages.withdrawalSubmit),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          if (snapshot.receivables.isEmpty)
-            const Text(PartnerMessages.receivableEmpty)
-          else
-            for (final item in snapshot.receivables)
-              Text(
-                '${formatPrice(item.cents)} · ${_day(item.creditDate)} · ${item.description}',
-              ),
           const SizedBox(height: 16),
-          TextField(
-            key: PartnerKeys.withdrawalAmount,
-            controller: _amount,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: PartnerMessages.withdrawalAmount,
+          _PayoutCard(
+            child: _BankSection(
+              snapshot: snapshot,
+              editing: _editingBank,
+              destination: _destination,
+              pixType: _pixType,
+              operation: _operation,
+              owner: _owner,
+              document: _document,
+              pix: _pix,
+              bankCode: _bankCode,
+              agency: _agency,
+              account: _account,
+              digit: _digit,
+              busy: _busy,
+              onEdit: () => setState(() => _editingBank = true),
+              onDestination: (value) => setState(() => _destination = value),
+              onPixType: (value) => setState(() => _pixType = value),
+              onOperation: (value) => setState(() => _operation = value),
+              onSave: _saveBank,
             ),
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton(
-              key: PartnerKeys.withdrawalSubmit,
-              onPressed: _busy || snapshot.withdrawalsBlocked
-                  ? null
-                  : _withdraw,
-              child: const Text(PartnerMessages.withdrawalSubmit),
+          const SizedBox(height: 16),
+          _PayoutCard(
+            child: _ScheduleSection(
+              auto: _auto,
+              frequency: _frequency,
+              weekday: _weekday ?? 1,
+              minimum: _minimum,
+              busy: _busy,
+              onAuto: (value) => setState(() => _auto = value),
+              onFrequency: (value) => setState(() => _frequency = value),
+              onWeekday: (value) => setState(() => _weekday = value),
+              onSave: _saveSchedule,
             ),
           ),
-          const SizedBox(height: 20),
-          _BankSection(
-            snapshot: snapshot,
-            editing: _editingBank,
-            destination: _destination,
-            pixType: _pixType,
-            operation: _operation,
-            owner: _owner,
-            document: _document,
-            pix: _pix,
-            bankCode: _bankCode,
-            agency: _agency,
-            account: _account,
-            digit: _digit,
-            busy: _busy,
-            onEdit: () => setState(() => _editingBank = true),
-            onDestination: (value) => setState(() => _destination = value),
-            onPixType: (value) => setState(() => _pixType = value),
-            onOperation: (value) => setState(() => _operation = value),
-            onSave: _saveBank,
-          ),
-          const SizedBox(height: 20),
-          _ScheduleSection(
-            auto: _auto,
-            frequency: _frequency,
-            weekday: _weekday ?? 1,
-            minimum: _minimum,
-            busy: _busy,
-            onAuto: (value) => setState(() => _auto = value),
-            onFrequency: (value) => setState(() => _frequency = value),
-            onWeekday: (value) => setState(() => _weekday = value),
-            onSave: _saveSchedule,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            PartnerMessages.withdrawalHistory,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+          const SizedBox(height: 16),
+          _PayoutCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  PartnerMessages.withdrawalHistory,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (snapshot.withdrawals.isEmpty)
+                  const Text(PartnerMessages.withdrawalEmpty)
+                else
+                  for (var i = 0; i < snapshot.withdrawals.length; i++) ...[
+                    _WithdrawalTile(
+                      item: snapshot.withdrawals[i],
+                      canRetry: _canRetry(snapshot, snapshot.withdrawals[i]),
+                      onRetry: () {
+                        _amount.text = _reais(
+                          snapshot.withdrawals[i].amountCents,
+                        );
+                        _withdraw();
+                      },
+                    ),
+                    if (i != snapshot.withdrawals.length - 1)
+                      Divider(
+                        height: 24,
+                        color: theme.colorScheme.outlineVariant,
+                      ),
+                  ],
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          if (snapshot.withdrawals.isEmpty)
-            const Text(PartnerMessages.withdrawalEmpty)
-          else
-            for (final item in snapshot.withdrawals)
-              _WithdrawalTile(item: item),
         ],
         if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
       ],
     );
   }
+}
+
+class _PayoutCard extends StatelessWidget {
+  const _PayoutCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+}
+
+ButtonStyle _tapTarget() {
+  return TextButton.styleFrom(
+    minimumSize: const Size(48, 48),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    tapTargetSize: MaterialTapTargetSize.padded,
+    alignment: Alignment.centerLeft,
+  );
 }
 
 class _BalanceCard extends StatelessWidget {
@@ -398,6 +488,7 @@ class _BankSection extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
+              style: _tapTarget(),
               onPressed: onEdit,
               child: Text(
                 bank == null
@@ -549,47 +640,61 @@ class _ScheduleSection extends StatelessWidget {
         Text(PartnerMessages.withdrawalAutoBody),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text(PartnerMessages.withdrawalAuto),
+          title: const Text(PartnerMessages.withdrawalAutoSwitch),
           value: auto,
           onChanged: busy ? null : onAuto,
         ),
-        Wrap(
-          spacing: 8,
-          children: [
-            ChoiceChip(
-              label: const Text(PartnerMessages.withdrawalDaily),
-              selected: frequency == 'daily',
-              onSelected: (_) => onFrequency('daily'),
-            ),
-            ChoiceChip(
-              label: const Text(PartnerMessages.withdrawalWeekly),
-              selected: frequency == 'weekly',
-              onSelected: (_) => onFrequency('weekly'),
-            ),
-          ],
-        ),
-        if (frequency == 'weekly')
-          DropdownButtonFormField<int>(
-            initialValue: weekday,
-            decoration: const InputDecoration(labelText: 'Dia'),
-            items: const [
-              DropdownMenuItem(value: 0, child: Text('Domingo')),
-              DropdownMenuItem(value: 1, child: Text('Segunda')),
-              DropdownMenuItem(value: 2, child: Text('Terça')),
-              DropdownMenuItem(value: 3, child: Text('Quarta')),
-              DropdownMenuItem(value: 4, child: Text('Quinta')),
-              DropdownMenuItem(value: 5, child: Text('Sexta')),
-              DropdownMenuItem(value: 6, child: Text('Sábado')),
+        Opacity(
+          opacity: auto ? 1 : 0.45,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text(PartnerMessages.withdrawalDaily),
+                    selected: frequency == 'daily',
+                    onSelected: auto ? (_) => onFrequency('daily') : null,
+                  ),
+                  ChoiceChip(
+                    label: const Text(PartnerMessages.withdrawalWeekly),
+                    selected: frequency == 'weekly',
+                    onSelected: auto ? (_) => onFrequency('weekly') : null,
+                  ),
+                ],
+              ),
+              if (frequency == 'weekly')
+                DropdownButtonFormField<int>(
+                  initialValue: weekday,
+                  decoration: const InputDecoration(labelText: 'Dia'),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('Domingo')),
+                    DropdownMenuItem(value: 1, child: Text('Segunda')),
+                    DropdownMenuItem(value: 2, child: Text('Terça')),
+                    DropdownMenuItem(value: 3, child: Text('Quarta')),
+                    DropdownMenuItem(value: 4, child: Text('Quinta')),
+                    DropdownMenuItem(value: 5, child: Text('Sexta')),
+                    DropdownMenuItem(value: 6, child: Text('Sábado')),
+                  ],
+                  onChanged: auto
+                      ? (value) {
+                          if (value != null) onWeekday(value);
+                        }
+                      : null,
+                ),
+              TextField(
+                enabled: auto && !busy,
+                controller: minimum,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: PartnerMessages.withdrawalMinimum,
+                  prefixText: r'R$ ',
+                ),
+              ),
             ],
-            onChanged: (value) {
-              if (value != null) onWeekday(value);
-            },
-          ),
-        TextField(
-          controller: minimum,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: PartnerMessages.withdrawalMinimum,
           ),
         ),
         const SizedBox(height: 8),
@@ -606,46 +711,60 @@ class _ScheduleSection extends StatelessWidget {
 }
 
 class _WithdrawalTile extends StatelessWidget {
-  const _WithdrawalTile({required this.item});
+  const _WithdrawalTile({
+    required this.item,
+    required this.canRetry,
+    required this.onRetry,
+  });
 
   final VenueWithdrawal item;
+  final bool canRetry;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final receipt = item.receiptUrl;
     final secure = receipt != null && receipt.startsWith('https://');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${formatPrice(item.amountCents)} · ${_status(item.status)} · ${_source(item.source)}',
+    final failed = item.status == 'failed';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${formatPrice(item.amountCents)} · ${_source(item.source)}'),
+        const SizedBox(height: 2),
+        Text(
+          _stamp(item.createdAt),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          Text(_stamp(item.createdAt)),
-          if (secure)
+        ),
+        const SizedBox(height: 8),
+        _StatusChip(status: item.status),
+        if (secure)
+          TextButton(
+            key: PartnerKeys.withdrawalReceipt,
+            style: _tapTarget(),
+            onPressed: () => launchExternalUrl(Uri.parse(receipt)),
+            child: const Text(PartnerMessages.withdrawalReceipt),
+          ),
+        if (failed) ...[
+          const SizedBox(height: 6),
+          Text(
+            withdrawalFailureMessage(item.failureReason),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+          if (canRetry)
             TextButton(
-              key: PartnerKeys.withdrawalReceipt,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              onPressed: () => launchExternalUrl(Uri.parse(receipt)),
-              child: const Text(PartnerMessages.withdrawalReceipt),
+              key: PartnerKeys.withdrawalRetry,
+              style: _tapTarget(),
+              onPressed: onRetry,
+              child: const Text(PartnerMessages.withdrawalRetry),
             ),
         ],
-      ),
+      ],
     );
-  }
-
-  String _status(String status) {
-    return switch (status) {
-      'done' => PartnerMessages.withdrawalDone,
-      'failed' => PartnerMessages.withdrawalFailed,
-      'cancelled' => PartnerMessages.withdrawalCancelled,
-      _ => PartnerMessages.withdrawalPending,
-    };
   }
 
   String _source(String source) {
@@ -738,10 +857,134 @@ class _ReauthDialogState extends State<_ReauthDialog> {
   }
 }
 
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final colors = theme.extension<ScapeStatusColors>();
+    final (label, icon, background, foreground) = switch (status) {
+      'done' => (
+        PartnerMessages.withdrawalDone,
+        Icons.check_circle,
+        colors?.successContainer ?? const Color(0xFFD7F3E3),
+        colors?.onSuccessContainer ?? const Color(0xFF1E7046),
+      ),
+      'failed' => (
+        PartnerMessages.withdrawalFailed,
+        Icons.error,
+        scheme.errorContainer,
+        scheme.onErrorContainer,
+      ),
+      'cancelled' => (
+        PartnerMessages.withdrawalCancelled,
+        Icons.cancel,
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
+      ),
+      _ => (
+        PartnerMessages.withdrawalPending,
+        Icons.schedule,
+        colors?.alertContainer ?? const Color(0xFFFFF1D0),
+        colors?.onAlertContainer ?? const Color(0xFF8A5A00),
+      ),
+    };
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: foreground),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReaisMaskFormatter extends TextInputFormatter {
+  const _ReaisMaskFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return const TextEditingValue(text: '');
+    final trimmed = digits.length > 11 ? digits.substring(0, 11) : digits;
+    final text = _reais(int.parse(trimmed));
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+/// Frase curta do motivo. Código interno vira texto; frase do Asaas passa.
+String withdrawalFailureMessage(String? reason) {
+  final text = reason?.trim() ?? '';
+  if (text.isEmpty || text == 'falhou' || text == 'erro') {
+    return 'O Asaas não concluiu este saque.';
+  }
+  if (text == 'asaas_unavailable') {
+    return 'O Asaas não respondeu. Tente de novo em instantes.';
+  }
+  if (text.startsWith('internal_error')) {
+    return 'Não foi possível concluir o saque.';
+  }
+  final lower = text.toLowerCase();
+  if (lower.contains('insufficient')) {
+    return 'Saldo insuficiente na subconta.';
+  }
+  if (lower.contains('not authorized') || lower.contains('não autoriz')) {
+    return 'A transferência não foi autorizada.';
+  }
+  final safe = _safeAsaasPhrase(text);
+  if (safe != null) return safe;
+  return 'O Asaas não concluiu este saque.';
+}
+
+String? _safeAsaasPhrase(String text) {
+  if (text.length < 8 || text.length > 80 || !text.contains(' ')) return null;
+  final lower = text.toLowerCase();
+  const blocked = ['aact_', 'bearer', 'api_key', 'secret', 'token', 'eyj'];
+  if (blocked.any(lower.contains)) return null;
+  if (text.contains('@') || text.contains('http')) return null;
+  if (RegExp(r'\d{11,}').hasMatch(text)) return null;
+  return text;
+}
+
 String _reais(int cents) {
   final whole = cents ~/ 100;
   final fraction = (cents % 100).toString().padLeft(2, '0');
-  return '$whole,$fraction';
+  final digits = whole.toString();
+  final grouped = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) grouped.write('.');
+    grouped.write(digits[i]);
+  }
+  return '$grouped,$fraction';
 }
 
 String _day(String iso) {

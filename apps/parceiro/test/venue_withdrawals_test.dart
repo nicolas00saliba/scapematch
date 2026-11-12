@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repository.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
@@ -37,6 +40,108 @@ void main() {
     );
     expect(find.byKey(PartnerKeys.withdrawalReceipt), findsOneWidget);
     expect(find.textContaining('0199'), findsOneWidget);
+    expect(
+      find.text(withdrawalFailureMessage('asaas_unavailable')),
+      findsOneWidget,
+    );
+    expect(find.byKey(PartnerKeys.withdrawalRetry), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(PartnerKeys.withdrawalReceipt)).height,
+      greaterThanOrEqualTo(48),
+    );
+    expect(
+      tester
+          .getSize(
+            find.widgetWithText(
+              TextButton,
+              PartnerMessages.withdrawalChangeBank,
+            ),
+          )
+          .height,
+      greaterThanOrEqualTo(48),
+    );
+    final done = tester.widget<Icon>(find.byIcon(Icons.check_circle));
+    final pending = tester.widget<Icon>(find.byIcon(Icons.schedule));
+    final failed = tester.widget<Icon>(find.byIcon(Icons.error));
+    final colors = Theme.of(tester.element(find.byIcon(Icons.check_circle)))
+        .extension<ScapeStatusColors>()!;
+    final scheme = Theme.of(tester.element(find.byIcon(Icons.error)))
+        .colorScheme;
+    expect(done.color, colors.onSuccessContainer);
+    expect(pending.color, colors.onAlertContainer);
+    expect(failed.color, scheme.onErrorContainer);
+    expect(done.color, isNot(pending.color));
+    expect(pending.color, isNot(failed.color));
+  });
+
+  test('status colors stay readable in both themes', () {
+    for (final brightness in Brightness.values) {
+      final theme = buildAppTheme(brightness);
+      final status = theme.extension<ScapeStatusColors>()!;
+      expect(
+        _contrast(status.onSuccessContainer, status.successContainer),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrast(status.onAlertContainer, status.alertContainer),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrast(
+          theme.colorScheme.onErrorContainer,
+          theme.colorScheme.errorContainer,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+  });
+
+  test('failure reasons from Asaas become a short sentence', () {
+    expect(
+      withdrawalFailureMessage('Saldo insuficiente para a transferência'),
+      'Saldo insuficiente para a transferência',
+    );
+    expect(
+      withdrawalFailureMessage('Insufficient balance'),
+      'Saldo insuficiente na subconta.',
+    );
+    expect(
+      withdrawalFailureMessage('internal_error:abc'),
+      'Não foi possível concluir o saque.',
+    );
+    expect(
+      withdrawalFailureMessage('token secreto vazou aqui'),
+      isNot(contains('token')),
+    );
+  });
+
+  testWidgets('fills the available balance and retries a failed withdrawal', (
+    tester,
+  ) async {
+    final repo = MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample());
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(PartnerKeys.withdrawalAll));
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(PartnerKeys.withdrawalAmount))
+          .controller!
+          .text,
+      '1.280,50',
+    );
+
+    await tester.tap(find.byKey(PartnerKeys.withdrawalRetry));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(PartnerKeys.withdrawalAmount))
+          .controller!
+          .text,
+      '40,00',
+    );
+    expect(find.byKey(PartnerKeys.withdrawalPassword), findsOneWidget);
+    expect(repo.actions, isEmpty);
   });
 
   testWidgets('refuses an amount above the available balance', (tester) async {
@@ -124,6 +229,17 @@ void main() {
     final repo = MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample());
     await _pump(tester, repo);
 
+    expect(find.text(PartnerMessages.withdrawalAuto), findsOneWidget);
+    expect(find.text(PartnerMessages.withdrawalAutoSwitch), findsOneWidget);
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.widgetWithText(ChoiceChip, PartnerMessages.withdrawalDaily),
+          )
+          .onSelected,
+      isNull,
+    );
+
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     await tester.tap(find.text(PartnerMessages.withdrawalWeekly));
@@ -158,7 +274,7 @@ VenuePayoutSnapshot _staff() {
 }
 
 Future<void> _pump(WidgetTester tester, VenueWithdrawalRepository repo) async {
-  tester.view.physicalSize = const Size(800, 2400);
+  tester.view.physicalSize = const Size(800, 3200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -166,7 +282,8 @@ Future<void> _pump(WidgetTester tester, VenueWithdrawalRepository repo) async {
     ProviderScope(
       overrides: [venueWithdrawalRepositoryProvider.overrideWithValue(repo)],
       child: MaterialApp(
-        locale: Locale('pt', 'BR'),
+        theme: buildAppTheme(Brightness.light),
+        locale: const Locale('pt', 'BR'),
         localizationsDelegates: [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -183,4 +300,24 @@ Future<void> _pump(WidgetTester tester, VenueWithdrawalRepository repo) async {
     ),
   );
   await tester.pumpAndSettle();
+}
+
+double _contrast(Color foreground, Color background) {
+  double channel(double value) {
+    return value <= 0.04045
+        ? value / 12.92
+        : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+  }
+
+  double luminance(Color color) {
+    return 0.2126 * channel(color.r) +
+        0.7152 * channel(color.g) +
+        0.0722 * channel(color.b);
+  }
+
+  final first = luminance(foreground);
+  final second = luminance(background);
+  final high = math.max(first, second);
+  final low = math.min(first, second);
+  return (high + 0.05) / (low + 0.05);
 }

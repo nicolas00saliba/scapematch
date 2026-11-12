@@ -22,7 +22,7 @@ void main() {
     await _pump(
       tester,
       MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
-      const Size(412, 1600),
+      const Size(412, 2600),
       Brightness.light,
     );
     await _shot(tester, dir, 'saldo-saques-celular.png', panel: true);
@@ -43,7 +43,7 @@ void main() {
     await _pump(
       tester,
       MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
-      const Size(412, 2000),
+      const Size(412, 3200),
       Brightness.light,
     );
     await tester.tap(find.text(PartnerMessages.withdrawalChangeBank));
@@ -55,7 +55,7 @@ void main() {
     await _pump(
       tester,
       MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
-      const Size(1280, 1400),
+      const Size(1280, 2000),
       Brightness.dark,
     );
     await _shot(tester, dir, 'saldo-saques-desktop.png', panel: true);

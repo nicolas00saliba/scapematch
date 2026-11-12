@@ -235,6 +235,9 @@ abstract final class PartnerMessages {
   static const withdrawalOwner = 'Nome do titular';
   static const withdrawalDocument = 'CPF ou CNPJ do titular';
   static const withdrawalAuto = 'Saque automático';
+  static const withdrawalAutoSwitch = 'Sacar automaticamente';
+  static const withdrawalAll = 'Sacar tudo';
+  static const withdrawalRetry = 'Tentar de novo';
   static const withdrawalAutoBody =
       'Quando o saldo disponível passar do mínimo, o valor segue para a conta cadastrada.';
   static const withdrawalDaily = 'Diário';
