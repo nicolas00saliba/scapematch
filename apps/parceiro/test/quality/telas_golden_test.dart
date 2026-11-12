@@ -38,16 +38,6 @@ void main() {
     await pumpParceiro(tester, size: const Size(390, 1400));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-    final toque = await androidTapTargetGuideline.evaluate(tester);
-    // A faixa "Demonstração" tem 29px de altura. Aumentar para 48px muda o
-    // layout. O teste só passa se essa faixa for o único alvo abaixo de 48px.
-    if (toque.passed) return;
-    final pedacos = (toque.reason ?? '')
-        .split('SemanticsNode')
-        .where((pedaco) => pedaco.contains('expected tap target'));
-    expect(pedacos, isNotEmpty);
-    for (final pedaco in pedacos) {
-      expect(pedaco, contains('Demonstração. Toque para ler o aviso.'));
-    }
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
   });
 }

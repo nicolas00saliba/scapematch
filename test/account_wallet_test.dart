@@ -70,7 +70,7 @@ void main() {
     for (final size in const [Size(390, 844), Size(1280, 800)]) {
       await _openAccount(tester, size);
       expect(tester.takeException(), isNull, reason: '$size account');
-      await tester.tap(find.byKey(AppKeys.accountDestination('cards')));
+      await _tapCards(tester);
       await tester.pumpAndSettle();
       expect(find.text('Nenhum cartão cadastrado'), findsOneWidget);
       expect(find.byKey(AppKeys.addCard), findsOneWidget);
@@ -126,7 +126,7 @@ void main() {
 
   testWidgets('a new card lists only the brand and last digits', (tester) async {
     await _openAccount(tester, const Size(390, 844));
-    await tester.tap(find.byKey(AppKeys.accountDestination('cards')));
+    await _tapCards(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.addCard));
     await tester.pumpAndSettle();
@@ -143,6 +143,22 @@ void main() {
     expect(find.textContaining('4111111111111111'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+}
+
+Future<void> _tapCards(WidgetTester tester) async {
+  final cards = find.byKey(AppKeys.accountDestination('cards'));
+  await tester.drag(
+    find.descendant(
+      of: find.byType(AccountScreen),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+      ),
+    ),
+    const Offset(0, -80),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(cards);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _openAccount(WidgetTester tester, Size size) async {
