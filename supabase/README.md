@@ -9,7 +9,7 @@ supabase db push
 
 ## Ordem
 
-1. `migrations/20261104120000_init.sql` — tabelas, cinco cidades e a comissão inicial. `20261111180000_commission_default_25.sql` leva o padrão intocado para 25% (2500 bps).
+1. `migrations/20261104120000_init.sql` — tabelas, cinco cidades e a comissão inicial. `20261111163545_commission_default_25.sql` leva o padrão intocado para 25% (2500 bps).
 2. `migrations/20261104120100_helpers.sql` — `is_admin`, perfil criado no cadastro, casa que nasce `pending`.
 3. `migrations/20261104120200_rls.sql` — RLS, bucket `room-photos` e o canal Realtime de `group_members`.
 4. `migrations/20261104120300_group_functions.sql` — criar, entrar, sair, excluir, fechar com menos gente, fila e falta.
