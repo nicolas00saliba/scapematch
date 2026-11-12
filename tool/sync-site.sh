@@ -4,6 +4,9 @@
 # Substitui o sync.sh daquele repositório, que copiava apps/landing.
 # Não roda no CI e não faz push sozinho. O push pede --push e o ok do Nícolas.
 #
+# O DSN do site é a variável PUBLIC_SENTRY_DSN neste ambiente. Sem ela,
+# o build sai com o SDK inerte. Não é variável da Cloudflare Pages.
+#
 # O CNAME publicado sai de apps/site/dist e tem de ser escapematch.com.br.
 # Se o dist ou o CNAME já existente no Pages divergir, o script aborta.
 # Ele não grava outro domínio no lugar.
@@ -31,6 +34,15 @@ done
 
 cd "$ROOT/apps/site"
 npm ci
+# O HTML publicado nasce aqui, não na Cloudflare Pages.
+# PUBLIC_SENTRY_DSN vazio deixa o SDK inerte. O release é o SHA deste repo.
+release="${PUBLIC_SENTRY_RELEASE:-}"
+if [ -z "$release" ]; then
+  release="$(git -C "$ROOT" rev-parse HEAD)"
+fi
+export PUBLIC_SENTRY_DSN="${PUBLIC_SENTRY_DSN:-${SENTRY_DSN:-}}"
+export PUBLIC_SENTRY_RELEASE="$release"
+export PUBLIC_SENTRY_ENVIRONMENT="${PUBLIC_SENTRY_ENVIRONMENT:-production}"
 npm run build
 
 cname="$(tr -d '[:space:]' < dist/CNAME)"

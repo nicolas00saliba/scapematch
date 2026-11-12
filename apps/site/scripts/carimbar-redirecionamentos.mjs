@@ -5,7 +5,7 @@ import path from 'node:path';
 // Este passo grava o endereço antigo de verdade e carimba a CSP da landing.
 const dist = path.resolve('dist');
 const csp =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'none'; frame-src 'none'; manifest-src 'self'; form-action 'self'";
+  "default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io; worker-src 'none'; frame-src 'none'; manifest-src 'self'; form-action 'self'";
 const carimbo = [
   '<meta name="referrer" content="strict-origin-when-cross-origin">',
   `<meta http-equiv="Content-Security-Policy" content="${csp}">`,

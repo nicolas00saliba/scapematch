@@ -7,13 +7,14 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test src/data/avaliacoes.test.ts scripts/verificacao-buscadores.test.mjs",
+    "test": "node --experimental-strip-types --test src/data/avaliacoes.test.ts scripts/verificacao-buscadores.test.mjs src/scripts/redigir-pii.test.ts",
     "dev": "astro dev",
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build && node scripts/carimbar-redirecionamentos.mjs",
     "preview": "astro preview"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",
+    "@sentry/astro": "^11.12.0",
     "astro": "^7.4.10"
   }
 }

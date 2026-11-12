@@ -15,6 +15,13 @@
 # Segredo necessário no repo scapematch:
 #   PAGES_DEPLOY_TOKEN — PAT com escrita nos 5 repos de Pages.
 #
+# Segredos opcionais do Sentry. Sem eles o SDK fica inerte:
+#   SENTRY_DSN_APP, SENTRY_DSN_PARCEIRO, SENTRY_DSN_ADMIN
+# O release é o SHA do commit. O site institucional não passa por este
+# workflow: tool/sync-site.sh compila apps/site e envia o dist ao
+# repositório scapematch-site. O DSN desse build é PUBLIC_SENTRY_DSN
+# no ambiente do script.
+#
 # --base-href must keep the leading and trailing slash.
 # APP_MODE=real|demo escolhe o repositório. O Parceiro continua outro app.
 #
@@ -38,6 +45,11 @@ jobs:
   build:
     name: Build web
     runs-on: ubuntu-latest
+    env:
+      SENTRY_DSN_APP: ${{ secrets.SENTRY_DSN_APP }}
+      SENTRY_DSN_PARCEIRO: ${{ secrets.SENTRY_DSN_PARCEIRO }}
+      SENTRY_DSN_ADMIN: ${{ secrets.SENTRY_DSN_ADMIN }}
+      SENTRY_RELEASE: ${{ github.sha }}
     permissions:
       actions: write
       contents: read
@@ -71,7 +83,7 @@ jobs:
 
       - name: Build player web (real, subdomain)
         run: |
-          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/app-root
+          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/app-root $(bash tool/sentry_defines.sh app production)
           bash tool/install_cleanup_service_worker.sh build/app-root
           bash tool/stamp_web_manifest.sh build/app-root player real
           bash tool/mark_real_web_copy.sh build/app-root player
@@ -86,7 +98,7 @@ jobs:
       - name: Build partner web (real, subdomain)
         working-directory: apps/parceiro
         run: |
-          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/parceiro-root
+          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/parceiro-root $(bash ../../tool/sentry_defines.sh parceiro production)
           bash ../../tool/install_cleanup_service_worker.sh build/parceiro-root
           bash ../../tool/stamp_web_manifest.sh build/parceiro-root partner real
           bash ../../tool/mark_real_web_copy.sh build/parceiro-root partner
@@ -101,7 +113,7 @@ jobs:
       - name: Build admin web (real, subdomínio proposto)
         working-directory: apps/admin
         run: |
-          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/admin-root
+          flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/admin-root $(bash ../../tool/sentry_defines.sh admin production)
           bash ../../tool/install_cleanup_service_worker.sh build/admin-root
           bash ../../tool/stamp_web_manifest.sh build/admin-root admin real
           bash ../../tool/mark_real_web_copy.sh build/admin-root admin
@@ -115,7 +127,7 @@ jobs:
 
       - name: Build player web (demo, subdomain root)
         run: |
-          flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-player
+          flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-player $(bash tool/sentry_defines.sh app demo)
           bash tool/install_cleanup_service_worker.sh build/demo-player
           bash tool/stamp_web_manifest.sh build/demo-player player demo
           bash tool/check_web_service_worker.sh build/demo-player player
@@ -126,7 +138,7 @@ jobs:
       - name: Build partner web (demo, parceiro-demo.escapematch.com.br)
         working-directory: apps/parceiro
         run: |
-          flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/parceiro-demo-root
+          flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/parceiro-demo-root $(bash ../../tool/sentry_defines.sh parceiro demo)
           bash ../../tool/install_cleanup_service_worker.sh build/parceiro-demo-root
           bash ../../tool/stamp_web_manifest.sh build/parceiro-demo-root partner demo
           bash ../../tool/check_web_service_worker.sh build/parceiro-demo-root partner
@@ -171,7 +183,7 @@ jobs:
       # Legado: quatro apps sob /scapematch/ no monorepo (sem downtime).
       - name: Build legacy monorepo tree
         run: |
-          flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-player
+          flutter build web --release --base-href /scapematch/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-player $(bash tool/sentry_defines.sh app production)
           bash tool/install_cleanup_service_worker.sh build/legacy-player
           bash tool/stamp_web_manifest.sh build/legacy-player player real
           bash tool/mark_real_web_copy.sh build/legacy-player player
@@ -180,7 +192,7 @@ jobs:
           bash tool/check_security_meta.sh flutter build/legacy-player/index.html
           (
             cd apps/parceiro
-            flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-parceiro
+            flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-parceiro $(bash ../../tool/sentry_defines.sh parceiro production)
             bash ../../tool/install_cleanup_service_worker.sh build/legacy-parceiro
             bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro partner real
             bash ../../tool/mark_real_web_copy.sh build/legacy-parceiro partner
@@ -188,7 +200,7 @@ jobs:
             bash ../../tool/check_web_manifest.sh build/legacy-parceiro partner real
             bash ../../tool/check_security_meta.sh flutter build/legacy-parceiro/index.html
           )
-          flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-player-demo
+          flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-player-demo $(bash tool/sentry_defines.sh app demo)
           bash tool/install_cleanup_service_worker.sh build/legacy-player-demo
           bash tool/stamp_web_manifest.sh build/legacy-player-demo player demo
           bash tool/check_web_service_worker.sh build/legacy-player-demo player
@@ -196,7 +208,7 @@ jobs:
           bash tool/check_security_meta.sh flutter build/legacy-player-demo/index.html
           (
             cd apps/parceiro
-            flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-parceiro-demo
+            flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-parceiro-demo $(bash ../../tool/sentry_defines.sh parceiro demo)
             bash ../../tool/install_cleanup_service_worker.sh build/legacy-parceiro-demo
             bash ../../tool/stamp_web_manifest.sh build/legacy-parceiro-demo partner demo
             bash ../../tool/check_web_service_worker.sh build/legacy-parceiro-demo partner
@@ -205,7 +217,7 @@ jobs:
           )
           (
             cd apps/admin
-            flutter build web --release --base-href /scapematch/admin/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-admin
+            flutter build web --release --base-href /scapematch/admin/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-admin $(bash ../../tool/sentry_defines.sh admin production)
             bash ../../tool/install_cleanup_service_worker.sh build/legacy-admin
             bash ../../tool/stamp_web_manifest.sh build/legacy-admin admin real
             bash ../../tool/mark_real_web_copy.sh build/legacy-admin admin

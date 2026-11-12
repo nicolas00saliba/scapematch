@@ -16,9 +16,12 @@ import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
 import 'package:scapematch/features/theme/data/theme_choice_store.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
+import 'package:scapematch/core/observability/sentry_boot.dart';
 import 'package:scapematch/providers/repositories.dart';
 
-Future<void> main() async {
+Future<void> main() => iniciarSentry(_abrirApp);
+
+Future<void> _abrirApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await bootScapeBackend();
   configureUrlStrategy();
