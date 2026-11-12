@@ -31,6 +31,7 @@ abstract final class PartnerMessages {
   static const reservations = 'Reservas';
   static const invoices = 'Notas fiscais';
   static const reviews = 'Avaliações';
+  static const ranking = 'Ranking';
   static const rooms = 'Salas';
   static const agenda = 'Agenda';
   static const agendaList = 'Lista';

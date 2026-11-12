@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch_admin/admin_mfa.dart';
 import 'package:scapematch_admin/admin_pages.dart';
+import 'package:scapematch_admin/admin_ranking.dart';
 import 'package:scapematch_admin/admin_reviews.dart';
 import 'package:scapematch_admin/admin_place.dart';
 import 'package:scapematch_admin/admin_session.dart';
@@ -48,6 +49,7 @@ class AdminShell extends ConsumerWidget {
     (AdminSection.destaques, 'Destaques', Icons.star_outline),
     (AdminSection.auditoria, 'Auditoria', Icons.history),
     (AdminSection.avaliacoes, 'Avaliações', Icons.reviews_outlined),
+    (AdminSection.ranking, 'Ranking', Icons.emoji_events_outlined),
   ];
 
   @override
@@ -68,6 +70,7 @@ class AdminShell extends ConsumerWidget {
       AdminSection.destaques => const DestaquesPage(),
       AdminSection.auditoria => const AuditoriaPage(),
       AdminSection.avaliacoes => const AvaliacoesPage(),
+      AdminSection.ranking => const RankingPage(),
     };
 
     void go(int next) =>

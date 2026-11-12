@@ -13,7 +13,15 @@ import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dar
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
-enum PartnerSection { balance, reservations, agenda, rooms, invoices, reviews }
+enum PartnerSection {
+  balance,
+  reservations,
+  agenda,
+  rooms,
+  invoices,
+  reviews,
+  ranking,
+}
 
 class PartnerFiscalController extends Notifier<VenueFiscalProfile> {
   @override
