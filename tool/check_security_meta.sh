@@ -107,8 +107,17 @@ def check_landing(directory):
         '<script src="frame-guard.js"></script>',
         '<script src="/frame-guard.js"></script>',
     )
+    def verificacao_google(path, text):
+        # Arquivo que o Search Console pede na raiz, sem HTML em volta.
+        # O conteúdo tem de ser exatamente a linha de verificação.
+        if not re.fullmatch(r"google[A-Za-z0-9]{16,}\.html", path.name):
+            return False
+        return text.strip() == f"google-site-verification: {path.name}"
+
     for path in pages:
         text = path.read_text()
+        if verificacao_google(path, text):
+            continue
         require(text, referrer, path)
         require(text, f'<meta http-equiv="Content-Security-Policy" content="{landing_csp}">', path)
         if not any(tag in text for tag in guard_tags):
