@@ -7,6 +7,18 @@
 // a cobrança seguinte manda creditCardToken.
 
 import { asaasStatus } from "./asaas_client_error.ts";
+import {
+  balanceCents,
+  findTransferInList,
+  parseFinancialTransactions,
+  parsePaymentReceivables,
+  parseTransfer,
+  transferPayload,
+  type FinancialMovement,
+  type Receivable,
+  type TransferRequest,
+  type TransferResult,
+} from "./asaas_transfers.ts";
 import { localChargeStatus, pixMatchesCharge } from "./pix_charge.ts";
 import { redactSensitive } from "./redact.ts";
 
@@ -747,6 +759,39 @@ export class AsaasProvider implements PaymentProvider {
         ? body.status
         : "REFUNDED",
     }));
+  }
+
+  financeBalanceCents(): Promise<number> {
+    return this.#send("/finance/balance", undefined, "GET").then(balanceCents);
+  }
+
+  confirmedReceivables(): Promise<Receivable[]> {
+    return this.#send(
+      "/payments?status=CONFIRMED&limit=100",
+      undefined,
+      "GET",
+    ).then(parsePaymentReceivables);
+  }
+
+  financialTransactions(): Promise<FinancialMovement[]> {
+    return this.#send(
+      "/financialTransactions?limit=100",
+      undefined,
+      "GET",
+    ).then(parseFinancialTransactions);
+  }
+
+  createTransfer(input: TransferRequest): Promise<TransferResult> {
+    return this.#send("/transfers", transferPayload(input)).then(parseTransfer);
+  }
+
+  findTransfer(externalReference: string): Promise<TransferResult | null> {
+    const query = encodeURIComponent(externalReference);
+    return this.#send(
+      `/transfers?externalReference=${query}&limit=10`,
+      undefined,
+      "GET",
+    ).then((body) => findTransferInList(body, externalReference));
   }
 
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
