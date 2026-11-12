@@ -136,4 +136,16 @@ abstract final class PartnerKeys {
   static const partnerTimeLaunch = Key('partner-time-launch');
   static const partnerTimeBoard = Key('partner-time-board');
   static const partnerReviewReply = Key('partner-review-reply');
+  static const withdrawals = Key('venue-withdrawals');
+  static const withdrawalBalance = Key('venue-withdrawal-balance');
+  static const withdrawalAmount = Key('venue-withdrawal-amount');
+  static const withdrawalSubmit = Key('venue-withdrawal-submit');
+  static const withdrawalReceipt = Key('venue-withdrawal-receipt');
+  static const withdrawalBank = Key('venue-withdrawal-bank');
+  static const withdrawalDocument = Key('venue-withdrawal-document');
+  static const withdrawalPix = Key('venue-withdrawal-pix');
+  static const withdrawalSaveBank = Key('venue-withdrawal-save-bank');
+  static const withdrawalAuto = Key('venue-withdrawal-auto');
+  static const withdrawalPassword = Key('venue-withdrawal-password');
+  static const withdrawalConfirm = Key('venue-withdrawal-confirm');
 }
