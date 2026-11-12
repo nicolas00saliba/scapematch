@@ -1,0 +1,66 @@
+# Links do build e da produção. A rotina diária entra na saúde das ferramentas.
+# saude: agenda
+
+name: Links quebrados
+
+on:
+  schedule:
+    - cron: "15 9 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/site/**"
+      - ".github/workflows/links-quebrados.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lychee:
+    name: Build e produção
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/site/package-lock.json
+
+      - name: Build the site
+        working-directory: apps/site
+        run: npm ci && npm run build
+
+      # Rotas do Flutter em GitHub Pages respondem 404 e mesmo assim
+      # entregam o app (o 404.html é o index). O lychee olha o status,
+      # então essas rotas internas ficam de fora. A raiz de cada host continua.
+      - name: Links do build
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          fail: true
+          args: >-
+            --verbose
+            --no-progress
+            --max-retries 2
+            --timeout 20
+            --accept 200,206,429
+            --root-dir apps/site/dist
+            --fallback-extensions html
+            --exclude '^https://(app|parceiro|parceiro-demo|demo|admin)\.escapematch\.com\.br/.+'
+            'apps/site/dist/**/*.html'
+
+      - name: Links de produção
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          fail: true
+          args: >-
+            --verbose
+            --no-progress
+            --max-retries 2
+            --timeout 20
+            --accept 200,206,429
+            --exclude '^https://(app|parceiro|parceiro-demo|demo|admin)\.escapematch\.com\.br/.+'
+            'https://escapematch.com.br'

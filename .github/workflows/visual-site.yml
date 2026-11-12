@@ -1,0 +1,42 @@
+name: Visual do site
+
+on:
+  pull_request:
+    paths:
+      - "apps/site/**"
+      - "e2e/site/**"
+      - ".github/workflows/visual-site.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    name: Regressão visual, axe e clique
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/site/package-lock.json
+            e2e/site/package-lock.json
+
+      - name: Install the site
+        working-directory: apps/site
+        run: npm ci
+
+      - name: Install Playwright
+        working-directory: e2e/site
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Test
+        working-directory: e2e/site
+        env:
+          ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+        run: npx playwright test
