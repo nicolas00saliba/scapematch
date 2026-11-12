@@ -21,6 +21,7 @@ import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_withdrawals_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/empty_slot_card.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_referral_code.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_invoices_screen.dart';
@@ -341,6 +342,8 @@ class _BalanceSection extends StatelessWidget {
             _StatementTile(line: line),
             const SizedBox(height: 10),
           ],
+        const SizedBox(height: 24),
+        VenueWithdrawalsPanel(venueId: snapshot.house.id),
       ],
     );
   }
