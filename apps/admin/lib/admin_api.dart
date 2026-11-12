@@ -30,6 +30,8 @@ abstract class AdminApi {
   Future<Map<String, Object?>> rewardSettings();
   Future<Map<String, Object?>> saveRewardSettings(Map<String, Object?> patch);
   Future<List<Map<String, Object?>>> rewardHistory();
+  Future<Map<String, Object?>> passportSettings();
+  Future<Map<String, Object?>> savePassportSettings(Map<String, Object?> patch);
   Future<EarningsReport> earnings({
     DateTime? from,
     DateTime? to,
@@ -573,6 +575,24 @@ class SupabaseAdminApi implements AdminApi {
   }
 
   @override
+  Future<Map<String, Object?>> passportSettings() async {
+    return _map(await _rpc('admin_passport_settings'));
+  }
+
+  @override
+  Future<Map<String, Object?>> savePassportSettings(
+    Map<String, Object?> patch,
+  ) async {
+    try {
+      return _map(
+        await _rpc('admin_save_passport_settings', {'p_patch': patch}),
+      );
+    } on PostgrestException catch (error) {
+      throw AdminRejected(error.message);
+    }
+  }
+
+  @override
   Future<EarningsReport> earnings({
     DateTime? from,
     DateTime? to,
@@ -810,12 +830,23 @@ class MemoryAdminApi implements AdminApi {
         'cashback_max_bps': 500,
         'cashback_ev_cap_bps': 100,
         'backed_full_slot_enabled': false,
+      },
+      passport = {
+        'passport_enabled': false,
+        'passport_rooms_5': 5,
+        'passport_points_5': 500,
+        'passport_rooms_10': 10,
+        'passport_points_10': 1000,
+        'passport_rooms_25': 25,
+        'passport_points_25': 3000,
+        'passport_house_points': 300,
       };
 
   final List<VenueProfile> houses;
   final List<PlayerProfile> people;
   final List<ReviewRow> queue;
   final Map<String, Object?> settings;
+  final Map<String, Object?> passport;
   final List<Map<String, Object?>> history = [];
   final List<AuditRow> audits = [];
   int platformBps = 2500;
@@ -1028,6 +1059,27 @@ class MemoryAdminApi implements AdminApi {
 
   @override
   Future<List<Map<String, Object?>>> rewardHistory() async => List.of(history);
+
+  @override
+  Future<Map<String, Object?>> passportSettings() async => Map.of(passport);
+
+  @override
+  Future<Map<String, Object?>> savePassportSettings(
+    Map<String, Object?> patch,
+  ) async {
+    final next = Map<String, Object?>.of(passport)..addAll(patch);
+    final rooms5 = next['passport_rooms_5'] as int? ?? 0;
+    final rooms10 = next['passport_rooms_10'] as int? ?? 0;
+    final rooms25 = next['passport_rooms_25'] as int? ?? 0;
+    if (rooms10 <= rooms5 || rooms25 <= rooms10) {
+      throw AdminRejected('os marcos de salas precisam crescer');
+    }
+    passport
+      ..clear()
+      ..addAll(next);
+    _note('save_passport_settings', '1', '$patch');
+    return Map.of(passport);
+  }
 
   @override
   Future<EarningsReport> earnings({

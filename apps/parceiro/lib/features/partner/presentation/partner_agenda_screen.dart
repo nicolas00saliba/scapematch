@@ -5,6 +5,7 @@ import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -1598,12 +1599,24 @@ class _SheetPerson extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playerId = playerIdOf(person);
     final marked = snapshot.markedAbsent(group.id, playerId);
+    final checked = snapshot.checkedIn(group.id, playerId);
+    final canCheckIn =
+        canMark &&
+        !marked &&
+        !checked &&
+        person.payment == PaymentStatus.paid &&
+        person.refund == RefundStatus.none;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(
         '${person.displayName} · ${GroupMessages.paymentStatus(person.payment)}',
       ),
-      subtitle: marked
+      subtitle: checked
+          ? Text(
+              PartnerMessages.attended,
+              key: PartnerKeys.partnerCheckedIn(group.id, playerId),
+            )
+          : marked
           ? Text(
               PartnerMessages.absenceLine(
                 snapshot.absenceCount(playerId),
@@ -1611,14 +1624,38 @@ class _SheetPerson extends ConsumerWidget {
               ),
             )
           : null,
-      trailing: !marked && canMark
+      trailing: canCheckIn
+          ? TextButton(
+              key: PartnerKeys.partnerCheckin(group.id, playerId),
+              onPressed: () async {
+                final result = await ref
+                    .read(partnerRepositoryProvider)
+                    .confirmAttendance(
+                      houseId: snapshot.house.id,
+                      groupId: group.id,
+                      playerId: playerId,
+                    );
+                if (!context.mounted) return;
+                if (result is SessionCheckinRejected) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(result.message)),
+                  );
+                  return;
+                }
+                ref.read(partnerRevisionProvider.notifier).bump();
+              },
+              child: const Text(PartnerMessages.confirmAttendance),
+            )
+          : !marked && !checked && canMark
           ? TextButton(
               onPressed: () async {
-                final result = await ref.read(partnerRepositoryProvider).markAbsence(
-                  houseId: snapshot.house.id,
-                  groupId: group.id,
-                  playerId: playerId,
-                );
+                final result = await ref
+                    .read(partnerRepositoryProvider)
+                    .markAbsence(
+                      houseId: snapshot.house.id,
+                      groupId: group.id,
+                      playerId: playerId,
+                    );
                 if (!context.mounted) return;
                 if (result is AbsenceRejected) {
                   ScaffoldMessenger.of(context).showSnackBar(

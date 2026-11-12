@@ -531,15 +531,21 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
   Map<String, Object?>? _settings;
   List<Map<String, Object?>> _history = const [];
   final _fields = <String, TextEditingController>{};
+  final _passportInputs = <String, TextEditingController>{};
   bool _blockSelf = true;
+  bool _passportOn = false;
   bool _freeSlot = false;
   String? _message;
+  String? _passportMessage;
 
   @override
   void initState() {
     super.initState();
     for (final field in rewardFields) {
       _fields[field.id] = TextEditingController();
+    }
+    for (final field in passportRuleFields) {
+      _passportInputs[field.id] = TextEditingController();
     }
     _load();
   }
@@ -549,6 +555,9 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
     for (final controller in _fields.values) {
       controller.dispose();
     }
+    for (final controller in _passportInputs.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -556,14 +565,19 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
     final api = ref.read(adminApiProvider);
     final settings = await api.rewardSettings();
     final history = await api.rewardHistory();
+    final passport = await api.passportSettings();
     if (!mounted) return;
     for (final field in rewardFields) {
       _fields[field.id]!.text = '${settings[field.id] ?? ''}';
+    }
+    for (final field in passportRuleFields) {
+      _passportInputs[field.id]!.text = '${passport[field.id] ?? ''}';
     }
     setState(() {
       _settings = settings;
       _history = history;
       _blockSelf = settings['block_self_payer'] == true;
+      _passportOn = passport['passport_enabled'] == true;
       _freeSlot = settings['backed_full_slot_enabled'] == true;
     });
   }
@@ -639,6 +653,46 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                         ? null
                         : TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
+                const SizedBox(height: 24),
+                Text(
+                  'Passaporte de salas',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: adminTeal,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'A flag nasce desligada. Os pontos do marco são sem lastro, como boas-vindas e promoção: só desconto, até o teto. Não pagam a vaga inteira. Casa com uma sala não ganha o marco de fechar a casa.',
+                  key: Key('admin-passaporte-intro'),
+                ),
+                SwitchListTile(
+                  key: const Key('admin-passaporte-flag'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Passaporte ligado'),
+                  value: _passportOn,
+                  onChanged: (value) => setState(() => _passportOn = value),
+                ),
+                for (final field in passportRuleFields) ...[
+                  TextField(
+                    key: Key('admin-passaporte-${field.id}'),
+                    controller: _passportInputs[field.id],
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(labelText: field.label),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                FilledButton(
+                  key: const Key('admin-salvar-passaporte'),
+                  onPressed: _savePassport,
+                  child: const Text('Salvar passaporte'),
+                ),
+                if (_passportMessage != null)
+                  Text(
+                    _passportMessage!,
+                    key: const Key('admin-passaporte-aviso'),
+                  ),
                 const SizedBox(height: 16),
                 Text(
                   'Histórico',
@@ -672,7 +726,51 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
     if (!mounted) return;
     setState(() => _message = 'Regras gravadas.');
   }
+
+  Future<void> _savePassport() async {
+    final patch = <String, Object?>{
+      'passport_enabled': _passportOn,
+      for (final field in passportRuleFields)
+        field.id: int.tryParse(_passportInputs[field.id]!.text.trim()) ?? 0,
+    };
+    try {
+      await ref.read(adminApiProvider).savePassportSettings(patch);
+    } on AdminRejected catch (error) {
+      if (!mounted) return;
+      setState(() => _passportMessage = error.message);
+      return;
+    }
+    await _load();
+    if (!mounted) return;
+    setState(() => _passportMessage = 'Passaporte gravado.');
+  }
 }
+
+class PassportRuleField {
+  const PassportRuleField({required this.id, required this.label});
+
+  final String id;
+  final String label;
+}
+
+const passportRuleFields = <PassportRuleField>[
+  PassportRuleField(id: 'passport_rooms_5', label: 'Salas do primeiro marco'),
+  PassportRuleField(id: 'passport_points_5', label: 'Pontos do primeiro marco'),
+  PassportRuleField(id: 'passport_rooms_10', label: 'Salas do segundo marco'),
+  PassportRuleField(
+    id: 'passport_points_10',
+    label: 'Pontos do segundo marco',
+  ),
+  PassportRuleField(id: 'passport_rooms_25', label: 'Salas do terceiro marco'),
+  PassportRuleField(
+    id: 'passport_points_25',
+    label: 'Pontos do terceiro marco',
+  ),
+  PassportRuleField(
+    id: 'passport_house_points',
+    label: 'Pontos ao fechar a casa',
+  ),
+];
 
 class GanhosPage extends ConsumerStatefulWidget {
   const GanhosPage({super.key});

@@ -20,6 +20,7 @@ abstract final class PartnerKeys {
   static const scapeLiability = Key('scape-liability');
   static const adminConsole = Key('admin-console-link');
   static const venueReferralCode = Key('venue-referral-code');
+  static const passportDesk = Key('passport-desk');
   static const emptySlot = Key('empty-slot');
   static const partnerApprove = Key('partner-approve');
   static const venueName = Key('venue-name');
@@ -88,6 +89,10 @@ abstract final class PartnerKeys {
   static const confirmRemoveSlot = Key('confirm-remove-slot');
   static Key partnerAbsence(String groupId, String playerId) =>
       Key('partner-absence-$groupId-$playerId');
+  static Key partnerCheckin(String groupId, String playerId) =>
+      Key('partner-checkin-$groupId-$playerId');
+  static Key partnerCheckedIn(String groupId, String playerId) =>
+      Key('partner-checked-in-$groupId-$playerId');
   static Key partnerAbsenceStanding(String groupId, String playerId) =>
       Key('partner-absence-standing-$groupId-$playerId');
   static const agendaCalendar = Key('agenda-calendar');

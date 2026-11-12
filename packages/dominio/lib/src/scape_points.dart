@@ -539,8 +539,8 @@ int referralBookingsForPoints({
 /// a vaga inteira, até o [reservedBalanceCents]. Esse saldo já entrou na
 /// comissão; a trava é não deixá-lo negativo. O que passar da comissão não
 /// aumenta o split acima de 100%: vira [PointSubsidyQuote.topupCents] e
-/// espera o próximo repasse da casa. Boas-vindas e promoções continuam no
-/// teto de sempre. Não há limite mensal.
+/// espera o próximo repasse da casa. Boas-vindas, promoções e o passaporte
+/// ficam sem lastro, no teto de sempre. Não há limite mensal.
 /// [availableBackedPoints] nulo conta tudo como sem lastro.
 /// [reservedBalanceCents] nulo usa o valor dos pontos com lastro do jogador.
 PointSubsidyQuote quotePointSubsidy({

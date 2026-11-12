@@ -30,6 +30,7 @@ abstract final class PartnerMessages {
   static const balance = 'Saldo';
   static const reservations = 'Reservas';
   static const invoices = 'Notas fiscais';
+  static const gifts = 'Mimos';
   static const rooms = 'Salas';
   static const agenda = 'Agenda';
   static const agendaList = 'Lista';
@@ -118,6 +119,8 @@ abstract final class PartnerMessages {
   }
 
   static const markAbsence = 'Marcar falta';
+  static const confirmAttendance = 'Confirmar comparecimento';
+  static const attended = 'Compareceu';
   static const pastSlots = 'horários já encerrados';
   static const noFutureSlots = 'Nenhum horário futuro nesta sala.';
   static const openGroup = 'Aberto';
