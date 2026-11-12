@@ -36,7 +36,21 @@ while IFS= read -r path; do
   git show "origin/main:${path}" | psql_db scapematch_from_main -f - >/dev/null
 done < <(git ls-tree -r --name-only origin/main supabase/migrations | sort)
 
+# O mesmo SQL com outro prefixo de versão (nome alinhado ao banco remoto)
+# não é migration nova. Reaplicar o CREATE em cima da main falha.
+declare -A main_migration_blobs=()
+while IFS= read -r blob; do
+  [[ -n "$blob" ]] || continue
+  main_migration_blobs["$blob"]=1
+done < <(git ls-tree -r origin/main supabase/migrations | awk '{print $3}')
+
 while IFS= read -r path; do
+  [[ -n "$path" ]] || continue
+  blob="$(git hash-object "$path")"
+  if [[ -n "${main_migration_blobs[$blob]:-}" ]]; then
+    echo "já aplicada na main, só o nome mudou: $path"
+    continue
+  fi
   psql_db scapematch_from_main -f "$root/$path" >/dev/null
 done < <(comm -13 \
   <(git ls-tree -r --name-only origin/main supabase/migrations | sort) \
