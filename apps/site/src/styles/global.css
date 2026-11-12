@@ -373,6 +373,13 @@ html.js .menu-abre {
   padding-inline: 0.9rem;
 }
 
+.menu .menu-baixar,
+.menu .menu-baixar:hover,
+.menu .menu-baixar:focus,
+.menu .menu-baixar:focus-visible {
+  color: #000;
+}
+
 .mega {
   position: absolute;
   left: 0;

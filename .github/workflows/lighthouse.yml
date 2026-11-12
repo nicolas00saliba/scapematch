@@ -1,0 +1,38 @@
+name: Lighthouse
+
+on:
+  pull_request:
+    paths:
+      - "apps/site/**"
+      - ".github/workflows/lighthouse.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  site:
+    name: Orçamento do site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/site/package-lock.json
+
+      - name: Build the site
+        working-directory: apps/site
+        run: npm ci && npm run build
+
+      - name: Lighthouse
+        # Três amostras. O orçamento compara a mediana, para um pico de CPU
+        # do runner não derrubar a home numa única passagem.
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
+        with:
+          configPath: ./apps/site/lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
