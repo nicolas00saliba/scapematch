@@ -1,0 +1,12 @@
+{
+  "name": "escapematch-e2e-apps",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "fluxos": "playwright test -c playwright.fluxos.config.ts"
+  },
+  "devDependencies": {
+    "@argos-ci/playwright": "7.8.0",
+    "@playwright/test": "1.65.0"
+  }
+}
