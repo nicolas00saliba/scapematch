@@ -1,0 +1,74 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+
+const descricao =
+  'Fale com a ESCAPEMATCH TECNOLOGIA LTDA em Curitiba-PR. CNPJ 70.100.608/0001-73, e-mail, app e Parceiro.';
+
+const contatoLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ContactPage',
+  name: 'Contato',
+  url: 'https://escapematch.com.br/contato',
+  inLanguage: 'pt-BR',
+  description: descricao,
+  mainEntity: {
+    '@type': 'Organization',
+    name: 'EscapeMatch',
+    legalName: 'ESCAPEMATCH TECNOLOGIA LTDA',
+    taxID: '70.100.608/0001-73',
+    email: 'contato@escapematch.com.br',
+    url: 'https://escapematch.com.br/',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Curitiba',
+      addressRegion: 'PR',
+      addressCountry: 'BR',
+    },
+  },
+};
+---
+
+<Base
+  title="Contato | EscapeMatch"
+  description={descricao}
+  path="/contato"
+  jsonLd={contatoLd}
+>
+  <PageTop titulo="Contato" frase="O canal é o e-mail." />
+  <article class="miolo pagina leitura">
+    <h2>Empresa</h2>
+    <ul class="lista-simples">
+      <li>ESCAPEMATCH TECNOLOGIA LTDA</li>
+      <li>CNPJ 70.100.608/0001-73</li>
+      <li>Curitiba-PR</li>
+    </ul>
+
+    <h2>E-mail</h2>
+    <p><a href="mailto:contato@escapematch.com.br">contato@escapematch.com.br</a></p>
+    <p>
+      Jogadores, casas e pedidos sobre dados pessoais escrevem para este endereço.
+      A página de <a href="/privacidade">privacidade</a> descreve os direitos do titular.
+    </p>
+
+    <h2>App e Parceiro</h2>
+    <ul class="lista-simples">
+      <li>
+        Jogador: <a href="/app">baixar o app</a> ou abrir
+        <a href="https://app.escapematch.com.br/" target="_blank" rel="noopener noreferrer">app.escapematch.com.br</a>.
+      </li>
+      <li>
+        Casa interessada: <a href="/para-casas/cadastro">como cadastrar</a> e o
+        <a href="https://parceiro.escapematch.com.br/" target="_blank" rel="noopener noreferrer">Parceiro</a>.
+      </li>
+    </ul>
+  </article>
+  <CtaBlock
+    titulo="Abrir o app ou o Parceiro"
+    acoes={[
+      { rotulo: 'Abrir o app', href: 'https://app.escapematch.com.br/', externo: true },
+      { rotulo: 'Sou uma casa', href: 'https://parceiro.escapematch.com.br/', externo: true },
+    ]}
+  />
+</Base>

@@ -1,0 +1,141 @@
+---
+import Base from '../layouts/Base.astro';
+import PageTop from '../components/PageTop.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+import { faqPage } from '../data/seo';
+
+const descricao =
+  'Como jogar escape room em Curitiba pelo EscapeMatch: achar grupo, reservar a vaga, avaliar a sala e ver o ranking de tempo.';
+
+const perguntas = [
+  {
+    pergunta: 'Dá para jogar escape room em Curitiba sem ter grupo?',
+    resposta:
+      'Dá. O EscapeMatch junta quem está sozinho. Você escolhe a sala e o horário, entra no grupo e paga a sua vaga. O jogo confirma quando o grupo bate o mínimo.',
+  },
+  {
+    pergunta: 'Como reservar a vaga?',
+    resposta:
+      'A reserva é feita no app, por pessoa. O preço é o da sala e aparece lá. A cobrança acontece quando o grupo confirma. Se o mínimo não bater, nada é cobrado.',
+  },
+  {
+    pergunta: 'Onde ficam as avaliações e o ranking de tempo?',
+    resposta:
+      'No app. A avaliação da sala usa seis critérios, de 1 a 5, e a nota pública só sai com avaliações suficientes. O ranking lista até dez tempos, com o nome do grupo e o relógio no formato 41:05 (Restavam 18:55).',
+  },
+  {
+    pergunta: 'Onde vejo as salas de Curitiba?',
+    resposta:
+      'No app. Lá estão as salas abertas, os horários e o preço por pessoa. A grade muda e a fonte é o próprio app.',
+  },
+];
+
+const pagina = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Escape room em Curitiba',
+  url: 'https://escapematch.com.br/escape-room-curitiba',
+  inLanguage: 'pt-BR',
+  description: descricao,
+  isPartOf: {
+    '@type': 'WebSite',
+    name: 'EscapeMatch',
+    url: 'https://escapematch.com.br/',
+  },
+  about: {
+    '@type': 'Service',
+    name: 'Grupo de escape room em Curitiba',
+    serviceType: 'Formação de grupos para escape room',
+    description: descricao,
+    areaServed: {
+      '@type': 'City',
+      name: 'Curitiba',
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Curitiba',
+        addressRegion: 'PR',
+        addressCountry: 'BR',
+      },
+    },
+    provider: {
+      '@type': 'Organization',
+      name: 'EscapeMatch',
+      url: 'https://escapematch.com.br/',
+    },
+    url: 'https://escapematch.com.br/escape-room-curitiba',
+  },
+};
+---
+
+<Base
+  title="Escape room em Curitiba | EscapeMatch"
+  description={descricao}
+  path="/escape-room-curitiba"
+  jsonLd={[pagina, faqPage(perguntas)]}
+>
+  <PageTop
+    titulo="Escape room em Curitiba"
+    frase="Você chega sozinho. O app junta o grupo. A vaga é sua."
+  />
+  <article class="miolo pagina leitura">
+    <h2>Achar um grupo</h2>
+    <p>
+      O lançamento do EscapeMatch começa em Curitiba, com escape room.
+      Você escolhe a sala e o horário no app. O EscapeMatch te coloca num grupo com outras pessoas.
+      O jogo confirma quando o grupo bate o mínimo. Quem chega depois paga a própria vaga, até lotar.
+    </p>
+    <p>
+      O caminho completo está em <a href="/como-funciona">Como funciona</a>.
+      As respostas curtas estão no <a href="/guia/escape-room-sozinho">guia de escape room sozinho</a>.
+    </p>
+
+    <h2>Reservar</h2>
+    <p>
+      A reserva é de uma vaga. O preço é o da sala, por pessoa, mostrado no app na hora de entrar.
+      A cobrança acontece quando o grupo confirma. Se o mínimo não bater, nada é cobrado.
+      Pix e cartão são processados pela Asaas.
+    </p>
+    <p>
+      O momento da cobrança está em <a href="/como-funciona/pagamento">Pagamento e regras</a>.
+      A saída do grupo está em <a href="/cancelamento">Regras de cancelamento</a>.
+    </p>
+
+    <h2>Avaliações</h2>
+    <p>
+      Depois da sessão, quem jogou pode avaliar a sala no app.
+      A nota junta seis critérios, cada um de 1 a 5: história, enigmas, cenário e imersão,
+      atendimento, limpeza e conforto, e custo-benefício. O comentário é opcional.
+      A nota pública da sala sai quando a quantidade de avaliações chega ao mínimo.
+    </p>
+
+    <h2>Ranking de tempo</h2>
+    <p>
+      No app, a sala pode mostrar os dez melhores tempos de quem escapou.
+      Cada linha traz o nome do grupo, o tempo e quanto restava, no formato 41:05 (Restavam 18:55).
+    </p>
+
+    <h2>Salas</h2>
+    <p>
+      Salas, horários e o preço por pessoa estão no <a href="/app">app</a>.
+      A grade muda, então a lista que vale é a de lá.
+      A modalidade está descrita em <a href="/experiencias/escape-room">Escape room</a>.
+    </p>
+
+    <h2>Perguntas frequentes</h2>
+    <div class="faq">
+      {perguntas.map((item) => (
+        <details>
+          <summary>{item.pergunta}</summary>
+          <p>{item.resposta}</p>
+        </details>
+      ))}
+    </div>
+  </article>
+  <CtaBlock
+    titulo="Ver Curitiba no app"
+    acoes={[
+      { rotulo: 'Ver salas no app', href: 'https://app.escapematch.com.br/', externo: true },
+      { rotulo: 'Tenho uma casa', href: '/para-casas/cadastro' },
+    ]}
+  />
+</Base>
