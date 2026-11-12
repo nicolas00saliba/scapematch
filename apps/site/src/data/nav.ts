@@ -11,6 +11,7 @@ export type Coluna = {
 
 export const jogarLinks: Link[] = [
   { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
+  { rotulo: 'Escape room em Curitiba', href: '/escape-room-curitiba' },
   { rotulo: 'Como funciona', href: '/como-funciona' },
   { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
   { rotulo: 'Experiências', href: '/experiencias' },
@@ -41,6 +42,7 @@ export const casaParceiraLinks: Link[] = [
 
 export const empresaLinks: Link[] = [
   { rotulo: 'Sobre', href: '/sobre' },
+  { rotulo: 'Contato', href: '/contato' },
 ];
 
 export const rodape: Coluna[] = [
@@ -48,6 +50,7 @@ export const rodape: Coluna[] = [
     titulo: 'Quero jogar',
     links: [
       { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
+      { rotulo: 'Escape room em Curitiba', href: '/escape-room-curitiba' },
       { rotulo: 'Como funciona', href: '/como-funciona' },
       { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
       { rotulo: 'Experiências', href: '/experiencias' },
@@ -82,6 +85,7 @@ export const rodape: Coluna[] = [
     links: [
       { rotulo: 'Central de ajuda', href: '/ajuda' },
       { rotulo: 'Sobre', href: '/sobre' },
+      { rotulo: 'Contato', href: '/contato' },
     ],
   },
   {
@@ -98,6 +102,7 @@ export const rodape: Coluna[] = [
 
 const nomes: Record<string, string> = {
   '/guia/escape-room-sozinho': 'Escape room sozinho',
+  '/escape-room-curitiba': 'Escape room em Curitiba',
   '/como-funciona': 'Como funciona',
   '/como-funciona/pagamento': 'Pagamento e regras',
   '/experiencias': 'Experiências',

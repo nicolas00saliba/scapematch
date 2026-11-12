@@ -215,4 +215,51 @@ abstract final class PartnerMessages {
   }
 
   static String perPerson(String price) => '$price por pessoa';
+
+  static const withdrawalsTitle = 'Saldo e saques';
+  static const withdrawalsBody =
+      'O saldo disponível já está na subconta da casa. O saque vai para uma conta com o mesmo CPF ou CNPJ.';
+  static const withdrawalPixNotice =
+      'Os saques saem por Pix. Em conta CNPJ, o Asaas dá 30 Pix grátis por mês.';
+  static const availableLabel = 'Disponível para saque';
+  static const receivableLabel = 'A receber';
+  static const receivableEmpty = 'Nada a receber no momento.';
+  static const withdrawalHistory = 'Histórico de saques';
+  static const withdrawalEmpty = 'Nenhum saque ainda.';
+  static const withdrawalAmount = 'Valor do saque';
+  static const withdrawalSubmit = 'Sacar';
+  static const withdrawalBank = 'Conta de saque';
+  static const withdrawalNoBank = 'Nenhuma conta cadastrada.';
+  static const withdrawalChangeBank = 'Alterar conta';
+  static const withdrawalSaveBank = 'Salvar conta';
+  static const withdrawalPix = 'Chave Pix';
+  static const withdrawalBankAccount = 'Conta bancária';
+  static const withdrawalBankPix = 'Esta conta recebe o saque por Pix.';
+  static const withdrawalOwner = 'Nome do titular';
+  static const withdrawalDocument = 'CPF ou CNPJ do titular';
+  static const withdrawalAuto = 'Saque automático';
+  static const withdrawalAutoSwitch = 'Sacar automaticamente';
+  static const withdrawalAll = 'Sacar tudo';
+  static const withdrawalRetry = 'Tentar de novo';
+  static const withdrawalAutoBody =
+      'Uma vez por semana, no dia escolhido, o saldo disponível segue por Pix.';
+  static const withdrawalWeekly = 'Semanal';
+  static const withdrawalMinimum = 'Valor mínimo';
+  static const withdrawalSaveSchedule = 'Salvar automático';
+  static const withdrawalStaff =
+      'Só o dono ou um admin da casa pode sacar. A equipe não movimenta este saldo.';
+  static const withdrawalBlocked =
+      'Os saques ficam bloqueados por 24 horas depois da troca da conta. O dono recebe um e-mail.';
+  static const withdrawalPassword = 'Senha da casa';
+  static const withdrawalTotp = 'Código do autenticador';
+  static const withdrawalConfirm = 'Confirmar';
+  static const withdrawalAmountInvalid = 'Informe o valor do saque.';
+  static const withdrawalReauth = 'Confirme que é você';
+  static const withdrawalReceipt = 'Comprovante';
+  static const withdrawalPending = 'Pendente';
+  static const withdrawalDone = 'Concluído';
+  static const withdrawalFailed = 'Falhou';
+  static const withdrawalCancelled = 'Cancelado';
+  static const withdrawalManual = 'Manual';
+  static const withdrawalAutomatic = 'Automático';
 }
