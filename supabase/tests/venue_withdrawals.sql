@@ -17,11 +17,20 @@ declare
     'public.list_due_venue_payouts()',
     'public.venue_payout_wallet(uuid)',
     'public.venue_bank_for_transfer(uuid)',
-    'public.venue_payout_snapshot(uuid,uuid,boolean)'
+    'public.venue_payout_snapshot(uuid,uuid,boolean)',
+    'public.list_venue_subaccounts()',
+    'public.list_stale_pending_withdrawals(integer)',
+    'public.venue_weekly_attempt_key(uuid,timestamptz)'
   ];
 begin
   if public.venue_payouts_enabled() then
     raise exception 'a flag de saque nasceu ligada';
+  end if;
+  if has_table_privilege('anon', 'public.venue_bank_accounts', 'select')
+    or has_table_privilege('authenticated', 'public.venue_bank_accounts', 'select')
+    or has_table_privilege('service_role', 'public.venue_bank_accounts', 'select')
+  then
+    raise exception 'a conta bancaria continua legivel pela API';
   end if;
   foreach v_name in array v_hidden loop
     if has_function_privilege('authenticated', v_name, 'execute')
@@ -326,14 +335,26 @@ do $$
 declare
   v_manual jsonb;
 begin
+  -- O Asaas já tirou o pendente do saldo disponível. 6000 cabe em 9000
+  -- mesmo com outro saque pendente de 4000. Somar de novo recusaria este.
   v_manual := public.claim_venue_withdrawal(
     'b1111111-1111-4111-8111-111111111111',
     'a1111111-1111-4111-8111-111111111111',
     'manual', '', 6000, 9000
   );
-  if v_manual is not null then
-    raise exception 'o manual passou do saldo com pendente';
+  if v_manual ->> 'fresh' <> 'true' then
+    raise exception 'o saldo disponivel recusou um saque que cabe';
   end if;
+end $$;
+
+do $$
+begin
+  perform public.claim_venue_withdrawal(
+    'b1111111-1111-4111-8111-111111111111',
+    'a1111111-1111-4111-8111-111111111111',
+    'manual', '', 10000, 9000
+  );
+  raise exception 'o manual passou do saldo disponivel';
 exception
   when others then
     if sqlerrm <> 'saldo' then
@@ -548,4 +569,290 @@ exception
     if sqlerrm not like 'permission denied%' then
       raise;
     end if;
+end $$;
+
+insert into public.venue_bank_accounts (
+  venue_id, destination, bank_code, agency, account_number, account_digit,
+  owner_name, owner_document, operation_type, updated_by
+) values (
+  'b2222222-2222-4222-8222-222222222222',
+  'bank', '341', '1234', '123456789', '0',
+  'Outra Casa', '66778899000100', 'TED',
+  'a4444444-4444-4444-8444-444444444444'
+);
+
+do $$
+declare
+  v_user text;
+  v_snap text;
+  v_value text;
+  v_column text;
+  v_users text[] := array[
+    'a1111111-1111-4111-8111-111111111111',
+    'a2222222-2222-4222-8222-222222222222',
+    'a5555555-5555-4555-8555-555555555555'
+  ];
+  v_columns text[] := array['pix_key', 'account_number', 'owner_document'];
+begin
+  perform set_config(
+    'request.jwt.claim.sub', 'a4444444-4444-4444-8444-444444444444', true
+  );
+  perform set_config('request.jwt.claim.aal', 'aal2', true);
+  set local role authenticated;
+  v_snap := public.my_venue_payouts(
+    'b2222222-2222-4222-8222-222222222222'
+  )::text;
+  if v_snap like '%123456789%' or v_snap like '%66778899000100%' then
+    raise exception 'o snapshot devolveu conta ou documento inteiro';
+  end if;
+  if v_snap not like '%6789%' then
+    raise exception 'o snapshot nao mascarou a conta';
+  end if;
+
+  foreach v_user in array v_users loop
+    perform set_config('request.jwt.claim.sub', v_user, true);
+    perform set_config('request.jwt.claim.aal', 'aal2', true);
+    foreach v_column in array v_columns loop
+      begin
+        execute format(
+          'select %I from public.venue_bank_accounts limit 1', v_column
+        ) into v_value;
+        raise exception '% leu %: %', v_user, v_column, v_value;
+      exception
+        when insufficient_privilege then
+          if sqlerrm not like 'permission denied%' then
+            raise;
+          end if;
+      end;
+    end loop;
+  end loop;
+end $$;
+
+do $$
+declare
+  v_old uuid;
+  v_count integer;
+begin
+  insert into public.venue_withdrawals (
+    venue_id, amount_cents, status, source, period_key,
+    external_reference, asaas_transfer_id, updated_at
+  ) values (
+    'b2222222-2222-4222-8222-222222222222',
+    100, 'pending', 'manual', 'manual:velho',
+    'ref-velho-pendente', 'tra_velho_pendente',
+    pg_catalog.now() - interval '7 hours'
+  ) returning id into v_old;
+
+  select count(*) into v_count
+  from public.list_stale_pending_withdrawals(6)
+  where id = v_old;
+  if v_count <> 1 then
+    raise exception 'o pendente antigo nao entrou na reconciliacao';
+  end if;
+
+  update public.venue_withdrawals
+  set updated_at = pg_catalog.now()
+  where id = v_old;
+  select count(*) into v_count
+  from public.list_stale_pending_withdrawals(6)
+  where id = v_old;
+  if v_count <> 0 then
+    raise exception 'o pendente recente entrou na reconciliacao';
+  end if;
+end $$;
+
+do $$
+begin
+  perform public.list_stale_pending_withdrawals(0);
+  raise exception 'a reconciliacao aceitou prazo invalido';
+exception
+  when others then
+    if sqlerrm <> 'valor' then
+      raise;
+    end if;
+end $$;
+
+do $$
+declare
+  v_base text;
+  v_key text;
+  v_id uuid;
+  v_retry integer;
+  v_count integer;
+  v_claim jsonb;
+  v_dispatch boolean;
+  v_now timestamptz := pg_catalog.now();
+begin
+  if pg_catalog.pg_get_functiondef('public.list_due_venue_payouts()'::regprocedure)
+    not like '%venue_weekly_attempt_key%'
+  then
+    raise exception 'a lista semanal nao usa a retentativa';
+  end if;
+
+  update public.venue_payout_schedules
+  set frequency = 'weekly',
+      weekday = pg_catalog.date_part(
+        'dow', v_now at time zone 'America/Sao_Paulo'
+      )::smallint
+  where venue_id = 'b1111111-1111-4111-8111-111111111111';
+
+  v_base := public.venue_payout_period_key('weekly', v_now);
+  v_key := public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  );
+  if v_key is distinct from v_base then
+    raise exception 'o semanal do dia nao abriu a primeira tentativa: %', v_key;
+  end if;
+
+  insert into public.venue_withdrawals (
+    venue_id, amount_cents, status, source, period_key,
+    external_reference, retry_count, created_at, updated_at
+  ) values (
+    'b1111111-1111-4111-8111-111111111111',
+    4000, 'failed', 'automatic', v_base,
+    'ref-semana-base', 0,
+    v_now - interval '1 day', v_now - interval '1 day'
+  ) returning id into v_id;
+
+  v_key := public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  );
+  if v_key is distinct from v_base then
+    raise exception 'a falha sem id nao reaproveitou a linha';
+  end if;
+
+  v_dispatch := public.begin_withdrawal_dispatch(v_id);
+  if v_dispatch is not true then
+    raise exception 'a primeira retentativa sem id nao saiu';
+  end if;
+  perform public.fail_venue_withdrawal(v_id, 'erro');
+  update public.venue_withdrawals
+  set updated_at = v_now - interval '1 day'
+  where id = v_id;
+  v_dispatch := public.begin_withdrawal_dispatch(v_id);
+  if v_dispatch is not true then
+    raise exception 'a segunda retentativa sem id nao saiu';
+  end if;
+  perform public.fail_venue_withdrawal(v_id, 'erro');
+  update public.venue_withdrawals
+  set updated_at = v_now - interval '1 day'
+  where id = v_id;
+  select retry_count into v_retry
+  from public.venue_withdrawals
+  where id = v_id;
+  if v_retry <> 2 then
+    raise exception 'o limite de retentativa nao ficou em 2: %', v_retry;
+  end if;
+  if public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  ) is not null then
+    raise exception 'a terceira retentativa ainda foi oferecida';
+  end if;
+  if public.begin_withdrawal_dispatch(v_id) then
+    raise exception 'a terceira retentativa sem id duplicou o envio';
+  end if;
+
+  update public.venue_withdrawals
+  set status = 'failed',
+      asaas_transfer_id = 'tra_semana_base',
+      retry_count = 0,
+      dispatch_started_at = null,
+      updated_at = v_now
+  where id = v_id;
+  if public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  ) is not null then
+    raise exception 'a retentativa saiu no mesmo dia da falha';
+  end if;
+  if public.begin_withdrawal_dispatch(v_id) then
+    raise exception 'reabriu uma transferencia que o Asaas ja conhece';
+  end if;
+
+  update public.venue_withdrawals
+  set updated_at = v_now - interval '1 day'
+  where id = v_id;
+  v_key := public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  );
+  if v_key is distinct from v_base || '-r1' then
+    raise exception 'o dia seguinte nao abriu a primeira retentativa: %', v_key;
+  end if;
+
+  v_claim := public.claim_venue_withdrawal(
+    'b1111111-1111-4111-8111-111111111111',
+    null, 'automatic', v_key, 4000, 9000
+  );
+  if v_claim ->> 'fresh' <> 'true' then
+    raise exception 'a retentativa nao criou o saque';
+  end if;
+  v_claim := public.claim_venue_withdrawal(
+    'b1111111-1111-4111-8111-111111111111',
+    null, 'automatic', v_key, 4000, 9000
+  );
+  if v_claim ->> 'fresh' <> 'false' then
+    raise exception 'a mesma retentativa criou outro saque';
+  end if;
+  select count(*) into v_count
+  from public.venue_withdrawals
+  where venue_id = 'b1111111-1111-4111-8111-111111111111'
+    and period_key = v_base || '-r1';
+  if v_count <> 1 then
+    raise exception 'a retentativa duplicou a linha: %', v_count;
+  end if;
+  if public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  ) is not null then
+    raise exception 'abriu outra retentativa com a anterior pendente';
+  end if;
+
+  update public.venue_withdrawals
+  set status = 'failed',
+      asaas_transfer_id = 'tra_semana_r1',
+      updated_at = v_now - interval '1 day'
+  where period_key = v_base || '-r1'
+    and venue_id = 'b1111111-1111-4111-8111-111111111111';
+  v_key := public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  );
+  if v_key is distinct from v_base || '-r2' then
+    raise exception 'a segunda retentativa da semana nao abriu: %', v_key;
+  end if;
+
+  insert into public.venue_withdrawals (
+    venue_id, amount_cents, status, source, period_key,
+    external_reference, asaas_transfer_id, created_at, updated_at
+  ) values (
+    'b1111111-1111-4111-8111-111111111111',
+    4000, 'failed', 'automatic', v_base || '-r2',
+    'ref-semana-r2', 'tra_semana_r2',
+    v_now - interval '1 day', v_now - interval '1 day'
+  );
+  if public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  ) is not null then
+    raise exception 'a semana passou de duas retentativas';
+  end if;
+
+  begin
+    perform public.claim_venue_withdrawal(
+      'b1111111-1111-4111-8111-111111111111',
+      null, 'automatic', v_base || '-r3', 4000, 9000
+    );
+    raise exception 'aceitou uma terceira retentativa';
+  exception
+    when others then
+      if sqlerrm <> 'valor' then
+        raise;
+      end if;
+  end;
+
+  update public.venue_withdrawals
+  set status = 'done'
+  where venue_id = 'b1111111-1111-4111-8111-111111111111'
+    and period_key in (v_base, v_base || '-r1', v_base || '-r2');
+  if public.venue_weekly_attempt_key(
+    'b1111111-1111-4111-8111-111111111111', v_now
+  ) is not null then
+    raise exception 'a semana concluida foi tentada de novo';
+  end if;
 end $$;

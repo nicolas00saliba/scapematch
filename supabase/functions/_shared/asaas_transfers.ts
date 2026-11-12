@@ -184,6 +184,116 @@ export function findTransferInList(
   return null;
 }
 
+/// Eventos da subconta. O webhook da conta raiz não recebe o que acontece nela.
+export const transferWebhookEvents = [
+  "TRANSFER_CREATED",
+  "TRANSFER_PENDING",
+  "TRANSFER_IN_BANK_PROCESSING",
+  "TRANSFER_BLOCKED",
+  "TRANSFER_DONE",
+  "TRANSFER_FAILED",
+  "TRANSFER_CANCELLED",
+] as const;
+
+export const transferWebhookName = "EscapeMatch saques";
+
+export type WebhookView = {
+  id: string;
+  url: string;
+  enabled: boolean;
+  interrupted: boolean;
+  events: string[];
+};
+
+export function transferWebhookUrl(env: EnvLike): string {
+  const explicit = (env.get("ASAAS_TRANSFER_WEBHOOK_URL") ?? "").trim();
+  if (
+    explicit.startsWith("https://") &&
+    explicit.includes("/asaas-transfer-webhook")
+  ) {
+    return explicit;
+  }
+  const base = (env.get("SUPABASE_URL") ?? "").trim().replace(/\/$/, "");
+  if (!base.startsWith("https://")) return "";
+  return `${base}/functions/v1/asaas-transfer-webhook`;
+}
+
+export function webhookEmail(env: EnvLike): string {
+  const email = (env.get("ASAAS_WEBHOOK_EMAIL") ?? "").trim();
+  if (email.length < 6 || email.length > 200 || /\s/.test(email)) return "";
+  if (!email.includes("@")) return "";
+  return email;
+}
+
+/// authToken do Asaas: 32 a 255, sem espaço, e não pode ser a apiKey.
+export function webhookAuthToken(env: EnvLike, apiKey = ""): string {
+  const token = env.get("ASAAS_WEBHOOK_TOKEN") ?? "";
+  if (token.length < 32 || token.length > 255 || /\s/.test(token)) return "";
+  if (apiKey.length > 0 && token === apiKey) return "";
+  return token;
+}
+
+export function transferWebhookBody(
+  url: string,
+  email: string,
+  token: string,
+): Record<string, unknown> {
+  return {
+    name: transferWebhookName,
+    url,
+    email,
+    enabled: true,
+    interrupted: false,
+    apiVersion: 3,
+    authToken: token,
+    sendType: "SEQUENTIALLY",
+    events: [...transferWebhookEvents],
+  };
+}
+
+export function parseWebhookList(
+  body: Record<string, unknown>,
+): WebhookView[] {
+  const rows = Array.isArray(body.data) ? body.data : [];
+  const items: WebhookView[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as Record<string, unknown>;
+    const id = text(item.id);
+    const url = text(item.url);
+    if (!id || !url) continue;
+    const events = Array.isArray(item.events)
+      ? item.events.filter((event): event is string => typeof event === "string")
+      : [];
+    items.push({
+      id,
+      url,
+      enabled: item.enabled === true,
+      interrupted: item.interrupted === true,
+      events,
+    });
+  }
+  return items;
+}
+
+export function webhookCoversTransfers(webhook: WebhookView, url: string): boolean {
+  if (webhook.url !== url || !webhook.enabled || webhook.interrupted) return false;
+  const events = new Set(webhook.events);
+  return transferWebhookEvents.every((event) => events.has(event));
+}
+
+/// Cria se a URL ainda não existe. Atualiza o mesmo id se faltar evento.
+/// Nunca devolve um segundo cadastro para a mesma URL.
+export function nextWebhookAction(
+  list: WebhookView[],
+  url: string,
+): { action: "create" } | { action: "update"; id: string } | { action: "ready" } {
+  const match = list.find((item) => item.url === url);
+  if (!match) return { action: "create" };
+  if (webhookCoversTransfers(match, url)) return { action: "ready" };
+  return { action: "update", id: match.id };
+}
+
 export function parsePaymentReceivables(
   body: Record<string, unknown>,
 ): Receivable[] {

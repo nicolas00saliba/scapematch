@@ -4,8 +4,10 @@ import {
   mapTransferEvent,
   mergeReceivables,
   transferPayload,
+  transferWebhookEvents,
 } from "./asaas_transfers.ts";
 import {
+  ensureTransferWebhook,
   handleScheduledWithdrawals,
   handleTransferWebhook,
   handleVenuePayouts,
@@ -57,6 +59,25 @@ function fake(options?: {
   enabled?: boolean;
   role?: string;
   balance?: number;
+  pending?: number;
+  period?: string;
+  stale?: Record<string, unknown>[];
+  subaccounts?: Record<string, unknown>[];
+  webhooks?: {
+    id: string;
+    url: string;
+    enabled: boolean;
+    interrupted: boolean;
+    events: string[];
+  }[];
+  transfer?: {
+    id: string;
+    status: "pending" | "done" | "failed" | "cancelled";
+    receiptUrl: string;
+    externalReference: string;
+    failReason: string;
+  } | null;
+  savedWebhooks?: { body: Record<string, unknown>; id?: string }[];
 }): Fake {
   const calls: Fake["calls"] = [];
   const created: Record<string, unknown>[] = [];
@@ -80,6 +101,12 @@ function fake(options?: {
         failReason: "",
       });
     },
+    readTransfer: () => Promise.resolve(options?.transfer ?? null),
+    listWebhooks: () => Promise.resolve(options?.webhooks ?? []),
+    saveWebhook: (body, id) => {
+      options?.savedWebhooks?.push({ body, id });
+      return Promise.resolve();
+    },
   };
   const store: PayoutStore = {
     actor: (jwt) => {
@@ -97,7 +124,7 @@ function fake(options?: {
           enabled: options?.enabled ?? true,
           can_withdraw: (options?.role ?? "owner") !== "staff",
           role: options?.role ?? "owner",
-          pending_cents: 0,
+          pending_cents: options?.pending ?? 0,
           withdrawals: [],
         });
       }
@@ -109,10 +136,16 @@ function fake(options?: {
       if (fn === "list_due_venue_payouts") {
         return Promise.resolve([{
           venue_id: venue,
-          period_key: "auto:2026-11-12",
+          period_key: options?.period ?? "auto:2026-11-12",
           min_amount_cents: 1000,
-          pending_cents: 0,
+          pending_cents: options?.pending ?? 0,
         }]);
+      }
+      if (fn === "list_venue_subaccounts") {
+        return Promise.resolve(options?.subaccounts ?? []);
+      }
+      if (fn === "list_stale_pending_withdrawals") {
+        return Promise.resolve(options?.stale ?? []);
       }
       if (fn === "claim_venue_withdrawal") {
         return Promise.resolve({
@@ -145,9 +178,10 @@ function fake(options?: {
         });
       }
       if (fn === "apply_transfer_event") {
+        const changed = args.p_status !== "pending";
         return Promise.resolve({
-          changed: true,
-          notice_id: notice,
+          changed,
+          notice_id: changed ? notice : null,
           status: args.p_status,
         });
       }
@@ -481,4 +515,227 @@ Deno.test("a transferencia usa a chave da subconta e nao a devolve no erro", asy
   }).catch((caught: Error) => caught);
   assert(error instanceof Error);
   assert(!error.message.includes(subKey));
+});
+
+Deno.test("o automatico usa o saldo inteiro porque o Asaas ja descontou o pendente", async () => {
+  const gate = fake({ pending: 4_000, balance: 10_000, period: "auto:2026-W46-r1" });
+  const secret = {
+    "x-venue-withdrawals-secret": "cron-secret",
+    origin: "https://parceiro.escapematch.com.br",
+  };
+  const response = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", { method: "POST", headers: secret }),
+    gate.deps,
+  );
+  assertEquals((await response.json()).created, 1);
+  const claim = gate.calls.find((call) => call.fn === "claim_venue_withdrawal");
+  assertEquals(claim?.args.p_amount_cents, 10_000);
+  assertEquals(claim?.args.p_available_cents, 10_000);
+  assertEquals(claim?.args.p_period_key, "auto:2026-W46-r1");
+  assertEquals(gate.created[0].value, 100);
+  assertEquals(gate.created.length, 1);
+});
+
+Deno.test("o webhook de transferencia fica na subconta e nao duplica", async () => {
+  const webhookUrl =
+    "https://example.supabase.co/functions/v1/asaas-transfer-webhook";
+  const saved: { body: Record<string, unknown>; id?: string }[] = [];
+  const listed = {
+    data: [] as Record<string, unknown>[],
+  };
+  const calls: { url: string; method: string; token: string }[] = [];
+  const provider = new AsaasProvider(
+    subKey,
+    "https://api-sandbox.asaas.com/v3",
+    (url, init) => {
+      const method = init?.method ?? "GET";
+      const headers = new Headers(init?.headers);
+      calls.push({ url, method, token: headers.get("access_token") ?? "" });
+      if (method === "GET") {
+        return Promise.resolve(new Response(JSON.stringify(listed), { status: 200 }));
+      }
+      listed.data = [{
+        id: "wh_casa",
+        url: webhookUrl,
+        enabled: true,
+        interrupted: false,
+        events: [...transferWebhookEvents],
+      }];
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: "wh_casa" }), { status: 200 }),
+      );
+    },
+  );
+  const env = {
+    get: (name: string) => {
+      const values: Record<string, string> = {
+        SUPABASE_URL: "https://example.supabase.co",
+        ASAAS_WEBHOOK_EMAIL: "ops@example.com",
+        ASAAS_WEBHOOK_TOKEN: webhookToken,
+      };
+      return values[name];
+    },
+  };
+  const client = {
+    listWebhooks: () => provider.listWebhooks(),
+    saveWebhook: (body: Record<string, unknown>, id?: string) => {
+      saved.push({ body, id });
+      return provider.saveWebhook(body, id);
+    },
+  };
+  assertEquals(await ensureTransferWebhook(client, env), "ready");
+  assertEquals(saved.length, 1);
+  assertEquals(saved[0].id, undefined);
+  assertEquals(saved[0].body.authToken, webhookToken);
+  assertEquals(saved[0].body.url, webhookUrl);
+  assertEquals(calls.every((call) => call.token === subKey), true);
+  assertEquals(calls.filter((call) => call.method === "POST").length, 1);
+
+  assertEquals(await ensureTransferWebhook(client, env), "ready");
+  assertEquals(saved.length, 1);
+  assertEquals(calls.filter((call) => call.method === "POST").length, 1);
+
+  const leaking = new AsaasProvider(
+    subKey,
+    "https://api-sandbox.asaas.com/v3",
+    () =>
+      Promise.resolve(new Response(
+        JSON.stringify({ errors: [{ description: webhookToken }] }),
+        { status: 400 },
+      )),
+  );
+  const leaked = await ensureTransferWebhook({
+    listWebhooks: () => Promise.resolve([]),
+    saveWebhook: () => leaking.saveWebhook({}),
+  }, env).catch((caught: Error) => caught);
+  assert(leaked instanceof Error);
+  assert(!leaked.message.includes(webhookToken));
+});
+
+Deno.test("subcontas existentes ganham o webhook e a reserva fica de fora", async () => {
+  const saved: { body: Record<string, unknown>; id?: string }[] = [];
+  const gate = fake({
+    subaccounts: [{ venue_id: venue }],
+    savedWebhooks: saved,
+  });
+  const base = gate.deps.env;
+  gate.deps.env = {
+    get: (name) => {
+      if (name === "SUPABASE_URL") return "https://example.supabase.co";
+      if (name === "ASAAS_WEBHOOK_EMAIL") return "ops@example.com";
+      return base.get(name);
+    },
+  };
+  const secret = {
+    "x-venue-withdrawals-secret": "cron-secret",
+    origin: "https://parceiro.escapematch.com.br",
+  };
+  const response = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", { method: "POST", headers: secret }),
+    gate.deps,
+  );
+  const body = await response.json();
+  assertEquals(body.webhooks, 1);
+  assertEquals(saved.length, 1);
+  assert(
+    (saved[0].body.events as string[]).includes("TRANSFER_FAILED"),
+  );
+  assert(!JSON.stringify(body).includes(webhookToken));
+
+  const reserveSaved: { body: Record<string, unknown>; id?: string }[] = [];
+  const reserve = fake({
+    wallet: "wal_reserva",
+    subaccounts: [{ venue_id: venue }],
+    savedWebhooks: reserveSaved,
+    enabled: false,
+  });
+  const reserveBase = reserve.deps.env;
+  reserve.deps.env = {
+    get: (name) => {
+      if (name === "SUPABASE_URL") return "https://example.supabase.co";
+      if (name === "ASAAS_WEBHOOK_EMAIL") return "ops@example.com";
+      return reserveBase.get(name);
+    },
+  };
+  await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", { method: "POST", headers: secret }),
+    reserve.deps,
+  );
+  assertEquals(reserveSaved, []);
+  assert(!reserve.calls.some((call) => call.fn === "read_venue_asaas_key"));
+});
+
+Deno.test("a reconciliacao consulta o pendente antigo e nao cria outra transferencia", async () => {
+  const done = fake({
+    enabled: false,
+    stale: [{
+      id: withdrawal,
+      venue_id: venue,
+      asaas_transfer_id: "tra_teste",
+      external_reference: withdrawal,
+    }],
+    transfer: {
+      id: "tra_teste",
+      status: "done",
+      receiptUrl: "https://example.com/recibo",
+      externalReference: withdrawal,
+      failReason: "",
+    },
+  });
+  const secret = {
+    "x-venue-withdrawals-secret": "cron-secret",
+    origin: "https://parceiro.escapematch.com.br",
+  };
+  const response = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", { method: "POST", headers: secret }),
+    done.deps,
+  );
+  const body = await response.json();
+  assertEquals(body.created, 0);
+  assertEquals(body.reconciled, 1);
+  assertEquals(done.created, []);
+  const applied = done.calls.find((call) => call.fn === "apply_transfer_event");
+  assertEquals(applied?.args.p_status, "done");
+  assertEquals(applied?.args.p_transfer_id, "tra_teste");
+  assert(!done.calls.some((call) => call.fn === "list_due_venue_payouts"));
+
+  const waiting = fake({
+    enabled: false,
+    stale: [{
+      id: withdrawal,
+      venue_id: venue,
+      asaas_transfer_id: "tra_teste",
+      external_reference: withdrawal,
+    }],
+    transfer: {
+      id: "tra_teste",
+      status: "pending",
+      receiptUrl: "",
+      externalReference: withdrawal,
+      failReason: "",
+    },
+  });
+  const still = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", { method: "POST", headers: secret }),
+    waiting.deps,
+  );
+  assertEquals((await still.json()).reconciled, 0);
+  assertEquals(waiting.created, []);
+
+  const reserve = fake({
+    wallet: "wal_reserva",
+    enabled: false,
+    stale: [{
+      id: withdrawal,
+      venue_id: venue,
+      asaas_transfer_id: "tra_teste",
+      external_reference: withdrawal,
+    }],
+  });
+  await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", { method: "POST", headers: secret }),
+    reserve.deps,
+  );
+  assertEquals(reserve.keys, []);
+  assert(!reserve.calls.some((call) => call.fn === "apply_transfer_event"));
 });

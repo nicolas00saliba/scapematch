@@ -7,10 +7,16 @@ import {
   isPointsReserve,
   mapTransferEvent,
   mergeReceivables,
+  nextWebhookAction,
   requestFromBank,
+  transferWebhookBody,
+  transferWebhookUrl,
+  webhookAuthToken,
+  webhookEmail,
   type EnvLike,
   type TransferRequest,
   type TransferResult,
+  type WebhookView,
 } from "./asaas_transfers.ts";
 import { bindJson, corsHeadersFor, todayInSaoPaulo } from "./http.ts";
 
@@ -46,6 +52,9 @@ export type TransferClient = {
   receivables(today: string): Promise<ReceivableView[]>;
   findTransfer(externalReference: string): Promise<TransferResult | null>;
   createTransfer(input: TransferRequest): Promise<TransferResult>;
+  readTransfer(id: string): Promise<TransferResult | null>;
+  listWebhooks(): Promise<WebhookView[]>;
+  saveWebhook(body: Record<string, unknown>, id?: string): Promise<void>;
 };
 
 export type PayoutStore = {
@@ -135,7 +144,41 @@ export function transferClient(provider: AsaasProvider): TransferClient {
     },
     findTransfer: (externalReference) => provider.findTransfer(externalReference),
     createTransfer: (input) => provider.createTransfer(input),
+    readTransfer: (id) =>
+      provider.readTransfer(id).catch((error: unknown) => {
+        if (error instanceof Error && error.message.startsWith("Asaas 404")) {
+          return null;
+        }
+        throw error;
+      }),
+    listWebhooks: () => provider.listWebhooks(),
+    saveWebhook: (body, id) => provider.saveWebhook(body, id),
   };
+}
+
+/// Uma transferência pendente há mais de 6 horas é consultada na API.
+/// O webhook continua sendo o caminho normal. Isto só destrava o que ele não viu.
+const stalePendingHours = 6;
+
+export async function ensureTransferWebhook(
+  client: Pick<TransferClient, "listWebhooks" | "saveWebhook">,
+  env: EnvLike,
+): Promise<"ready" | "skipped"> {
+  const url = transferWebhookUrl(env);
+  const email = webhookEmail(env);
+  const token = webhookAuthToken(env);
+  if (!url || !email || !token) return "skipped";
+  const action = nextWebhookAction(await client.listWebhooks(), url);
+  if (action.action === "ready") return "ready";
+  try {
+    await client.saveWebhook(
+      transferWebhookBody(url, email, token),
+      action.action === "update" ? action.id : undefined,
+    );
+  } catch (error) {
+    throw scrubSecret(error, token);
+  }
+  return "ready";
 }
 
 export async function secretMatches(
@@ -279,19 +322,25 @@ export async function handleScheduledWithdrawals(
     return json({ error: "not authenticated" }, 401);
   }
   try {
+    const webhooks = await syncTransferWebhooks(deps);
+    const reconciled = await reconcileStaleWithdrawals(deps);
     const enabled = await deps.store.rpc("venue_payouts_enabled", {});
-    if (enabled !== true) return json({ ok: true, created: 0 });
+    if (enabled !== true) {
+      return json({ ok: true, created: 0, webhooks, reconciled });
+    }
     const due = asRows(await deps.store.rpc("list_due_venue_payouts", {}));
     let created = 0;
     for (const row of due) {
       try {
         const venueId = text(row.venue_id);
-        const pending = Number(row.pending_cents) || 0;
         const min = Number(row.min_amount_cents) || 0;
         const keys = await subaccount(deps, venueId);
         if (keys.kind !== "ok") continue;
         const balance = await keys.client.balanceCents();
-        const amount = balance - pending;
+        // O saldo disponível do Asaas já desconta a transferência em andamento.
+        // O cancelamento devolve o valor. Subtrair o pendente local de novo
+        // recusaria um saque que ainda cabe nesse saldo.
+        const amount = balance;
         if (amount <= 0 || amount < min) continue;
         const result = await sendWithdrawal(deps, {
           venueId,
@@ -308,11 +357,61 @@ export async function handleScheduledWithdrawals(
       }
     }
     await flushNotices(deps);
-    return json({ ok: true, created });
+    return json({ ok: true, created, webhooks, reconciled });
   } catch (error) {
     const failure = clientFailure(error, "schedule-venue-withdrawals");
     return json(failure.body, failure.status);
   }
+}
+
+async function syncTransferWebhooks(deps: PayoutDeps): Promise<number> {
+  if (!transferWebhookUrl(deps.env) || !webhookEmail(deps.env)) return 0;
+  if (!webhookAuthToken(deps.env)) return 0;
+  const venues = asRows(await deps.store.rpc("list_venue_subaccounts", {}));
+  let ready = 0;
+  for (const row of venues) {
+    try {
+      const keys = await subaccount(deps, text(row.venue_id));
+      if (keys.kind !== "ok") continue;
+      const result = await ensureTransferWebhook(keys.client, deps.env);
+      if (result === "ready") ready += 1;
+    } catch (error) {
+      logCaught("schedule-venue-withdrawals", error);
+    }
+  }
+  return ready;
+}
+
+async function reconcileStaleWithdrawals(deps: PayoutDeps): Promise<number> {
+  const rows = asRows(await deps.store.rpc("list_stale_pending_withdrawals", {
+    p_hours: stalePendingHours,
+  }));
+  let updated = 0;
+  for (const row of rows) {
+    try {
+      const keys = await subaccount(deps, text(row.venue_id));
+      if (keys.kind !== "ok") continue;
+      const transferId = text(row.asaas_transfer_id);
+      const transfer = transferId
+        ? await keys.client.readTransfer(transferId)
+        : await keys.client.findTransfer(text(row.external_reference));
+      if (!transfer) continue;
+      const applied = record(await deps.store.rpc("apply_transfer_event", {
+        p_external_reference: text(row.external_reference) || transfer.externalReference,
+        p_transfer_id: transfer.id,
+        p_status: transfer.status,
+        p_receipt: transfer.receiptUrl,
+        p_reason: transfer.failReason,
+      }));
+      if (applied?.changed === true) {
+        updated += 1;
+        await deliverNotice(deps, applied.notice_id);
+      }
+    } catch (error) {
+      logCaught("schedule-venue-withdrawals", error);
+    }
+  }
+  return updated;
 }
 
 type SendInput = {
@@ -515,6 +614,12 @@ function decodeBase64Url(value: string): string {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/") +
     "=".repeat((4 - (value.length % 4)) % 4);
   return atob(padded);
+}
+
+function scrubSecret(error: unknown, secret: string): Error {
+  const message = error instanceof Error ? error.message : "erro";
+  const clean = secret ? message.split(secret).join("[redacted]") : message;
+  return new Error(clean);
 }
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {

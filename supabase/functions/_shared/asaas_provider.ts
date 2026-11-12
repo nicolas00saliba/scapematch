@@ -13,7 +13,9 @@ import {
   parseFinancialTransactions,
   parsePaymentReceivables,
   parseTransfer,
+  parseWebhookList,
   transferPayload,
+  type WebhookView,
   type FinancialMovement,
   type Receivable,
   type TransferRequest,
@@ -792,6 +794,30 @@ export class AsaasProvider implements PaymentProvider {
       undefined,
       "GET",
     ).then((body) => findTransferInList(body, externalReference));
+  }
+
+  readTransfer(id: string): Promise<TransferResult> {
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(id)) throw new Error("valor");
+    return this.#send(
+      `/transfers/${encodeURIComponent(id)}`,
+      undefined,
+      "GET",
+    ).then(parseTransfer);
+  }
+
+  /// Webhooks da conta desta apiKey. Na subconta, a chave tem de ser a dela.
+  listWebhooks(): Promise<WebhookView[]> {
+    return this.#send("/webhooks?limit=100", undefined, "GET").then(
+      parseWebhookList,
+    );
+  }
+
+  saveWebhook(body: Record<string, unknown>, id?: string): Promise<void> {
+    if (id !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
+      throw new Error("valor");
+    }
+    const path = id ? `/webhooks/${encodeURIComponent(id)}` : "/webhooks";
+    return this.#send(path, body, id ? "PUT" : "POST").then(() => undefined);
   }
 
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
