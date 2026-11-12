@@ -1,0 +1,60 @@
+name: Visual dos apps
+
+on:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'web/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'apps/parceiro/**'
+      - 'apps/admin/**'
+      - 'e2e/apps/**'
+      - 'tool/servir_spa.py'
+      - '.github/workflows/visual-apps.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  prints:
+    name: Prints das telas públicas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+          cache: true
+
+      - name: Build do jogador em modo demo
+        run: flutter build web --release --dart-define=APP_MODE=demo --base-href=/
+
+      - name: Build do parceiro em modo demo
+        working-directory: apps/parceiro
+        run: flutter build web --release --dart-define=APP_MODE=demo --base-href=/
+
+      - name: Build do admin
+        working-directory: apps/admin
+        run: flutter build web --release --base-href=/
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/apps/package-lock.json
+
+      - name: Instala o Playwright
+        working-directory: e2e/apps
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Prints em 390px e 1440px
+        working-directory: e2e/apps
+        env:
+          ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+        run: npx playwright test

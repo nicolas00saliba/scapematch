@@ -1,0 +1,46 @@
+name: Fluxos críticos
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'e2e/apps/**'
+      - '.github/workflows/fluxos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fluxos:
+    name: Cadastro, login, busca, reserva e parceiro
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/apps/package-lock.json
+
+      - name: Instala o Playwright
+        working-directory: e2e/apps
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Roda os fluxos
+        working-directory: e2e/apps
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_JOGADOR_EMAIL: ${{ secrets.E2E_JOGADOR_EMAIL }}
+          E2E_JOGADOR_SENHA: ${{ secrets.E2E_JOGADOR_SENHA }}
+          E2E_BUSCA: ${{ secrets.E2E_BUSCA }}
+          E2E_SALA_URL: ${{ secrets.E2E_SALA_URL }}
+          E2E_CADASTRO: ${{ secrets.E2E_CADASTRO }}
+          E2E_CADASTRO_EMAIL: ${{ secrets.E2E_CADASTRO_EMAIL }}
+          E2E_CADASTRO_SENHA: ${{ secrets.E2E_CADASTRO_SENHA }}
+          E2E_PARCEIRO_URL: ${{ secrets.E2E_PARCEIRO_URL }}
+          E2E_PARCEIRO_EMAIL: ${{ secrets.E2E_PARCEIRO_EMAIL }}
+          E2E_PARCEIRO_SENHA: ${{ secrets.E2E_PARCEIRO_SENHA }}
+        run: npm run fluxos
