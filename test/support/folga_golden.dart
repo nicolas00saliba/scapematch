@@ -24,9 +24,3 @@ class FolgaGolden extends LocalFileComparator {
   }
 }
 
-void usarFolgaGolden() {
-  final atual = goldenFileComparator;
-  if (atual is LocalFileComparator && atual is! FolgaGolden) {
-    goldenFileComparator = FolgaGolden(atual.basedir);
-  }
-}
