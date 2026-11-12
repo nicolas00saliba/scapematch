@@ -37,14 +37,10 @@ String formatRoomClock(int seconds) {
   return '$mm:$ss';
 }
 
-/// Tempo gasto em mm:ss e, entre parênteses, os minutos que sobraram.
-/// Minutos arredondados para baixo. Menos de um minuto sai em segundos.
+/// Tempo gasto e o que restava, os dois em mm:ss.
 String formatRoomTimeLine(int elapsedSeconds, int remainingSeconds) {
   final safe = remainingSeconds < 0 ? 0 : remainingSeconds;
-  final rest = safe < 60
-      ? 'Restavam $safe s'
-      : 'Restavam ${safe ~/ 60} min';
-  return '${formatRoomClock(elapsedSeconds)} ($rest)';
+  return '${formatRoomClock(elapsedSeconds)} (Restavam ${formatRoomClock(safe)})';
 }
 
 int remainingSeconds({

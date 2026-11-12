@@ -43,7 +43,7 @@ void main() {
     expect(flag.value, isFalse);
     expect(find.textContaining('Desligada'), findsOneWidget);
     expect(find.text('Os Ninjas · Ninja Escape · O Cofre'), findsOneWidget);
-    expect(find.textContaining('38:12 (Restavam 21 min)'), findsOneWidget);
+    expect(find.textContaining('38:12 (Restavam 21:48)'), findsOneWidget);
     await _shot(tester, 'ranking-admin');
 
     await tester.tap(find.byKey(const Key('admin-ranking-flag')));

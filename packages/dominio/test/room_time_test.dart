@@ -2,7 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('o tempo gasto fica em mm:ss e o restante em minutos', () {
+  test('o tempo gasto e o restante saem em mm:ss', () {
     expect(formatRoomClock(0), '00:00');
     expect(formatRoomClock(75), '01:15');
     expect(formatRoomClock(38 * 60 + 12), '38:12');
@@ -10,18 +10,18 @@ void main() {
       remainingSeconds(durationMinutes: 60, elapsedSeconds: 38 * 60 + 12),
       21 * 60 + 48,
     );
-    expect(formatRoomTimeLine(40 * 60, 20 * 60), '40:00 (Restavam 20 min)');
+    expect(formatRoomTimeLine(40 * 60, 20 * 60), '40:00 (Restavam 20:00)');
     expect(
       formatRoomTimeLine(38 * 60 + 12, 21 * 60 + 48),
-      '38:12 (Restavam 21 min)',
+      '38:12 (Restavam 21:48)',
     );
     expect(
       formatRoomTimeLine(41 * 60 + 5, 18 * 60 + 55),
-      '41:05 (Restavam 18 min)',
+      '41:05 (Restavam 18:55)',
     );
-    expect(formatRoomTimeLine(59 * 60, 60), '59:00 (Restavam 1 min)');
-    expect(formatRoomTimeLine(60 * 60, 45), '60:00 (Restavam 45 s)');
-    expect(formatRoomTimeLine(60 * 60, 0), '60:00 (Restavam 0 s)');
+    expect(formatRoomTimeLine(59 * 60, 60), '59:00 (Restavam 01:00)');
+    expect(formatRoomTimeLine(60 * 60, 45), '60:00 (Restavam 00:45)');
+    expect(formatRoomTimeLine(60 * 60, 0), '60:00 (Restavam 00:00)');
     expect(formatRoomDate(DateTime(2026, 11, 2)), '02/11/2026');
   });
 
