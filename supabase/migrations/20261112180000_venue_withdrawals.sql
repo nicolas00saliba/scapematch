@@ -2,8 +2,8 @@
 -- Não aplicar no projeto remoto neste PR.
 --
 -- O split e a comissão não mudam. O dinheiro já está na subconta Asaas
--- da casa (walletId). O saque é uma transferência dessa subconta, com a
--- chave dela, para Pix ou TED de mesma titularidade.
+-- da casa (walletId). O saque é uma transferência Pix dessa subconta,
+-- com a chave dela, para uma chave Pix ou uma conta que aceite Pix.
 --
 -- A subconta Reserva de pontos não é uma casa: não tem linha aqui,
 -- não tem conta bancária e nenhuma função desta migration a movimenta.
@@ -36,7 +36,7 @@ create table public.venue_bank_accounts (
   account_digit text,
   owner_name text not null check (char_length(owner_name) between 2 and 120),
   owner_document text not null,
-  operation_type text not null check (operation_type in ('PIX', 'TED')),
+  operation_type text not null check (operation_type = 'PIX'),
   withdrawals_blocked_until timestamptz,
   updated_at timestamptz not null default pg_catalog.now(),
   updated_by uuid not null,
@@ -44,6 +44,7 @@ create table public.venue_bank_accounts (
     (destination = 'pix' and operation_type = 'PIX' and pix_key is not null and pix_key_type is not null)
     or (
       destination = 'bank'
+      and operation_type = 'PIX'
       and bank_code is not null
       and agency is not null
       and account_number is not null
@@ -58,19 +59,15 @@ comment on table public.venue_bank_accounts is
 create table public.venue_payout_schedules (
   venue_id uuid primary key references public.venues (id) on delete cascade,
   enabled boolean not null default false,
-  frequency text not null check (frequency in ('daily', 'weekly')),
-  weekday smallint check (weekday between 0 and 6),
+  frequency text not null check (frequency = 'weekly'),
+  weekday smallint not null check (weekday between 0 and 6),
   min_amount_cents integer not null check (min_amount_cents >= 0),
   updated_at timestamptz not null default pg_catalog.now(),
-  updated_by uuid not null,
-  check (
-    (frequency = 'daily' and weekday is null)
-    or (frequency = 'weekly' and weekday is not null)
-  )
+  updated_by uuid not null
 );
 
 comment on table public.venue_payout_schedules is
-  'Saque automático. weekday 0 é domingo, no fuso America/Sao_Paulo. O cron não duplica o período.';
+  'Saque automático semanal. weekday 0 é domingo, no fuso America/Sao_Paulo. Não há diário.';
 
 create table public.venue_withdrawals (
   id uuid primary key default pg_catalog.gen_random_uuid(),
@@ -279,11 +276,8 @@ language sql
 stable
 set search_path = ''
 as $$
-  select case p_frequency
-    when 'daily' then 'auto:' || pg_catalog.to_char(
-      p_at at time zone 'America/Sao_Paulo', 'YYYY-MM-DD'
-    )
-    when 'weekly' then 'auto:' || pg_catalog.to_char(
+  select case
+    when p_frequency = 'weekly' then 'auto:' || pg_catalog.to_char(
       p_at at time zone 'America/Sao_Paulo', 'IYYY-"W"IW'
     )
     else null
@@ -404,8 +398,8 @@ begin
     'schedule', case
       when v_schedule.venue_id is null then pg_catalog.jsonb_build_object(
         'enabled', false,
-        'frequency', 'daily',
-        'weekday', null,
+        'frequency', 'weekly',
+        'weekday', 1,
         'min_amount_cents', 0
       )
       else pg_catalog.jsonb_build_object(
@@ -524,6 +518,10 @@ begin
     raise exception 'valor' using errcode = '22023';
   end if;
 
+  if pg_catalog.upper(pg_catalog.btrim(coalesce(p_operation_type, ''))) = 'TED' then
+    raise exception 'sem pix' using errcode = '22023';
+  end if;
+
   if p_destination = 'pix' then
     v_operation := 'PIX';
     v_key_type := pg_catalog.upper(pg_catalog.btrim(coalesce(p_pix_key_type, '')));
@@ -555,7 +553,7 @@ begin
     v_account := null;
     v_digit := null;
   elsif p_destination = 'bank' then
-    v_operation := case when p_operation_type = 'TED' then 'TED' else 'PIX' end;
+    v_operation := 'PIX';
     v_bank := private.only_digits(p_bank_code);
     v_agency := private.only_digits(p_agency);
     v_account := private.only_digits(p_account_number);
@@ -673,16 +671,12 @@ begin
   if p_min_amount_cents is null or p_min_amount_cents < 0 then
     raise exception 'valor' using errcode = '22023';
   end if;
-  if v_frequency = 'daily' then
-    v_weekday := null;
-  elsif v_frequency = 'weekly' then
-    if p_weekday is null or p_weekday < 0 or p_weekday > 6 then
-      raise exception 'valor' using errcode = '22023';
-    end if;
-    v_weekday := p_weekday::smallint;
-  else
+  if v_frequency is distinct from 'weekly'
+    or p_weekday is null or p_weekday < 0 or p_weekday > 6
+  then
     raise exception 'valor' using errcode = '22023';
   end if;
+  v_weekday := p_weekday::smallint;
 
   insert into public.venue_payout_schedules (
     venue_id, enabled, frequency, weekday, min_amount_cents, updated_at, updated_by
@@ -802,7 +796,7 @@ begin
       raise exception 'minimo' using errcode = '22023';
     end if;
     v_period := pg_catalog.btrim(coalesce(p_period_key, ''));
-    if v_period !~ '^auto:[0-9]{4}-[0-9W-]{2,12}$' then
+    if v_period !~ '^auto:[0-9]{4}-W[0-9]{2}(-r[12])?$' then
       raise exception 'valor' using errcode = '22023';
     end if;
     select id, amount_cents
@@ -1133,17 +1127,12 @@ as $$
     and v.status = 'approved'
     and v.asaas_wallet_id is not null
     and (b.withdrawals_blocked_until is null or b.withdrawals_blocked_until <= pg_catalog.now())
-    and (
-      s.frequency = 'daily'
-      or (
-        s.frequency = 'weekly'
-        and s.weekday = private.sao_paulo_weekday(pg_catalog.now())
-      )
-    );
+    and s.frequency = 'weekly'
+    and s.weekday = private.sao_paulo_weekday(pg_catalog.now());
 $$;
 
 comment on function public.list_due_venue_payouts() is
-  'Casas com saque automático devido hoje. Não inclui a Reserva de pontos.';
+  'Casas com saque automático semanal devido hoje. Não inclui a Reserva de pontos.';
 
 revoke all on function public.list_due_venue_payouts()
   from public, anon, authenticated;

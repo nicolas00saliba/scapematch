@@ -148,6 +148,7 @@ abstract final class PartnerKeys {
   static const withdrawalPix = Key('venue-withdrawal-pix');
   static const withdrawalSaveBank = Key('venue-withdrawal-save-bank');
   static const withdrawalAuto = Key('venue-withdrawal-auto');
+  static const withdrawalWeekday = Key('venue-withdrawal-weekday');
   static const withdrawalPassword = Key('venue-withdrawal-password');
   static const withdrawalConfirm = Key('venue-withdrawal-confirm');
 }

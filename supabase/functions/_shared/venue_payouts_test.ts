@@ -1,8 +1,10 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { AsaasProvider } from "./asaas_provider.ts";
 import {
+  isPixRejected,
   mapTransferEvent,
   mergeReceivables,
+  requestFromBank,
   transferPayload,
   transferWebhookEvents,
 } from "./asaas_transfers.ts";
@@ -60,6 +62,8 @@ function fake(options?: {
   role?: string;
   balance?: number;
   pending?: number;
+  failTransfer?: Error;
+  bankOperation?: string;
   period?: string;
   stale?: Record<string, unknown>[];
   subaccounts?: Record<string, unknown>[];
@@ -92,6 +96,7 @@ function fake(options?: {
       ]),
     findTransfer: () => Promise.resolve(null),
     createTransfer: (input) => {
+      if (options?.failTransfer) return Promise.reject(options.failTransfer);
       created.push(transferPayload(input) as Record<string, unknown>);
       return Promise.resolve({
         id: "tra_teste",
@@ -136,7 +141,7 @@ function fake(options?: {
       if (fn === "list_due_venue_payouts") {
         return Promise.resolve([{
           venue_id: venue,
-          period_key: options?.period ?? "auto:2026-11-12",
+          period_key: options?.period ?? "auto:2026-W46",
           min_amount_cents: 1000,
           pending_cents: options?.pending ?? 0,
         }]);
@@ -162,7 +167,7 @@ function fake(options?: {
           destination: "pix",
           pix_key: "11222333000181",
           pix_key_type: "CNPJ",
-          operation_type: "PIX",
+          operation_type: options?.bankOperation ?? "PIX",
           owner_name: "Casa do Saque",
           owner_document: "11222333000181",
         });
@@ -443,7 +448,7 @@ Deno.test("webhook de transferencia exige o token e conclui o saque", async () =
   assertEquals(ignored.calls, []);
 });
 
-Deno.test("pix e ted montam o corpo sem a chave da api", () => {
+Deno.test("toda transferencia sai como pix e nunca como ted", () => {
   const pix = transferPayload({
     valueCents: 1500,
     externalReference: withdrawal,
@@ -453,8 +458,9 @@ Deno.test("pix e ted montam o corpo sem a chave da api", () => {
     pixKeyType: "CNPJ",
   });
   assertEquals(pix.value, 15);
+  assertEquals(pix.operationType, "PIX");
   assertEquals(pix.pixAddressKeyType, "CNPJ");
-  const ted = transferPayload({
+  const account = transferPayload({
     valueCents: 2000,
     externalReference: withdrawal,
     description: "Saque EscapeMatch",
@@ -467,9 +473,24 @@ Deno.test("pix e ted montam o corpo sem a chave da api", () => {
     ownerName: "Casa",
     ownerDocument: "11222333000181",
   });
-  const bank = ted.bankAccount as { bank: { code: string } };
-  assertEquals(ted.operationType, "TED");
+  const bank = account.bankAccount as { bank: { code: string } };
+  assertEquals(account.operationType, "PIX");
+  assert(!JSON.stringify(account).includes("TED"));
   assertEquals(bank.bank.code, "341");
+  let refused = false;
+  try {
+    requestFromBank(
+      { operation_type: "TED", destination: "bank" },
+      100,
+      withdrawal,
+    );
+  } catch (error) {
+    refused = error instanceof Error && error.message === "sem pix";
+  }
+  assert(refused);
+  assert(isPixRejected(new Error(
+    'Asaas 400: {"errors":[{"description":"A instituição de destino não participa do arranjo Pix."}]}',
+  )));
   assertEquals(mapTransferEvent("TRANSFER_FAILED"), "failed");
   assertEquals(mapTransferEvent("PAYMENT_RECEIVED"), null);
   assertEquals(
@@ -480,6 +501,33 @@ Deno.test("pix e ted montam o corpo sem a chave da api", () => {
     ).map((item) => item.creditDate),
     ["2026-11-18", "2026-11-20"],
   );
+});
+
+Deno.test("banco sem pix falha com mensagem clara e nao vira ted", async () => {
+  const saved = fake({ bankOperation: "TED" });
+  const response = await handleVenuePayouts(
+    post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
+    saved.deps,
+  );
+  assertEquals((await response.json()).error, "sem pix");
+  assertEquals(saved.created, []);
+  const failed = saved.calls.find((call) => call.fn === "fail_venue_withdrawal");
+  assertEquals(failed?.args.p_reason, "sem pix");
+
+  const rejected = fake({
+    failTransfer: new Error(
+      'Asaas 400: {"errors":[{"description":"A instituição de destino não participa do arranjo Pix."}]}',
+    ),
+  });
+  const again = await handleVenuePayouts(
+    post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
+    rejected.deps,
+  );
+  const body = await again.json();
+  assertEquals(body.error, "sem pix");
+  assertEquals(rejected.created, []);
+  assert(!JSON.stringify(body).includes("instituição"));
+  assert(!JSON.stringify(body).includes("TED"));
 });
 
 Deno.test("a transferencia usa a chave da subconta e nao a devolve no erro", async () => {

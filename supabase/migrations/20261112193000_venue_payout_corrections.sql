@@ -6,7 +6,7 @@
 --
 -- venue_bank_accounts não tem select para anon, authenticated nem service_role.
 -- O app lê my_venue_payouts, que mascara a chave. A chave inteira só sai
--- em venue_bank_for_transfer, para a Edge Function montar o Pix ou o TED.
+-- em venue_bank_for_transfer, para a Edge Function montar o Pix.
 --
 -- Um automático semanal que falhou volta no dia seguinte, na mesma semana,
 -- no máximo duas vezes. A linha do período continua única.
@@ -99,7 +99,7 @@ begin
       raise exception 'minimo' using errcode = '22023';
     end if;
     v_period := pg_catalog.btrim(coalesce(p_period_key, ''));
-    if v_period !~ '^auto:[0-9]{4}-([0-9]{2}-[0-9]{2}|W[0-9]{2}(-r[12])?)$' then
+    if v_period !~ '^auto:[0-9]{4}-W[0-9]{2}(-r[12])?$' then
       raise exception 'valor' using errcode = '22023';
     end if;
     select id, amount_cents
@@ -385,35 +385,25 @@ set search_path = ''
 as $$
   select
     s.venue_id,
-    case
-      when s.frequency = 'weekly' then public.venue_weekly_attempt_key(
-        s.venue_id, pg_catalog.now()
-      )
-      else public.venue_payout_period_key(s.frequency, pg_catalog.now())
-    end,
+    public.venue_weekly_attempt_key(s.venue_id, pg_catalog.now()),
     s.min_amount_cents
   from public.venue_payout_schedules s
   join public.venues v on v.id = s.venue_id
   join public.venue_bank_accounts b on b.venue_id = s.venue_id
   where public.venue_payouts_enabled()
     and s.enabled
+    and s.frequency = 'weekly'
     and v.status = 'approved'
     and v.asaas_wallet_id is not null
     and (
       b.withdrawals_blocked_until is null
       or b.withdrawals_blocked_until <= pg_catalog.now()
     )
-    and (
-      s.frequency = 'daily'
-      or (
-        s.frequency = 'weekly'
-        and public.venue_weekly_attempt_key(s.venue_id, pg_catalog.now()) is not null
-      )
-    );
+    and public.venue_weekly_attempt_key(s.venue_id, pg_catalog.now()) is not null;
 $$;
 
 comment on function public.list_due_venue_payouts() is
-  'Casas com saque automático devido. O semanal que falhou volta no dia seguinte, até duas vezes. Não inclui a Reserva de pontos.';
+  'Casas com saque automático semanal devido. O que falhou volta no dia seguinte, até duas vezes. Não há diário e não inclui a Reserva de pontos.';
 
 revoke all on function public.list_due_venue_payouts()
   from public, anon, authenticated;

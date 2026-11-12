@@ -4,6 +4,7 @@
 import { clientFailure, logCaught, storedFailure } from "./asaas_client_error.ts";
 import { AsaasProvider, asaasSandboxBaseUrl, tokensMatch } from "./asaas_provider.ts";
 import {
+  isPixRejected,
   isPointsReserve,
   mapTransferEvent,
   mergeReceivables,
@@ -31,6 +32,7 @@ const knownErrors = [
   "valor",
   "sem subconta",
   "sem conta",
+  "sem pix",
   "minimo",
   "agenda",
 ];
@@ -472,11 +474,13 @@ async function sendWithdrawal(
       },
     };
   } catch (error) {
-    const reason = storedFailure("venue-payouts", error);
+    const rejected = isPixRejected(error);
+    const reason = rejected ? "sem pix" : storedFailure("venue-payouts", error);
     await deps.store.rpc("fail_venue_withdrawal", {
       p_id: id,
       p_reason: reason,
     }).catch(() => undefined);
+    if (rejected) return { status: 403, body: { error: "sem pix" } };
     const code = publicCode(error);
     if (code !== "erro") return { status: 403, body: { error: code } };
     return { status: 502, body: { error: "asaas_unavailable" } };

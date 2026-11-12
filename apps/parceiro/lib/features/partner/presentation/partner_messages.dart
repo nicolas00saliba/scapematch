@@ -219,6 +219,8 @@ abstract final class PartnerMessages {
   static const withdrawalsTitle = 'Saldo e saques';
   static const withdrawalsBody =
       'O saldo disponível já está na subconta da casa. O saque vai para uma conta com o mesmo CPF ou CNPJ.';
+  static const withdrawalPixNotice =
+      'Os saques saem por Pix. Em conta CNPJ, o Asaas dá 30 Pix grátis por mês.';
   static const availableLabel = 'Disponível para saque';
   static const receivableLabel = 'A receber';
   static const receivableEmpty = 'Nada a receber no momento.';
@@ -232,6 +234,7 @@ abstract final class PartnerMessages {
   static const withdrawalSaveBank = 'Salvar conta';
   static const withdrawalPix = 'Chave Pix';
   static const withdrawalBankAccount = 'Conta bancária';
+  static const withdrawalBankPix = 'Esta conta recebe o saque por Pix.';
   static const withdrawalOwner = 'Nome do titular';
   static const withdrawalDocument = 'CPF ou CNPJ do titular';
   static const withdrawalAuto = 'Saque automático';
@@ -239,8 +242,7 @@ abstract final class PartnerMessages {
   static const withdrawalAll = 'Sacar tudo';
   static const withdrawalRetry = 'Tentar de novo';
   static const withdrawalAutoBody =
-      'Quando o saldo disponível passar do mínimo, o valor segue para a conta cadastrada.';
-  static const withdrawalDaily = 'Diário';
+      'Uma vez por semana, no dia escolhido, o saldo disponível segue por Pix.';
   static const withdrawalWeekly = 'Semanal';
   static const withdrawalMinimum = 'Valor mínimo';
   static const withdrawalSaveSchedule = 'Salvar automático';

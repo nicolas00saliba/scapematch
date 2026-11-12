@@ -33,7 +33,6 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   String? _error;
   String _destination = 'pix';
   String _pixType = 'CNPJ';
-  String _operation = 'PIX';
   int? _weekday = 1;
 
   final _amount = TextEditingController();
@@ -46,7 +45,6 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   final _digit = TextEditingController();
   final _minimum = TextEditingController(text: '50,00');
   var _auto = false;
-  var _frequency = 'daily';
 
   @override
   void initState() {
@@ -82,8 +80,7 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   void _apply(VenuePayoutSnapshot snapshot) {
     _snapshot = snapshot;
     _auto = snapshot.schedule.enabled;
-    _frequency = snapshot.schedule.frequency;
-    _weekday = snapshot.schedule.weekday ?? _weekday;
+    _weekday = snapshot.schedule.weekday ?? _weekday ?? 1;
     if (snapshot.schedule.minAmountCents > 0) {
       _minimum.text = _reais(snapshot.schedule.minAmountCents);
     }
@@ -122,7 +119,7 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
       destination: _destination,
       ownerName: _owner.text.trim(),
       ownerDocument: _document.text.trim(),
-      operationType: _operation,
+      operationType: 'PIX',
       pixKey: _pix.text.trim(),
       pixKeyType: _pixType,
       bankCode: _bankCode.text.trim(),
@@ -144,8 +141,8 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
     if (!await _guard()) return;
     final schedule = VenuePayoutSchedule(
       enabled: _auto,
-      frequency: _frequency,
-      weekday: _frequency == 'weekly' ? _weekday : null,
+      frequency: 'weekly',
+      weekday: _weekday ?? 1,
       minAmountCents: minimum,
     );
     await _run(
@@ -287,7 +284,6 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
               editing: _editingBank,
               destination: _destination,
               pixType: _pixType,
-              operation: _operation,
               owner: _owner,
               document: _document,
               pix: _pix,
@@ -299,7 +295,6 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
               onEdit: () => setState(() => _editingBank = true),
               onDestination: (value) => setState(() => _destination = value),
               onPixType: (value) => setState(() => _pixType = value),
-              onOperation: (value) => setState(() => _operation = value),
               onSave: _saveBank,
             ),
           ),
@@ -307,12 +302,10 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
           _PayoutCard(
             child: _ScheduleSection(
               auto: _auto,
-              frequency: _frequency,
               weekday: _weekday ?? 1,
               minimum: _minimum,
               busy: _busy,
               onAuto: (value) => setState(() => _auto = value),
-              onFrequency: (value) => setState(() => _frequency = value),
               onWeekday: (value) => setState(() => _weekday = value),
               onSave: _saveSchedule,
             ),
@@ -417,6 +410,8 @@ class _BalanceCard extends StatelessWidget {
             ),
             if (snapshot.pendingCents > 0)
               Text('Pendente ${formatPrice(snapshot.pendingCents)}'),
+            const SizedBox(height: 8),
+            Text(PartnerMessages.withdrawalPixNotice),
           ],
         ),
       ),
@@ -430,7 +425,6 @@ class _BankSection extends StatelessWidget {
     required this.editing,
     required this.destination,
     required this.pixType,
-    required this.operation,
     required this.owner,
     required this.document,
     required this.pix,
@@ -442,7 +436,6 @@ class _BankSection extends StatelessWidget {
     required this.onEdit,
     required this.onDestination,
     required this.onPixType,
-    required this.onOperation,
     required this.onSave,
   });
 
@@ -450,7 +443,6 @@ class _BankSection extends StatelessWidget {
   final bool editing;
   final String destination;
   final String pixType;
-  final String operation;
   final TextEditingController owner;
   final TextEditingController document;
   final TextEditingController pix;
@@ -462,7 +454,6 @@ class _BankSection extends StatelessWidget {
   final VoidCallback onEdit;
   final ValueChanged<String> onDestination;
   final ValueChanged<String> onPixType;
-  final ValueChanged<String> onOperation;
   final VoidCallback onSave;
 
   @override
@@ -566,17 +557,7 @@ class _BankSection extends StatelessWidget {
               controller: digit,
               decoration: const InputDecoration(labelText: 'Dígito'),
             ),
-            DropdownButtonFormField<String>(
-              initialValue: operation,
-              decoration: const InputDecoration(labelText: 'Tipo'),
-              items: const [
-                DropdownMenuItem(value: 'PIX', child: Text('Pix')),
-                DropdownMenuItem(value: 'TED', child: Text('TED')),
-              ],
-              onChanged: (value) {
-                if (value != null) onOperation(value);
-              },
-            ),
+            const Text(PartnerMessages.withdrawalBankPix),
           ],
           const SizedBox(height: 8),
           Align(
@@ -596,30 +577,26 @@ class _BankSection extends StatelessWidget {
     if (bank.destination == 'pix') {
       return 'Pix ${bank.pixKeyType ?? ''} · ${bank.pixKeyMasked ?? ''} · ${bank.ownerName}';
     }
-    return 'Banco ${bank.bankCode ?? ''} · ag ${bank.agency ?? ''} · ${bank.accountMasked ?? ''} · ${bank.operationType}';
+    return 'Pix · banco ${bank.bankCode ?? ''} · ag ${bank.agency ?? ''} · ${bank.accountMasked ?? ''}';
   }
 }
 
 class _ScheduleSection extends StatelessWidget {
   const _ScheduleSection({
     required this.auto,
-    required this.frequency,
     required this.weekday,
     required this.minimum,
     required this.busy,
     required this.onAuto,
-    required this.onFrequency,
     required this.onWeekday,
     required this.onSave,
   });
 
   final bool auto;
-  final String frequency;
   final int weekday;
   final TextEditingController minimum;
   final bool busy;
   final ValueChanged<bool> onAuto;
-  final ValueChanged<String> onFrequency;
   final ValueChanged<int> onWeekday;
   final VoidCallback onSave;
 
@@ -649,40 +626,26 @@ class _ScheduleSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text(PartnerMessages.withdrawalDaily),
-                    selected: frequency == 'daily',
-                    onSelected: auto ? (_) => onFrequency('daily') : null,
-                  ),
-                  ChoiceChip(
-                    label: const Text(PartnerMessages.withdrawalWeekly),
-                    selected: frequency == 'weekly',
-                    onSelected: auto ? (_) => onFrequency('weekly') : null,
-                  ),
+              Text(PartnerMessages.withdrawalWeekly),
+              DropdownButtonFormField<int>(
+                key: PartnerKeys.withdrawalWeekday,
+                initialValue: weekday,
+                decoration: const InputDecoration(labelText: 'Dia'),
+                items: const [
+                  DropdownMenuItem(value: 0, child: Text('Domingo')),
+                  DropdownMenuItem(value: 1, child: Text('Segunda')),
+                  DropdownMenuItem(value: 2, child: Text('Terça')),
+                  DropdownMenuItem(value: 3, child: Text('Quarta')),
+                  DropdownMenuItem(value: 4, child: Text('Quinta')),
+                  DropdownMenuItem(value: 5, child: Text('Sexta')),
+                  DropdownMenuItem(value: 6, child: Text('Sábado')),
                 ],
+                onChanged: auto
+                    ? (value) {
+                        if (value != null) onWeekday(value);
+                      }
+                    : null,
               ),
-              if (frequency == 'weekly')
-                DropdownButtonFormField<int>(
-                  initialValue: weekday,
-                  decoration: const InputDecoration(labelText: 'Dia'),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('Domingo')),
-                    DropdownMenuItem(value: 1, child: Text('Segunda')),
-                    DropdownMenuItem(value: 2, child: Text('Terça')),
-                    DropdownMenuItem(value: 3, child: Text('Quarta')),
-                    DropdownMenuItem(value: 4, child: Text('Quinta')),
-                    DropdownMenuItem(value: 5, child: Text('Sexta')),
-                    DropdownMenuItem(value: 6, child: Text('Sábado')),
-                  ],
-                  onChanged: auto
-                      ? (value) {
-                          if (value != null) onWeekday(value);
-                        }
-                      : null,
-                ),
               TextField(
                 enabled: auto && !busy,
                 controller: minimum,
@@ -949,6 +912,9 @@ String withdrawalFailureMessage(String? reason) {
   }
   if (text == 'asaas_unavailable') {
     return 'O Asaas não respondeu. Tente de novo em instantes.';
+  }
+  if (text == 'sem pix') {
+    return 'Este banco ou esta chave não aceita Pix. Cadastre uma chave Pix ou uma conta que receba Pix.';
   }
   if (text.startsWith('internal_error')) {
     return 'Não foi possível concluir o saque.';

@@ -22,7 +22,7 @@ void main() {
     await _pump(
       tester,
       MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
-      const Size(412, 2600),
+      const Size(412, 2900),
       Brightness.light,
     );
     await _shot(tester, dir, 'saldo-saques-celular.png', panel: true);
@@ -55,9 +55,11 @@ void main() {
     await _pump(
       tester,
       MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
-      const Size(1280, 2000),
+      const Size(1280, 2400),
       Brightness.dark,
     );
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
     await _shot(tester, dir, 'saldo-saques-desktop.png', panel: true);
   });
 }

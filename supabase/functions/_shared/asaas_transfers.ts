@@ -1,5 +1,6 @@
-// Transferência da subconta Asaas para Pix ou TED.
-// A chave da subconta só entra no header access_token, pelo AsaasProvider.
+// Transferência Pix da subconta Asaas. A chave da subconta só entra
+// no header access_token, pelo AsaasProvider. Sem operationType, o Asaas
+// pode cair em TED quando o banco não participa do Pix.
 
 export type Receivable = {
   cents: number;
@@ -106,6 +107,16 @@ export function mapTransferEvent(
   }
 }
 
+/// O Asaas devolveu que o destino não aceita Pix. Não tentar TED.
+export function isPixRejected(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : "";
+  if (raw === "sem pix") return true;
+  if (!raw.toLowerCase().includes("pix")) return false;
+  return /n[aã]o participa|n[aã]o aceit|n[aã]o suport|indispon/.test(
+    raw.toLowerCase(),
+  );
+}
+
 export function transferPayload(
   input: TransferRequest,
 ): Record<string, unknown> {
@@ -113,24 +124,31 @@ export function transferPayload(
     value: centsToReais(input.valueCents),
     externalReference: input.externalReference,
     description: input.description,
+    operationType: "PIX",
   };
   if (input.destination === "pix") {
+    if (!input.pixKey || !input.pixKeyType) throw new Error("sem pix");
     return {
       ...base,
-      pixAddressKey: input.pixKey ?? "",
-      pixAddressKeyType: input.pixKeyType ?? "",
+      pixAddressKey: input.pixKey,
+      pixAddressKeyType: input.pixKeyType,
     };
+  }
+  if (
+    !input.bankCode || !input.agency || !input.accountNumber ||
+    !input.accountDigit
+  ) {
+    throw new Error("sem pix");
   }
   return {
     ...base,
-    operationType: input.operationType === "TED" ? "TED" : "PIX",
     bankAccount: {
-      bank: { code: input.bankCode ?? "" },
+      bank: { code: input.bankCode },
       ownerName: input.ownerName ?? "",
       cpfCnpj: input.ownerDocument ?? "",
-      agency: input.agency ?? "",
-      account: input.accountNumber ?? "",
-      accountDigit: input.accountDigit ?? "",
+      agency: input.agency,
+      account: input.accountNumber,
+      accountDigit: input.accountDigit,
     },
   };
 }
@@ -140,6 +158,9 @@ export function requestFromBank(
   valueCents: number,
   externalReference: string,
 ): TransferRequest {
+  if (text(bank.operation_type).toUpperCase() === "TED") {
+    throw new Error("sem pix");
+  }
   const destination = bank.destination === "bank" ? "bank" : "pix";
   return {
     valueCents,

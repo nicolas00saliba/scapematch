@@ -247,12 +247,12 @@ declare
 begin
   v_first := public.claim_venue_withdrawal(
     'b1111111-1111-4111-8111-111111111111',
-    null, 'automatic', 'auto:2026-11-12', 4000, 9000
+    null, 'automatic', 'auto:2026-W10', 4000, 9000
   );
   perform public.save_venue_payout_schedule(
     'b1111111-1111-4111-8111-111111111111',
     'a1111111-1111-4111-8111-111111111111',
-    true, 'daily', null, 1000
+    true, 'weekly', 4, 1000
   );
   if v_first is not null then
     raise exception 'automatico sem agenda criou saque';
@@ -267,7 +267,7 @@ end $$;
 select public.save_venue_payout_schedule(
   'b1111111-1111-4111-8111-111111111111',
   'a1111111-1111-4111-8111-111111111111',
-  true, 'daily', null, 1000
+  true, 'weekly', 4, 1000
 );
 
 do $$
@@ -279,11 +279,11 @@ declare
 begin
   v_first := public.claim_venue_withdrawal(
     'b1111111-1111-4111-8111-111111111111',
-    null, 'automatic', 'auto:2026-11-12', 4000, 9000
+    null, 'automatic', 'auto:2026-W10', 4000, 9000
   );
   v_second := public.claim_venue_withdrawal(
     'b1111111-1111-4111-8111-111111111111',
-    null, 'automatic', 'auto:2026-11-12', 4000, 9000
+    null, 'automatic', 'auto:2026-W10', 4000, 9000
   );
   if v_first ->> 'fresh' <> 'true' or v_second ->> 'fresh' <> 'false' then
     raise exception 'o segundo automatico do periodo nao reaproveitou a linha';
@@ -294,7 +294,7 @@ begin
   select count(*) into v_count
   from public.venue_withdrawals
   where venue_id = 'b1111111-1111-4111-8111-111111111111'
-    and period_key = 'auto:2026-11-12';
+    and period_key = 'auto:2026-W10';
   if v_count <> 1 then
     raise exception 'indice unico do periodo falhou: %', v_count;
   end if;
@@ -322,7 +322,7 @@ begin
     venue_id, amount_cents, status, source, period_key, external_reference
   ) values (
     'b1111111-1111-4111-8111-111111111111',
-    100, 'pending', 'automatic', 'auto:2026-11-12',
+    100, 'pending', 'automatic', 'auto:2026-W10',
     'outra-referencia-unica'
   );
   raise exception 'o indice unico aceitou o segundo automatico';
@@ -408,8 +408,18 @@ declare
 begin
   if public.venue_payout_period_key(
     'daily', '2026-11-12 02:00:00+00'
-  ) <> 'auto:2026-11-11' then
-    raise exception 'o periodo diario nao usou America/Sao_Paulo';
+  ) is not null then
+    raise exception 'o diario ainda tem periodo';
+  end if;
+  if public.venue_payout_period_key(
+    'weekly', '2026-11-12 02:00:00+00'
+  ) <> 'auto:2026-W46' then
+    raise exception 'o periodo semanal nao usou America/Sao_Paulo';
+  end if;
+  if pg_catalog.date_part(
+    'dow', timestamptz '2026-11-12 02:00:00+00' at time zone 'America/Sao_Paulo'
+  ) <> 3 then
+    raise exception 'o fuso nao recuou para quarta';
   end if;
 
   perform set_config(
@@ -577,7 +587,7 @@ insert into public.venue_bank_accounts (
 ) values (
   'b2222222-2222-4222-8222-222222222222',
   'bank', '341', '1234', '123456789', '0',
-  'Outra Casa', '66778899000100', 'TED',
+  'Outra Casa', '66778899000100', 'PIX',
   'a4444444-4444-4444-8444-444444444444'
 );
 
@@ -855,4 +865,49 @@ begin
   ) is not null then
     raise exception 'a semana concluida foi tentada de novo';
   end if;
+end $$;
+
+do $$
+begin
+  perform public.save_venue_payout_schedule(
+    'b1111111-1111-4111-8111-111111111111',
+    'a1111111-1111-4111-8111-111111111111',
+    true, 'daily', null, 1000
+  );
+  raise exception 'aceitou saque diario';
+exception
+  when others then
+    if sqlerrm <> 'valor' then
+      raise;
+    end if;
+end $$;
+
+do $$
+begin
+  perform public.claim_venue_withdrawal(
+    'b1111111-1111-4111-8111-111111111111',
+    null, 'automatic', 'auto:2026-11-12', 1000, 9000
+  );
+  raise exception 'aceitou periodo diario';
+exception
+  when others then
+    if sqlerrm <> 'valor' then
+      raise;
+    end if;
+end $$;
+
+do $$
+begin
+  perform public.save_venue_bank_account(
+    'b1111111-1111-4111-8111-111111111111',
+    'a1111111-1111-4111-8111-111111111111',
+    'bank', null, null, '341', '0001', '12345', '6',
+    'Casa do Saque', '55667788000199', 'TED'
+  );
+  raise exception 'aceitou ted';
+exception
+  when others then
+    if sqlerrm <> 'sem pix' then
+      raise;
+    end if;
 end $$;

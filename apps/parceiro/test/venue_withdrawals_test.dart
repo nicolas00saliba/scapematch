@@ -231,18 +231,19 @@ void main() {
 
     expect(find.text(PartnerMessages.withdrawalAuto), findsOneWidget);
     expect(find.text(PartnerMessages.withdrawalAutoSwitch), findsOneWidget);
+    expect(find.text(PartnerMessages.withdrawalPixNotice), findsOneWidget);
+    expect(find.text('Diário'), findsNothing);
+    expect(find.text('TED'), findsNothing);
     expect(
       tester
-          .widget<ChoiceChip>(
-            find.widgetWithText(ChoiceChip, PartnerMessages.withdrawalDaily),
+          .widget<DropdownButtonFormField<int>>(
+            find.byKey(PartnerKeys.withdrawalWeekday),
           )
-          .onSelected,
+          .onChanged,
       isNull,
     );
 
     await tester.tap(find.byType(Switch));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(PartnerMessages.withdrawalWeekly));
     await tester.pumpAndSettle();
     await tester.tap(find.text(PartnerMessages.withdrawalSaveSchedule));
     await tester.pumpAndSettle();
@@ -255,6 +256,7 @@ void main() {
     final saved = await repo.load('casa');
     expect(saved.schedule.enabled, isTrue);
     expect(saved.schedule.frequency, 'weekly');
+    expect(saved.schedule.weekday, 1);
   });
 }
 

@@ -151,7 +151,8 @@ class VenuePayoutSnapshot {
     pendingCents: 0,
     schedule: VenuePayoutSchedule(
       enabled: false,
-      frequency: 'daily',
+      frequency: 'weekly',
+      weekday: 1,
       minAmountCents: 0,
     ),
     receivables: [],
@@ -175,7 +176,8 @@ class VenuePayoutSnapshot {
       ),
       schedule: const VenuePayoutSchedule(
         enabled: false,
-        frequency: 'daily',
+        frequency: 'weekly',
+        weekday: 1,
         minAmountCents: 5000,
       ),
       receivables: const [
@@ -242,6 +244,8 @@ String payoutErrorMessage(String code) {
     'reauth' => 'Confirme a senha de novo para sacar.',
     'mfa' => 'Informe o código do autenticador.',
     'sem conta' => 'Cadastre a conta de saque antes.',
+    'sem pix' =>
+      'Este banco ou esta chave não aceita Pix. Cadastre uma chave Pix ou uma conta que receba Pix.',
     'sem subconta' => 'A subconta da casa ainda não está pronta.',
     'reserva' => 'Essa conta não pode sacar.',
     'valor' => 'Confira os dados da conta e o valor.',
@@ -312,6 +316,9 @@ class MemoryVenueWithdrawalRepository implements VenueWithdrawalRepository {
     _requireConfirmed();
     final document = draft.ownerDocument.replaceAll(RegExp(r'\D'), '');
     if (document != houseDocument) throw const PayoutFailure('titularidade');
+    if (draft.operationType.toUpperCase() == 'TED') {
+      throw const PayoutFailure('sem pix');
+    }
     if (draft.destination == 'pix' &&
         (draft.pixKeyType == 'CPF' || draft.pixKeyType == 'CNPJ')) {
       final key = draft.pixKey.replaceAll(RegExp(r'\D'), '');
@@ -336,7 +343,7 @@ class MemoryVenueWithdrawalRepository implements VenueWithdrawalRepository {
       blockedUntil: DateTime.now().add(const Duration(hours: 24)),
       bank: VenueBankSummary(
         destination: draft.destination,
-        operationType: draft.operationType,
+        operationType: 'PIX',
         ownerName: draft.ownerName,
         pixKeyType: draft.pixKeyType,
         pixKeyMasked: '****$tail',
@@ -355,6 +362,9 @@ class MemoryVenueWithdrawalRepository implements VenueWithdrawalRepository {
     VenuePayoutSchedule schedule,
   ) async {
     _requireConfirmed();
+    if (schedule.frequency != 'weekly' || schedule.weekday == null) {
+      throw const PayoutFailure('valor');
+    }
     actions.add('schedule');
     _snapshot = VenuePayoutSnapshot(
       enabled: _snapshot.enabled,
@@ -555,8 +565,9 @@ class SupabaseVenueWithdrawalRepository implements VenueWithdrawalRepository {
       'not owner',
       'reauth',
       'mfa',
-      'sem conta',
-      'sem subconta',
+    'sem conta',
+    'sem pix',
+    'sem subconta',
       'reserva',
       'valor',
     ]) {
@@ -590,7 +601,7 @@ class SupabaseVenueWithdrawalRepository implements VenueWithdrawalRepository {
           : null,
       schedule: VenuePayoutSchedule(
         enabled: scheduleMap['enabled'] == true,
-        frequency: scheduleMap['frequency']?.toString() ?? 'daily',
+        frequency: 'weekly',
         weekday: scheduleMap['weekday'] is int
             ? scheduleMap['weekday'] as int
             : null,
