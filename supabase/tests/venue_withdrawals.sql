@@ -50,6 +50,36 @@ begin
   then
     raise exception 'grants de leitura de saque saíram do combinado';
   end if;
+  if not has_function_privilege(
+      'service_role', 'public.venue_payouts_enabled()', 'execute'
+    )
+    or has_function_privilege('anon', 'public.venue_payouts_enabled()', 'execute')
+  then
+    raise exception 'grant da flag de saque saiu do combinado';
+  end if;
+end $$;
+
+do $$
+declare
+  v_enabled boolean;
+begin
+  set local role service_role;
+  v_enabled := public.venue_payouts_enabled();
+  if v_enabled is distinct from false then
+    raise exception 'service_role nao leu a flag desligada';
+  end if;
+end $$;
+
+do $$
+begin
+  set local role anon;
+  perform public.venue_payouts_enabled();
+  raise exception 'anon executou a flag de saque';
+exception
+  when insufficient_privilege then
+    if sqlerrm not like 'permission denied%' then
+      raise;
+    end if;
 end $$;
 
 insert into auth.users (id, email)
