@@ -10,28 +10,13 @@ const caminhos = [
   '/app',
 ];
 
-// O cobre da marca (#d2642a) com o texto #221f1b fica em 4,37:1 no
-// "Baixar o app" do menu, a 15px. O AA pede 4,5:1. Mudar o token
-// --cobre altera o botão em todo o site, então fica para o Nícolas.
-const conhecidas = new Set(['color-contrast:.menu-baixar']);
-
 for (const caminho of caminhos) {
   test(`axe em ${caminho}`, async ({ page }) => {
     await page.goto(caminho);
     const resultados = await new AxeBuilder({ page }).analyze();
-    const graves = resultados.violations
-      .map((item) => ({
-        ...item,
-        nodes: item.nodes.filter((node) => {
-          const alvo = `${item.id}:${node.target.join(' ')}`;
-          return !conhecidas.has(alvo);
-        }),
-      }))
-      .filter(
-        (item) =>
-          (item.impact === 'serious' || item.impact === 'critical') &&
-          item.nodes.length > 0,
-      );
+    const graves = resultados.violations.filter(
+      (item) => item.impact === 'serious' || item.impact === 'critical',
+    );
     expect(graves, formatar(graves)).toEqual([]);
   });
 }

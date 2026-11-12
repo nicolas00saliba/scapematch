@@ -2,6 +2,9 @@ name: Lighthouse
 
 on:
   pull_request:
+    paths:
+      - "apps/site/**"
+      - ".github/workflows/lighthouse.yml"
 
 permissions:
   contents: read
@@ -31,13 +34,3 @@ jobs:
           configPath: ./apps/site/lighthouserc.json
           uploadArtifacts: true
           temporaryPublicStorage: true
-
-  aviso-carga:
-    name: Aviso de carga dos apps
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Medir o HTML dos apps
-        run: python3 tool/aviso_carga.py

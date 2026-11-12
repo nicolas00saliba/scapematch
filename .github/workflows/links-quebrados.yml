@@ -37,7 +37,23 @@ jobs:
       # Rotas do Flutter em GitHub Pages respondem 404 e mesmo assim
       # entregam o app (o 404.html é o index). O lychee olha o status,
       # então essas rotas internas ficam de fora. A raiz de cada host continua.
+      # No pull request só os links do próprio dist. Um site externo fora
+      # do ar não pode barrar um PR que não tem nada a ver com ele.
+      - name: Links internos do build
+        if: github.event_name == 'pull_request'
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          fail: true
+          args: >-
+            --verbose
+            --no-progress
+            --offline
+            --root-dir apps/site/dist
+            --fallback-extensions html
+            'apps/site/dist/**/*.html'
+
       - name: Links do build
+        if: github.event_name != 'pull_request'
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           fail: true
@@ -53,6 +69,7 @@ jobs:
             'apps/site/dist/**/*.html'
 
       - name: Links de produção
+        if: github.event_name != 'pull_request'
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           fail: true
