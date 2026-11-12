@@ -10,7 +10,7 @@ void main() {
     expect(find.byKey(const Key('room-time-board')), findsOneWidget);
     expect(find.text('Ranking da sala'), findsOneWidget);
     expect(find.text('Os Ninjas'), findsOneWidget);
-    expect(find.text('38:12 (21:48)'), findsOneWidget);
+    expect(find.text('38:12 (Restavam 21 min)'), findsOneWidget);
     expect(find.textContaining('Ana · Bruno · Caio'), findsOneWidget);
     expect(find.text('1º'), findsOneWidget);
     expect(find.text('2º'), findsOneWidget);
@@ -26,9 +26,9 @@ void main() {
     expect(find.text('Seus tempos'), findsOneWidget);
     expect(find.text('O Cofre'), findsOneWidget);
     expect(find.text('2º'), findsOneWidget);
-    expect(find.text('41:05 (18:55)'), findsOneWidget);
+    expect(find.text('41:05 (Restavam 18 min)'), findsOneWidget);
     expect(find.textContaining('Não escapou'), findsOneWidget);
-    expect(find.text('60:00 (00:00)'), findsOneWidget);
+    expect(find.text('60:00 (Restavam 0 s)'), findsOneWidget);
   });
 
   testWidgets('aparecer no ranking nasce ligado e o jogador desliga', (

@@ -1498,6 +1498,7 @@ returns table (
   room_name text,
   group_name text,
   elapsed_seconds integer,
+  remaining_seconds integer,
   escaped boolean,
   removed boolean,
   played_on date
@@ -1517,6 +1518,7 @@ begin
     room.name,
     entry.group_name,
     entry.elapsed_seconds,
+    (entry.duration_seconds - entry.elapsed_seconds)::integer,
     entry.escaped,
     entry.removed_at is not null,
     (entry.played_at at time zone 'America/Sao_Paulo')::date

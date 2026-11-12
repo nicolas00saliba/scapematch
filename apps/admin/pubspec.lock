@@ -154,7 +154,7 @@ packages:
     source: hosted
     version: "0.7.15"
   dominio:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "../../packages/dominio"
       relative: true

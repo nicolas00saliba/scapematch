@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
@@ -20,6 +21,7 @@ class RankingRow {
     required this.roomName,
     required this.groupName,
     required this.elapsedSeconds,
+    required this.remainingSeconds,
     required this.escaped,
     required this.removed,
     required this.playedOn,
@@ -30,6 +32,7 @@ class RankingRow {
   final String roomName;
   final String groupName;
   final int elapsedSeconds;
+  final int remainingSeconds;
   final bool escaped;
   final bool removed;
   final String playedOn;
@@ -41,6 +44,7 @@ class RankingRow {
       roomName: roomName,
       groupName: groupName,
       elapsedSeconds: elapsedSeconds,
+      remainingSeconds: remainingSeconds,
       escaped: escaped,
       removed: removed ?? this.removed,
       playedOn: playedOn,
@@ -67,6 +71,7 @@ class MemoryRankingAdminApi implements RankingAdminApi {
       roomName: 'O Cofre',
       groupName: 'Os Ninjas',
       elapsedSeconds: 38 * 60 + 12,
+      remainingSeconds: 21 * 60 + 48,
       escaped: true,
       removed: false,
       playedOn: '2026-11-02',
@@ -126,6 +131,9 @@ class SupabaseRankingAdminApi implements RankingAdminApi {
             groupName: '${row['group_name']}',
             elapsedSeconds: row['elapsed_seconds'] is num
                 ? (row['elapsed_seconds'] as num).round()
+                : 0,
+            remainingSeconds: row['remaining_seconds'] is num
+                ? (row['remaining_seconds'] as num).round()
                 : 0,
             escaped: row['escaped'] == true,
             removed: row['removed'] == true,
@@ -269,7 +277,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
               contentPadding: EdgeInsets.zero,
               title: Text('${row.groupName} · ${row.venueName} · ${row.roomName}'),
               subtitle: Text(
-                '${_clock(row.elapsedSeconds)} · ${row.escaped ? 'escapou' : 'não escapou'} · ${row.playedOn}${row.removed ? ' · removido' : ''}',
+                '${formatRoomTimeLine(row.elapsedSeconds, row.remainingSeconds)} · ${row.escaped ? 'escapou' : 'não escapou'} · ${row.playedOn}${row.removed ? ' · removido' : ''}',
               ),
               trailing: row.removed
                   ? null
@@ -285,8 +293,3 @@ class _RankingPageState extends ConsumerState<RankingPage> {
   }
 }
 
-String _clock(int seconds) {
-  final minutes = seconds ~/ 60;
-  final rest = seconds % 60;
-  return '${minutes.toString().padLeft(2, '0')}:${rest.toString().padLeft(2, '0')}';
-}
