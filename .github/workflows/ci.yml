@@ -378,7 +378,7 @@ jobs:
 
       - name: Build the site
         working-directory: apps/site
-        run: npm ci && npm run build
+        run: npm ci && npm test && npm run build
 
       - name: Check routes, title and badge
         run: |

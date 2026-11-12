@@ -1,6 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum AdminSection { casas, jogadores, regras, ganhos, destaques, auditoria }
+enum AdminSection {
+  casas,
+  jogadores,
+  regras,
+  ganhos,
+  destaques,
+  auditoria,
+  avaliacoes,
+  ranking,
+}
 
 class AdminPlace {
   const AdminPlace({this.section = AdminSection.casas, this.id});

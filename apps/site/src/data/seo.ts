@@ -1,5 +1,9 @@
 // sameAs fica de fora: o repositório não publica Instagram, TikTok,
 // LinkedIn nem outro perfil oficial.
+// A nota de casa e de sala sai por aggregateRatingLd, e só com o mínimo.
+
+export { aggregateRatingLd } from './avaliacoes';
+export type { NotaPublica } from './avaliacoes';
 
 export const origem = 'https://escapematch.com.br';
 

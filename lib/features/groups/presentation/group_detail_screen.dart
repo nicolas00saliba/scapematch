@@ -42,6 +42,7 @@ import 'package:scapematch/features/groups/presentation/invite_sheet.dart';
 import 'package:scapematch/features/groups/presentation/my_groups_view_model.dart';
 import 'package:scapematch/features/social/presentation/party_join_sheet.dart';
 import 'package:scapematch/features/social/presentation/social_providers.dart';
+import 'package:scapematch/features/ranking/presentation/room_time_view.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class GroupDetailScreen extends ConsumerStatefulWidget {
@@ -204,6 +205,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   icon: Icons.check_circle,
                   text: GroupMessages.joinedBanner,
                 ),
+                if (me.payment == PaymentStatus.paid &&
+                    me.refund != RefundStatus.refunded)
+                  TeamNameSlot(
+                    groupId: group.id,
+                    canEdit: true,
+                  ),
               ],
               if (_leaveMismatch(me) case final mismatch?) ...[
                 const SizedBox(height: 12),

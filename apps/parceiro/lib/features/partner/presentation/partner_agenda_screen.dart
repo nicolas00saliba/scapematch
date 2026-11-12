@@ -12,6 +12,7 @@ import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_ranking_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
@@ -1548,6 +1549,10 @@ class _SessionSheet extends ConsumerWidget {
                   person: person,
                   canMark: started && !group.isCancelled,
                 ),
+            if (started && !group.isCancelled) ...[
+              const SizedBox(height: 16),
+              SessionTimeLaunch(group: group),
+            ],
             if (!group.isCancelled && snapshot.now.isBefore(group.startsAt)) ...[
               const SizedBox(height: 12),
               FilledButton(

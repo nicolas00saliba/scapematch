@@ -261,6 +261,19 @@ abstract final class AppKeys {
   static Key partyCrewOption(String id) => Key('party-crew-$id');
   static Key partyFriend(String id) => Key('party-friend-$id');
   static Key friendBadge(String id) => Key('friend-badge-$id');
+  static const roomReviewForm = Key('room-review-form');
+  static const roomReviewComment = Key('room-review-comment');
+  static const roomReviewSubmit = Key('room-review-submit');
+  static const roomReviewOverall = Key('room-review-overall');
+  static const roomReviewError = Key('room-review-error');
+  static Key reviewScore(String category, int score) =>
+      Key('review-$category-$score');
+  static Key reviewInvite(String groupId) => Key('review-invite-$groupId');
+  static Key venueInvite(String venueId) => Key('venue-invite-$venueId');
+  static Key venueInviteAccept(String venueId) =>
+      Key('venue-invite-accept-$venueId');
+  static Key venueInviteDecline(String venueId) =>
+      Key('venue-invite-decline-$venueId');
   static const installBanner = Key('install-banner');
   static const installBannerAction = Key('install-banner-action');
   static const installBannerDismiss = Key('install-banner-dismiss');

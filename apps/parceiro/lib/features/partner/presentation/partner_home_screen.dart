@@ -12,7 +12,6 @@ import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
-import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -20,11 +19,12 @@ import 'package:scapematch_parceiro/features/partner/data/partner_repository.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
-import 'package:scapematch_parceiro/features/partner/presentation/passport_desk.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/empty_slot_card.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_referral_code.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_invoices_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_ranking_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_reviews_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
@@ -48,14 +48,10 @@ class PartnerHome extends ConsumerWidget {
       PartnerSection.agenda => PartnerAgenda(snapshot: snapshot),
       PartnerSection.rooms => _RoomsSection(snapshot: snapshot),
       PartnerSection.invoices => PartnerInvoices(snapshot: snapshot),
-      PartnerSection.gifts => PassportDesk(
-        venueId: snapshot.house.id,
-        rooms: [
-          for (final room in snapshot.rooms)
-            PassportRoomChoice(id: room.id, name: room.name),
-        ],
-        preview: scapeUsesLiveBackend ? null : PassportDeskData.sample,
+      PartnerSection.reviews => PartnerReviewsSection(
+        houseName: snapshot.house.name,
       ),
+      PartnerSection.ranking => PartnerRankingSection(snapshot: snapshot),
     };
     return Scaffold(
       body: Column(
@@ -182,7 +178,8 @@ String _sectionLabel(PartnerSection section) {
     PartnerSection.agenda => PartnerMessages.agenda,
     PartnerSection.rooms => PartnerMessages.rooms,
     PartnerSection.invoices => PartnerMessages.invoices,
-    PartnerSection.gifts => PartnerMessages.gifts,
+    PartnerSection.reviews => PartnerMessages.reviews,
+    PartnerSection.ranking => PartnerMessages.ranking,
   };
 }
 
@@ -249,9 +246,14 @@ class _PartnerRail extends ConsumerWidget {
           label: Text(PartnerMessages.invoices),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.card_giftcard_outlined),
-          selectedIcon: Icon(Icons.card_giftcard),
-          label: Text(PartnerMessages.gifts),
+          icon: Icon(Icons.star_outline),
+          selectedIcon: Icon(Icons.star),
+          label: Text(PartnerMessages.reviews),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.emoji_events_outlined),
+          selectedIcon: Icon(Icons.emoji_events),
+          label: Text(PartnerMessages.ranking),
         ),
       ],
     );
@@ -841,16 +843,9 @@ class _PlayerChip extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final playerId = playerIdOf(person);
     final marked = snapshot.markedAbsent(group.id, playerId);
-    final checked = snapshot.checkedIn(group.id, playerId);
     final count = snapshot.absenceCount(playerId);
     final standing = snapshot.standingOf(playerId);
     final status = GroupMessages.paymentStatus(person.payment);
-    final canCheckIn =
-        canMark &&
-        !marked &&
-        !checked &&
-        person.payment == PaymentStatus.paid &&
-        person.refund == RefundStatus.none;
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
@@ -868,26 +863,6 @@ class _PlayerChip extends ConsumerWidget {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-            if (checked)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Text(
-                  PartnerMessages.attended,
-                  key: PartnerKeys.partnerCheckedIn(group.id, playerId),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              )
-            else if (canCheckIn)
-              TextButton(
-                key: PartnerKeys.partnerCheckin(group.id, playerId),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 32),
-                ),
-                onPressed: () => _checkIn(context, ref, playerId),
-                child: const Text(PartnerMessages.confirmAttendance),
-              ),
             if (marked)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -897,7 +872,7 @@ class _PlayerChip extends ConsumerWidget {
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               )
-            else if (canMark && !checked)
+            else if (canMark)
               TextButton(
                 key: PartnerKeys.partnerAbsence(group.id, playerId),
                 style: TextButton.styleFrom(
@@ -925,26 +900,6 @@ class _PlayerChip extends ConsumerWidget {
         .markAbsence(houseId: houseId, groupId: group.id, playerId: playerId);
     if (!context.mounted) return;
     if (result is AbsenceRejected) {
-      _snack(context, result.message);
-      return;
-    }
-    ref.read(partnerRevisionProvider.notifier).bump();
-  }
-
-  Future<void> _checkIn(
-    BuildContext context,
-    WidgetRef ref,
-    String playerId,
-  ) async {
-    final result = await ref
-        .read(partnerRepositoryProvider)
-        .confirmAttendance(
-          houseId: snapshot.house.id,
-          groupId: group.id,
-          playerId: playerId,
-        );
-    if (!context.mounted) return;
-    if (result is SessionCheckinRejected) {
       _snack(context, result.message);
       return;
     }
