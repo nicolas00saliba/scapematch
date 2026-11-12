@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // Ambiente de teste ou demonstração. Nunca a produção com pagamento real.
 // O sandbox do Asaas fica nas Edge Functions. Este teste para na tela de
@@ -9,7 +9,8 @@ import { expect, test } from '@playwright/test';
 //   E2E_JOGADOR_EMAIL     usuário sintético
 //   E2E_JOGADOR_SENHA
 //   E2E_BUSCA             texto da busca, por exemplo o nome de uma sala
-//   E2E_SALA_URL          URL da sala no mesmo host, para chegar no Pix
+//   E2E_SALA_URL          URL da sala ou do grupo no mesmo host, para chegar
+//                         no Pix. Na demo: /groups/grp-cwb-cofre-almost
 //   E2E_CADASTRO          "1" para executar o cadastro
 //   E2E_CADASTRO_EMAIL    e-mail descartável do cadastro
 //   E2E_CADASTRO_SENHA
@@ -84,10 +85,19 @@ test('rejeita host de produção e aceita a demo', () => {
   expect(urlsDeProducao(['https://parceiro-demo.escapematch.com.br/'])).toEqual([]);
 });
 
-async function entrar(page: import('@playwright/test').Page) {
+// O campo do Flutter web às vezes perde o fill quando o foco ainda está
+// trocando. Clicar e digitar de verdade é estável.
+async function preencher(campo: Locator, valor: string) {
+  await campo.click();
+  await campo.page().waitForTimeout(200);
+  await campo.page().keyboard.press('ControlOrMeta+A');
+  await campo.page().keyboard.type(valor, { delay: 15 });
+}
+
+async function entrar(page: Page) {
   await page.goto(`${base}/login`);
-  await page.getByLabel('E-mail').fill(email);
-  await page.getByLabel('Senha').fill(senha);
+  await preencher(page.getByLabel('E-mail'), email);
+  await preencher(page.getByLabel('Senha'), senha);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByLabel('E-mail')).toBeHidden({ timeout: 20_000 });
 }
@@ -99,8 +109,8 @@ test('cadastro com usuário sintético', async ({ page }) => {
   );
   await page.goto(`${base}/cadastro`);
   await page.getByLabel('Nome').fill('Conta sintética');
-  await page.getByLabel('E-mail').fill(process.env.E2E_CADASTRO_EMAIL!);
-  await page.getByLabel('Senha').fill(process.env.E2E_CADASTRO_SENHA ?? 'sintetica-e2e');
+  await preencher(page.getByLabel('E-mail'), process.env.E2E_CADASTRO_EMAIL!);
+  await preencher(page.getByLabel('Senha'), process.env.E2E_CADASTRO_SENHA ?? 'sintetica-e2e');
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await expect(page.getByText('Criar conta')).toBeHidden({ timeout: 20_000 });
 });
@@ -114,8 +124,12 @@ test('busca de sala', async ({ page }) => {
   const busca = process.env.E2E_BUSCA ?? '';
   test.fixme(faltaJogador || !busca, 'Falta E2E_BUSCA com o nome de uma sala do ambiente de teste.');
   await entrar(page);
-  await page.getByPlaceholder('Buscar sala ou casa').fill(busca);
-  await expect(page.getByText(busca).first()).toBeVisible();
+  // No Flutter web a dica vira aria-label, não placeholder.
+  await preencher(page.getByRole('textbox', { name: 'Buscar sala ou casa' }), busca);
+  // O cartão do grupo é um botão cujo nome começa pela sala.
+  await expect(
+    page.getByText(busca).or(page.getByRole('button', { name: busca })).first(),
+  ).toBeVisible({ timeout: 20_000 });
 });
 
 test('reserva até a tela de pagamento', async ({ page }) => {
@@ -126,11 +140,16 @@ test('reserva até a tela de pagamento', async ({ page }) => {
   );
   await entrar(page);
   await page.goto(sala);
-  const achar = page.getByRole('button', { name: 'Achar grupo' }).first();
-  if (await achar.isVisible()) {
-    await achar.click();
+  // Na sala, Achar grupo. No grupo, Entrar no grupo abre Pagar minha parte.
+  // Na demo tudo fica na memória do navegador: não cobra nem reserva.
+  const passo = page.getByRole('button', { name: /^(Achar grupo|Entrar no grupo)$/ }).first();
+  const pagar = page.getByText(/Pix|Pagar minha parte/).first();
+  await expect(passo.or(pagar).first()).toBeVisible({ timeout: 20_000 });
+  if (!(await pagar.isVisible())) {
+    // O Flutter redesenha o botão logo depois do toque. Um clique basta.
+    await passo.click({ timeout: 10_000 }).catch(() => {});
   }
-  await expect(page.getByText(/Pix|Pagar minha parte/).first()).toBeVisible();
+  await expect(pagar).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('button', { name: 'Simular pagamento' })).toHaveCount(0);
 });
 
@@ -143,8 +162,8 @@ test('painel do parceiro e saldo da casa', async ({ page }) => {
     'Falta E2E_PARCEIRO_URL e o usuário sintético da casa.',
   );
   await page.goto(url);
-  await page.getByLabel('E-mail').fill(parceiroEmail);
-  await page.getByLabel('Senha').fill(parceiroSenha);
+  await preencher(page.getByLabel('E-mail'), parceiroEmail);
+  await preencher(page.getByLabel('Senha'), parceiroSenha);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByText('Saldo da casa')).toBeVisible({ timeout: 20_000 });
   if (process.env.E2E_SAQUES === '1') {
