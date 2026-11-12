@@ -21,7 +21,7 @@ const perguntas = [
   {
     pergunta: 'Onde ficam as avaliações e o ranking de tempo?',
     resposta:
-      'No app. A avaliação da sala usa seis critérios, de 1 a 5, e a nota pública só sai com avaliações suficientes. O ranking mostra até dez tempos de quem escapou.',
+      'No app. A avaliação da sala usa seis critérios, de 1 a 5, e a nota pública só sai com avaliações suficientes. O ranking lista até dez tempos, com o nome do grupo e o relógio no formato 41:05 (Restavam 18:55).',
   },
   {
     pergunta: 'Onde vejo as salas de Curitiba?',
@@ -111,8 +111,7 @@ const pagina = {
     <h2>Ranking de tempo</h2>
     <p>
       No app, a sala pode mostrar os dez melhores tempos de quem escapou.
-      O padrão é o primeiro nome aparecer nesse ranking.
-      Desligar essa opção tira o nome da lista. O tempo do grupo continua registrado.
+      Cada linha traz o nome do grupo, o tempo e quanto restava, no formato 41:05 (Restavam 18:55).
     </p>
 
     <h2>Salas</h2>
