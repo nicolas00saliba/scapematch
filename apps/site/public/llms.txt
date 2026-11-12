@@ -24,5 +24,7 @@ Não há perfil oficial de Instagram, TikTok ou LinkedIn publicado neste reposit
 - [Ajuda](https://escapematch.com.br/ajuda): perguntas frequentes.
 - [Para casas](https://escapematch.com.br/para-casas): casas parceiras e preços.
 - [Sobre](https://escapematch.com.br/sobre): o que a plataforma é.
+- [Escape room em Curitiba](https://escapematch.com.br/escape-room-curitiba): achar grupo, reservar, avaliações e ranking de tempo.
+- [Contato](https://escapematch.com.br/contato): e-mail, CNPJ e links do app e do Parceiro.
 
 Texto completo: https://escapematch.com.br/llms-full.txt
