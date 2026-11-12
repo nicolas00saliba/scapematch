@@ -4,9 +4,12 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/url_strategy.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/core/observability/sentry_boot.dart';
 import 'package:scapematch_admin/admin_app.dart';
 
-Future<void> main() async {
+Future<void> main() => iniciarSentry(_abrirApp);
+
+Future<void> _abrirApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await bootScapeBackend();
   configureUrlStrategy();

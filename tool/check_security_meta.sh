@@ -9,6 +9,7 @@ if [ "$#" -ne 2 ]; then
   echo "uso: $0 flutter <index.html>" >&2
   echo "     $0 admin <index.html>" >&2
   echo "     $0 landing <diretório>" >&2
+  echo "     $0 site <diretório>" >&2
   exit 1
 fi
 
@@ -30,7 +31,9 @@ flutter_csp = (
     "https://api.pwnedpasswords.com "
     "https://www.gstatic.com/flutter-canvaskit/ "
     "https://fonts.gstatic.com/s/ "
-    "https://tile.openstreetmap.org; "
+    "https://tile.openstreetmap.org "
+    "https://*.ingest.sentry.io https://*.ingest.us.sentry.io "
+    "https://*.ingest.de.sentry.io; "
     "worker-src 'self' blob:; frame-src 'none'; "
     "manifest-src 'self'; form-action 'self'"
 )
@@ -45,7 +48,9 @@ admin_csp = (
     "connect-src 'self' https://eujlhicairvksvmssruz.supabase.co "
     "wss://eujlhicairvksvmssruz.supabase.co "
     "https://www.gstatic.com/flutter-canvaskit/ "
-    "https://fonts.gstatic.com/s/; "
+    "https://fonts.gstatic.com/s/ "
+    "https://*.ingest.sentry.io https://*.ingest.us.sentry.io "
+    "https://*.ingest.de.sentry.io; "
     "worker-src 'self' blob:; frame-src 'none'; "
     "manifest-src 'self'; form-action 'self'"
 )
@@ -53,6 +58,14 @@ landing_csp = (
     "default-src 'self'; base-uri 'self'; object-src 'none'; "
     "script-src 'self'; style-src 'self'; img-src 'self'; "
     "font-src 'self'; connect-src 'self'; worker-src 'none'; "
+    "frame-src 'none'; manifest-src 'self'; form-action 'self'"
+)
+site_csp = (
+    "default-src 'self'; base-uri 'self'; object-src 'none'; "
+    "script-src 'self'; style-src 'self'; img-src 'self'; "
+    "font-src 'self'; connect-src 'self' "
+    "https://*.ingest.sentry.io https://*.ingest.us.sentry.io "
+    "https://*.ingest.de.sentry.io; worker-src 'none'; "
     "frame-src 'none'; manifest-src 'self'; form-action 'self'"
 )
 referrer = '<meta name="referrer" content="strict-origin-when-cross-origin">'
@@ -92,7 +105,7 @@ def check_flutter(path, csp):
         raise SystemExit(f"{path} abre rede que o Admin não usa")
     reject(text, path)
 
-def check_landing(directory):
+def check_landing(directory, csp):
     if (directory / "_headers").exists():
         raise SystemExit(f"{directory}/_headers não é aplicado pelo GitHub Pages")
     pages = sorted(directory.rglob("*.html"))
@@ -110,7 +123,7 @@ def check_landing(directory):
     for path in pages:
         text = path.read_text()
         require(text, referrer, path)
-        require(text, f'<meta http-equiv="Content-Security-Policy" content="{landing_csp}">', path)
+        require(text, f'<meta http-equiv="Content-Security-Policy" content="{csp}">', path)
         if not any(tag in text for tag in guard_tags):
             raise SystemExit(f"ausente em {path}: frame-guard.js")
         if "unsafe-eval" in text or "gstatic" in text or "supabase.co" in text:
@@ -122,7 +135,9 @@ if mode == "flutter":
 elif mode == "admin":
     check_flutter(target, admin_csp)
 elif mode == "landing":
-    check_landing(target)
+    check_landing(target, landing_csp)
+elif mode == "site":
+    check_landing(target, site_csp)
 else:
     raise SystemExit(f"modo desconhecido: {mode}")
 PY

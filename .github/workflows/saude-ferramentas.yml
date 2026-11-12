@@ -1,0 +1,42 @@
+# A rotina diária consulta os workflows marcados com `# saude: agenda`.
+# No pull request só rodam os testes do script, sem olhar a agenda ainda.
+
+name: Saúde das ferramentas
+
+on:
+  schedule:
+    - cron: "20 10 * * *"
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  testes:
+    name: Testes dos scripts
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Testar disponibilidade, saúde e defines do Sentry
+        run: |
+          python3 tool/test_disponibilidade.py
+          python3 tool/test_saude_ferramentas.py
+          bash tool/test_sentry_defines.sh
+
+  consulta:
+    name: Sucesso nas últimas 24h
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Consultar execuções
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tool/saude_ferramentas.py

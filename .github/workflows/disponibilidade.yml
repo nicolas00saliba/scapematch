@@ -1,0 +1,28 @@
+# Checagem de disponibilidade no próprio repositório, no estilo Upptime.
+# O plano gratuito de repositório público não cobra o minuto do ubuntu-latest.
+# 15 minutos é o intervalo curto que ainda cabe numa rotina estável.
+# saude: agenda
+
+name: Disponibilidade
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  checar:
+    name: Hosts publicados
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checar HTTPS, status, texto e tempo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tool/disponibilidade.py --aplicar
