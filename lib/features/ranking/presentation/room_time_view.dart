@@ -126,6 +126,123 @@ class _MyRoomTimesLiveState extends ConsumerState<_MyRoomTimesLive> {
   }
 }
 
+/// O jogador escolhe se o primeiro nome entra no ranking público.
+class RoomTimeVisibilitySlot extends ConsumerWidget {
+  const RoomTimeVisibilitySlot({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(roomTimeRankingEnabledProvider);
+    return enabled.maybeWhen(
+      data: (on) {
+        if (!on || !scapeUsesLiveBackend) return const SizedBox.shrink();
+        return const _RoomTimeVisibilityLive();
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _RoomTimeVisibilityLive extends ConsumerStatefulWidget {
+  const _RoomTimeVisibilityLive();
+
+  @override
+  ConsumerState<_RoomTimeVisibilityLive> createState() =>
+      _RoomTimeVisibilityLiveState();
+}
+
+class _RoomTimeVisibilityLiveState extends ConsumerState<_RoomTimeVisibilityLive> {
+  bool? _appears;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final appears = await ref.read(roomTimeGatewayProvider).appearsInRanking();
+      if (!mounted) return;
+      setState(() => _appears = appears);
+    } on Object {
+      if (!mounted) return;
+      setState(() => _appears = true);
+    }
+  }
+
+  Future<void> _set(bool appears) async {
+    final previous = _appears;
+    setState(() {
+      _appears = appears;
+      _error = null;
+    });
+    try {
+      await ref.read(roomTimeGatewayProvider).setAppearsInRanking(appears);
+    } on RoomTimeRejected catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _appears = previous;
+        _error = error.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appears = _appears;
+    if (appears == null) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 16),
+        child: LinearProgressIndicator(),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: RoomTimeVisibilityCard(
+        appears: appears,
+        error: _error,
+        onChanged: _set,
+      ),
+    );
+  }
+}
+
+class RoomTimeVisibilityCard extends StatelessWidget {
+  const RoomTimeVisibilityCard({
+    super.key,
+    required this.appears,
+    required this.onChanged,
+    this.error,
+  });
+
+  final bool appears;
+  final ValueChanged<bool> onChanged;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          key: const Key('room-time-visibility'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Aparecer no ranking público'),
+          subtitle: const Text(
+            'O padrão é aparecer. Se desligar, seu primeiro nome sai do ranking. O tempo do grupo continua.',
+          ),
+          value: appears,
+          onChanged: onChanged,
+        ),
+        if (error != null)
+          Text(error!, key: const Key('room-time-visibility-error')),
+      ],
+    );
+  }
+}
+
 /// Nome do grupo, escolhido por quem está na sessão.
 class TeamNameSlot extends ConsumerWidget {
   const TeamNameSlot({super.key, required this.groupId, required this.canEdit});

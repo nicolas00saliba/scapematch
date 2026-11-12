@@ -52,7 +52,13 @@ alter table public.groups
   );
 
 comment on column public.groups.team_name is
-  'Nome escolhido pelo grupo para o ranking. Nulo usa o padrão Grupo. A view de grupos não foi recriada, então o nome não sai por ela.';
+  'Nome escolhido pelo grupo para o ranking. Nulo usa o padrão Grupo. A casa não grava aqui ao lançar o tempo. A view de grupos não foi recriada, então o nome não sai por ela.';
+
+alter table public.profiles
+  add column show_in_room_ranking boolean not null default true;
+
+comment on column public.profiles.show_in_room_ranking is
+  'O jogador aparece no ranking público. O padrão é aparecer. Desligar tira só o nome dele; a linha do grupo fica.';
 
 create table public.room_time_entries (
   id uuid primary key default pg_catalog.gen_random_uuid(),
@@ -105,14 +111,14 @@ create table public.room_time_audit (
   entry_id uuid not null references public.room_time_entries (id) on delete cascade,
   venue_id uuid not null references public.venues (id) on delete cascade,
   actor_id uuid not null references auth.users (id),
-  action text not null check (action in ('record', 'edit', 'remove')),
+  action text not null check (action in ('record', 'edit', 'remove', 'correct_name')),
   before_state jsonb,
   after_state jsonb,
   created_at timestamptz not null default pg_catalog.now()
 );
 
 comment on table public.room_time_audit is
-  'Auditoria de lançar, editar e remover. O Admin aal2 também grava em admin_audit_log.';
+  'Auditoria de lançar, editar, corrigir o nome e remover. O Admin aal2 também grava em admin_audit_log.';
 
 create index room_time_audit_by_entry
   on public.room_time_audit (entry_id, created_at);
@@ -651,7 +657,11 @@ begin
     raise exception 'O tempo fica entre 1 segundo e a duração da sala.'
       using errcode = '22023';
   end if;
-  v_name := private.room_time_resolve_name(p_group_name, v_group.team_name);
+  if nullif(pg_catalog.btrim(coalesce(v_group.team_name, '')), '') is not null then
+    v_name := private.room_time_clean_name(v_group.team_name);
+  else
+    v_name := private.room_time_resolve_name(p_group_name, null);
+  end if;
 
   select entry.id, entry.removed_at
     into v_existing, v_removed
@@ -689,11 +699,6 @@ begin
 
   perform private.room_time_write_members(v_existing, p_group_id, p_members);
 
-  update public.groups
-    set team_name = v_name
-    where id = p_group_id
-      and team_name is distinct from v_name;
-
   perform private.room_time_audit(
     v_existing,
     v_group.venue_id,
@@ -727,6 +732,7 @@ declare
   v_actor uuid;
   v_entry public.room_time_entries%rowtype;
   v_name text;
+  v_chosen text;
   v_before jsonb;
 begin
   perform private.room_time_reject_if_off();
@@ -748,7 +754,16 @@ begin
     raise exception 'O tempo fica entre 1 segundo e a duração da sala.'
       using errcode = '22023';
   end if;
-  v_name := private.room_time_resolve_name(p_group_name, v_entry.group_name);
+  select chosen.team_name into v_chosen
+  from public.groups chosen
+  where chosen.id = v_entry.group_id;
+  if nullif(pg_catalog.btrim(coalesce(v_chosen, '')), '') is not null then
+    v_name := private.room_time_clean_name(v_chosen);
+  elsif nullif(pg_catalog.btrim(coalesce(p_group_name, '')), '') is not null then
+    v_name := private.room_time_clean_name(p_group_name);
+  else
+    v_name := v_entry.group_name;
+  end if;
   v_before := private.room_time_snapshot(v_entry.id);
   update public.room_time_entries
     set group_name = v_name,
@@ -758,10 +773,6 @@ begin
         updated_by = v_actor
     where id = v_entry.id;
   perform private.room_time_write_members(v_entry.id, v_entry.group_id, p_members);
-  update public.groups
-    set team_name = v_name
-    where id = v_entry.group_id
-      and team_name is distinct from v_name;
   perform private.room_time_audit(
     v_entry.id,
     v_entry.venue_id,
@@ -863,8 +874,10 @@ begin
         when coalesce(prefs.show_members, false) then coalesce((
           select pg_catalog.array_agg(member.label order by member.sort_order)
           from public.room_time_members member
+          join public.profiles profile on profile.id = member.user_id
           where member.entry_id = entry.id
             and member.published
+            and profile.show_in_room_ranking
         ), '{}'::text[])
         else '{}'::text[]
       end as members
@@ -897,7 +910,7 @@ end;
 $$;
 
 comment on function public.room_time_ranking(uuid, integer) is
-  'Top 10 público da sala, do menor tempo. Sem user id, e-mail ou nome completo. Flag, casa aprovada e preferência da casa ligam a leitura.';
+  'Top 10 público da sala, do menor tempo. Sem user id, e-mail ou nome completo. Flag, casa aprovada, preferência da casa e a escolha de cada jogador ligam a leitura.';
 
 revoke all on function public.room_time_ranking(uuid, integer)
   from public, anon, authenticated, service_role;
@@ -999,7 +1012,8 @@ returns table (
   rank_place integer,
   played_on date,
   members jsonb,
-  recorded_at timestamptz
+  recorded_at timestamptz,
+  name_chosen boolean
 )
 language plpgsql
 stable
@@ -1056,7 +1070,13 @@ begin
       from public.room_time_members member
       where member.entry_id = entry.id
     ), '[]'::jsonb),
-    entry.created_at
+    entry.created_at,
+    exists (
+      select 1
+      from public.groups chosen
+      where chosen.id = entry.group_id
+        and nullif(pg_catalog.btrim(coalesce(chosen.team_name, '')), '') is not null
+    )
   from public.room_time_entries entry
   left join ranked on ranked.id = entry.id
   where entry.room_id = p_room_id
@@ -1097,27 +1117,17 @@ begin
   if v_group.cancelled_at is not null then
     raise exception 'grupo cancelado' using errcode = 'P0001';
   end if;
-  if not (
-    exists (
-      select 1
-      from public.group_members member
-      where member.group_id = p_group_id
-        and member.user_id = v_uid
-        and member.attendance <> 'cancelled'
-    )
-    or private.owns_venue(v_group.venue_id)
-    or exists (
-      select 1
-      from public.venue_staff staff
-      where staff.venue_id = v_group.venue_id
-        and staff.user_id = v_uid
-        and staff.status = 'accepted'
-    )
+  if not exists (
+    select 1
+    from public.group_members member
+    where member.group_id = p_group_id
+      and member.user_id = v_uid
+      and member.payment_status = 'paid'
+      and member.attendance <> 'cancelled'
+      and member.refund_status is distinct from 'refunded'
   ) then
-    if not private.is_admin() then
-      raise exception 'sem permissão' using errcode = '42501';
-    end if;
-    perform private.admin_require();
+    raise exception 'Só quem pagou e está na sessão pode escolher o nome.'
+      using errcode = 'P0001';
   end if;
   if nullif(pg_catalog.btrim(coalesce(p_name, '')), '') is null then
     v_name := null;
@@ -1127,6 +1137,12 @@ begin
   update public.groups
     set team_name = v_name
     where id = p_group_id;
+  update public.room_time_entries
+    set group_name = coalesce(v_name, 'Grupo'),
+        updated_at = pg_catalog.now(),
+        updated_by = v_uid
+    where group_id = p_group_id
+      and removed_at is null;
   return coalesce(v_name, 'Grupo');
 end;
 $$;
@@ -1134,6 +1150,161 @@ $$;
 revoke all on function public.set_group_team_name(uuid, text)
   from public, anon, authenticated, service_role;
 grant execute on function public.set_group_team_name(uuid, text)
+  to authenticated;
+
+create or replace function public.correct_group_team_name(
+  p_group_id uuid,
+  p_name text
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid;
+  v_group record;
+  v_name text;
+  v_entry uuid;
+  v_before jsonb;
+begin
+  perform private.room_time_reject_if_off();
+  select * into v_group from private.room_time_load_group(p_group_id);
+  if not found then
+    raise exception 'grupo não encontrado' using errcode = 'P0002';
+  end if;
+  v_actor := private.room_time_require_manager(v_group.venue_id);
+  v_name := private.room_time_clean_name(p_name);
+  update public.groups
+    set team_name = v_name
+    where id = p_group_id;
+  select entry.id into v_entry
+  from public.room_time_entries entry
+  where entry.group_id = p_group_id
+    and entry.removed_at is null;
+  if v_entry is not null then
+    v_before := private.room_time_snapshot(v_entry);
+    update public.room_time_entries
+      set group_name = v_name,
+          updated_at = pg_catalog.now(),
+          updated_by = v_actor
+      where id = v_entry;
+    perform private.room_time_audit(
+      v_entry,
+      v_group.venue_id,
+      v_actor,
+      'correct_name',
+      v_before,
+      private.room_time_snapshot(v_entry)
+    );
+  end if;
+  return v_name;
+end;
+$$;
+
+comment on function public.correct_group_team_name(uuid, text) is
+  'A casa corrige o nome do grupo de propósito. Lançar ou editar o tempo não faz isso.';
+
+revoke all on function public.correct_group_team_name(uuid, text)
+  from public, anon, authenticated, service_role;
+grant execute on function public.correct_group_team_name(uuid, text)
+  to authenticated;
+
+create or replace function public.group_chosen_team_name(p_group_id uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_group record;
+begin
+  if v_uid is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  if not private.room_time_enabled() then
+    return null;
+  end if;
+  select * into v_group from private.room_time_load_group(p_group_id);
+  if not found then
+    raise exception 'grupo não encontrado' using errcode = 'P0002';
+  end if;
+  if not (
+    private.owns_venue(v_group.venue_id)
+    or exists (
+      select 1
+      from public.venue_staff staff
+      where staff.venue_id = v_group.venue_id
+        and staff.user_id = v_uid
+        and staff.status = 'accepted'
+    )
+    or private.is_admin_aal2()
+  ) then
+    raise exception 'sem permissão' using errcode = '42501';
+  end if;
+  return nullif(pg_catalog.btrim(coalesce(v_group.team_name, '')), '');
+end;
+$$;
+
+revoke all on function public.group_chosen_team_name(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.group_chosen_team_name(uuid) to authenticated;
+
+create or replace function public.my_room_time_visibility()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    (
+      select profile.show_in_room_ranking
+      from public.profiles profile
+      where profile.id = auth.uid()
+    ),
+    true
+  );
+$$;
+
+revoke all on function public.my_room_time_visibility()
+  from public, anon, authenticated, service_role;
+grant execute on function public.my_room_time_visibility() to authenticated;
+
+create or replace function public.set_my_room_time_visibility(p_show boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  perform private.room_time_reject_if_off();
+  if v_uid is null then
+    raise exception 'not authenticated' using errcode = '28000';
+  end if;
+  if p_show is null then
+    raise exception 'Preferência incompleta.' using errcode = '22023';
+  end if;
+  update public.profiles
+    set show_in_room_ranking = p_show
+    where id = v_uid;
+  if not found then
+    raise exception 'perfil não encontrado' using errcode = 'P0002';
+  end if;
+  return p_show;
+end;
+$$;
+
+comment on function public.set_my_room_time_visibility(boolean) is
+  'O jogador escolhe se o primeiro nome aparece no ranking público. O padrão é aparecer.';
+
+revoke all on function public.set_my_room_time_visibility(boolean)
+  from public, anon, authenticated, service_role;
+grant execute on function public.set_my_room_time_visibility(boolean)
   to authenticated;
 
 create or replace function public.group_team_name(p_group_id uuid)

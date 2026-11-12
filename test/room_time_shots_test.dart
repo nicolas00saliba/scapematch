@@ -25,8 +25,27 @@ void main() {
       tester,
       dir,
       'ranking-perfil',
-      const Size(390, 720),
-      MyRoomTimesView(lines: _mine()),
+      const Size(390, 980),
+      Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Perfil',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text('Nome e os tempos que a casa lançou para você.'),
+              RoomTimeVisibilityCard(appears: true, onChanged: (_) {}),
+              MyRoomTimesView(lines: _mine()),
+            ],
+          );
+        },
+      ),
     );
   });
 }

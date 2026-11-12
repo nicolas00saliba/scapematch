@@ -205,10 +205,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   icon: Icons.check_circle,
                   text: GroupMessages.joinedBanner,
                 ),
-                TeamNameSlot(
-                  groupId: group.id,
-                  canEdit: true,
-                ),
+                if (me.payment == PaymentStatus.paid &&
+                    me.refund != RefundStatus.refunded)
+                  TeamNameSlot(
+                    groupId: group.id,
+                    canEdit: true,
+                  ),
               ],
               if (_leaveMismatch(me) case final mismatch?) ...[
                 const SizedBox(height: 12),

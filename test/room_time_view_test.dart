@@ -30,6 +30,36 @@ void main() {
     expect(find.textContaining('Não escapou'), findsOneWidget);
     expect(find.text('60:00 (00:00)'), findsOneWidget);
   });
+
+  testWidgets('aparecer no ranking nasce ligado e o jogador desliga', (
+    tester,
+  ) async {
+    var appears = true;
+    await tester.pumpWidget(
+      _app(
+        StatefulBuilder(
+          builder: (context, setState) {
+            return RoomTimeVisibilityCard(
+              appears: appears,
+              onChanged: (value) => setState(() => appears = value),
+            );
+          },
+        ),
+      ),
+    );
+    expect(find.text('Aparecer no ranking público'), findsOneWidget);
+    expect(find.textContaining('O padrão é aparecer'), findsOneWidget);
+    expect(
+      tester.widget<SwitchListTile>(find.byKey(const Key('room-time-visibility'))).value,
+      isTrue,
+    );
+    await tester.tap(find.byKey(const Key('room-time-visibility')));
+    await tester.pump();
+    expect(
+      tester.widget<SwitchListTile>(find.byKey(const Key('room-time-visibility'))).value,
+      isFalse,
+    );
+  });
 }
 
 Widget _app(Widget child) {

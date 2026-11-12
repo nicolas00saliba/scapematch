@@ -6,6 +6,8 @@ abstract class RoomTimeGateway {
   Future<List<RoomTimeLine>> mine();
   Future<String> teamName(String groupId);
   Future<void> setTeamName(String groupId, String name);
+  Future<bool> appearsInRanking();
+  Future<void> setAppearsInRanking(bool appears);
 }
 
 class MemoryRoomTimeGateway implements RoomTimeGateway {
@@ -33,6 +35,16 @@ class MemoryRoomTimeGateway implements RoomTimeGateway {
     final error = roomTimeNameError(name);
     if (error != null) throw RoomTimeRejected(error);
     storedName = roomTimeNameOrDefault(name);
+  }
+
+  bool appears = true;
+
+  @override
+  Future<bool> appearsInRanking() async => appears;
+
+  @override
+  Future<void> setAppearsInRanking(bool appears) async {
+    this.appears = appears;
   }
 }
 
@@ -107,6 +119,23 @@ class SupabaseRoomTimeGateway implements RoomTimeGateway {
       await client.rpc('set_group_team_name', params: {
         'p_group_id': groupId,
         'p_name': name.trim(),
+      });
+    } on PostgrestException catch (error) {
+      throw RoomTimeRejected(error.message);
+    }
+  }
+
+  @override
+  Future<bool> appearsInRanking() async {
+    final raw = await client.rpc('my_room_time_visibility');
+    return raw == true;
+  }
+
+  @override
+  Future<void> setAppearsInRanking(bool appears) async {
+    try {
+      await client.rpc('set_my_room_time_visibility', params: {
+        'p_show': appears,
       });
     } on PostgrestException catch (error) {
       throw RoomTimeRejected(error.message);

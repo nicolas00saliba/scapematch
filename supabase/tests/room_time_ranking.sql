@@ -73,6 +73,18 @@ begin
     'anon',
     'public.admin_save_room_time_settings(boolean)',
     'execute'
+  ) or not has_function_privilege(
+    'authenticated',
+    'public.set_my_room_time_visibility(boolean)',
+    'execute'
+  ) or has_function_privilege(
+    'anon',
+    'public.set_my_room_time_visibility(boolean)',
+    'execute'
+  ) or has_function_privilege(
+    'anon',
+    'public.correct_group_team_name(uuid, text)',
+    'execute'
   ) then
     raise exception 'execute do ranking saiu do combinado';
   end if;
@@ -90,7 +102,11 @@ begin
         'my_room_times',
         'partner_room_times',
         'set_group_team_name',
+        'correct_group_team_name',
         'group_team_name',
+        'group_chosen_team_name',
+        'my_room_time_visibility',
+        'set_my_room_time_visibility',
         'set_venue_time_ranking',
         'venue_time_ranking',
         'room_time_ranking_enabled',
@@ -381,7 +397,50 @@ exception
     end if;
 end $$;
 
+do $$
+begin
+  perform public.set_group_team_name(
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd6',
+    'Sem Pagar'
+  );
+  raise exception 'sem pagamento escolheu nome';
+exception
+  when sqlstate 'P0001' then
+    if sqlerrm not like '%pagou%' then
+      raise;
+    end if;
+end $$;
+
 reset role;
+select set_config('request.jwt.claim.sub', '', true);
+update public.group_members
+set attendance = 'cancelled'
+where group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd2'
+  and user_id = 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4';
+
+select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', true);
+set local role authenticated;
+
+do $$
+begin
+  perform public.set_group_team_name(
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd2',
+    'Saiu'
+  );
+  raise exception 'presença cancelada escolheu nome';
+exception
+  when sqlstate 'P0001' then
+    if sqlerrm not like '%pagou%' then
+      raise;
+    end if;
+end $$;
+
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+update public.group_members
+set attendance = 'joined'
+where group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd2'
+  and user_id = 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4';
 
 select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6', true);
 set local role authenticated;
@@ -399,6 +458,20 @@ reset role;
 
 select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', true);
 set local role authenticated;
+
+do $$
+begin
+  perform public.set_group_team_name(
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1',
+    'Da Casa'
+  );
+  raise exception 'casa escolheu o nome pelo atalho do jogador';
+exception
+  when sqlstate 'P0001' then
+    if sqlerrm not like '%pagou%' then
+      raise;
+    end if;
+end $$;
 
 do $$
 begin
@@ -496,6 +569,69 @@ begin
     raise exception 'não usou o nome do grupo: %', v_name;
   end if;
 
+  perform public.edit_room_time(
+    (
+      select entry.id
+      from public.room_time_entries entry
+      where entry.group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1'
+    ),
+    2400,
+    true,
+    'Casa Mandou',
+    null
+  );
+  select entry.group_name into v_name
+  from public.room_time_entries entry
+  where entry.group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1';
+  if v_name <> 'Os Ninjas' then
+    raise exception 'editar o tempo trocou o nome do grupo: %', v_name;
+  end if;
+  if (
+    select chosen.team_name
+    from public.groups chosen
+    where chosen.id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1'
+  ) <> 'Os Ninjas' then
+    raise exception 'editar o tempo gravou por cima do nome escolhido';
+  end if;
+
+  perform public.correct_group_team_name(
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1',
+    'Ninjas Oficiais'
+  );
+  select entry.group_name into v_name
+  from public.room_time_entries entry
+  where entry.group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1';
+  if v_name <> 'Ninjas Oficiais' then
+    raise exception 'a correção não entrou no ranking: %', v_name;
+  end if;
+  if not exists (
+    select 1
+    from public.room_time_audit audit
+    join public.room_time_entries entry on entry.id = audit.entry_id
+    where entry.group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1'
+      and audit.action = 'correct_name'
+  ) then
+    raise exception 'correção sem auditoria';
+  end if;
+
+  perform set_config(
+    'request.jwt.claim.sub',
+    'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4',
+    true
+  );
+  set local role authenticated;
+  perform public.set_group_team_name(
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1',
+    'Os Ninjas'
+  );
+  reset role;
+  select entry.group_name into v_name
+  from public.room_time_entries entry
+  where entry.group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1';
+  if v_name <> 'Os Ninjas' then
+    raise exception 'o jogador não recuperou o nome: %', v_name;
+  end if;
+
   select entry.group_name into v_name
   from public.room_time_entries entry
   where entry.group_id = 'd1dddddd-dddd-4ddd-8ddd-ddddddddddd3';
@@ -560,6 +696,79 @@ begin
     raise exception 'integrantes não são o primeiro nome: %', v_members;
   end if;
 end $$;
+
+select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', true);
+set local role authenticated;
+select public.my_room_time_visibility();
+
+do $$
+declare
+  v_show boolean;
+begin
+  select public.my_room_time_visibility() into v_show;
+  if v_show is not true then
+    raise exception 'aparecer no ranking não nasce ligado';
+  end if;
+end $$;
+
+select public.set_my_room_time_visibility(false);
+reset role;
+
+select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5', true);
+set local role authenticated;
+select public.set_my_room_time_visibility(false);
+reset role;
+
+do $$
+declare
+  v_members text[];
+  v_count integer;
+  v_partner integer;
+  v_ana boolean;
+begin
+  select members into v_members
+  from public.room_time_ranking('d1cccccc-cccc-4ccc-8ccc-ccccccccccc1', 10)
+  where group_name = 'Os Ninjas';
+  if v_members <> '{}'::text[] then
+    raise exception 'quem desligou continuou no ranking público: %', v_members;
+  end if;
+  select count(*) into v_count
+  from public.room_time_ranking('d1cccccc-cccc-4ccc-8ccc-ccccccccccc1', 10)
+  where group_name = 'Os Ninjas';
+  if v_count <> 1 then
+    raise exception 'a linha sumiu quando todos desligaram o nome';
+  end if;
+
+  perform set_config(
+    'request.jwt.claim.sub',
+    'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
+    true
+  );
+  set local role authenticated;
+  select count(*) into v_partner
+  from public.partner_room_times('d1cccccc-cccc-4ccc-8ccc-ccccccccccc1') line
+  where line.group_name = 'Os Ninjas'
+    and line.members::text like '%Ana%';
+  if v_partner <> 1 then
+    raise exception 'a casa perdeu o integrante que saiu do ranking público';
+  end if;
+  select line.name_chosen into v_ana
+  from public.partner_room_times('d1cccccc-cccc-4ccc-8ccc-ccccccccccc1') line
+  where line.group_name = 'Os Ninjas';
+  if v_ana is not true then
+    raise exception 'a casa não viu que o grupo escolheu o nome';
+  end if;
+  reset role;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', true);
+set local role authenticated;
+select public.set_my_room_time_visibility(true);
+reset role;
+select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5', true);
+set local role authenticated;
+select public.set_my_room_time_visibility(true);
+reset role;
 
 select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', true);
 set local role authenticated;

@@ -40,6 +40,8 @@ abstract class PartnerRoomTimeGateway {
   Future<void> record(String groupId, RoomTimeDraft draft);
   Future<void> edit(String entryId, RoomTimeDraft draft);
   Future<void> remove(String entryId);
+  Future<void> correctName(String groupId, String name);
+  Future<String?> chosenTeamName(String groupId);
 }
 
 class MemoryPartnerRoomTimeGateway implements PartnerRoomTimeGateway {
@@ -80,7 +82,9 @@ class MemoryPartnerRoomTimeGateway implements PartnerRoomTimeGateway {
       entryId: current.entryId,
       groupId: current.groupId,
       place: current.place,
-      groupName: roomTimeNameOrDefault(draft.groupName),
+      groupName: current.nameChosen
+          ? current.groupName
+          : roomTimeNameOrDefault(draft.groupName),
       elapsedSeconds: draft.elapsedSeconds,
       remainingSeconds: (current.elapsedSeconds + current.remainingSeconds -
               draft.elapsedSeconds)
@@ -89,6 +93,7 @@ class MemoryPartnerRoomTimeGateway implements PartnerRoomTimeGateway {
       members: [for (final member in draft.members) firstLabel(member.label)],
       memberIds: [for (final member in draft.members) member.userId],
       escaped: draft.escaped,
+      nameChosen: current.nameChosen,
       roomName: current.roomName,
       venueName: current.venueName,
     );
@@ -98,6 +103,37 @@ class MemoryPartnerRoomTimeGateway implements PartnerRoomTimeGateway {
   Future<void> remove(String entryId) async {
     lines.removeWhere((line) => line.entryId == entryId);
   }
+
+  final Map<String, String> chosenNames = {};
+
+  @override
+  Future<void> correctName(String groupId, String name) async {
+    final error = roomTimeNameError(name);
+    if (error != null) throw RoomTimeRejected(error);
+    final cleaned = roomTimeNameOrDefault(name);
+    chosenNames[groupId] = cleaned;
+    final index = lines.indexWhere((line) => line.groupId == groupId);
+    if (index < 0) return;
+    final current = lines[index];
+    lines[index] = RoomTimeLine(
+      entryId: current.entryId,
+      groupId: current.groupId,
+      place: current.place,
+      groupName: cleaned,
+      elapsedSeconds: current.elapsedSeconds,
+      remainingSeconds: current.remainingSeconds,
+      playedOn: current.playedOn,
+      members: current.members,
+      memberIds: current.memberIds,
+      escaped: current.escaped,
+      roomName: current.roomName,
+      venueName: current.venueName,
+      nameChosen: true,
+    );
+  }
+
+  @override
+  Future<String?> chosenTeamName(String groupId) async => chosenNames[groupId];
 
   void _reject(RoomTimeDraft draft) {
     final error = roomTimeNameError(draft.groupName);
@@ -147,6 +183,7 @@ class SupabasePartnerRoomTimeGateway implements PartnerRoomTimeGateway {
             members: _memberLabels(row['members']),
             memberIds: _memberIds(row['members']),
             escaped: row['escaped'] == true,
+            nameChosen: row['name_chosen'] == true,
           ),
     ];
   }
@@ -178,6 +215,28 @@ class SupabasePartnerRoomTimeGateway implements PartnerRoomTimeGateway {
   @override
   Future<void> remove(String entryId) async {
     await _rpc('remove_room_time', {'p_entry_id': entryId});
+  }
+
+  @override
+  Future<void> correctName(String groupId, String name) async {
+    _check(RoomTimeDraft(
+      groupName: name,
+      elapsedSeconds: 1,
+      escaped: true,
+      members: const [],
+    ));
+    await _rpc('correct_group_team_name', {
+      'p_group_id': groupId,
+      'p_name': name.trim(),
+    });
+  }
+
+  @override
+  Future<String?> chosenTeamName(String groupId) async {
+    final raw = await _rpc('group_chosen_team_name', {'p_group_id': groupId});
+    final name = raw?.toString().trim() ?? '';
+    if (name.isEmpty || name == 'null') return null;
+    return name;
   }
 
   Future<Object?> _rpc(String name, Map<String, Object?> params) async {

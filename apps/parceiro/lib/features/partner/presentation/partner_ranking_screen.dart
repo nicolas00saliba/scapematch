@@ -72,6 +72,7 @@ class _PartnerRankingLiveState extends ConsumerState<PartnerRankingLive> {
     showMembers: false,
   );
   List<RoomTimeLine> _lines = const [];
+  Map<String, String> _chosenNames = const {};
   var _loading = true;
   String? _error;
 
@@ -97,10 +98,17 @@ class _PartnerRankingLiveState extends ConsumerState<PartnerRankingLive> {
       final gateway = ref.read(partnerRoomTimeGatewayProvider);
       final prefs = await gateway.prefs(widget.snapshot.house.id);
       final lines = await gateway.times(roomId);
+      final chosen = <String, String>{};
+      for (final group in widget.snapshot.groups) {
+        if (group.roomId != roomId || group.isCancelled) continue;
+        final name = await gateway.chosenTeamName(group.id);
+        if (name != null && name.isNotEmpty) chosen[group.id] = name;
+      }
       if (!mounted) return;
       setState(() {
         _prefs = prefs;
         _lines = lines;
+        _chosenNames = chosen;
         _loading = false;
       });
     } on RoomTimeRejected catch (error) {
@@ -195,13 +203,27 @@ class _PartnerRankingLiveState extends ConsumerState<PartnerRankingLive> {
                 return error.message;
               }
             },
+            onCorrectName: (line, name) async {
+              final groupId = line.groupId;
+              if (groupId == null) return 'Grupo não encontrado.';
+              try {
+                await ref
+                    .read(partnerRoomTimeGatewayProvider)
+                    .correctName(groupId, name);
+                await _load();
+                return null;
+              } on RoomTimeRejected catch (error) {
+                return error.message;
+              }
+            },
           ),
           for (final group in pending) ...[
             const SizedBox(height: 12),
             Text(group.roomName, style: Theme.of(context).textTheme.titleSmall),
             RoomTimeLaunchForm(
               durationMinutes: group.durationMinutes,
-              initialName: '',
+              initialName: _chosenNames[group.id] ?? '',
+              nameLocked: _chosenNames.containsKey(group.id),
               members: [
                 for (final person in group.participants)
                   if (person.occupiesSeat && (person.userId ?? '').isNotEmpty)
@@ -243,6 +265,7 @@ class RoomTimeLaunchForm extends StatefulWidget {
     this.initialElapsedSeconds = 0,
     this.initialEscaped = true,
     this.fieldPrefix = 'partner-time',
+    this.nameLocked = false,
   });
 
   final int durationMinutes;
@@ -254,6 +277,7 @@ class RoomTimeLaunchForm extends StatefulWidget {
   final int initialElapsedSeconds;
   final bool initialEscaped;
   final String fieldPrefix;
+  final bool nameLocked;
 
   @override
   State<RoomTimeLaunchForm> createState() => _RoomTimeLaunchFormState();
@@ -361,10 +385,14 @@ class _RoomTimeLaunchFormState extends State<RoomTimeLaunchForm> {
         TextField(
           key: Key('${widget.fieldPrefix}-name'),
           controller: _name,
+          enabled: !_busy && !widget.nameLocked,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Nome do grupo',
             hintText: 'Grupo',
+            helperText: widget.nameLocked
+                ? 'O grupo escolheu este nome. Para trocar, use Corrigir nome.'
+                : 'Se o grupo já escolheu, este campo não substitui o nome dele.',
           ),
         ),
         const SizedBox(height: 12),
@@ -443,6 +471,7 @@ class RoomTimeHousePanel extends StatelessWidget {
     required this.onShowMembers,
     required this.onRemove,
     this.onEdit,
+    this.onCorrectName,
   });
 
   final List<RoomTimeLine> lines;
@@ -452,6 +481,7 @@ class RoomTimeHousePanel extends StatelessWidget {
   final ValueChanged<bool> onShowMembers;
   final Future<void> Function(RoomTimeLine line) onRemove;
   final Future<String?> Function(RoomTimeLine line, RoomTimeDraft draft)? onEdit;
+  final Future<String?> Function(RoomTimeLine line, String name)? onCorrectName;
 
   @override
   Widget build(BuildContext context) {
@@ -487,7 +517,12 @@ class RoomTimeHousePanel extends StatelessWidget {
           const Text('Ainda não há grupos que escaparam nesta sala.')
         else
           for (final line in escaped)
-            _HouseRow(line: line, onRemove: onRemove, onEdit: onEdit),
+            _HouseRow(
+              line: line,
+              onRemove: onRemove,
+              onEdit: onEdit,
+              onCorrectName: onCorrectName,
+            ),
         if (stayed.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
@@ -498,7 +533,12 @@ class RoomTimeHousePanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           for (final line in stayed)
-            _HouseRow(line: line, onRemove: onRemove, onEdit: onEdit),
+            _HouseRow(
+              line: line,
+              onRemove: onRemove,
+              onEdit: onEdit,
+              onCorrectName: onCorrectName,
+            ),
         ],
       ],
     );
@@ -510,11 +550,13 @@ class _HouseRow extends StatefulWidget {
     required this.line,
     required this.onRemove,
     required this.onEdit,
+    required this.onCorrectName,
   });
 
   final RoomTimeLine line;
   final Future<void> Function(RoomTimeLine line) onRemove;
   final Future<String?> Function(RoomTimeLine line, RoomTimeDraft draft)? onEdit;
+  final Future<String?> Function(RoomTimeLine line, String name)? onCorrectName;
 
   @override
   State<_HouseRow> createState() => _HouseRowState();
@@ -522,6 +564,21 @@ class _HouseRow extends StatefulWidget {
 
 class _HouseRowState extends State<_HouseRow> {
   var _editing = false;
+  var _correcting = false;
+  late final TextEditingController _correction;
+  String? _correctionError;
+
+  @override
+  void initState() {
+    super.initState();
+    _correction = TextEditingController(text: widget.line.groupName);
+  }
+
+  @override
+  void dispose() {
+    _correction.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -536,6 +593,7 @@ class _HouseRowState extends State<_HouseRow> {
         initialEscaped: line.escaped,
         heading: 'Editar tempo',
         fieldPrefix: 'partner-time-edit',
+        nameLocked: line.nameChosen,
         members: [
           for (var index = 0; index < line.memberIds.length; index++)
             RoomTimeMemberDraft(
@@ -555,11 +613,55 @@ class _HouseRowState extends State<_HouseRow> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         RoomTimeRow(line: line),
+        if (_correcting && widget.onCorrectName != null) ...[
+          const SizedBox(height: 8),
+          TextField(
+            key: Key('partner-time-correct-name-${line.entryId ?? line.groupName}'),
+            controller: _correction,
+            decoration: const InputDecoration(
+              labelText: 'Nome corrigido',
+              helperText: 'Isto troca o nome que o grupo escolheu.',
+            ),
+          ),
+          if (_correctionError != null)
+            Text(
+              _correctionError!,
+              key: Key('partner-time-correct-error-${line.entryId ?? line.groupName}'),
+            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              key: Key('partner-time-correct-save-${line.entryId ?? line.groupName}'),
+              onPressed: () async {
+                final error = roomTimeNameError(_correction.text);
+                if (error != null) {
+                  setState(() => _correctionError = error);
+                  return;
+                }
+                final result = await widget.onCorrectName!(line, _correction.text);
+                if (!mounted) return;
+                setState(() {
+                  _correctionError = result;
+                  if (result == null) _correcting = false;
+                });
+              },
+              child: const Text('Salvar correção'),
+            ),
+          ),
+        ],
         Align(
           alignment: Alignment.centerRight,
           child: Wrap(
             spacing: 8,
             children: [
+              if (widget.onCorrectName != null)
+                TextButton(
+                  key: Key(
+                    'partner-time-correct-${line.entryId ?? line.groupName}',
+                  ),
+                  onPressed: () => setState(() => _correcting = !_correcting),
+                  child: const Text('Corrigir nome'),
+                ),
               TextButton(
                 key: Key('partner-time-edit-${line.entryId ?? line.groupName}'),
                 onPressed: widget.onEdit == null
@@ -581,22 +683,56 @@ class _HouseRowState extends State<_HouseRow> {
 }
 
 /// Atalho na ficha da sessão. Só aparece com a flag ligada.
-class SessionTimeLaunch extends ConsumerWidget {
+class SessionTimeLaunch extends ConsumerStatefulWidget {
   const SessionTimeLaunch({super.key, required this.group});
 
   final Group group;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SessionTimeLaunch> createState() => _SessionTimeLaunchState();
+}
+
+class _SessionTimeLaunchState extends ConsumerState<SessionTimeLaunch> {
+  String? _chosen;
+  var _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final name = await ref
+          .read(partnerRoomTimeGatewayProvider)
+          .chosenTeamName(widget.group.id);
+      if (!mounted) return;
+      setState(() {
+        _chosen = name;
+        _ready = true;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() => _ready = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final enabled = ref.watch(roomTimeRankingEnabledProvider);
     return enabled.maybeWhen(
       data: (on) {
-        if (!on || !scapeUsesLiveBackend) return const SizedBox.shrink();
+        if (!on || !scapeUsesLiveBackend || !_ready) {
+          return const SizedBox.shrink();
+        }
+        final chosen = _chosen;
         return RoomTimeLaunchForm(
-          durationMinutes: group.durationMinutes,
-          initialName: '',
+          durationMinutes: widget.group.durationMinutes,
+          initialName: chosen ?? '',
+          nameLocked: chosen != null,
           members: [
-            for (final person in group.participants)
+            for (final person in widget.group.participants)
               if (person.occupiesSeat && (person.userId ?? '').isNotEmpty)
                 RoomTimeMemberDraft(
                   userId: person.userId!,
@@ -606,7 +742,7 @@ class SessionTimeLaunch extends ConsumerWidget {
           onSubmit: (draft) async {
             try {
               await ref.read(partnerRoomTimeGatewayProvider).record(
-                group.id,
+                widget.group.id,
                 draft,
               );
               return null;

@@ -87,6 +87,61 @@ void main() {
     expect(find.byKey(const Key('partner-ranking-off')), findsNothing);
   });
 
+  testWidgets('corrigir nome não é o mesmo que editar o tempo', (tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    String? corrected;
+    await tester.pumpWidget(
+      _app(
+        RoomTimeHousePanel(
+          lines: [
+            RoomTimeLine(
+              entryId: 't1',
+              groupId: 'g1',
+              place: 1,
+              groupName: 'Os Ninjas',
+              elapsedSeconds: 38 * 60 + 12,
+              remainingSeconds: 21 * 60 + 48,
+              playedOn: DateTime(2026, 11, 2),
+              members: const ['Ana'],
+              escaped: true,
+              nameChosen: true,
+            ),
+          ],
+          showPublic: true,
+          showMembers: true,
+          onShowPublic: (_) {},
+          onShowMembers: (_) {},
+          onRemove: (_) async {},
+          onEdit: (_, _) async => null,
+          onCorrectName: (_, name) async {
+            corrected = name;
+            return null;
+          },
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('partner-time-correct-t1')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('partner-time-correct-name-t1')),
+      'Casa Mandou',
+    );
+    await tester.tap(find.byKey(const Key('partner-time-correct-save-t1')));
+    await tester.pump();
+    expect(corrected, 'Casa Mandou');
+
+    await tester.tap(find.byKey(const Key('partner-time-edit-t1')));
+    await tester.pump();
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('partner-time-edit-name')),
+    );
+    expect(field.enabled, isFalse);
+    expect(find.textContaining('O grupo escolheu este nome'), findsOneWidget);
+  });
+
   testWidgets('a aba desligada não mostra tempos', (tester) async {
     await tester.pumpWidget(_app(const PartnerRankingOff()));
     expect(find.textContaining('desligado'), findsOneWidget);

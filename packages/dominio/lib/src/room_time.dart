@@ -152,6 +152,7 @@ class RoomTimeLine {
     this.roomName,
     this.venueName,
     this.memberIds = const [],
+    this.nameChosen = false,
   });
 
   final int? place;
@@ -168,6 +169,9 @@ class RoomTimeLine {
 
   /// Contas ligadas à linha, na mesma ordem de [members]. Vazio no ranking público.
   final List<String> memberIds;
+
+  /// O grupo já escolheu o nome. Lançar ou editar o tempo não troca esse nome.
+  final bool nameChosen;
 
   RoomTimeMedal? get medal => medalForPlace(escaped ? place : null);
 

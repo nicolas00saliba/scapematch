@@ -79,6 +79,7 @@ class AccountDestinationScreen extends ConsumerWidget {
               ? 'Sem login nesta versão. Este perfil é fictício e não sai deste aparelho.'
               : 'Nome e os tempos que a casa lançou para você.',
         ),
+        const RoomTimeVisibilitySlot(),
         const MyRoomTimesSlot(),
       ],
       AccountDestination.partners =>
