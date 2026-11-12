@@ -308,6 +308,34 @@ insert into public.group_members (
   ('d1dddddd-dddd-4ddd-8ddd-ddddddddddd8', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', 'Ana Souza', 'paid', pg_catalog.now() - interval '9 days'),
   ('d1dddddd-dddd-4ddd-8ddd-ddddddddddd9', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', 'Ana Souza', 'paid', pg_catalog.now() - interval '2 days');
 
+-- Com session_checkins (migration do passaporte), o lançamento exige o
+-- carimbo da casa. O ddd8 fica sem carimbo até o bloco final.
+do $$
+begin
+  if pg_catalog.to_regclass('public.session_checkins') is null then
+    return;
+  end if;
+  insert into public.session_checkins (
+    venue_id, group_id, user_id, room_id, marked_by
+  )
+  select
+    grp.venue_id,
+    member.group_id,
+    member.user_id,
+    grp.room_id,
+    'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
+  from public.group_members member
+  join public.groups grp on grp.id = member.group_id
+  where member.group_id in (
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd1',
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd2',
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd3',
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd7',
+    'd1dddddd-dddd-4ddd-8ddd-ddddddddddd9'
+  )
+    and member.payment_status = 'paid';
+end $$;
+
 select set_config('request.jwt.claim.sub', 'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', true);
 select set_config('request.jwt.claim.aal', 'aal1', true);
 set local role authenticated;
@@ -507,7 +535,8 @@ begin
   raise exception 'sem reserva paga aceitou tempo';
 exception
   when sqlstate 'P0001' then
-    if sqlerrm not like '%reserva paga%' then
+    if sqlerrm not like '%reserva paga%'
+      and sqlerrm not like '%comparecimento%' then
       raise;
     end if;
 end $$;
@@ -1019,6 +1048,17 @@ begin
       'Bruno Lima',
       'paid'
     );
+    if pg_catalog.to_regclass('public.session_checkins') is not null then
+      insert into public.session_checkins (
+        venue_id, group_id, user_id, room_id, marked_by
+      ) values (
+        'd1bbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        v_group,
+        'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5',
+        'd1cccccc-cccc-4ccc-8ccc-ccccccccccc3',
+        'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
+      );
+    end if;
     perform set_config(
       'request.jwt.claim.sub',
       'd1aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
@@ -1042,7 +1082,7 @@ begin
   end if;
 end $$;
 
-create table public.session_checkins (
+create table if not exists public.session_checkins (
   id uuid primary key default pg_catalog.gen_random_uuid(),
   venue_id uuid not null references public.venues (id) on delete cascade,
   group_id uuid not null references public.groups (id) on delete cascade,

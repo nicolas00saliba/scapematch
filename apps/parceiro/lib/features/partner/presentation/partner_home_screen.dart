@@ -12,6 +12,7 @@ import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
@@ -843,9 +844,16 @@ class _PlayerChip extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final playerId = playerIdOf(person);
     final marked = snapshot.markedAbsent(group.id, playerId);
+    final checked = snapshot.checkedIn(group.id, playerId);
     final count = snapshot.absenceCount(playerId);
     final standing = snapshot.standingOf(playerId);
     final status = GroupMessages.paymentStatus(person.payment);
+    final canCheckIn =
+        canMark &&
+        !marked &&
+        !checked &&
+        person.payment == PaymentStatus.paid &&
+        person.refund == RefundStatus.none;
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
@@ -863,6 +871,26 @@ class _PlayerChip extends ConsumerWidget {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
+            if (checked)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Text(
+                  PartnerMessages.attended,
+                  key: PartnerKeys.partnerCheckedIn(group.id, playerId),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              )
+            else if (canCheckIn)
+              TextButton(
+                key: PartnerKeys.partnerCheckin(group.id, playerId),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 32),
+                ),
+                onPressed: () => _checkIn(context, ref, playerId),
+                child: const Text(PartnerMessages.confirmAttendance),
+              ),
             if (marked)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -872,7 +900,7 @@ class _PlayerChip extends ConsumerWidget {
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               )
-            else if (canMark)
+            else if (canMark && !checked)
               TextButton(
                 key: PartnerKeys.partnerAbsence(group.id, playerId),
                 style: TextButton.styleFrom(
@@ -900,6 +928,26 @@ class _PlayerChip extends ConsumerWidget {
         .markAbsence(houseId: houseId, groupId: group.id, playerId: playerId);
     if (!context.mounted) return;
     if (result is AbsenceRejected) {
+      _snack(context, result.message);
+      return;
+    }
+    ref.read(partnerRevisionProvider.notifier).bump();
+  }
+
+  Future<void> _checkIn(
+    BuildContext context,
+    WidgetRef ref,
+    String playerId,
+  ) async {
+    final result = await ref
+        .read(partnerRepositoryProvider)
+        .confirmAttendance(
+          houseId: snapshot.house.id,
+          groupId: group.id,
+          playerId: playerId,
+        );
+    if (!context.mounted) return;
+    if (result is SessionCheckinRejected) {
       _snack(context, result.message);
       return;
     }

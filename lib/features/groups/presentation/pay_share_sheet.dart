@@ -387,7 +387,9 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                           'Usar ${formatPoints(widget.points!.points)} Scape Points',
                         ),
                         subtitle: Text(
-                          'Abate ${formatPrice(widget.points!.subsidyCents)}. A casa recebe o valor cheio.',
+                          widget.points!.chargedCents == 0
+                              ? 'A vaga fica grátis. A casa recebe os 75% no crédito do próximo repasse. Se a reserva for cancelada, os pontos voltam.'
+                              : 'Abate ${formatPrice(widget.points!.subsidyCents)}. A casa recebe o valor cheio.',
                         ),
                         onChanged: _busy
                             ? null

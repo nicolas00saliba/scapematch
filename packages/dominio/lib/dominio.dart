@@ -7,6 +7,7 @@ export 'src/closing.dart';
 export 'src/commission.dart';
 export 'src/fiscal_invoice.dart';
 export 'src/ledger.dart';
+export 'src/passport.dart';
 export 'src/payment_book.dart';
 export 'src/payment_exception.dart';
 export 'src/payment_provider.dart';

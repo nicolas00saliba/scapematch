@@ -4,15 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/scape_points/domain/passport_book.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/scape_points/presentation/passport_card.dart';
 
 /// Saldo e extrato. No modo real lê `my_scape_wallet`. Na demonstração,
 /// os números são de exemplo.
 class ScapePointsBody extends ConsumerStatefulWidget {
-  const ScapePointsBody({super.key, this.preview});
+  const ScapePointsBody({super.key, this.preview, this.passportPreview});
 
   /// Quando preenchido, a tela não chama o servidor.
   final ScapeWallet? preview;
+
+  /// Passaporte junto do preview. Nulo deixa a aba só com o extrato.
+  final PassportBook? passportPreview;
 
   @override
   ConsumerState<ScapePointsBody> createState() => _ScapePointsBodyState();
@@ -20,6 +25,7 @@ class ScapePointsBody extends ConsumerStatefulWidget {
 
 class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
   ScapeWallet? _wallet;
+  PassportBook? _passport;
   var _loading = false;
   String? _error;
   final _code = TextEditingController();
@@ -43,11 +49,13 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
   Future<void> _load() async {
     try {
       final data = await scapeSupabase.rpc('my_scape_wallet');
+      final book = await _readPassport();
       if (!mounted) return;
       setState(() {
         _wallet = data is Map
             ? ScapeWallet.fromJson(Map<String, dynamic>.from(data))
             : null;
+        _passport = book;
         _loading = false;
         _error = _wallet == null
             ? 'Não foi possível ler os Scape Points.'
@@ -60,6 +68,18 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
         _error = 'Não foi possível ler os Scape Points.';
       });
     }
+  }
+
+  Future<PassportBook?> _readPassport() async {
+    try {
+      final data = await scapeSupabase.rpc('my_passport');
+      if (data is Map) {
+        return PassportBook.fromJson(Map<String, dynamic>.from(data));
+      }
+    } on Object {
+      return null;
+    }
+    return null;
   }
 
   Future<void> _claim() async {
@@ -93,10 +113,15 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
       return ScapePointsView(
         wallet: widget.preview!,
         sample: identical(widget.preview, ScapeWallet.sample),
+        passport: widget.passportPreview,
       );
     }
     if (!scapeUsesLiveBackend) {
-      return const ScapePointsView(wallet: ScapeWallet.sample, sample: true);
+      return const ScapePointsView(
+        wallet: ScapeWallet.sample,
+        sample: true,
+        passport: PassportBook.sample,
+      );
     }
     if (_loading) {
       return const Padding(
@@ -111,7 +136,7 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ScapePointsView(wallet: wallet, sample: false),
+        ScapePointsView(wallet: wallet, sample: false, passport: _passport),
         if (wallet.canClaim) ...[
           const SizedBox(height: 16),
           TextField(
@@ -144,10 +169,12 @@ class ScapePointsView extends StatelessWidget {
     super.key,
     required this.wallet,
     required this.sample,
+    this.passport,
   });
 
   final ScapeWallet wallet;
   final bool sample;
+  final PassportBook? passport;
 
   @override
   Widget build(BuildContext context) {
@@ -184,6 +211,12 @@ class ScapePointsView extends StatelessWidget {
                 Text(formatPrice(wallet.availableCents)),
                 const SizedBox(height: 8),
                 Text('${formatPoints(wallet.pendingPoints)} pontos chegando'),
+                if (wallet.freeSlotEnabled) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${formatPoints(wallet.backedPoints)} pontos de indicação e de cashback podem cobrir a vaga. ${formatPoints(wallet.unbackedPoints)} pontos de boas-vindas e promoção ficam no teto atual.',
+                  ),
+                ],
                 const SizedBox(height: 8),
                 if (wallet.availablePoints < wallet.redeemMinPoints) ...[
                   LinearProgressIndicator(
@@ -222,6 +255,10 @@ class ScapePointsView extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _CodeRow(code: wallet.referralCode),
+        if (passport != null) ...[
+          const SizedBox(height: 16),
+          PassportCard(book: passport!),
+        ],
         const SizedBox(height: 16),
         Text(
           'Extrato',

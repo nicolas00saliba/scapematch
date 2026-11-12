@@ -37,6 +37,11 @@ import { clientIp } from "../_shared/client_ip.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
 import { syncPayerDocument } from "../_shared/payer_document.ts";
 import { splitMatchesSubsidy } from "../_shared/scape_points.ts";
+import {
+  pointsReserveSplitLine,
+  readEnv,
+  settlePaidChargeReserve,
+} from "../_shared/points_reserve_asaas.ts";
 import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
 import {
   bindJson,
@@ -146,11 +151,23 @@ export async function createCharge(
     const { data: existing } = await admin
       .from("payment_charges")
       .select(
-        "id, status, qr_code, qr_code_base64, provider_ref, billing_type, amount_cents, subsidy_cents, split_percent, house_fixed_cents, points_redeemed, reserved_at, attempt_id, idempotency_key",
+        "id, status, provider, qr_code, qr_code_base64, provider_ref, billing_type, amount_cents, subsidy_cents, split_percent, house_fixed_cents, points_redeemed, reserved_at, attempt_id, idempotency_key",
       )
       .eq("group_id", groupId)
       .eq("user_id", user.id)
       .maybeSingle();
+    if (existing?.provider === "points" && existing.status === "paid") {
+      return json({
+        charge_id: existing.id,
+        status: "paid",
+        provider_ref: null,
+        qr_code: "",
+        qr_code_base64: null,
+        billing_type: existing.billing_type,
+        amount_cents: 0,
+        points_only: true,
+      });
+    }
     if (
       existing &&
       existing.billing_type !== "PIX" &&
@@ -200,6 +217,7 @@ export async function createCharge(
     let pointsRedeemed = 0;
     let grossForReserve: number | null = null;
     let splitPercent: number | null = null;
+    let pointsOnly = false;
     if (openExisting && typeof existing?.amount_cents === "number") {
       amountCents = existing.amount_cents;
       const storedSplit = numberOrNull(existing.split_percent);
@@ -212,8 +230,9 @@ export async function createCharge(
         commissionBps,
         points,
       });
-      if (held.points > 0 && held.chargedCents > 0) {
+      if (held.points > 0 && (held.chargedCents > 0 || held.pointsOnly)) {
         if (
+          !held.pointsOnly &&
           held.houseNetCents != null &&
           held.splitPercent != null &&
           !splitMatchesSubsidy(
@@ -232,11 +251,53 @@ export async function createCharge(
         pointsRedeemed = held.points;
         grossForReserve = held.grossCents;
         splitPercent = held.splitPercent;
+        pointsOnly = held.pointsOnly;
       }
     }
     const split = {
       walletId: venue.asaas_wallet_id as string,
       fixedValue: 0,
+    };
+    const reserveSplitsFor = async (
+      houseFixedCents: number,
+      chargeId: string,
+    ) => {
+      if (!asaas.sandbox) return [];
+      const wallet = readEnv(Deno.env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
+      if (!wallet) return [];
+      const gross = grossForReserve ?? grossCents;
+      const { data, error } = await admin.rpc("points_reserve_split_cents", {
+        p_user_id: user.id,
+        p_venue_id: venue.id,
+        p_gross: gross,
+        p_charged: amountCents,
+        p_house_fixed: houseFixedCents,
+        p_billing_type: billingType,
+      });
+      if (error || typeof data !== "number" || data <= 0) return [];
+      const line = pointsReserveSplitLine({
+        sandbox: true,
+        reserveWalletId: wallet,
+        rootWalletId: readEnv(Deno.env, "ASAAS_ROOT_WALLET_ID"),
+        houseWalletId: venue.asaas_wallet_id as string,
+        referralCents: data,
+      });
+      if (!line || !chargeId) return line ? [line] : [];
+      const cashback = await admin.rpc("cashback_reserve_split_cents", {
+        p_gross: gross,
+      });
+      if (
+        cashback.error ||
+        typeof cashback.data !== "number" ||
+        cashback.data <= 0
+      ) {
+        return [line];
+      }
+      const noted = await admin.rpc("note_cashback_reserve", {
+        p_charge_id: chargeId,
+        p_cents: cashback.data,
+      });
+      return noted.error ? [] : [line];
     };
 
     const { data: profile } = await admin
@@ -246,6 +307,33 @@ export async function createCharge(
       .maybeSingle();
     const cpf = playerCpfDigits(profile?.cpf);
     if (!cpf) return json({ error: "cpf_required" }, 422);
+    if (pointsOnly) {
+      const confirmed = await admin.rpc("confirm_points_booking", {
+        p_group_id: groupId,
+        p_user_id: user.id,
+        p_venue_id: venue.id,
+        p_idempotency_key: idempotencyKey,
+        p_wallet_id: venue.asaas_wallet_id,
+        p_commission_bps: commissionBps,
+        p_billing_type: billingType,
+      });
+      if (confirmed.error || !confirmed.data) throw new Error("erro");
+      holdOpen = false;
+      const row = confirmed.data as Record<string, unknown>;
+      await settlePaidChargeReserve(admin, Deno.env, String(row.id)).catch(
+        () => undefined,
+      );
+      return json({
+        charge_id: row.id,
+        status: "paid",
+        provider_ref: null,
+        qr_code: "",
+        qr_code_base64: null,
+        billing_type: billingType,
+        amount_cents: 0,
+        points_only: true,
+      });
+    }
     const previousCustomer = profile?.asaas_customer_id as string | null;
     const customerId = await customerWithCpf(asaas, {
       customerId: previousCustomer,
@@ -441,6 +529,10 @@ export async function createCharge(
             description,
             externalReference: pixExternalReference(groupId, user.id),
             split,
+            extraSplits: await reserveSplitsFor(
+              Math.round(split.fixedValue * 100),
+              reserved.id,
+            ),
             onCreated: async (payment) => {
               const stored = await attachPixProvider(
                 admin,
@@ -564,6 +656,10 @@ export async function createCharge(
           description,
           externalReference: idempotencyKey,
           split,
+          extraSplits: await reserveSplitsFor(
+            Math.round(split.fixedValue * 100),
+            "",
+          ),
           remoteIp,
           creditCardToken: owned.creditCardToken,
         });
@@ -601,6 +697,7 @@ export async function createCharge(
           description,
           externalReference: idempotencyKey,
           split,
+          extraSplits: await reserveSplitsFor(fixedCents, chargeId),
           remoteIp,
           creditCardToken: owned.creditCardToken,
         });
@@ -677,6 +774,10 @@ export async function createCharge(
           reservedCard.amount_cents || amountCents,
           reservedCard.id,
           reservedCard.attempt_id,
+        );
+        await reserveSplitsFor(
+          reservedCard.house_fixed_cents,
+          reservedCard.id,
         );
         amountCents = reservedCard.amount_cents || amountCents;
         holdOpen = false;
@@ -1248,6 +1349,7 @@ type HeldPoints = {
   grossCents: number;
   houseNetCents: number | null;
   splitPercent: number | null;
+  pointsOnly: boolean;
 };
 
 async function holdPointRedemption(
@@ -1276,6 +1378,7 @@ async function holdPointRedemption(
     grossCents: numberOrNull(row.gross_cents) ?? 0,
     houseNetCents: numberOrNull(row.house_net_cents),
     splitPercent: numberOrNull(row.split_percent),
+    pointsOnly: row.points_only === true,
   };
 }
 
