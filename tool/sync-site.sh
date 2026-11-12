@@ -32,6 +32,14 @@ for arg in "$@"; do
   esac
 done
 
+# No box, o DSN do site fica em ~/.secrets/sentry-site.env (chmod 600,
+# fora do repositório). Uma variável já exportada tem prioridade.
+SENTRY_ENV_FILE="${SENTRY_SITE_ENV:-$HOME/.secrets/sentry-site.env}"
+if [ -z "${PUBLIC_SENTRY_DSN:-}" ] && [ -z "${SENTRY_DSN:-}" ] && [ -r "$SENTRY_ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$SENTRY_ENV_FILE"
+fi
+
 cd "$ROOT/apps/site"
 npm ci
 # O HTML publicado nasce aqui, não na Cloudflare Pages.
