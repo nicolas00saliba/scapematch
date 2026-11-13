@@ -35,7 +35,7 @@ insert into public.venues (
   -49.27,
   5000,
   'cnpj',
-  '90807060000103',
+  '80706050000120',
   '4130000102',
   'approved'
 );
@@ -148,7 +148,7 @@ begin
     select 1 from pg_catalog.jsonb_array_elements(v_snap -> 'withdrawals') item
     where item ->> 'asaas_transfer_id' = 'tra_conciliacao'
   ) or v_snap::text like '%segredo-qr-nao-sair%'
-    or v_snap::text like '%90807060000103%'
+    or v_snap::text like '%80706050000120%'
   then
     raise exception 'o retrato do livro saiu errado: %', v_snap;
   end if;
@@ -214,7 +214,7 @@ begin
   if (v_board -> 'run' ->> 'divergence_count')::integer <> 1
     or v_board -> 'rows' -> 0 ->> 'kind' is distinct from 'charge_status'
     or v_board::text like '%nao-grava%'
-    or v_board::text like '%90807060000103%'
+    or v_board::text like '%80706050000120%'
   then
     raise exception 'o admin não viu a divergência: %', v_board;
   end if;
