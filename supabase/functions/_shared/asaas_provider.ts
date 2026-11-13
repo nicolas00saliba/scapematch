@@ -435,6 +435,42 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
+  /// A listagem de notas filtra por externalReference. Ainda assim a
+  /// comparação é no código, e a página anda se hasMore vier ligado.
+  findInvoiceByReference(
+    externalReference: string,
+  ): Promise<{ id: string; status: string } | null> {
+    const reference = externalReference.trim();
+    if (!/^[\w:.-]{1,100}$/.test(reference)) return Promise.resolve(null);
+    const load = (
+      offset: number,
+    ): Promise<{ id: string; status: string } | null> => {
+      const query = new URLSearchParams({
+        externalReference: reference,
+        limit: "100",
+        offset: String(offset),
+      });
+      return this.#send(`/invoices?${query}`, undefined, "GET").then((body) => {
+        const rows = Array.isArray(body.data) ? body.data : [];
+        for (const row of rows) {
+          if (!row || typeof row !== "object") continue;
+          const item = row as Record<string, unknown>;
+          if (item.externalReference !== reference) continue;
+          if (typeof item.id !== "string" || item.id.length === 0) continue;
+          return {
+            id: item.id,
+            status: typeof item.status === "string" ? item.status : "",
+          };
+        }
+        if (body.hasMore === true && rows.length > 0 && offset < 400) {
+          return load(offset + rows.length);
+        }
+        return null;
+      });
+    };
+    return load(0);
+  }
+
   getInvoice(invoiceId: string): Promise<InvoiceView> {
     return this.#send(`/invoices/${invoiceId}`, undefined, "GET").then(
       (body) => ({

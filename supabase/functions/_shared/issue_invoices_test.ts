@@ -1,7 +1,12 @@
 import { assertEquals } from "jsr:@std/assert";
 import {
+  invoiceAttemptLimit,
   invoiceEmissionEnabled,
+  invoiceErrorRetryable,
+  invoiceFailureReason,
+  invoiceProcessingStaleMs,
   issuePaidInvoices,
+  retryFailedInvoices,
   shouldEmitInvoice,
 } from "./issue_invoices.ts";
 
@@ -157,6 +162,231 @@ Deno.test("sandbox continua simulado mesmo com a chave ligada", async () => {
   assertEquals(state.invoices.every((row) => row.status === "simulated"), true);
 });
 
+Deno.test("webhook e settle ao mesmo tempo emitem cada nota uma vez", async () => {
+  const state = { invoices: [] as Record<string, unknown>[] };
+  let schedules = 0;
+  const asaas = liveAsaas(() => {
+    schedules += 1;
+  });
+  const admin = adminFor(state);
+  await Promise.all([
+    issuePaidInvoices(admin, charge, {
+      sandbox: false,
+      emissionEnabled: true,
+      asaas,
+    }),
+    issuePaidInvoices(admin, charge, {
+      sandbox: false,
+      emissionEnabled: true,
+      asaas,
+    }),
+  ]);
+  assertEquals(schedules, 2);
+  assertEquals(state.invoices.filter((row) => row.kind === "service").length, 1);
+  assertEquals(
+    state.invoices.filter((row) => row.kind === "commission").length,
+    1,
+  );
+  assertEquals(
+    state.invoices.every((row) => row.provider_invoice_id != null),
+    true,
+  );
+});
+
+Deno.test("processing velho reaproveita a nota e o recente não emite", async () => {
+  const stale = new Date(Date.now() - invoiceProcessingStaleMs - 1000).toISOString();
+  const state = {
+    invoices: [{
+      id: "nota-velha",
+      payment_charge_id: "charge-1",
+      kind: "commission",
+      status: "processing",
+      provider_invoice_id: null,
+      attempt_count: 1,
+      updated_at: stale,
+      error_message: null,
+    }, {
+      id: "nota-nova",
+      payment_charge_id: "charge-1",
+      kind: "service",
+      status: "processing",
+      provider_invoice_id: null,
+      attempt_count: 1,
+      updated_at: new Date().toISOString(),
+      error_message: null,
+    }],
+  };
+  let schedules = 0;
+  await issuePaidInvoices(adminFor(state), charge, {
+    sandbox: false,
+    emissionEnabled: true,
+    asaas: liveAsaas(() => {
+      schedules += 1;
+    }, {
+      "commission:charge-1": { id: "inv_antiga", status: "AUTHORIZED" },
+    }),
+  });
+  const commission = state.invoices.find((row) => row.kind === "commission");
+  const service = state.invoices.find((row) => row.kind === "service");
+  assertEquals(schedules, 0);
+  assertEquals(commission?.provider_invoice_id, "inv_antiga");
+  assertEquals(commission?.status, "authorized");
+  assertEquals(service?.status, "processing");
+  assertEquals(service?.provider_invoice_id, null);
+});
+
+Deno.test("erro sem certificado volta a emitir até o limite", async () => {
+  const reason = invoiceFailureReason(new Error(
+    'Asaas 400 {"errors":[{"code":"invalid_object","description":"Certificado digital ausente"}]}',
+  ));
+  assertEquals(reason, "sem_certificado");
+  assertEquals(invoiceErrorRetryable(reason), true);
+  assertEquals(invoiceErrorRetryable("internal_error:abc"), false);
+
+  const failing = { invoices: [] as Record<string, unknown>[] };
+  await issuePaidInvoices(adminFor(failing), charge, {
+    sandbox: false,
+    emissionEnabled: true,
+    asaas: failingAsaas(new Error(
+      'Asaas 400 {"errors":[{"code":"invalid_object","description":"Certificado digital ausente"}]}',
+    )),
+  });
+  assertEquals(failing.invoices.every((row) => row.status === "error"), true);
+  assertEquals(
+    failing.invoices.every((row) => row.error_message === "sem_certificado"),
+    true,
+  );
+  assertEquals(failing.invoices.every((row) => row.attempt_count === 1), true);
+
+  let schedules = 0;
+  const state = {
+    invoices: [{
+      id: "nota-comissao",
+      payment_charge_id: "charge-1",
+      kind: "commission",
+      status: "error",
+      provider_invoice_id: null,
+      attempt_count: 1,
+      updated_at: "2026-11-13T12:00:00.000Z",
+      error_message: "sem_certificado",
+    }, {
+      id: "nota-servico",
+      payment_charge_id: "charge-1",
+      kind: "service",
+      status: "authorized",
+      provider_invoice_id: "inv_servico",
+      attempt_count: 1,
+      error_message: null,
+    }],
+    charges: { "charge-1": { ...charge } },
+  };
+  const retried = await retryFailedInvoices(adminFor(state), {
+    sandbox: false,
+    emissionEnabled: true,
+    asaas: liveAsaas(() => {
+      schedules += 1;
+    }),
+  });
+  const commission = state.invoices.find((row) => row.kind === "commission");
+  assertEquals(retried, 1);
+  assertEquals(schedules, 1);
+  assertEquals(commission?.status, "authorized");
+  assertEquals(commission?.attempt_count, 2);
+
+  const exhausted = {
+    invoices: [{
+      id: "nota-limite",
+      payment_charge_id: "charge-1",
+      kind: "commission",
+      status: "error",
+      provider_invoice_id: null,
+      attempt_count: invoiceAttemptLimit,
+      error_message: "asaas_unavailable",
+    }],
+    charges: { "charge-1": { ...charge } },
+  };
+  let extra = 0;
+  const again = await retryFailedInvoices(adminFor(exhausted), {
+    sandbox: false,
+    emissionEnabled: true,
+    asaas: liveAsaas(() => {
+      extra += 1;
+    }),
+  });
+  assertEquals(again, 0);
+  assertEquals(extra, 0);
+  assertEquals(exhausted.invoices[0]?.status, "error");
+
+  const off = await retryFailedInvoices(adminFor(state), {
+    sandbox: false,
+    emissionEnabled: false,
+    asaas: liveAsaas(() => {
+      extra += 1;
+    }),
+  });
+  assertEquals(off, 0);
+});
+
+function liveAsaas(
+  onSchedule: () => void,
+  existing: Record<string, { id: string; status: string }> = {},
+) {
+  let created = 0;
+  const asaas = {
+    findInvoiceByReference(reference: string) {
+      return Promise.resolve(existing[reference] ?? null);
+    },
+    scheduleInvoice() {
+      onSchedule();
+      created += 1;
+      return Promise.resolve({ id: `inv_${created}`, status: "SCHEDULED" });
+    },
+    authorizeInvoice(id: string) {
+      return Promise.resolve({ id, status: "AUTHORIZED" });
+    },
+    getInvoice(id: string) {
+      return Promise.resolve({
+        id,
+        status: "AUTHORIZED",
+        number: "15",
+        pdfUrl: "https://asaas.com/nota.pdf",
+        xmlUrl: "https://asaas.com/nota.xml",
+      });
+    },
+    createCustomer() {
+      return Promise.resolve({ id: "cus_1" });
+    },
+    withKey() {
+      return asaas;
+    },
+  };
+  return asaas as never;
+}
+
+function failingAsaas(error: Error) {
+  const asaas = {
+    findInvoiceByReference() {
+      return Promise.resolve(null);
+    },
+    scheduleInvoice() {
+      throw error;
+    },
+    authorizeInvoice() {
+      throw error;
+    },
+    getInvoice() {
+      throw error;
+    },
+    createCustomer() {
+      return Promise.resolve({ id: "cus_1" });
+    },
+    withKey() {
+      return asaas;
+    },
+  };
+  return asaas as never;
+}
+
 function asaasSpy(calls: string[]): never {
   return new Proxy({}, {
     get(_target, prop) {
@@ -166,27 +396,63 @@ function asaasSpy(calls: string[]): never {
   }) as never;
 }
 
-function adminFor(state: { invoices: Record<string, unknown>[] }) {
+function adminFor(state: {
+  invoices: Record<string, unknown>[];
+  charges?: Record<string, Record<string, unknown>>;
+}) {
   return {
+    auth: {
+      admin: {
+        getUserById() {
+          return Promise.resolve({ data: { user: { email: "ana@example.com" } } });
+        },
+      },
+    },
+    rpc() {
+      return Promise.resolve({ data: "chave-subconta", error: null });
+    },
     from(table: string) {
       let mode = "select";
       const filters: Record<string, unknown> = {};
+      const nulls: Record<string, unknown> = {};
+      const below: Record<string, unknown> = {};
       let patch: Record<string, unknown> | null = null;
       const api = {
         select() {
-          mode = "select";
+          if (mode !== "update") mode = "select";
           return api;
         },
         eq(column: string, value: unknown) {
           filters[column] = value;
           return api;
         },
+        is(column: string, value: unknown) {
+          nulls[column] = value;
+          return api;
+        },
+        lt(column: string, value: unknown) {
+          below[column] = value;
+          return api;
+        },
+        limit() {
+          return api;
+        },
         neq() {
           return api;
         },
         insert(row: Record<string, unknown>) {
+          if (table !== "fiscal_invoices") {
+            return Promise.resolve({ data: [row], error: null });
+          }
+          const duplicate = state.invoices.some((item) =>
+            item.payment_charge_id === row.payment_charge_id &&
+            item.kind === row.kind
+          );
+          if (duplicate) {
+            return Promise.resolve({ data: null, error: { code: "23505" } });
+          }
           state.invoices.push(row);
-          return Promise.resolve({ error: null });
+          return Promise.resolve({ data: [row], error: null });
         },
         update(row: Record<string, unknown>) {
           mode = "update";
@@ -194,13 +460,27 @@ function adminFor(state: { invoices: Record<string, unknown>[] }) {
           return api;
         },
         maybeSingle() {
+          if (table === "payment_charges") {
+            const id = String(filters.id ?? "");
+            return Promise.resolve({
+              data: state.charges?.[id] ?? null,
+              error: null,
+            });
+          }
           return Promise.resolve({ data: single(table), error: null });
         },
         then(resolve: (value: unknown) => void) {
           if (mode === "update") {
-            const found = state.invoices.find((item) => item.id === filters.id);
-            if (found && patch) Object.assign(found, patch);
-            resolve({ error: null });
+            const found = state.invoices.filter((item) =>
+              matches(item, filters, nulls, below)
+            );
+            if (patch) {
+              for (const item of found) Object.assign(item, patch);
+            }
+            resolve({
+              data: found.map((item) => ({ id: item.id })),
+              error: null,
+            });
             return;
           }
           if (table === "group_members") {
@@ -210,7 +490,7 @@ function adminFor(state: { invoices: Record<string, unknown>[] }) {
           if (table === "fiscal_invoices") {
             resolve({
               data: state.invoices.filter((item) =>
-                item.payment_charge_id === filters.payment_charge_id
+                matches(item, filters, nulls, below)
               ),
               error: null,
             });
@@ -222,6 +502,30 @@ function adminFor(state: { invoices: Record<string, unknown>[] }) {
       return api;
     },
   };
+}
+
+function matches(
+  item: Record<string, unknown>,
+  filters: Record<string, unknown>,
+  nulls: Record<string, unknown>,
+  below: Record<string, unknown>,
+): boolean {
+  for (const [column, value] of Object.entries(filters)) {
+    if (item[column] !== value) return false;
+  }
+  for (const [column, value] of Object.entries(nulls)) {
+    if (value === null && item[column] != null) return false;
+  }
+  for (const [column, value] of Object.entries(below)) {
+    const current = item[column];
+    if (typeof value === "number") {
+      const amount = typeof current === "number" ? current : 0;
+      if (!(amount < value)) return false;
+      continue;
+    }
+    if (String(current ?? "") >= String(value)) return false;
+  }
+  return true;
 }
 
 function single(table: string): Record<string, unknown> | null {
@@ -251,6 +555,8 @@ function single(table: string): Record<string, unknown> | null {
       iss_rate: 2,
     };
   }
-  if (table === "profiles") return { display_name: "Ana" };
+  if (table === "profiles") {
+    return { display_name: "Ana", cpf: "52998224725" };
+  }
   return null;
 }
