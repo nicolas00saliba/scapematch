@@ -6,10 +6,11 @@
 // O percentual do Asaas incide no líquido depois da taxa. Por isso o lastro
 // vai em fixedValue, no valor em centavos da indicação (2,5% do bruto).
 // O valor da cobrança do jogador não muda: a linha só reparte o que já foi
-// calculado. Antes de transferir, a função procura o externalReference.
-// Se a transferência já existe, não cria outra.
+// calculado. O claim grava a linha pending antes de qualquer chamada.
+// A listagem de transferências não filtra por externalReference: a busca
+// usa dateCreated[ge], percorre as páginas e compara a referência no código.
+// Autorização de evento crítico não liquida a reserva.
 
-import { findTransferInList } from "./asaas_transfers.ts";
 import {
   asaasSandboxBaseUrl,
   fixedReaisFromCents,
@@ -168,6 +169,23 @@ async function sendLeg(
   });
   if (claim.error) return false;
   if (claim.data === "done") return true;
+  if (claim.data !== "send" && claim.data !== "skip") return false;
+  const anchor = await input.rpc("points_reserve_transfer_anchor", {
+    p_charge_id: input.chargeId,
+    p_purpose: leg.purpose,
+  });
+  const createdOn = typeof anchor.data === "string" ? anchor.data.slice(0, 10) : "";
+  if (anchor.error || !reserveDay.test(createdOn)) {
+    if (claim.data === "send") {
+      await input.rpc("complete_points_reserve_transfer", {
+        p_charge_id: input.chargeId,
+        p_purpose: leg.purpose,
+        p_provider_ref: null,
+        p_ok: false,
+      });
+    }
+    return false;
+  }
   const transfer = {
     baseUrl: input.baseUrl,
     apiKey: input.reserveApiKey,
@@ -175,32 +193,13 @@ async function sendLeg(
     valueCents: leg.cents,
     destinationWalletId: leg.walletId,
     externalReference: `reserve:${input.chargeId}:${leg.purpose}`,
+    createdOn,
   };
-  if (claim.data === "skip") {
-    try {
-      const id = await findReserveTransfer(transfer);
-      if (!id) return false;
-      const saved = await input.rpc("complete_points_reserve_transfer", {
-        p_charge_id: input.chargeId,
-        p_purpose: leg.purpose,
-        p_provider_ref: id,
-        p_ok: true,
-      });
-      return !saved.error;
-    } catch {
-      return false;
-    }
-  }
-  if (claim.data !== "send") return false;
   try {
-    const id = await postReserveTransfer(transfer);
-    const saved = await input.rpc("complete_points_reserve_transfer", {
-      p_charge_id: input.chargeId,
-      p_purpose: leg.purpose,
-      p_provider_ref: id,
-      p_ok: true,
-    });
-    return !saved.error;
+    const hit = claim.data === "skip"
+      ? await findReserveTransfer(transfer)
+      : await postReserveTransfer(transfer);
+    return await finishLeg(input, leg.purpose, hit);
   } catch {
     await input.rpc("complete_points_reserve_transfer", {
       p_charge_id: input.chargeId,
@@ -212,6 +211,58 @@ async function sendLeg(
   }
 }
 
+async function finishLeg(
+  input: ReservePayoutInput,
+  purpose: string,
+  hit: ReserveHit | null,
+): Promise<boolean> {
+  if (!hit) return false;
+  if (hit.state === "paid") {
+    const saved = await input.rpc("complete_points_reserve_transfer", {
+      p_charge_id: input.chargeId,
+      p_purpose: purpose,
+      p_provider_ref: hit.id,
+      p_ok: true,
+    });
+    return !saved.error;
+  }
+  if (hit.state === "failed") {
+    await input.rpc("complete_points_reserve_transfer", {
+      p_charge_id: input.chargeId,
+      p_purpose: purpose,
+      p_provider_ref: hit.id,
+      p_ok: false,
+    });
+    return false;
+  }
+  if (hit.state === "awaiting_authorization") {
+    await input.rpc("note_points_reserve_awaiting", {
+      p_charge_id: input.chargeId,
+      p_purpose: purpose,
+      p_provider_ref: hit.id,
+    });
+    alertReserveAuthorization({
+      chargeId: input.chargeId,
+      purpose,
+      transferId: hit.id,
+    });
+    return false;
+  }
+  await input.rpc("remember_points_reserve_transfer", {
+    p_charge_id: input.chargeId,
+    p_purpose: purpose,
+    p_provider_ref: hit.id,
+  });
+  if (hit.state === "mismatch") {
+    console.error(JSON.stringify({
+      scope: "points_reserve",
+      code: "reserve_value_mismatch",
+      purpose,
+    }));
+  }
+  return false;
+}
+
 export type ReserveTransferInput = {
   baseUrl: string;
   apiKey: string;
@@ -219,7 +270,20 @@ export type ReserveTransferInput = {
   valueCents: number;
   destinationWalletId: string;
   externalReference: string;
+  /// Dia da linha pending, em America/Sao_Paulo. Vira dateCreated[ge].
+  createdOn: string;
 };
+
+export type ReserveHit = {
+  id: string;
+  state: "paid" | "awaiting_authorization" | "open" | "failed" | "mismatch";
+};
+
+/// A listagem oficial devolve no máximo 100 por página.
+export const reserveTransferPageSize = 100;
+
+const reserveListPages = 50;
+const reserveDay = /^\d{4}-\d{2}-\d{2}$/;
 
 const reservePurposes = new Set([
   "house",
@@ -232,31 +296,40 @@ const reservePurposes = new Set([
 /// Nome antigo. Vale no sandbox e na produção oficial.
 export const postSandboxTransfer = postReserveTransfer;
 
-/// Procura a transferência pelo externalReference. Não cria outra.
+/// Procura a transferência nas páginas a partir da data da reserva.
+/// A query não manda externalReference: esse filtro não existe na listagem.
 export async function findReserveTransfer(
   input: ReserveTransferInput,
-): Promise<string | null> {
+): Promise<ReserveHit | null> {
   const base = officialBase(input.baseUrl);
   const key = input.apiKey.trim();
   if (!key) throw new Error("chave da reserva ausente");
   assertReference(input.externalReference);
-  const query = encodeURIComponent(input.externalReference);
-  const response = await input.fetchFn(
-    `${base}/transfers?externalReference=${query}&limit=10`,
-    { method: "GET", headers: asaasHeaders(key) },
-  );
-  if (!response.ok) throw new Error(`Asaas ${response.status}`);
-  const body = await response.json().catch(() => null);
-  if (!body || typeof body !== "object") return null;
-  return findTransferInList(
-    body as Record<string, unknown>,
-    input.externalReference,
-  )?.id ?? null;
+  if (!reserveDay.test(input.createdOn)) throw new Error("data da reserva");
+  let offset = 0;
+  for (let page = 0; page < reserveListPages; page++) {
+    const response = await input.fetchFn(
+      transferListUrl(base, input.createdOn, offset),
+      { method: "GET", headers: asaasHeaders(key) },
+    );
+    if (!response.ok) throw new Error(`Asaas ${response.status}`);
+    const body = await response.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      throw new Error("lista de transferências");
+    }
+    const record = body as Record<string, unknown>;
+    const hit = matchReservePage(record, input.externalReference, input.valueCents);
+    if (hit) return hit;
+    const rows = Array.isArray(record.data) ? record.data.length : 0;
+    if (record.hasMore !== true || rows === 0) return null;
+    offset += rows;
+  }
+  throw new Error("lista de transferências incompleta");
 }
 
 export async function postReserveTransfer(
   input: ReserveTransferInput,
-): Promise<string> {
+): Promise<ReserveHit> {
   const existing = await findReserveTransfer(input);
   if (existing) return existing;
   const wallet = input.destinationWalletId.trim();
@@ -282,11 +355,75 @@ export async function postReserveTransfer(
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`Asaas ${response.status}`);
-  const body = JSON.parse(text) as { id?: unknown };
-  if (typeof body.id !== "string" || body.id.length === 0) {
-    throw new Error("Resposta do Asaas sem id");
+  const hit = classifyReserveTransfer(JSON.parse(text), input.valueCents);
+  if (!hit) throw new Error("Resposta do Asaas sem id");
+  return hit;
+}
+
+/// DONE com authorized diferente de false está pago. Token pendente não.
+export function classifyReserveTransfer(
+  body: unknown,
+  expectedCents: number,
+): ReserveHit | null {
+  if (!body || typeof body !== "object") return null;
+  const item = body as Record<string, unknown>;
+  const id = typeof item.id === "string" ? item.id : "";
+  if (!id) return null;
+  if (typeof item.value === "number" && Math.round(item.value * 100) !== expectedCents) {
+    return { id, state: "mismatch" };
   }
-  return body.id;
+  const status = typeof item.status === "string" ? item.status : "";
+  if (
+    status === "AWAITING_CRITICAL_ACTION_AUTHORIZATION" ||
+    item.authorized === false
+  ) {
+    return { id, state: "awaiting_authorization" };
+  }
+  if (status === "DONE") return { id, state: "paid" };
+  if (status === "FAILED" || status === "CANCELLED") {
+    return { id, state: "failed" };
+  }
+  return { id, state: "open" };
+}
+
+export function alertReserveAuthorization(input: {
+  chargeId: string;
+  purpose: string;
+  transferId: string;
+}): void {
+  const charge = safeToken(input.chargeId);
+  const purpose = reservePurposes.has(input.purpose) ? input.purpose : "invalid";
+  const transfer = safeToken(input.transferId);
+  console.error(JSON.stringify({
+    scope: "points_reserve",
+    code: "awaiting_critical_action_authorization",
+    charge,
+    purpose,
+    transfer,
+  }));
+}
+
+function matchReservePage(
+  body: Record<string, unknown>,
+  externalReference: string,
+  expectedCents: number,
+): ReserveHit | null {
+  const rows = Array.isArray(body.data) ? body.data : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as Record<string, unknown>;
+    if (item.externalReference !== externalReference) continue;
+    return classifyReserveTransfer(item, expectedCents);
+  }
+  return null;
+}
+
+function transferListUrl(base: string, createdOn: string, offset: number): string {
+  return `${base}/transfers?dateCreated[ge]=${createdOn}&limit=${reserveTransferPageSize}&offset=${offset}`;
+}
+
+function safeToken(value: string): string {
+  return /^[A-Za-z0-9_-]{1,80}$/.test(value) ? value : "invalid";
 }
 
 function officialBase(baseUrl: string): string {

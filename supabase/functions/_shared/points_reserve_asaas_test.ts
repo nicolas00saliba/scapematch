@@ -2,11 +2,13 @@ import { assertEquals, assertRejects } from "jsr:@std/assert";
 import { asaasProductionBaseUrl, asaasSandboxBaseUrl } from "./asaas_provider.ts";
 import {
   backedCentsOf,
+  classifyReserveTransfer,
   fundCashbackReserve,
   pointsReserveMoves,
   pointsReserveSplitLine,
   postReserveTransfer,
   readEnv,
+  reserveTransferPageSize,
   settlePointsReservePayout,
 } from "./points_reserve_asaas.ts";
 
@@ -72,6 +74,7 @@ Deno.test("URL que não é a API Asaas não chama a rede", async () => {
         valueCents: 7500,
         destinationWalletId: "wal_casa",
         externalReference: "reserve:abc:house",
+        createdOn: "2026-11-13",
       }),
     Error,
     "Asaas",
@@ -85,15 +88,18 @@ Deno.test("produção transfere o valor exato e a repetição não cria outra", 
   const fetchFn = (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     if (method === "GET") {
+      const parsed = new URL(String(url));
+      assertEquals(parsed.searchParams.get("externalReference"), null);
+      assertEquals(parsed.searchParams.get("dateCreated[ge]"), "2026-11-13");
       const data = posts === 0
         ? []
         : [{
           id: "tr_prod",
           externalReference: reference,
-          status: "PENDING",
+          status: "DONE",
           value: 75,
         }];
-      return Promise.resolve(new Response(JSON.stringify({ data })));
+      return Promise.resolve(new Response(JSON.stringify({ data, hasMore: false })));
     }
     posts += 1;
     const body = JSON.parse(String(init?.body));
@@ -104,7 +110,12 @@ Deno.test("produção transfere o valor exato e a repetição não cria outra", 
     });
     assertEquals(String(url), `${asaasProductionBaseUrl}/transfers`);
     assertEquals(new Headers(init?.headers).get("access_token"), "chave-reserva");
-    return Promise.resolve(new Response(JSON.stringify({ id: "tr_prod" })));
+    return Promise.resolve(new Response(JSON.stringify({
+      id: "tr_prod",
+      status: "DONE",
+      value: 75,
+      externalReference: reference,
+    })));
   };
   const input = {
     baseUrl: asaasProductionBaseUrl,
@@ -113,10 +124,88 @@ Deno.test("produção transfere o valor exato e a repetição não cria outra", 
     valueCents: 7500,
     destinationWalletId: "wal_casa",
     externalReference: reference,
+    createdOn: "2026-11-13",
   };
-  assertEquals(await postReserveTransfer(input), "tr_prod");
-  assertEquals(await postReserveTransfer(input), "tr_prod");
+  assertEquals(await postReserveTransfer(input), { id: "tr_prod", state: "paid" });
+  assertEquals(await postReserveTransfer(input), { id: "tr_prod", state: "paid" });
   assertEquals(posts, 1);
+});
+
+Deno.test("a transferência certa na segunda página não cria outra", async () => {
+  const reference = "reserve:abc:house";
+  let posts = 0;
+  const hit = await postReserveTransfer({
+    baseUrl: asaasProductionBaseUrl,
+    apiKey: "chave-reserva",
+    fetchFn: (url, init) => {
+      if ((init?.method ?? "GET") === "POST") {
+        posts += 1;
+        return Promise.resolve(new Response("{}"));
+      }
+      const parsed = new URL(String(url));
+      assertEquals(parsed.searchParams.get("externalReference"), null);
+      assertEquals(parsed.searchParams.get("dateCreated[ge]"), "2026-11-13");
+      assertEquals(parsed.searchParams.get("limit"), String(reserveTransferPageSize));
+      const offset = Number(parsed.searchParams.get("offset"));
+      if (offset === 0) {
+        const data = Array.from({ length: reserveTransferPageSize }, (_, index) => ({
+          id: `tr_${index}`,
+          externalReference: `outra:${index}`,
+          status: "DONE",
+          value: 1,
+        }));
+        return Promise.resolve(new Response(JSON.stringify({
+          data,
+          hasMore: true,
+          limit: reserveTransferPageSize,
+          offset: 0,
+        })));
+      }
+      assertEquals(offset, reserveTransferPageSize);
+      return Promise.resolve(new Response(JSON.stringify({
+        data: [{
+          id: "tr_certa",
+          externalReference: reference,
+          status: "DONE",
+          value: 75,
+        }],
+        hasMore: false,
+        limit: reserveTransferPageSize,
+        offset,
+      })));
+    },
+    valueCents: 7500,
+    destinationWalletId: "wal_casa",
+    externalReference: reference,
+    createdOn: "2026-11-13",
+  });
+  assertEquals(hit, { id: "tr_certa", state: "paid" });
+  assertEquals(posts, 0);
+});
+
+Deno.test("token pendente não conta como transferência paga", () => {
+  assertEquals(
+    classifyReserveTransfer({
+      id: "tr_auth",
+      status: "AWAITING_CRITICAL_ACTION_AUTHORIZATION",
+      authorized: false,
+      value: 75,
+    }, 7500),
+    { id: "tr_auth", state: "awaiting_authorization" },
+  );
+  assertEquals(
+    classifyReserveTransfer({
+      id: "tr_sms",
+      status: "PENDING",
+      authorized: false,
+      value: 75,
+    }, 7500),
+    { id: "tr_sms", state: "awaiting_authorization" },
+  );
+  assertEquals(
+    classifyReserveTransfer({ id: "tr_ok", status: "DONE", value: 75 }, 7500),
+    { id: "tr_ok", state: "paid" },
+  );
 });
 
 Deno.test("no sandbox a transferência usa a chave da subconta", async () => {
@@ -131,13 +220,18 @@ Deno.test("no sandbox a transferência usa a chave da subconta", async () => {
       seen.url = String(url);
       seen.key = new Headers(init?.headers).get("access_token") ?? "";
       seen.body = String(init?.body);
-      return Promise.resolve(new Response(JSON.stringify({ id: "tr_1" })));
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "tr_1",
+        status: "DONE",
+        value: 75,
+      })));
     },
     valueCents: 7500,
     destinationWalletId: "wal_casa",
     externalReference: "reserve:abc:house",
+    createdOn: "2026-11-13",
   });
-  assertEquals(id, "tr_1");
+  assertEquals(id, { id: "tr_1", state: "paid" });
   assertEquals(seen.url, `${asaasSandboxBaseUrl}/transfers`);
   assertEquals(seen.key, "chave-reserva");
   assertEquals(
@@ -185,6 +279,9 @@ Deno.test("produção paga a casa uma vez; repetição acha a transferência", a
     if (fn === "claim_points_reserve_transfer") {
       return Promise.resolve({ data: posts === 0 ? "send" : "skip", error: null });
     }
+    if (fn === "points_reserve_transfer_anchor") {
+      return Promise.resolve({ data: "2026-11-13", error: null });
+    }
     return Promise.resolve({ data: null, error: null });
   };
   const fetchFn = (url: string, init?: RequestInit) => {
@@ -195,12 +292,20 @@ Deno.test("produção paga a casa uma vez; repetição acha a transferência", a
       assertEquals(body.value, 75);
       assertEquals(body.walletId, "wal_casa");
       assertEquals(String(url), `${asaasProductionBaseUrl}/transfers`);
-      return Promise.resolve(new Response(JSON.stringify({ id: "tr_casa" })));
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "tr_casa",
+        status: "DONE",
+        value: 75,
+        externalReference: reference,
+      })));
     }
+    const parsed = new URL(String(url));
+    assertEquals(parsed.searchParams.get("externalReference"), null);
+    assertEquals(parsed.searchParams.get("dateCreated[ge]"), "2026-11-13");
     const data = posts === 0
       ? []
-      : [{ id: "tr_casa", externalReference: reference, status: "DONE" }];
-    return Promise.resolve(new Response(JSON.stringify({ data })));
+      : [{ id: "tr_casa", externalReference: reference, status: "DONE", value: 75 }];
+    return Promise.resolve(new Response(JSON.stringify({ data, hasMore: false })));
   };
   const input = {
     rpc,
@@ -216,6 +321,94 @@ Deno.test("produção paga a casa uma vez; repetição acha a transferência", a
   assertEquals(await settlePointsReservePayout(input), true);
   assertEquals(await settlePointsReservePayout(input), true);
   assertEquals(posts, 1);
+});
+
+Deno.test("autorização de evento crítico não liquida e não transfere de novo", async () => {
+  const reference = "reserve:abc:house";
+  const notes: string[] = [];
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (line?: unknown) => {
+    logs.push(String(line));
+  };
+  let posts = 0;
+  try {
+    const rpc = (fn: string, args: Record<string, unknown>) => {
+      if (fn === "claim_points_reserve_transfer") {
+        return Promise.resolve({ data: posts === 0 ? "send" : "skip", error: null });
+      }
+      if (fn === "points_reserve_transfer_anchor") {
+        return Promise.resolve({ data: "2026-11-13", error: null });
+      }
+      if (fn === "note_points_reserve_awaiting") {
+        notes.push(String(args.p_provider_ref));
+        return Promise.resolve({ data: null, error: null });
+      }
+      if (fn === "complete_points_reserve_transfer" && args.p_ok === true) {
+        return Promise.resolve({ data: null, error: { message: "nao liquidar" } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    };
+    const fetchFn = (url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST") {
+        posts += 1;
+        return Promise.resolve(new Response(JSON.stringify({
+          id: "tr_auth",
+          status: "AWAITING_CRITICAL_ACTION_AUTHORIZATION",
+          authorized: false,
+          value: 75,
+          externalReference: reference,
+        })));
+      }
+      const offset = Number(new URL(String(url)).searchParams.get("offset"));
+      if (posts === 0 || offset === 0) {
+        const data = Array.from({ length: reserveTransferPageSize }, (_, index) => ({
+          id: `tr_${index}`,
+          externalReference: `outra:${index}`,
+          status: "DONE",
+          value: 1,
+        }));
+        return Promise.resolve(new Response(JSON.stringify({
+          data,
+          hasMore: posts > 0,
+          offset,
+        })));
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        data: [{
+          id: "tr_auth",
+          externalReference: reference,
+          status: "AWAITING_CRITICAL_ACTION_AUTHORIZATION",
+          authorized: false,
+          value: 75,
+        }],
+        hasMore: false,
+        offset,
+      })));
+    };
+    const input = {
+      rpc,
+      baseUrl: asaasProductionBaseUrl,
+      reserveApiKey: "chave",
+      rootWalletId: "wal_raiz",
+      houseWalletId: "wal_casa",
+      chargeId: "abc",
+      backedCents: 7500,
+      houseOwedCents: 7500,
+      fetchFn,
+    };
+    assertEquals(await settlePointsReservePayout(input), false);
+    assertEquals(await settlePointsReservePayout(input), false);
+    assertEquals(posts, 1);
+    assertEquals(notes, ["tr_auth", "tr_auth"]);
+    assertEquals(logs.some((line) => line.includes("chave")), false);
+    assertEquals(
+      logs.filter((line) => line.includes("awaiting_critical_action_authorization")).length,
+      2,
+    );
+  } finally {
+    console.error = original;
+  }
 });
 
 Deno.test("cashback entra na subconta pela conta raiz na API oficial", async () => {
@@ -248,6 +441,9 @@ Deno.test("cashback entra na subconta pela conta raiz na API oficial", async () 
       assertEquals(args.p_wallet_id, "wal_reserva");
       return Promise.resolve({ data: "send", error: null });
     }
+    if (fn === "points_reserve_transfer_anchor") {
+      return Promise.resolve({ data: "2026-11-13", error: null });
+    }
     return Promise.resolve({ data: null, error: null });
   };
   await fundCashbackReserve(
@@ -269,7 +465,11 @@ Deno.test("cashback entra na subconta pela conta raiz na API oficial", async () 
       seen.key = new Headers(init?.headers).get("access_token") ?? "";
       seen.body = String(init?.body);
       assertEquals(String(url), `${asaasSandboxBaseUrl}/transfers`);
-      return Promise.resolve(new Response(JSON.stringify({ id: "tr_cb" })));
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "tr_cb",
+        status: "DONE",
+        value: 2.5,
+      })));
     },
   );
   assertEquals(seen.key, "chave-raiz");
