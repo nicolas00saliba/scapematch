@@ -18,12 +18,12 @@ const respostas = [
   {
     pergunta: 'Vou ficar de fora do grupo?',
     resposta:
-      'Não. O grupo é feito de quem entrou naquela sala e naquele horário. Você entra do mesmo jeito que as outras pessoas e paga só a sua vaga.',
+      'Não. O grupo é quem entrou naquela sala, naquele horário. Você entra do mesmo jeito que as outras pessoas e paga só a sua vaga.',
   },
   {
-    pergunta: 'E se mais tarde eu quiser chamar alguém?',
+    pergunta: 'E se faltar gente no grupo?',
     resposta:
-      'Quem passa a ter companhia pode completar as vagas que faltam. Cada pessoa paga a própria vaga. O jogo continua confirmando no mínimo.',
+      'O app completa as vagas que faltam com outras pessoas que também chegaram sozinhas. Cada pessoa paga a própria vaga. O jogo confirma quando o grupo bate o mínimo.',
   },
   oQueE,
 ];
@@ -46,8 +46,8 @@ const respostas = [
       <h2>{respostas[1].pergunta}</h2>
       <p>{respostas[1].resposta}</p>
       <p>
-        O passo a passo curto de chegar sem grupo está em <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
-        Este texto é para quem está sem uma turma e quer saber se a vaga continua valendo.
+        O passo a passo de chegar sem grupo está em <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
+        Esta página é para quem quer jogar e não tem uma turma.
       </p>
     </section>
     <section>
@@ -56,7 +56,7 @@ const respostas = [
       <p>
         A casa conduz a sessão. As regras são as mesmas para todo mundo: respeito, chegar no horário e seguir a casa.
         O combinado está em <a href="/seguranca">Segurança</a>.
-        A sessão com gente nova está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
+        A sessão com quem você não conhece está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
       </p>
     </section>
     <section>
@@ -64,7 +64,7 @@ const respostas = [
       <p>{respostas[3].resposta}</p>
       <p>
         Ir em duas pessoas tem página própria: <a href="/guia/escape-room-para-2-pessoas">escape room para 2 pessoas</a>.
-        Comparar amigos, grupos de mensagem e a casa está em <a href="/guia/como-achar-grupo-escape-room">onde achar grupo</a>.
+        Amigos, grupos de mensagem e a casa estão em <a href="/guia/como-achar-grupo-escape-room">onde achar grupo</a>.
       </p>
     </section>
     <section>
@@ -74,16 +74,15 @@ const respostas = [
         A cobrança só acontece quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado.
       </p>
       <p>
-        O detalhe está em <a href="/como-funciona/pagamento">Pagamento e regras</a>
-        e em <a href="/cancelamento">Regras de cancelamento</a>.
+        O detalhe está em <a href="/como-funciona/pagamento">Pagamento e regras</a> e em <a href="/cancelamento">Regras de cancelamento</a>.
       </p>
     </section>
     <section>
       <h2>{oQueE.pergunta}</h2>
       <p>{oQueE.resposta}</p>
       <p>
-        O lançamento é em Curitiba. Na cidade, o recorte de quem chega sem grupo está em <a href="/guia/escape-room-sozinho-curitiba">escape room sozinho em Curitiba</a>.
-        A lista dos recortes está em <a href="/guia">guias</a>.
+        O lançamento é em Curitiba. Quem chega sem grupo na cidade vê <a href="/guia/escape-room-sozinho-curitiba">escape room sozinho em Curitiba</a>.
+        A lista dos guias está em <a href="/guia">guias</a>.
       </p>
     </section>
   </article>

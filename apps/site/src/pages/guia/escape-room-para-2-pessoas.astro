@@ -8,7 +8,7 @@ const respostas = [
   {
     pergunta: 'Dá para jogar escape room para 2 pessoas?',
     resposta:
-      'Dá para ir em dupla. O jogo confirma quando o grupo bate o mínimo da sala. Se duas pessoas ainda não fecham esse mínimo, o EscapeMatch completa as vagas que faltam. Cada um paga só a própria vaga. Se o mínimo não bater, nada é cobrado.',
+      'Dá para ir em dupla. O jogo confirma quando o grupo bate o mínimo da sala. Se duas pessoas ainda não bastam para o mínimo, o app completa as vagas com outras pessoas que também chegaram sozinhas. Cada um paga só a própria vaga. Se o mínimo não bater, nada é cobrado.',
   },
   {
     pergunta: 'A dupla paga a sala inteira?',
@@ -18,12 +18,12 @@ const respostas = [
   {
     pergunta: 'Já somos duas pessoas. Dá para usar o app?',
     resposta:
-      'Dá. Quem já tem uma dupla escolhe a sala e o horário e completa as vagas que faltam. Cada pessoa continua pagando a própria vaga. O jogo confirma no mínimo.',
+      'Dá. A dupla escolhe a sala e o horário. Se ainda faltar gente, o app completa as vagas com outras pessoas que também chegaram sozinhas. Cada pessoa paga a própria vaga. O jogo confirma quando o grupo bate o mínimo.',
   },
   {
     pergunta: 'A dupla precisa conhecer o resto do grupo?',
     resposta:
-      'Não. Quem entra para completar a sala pode ser alguém que você não conhecia. Vocês se encontram na casa, no horário marcado, e a casa conduz a sessão.',
+      'Não. A vaga que falta pode ficar com alguém que você não conhecia e que também chegou sozinho. Vocês se encontram na casa, no horário marcado, e a casa conduz a sessão.',
   },
   oQueE,
 ];
@@ -31,7 +31,7 @@ const respostas = [
 
 <Base
   title="Escape room para 2 pessoas | EscapeMatch"
-  description="Escape room para duas pessoas. Se a dupla não fechar o mínimo, o app completa as vagas. Cada um paga a sua."
+  description="Escape room para duas pessoas. Se faltar gente, o app completa com quem também chegou sozinho. Cada um paga a própria vaga."
   path="/guia/escape-room-para-2-pessoas"
   ogImage="/assets/og/home.png"
   jsonLd={faqPage(respostas)}
@@ -54,7 +54,7 @@ const respostas = [
       <h2>{respostas[2].pergunta}</h2>
       <p>{respostas[2].resposta}</p>
       <p>
-        Chegar sem nenhuma companhia é outro recorte: <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
+        Quem chega sozinho vê <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
         O passo a passo do grupo está em <a href="/como-funciona">Como funciona</a>.
       </p>
     </section>
@@ -62,7 +62,7 @@ const respostas = [
       <h2>{respostas[3].pergunta}</h2>
       <p>{respostas[3].resposta}</p>
       <p>
-        Como essa sessão funciona está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
+        A sessão com quem você não conhece está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
         O combinado está em <a href="/seguranca">Segurança</a>.
       </p>
     </section>
@@ -82,7 +82,7 @@ const respostas = [
       <p>{oQueE.resposta}</p>
       <p>
         Outras formas de achar gente estão em <a href="/guia/como-achar-grupo-escape-room">onde achar grupo</a>.
-        A lista dos recortes está em <a href="/guia">guias</a>.
+        A lista dos guias está em <a href="/guia">guias</a>.
       </p>
     </section>
   </article>

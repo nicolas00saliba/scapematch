@@ -503,7 +503,7 @@ def main() -> None:
         "/guia/escape-room-com-desconhecidos": (
             "Dá para jogar escape room com desconhecidos?",
             "Como é a sessão com desconhecidos?",
-            "O que vale na convivência do grupo?",
+            "Qual é a regra de convivência?",
             "Quem paga quando o grupo é de desconhecidos?",
             "O que é o EscapeMatch?",
         ),
@@ -518,7 +518,7 @@ def main() -> None:
             "Não tenho amigos para jogar escape room. Dá para ir?",
             "Preciso levar uma turma?",
             "Vou ficar de fora do grupo?",
-            "E se mais tarde eu quiser chamar alguém?",
+            "E se faltar gente no grupo?",
             "O que é o EscapeMatch?",
         ),
         "/guia/escape-room-em-grupo-curitiba": (
