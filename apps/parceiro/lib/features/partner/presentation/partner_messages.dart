@@ -182,16 +182,25 @@ abstract final class PartnerMessages {
   static const claimCodeHint = '6 dígitos';
   static const claimManualSent =
       'Este perfil não tem contato oficial. O pedido ficou pendente para o admin aprovar.';
-  static const claimRate =
-      'Espere um pouco antes de pedir outro código.';
+  static const claimRate = 'Espere um pouco antes de pedir outro código.';
   static const claimMismatch = 'Código incorreto ou vencido.';
-  static const claimLinked = 'A casa é sua. Fotos, salas e avaliações continuam no mesmo perfil.';
+  static const claimLinked =
+      'A casa é sua. Fotos, salas e avaliações continuam no mesmo perfil.';
   static const claimFinanceBody =
-      'Para receber no app, complete a subconta Asaas e a chave Pix. Enquanto as duas não estiverem prontas, pagamento e saque ficam desligados.';
+      'Complete nesta ordem: subconta Asaas, documentos da subconta e chave Pix. Enquanto a subconta e a chave não estiverem prontas, pagamento e saque ficam desligados.';
+  static const claimStepSubaccount = '1. Subconta Asaas';
+  static const claimStepDocuments = '2. Documentos da subconta';
+  static const claimStepPix = '3. Chave Pix';
+  static const claimStepPending = 'Pendente';
+  static const claimStepReady = 'Pronta';
+  static const claimStepApproved = 'Aprovados';
+  static const claimStepPixReady = 'Cadastrada';
+  static const claimStepWait = 'Aguardando a subconta';
+  static const claimStepUnknown = 'Não foi possível consultar';
   static const claimProvision = 'Criar subconta Asaas';
   static const claimProvisionDone = 'Pedido de subconta enviado.';
   static const claimBankHint =
-      'A chave Pix fica na tela de saldo, em conta de saque. Os documentos da subconta entram quando essa tela estiver publicada.';
+      'A chave Pix se cadastra na tela de saldo, em conta de saque.';
   static const sendClaim = 'Pedir reivindicação';
   static const claimSent =
       'Pedido enviado. O admin decide se a casa passa para você.';

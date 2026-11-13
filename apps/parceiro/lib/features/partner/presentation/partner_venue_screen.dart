@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_documents_repository.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_claim.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/company_type_field.dart';
@@ -146,6 +148,43 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
           onSend: () => _claims.send(claim.venueId),
           onConfirm: (code) => _claims.confirm(claim.venueId, code),
           onProvision: () => _claims.provision(claim.venueId),
+          onLoadDocuments: () =>
+              ref.read(venueDocumentsRepositoryProvider).load(claim.venueId),
+          onUploadDocument: (item) async {
+            final file = await ref.read(venueDocumentPickerProvider).pick();
+            if (file == null) return null;
+            return ref
+                .read(venueDocumentsRepositoryProvider)
+                .upload(
+                  venueId: claim.venueId,
+                  documentId: item.id,
+                  bytes: file.bytes,
+                );
+          },
+          onOpenUrl: launchExternalUrl,
+          onSubaccountReady: () async {
+            try {
+              final row = await scapeSupabase
+                  .from('venues')
+                  .select('receives_payments')
+                  .eq('id', claim.venueId)
+                  .maybeSingle();
+              return row?['receives_payments'] == true;
+            } on Object {
+              return false;
+            }
+          },
+          onPixReady: () async {
+            try {
+              final ready = await scapeSupabase.rpc(
+                'venue_finance_ready',
+                params: {'p_venue_id': claim.venueId},
+              );
+              return ready == true;
+            } on Object {
+              return false;
+            }
+          },
           onOpenHouse: () {
             ref.read(partnerSessionProvider.notifier).reload();
           },

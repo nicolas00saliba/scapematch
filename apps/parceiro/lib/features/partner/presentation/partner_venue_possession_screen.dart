@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_documents_repository.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_claim.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_documents_card.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 class VenueClaimOffer extends StatelessWidget {
@@ -63,6 +65,11 @@ class VenueClaimDesk extends StatefulWidget {
     required this.onConfirm,
     required this.onProvision,
     this.onOpenHouse,
+    this.onLoadDocuments,
+    this.onUploadDocument,
+    this.onOpenUrl,
+    this.onSubaccountReady,
+    this.onPixReady,
   });
 
   final ClaimableVenue venue;
@@ -70,6 +77,12 @@ class VenueClaimDesk extends StatefulWidget {
   final Future<bool> Function(String code) onConfirm;
   final Future<String?> Function() onProvision;
   final VoidCallback? onOpenHouse;
+  final Future<VenueDocumentsView> Function()? onLoadDocuments;
+  final Future<VenueDocumentsView?> Function(VenueDocumentItem item)?
+  onUploadDocument;
+  final void Function(Uri uri)? onOpenUrl;
+  final Future<bool> Function()? onSubaccountReady;
+  final Future<bool> Function()? onPixReady;
 
   @override
   State<VenueClaimDesk> createState() => _VenueClaimDeskState();
@@ -168,6 +181,11 @@ class _VenueClaimDeskState extends State<VenueClaimDesk> {
       return VenueFinanceStep(
         onProvision: widget.onProvision,
         onOpenHouse: widget.onOpenHouse,
+        onLoadDocuments: widget.onLoadDocuments,
+        onUploadDocument: widget.onUploadDocument,
+        onOpenUrl: widget.onOpenUrl,
+        onSubaccountReady: widget.onSubaccountReady,
+        onPixReady: widget.onPixReady,
       );
     }
     return _panel(
@@ -226,31 +244,132 @@ class VenueFinanceStep extends StatefulWidget {
     super.key,
     required this.onProvision,
     this.onOpenHouse,
+    this.onLoadDocuments,
+    this.onUploadDocument,
+    this.onOpenUrl,
+    this.onSubaccountReady,
+    this.onPixReady,
   });
 
   final Future<String?> Function() onProvision;
   final VoidCallback? onOpenHouse;
+  final Future<VenueDocumentsView> Function()? onLoadDocuments;
+  final Future<VenueDocumentsView?> Function(VenueDocumentItem item)?
+  onUploadDocument;
+  final void Function(Uri uri)? onOpenUrl;
+  final Future<bool> Function()? onSubaccountReady;
+  final Future<bool> Function()? onPixReady;
 
   @override
   State<VenueFinanceStep> createState() => _VenueFinanceStepState();
 }
 
 class _VenueFinanceStepState extends State<VenueFinanceStep> {
-  String? _message;
   var _busy = false;
+  var _subaccount = false;
+  var _pixReady = false;
+  String? _subaccountNote;
+  VenueDocumentsView? _documents;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.onPixReady != null || widget.onSubaccountReady != null) {
+      _refreshReady();
+    }
+  }
+
+  Future<void> _refreshReady() async {
+    final subaccount = widget.onSubaccountReady == null
+        ? false
+        : await widget.onSubaccountReady!();
+    final pix = widget.onPixReady == null ? false : await widget.onPixReady!();
+    if (!mounted) return;
+    setState(() {
+      _pixReady = pix;
+      if (subaccount || pix) _subaccount = true;
+    });
+    if (subaccount || pix || _subaccount) await _loadDocuments();
+  }
 
   Future<void> _provision() async {
     setState(() => _busy = true);
-    final error = await widget.onProvision();
+    final failure = await widget.onProvision();
     if (!mounted) return;
     setState(() {
       _busy = false;
-      _message = error ?? PartnerMessages.claimProvisionDone;
+      if (failure == null) {
+        _subaccount = true;
+        _subaccountNote = PartnerMessages.claimProvisionDone;
+      } else {
+        _subaccountNote = failure;
+      }
     });
+    if (failure == null) {
+      await _loadDocuments();
+      await _refreshReady();
+    }
+  }
+
+  Future<void> _loadDocuments() async {
+    final load = widget.onLoadDocuments;
+    if (load == null) return;
+    try {
+      final view = await load();
+      if (!mounted) return;
+      setState(() => _documents = view);
+    } on Object {
+      if (!mounted) return;
+      setState(() => _documents = VenueDocumentsView.unavailable);
+    }
+  }
+
+  Future<void> _upload(VenueDocumentItem item) async {
+    final upload = widget.onUploadDocument;
+    if (upload == null) return;
+    setState(() => _busy = true);
+    try {
+      final view = await upload(item);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        if (view != null) _documents = view;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await _loadDocuments();
+    }
+  }
+
+  String get _subaccountStatus {
+    if (_subaccount && _pixReady) return PartnerMessages.claimStepReady;
+    if (_subaccount) {
+      return _subaccountNote ?? PartnerMessages.claimStepReady;
+    }
+    return _subaccountNote ?? PartnerMessages.claimStepPending;
+  }
+
+  String get _documentsStatus {
+    if (!_subaccount) return PartnerMessages.claimStepWait;
+    final view = _documents;
+    if (view == null) return PartnerMessages.claimStepPending;
+    if (view.approved) return PartnerMessages.claimStepApproved;
+    if (!view.known || view.message != null) {
+      return PartnerMessages.claimStepUnknown;
+    }
+    return PartnerMessages.claimStepPending;
+  }
+
+  String get _pixStatus {
+    if (_pixReady) return PartnerMessages.claimStepPixReady;
+    if (!_subaccount) return PartnerMessages.claimStepWait;
+    return PartnerMessages.claimStepPending;
   }
 
   @override
   Widget build(BuildContext context) {
+    final documents = _documents;
     return ListView(
       key: PartnerKeys.venueClaimFinance,
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
@@ -261,15 +380,43 @@ class _VenueFinanceStepState extends State<VenueFinanceStep> {
         ),
         const SizedBox(height: 8),
         const Text(PartnerMessages.claimFinanceBody),
-        const SizedBox(height: 8),
-        const Text(PartnerMessages.claimBankHint),
         const SizedBox(height: 16),
-        FilledButton(
-          key: PartnerKeys.venueClaimProvision,
-          onPressed: _busy ? null : _provision,
-          child: const Text(PartnerMessages.claimProvision),
+        Column(
+          key: PartnerKeys.venueClaimChecklist,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ClaimStep(
+              titleKey: PartnerKeys.venueClaimStepSubaccount,
+              title: PartnerMessages.claimStepSubaccount,
+              status: _subaccountStatus,
+              child: FilledButton(
+                key: PartnerKeys.venueClaimProvision,
+                onPressed: _busy || _subaccount ? null : _provision,
+                child: const Text(PartnerMessages.claimProvision),
+              ),
+            ),
+            _ClaimStep(
+              titleKey: PartnerKeys.venueClaimStepDocuments,
+              title: PartnerMessages.claimStepDocuments,
+              status: _documentsStatus,
+              child: _subaccount && documents != null
+                  ? VenueDocumentsCard(
+                      view: documents,
+                      busy: _busy,
+                      onOpen: widget.onOpenUrl ?? (_) {},
+                      onUpload: _upload,
+                      onRefresh: _loadDocuments,
+                    )
+                  : null,
+            ),
+            _ClaimStep(
+              titleKey: PartnerKeys.venueClaimStepPix,
+              title: PartnerMessages.claimStepPix,
+              status: _pixStatus,
+              child: const Text(PartnerMessages.claimBankHint),
+            ),
+          ],
         ),
-        if (_message != null) ...[const SizedBox(height: 12), Text(_message!)],
         if (widget.onOpenHouse != null) ...[
           const SizedBox(height: 12),
           TextButton(
@@ -278,6 +425,37 @@ class _VenueFinanceStepState extends State<VenueFinanceStep> {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _ClaimStep extends StatelessWidget {
+  const _ClaimStep({
+    required this.titleKey,
+    required this.title,
+    required this.status,
+    this.child,
+  });
+
+  final Key titleKey;
+  final String title;
+  final String status;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        key: titleKey,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(status),
+          if (child != null) ...[const SizedBox(height: 8), child!],
+        ],
+      ),
     );
   }
 }
