@@ -1,5 +1,12 @@
 # Decisões provisórias
 
+## A nota fiscal nasce desligada em produção
+
+- **Data:** 2026-11-13
+- **Decisão:** sem certificado A1 a NFS-e da comissão falha em produção. A emissão fica desligada até a variável `ASAAS_INVOICE_EMISSION` valer `on`. Qualquer outro valor, inclusive vazio, desliga. Desligada, a cobrança não chama `/v3/invoices`. A nota que seria enviada fica `scheduled`, sem `provider_invoice_id`, para sair quando a chave ligar. Uma falha na emissão não desfaz a cobrança. O sandbox continua gravando `simulated`.
+- **Onde está no código:** `supabase/functions/_shared/issue_invoices.ts`, chamado por `asaas-webhook` e `settle-charges`.
+- **Como trocar depois:** não houve migration nem publicação. Depois do certificado A1, o Nícolas grava `ASAAS_INVOICE_EMISSION=on` e publica as funções. Rodar de novo o settle do grupo emite as notas que ficaram `scheduled`.
+
 ## O host escolhe o mínimo e o máximo
 
 - **Data:** 2026-11-10

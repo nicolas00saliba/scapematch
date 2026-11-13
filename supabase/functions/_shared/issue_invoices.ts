@@ -1,9 +1,11 @@
 // Emite as duas NFS-e quando a cobrança já está paga e o grupo fechou.
 // No sandbox não chama /v3/invoices: grava status simulated com links de teste.
-// Em produção usa a chave da subconta para o serviço e a chave raiz para a comissão.
+// Em produção a emissão fica desligada até ASAAS_INVOICE_EMISSION=on.
+// Desligada, a nota que seria enviada fica scheduled, sem chamar o Asaas,
+// para sair depois que o certificado A1 estiver na conta. A cobrança não falha.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { storedFailure } from "./asaas_client_error.ts";
+import { logCaught, storedFailure } from "./asaas_client_error.ts";
 import { customerWithCpf, playerCpfDigits } from "./player_cpf.ts";
 import {
   AsaasProvider,
@@ -43,28 +45,68 @@ const defaultPlatform = {
   issRate: 2,
 };
 
+/// Só o valor `on` liga a emissão. Qualquer outra coisa, inclusive vazio, desliga.
+export const invoiceEmissionSetting = "ASAAS_INVOICE_EMISSION";
+
+export function invoiceEmissionEnabled(
+  env: { get(name: string): string | undefined },
+): boolean {
+  try {
+    return (env.get(invoiceEmissionSetting) ?? "").trim().toLowerCase() === "on";
+  } catch {
+    return false;
+  }
+}
+
+/// Produção com a chave ligada e cliente Asaas. Sandbox continua simulado.
+export function shouldEmitInvoice(input: {
+  status: string;
+  sandbox: boolean;
+  emissionEnabled: boolean;
+  hasClient: boolean;
+}): boolean {
+  return input.status === "scheduled" &&
+    !input.sandbox &&
+    input.emissionEnabled &&
+    input.hasClient;
+}
+
+type StoredInvoice = {
+  id: string;
+  kind: string;
+  status: string;
+  provider_invoice_id: string | null;
+};
+
 export async function issuePaidInvoices(
   admin: Admin,
   charge: ChargeRow,
-  options: { sandbox: boolean; asaas?: AsaasProvider },
+  options: { sandbox: boolean; asaas?: AsaasProvider; emissionEnabled?: boolean },
 ): Promise<void> {
+  try {
+    await issuePaidInvoicesBody(admin, charge, options);
+  } catch (error) {
+    logCaught("issue_invoices", error);
+  }
+}
+
+async function issuePaidInvoicesBody(
+  admin: Admin,
+  charge: ChargeRow,
+  options: { sandbox: boolean; asaas?: AsaasProvider; emissionEnabled?: boolean },
+): Promise<void> {
+  const emissionEnabled = options.emissionEnabled ??
+    invoiceEmissionEnabled(safeEnv());
+  const resolved = { ...options, emissionEnabled };
   const closed = await groupIsClosed(admin, charge.group_id);
   if (!closed) return;
 
   const { data: existing } = await admin
     .from("fiscal_invoices")
-    .select("kind")
+    .select("id, kind, status, provider_invoice_id")
     .eq("payment_charge_id", charge.id);
-  const have = new Set(
-    ((existing ?? []) as Array<{ kind: string }>).map((row) => row.kind),
-  );
-  if (
-    have.has("service") &&
-    (have.has("commission") ||
-      commissionCents(charge.amount_cents, charge.commission_bps) === 0)
-  ) {
-    return;
-  }
+  const stored = ((existing ?? []) as StoredInvoice[]);
+  const byKind = new Map(stored.map((row) => [row.kind, row]));
 
   const venue = await loadVenue(admin, charge.venue_id);
   if (!venue) return;
@@ -76,13 +118,16 @@ export async function issuePaidInvoices(
     commissionCents: fee,
     playerName,
     venue: fiscal,
-    sandbox: options.sandbox,
+    sandbox: resolved.sandbox,
     platform: platformFromEnv(),
   });
 
   for (const draft of drafts) {
-    if (have.has(draft.kind)) continue;
-    await writeDraft(admin, charge, draft, options);
+    const row = byKind.get(draft.kind);
+    if (row && (row.status !== "scheduled" || row.provider_invoice_id)) {
+      continue;
+    }
+    await writeDraft(admin, charge, draft, resolved, row);
   }
 }
 
@@ -146,7 +191,8 @@ async function writeDraft(
   admin: Admin,
   charge: ChargeRow,
   draft: InvoiceDraft,
-  options: { sandbox: boolean; asaas?: AsaasProvider },
+  options: { sandbox: boolean; asaas?: AsaasProvider; emissionEnabled: boolean },
+  existing?: StoredInvoice,
 ) {
   const suffix = draft.kind === "service" ? "S" : "C";
   const number = draft.status === "simulated"
@@ -174,31 +220,52 @@ async function writeDraft(
       : null,
   };
 
-  if (draft.status !== "scheduled" || !options.asaas) {
+  const emittedFields = (emitted: {
+    status: string;
+    number: string;
+    pdfUrl: string;
+    xmlUrl: string;
+    id: string;
+  }) => ({
+    status: emitted.status,
+    number: emitted.number || null,
+    pdf_url: emitted.pdfUrl || null,
+    xml_url: emitted.xmlUrl || null,
+    provider_invoice_id: emitted.id,
+    issued_at: emitted.status === "authorized" ? new Date().toISOString() : null,
+    error_message: emitted.status === "error" ? "Asaas recusou a nota" : null,
+  });
+
+  const emit = shouldEmitInvoice({
+    status: draft.status,
+    sandbox: options.sandbox,
+    emissionEnabled: options.emissionEnabled,
+    hasClient: Boolean(options.asaas),
+  });
+  if (!emit || !options.asaas) {
+    if (existing) return;
     await insertInvoice(admin, base);
     return;
   }
 
   try {
     const emitted = await emitOnAsaas(admin, options.asaas, charge, draft);
-    await insertInvoice(admin, {
-      ...base,
-      status: emitted.status,
-      number: emitted.number || null,
-      pdf_url: emitted.pdfUrl || null,
-      xml_url: emitted.xmlUrl || null,
-      provider_invoice_id: emitted.id,
-      issued_at: emitted.status === "authorized"
-        ? new Date().toISOString()
-        : null,
-      error_message: emitted.status === "error" ? "Asaas recusou a nota" : null,
-    });
+    const fields = emittedFields(emitted);
+    if (existing) {
+      await admin.from("fiscal_invoices").update(fields).eq("id", existing.id);
+      return;
+    }
+    await insertInvoice(admin, { ...base, ...fields });
   } catch (error) {
-    await insertInvoice(admin, {
-      ...base,
+    const fields = {
       status: "error",
       error_message: storedFailure("issue_invoices", error),
-    });
+    };
+    if (existing) {
+      await admin.from("fiscal_invoices").update(fields).eq("id", existing.id);
+      return;
+    }
+    await insertInvoice(admin, { ...base, ...fields });
   }
 }
 
@@ -423,9 +490,29 @@ async function emailOf(admin: Admin, userId: string): Promise<string | null> {
 }
 
 function platformFromEnv() {
-  const code = Deno.env.get("ASAAS_FISCAL_SERVICE_CODE");
-  const name = Deno.env.get("ASAAS_FISCAL_SERVICE_NAME");
-  const iss = Number(Deno.env.get("ASAAS_FISCAL_ISS") ?? "");
+  const code = envValue("ASAAS_FISCAL_SERVICE_CODE");
+  const name = envValue("ASAAS_FISCAL_SERVICE_NAME");
+  const iss = Number(envValue("ASAAS_FISCAL_ISS"));
   if (!code || !name || !(iss > 0)) return defaultPlatform;
   return { serviceCode: code, serviceName: name, issRate: iss };
+}
+
+function envValue(name: string): string {
+  try {
+    return Deno.env.get(name) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function safeEnv(): { get(name: string): string | undefined } {
+  return {
+    get(name: string) {
+      try {
+        return Deno.env.get(name);
+      } catch {
+        return undefined;
+      }
+    },
+  };
 }
