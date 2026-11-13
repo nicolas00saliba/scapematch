@@ -1,0 +1,80 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { definicao } from '../../data/seo';
+
+const guias = [
+  {
+    href: '/guia/escape-room-sozinho',
+    titulo: 'Escape room sozinho',
+    frase: 'Se dá para jogar quando você chega sem grupo, e como a vaga confirma.',
+  },
+  {
+    href: '/guia/escape-room-sozinho-curitiba',
+    titulo: 'Escape room sozinho em Curitiba',
+    frase: 'Onde e como jogar sozinho na cidade do lançamento. O site não lista casas.',
+  },
+  {
+    href: '/guia/como-achar-grupo-escape-room',
+    titulo: 'Onde achar grupo de escape room',
+    frase: 'Amigos, grupos de mensagem, a casa ou o EscapeMatch.',
+  },
+  {
+    href: '/guia/escape-room-com-desconhecidos',
+    titulo: 'Escape room com desconhecidos',
+    frase: 'Como é a sessão com gente que você não conhecia.',
+  },
+  {
+    href: '/guia/escape-room-para-2-pessoas',
+    titulo: 'Escape room para 2 pessoas',
+    frase: 'Ir em dupla. Se faltar gente, o app completa com quem também chegou sozinho.',
+  },
+  {
+    href: '/guia/nao-tenho-amigos-para-escape-room',
+    titulo: 'Não tenho amigos para jogar escape room',
+    frase: 'Chegar sem turma e entrar no grupo do mesmo jeito que as outras pessoas.',
+  },
+  {
+    href: '/guia/escape-room-em-grupo-curitiba',
+    titulo: 'Escape room em grupo em Curitiba',
+    frase: 'Como o grupo se forma na cidade do lançamento, sem lista de casas.',
+  },
+  {
+    href: '/guia/primeira-vez-em-escape-room',
+    titulo: 'Primeira vez em escape room',
+    frase: 'O que esperar da sessão presencial na primeira sala.',
+  },
+];
+---
+
+<Base
+  title="Guias de escape room | EscapeMatch"
+  description="Índice dos guias: sozinho, desconhecidos, dupla, sem turma, grupo em Curitiba e primeira vez."
+  path="/guia"
+  ogImage="/assets/og/home.png"
+>
+  <header class="miolo pagina-topo">
+    <h1>Guias para jogar escape room</h1>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="resposta-direta">
+      Cada página responde uma busca. Salas, horários e o preço por pessoa ficam no app.
+    </p>
+  </header>
+  <article class="miolo pagina leitura">
+    {guias.map((guia) => (
+      <section>
+        <h2><a href={guia.href}>{guia.titulo}</a></h2>
+        <p>{guia.frase}</p>
+      </section>
+    ))}
+    <section>
+      <h2>Fora dos guias</h2>
+      <p>
+        O passo a passo está em <a href="/como-funciona">Como funciona</a>.
+        A cidade, com avaliações e ranking no app, está em <a href="/escape-room-curitiba">Escape room em Curitiba</a>.
+        Dúvidas de grupo, pagamento e pontos estão na <a href="/ajuda">central de ajuda</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock titulo="Entrar num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
+</Base>

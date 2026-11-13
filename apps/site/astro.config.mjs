@@ -101,7 +101,7 @@ export default defineConfig({
         return rota !== '/convite' && rota !== '/404' && rota !== '/cidades/curitiba';
       },
       serialize(item) {
-        item.lastmod = new Date('2026-11-12T00:00:00.000Z');
+        item.lastmod = new Date('2026-11-13T00:00:00.000Z');
         return item;
       },
     }),

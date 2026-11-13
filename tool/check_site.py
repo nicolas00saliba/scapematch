@@ -19,9 +19,15 @@ ROTAS = [
     "/como-funciona/pagamento",
     "/experiencias",
     "/experiencias/escape-room",
+    "/guia",
     "/guia/escape-room-sozinho",
     "/guia/escape-room-sozinho-curitiba",
     "/guia/como-achar-grupo-escape-room",
+    "/guia/escape-room-com-desconhecidos",
+    "/guia/escape-room-para-2-pessoas",
+    "/guia/nao-tenho-amigos-para-escape-room",
+    "/guia/escape-room-em-grupo-curitiba",
+    "/guia/primeira-vez-em-escape-room",
     "/escape-room-curitiba",
     "/seguranca",
     "/app",
@@ -280,9 +286,15 @@ def main() -> None:
         "/cancelamento",
         "/contato",
         "/escape-room-curitiba",
+        "/guia",
         "/guia/escape-room-sozinho",
         "/guia/escape-room-sozinho-curitiba",
         "/guia/como-achar-grupo-escape-room",
+        "/guia/escape-room-com-desconhecidos",
+        "/guia/escape-room-para-2-pessoas",
+        "/guia/nao-tenho-amigos-para-escape-room",
+        "/guia/escape-room-em-grupo-curitiba",
+        "/guia/primeira-vez-em-escape-room",
     ):
         if f"{SITE}{rota}<" not in sitemap and f"{SITE}{rota}/" not in sitemap:
             falha(f"{rota} saiu do sitemap")
@@ -487,6 +499,59 @@ def main() -> None:
     )
     if "não lista casas parceiras" not in guia_curitiba.lower():
         falha("o guia de Curitiba não avisa que o site não lista casas")
+    guias_novos = {
+        "/guia/escape-room-com-desconhecidos": (
+            "Dá para jogar escape room com desconhecidos?",
+            "Como é a sessão com desconhecidos?",
+            "Qual é a regra de convivência?",
+            "Quem paga quando o grupo é de desconhecidos?",
+            "O que é o EscapeMatch?",
+        ),
+        "/guia/escape-room-para-2-pessoas": (
+            "Dá para jogar escape room para 2 pessoas?",
+            "A dupla paga a sala inteira?",
+            "Já somos duas pessoas. Dá para usar o app?",
+            "A dupla precisa conhecer o resto do grupo?",
+            "O que é o EscapeMatch?",
+        ),
+        "/guia/nao-tenho-amigos-para-escape-room": (
+            "Não tenho amigos para jogar escape room. Dá para ir?",
+            "Preciso levar uma turma?",
+            "Vou ficar de fora do grupo?",
+            "E se faltar gente no grupo?",
+            "O que é o EscapeMatch?",
+        ),
+        "/guia/escape-room-em-grupo-curitiba": (
+            "Como jogar escape room em grupo em Curitiba?",
+            "Quem entra nesse grupo?",
+            "Quando o grupo em Curitiba confirma?",
+            "Onde vejo as salas de grupo em Curitiba?",
+            "O que é o EscapeMatch?",
+        ),
+        "/guia/primeira-vez-em-escape-room": (
+            "Primeira vez em escape room: o que saber?",
+            "Preciso ter jogado escape room antes?",
+            "O que fazer na hora da sessão?",
+            "E se for a primeira vez e o grupo não fechar?",
+            "O que é o EscapeMatch?",
+        ),
+    }
+    for rota, perguntas in guias_novos.items():
+        html_guia = arquivo(rota).read_text()
+        if DEFINICAO not in html_guia:
+            falha(f"definição canônica ausente em {rota}")
+        if '"@type":"FAQPage"' not in html_guia:
+            falha(f"{rota} saiu sem FAQPage")
+        exigir_faq(html_guia, rota, perguntas)
+    guia_grupo_cidade = arquivo("/guia/escape-room-em-grupo-curitiba").read_text()
+    if "não lista casas parceiras" not in guia_grupo_cidade.lower():
+        falha("o guia de grupo em Curitiba não avisa que o site não lista casas")
+    hub = arquivo("/guia").read_text()
+    if DEFINICAO not in hub:
+        falha("definição canônica ausente no índice de guias")
+    for rota in guias_novos:
+        if f'href="{rota}"' not in hub:
+            falha(f"o índice de guias não aponta para {rota}")
     exigir_faq(como, "/como-funciona", ("Como completar o grupo de uma sala de escape?",))
     exigir_faq(arquivo("/ajuda/grupo").read_text(), "/ajuda/grupo", ("O EscapeMatch é um jogo?",))
     cidade = arquivo("/escape-room-curitiba").read_text()
@@ -536,8 +601,14 @@ def main() -> None:
         if "Não há perfil oficial de Instagram" in texto:
             falha(f"{nome} ainda diz que não há Instagram")
         for rota in (
+            "/guia",
             "/guia/escape-room-sozinho-curitiba",
             "/guia/como-achar-grupo-escape-room",
+            "/guia/escape-room-com-desconhecidos",
+            "/guia/escape-room-para-2-pessoas",
+            "/guia/nao-tenho-amigos-para-escape-room",
+            "/guia/escape-room-em-grupo-curitiba",
+            "/guia/primeira-vez-em-escape-room",
         ):
             if rota not in texto:
                 falha(f"{nome} sem {rota}")
