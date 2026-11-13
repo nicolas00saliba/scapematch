@@ -74,4 +74,37 @@ printf '/\n  X-Robots-Tag: noindex, nofollow\n' > "$tmp/_headers"
 recusa "_headers ignorado pelo Pages"
 rm "$tmp/_headers"
 
+pagina '<meta name="robots" content="noindex, nofollow">' \
+  '<p><a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a></p>
+   <script src="flutter_bootstrap.js"></script>'
+recusa "link solto no app"
+
+pagina '<meta name="robots" content="noindex, nofollow">' \
+  '<div id="scape-splash"><a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a></div>
+   <p><a href="https://escapematch.com.br/">Outro</a></p>
+   <script>
+     window.addEventListener("flutter-first-frame", function () {
+       var splash = document.getElementById("scape-splash");
+       if (splash) splash.remove();
+     });
+   </script>
+   <script src="flutter_bootstrap.js"></script>'
+recusa "link extra fora da abertura"
+
+pagina '<meta name="robots" content="noindex, nofollow">' \
+  '<div id="scape-splash"><a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a></div>
+   <script src="flutter_bootstrap.js"></script>'
+recusa "abertura sem flutter-first-frame"
+
+pagina '<meta name="robots" content="noindex, nofollow">' \
+  '<div id="scape-splash"><a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a></div>
+   <script>
+     window.addEventListener("flutter-first-frame", function () {
+       var splash = document.getElementById("scape-splash");
+       if (splash) splash.remove();
+     });
+   </script>
+   <script src="flutter_bootstrap.js"></script>'
+bash "$check" "$tmp/index.html"
+
 echo "checagem de noindex ok"

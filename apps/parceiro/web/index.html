@@ -62,13 +62,19 @@
       overscroll-behavior: none;
       background: #111111;
     }
-    .scape-site {
-      margin: 16px;
+    #scape-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111111;
+    }
+    #scape-splash a {
+      color: #F2F2F2;
       font-family: sans-serif;
       font-size: 16px;
-    }
-    .scape-site a {
-      color: #F2F2F2;
     }
   </style>
   <script>
@@ -127,7 +133,17 @@
   </script>
 </head>
 <body>
-  <p class="scape-site"><a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a></p>
+  <div id="scape-splash">
+    <a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a>
+  </div>
+  <script>
+    // A abertura sai no primeiro frame. O link não fica atrás do canvas
+    // nem na ordem do Tab depois que o app abre.
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('scape-splash');
+      if (splash) splash.remove();
+    });
+  </script>
   <script>
     // Não registra um worker novo. Se a casa ainda tiver o worker de
     // cache, esta visita pede a versão que se desregistra e limpa o cache.

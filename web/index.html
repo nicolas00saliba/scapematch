@@ -78,13 +78,19 @@
       overscroll-behavior: none;
       background: #FFFFFF;
     }
-    .scape-site {
-      margin: 16px;
+    #scape-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+    #scape-splash a {
+      color: #0F4C4A;
       font-family: sans-serif;
       font-size: 16px;
-    }
-    .scape-site a {
-      color: #0F4C4A;
     }
   </style>
   <script>
@@ -143,7 +149,17 @@
   </script>
 </head>
 <body>
-  <p class="scape-site"><a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a></p>
+  <div id="scape-splash">
+    <a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a>
+  </div>
+  <script>
+    // A abertura sai no primeiro frame. O link não fica atrás do canvas
+    // nem na ordem do Tab depois que o app abre.
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('scape-splash');
+      if (splash) splash.remove();
+    });
+  </script>
   <script>
     // Um service worker antigo do jogador cobria /scapematch/ inteiro.
     // No Pages antigo, se este shell abrir num caminho do Parceiro,

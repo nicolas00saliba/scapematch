@@ -8,7 +8,7 @@ set -euo pipefail
 raiz=$(cd "$(dirname "$0")/.." && pwd)
 
 python3 - "$raiz" "$@" <<'PY'
-import pathlib, sys
+import pathlib, re, sys
 from html.parser import HTMLParser
 
 raiz = pathlib.Path(sys.argv[1])
@@ -50,13 +50,14 @@ class Pagina(HTMLParser):
             or "display:none" in estilo
             or "visibility:hidden" in estilo
         )
-        self._pilha.append((tag, escondido))
+        self._pilha.append((tag, escondido, atributos.get("id") or ""))
         if tag == "meta" and (atributos.get("name") or "").lower() == "robots":
             self.robots.append((atributos.get("content") or "").strip())
         if tag == "a":
             self._ancora = {
                 "href": atributos.get("href") or "",
                 "escondido": escondido,
+                "ids": [item[2] for item in self._pilha if item[2]],
             }
             self._texto = []
 
@@ -92,11 +93,26 @@ def bloqueia(texto):
     return False
 
 
+def ids_no_primeiro_frame(texto):
+    ids = set()
+    blocos = re.findall(
+        r"addEventListener\(\s*['\"]flutter-first-frame['\"]\s*,\s*function\s*\(\s*\)\s*\{(.*?)\}\s*\)",
+        texto,
+        flags=re.S,
+    )
+    for bloco in blocos:
+        if ".remove()" not in bloco:
+            continue
+        ids.update(re.findall(r"getElementById\(\s*['\"]([^'\"]+)['\"]\s*\)", bloco))
+    return ids
+
+
 def conferir_html(path):
     if not path.is_file():
         raise SystemExit(f"ausente: {path}")
+    texto = path.read_text()
     pagina = Pagina()
-    pagina.feed(path.read_text())
+    pagina.feed(texto)
     if pagina.robots != [meta]:
         raise SystemExit(
             f"{path}: a meta robots tem de ser {meta!r}, veio {pagina.robots!r}"
@@ -108,6 +124,16 @@ def conferir_html(path):
         raise SystemExit(
             f"{path}: o link para {oficial}/ está escondido ou sem texto"
         )
+    if "flutter_bootstrap.js" in texto:
+        removidos = ids_no_primeiro_frame(texto)
+        soltos = [
+            item for item in links if not (set(item["ids"]) & removidos)
+        ]
+        if soltos:
+            raise SystemExit(
+                f"{path}: o link para {oficial}/ fica fora da abertura. "
+                "Ele tem de ser removido no flutter-first-frame."
+            )
 
 
 def conferir_pasta(pasta):
