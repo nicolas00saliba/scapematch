@@ -73,13 +73,14 @@ Deno.serve(async (req) => {
           externalReference: user.id,
           cpf,
         });
-        await storeReplacedCustomer(
+        const storedCustomer = await storeReplacedCustomer(
           admin,
           user.id,
           previousCustomer,
           resolvedCustomer.id,
+          asaas,
         );
-        const customerId = resolvedCustomer.id;
+        const customerId = storedCustomer.id;
 
         const tokenized = await asaas.tokenizeCard({
           customer: customerId,

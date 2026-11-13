@@ -35,19 +35,37 @@ export type ResolvedCustomer = {
 /// A cobrança com cartão salvo pede recadastro quando o customer foi trocado.
 export const cardReregisterCode = "card_reregister";
 
+type ClaimFilter = {
+  eq(column: string, value: string): ClaimFilter;
+  is(column: string, value: null): ClaimFilter;
+  select(columns: string): PromiseLike<{
+    data: unknown;
+    error: { message?: string } | null;
+  }>;
+};
+
 type CustomerStore = {
   from(table: string): {
     update(values: Record<string, unknown>): {
-      eq(
-        column: string,
-        value: string,
-      ): PromiseLike<{ error: { message?: string } | null }>;
+      eq(column: string, value: string): ClaimFilter;
+    };
+    select(columns: string): {
+      eq(column: string, value: string): {
+        maybeSingle(): PromiseLike<{
+          data: Record<string, unknown> | null;
+          error: { message?: string } | null;
+        }>;
+      };
     };
   };
   rpc(
     name: string,
     args: Record<string, unknown>,
   ): PromiseLike<{ data: unknown; error: { message?: string } | null }>;
+};
+
+type CustomerCleaner = {
+  deleteCustomer(id: string): Promise<void>;
 };
 
 function cpfOrThrow(value: string): string {
@@ -105,30 +123,62 @@ export async function customerWithCpf(
   return (await resolveCustomerWithCpf(asaas, input)).id;
 }
 
-/// Desativa os cartões do customer antigo e só então grava o id novo.
-/// A ordem importa: o gatilho do cartão exige que o perfil ainda aponte
-/// para o customer do cartão.
+/// Quem grava o id novo é o update com `asaas_customer_id = previousId`.
+/// A outra chamada relê o perfil e usa o customer que ficou. O id que
+/// ela criou no Asaas é apagado; se o DELETE falhar, a cobrança segue.
 export async function storeReplacedCustomer(
   db: CustomerStore,
   userId: string,
   previousId: string | null,
   nextId: string,
-): Promise<string | null> {
-  const replaced = previousId && previousId !== nextId ? previousId : null;
-  if (replaced) {
+  asaas?: CustomerCleaner,
+): Promise<{ id: string; replacedId: string | null }> {
+  if (previousId && previousId !== nextId) {
     const deactivated = await db.rpc("deactivate_customer_saved_cards", {
       p_user_id: userId,
-      p_customer_id: replaced,
+      p_customer_id: previousId,
     });
     if (deactivated.error) throw new Error("customer_cards");
   }
-  if (nextId !== previousId) {
-    const updated = await db.from("profiles").update({
-      asaas_customer_id: nextId,
-    }).eq("id", userId);
-    if (updated.error) throw new Error("customer_profile");
+  const id = await claimCustomerId(db, userId, previousId, nextId);
+  if (asaas && id !== nextId) {
+    try {
+      await asaas.deleteCustomer(nextId);
+    } catch (_error) {
+      // O perdedor pode ficar na conta. A cobrança usa o id que venceu.
+    }
   }
-  return replaced;
+  return {
+    id,
+    replacedId: previousId && id !== previousId ? previousId : null,
+  };
+}
+
+async function claimCustomerId(
+  db: CustomerStore,
+  userId: string,
+  previousId: string | null,
+  nextId: string,
+): Promise<string> {
+  if (previousId === nextId) return nextId;
+  let filter = db.from("profiles").update({
+    asaas_customer_id: nextId,
+  }).eq("id", userId);
+  filter = previousId === null
+    ? filter.is("asaas_customer_id", null)
+    : filter.eq("asaas_customer_id", previousId);
+  const claimed = await filter.select("asaas_customer_id");
+  if (claimed.error) throw new Error("customer_profile");
+  const rows = Array.isArray(claimed.data) ? claimed.data : [];
+  if (rows.length > 0) return nextId;
+  const current = await db.from("profiles").select("asaas_customer_id").eq(
+    "id",
+    userId,
+  ).maybeSingle();
+  if (current.error) throw new Error("customer_profile");
+  const id = current.data?.asaas_customer_id;
+  if (typeof id === "string" && id.length > 0) return id;
+  throw new Error("customer_profile");
 }
 
 /// Cartão salvo ligado ao customer que acabou de ser trocado.

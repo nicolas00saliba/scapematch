@@ -190,10 +190,43 @@ Deno.test("customer 404 ou deleted é recriado e o cartão antigo pede recadastr
       from() {
         return {
           update() {
+            const chain = {
+              eq() {
+                return chain;
+              },
+              is() {
+                return chain;
+              },
+              select() {
+                order.push("profile");
+                return Promise.resolve({
+                  data: [{ asaas_customer_id: "cus_404_novo" }],
+                  error: null,
+                });
+              },
+              maybeSingle() {
+                return Promise.resolve({ data: null, error: null });
+              },
+            };
+            return chain;
+          },
+          select() {
             return {
               eq() {
-                order.push("profile");
-                return Promise.resolve({ error: null });
+                return {
+                  maybeSingle() {
+                    return Promise.resolve({ data: null, error: null });
+                  },
+                };
+              },
+              is() {
+                return this;
+              },
+              select() {
+                return Promise.resolve({ data: [], error: null });
+              },
+              maybeSingle() {
+                return Promise.resolve({ data: null, error: null });
               },
             };
           },
@@ -204,12 +237,123 @@ Deno.test("customer 404 ou deleted é recriado e o cartão antigo pede recadastr
     "cus_404",
     "cus_404_novo",
   );
-  assertEquals(replaced, "cus_404");
+  assertEquals(replaced, { id: "cus_404_novo", replacedId: "cus_404" });
   assertEquals(order, ["deactivate_customer_saved_cards", "profile"]);
-  assertEquals(chargeAsksNewCard(replaced, "card-1"), true);
-  assertEquals(chargeAsksNewCard(replaced, ""), false);
+  assertEquals(chargeAsksNewCard(replaced.replacedId, "card-1"), true);
+  assertEquals(chargeAsksNewCard(replaced.replacedId, ""), false);
   assertEquals(chargeAsksNewCard(null, "card-1"), false);
   assertEquals(cardReregisterCode, "card_reregister");
+});
+
+Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", async () => {
+  let profile = "cus_old";
+  const deleted: string[] = [];
+  const db = {
+    rpc() {
+      return Promise.resolve({ data: 1, error: null });
+    },
+    from() {
+      return {
+        update(values: Record<string, unknown>) {
+          const next = String(values.asaas_customer_id);
+          const filters: Record<string, string> = {};
+          const chain = {
+            eq(column: string, value: string) {
+              filters[column] = value;
+              return chain;
+            },
+            is() {
+              return chain;
+            },
+            select() {
+              const previous = filters.asaas_customer_id;
+              if (profile === previous) {
+                profile = next;
+                return Promise.resolve({
+                  data: [{ asaas_customer_id: next }],
+                  error: null,
+                });
+              }
+              return Promise.resolve({ data: [], error: null });
+            },
+            maybeSingle() {
+              return Promise.resolve({ data: null, error: null });
+            },
+          };
+          return chain;
+        },
+        select() {
+          return {
+            eq() {
+              return {
+                maybeSingle() {
+                  return Promise.resolve({
+                    data: { asaas_customer_id: profile },
+                    error: null,
+                  });
+                },
+              };
+            },
+            is() {
+              return this;
+            },
+            select() {
+              return Promise.resolve({ data: [], error: null });
+            },
+            maybeSingle() {
+              return Promise.resolve({
+                data: { asaas_customer_id: profile },
+                error: null,
+              });
+            },
+          };
+        },
+      };
+    },
+  };
+  const asaas = {
+    deleteCustomer(id: string) {
+      deleted.push(id);
+      return Promise.reject(new Error("Asaas 400: sem apagar"));
+    },
+  };
+  const [first, second] = await Promise.all([
+    storeReplacedCustomer(db, "user-1", "cus_old", "cus_a", asaas),
+    storeReplacedCustomer(db, "user-1", "cus_old", "cus_b", asaas),
+  ]);
+  assertEquals(first.id, second.id);
+  assertEquals(first.replacedId, "cus_old");
+  assertEquals(second.replacedId, "cus_old");
+  assertEquals(profile, first.id);
+  assertEquals(deleted, [first.id === "cus_a" ? "cus_b" : "cus_a"]);
+  assertEquals(chargeAsksNewCard(second.replacedId, "card-1"), true);
+
+  deleted.length = 0;
+  profile = "cus_old";
+  const loserDeletes = {
+    deleteCustomer(id: string) {
+      deleted.push(id);
+      return Promise.resolve();
+    },
+  };
+  const winner = await storeReplacedCustomer(
+    db,
+    "user-1",
+    "cus_old",
+    "cus_win",
+    loserDeletes,
+  );
+  const loser = await storeReplacedCustomer(
+    db,
+    "user-1",
+    "cus_old",
+    "cus_lose",
+    loserDeletes,
+  );
+  assertEquals(winner.id, "cus_win");
+  assertEquals(loser.id, "cus_win");
+  assertEquals(deleted, ["cus_lose"]);
+  assertEquals(profile, "cus_win");
 });
 
 Deno.test("customer 500 não recria e não troca o id", async () => {

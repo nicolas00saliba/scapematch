@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
+  asaasStatus,
   cardDeclined,
   clientFailure,
   isCardDeclined,
@@ -349,13 +350,15 @@ export async function createCharge(
       externalReference: user.id,
       cpf,
     });
-    const replacedCustomer = await storeReplacedCustomer(
+    const storedCustomer = await storeReplacedCustomer(
       admin,
       user.id,
       previousCustomer,
       resolvedCustomer.id,
+      asaas,
     );
-    const customerId = resolvedCustomer.id;
+    const customerId = storedCustomer.id;
+    const replacedCustomer = storedCustomer.replacedId;
 
     const dueDate = todayInSaoPaulo();
     const description = `${venue.name}`;
@@ -426,10 +429,20 @@ export async function createCharge(
           pixExternalReference(groupId, user.id),
         );
         if (found) {
-          const full = await asaas.readPayment(found.id);
-          if (!pixMatchesCharge(full, expected)) {
+          const full = await paymentOrGone(asaas, found.id);
+          if (asaasPaymentGone(full)) {
+            const claimed = await claimExpiredPixReservation(
+              admin,
+              reserved.id,
+            );
+            if (!claimed) {
+              return json({ error: "pagamento em andamento" }, 409);
+            }
+            attemptId = claimed;
+            createPix = true;
+          } else if (!pixMatchesCharge(full, expected)) {
             return json({ error: "pix_reuse_mismatch" }, 409);
-          }
+          } else {
           const stored = await attachPixProvider(
             admin,
             reserved.id,
@@ -439,7 +452,7 @@ export async function createCharge(
           if (!stored) return json({ error: "pagamento em andamento" }, 409);
           const remote = stored === found.id
             ? full
-            : await asaas.readPayment(stored);
+            : await paymentOrGone(asaas, stored);
           if (stored !== found.id && !pixMatchesCharge(remote, expected)) {
             return json({ error: "pix_reuse_mismatch" }, 409);
           }
@@ -474,6 +487,7 @@ export async function createCharge(
             qrCode = existing?.qr_code ?? null;
             qrImage = existing?.qr_code_base64 ?? null;
           }
+          }
         } else {
           const claimed = await claimExpiredPixReservation(admin, reserved.id);
           if (!claimed) return json({ error: "pagamento em andamento" }, 409);
@@ -482,7 +496,7 @@ export async function createCharge(
         }
       }
       if (action === "reuse" && reserved.provider_ref) {
-        const full = await asaas.readPayment(reserved.provider_ref);
+        const full = await paymentOrGone(asaas, reserved.provider_ref);
         if (asaasPaymentGone(full)) {
           const reopened = await detachGonePix(
             admin,
@@ -1256,6 +1270,20 @@ async function recordOrphanPayment(
   if (error) throw new Error("erro");
 }
 
+async function paymentOrGone(
+  asaas: AsaasProvider,
+  paymentId: string,
+): Promise<Record<string, unknown>> {
+  try {
+    return await asaas.readPayment(paymentId);
+  } catch (error) {
+    if (asaasStatus(error) === 404) {
+      return { id: paymentId, deleted: true, status: "DELETED" };
+    }
+    throw error;
+  }
+}
+
 async function dropExpiredReservation(
   asaas: AsaasProvider,
   admin: ChargeDb,
@@ -1306,7 +1334,8 @@ async function compensateLostPayment(
   try {
     if (action === "refund") await asaas.refund(input.providerRef);
     else await asaas.cancelAuthorization(input.providerRef);
-  } catch (_error) {
+  } catch (error) {
+    if (asaasStatus(error) === 404) return;
     await recordOrphanPayment(admin, {
       providerRef: input.providerRef,
       chargeId: input.chargeId,

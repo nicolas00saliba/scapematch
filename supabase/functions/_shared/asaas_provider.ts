@@ -470,6 +470,16 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
+  /// Apaga o customer que perdeu a corrida. 404 já está fora da conta.
+  async deleteCustomer(id: string): Promise<void> {
+    try {
+      await this.#send(`/customers/${id}`, undefined, "DELETE");
+    } catch (error) {
+      if (asaasStatus(error) === 404) return;
+      throw error;
+    }
+  }
+
   /// Só o documento. Não manda nome, e-mail nem o corpo antigo.
   updateCustomerCpf(id: string, cpfCnpj: string): Promise<void> {
     return this.#send(`/customers/${id}`, { cpfCnpj }, "PUT").then(
