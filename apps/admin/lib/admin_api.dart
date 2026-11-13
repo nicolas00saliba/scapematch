@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch_admin/admin_format.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -42,6 +43,8 @@ abstract class AdminApi {
   Future<void> setHighlight(String kind, String id, int? rank);
   Future<List<AuditRow>> audit();
   Future<String?> provisionWallet(String venueId);
+  Future<PaymentsBoard> payments();
+  Future<bool> setVenuePayoutsEnabled(bool enabled);
 }
 
 /// O banco recusou o pedido. A mensagem é a do `raise` (SQLSTATE 22023).
@@ -306,6 +309,70 @@ class HighlightsBoard {
   final List<NamedRank> venues;
   final List<NamedRank> rooms;
   final List<NamedRank> news;
+}
+
+class PaymentLine {
+  const PaymentLine({
+    required this.id,
+    required this.title,
+    required this.detail,
+    required this.when,
+  });
+
+  final String id;
+  final String title;
+  final String detail;
+  final DateTime? when;
+}
+
+class WebhookErrorLine {
+  const WebhookErrorLine({
+    required this.id,
+    required this.source,
+    required this.code,
+    required this.providerRef,
+    required this.when,
+  });
+
+  final String id;
+  final String source;
+  final String code;
+  final String providerRef;
+  final DateTime? when;
+}
+
+class PaymentsBoard {
+  const PaymentsBoard({
+    required this.asaasApiKey,
+    required this.asaasBaseUrlProduction,
+    required this.asaasWebhookToken,
+    required this.asaasWebhookEmail,
+    required this.venueWithdrawalsSecret,
+    required this.vaultUrl,
+    required this.vaultSecret,
+    required this.payoutsEnabled,
+    required this.cronLastFailed,
+    required this.cronFailureCode,
+    required this.charges,
+    required this.refunds,
+    required this.withdrawals,
+    required this.webhookErrors,
+  });
+
+  final bool? asaasApiKey;
+  final bool? asaasBaseUrlProduction;
+  final bool? asaasWebhookToken;
+  final bool? asaasWebhookEmail;
+  final bool? venueWithdrawalsSecret;
+  final bool vaultUrl;
+  final bool vaultSecret;
+  final bool payoutsEnabled;
+  final bool? cronLastFailed;
+  final String? cronFailureCode;
+  final List<PaymentLine> charges;
+  final List<PaymentLine> refunds;
+  final List<PaymentLine> withdrawals;
+  final List<WebhookErrorLine> webhookErrors;
 }
 
 class AuditRow {
@@ -692,6 +759,88 @@ class SupabaseAdminApi implements AdminApi {
           after: '${item['after_state'] ?? ''}',
         ),
     ];
+  }
+
+  @override
+  Future<PaymentsBoard> payments() async {
+    final row = _map(await _rpc('admin_payments_board'));
+    final ready = _map(row['readiness']);
+    var asaasApiKey = _optionalBool(null);
+    var asaasBase = _optionalBool(null);
+    var asaasToken = _optionalBool(null);
+    var asaasEmail = _optionalBool(null);
+    var withdrawalsSecret = _optionalBool(null);
+    try {
+      final response = await _client.functions.invoke('payments-readiness');
+      final data = response.data;
+      if (data is Map) {
+        asaasApiKey = _optionalBool(data['asaas_api_key']);
+        asaasBase = _optionalBool(data['asaas_base_url_production']);
+        asaasToken = _optionalBool(data['asaas_webhook_token']);
+        asaasEmail = _optionalBool(data['asaas_webhook_email']);
+        withdrawalsSecret = _optionalBool(data['venue_withdrawals_secret']);
+      }
+    } on Object {
+      // A função ainda pode não estar publicada. O RPC cobre o Vault e a flag.
+    }
+    return PaymentsBoard(
+      asaasApiKey: asaasApiKey,
+      asaasBaseUrlProduction: asaasBase,
+      asaasWebhookToken: asaasToken,
+      asaasWebhookEmail: asaasEmail,
+      venueWithdrawalsSecret: withdrawalsSecret,
+      vaultUrl: ready['vault_venue_withdrawals_url'] == true,
+      vaultSecret: ready['vault_venue_withdrawals_secret'] == true,
+      payoutsEnabled: ready['venue_payouts_enabled'] == true,
+      cronLastFailed: _optionalBool(ready['cron_last_failed']),
+      cronFailureCode: ready['cron_failure_code'] == null
+          ? null
+          : _text(ready['cron_failure_code']),
+      charges: _paymentLines(_list(row['charges'])),
+      refunds: _paymentLines(_list(row['refunds'])),
+      withdrawals: [
+        for (final item in _list(row['withdrawals']))
+          PaymentLine(
+            id: _text(item['id']),
+            title: _text(item['venue_name'], 'Casa'),
+            detail:
+                '${_text(item['status'])} · ${_text(item['source'])} · ${reais(_int(item['amount_cents']))}',
+            when: DateTime.tryParse(_text(item['created_at'])),
+          ),
+      ],
+      webhookErrors: [
+        for (final item in _list(row['webhook_errors']))
+          WebhookErrorLine(
+            id: _text(item['id']),
+            source: _text(item['source']),
+            code: _text(item['code']),
+            providerRef: _text(item['provider_ref']),
+            when: DateTime.tryParse(_text(item['created_at'])),
+          ),
+      ],
+    );
+  }
+
+  List<PaymentLine> _paymentLines(List<Map<String, dynamic>> rows) {
+    return [
+      for (final item in rows)
+        PaymentLine(
+          id: _text(item['id']),
+          title:
+              '${_text(item['venue_name'], 'Casa')} · ${_text(item['billing_type'])}',
+          detail:
+              '${_text(item['status'])} · ${reais(_int(item['amount_cents']))}',
+          when: DateTime.tryParse(_text(item['created_at'])),
+        ),
+    ];
+  }
+
+  @override
+  Future<bool> setVenuePayoutsEnabled(bool enabled) async {
+    final value = await _rpc('admin_set_venue_payouts_enabled', {
+      'p_enabled': enabled,
+    });
+    return value == true;
   }
 
   @override
@@ -1175,6 +1324,59 @@ class MemoryAdminApi implements AdminApi {
     return null;
   }
 
+  bool payoutsEnabled = false;
+  PaymentsBoard? paymentsFixture;
+
+  @override
+  Future<PaymentsBoard> payments() async {
+    final fixture = paymentsFixture;
+    if (fixture != null) {
+      return PaymentsBoard(
+        asaasApiKey: fixture.asaasApiKey,
+        asaasBaseUrlProduction: fixture.asaasBaseUrlProduction,
+        asaasWebhookToken: fixture.asaasWebhookToken,
+        asaasWebhookEmail: fixture.asaasWebhookEmail,
+        venueWithdrawalsSecret: fixture.venueWithdrawalsSecret,
+        vaultUrl: fixture.vaultUrl,
+        vaultSecret: fixture.vaultSecret,
+        payoutsEnabled: payoutsEnabled,
+        cronLastFailed: fixture.cronLastFailed,
+        cronFailureCode: fixture.cronFailureCode,
+        charges: fixture.charges,
+        refunds: fixture.refunds,
+        withdrawals: fixture.withdrawals,
+        webhookErrors: fixture.webhookErrors,
+      );
+    }
+    return PaymentsBoard(
+      asaasApiKey: null,
+      asaasBaseUrlProduction: null,
+      asaasWebhookToken: null,
+      asaasWebhookEmail: null,
+      venueWithdrawalsSecret: null,
+      vaultUrl: false,
+      vaultSecret: false,
+      payoutsEnabled: payoutsEnabled,
+      cronLastFailed: null,
+      cronFailureCode: null,
+      charges: const [],
+      refunds: const [],
+      withdrawals: const [],
+      webhookErrors: const [],
+    );
+  }
+
+  @override
+  Future<bool> setVenuePayoutsEnabled(bool enabled) async {
+    payoutsEnabled = enabled;
+    _note(
+      'set_venue_payouts_enabled',
+      '1',
+      'enabled:$enabled',
+    );
+    return enabled;
+  }
+
   void _note(String action, String id, String after) {
     audits.add(
       AuditRow(
@@ -1222,4 +1424,10 @@ int _int(Object? value, {int fallback = 0}) {
 int? _intOrNull(Object? value) {
   if (value == null) return null;
   return _int(value);
+}
+
+bool? _optionalBool(Object? value) {
+  if (value == true) return true;
+  if (value == false) return false;
+  return null;
 }

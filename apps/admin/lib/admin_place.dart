@@ -5,6 +5,7 @@ enum AdminSection {
   jogadores,
   regras,
   ganhos,
+  pagamentos,
   destaques,
   auditoria,
   avaliacoes,
