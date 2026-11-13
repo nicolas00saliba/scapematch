@@ -883,6 +883,9 @@ class SupabaseAdminApi implements AdminApi {
     } on Object {
       // A função ainda pode não estar publicada. O RPC cobre o Vault e a flag.
     }
+    if (ready['vault_venue_withdrawals_secret'] == true) {
+      withdrawalsSecret = true;
+    }
     return PaymentsBoard(
       asaasApiKey: asaasApiKey,
       asaasBaseUrlProduction: asaasBase,

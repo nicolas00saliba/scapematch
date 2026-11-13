@@ -3,6 +3,7 @@
 
 import { clientFailure, logCaught, storedFailure } from "./asaas_client_error.ts";
 import { AsaasProvider, asaasSandboxBaseUrl, tokensMatch } from "./asaas_provider.ts";
+import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
 import {
   isPixRejected,
   isPointsReserve,
@@ -74,6 +75,7 @@ export type PayoutDeps = {
   fetchFn?: typeof fetch;
   nowSec?: number;
   today?: string;
+  secretCache?: SecretCache;
 };
 
 type Subaccount =
@@ -329,11 +331,20 @@ export async function handleScheduledWithdrawals(
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeadersFor(req, deps.env) });
   }
-  const secret = deps.env.get("VENUE_WITHDRAWALS_SECRET") ?? "";
   const header = req.headers.get("x-venue-withdrawals-secret") ?? "";
-  // verify_jwt = false. Sem o segredo, qualquer um chama esta URL.
+  // verify_jwt = false. Sem env e sem Vault, qualquer um chamaria esta URL.
   // 503 e nenhum evento: o alerta sai uma vez no cron, não por request.
-  if (secret.trim() === "") {
+  const secret = await resolveCronSecret({
+    envValue: deps.env.get("VENUE_WITHDRAWALS_SECRET"),
+    vaultName: "venue_withdrawals_secret",
+    cache: deps.secretCache,
+    now: deps.nowSec == null ? undefined : deps.nowSec * 1000,
+    readVault: () =>
+      deps.store.rpc("cron_vault_secret", {
+        p_name: "venue_withdrawals_secret",
+      }),
+  });
+  if (secret === "") {
     return json({ error: "config_ausente" }, 503);
   }
   if (!(await secretMatches(header, secret))) {

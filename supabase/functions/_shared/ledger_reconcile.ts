@@ -1,6 +1,7 @@
 // Conciliação diária. Só GET no Asaas. Não cria cobrança, estorno nem transferência.
 
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
+import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
 
 export type RemotePayment = {
   id: string;
@@ -381,6 +382,7 @@ export type LedgerDeps = {
   fetchFn?: FetchFn;
   store?: Store;
   now?: Date;
+  secretCache?: SecretCache;
 };
 
 const pageLimit = 100;
@@ -394,9 +396,23 @@ export async function handleLedgerReconcile(
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeadersFor(req, deps.env) });
   }
-  const secret = deps.env.get("LEDGER_RECONCILE_SECRET") ?? "";
   const header = req.headers.get("x-ledger-reconcile-secret") ?? "";
-  if (secret.trim() === "") {
+  const secret = await resolveCronSecret({
+    envValue: deps.env.get("LEDGER_RECONCILE_SECRET"),
+    vaultName: "ledger_reconcile_secret",
+    cache: deps.secretCache,
+    now: deps.now?.getTime(),
+    readVault: deps.store
+      ? async () => {
+        const result = await deps.store!.rpc("cron_vault_secret", {
+          p_name: "ledger_reconcile_secret",
+        });
+        if (result.error) return "";
+        return result.data;
+      }
+      : undefined,
+  });
+  if (secret === "") {
     return json({ error: "config_ausente" }, 503);
   }
   if (!(await secretMatches(header, secret))) {

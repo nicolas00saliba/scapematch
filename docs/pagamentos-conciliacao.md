@@ -14,13 +14,13 @@ Isso não substitui `reconcile-payments`. Aquela função, a cada 5 minutos, liq
 
 Sem `ledger_reconcile_url` ou sem `ledger_reconcile_secret`, a função do cron levanta `ledger_reconcile_config_ausente` e cita só o nome do item. O pg_cron grava o job como `failed`. A mensagem não leva o valor.
 
-Sem a env `LEDGER_RECONCILE_SECRET`, a função responde `503` e não chama o Asaas. Com a env preenchida e o header errado, a resposta é `401`, também sem chamada.
+Sem a env `LEDGER_RECONCILE_SECRET`, a função lê `ledger_reconcile_secret` no Vault. Sem os dois, responde `503` e não chama o Asaas. Com um dos dois preenchido e o header errado, a resposta é `401`, também sem chamada. A env tem prioridade. O valor não entra em log.
 
 Nada abaixo foi aplicado neste repositório no projeto remoto.
 
 ## Migration
 
-Arquivo: `supabase/migrations/20261113190000_ledger_reconcile.sql`.
+Arquivo: `supabase/migrations/20261113190000_ledger_reconcile.sql`. A leitura do segredo pela função está em `supabase/migrations/20261113210000_cron_vault_secret.sql`.
 
 ## Envs da Edge Function
 
@@ -30,6 +30,8 @@ supabase secrets set --project-ref <project-ref> \
   ASAAS_BASE_URL='<https://api.asaas.com/v3 em produção, ou a URL de sandbox>' \
   LEDGER_RECONCILE_SECRET='<segredo longo, o mesmo do Vault>'
 ```
+
+`LEDGER_RECONCILE_SECRET` é opcional. Sem ela, a função usa o item `ledger_reconcile_secret` do Vault. Se a env existir, ela ganha e tem de ser o mesmo texto que o cron manda no header.
 
 Publicar, sem fazer isso daqui:
 

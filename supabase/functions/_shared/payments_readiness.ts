@@ -23,8 +23,10 @@ export type ReadinessReport = {
   asaas_webhook_token: boolean;
   asaas_webhook_email: boolean;
   venue_withdrawals_secret: boolean;
+  ledger_reconcile_secret: boolean;
   vault_venue_withdrawals_url: boolean;
   vault_venue_withdrawals_secret: boolean;
+  vault_ledger_reconcile_secret: boolean;
   venue_payouts_enabled: boolean;
   cron_last_failed: boolean | null;
   cron_failure_code: string | null;
@@ -52,9 +54,13 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
     asaas_webhook_email: secretPresent(env.get("ASAAS_WEBHOOK_EMAIL")),
     venue_withdrawals_secret: secretPresent(
       env.get("VENUE_WITHDRAWALS_SECRET"),
-    ),
+    ) || row.vault_venue_withdrawals_secret === true,
+    ledger_reconcile_secret: secretPresent(
+      env.get("LEDGER_RECONCILE_SECRET"),
+    ) || row.vault_ledger_reconcile_secret === true,
     vault_venue_withdrawals_url: row.vault_venue_withdrawals_url === true,
     vault_venue_withdrawals_secret: row.vault_venue_withdrawals_secret === true,
+    vault_ledger_reconcile_secret: row.vault_ledger_reconcile_secret === true,
     venue_payouts_enabled: row.venue_payouts_enabled === true,
     cron_last_failed: failed,
     cron_failure_code: failed === true ? code : null,
