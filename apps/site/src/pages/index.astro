@@ -67,6 +67,7 @@ const perguntas = [
           <li><a href="/guia/escape-room-sozinho">Escape room sozinho</a></li>
           <li><a href="/guia/escape-room-sozinho-curitiba">Sozinho em Curitiba</a></li>
           <li><a href="/guia/como-achar-grupo-escape-room">Onde achar grupo</a></li>
+          <li><a href="/guia">Todos os guias</a></li>
           <li><a href="/como-funciona">Como funciona</a></li>
           <li><a href="/experiencias">O que jogar</a></li>
           <li><a href="/vantagens">Ganhe 100 pontos</a></li>
@@ -220,7 +221,10 @@ const perguntas = [
             <summary>{item.pergunta}</summary>
             <p>{item.resposta}</p>
             {item.pergunta === 'Dá para jogar sem conhecer ninguém?' && (
-              <p><a href="/guia/escape-room-sozinho">Guia: escape room sozinho</a></p>
+              <p>
+                <a href="/guia/escape-room-sozinho">Guia: escape room sozinho</a>.
+                A sessão com gente nova está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
+              </p>
             )}
           </details>
         ))}

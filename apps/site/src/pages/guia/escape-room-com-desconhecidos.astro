@@ -1,0 +1,90 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { definicao, faqPage } from '../../data/seo';
+import { oQueE } from '../../data/perguntas-marca';
+
+const respostas = [
+  {
+    pergunta: 'Dá para jogar escape room com desconhecidos?',
+    resposta:
+      'Dá. No EscapeMatch, o grupo se forma com pessoas que não se conheciam. Vocês se encontram na casa, no horário marcado, e a casa conduz a sessão. Cada pessoa paga a própria vaga. Não é um jogo de celular.',
+  },
+  {
+    pergunta: 'Como é a sessão com desconhecidos?',
+    resposta:
+      'A sessão é presencial. O grupo entra numa sala e resolve os desafios juntos para sair antes do tempo acabar. A casa monta a sala, explica e conduz. Vocês não precisam ter conversado antes.',
+  },
+  {
+    pergunta: 'O que vale na convivência do grupo?',
+    resposta:
+      'Respeito com todos. Nada de discriminação ou assédio. Chegar no horário. Seguir as regras da casa.',
+  },
+  {
+    pergunta: 'Quem paga quando o grupo é de desconhecidos?',
+    resposta:
+      'Cada pessoa paga só a própria vaga. A cobrança só acontece quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado.',
+  },
+  oQueE,
+];
+---
+
+<Base
+  title="Escape room com desconhecidos | EscapeMatch"
+  description="Como é jogar escape room com desconhecidos. A sessão é presencial e cada pessoa paga a própria vaga."
+  path="/guia/escape-room-com-desconhecidos"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+>
+  <header class="miolo pagina-topo">
+    <h1>{respostas[0].pergunta}</h1>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="resposta-direta">{respostas[0].resposta}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    <section>
+      <h2>{respostas[1].pergunta}</h2>
+      <p>{respostas[1].resposta}</p>
+      <p>
+        Este guia é sobre a sessão com gente nova. O caminho de quem chega sem grupo está em <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
+        A modalidade está em <a href="/experiencias/escape-room">Escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[2].pergunta}</h2>
+      <p>{respostas[2].resposta}</p>
+      <p>
+        O texto completo está em <a href="/seguranca">Segurança</a>.
+        Na primeira sala, o recorte é <a href="/guia/primeira-vez-em-escape-room">primeira vez em escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[3].pergunta}</h2>
+      <p>{respostas[3].resposta}</p>
+      <p>
+        O preço é o da sala, por pessoa, mostrado no app. Não existe um ingresso único do EscapeMatch.
+        A cobrança está em <a href="/como-funciona/pagamento">Pagamento e regras</a>.
+        Se o grupo não confirmar, a regra está em <a href="/cancelamento">Regras de cancelamento</a>.
+      </p>
+    </section>
+    <section>
+      <h2>Onde o grupo se encontra</h2>
+      <p>
+        O lançamento é em Curitiba. A sala fica numa casa da cidade, e o site não lista casas parceiras, endereço nem preço.
+        O grupo na cidade está em <a href="/guia/escape-room-em-grupo-curitiba">escape room em grupo em Curitiba</a>.
+      </p>
+      <p>
+        Amigos, grupos de mensagem e casas que completam a sala são outro assunto: <a href="/guia/como-achar-grupo-escape-room">onde achar grupo de escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{oQueE.pergunta}</h2>
+      <p>{oQueE.resposta}</p>
+      <p>
+        A lista dos recortes está em <a href="/guia">guias</a>.
+        Para abrir o app, a página é <a href="/app">Baixar o app</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock titulo="Entrar num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
+</Base>

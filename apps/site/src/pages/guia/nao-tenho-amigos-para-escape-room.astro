@@ -1,0 +1,91 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { definicao, faqPage } from '../../data/seo';
+import { oQueE } from '../../data/perguntas-marca';
+
+const respostas = [
+  {
+    pergunta: 'Não tenho amigos para jogar escape room. Dá para ir?',
+    resposta:
+      'Dá. O grupo não precisa começar com os seus amigos. O EscapeMatch junta quem quer a mesma sala e o mesmo horário. Você escolhe no app, entra no grupo e paga só a sua vaga.',
+  },
+  {
+    pergunta: 'Preciso levar uma turma?',
+    resposta:
+      'Não. Dá para chegar sem turma. O app te coloca num grupo. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado.',
+  },
+  {
+    pergunta: 'Vou ficar de fora do grupo?',
+    resposta:
+      'Não. O grupo é feito de quem entrou naquela sala e naquele horário. Você entra do mesmo jeito que as outras pessoas e paga só a sua vaga.',
+  },
+  {
+    pergunta: 'E se mais tarde eu quiser chamar alguém?',
+    resposta:
+      'Quem passa a ter companhia pode completar as vagas que faltam. Cada pessoa paga a própria vaga. O jogo continua confirmando no mínimo.',
+  },
+  oQueE,
+];
+---
+
+<Base
+  title="Não tenho amigos para escape room | EscapeMatch"
+  description="Dá para jogar escape room sem levar uma turma. O EscapeMatch junta o grupo e você paga só a sua vaga."
+  path="/guia/nao-tenho-amigos-para-escape-room"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+>
+  <header class="miolo pagina-topo">
+    <h1>{respostas[0].pergunta}</h1>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="resposta-direta">{respostas[0].resposta}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    <section>
+      <h2>{respostas[1].pergunta}</h2>
+      <p>{respostas[1].resposta}</p>
+      <p>
+        O passo a passo curto de chegar sem grupo está em <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
+        Este texto é para quem está sem uma turma e quer saber se a vaga continua valendo.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[2].pergunta}</h2>
+      <p>{respostas[2].resposta}</p>
+      <p>
+        A casa conduz a sessão. As regras são as mesmas para todo mundo: respeito, chegar no horário e seguir a casa.
+        O combinado está em <a href="/seguranca">Segurança</a>.
+        A sessão com gente nova está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[3].pergunta}</h2>
+      <p>{respostas[3].resposta}</p>
+      <p>
+        Ir em duas pessoas tem página própria: <a href="/guia/escape-room-para-2-pessoas">escape room para 2 pessoas</a>.
+        Comparar amigos, grupos de mensagem e a casa está em <a href="/guia/como-achar-grupo-escape-room">onde achar grupo</a>.
+      </p>
+    </section>
+    <section>
+      <h2>A vaga e a cobrança</h2>
+      <p>
+        Você paga só a sua vaga. O preço é o da sala, por pessoa, mostrado no app.
+        A cobrança só acontece quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado.
+      </p>
+      <p>
+        O detalhe está em <a href="/como-funciona/pagamento">Pagamento e regras</a>
+        e em <a href="/cancelamento">Regras de cancelamento</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{oQueE.pergunta}</h2>
+      <p>{oQueE.resposta}</p>
+      <p>
+        O lançamento é em Curitiba. Na cidade, o recorte de quem chega sem grupo está em <a href="/guia/escape-room-sozinho-curitiba">escape room sozinho em Curitiba</a>.
+        A lista dos recortes está em <a href="/guia">guias</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock titulo="Entrar num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
+</Base>

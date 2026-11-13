@@ -1,0 +1,91 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { definicao, faqPage } from '../../data/seo';
+import { oQueE } from '../../data/perguntas-marca';
+
+const respostas = [
+  {
+    pergunta: 'Primeira vez em escape room: o que saber?',
+    resposta:
+      'Na primeira vez, o grupo entra numa sala e resolve os desafios juntos para sair antes do tempo acabar. A casa monta a sala e conduz a sessão. Não precisa ter jogado antes e não precisa conhecer o grupo. No EscapeMatch, você escolhe a sala e o horário, entra no grupo e paga só a sua vaga. Não é um jogo de celular.',
+  },
+  {
+    pergunta: 'Preciso ter jogado escape room antes?',
+    resposta:
+      'Não. A casa explica e conduz a sessão. Você não precisa levar experiência nem um time pronto.',
+  },
+  {
+    pergunta: 'O que fazer na hora da sessão?',
+    resposta:
+      'Chegue no horário. Siga as regras da casa. Respeito com todos. Nada de discriminação ou assédio. Vocês se encontram na casa, e a sessão é presencial.',
+  },
+  {
+    pergunta: 'E se for a primeira vez e o grupo não fechar?',
+    resposta:
+      'Se o mínimo não bater, o jogo não confirma e nada é cobrado. A cobrança da sua vaga só acontece quando o grupo confirma.',
+  },
+  oQueE,
+];
+---
+
+<Base
+  title="Primeira vez em escape room: dicas | EscapeMatch"
+  description="O que saber na primeira vez em escape room: a casa conduz a sessão e você paga só a sua vaga."
+  path="/guia/primeira-vez-em-escape-room"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+>
+  <header class="miolo pagina-topo">
+    <h1>{respostas[0].pergunta}</h1>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="resposta-direta">{respostas[0].resposta}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    <section>
+      <h2>{respostas[1].pergunta}</h2>
+      <p>{respostas[1].resposta}</p>
+      <p>
+        Chegar sem grupo está em <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
+        Chegar sem uma turma pronta está em <a href="/guia/nao-tenho-amigos-para-escape-room">não tenho amigos para jogar escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[2].pergunta}</h2>
+      <p>{respostas[2].resposta}</p>
+      <p>
+        O combinado está em <a href="/seguranca">Segurança</a>.
+        Jogar com gente que você não conhecia está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[3].pergunta}</h2>
+      <p>{respostas[3].resposta}</p>
+      <p>
+        Você paga só a sua vaga. O preço é o da sala, por pessoa, mostrado no app.
+        Veja <a href="/como-funciona/pagamento">Pagamento e regras</a>
+        e <a href="/cancelamento">Regras de cancelamento</a>.
+      </p>
+    </section>
+    <section>
+      <h2>Onde é a primeira sala</h2>
+      <p>
+        O lançamento é em Curitiba. Salas, horários e o preço por pessoa estão no app.
+        O site não lista casas parceiras, endereço nem preço.
+      </p>
+      <p>
+        O grupo na cidade está em <a href="/guia/escape-room-em-grupo-curitiba">escape room em grupo em Curitiba</a>.
+        O que é a modalidade está em <a href="/experiencias/escape-room">Escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{oQueE.pergunta}</h2>
+      <p>{oQueE.resposta}</p>
+      <p>
+        A lista dos recortes está em <a href="/guia">guias</a>.
+        Para abrir o app, a página é <a href="/app">Baixar o app</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock titulo="Escolher a primeira sala" acoes={[{ rotulo: 'Ver o app', href: '/app' }]} />
+</Base>

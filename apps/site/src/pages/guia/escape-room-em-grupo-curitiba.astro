@@ -1,0 +1,91 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { definicao, faqPage } from '../../data/seo';
+import { oQueE } from '../../data/perguntas-marca';
+
+const respostas = [
+  {
+    pergunta: 'Como jogar escape room em grupo em Curitiba?',
+    resposta:
+      'Em Curitiba, o EscapeMatch junta o grupo no app. Você escolhe a sala e o horário. O jogo confirma quando o grupo bate o mínimo. Cada pessoa paga só a própria vaga. A sessão é presencial, numa casa da cidade. O site não lista casas parceiras, endereço nem preço.',
+  },
+  {
+    pergunta: 'Quem entra nesse grupo?',
+    resposta:
+      'Entra quem escolheu a mesma sala e o mesmo horário. Tem gente que chegou sem turma e gente que já tinha parte do grupo e completou as vagas. Ninguém precisa se conhecer antes.',
+  },
+  {
+    pergunta: 'Quando o grupo em Curitiba confirma?',
+    resposta:
+      'Quando bate o mínimo. A partir daí o jogo está confirmado. Quem chega depois paga a própria vaga na hora, até lotar. Se o mínimo não bater, nada é cobrado.',
+  },
+  {
+    pergunta: 'Onde vejo as salas de grupo em Curitiba?',
+    resposta:
+      'No app. Lá estão as salas abertas, os horários e o preço por pessoa. A grade muda. Este site não lista casas parceiras, endereço nem preço.',
+  },
+  oQueE,
+];
+---
+
+<Base
+  title="Escape room em grupo em Curitiba | EscapeMatch"
+  description="Como o grupo de escape room se forma em Curitiba. O site não lista casas, endereço nem preço."
+  path="/guia/escape-room-em-grupo-curitiba"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+>
+  <header class="miolo pagina-topo">
+    <h1>{respostas[0].pergunta}</h1>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="resposta-direta">{respostas[0].resposta}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    <section>
+      <h2>{respostas[1].pergunta}</h2>
+      <p>{respostas[1].resposta}</p>
+      <p>
+        Quem chega sem grupo na cidade tem outro guia: <a href="/guia/escape-room-sozinho-curitiba">escape room sozinho em Curitiba</a>.
+        Ir em dupla está em <a href="/guia/escape-room-para-2-pessoas">escape room para 2 pessoas</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[2].pergunta}</h2>
+      <p>{respostas[2].resposta}</p>
+      <p>
+        A cobrança está em <a href="/como-funciona/pagamento">Pagamento e regras</a>.
+        Se o grupo não confirmar, nada é cobrado. A regra está em <a href="/cancelamento">Regras de cancelamento</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[3].pergunta}</h2>
+      <p>{respostas[3].resposta}</p>
+      <p>
+        Avaliações e ranking de tempo também ficam no app. A página da cidade explica isso em <a href="/escape-room-curitiba">Escape room em Curitiba</a>.
+        A modalidade está em <a href="/experiencias/escape-room">Escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>A sessão do grupo</h2>
+      <p>
+        Vocês se encontram na casa, no horário marcado. A casa conduz a sessão.
+        Escape room é o que está disponível. Jogos de tabuleiro e laser tag estão em breve.
+        Não é um jogo de celular.
+      </p>
+      <p>
+        O combinado de convivência está em <a href="/seguranca">Segurança</a>.
+        O passo a passo está em <a href="/como-funciona">Como funciona</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{oQueE.pergunta}</h2>
+      <p>{oQueE.resposta}</p>
+      <p>
+        A lista dos recortes está em <a href="/guia">guias</a>.
+        Para abrir o app, a página é <a href="/app">Baixar o app</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock titulo="Entrar num grupo em Curitiba" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
+</Base>
