@@ -5,6 +5,7 @@ void main() {
   VenueDraft draft({
     String documentKind = 'cnpj',
     String documentNumber = '04.252.011/0001-10',
+    String companyType = 'LIMITED',
     String inviteCode = 'ninja-cwb',
     String phone = '(41) 99999-0000',
     String postalCode = '80020-310',
@@ -21,6 +22,7 @@ void main() {
       documentNumber: documentNumber,
       category: 'escape-room',
       incomeReais: '5000',
+      companyType: companyType,
       inviteCode: inviteCode,
     );
   }
@@ -43,5 +45,19 @@ void main() {
     expect(draft(inviteCode: 'Ninja CWB').validate(), contains('convite'));
     expect(draft(postalCode: '800').validate(), contains('CEP'));
     expect(draft(phone: '123').validate(), contains('telefone'));
+  });
+
+  test('CNPJ exige um tipo da API e CPF não envia tipo', () {
+    expect(draft(companyType: 'MEI').validate(), isNull);
+    expect(draft(companyType: 'ASSOCIATION').validate(), isNull);
+    expect(draft(companyType: 'LTDA').validate(), contains('tipo da empresa'));
+    expect(
+      draft(
+        documentKind: 'cpf',
+        documentNumber: '123.456.789-09',
+        companyType: 'LTDA',
+      ).validate(),
+      isNull,
+    );
   });
 }

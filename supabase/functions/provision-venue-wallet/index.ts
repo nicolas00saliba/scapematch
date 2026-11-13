@@ -5,6 +5,7 @@ import {
   logCaught,
 } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { companyTypeForSubaccount } from "../_shared/subaccount_company.ts";
 import { isPointsReserve } from "../_shared/asaas_transfers.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import {
@@ -22,6 +23,7 @@ type VenueRow = {
   name: string;
   document_kind: string;
   document_number: string;
+  company_type: string | null;
   phone: string;
   street_address: string;
   address_number: string;
@@ -61,7 +63,7 @@ Deno.serve(async (req) => {
     let query = admin
       .from("venues")
       .select(
-        "id, owner_id, name, document_kind, document_number, phone, street_address, address_number, neighborhood, postal_code, income_value",
+        "id, owner_id, name, document_kind, document_number, company_type, phone, street_address, address_number, neighborhood, postal_code, income_value",
       )
       .eq("status", "approved")
       .is("asaas_wallet_id", null);
@@ -120,9 +122,10 @@ function subaccountBody(
     name: venue.name,
     email,
     cpfCnpj: venue.document_number,
-    companyType: venue.document_kind === "cnpj"
-      ? "LIMITED" as const
-      : undefined,
+    companyType: companyTypeForSubaccount(
+      venue.document_kind,
+      venue.company_type,
+    ),
     birthDate,
     phone: venue.phone,
     mobilePhone: venue.phone,

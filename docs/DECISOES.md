@@ -669,3 +669,11 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Motivo:** o dono pediu um lugar de conta no espírito de um app de passagens, com o visual do EscapeMatch e os nomes adaptados (viajantes viram parceiros de jogo).
 - **Onde está no código:** ramo 2 do `StatefulShellRoute` (`/account`), `AccountScreen` e `AccountDestinationScreen`. O nome vem de `currentUserProvider`.
 - **Como trocar depois:** login de verdade substitui o provider. O saldo e os cartões seguem o plano em [PAGAMENTOS_PLANO.md](PAGAMENTOS_PLANO.md). Os textos de “fictício” saem dessas telas.
+
+## Customer que sumiu da conta e o tipo da empresa
+
+- **Data:** 2026-11-13
+- **Decisão:** se o customer salvo do jogador responde 404 ou vem com `deleted`, a cobrança e a tokenização criam outro customer na conta Asaas atual, gravam o id novo e desativam os cartões do id antigo. O jogador vê “Este cartão não vale mais nesta conta. Cadastre o cartão de novo.” A desativação acontece antes de trocar o id no perfil. Um erro que não é 404 continua 502, sem criar outro customer. A subconta da casa manda `companyType` só no CNPJ, lido de `venues.company_type` (`MEI`, `LIMITED`, `INDIVIDUAL`, `ASSOCIATION`). Valor desconhecido vira `LIMITED`. CPF não envia a chave. O cadastro da casa pergunta o tipo quando o documento é CNPJ. A coluna nasce `LIMITED`, o mesmo valor que a provisão usava para todo CNPJ. A migration `20261113193000_customer_company_type.sql` não é aplicada no remoto por este PR.
+- **Motivo:** clientes criados no sandbox, ou antes da troca da chave de CPF para a conta PJ, não existem na conta atual. A cobrança respondia 502 e o cartão tokenizado ficava órfão. A provisão mandava `LIMITED` para todo CNPJ, inclusive MEI.
+- **Onde está no código:** `resolveCustomerWithCpf` e `storeReplacedCustomer` em `player_cpf.ts`, usados por `create-charge` e `tokenize-card`. O código `card_reregister` vira texto em `liveChargeErrorMessage`. `companyTypeForSubaccount` entra em `provision-venue-wallet`. A pergunta fica em `CompanyTypeField`, no cadastro da casa.
+- **Como trocar depois:** outro tipo da API entra no check da coluna, em `asaasCompanyTypes` e em `VenueDraft.companyTypes`. Aplicar a migration antes de publicar `create-charge`, `tokenize-card` e `provision-venue-wallet`.

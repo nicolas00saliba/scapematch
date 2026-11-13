@@ -42,7 +42,13 @@ import {
   readEnv,
   settlePaidChargeReserve,
 } from "../_shared/points_reserve_asaas.ts";
-import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
+import {
+  cardReregisterCode,
+  chargeAsksNewCard,
+  playerCpfDigits,
+  resolveCustomerWithCpf,
+  storeReplacedCustomer,
+} from "../_shared/player_cpf.ts";
 import {
   bindJson,
   corsHeadersFor,
@@ -52,6 +58,7 @@ import {
 import { hasRawCardData } from "../_shared/raw_card.ts";
 import {
   cardForCharge,
+  isMissingCard,
   loadOwnedCard,
   requestedSavedCardId,
   type SavedCard,
@@ -335,19 +342,20 @@ export async function createCharge(
       });
     }
     const previousCustomer = profile?.asaas_customer_id as string | null;
-    const customerId = await customerWithCpf(asaas, {
+    const resolvedCustomer = await resolveCustomerWithCpf(asaas, {
       customerId: previousCustomer,
       name: profile?.display_name ?? "Jogador",
       email: user.email ?? "",
       externalReference: user.id,
       cpf,
     });
-    if (customerId !== previousCustomer) {
-      await admin.from("profiles").update({ asaas_customer_id: customerId }).eq(
-        "id",
-        user.id,
-      );
-    }
+    const replacedCustomer = await storeReplacedCustomer(
+      admin,
+      user.id,
+      previousCustomer,
+      resolvedCustomer.id,
+    );
+    const customerId = resolvedCustomer.id;
 
     const dueDate = todayInSaoPaulo();
     const description = `${venue.name}`;
@@ -614,15 +622,36 @@ export async function createCharge(
       if (!savedCardId) {
         return json({ error: "saved_card_id é obrigatório" }, 400);
       }
-      const owned = await cardForCharge(
-        {
-          findOwned: (userId, customerIdForCard, cardId) =>
-            findOwnedCard(admin, userId, customerIdForCard, cardId),
-        },
-        user.id,
-        customerId,
-        savedCardId,
-      );
+      if (chargeAsksNewCard(replacedCustomer, savedCardId)) {
+        return json({ error: cardReregisterCode }, 409);
+      }
+      let owned;
+      try {
+        owned = await cardForCharge(
+          {
+            findOwned: (userId, customerIdForCard, cardId) =>
+              findOwnedCard(admin, userId, customerIdForCard, cardId),
+          },
+          user.id,
+          customerId,
+          savedCardId,
+        );
+      } catch (error) {
+        if (
+          isMissingCard(error) &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+            .test(savedCardId)
+        ) {
+          const stale = await admin.rpc("saved_card_needs_reregister", {
+            p_user_id: user.id,
+            p_card_id: savedCardId,
+          });
+          if (!stale.error && stale.data === true) {
+            return json({ error: cardReregisterCode }, 409);
+          }
+        }
+        throw error;
+      }
       let cardChargeId = existing?.id ?? "";
       let attemptId = "";
       const switchInput = existing

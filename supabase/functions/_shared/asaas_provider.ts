@@ -460,10 +460,13 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
-  getCustomer(id: string): Promise<{ id: string; cpfCnpj: string }> {
+  getCustomer(
+    id: string,
+  ): Promise<{ id: string; cpfCnpj: string; deleted: boolean }> {
     return this.#send(`/customers/${id}`, undefined, "GET").then((body) => ({
       id: stringField(body, "id"),
       cpfCnpj: optionalString(body, "cpfCnpj").replace(/\D/g, ""),
+      deleted: body.deleted === true,
     }));
   }
 

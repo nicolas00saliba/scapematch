@@ -31,6 +31,10 @@ Deno.test("create-charge recusa número, CVV e validade", async () => {
   assertEquals(charge.includes("remote_ip"), false);
   assert(charge.includes("clientIp"));
   assert(charge.includes("loadOwnedCard"));
+  assert(charge.includes("cardReregisterCode"));
+  const replacedAt = charge.indexOf("await storeReplacedCustomer");
+  const authorizeAt = charge.indexOf("authorizeCard");
+  assert(replacedAt > 0 && replacedAt < authorizeAt);
   assert(charge.includes("cap_point_redemption"));
   assert(charge.includes('if (capped.error) throw new Error("pontos")'));
   const capAt = charge.indexOf("cap_point_redemption");
@@ -78,9 +82,11 @@ Deno.test("tokenize-card não loga e a resposta não leva o token", async () => 
   assertEquals(JSON.stringify(card).includes("1.2.3.4"), false);
   const claimAt = source.indexOf("claim_card_tokenize_attempt");
   const tokenizeAt = source.indexOf("tokenizeCard");
-  const customerAt = source.indexOf("customerWithCpf(asaas");
+  const customerAt = source.indexOf("await resolveCustomerWithCpf");
+  const replacedAt = source.indexOf("await storeReplacedCustomer");
   assert(claimAt > 0 && claimAt < tokenizeAt);
-  assert(claimAt < customerAt);
+  assert(claimAt < customerAt && customerAt < replacedAt);
+  assert(replacedAt < tokenizeAt);
   assert(source.includes("holder_cpf_invalid"));
   assertEquals(source.includes("?? cpf"), false);
   const holderAt = source.indexOf("creditCardHolderInfo");

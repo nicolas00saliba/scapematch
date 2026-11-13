@@ -60,6 +60,8 @@ const liveChargeRejected = 'A cobrança não foi aceita.';
 const livePixMissing = 'O Asaas não devolveu o código Pix.';
 const liveCardPending = 'A cobrança do cartão ainda está pendente.';
 const liveCardDeclined = 'O cartão foi recusado.';
+const liveCardReregister =
+    'Este cartão não vale mais nesta conta. Cadastre o cartão de novo.';
 const liveChooseCard = 'Escolha um cartão salvo ou preencha um novo.';
 
 /// Texto do campo `error` de `create-charge`, já seguro para mostrar.
@@ -71,6 +73,7 @@ String liveChargeErrorMessage(Object? details) {
     'A casa ainda não tem subconta Asaas.' => code,
     'A cobrança não recebe dados do cartão.' => code,
     'card_declined' => liveCardDeclined,
+    'card_reregister' => liveCardReregister,
     'cpf_required' => 'Para pagar, o Asaas precisa do seu CPF.',
     'asaas_unavailable' => 'O Asaas não respondeu. Tente de novo em instantes.',
     'pix_em_aberto' => 'Já existe um Pix em aberto para esta parte.',

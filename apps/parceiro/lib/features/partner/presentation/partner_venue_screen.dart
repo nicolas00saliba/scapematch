@@ -6,6 +6,7 @@ import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/company_type_field.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
@@ -29,6 +30,7 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
   final _invite = TextEditingController();
   final _referral = TextEditingController();
   String _kind = 'cnpj';
+  String _companyType = 'LIMITED';
   String _category = 'escape-room';
   String? _cityId = 'curitiba';
   List<City> _cities = knownCities;
@@ -78,6 +80,7 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       phone: _phone.text,
       documentKind: _kind,
       documentNumber: _document.text,
+      companyType: _companyType,
       category: _category,
       incomeReais: _income.text,
       inviteCode: _invite.text,
@@ -233,6 +236,11 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          CompanyTypeField(
+            documentKind: _kind,
+            value: _companyType,
+            onChanged: (value) => setState(() => _companyType = value),
+          ),
           DropdownButtonFormField<String>(
             initialValue: _category,
             decoration: const InputDecoration(
