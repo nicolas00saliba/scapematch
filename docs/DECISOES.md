@@ -1,5 +1,12 @@
 # Decisões provisórias
 
+## A nota fiscal nasce desligada em produção
+
+- **Data:** 2026-11-13
+- **Decisão:** sem certificado A1 a NFS-e da comissão falha em produção. A emissão fica desligada até a variável `ASAAS_INVOICE_EMISSION` valer `on`. Qualquer outro valor, inclusive vazio, desliga. Desligada, a cobrança não chama `/v3/invoices`. A nota que seria enviada fica `scheduled`, sem `provider_invoice_id`, para sair quando a chave ligar. Com a chave ligada, só quem ganha o update condicional para `processing` (ainda `scheduled` e sem id) chama o Asaas. Falha volta para `error` com `sem_certificado` ou `asaas_unavailable`. Esses dois motivos podem ser reprocessados, no máximo 5 vezes. `processing` parado há mais de 15 minutos procura a nota por `externalReference` antes de criar outra. Uma falha na emissão não desfaz a cobrança. O sandbox continua gravando `simulated`.
+- **Onde está no código:** `supabase/functions/_shared/issue_invoices.ts`, chamado por `asaas-webhook` e `settle-charges`. `retryFailedInvoices` varre as notas em `error`.
+- **Como trocar depois:** a migration `20261113181000_fiscal_invoice_retry.sql` não foi aplicada no remoto. Depois do certificado A1, o Nícolas aplica essa migration, grava `ASAAS_INVOICE_EMISSION=on` e publica as funções. Rodar de novo o settle emite as `scheduled` e tenta de novo as `error` transitórias.
+
 ## A reserva de pontos vale na API oficial
 
 - **Data:** 2026-11-13
