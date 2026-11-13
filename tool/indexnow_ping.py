@@ -5,6 +5,13 @@ O passo só deve rodar depois que o site foi publicado. A chave fica no
 arquivo público da raiz, que é o jeito do protocolo provar o domínio.
 O GitHub Pages pode demorar a servir esse arquivo, então o envio espera
 a URL da chave responder 200 com o próprio texto da chave.
+
+O Cloudflare na frente de escapematch.com.br responde 403 ao User-Agent
+padrão do urllib (Python-urllib/3.x). A leitura da chave e o POST usam
+um User-Agent próprio. Com EscapeMatch-IndexNow/1.0 a chave responde 200.
+Se esse agente passar a levar 403, troque AGENTE por um de navegador e
+registre o motivo aqui. Não envie o ping fingindo outro programa sem
+anotar essa troca.
 """
 
 from __future__ import annotations
@@ -20,6 +27,7 @@ from pathlib import Path
 
 HOST = "escapematch.com.br"
 API = "https://api.indexnow.org/indexnow"
+AGENTE = "EscapeMatch-IndexNow/1.0 (+https://escapematch.com.br)"
 CHAVE = re.compile(r"^[0-9a-f]{8,128}$")
 SITEMAP = re.compile(r"^https://escapematch\.com\.br/sitemap(?:-index|-\d+)?\.xml$")
 LIMITE = 10_000
@@ -77,10 +85,21 @@ def corpo(chave: str, urls: list[str]) -> dict[str, object]:
     }
 
 
-def chave_publicada(chave: str, abrir) -> bool:
+def pedido(
+    url: str,
+    data: bytes | None = None,
+    method: str | None = None,
+) -> urllib.request.Request:
+    headers = {"User-Agent": AGENTE}
+    if data is not None:
+        headers["Content-Type"] = "application/json; charset=utf-8"
+    return urllib.request.Request(url, data=data, headers=headers, method=method)
+
+
+def chave_publicada(chave: str, abrir=urllib.request.urlopen) -> bool:
     url = f"https://{HOST}/{chave}.txt"
     try:
-        with abrir(url, timeout=10) as resp:
+        with abrir(pedido(url), timeout=10) as resp:
             if int(resp.status) != 200:
                 return False
             texto = resp.read().decode("utf-8", "replace").strip()
@@ -107,16 +126,10 @@ def esperar_chave(
         dormir(min(intervalo, prazo - agora))
 
 
-def enviar(payload: dict[str, object]) -> int:
+def enviar(payload: dict[str, object], abrir=urllib.request.urlopen) -> int:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    pedido = urllib.request.Request(
-        API,
-        data=data,
-        headers={"Content-Type": "application/json; charset=utf-8"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(pedido, timeout=30) as resp:
+        with abrir(pedido(API, data=data, method="POST"), timeout=30) as resp:
             return int(resp.status)
     except urllib.error.HTTPError as exc:
         detalhe = exc.read().decode("utf-8", "replace")[:500]

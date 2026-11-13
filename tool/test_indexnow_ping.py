@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -17,6 +18,18 @@ import indexnow_ping
 
 
 CHAVE = "9360498fa2723ee1d3118bb648bbdbd7"
+
+
+def url_do(pedido: object) -> str:
+    if not isinstance(pedido, urllib.request.Request):
+        raise AssertionError(f"esperado Request, veio {type(pedido).__name__}")
+    return pedido.full_url
+
+
+def assert_agente(caso: unittest.TestCase, pedido: urllib.request.Request) -> None:
+    caso.assertEqual(pedido.get_header("User-agent"), indexnow_ping.AGENTE)
+    caso.assertNotIn("Mozilla", indexnow_ping.AGENTE)
+    caso.assertNotIn("Python-urllib", indexnow_ping.AGENTE)
 
 
 class IndexNowTeste(unittest.TestCase):
@@ -101,8 +114,10 @@ class IndexNowTeste(unittest.TestCase):
 
         respostas = iter([urllib.error.URLError("404"), urllib.error.URLError("404"), corpo_http(200, CHAVE)])
 
-        def abrir(url: str, timeout: int = 10):
-            self.assertEqual(url, f"https://escapematch.com.br/{CHAVE}.txt")
+        def abrir(pedido: urllib.request.Request, timeout: int = 10):
+            self.assertEqual(url_do(pedido), f"https://escapematch.com.br/{CHAVE}.txt")
+            assert_agente(self, pedido)
+            self.assertIsNone(pedido.data)
             item = next(respostas)
             if isinstance(item, Exception):
                 raise item
@@ -111,6 +126,33 @@ class IndexNowTeste(unittest.TestCase):
         ok = indexnow_ping.esperar_chave(CHAVE, abrir, dormir=dormir, relogio=agora, limite=60, intervalo=15)
         self.assertTrue(ok)
         self.assertEqual(relogio["t"], 30)
+
+    def test_agente_proprio_na_chave_e_no_post(self) -> None:
+        self.assertEqual(
+            indexnow_ping.AGENTE,
+            "EscapeMatch-IndexNow/1.0 (+https://escapematch.com.br)",
+        )
+        vistos: list[urllib.request.Request] = []
+
+        def abrir(pedido: urllib.request.Request, timeout: int = 10):
+            vistos.append(pedido)
+            if pedido.full_url.endswith(".txt"):
+                return corpo_http(200, CHAVE)
+            return corpo_http(200, "")
+
+        self.assertTrue(indexnow_ping.chave_publicada(CHAVE, abrir))
+        status = indexnow_ping.enviar(indexnow_ping.corpo(CHAVE, ["https://escapematch.com.br/"]), abrir)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(vistos), 2)
+        assert_agente(self, vistos[0])
+        assert_agente(self, vistos[1])
+        self.assertEqual(vistos[1].get_method(), "POST")
+        self.assertEqual(vistos[1].full_url, indexnow_ping.API)
+        self.assertEqual(
+            vistos[1].get_header("Content-type"),
+            "application/json; charset=utf-8",
+        )
+        self.assertIn(b"escapematch.com.br", vistos[1].data or b"")
 
     def test_corpo_errado_ou_status_diferente_nao_libera(self) -> None:
         self.assertFalse(indexnow_ping.chave_publicada(CHAVE, lambda url, timeout=10: corpo_http(200, "outra")))
