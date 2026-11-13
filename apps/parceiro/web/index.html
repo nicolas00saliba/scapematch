@@ -16,8 +16,10 @@
     do Pwned Passwords. O Asaas fica nas Edge Functions: o navegador só
     abre o PDF da nota, não chama a API. O CanvasKit baixa a Roboto e as
     Noto de fallback com fetch em fonts.gstatic.com/s/ — isso é
-    connect-src. font-src continua 'self' e data:. O Sentry, quando o
-    build recebe SENTRY_DSN, envia o envelope para *.ingest.sentry.io.
+    connect-src. font-src continua 'self' e data:. O SDK JS do Sentry
+    sai de sentry/11.0.0/ neste site, antes do Flutter. script-src não
+    ganha origem nova. Quando o build recebe SENTRY_DSN, o envelope
+    segue para *.ingest.sentry.io.
   -->
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://www.gstatic.com/flutter-canvaskit/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://eujlhicairvksvmssruz.supabase.co wss://eujlhicairvksvmssruz.supabase.co https://api.pwnedpasswords.com https://www.gstatic.com/flutter-canvaskit/ https://fonts.gstatic.com/s/ https://tile.openstreetmap.org https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io; worker-src 'self' blob:; frame-src 'none'; manifest-src 'self'; form-action 'self'">
@@ -35,6 +37,8 @@
       if (guard) guard.remove();
     })();
   </script>
+  <script id="sentry-cdn-rewrite" src="sentry/sentry-cdn-rewrite.js"></script>
+  <script id="sentry-sdk-local" src="sentry/11.0.0/bundle.tracing.min.js" integrity="sha384-TcpSGbL8WtdpR8lXDGGaurUtinn44aaUcN/5iratedpnLQZYJpnJlzK4pdS8sBn5" crossorigin="anonymous"></script>
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="EscapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda. Esta versão usa dados de exemplo.">

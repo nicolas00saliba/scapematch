@@ -13,10 +13,21 @@ if [ "$#" -ne 2 ]; then
   exit 1
 fi
 
-python3 - "$1" "$2" <<'PY'
-import pathlib, re, sys
+raiz=$(cd "$(dirname "$0")/.." && pwd)
+python3 - "$1" "$2" "$raiz" <<'PY'
+import base64, hashlib, os, pathlib, re, sys
 
-mode, target = sys.argv[1], pathlib.Path(sys.argv[2])
+mode, target, repo = sys.argv[1], pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+# sentry_flutter 10.3.0 (sentry_js_sdk_version.dart): JS SDK 11.0.0.
+# O release pede o .min; o debug pede o bundle sem minificar. Os dois
+# hashes são os integrity que o pacote grava no script da CDN.
+sdk_version = "11.0.0"
+sdk_bundles = {
+    "bundle.tracing.min.js":
+        "sha384-TcpSGbL8WtdpR8lXDGGaurUtinn44aaUcN/5iratedpnLQZYJpnJlzK4pdS8sBn5",
+    "bundle.tracing.js":
+        "sha384-hlI/tESUJSweV0xHfXj9uDHTAXNGExvDMzSQy/tiwSZ/o14fLbBfq7wKSCebkOgN",
+}
 flutter_csp = (
     "default-src 'self'; base-uri 'self'; object-src 'none'; "
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' "
@@ -92,10 +103,96 @@ def reject(text, where):
                     f"{where} põe {item} na CSP em meta; o navegador ignora"
                 )
 
+def sri(path):
+    digest = hashlib.sha384(path.read_bytes()).digest()
+    return "sha384-" + base64.b64encode(digest).decode("ascii")
+
+def check_sentry_sdk(path):
+    # O HTML não cita a CDN. O gancho que troca o endereço fica no JS.
+    text = path.read_text()
+    if "browser.sentry-cdn.com" in text:
+        raise SystemExit(f"{path} cita a CDN do Sentry; o bundle tem de ser 'self'")
+    require(text, 'id="sentry-cdn-rewrite"', path)
+    require(text, 'src="sentry/sentry-cdn-rewrite.js"', path)
+    require(text, 'id="sentry-sdk-local"', path)
+    require(
+        text,
+        f'src="sentry/{sdk_version}/bundle.tracing.min.js"',
+        path,
+    )
+    require(text, f'integrity="{sdk_bundles["bundle.tracing.min.js"]}"', path)
+    require(text, 'crossorigin="anonymous"', path)
+    canon = repo / "web" / "sentry"
+    rewrite = path.parent / "sentry" / "sentry-cdn-rewrite.js"
+    if not rewrite.is_file():
+        raise SystemExit(f"ausente: {rewrite}")
+    if rewrite.read_bytes() != (canon / "sentry-cdn-rewrite.js").read_bytes():
+        raise SystemExit(f"{rewrite} difere de web/sentry/sentry-cdn-rewrite.js")
+    if "browser.sentry-cdn.com/" not in rewrite.read_text():
+        raise SystemExit(f"{rewrite} não reconhece a CDN do Sentry")
+    for name, expected in sdk_bundles.items():
+        file = path.parent / "sentry" / sdk_version / name
+        if not file.is_file():
+            raise SystemExit(f"ausente: {file}")
+        got = sri(file)
+        if got != expected:
+            raise SystemExit(
+                f"hash de {file} é {got}; o sentry_flutter 10.3.0 espera {expected}"
+            )
+        canonical = canon / sdk_version / name
+        if file.read_bytes() != canonical.read_bytes():
+            raise SystemExit(f"{file} difere de {canonical}")
+
+def check_sentry_package():
+    lock = (repo / "pubspec.lock").read_text()
+    found = re.search(
+        r"\n  sentry_flutter:\n(?:    .*\n)*?    version: \"([^\"]+)\"",
+        lock,
+    )
+    if not found:
+        raise SystemExit("pubspec.lock sem sentry_flutter")
+    version = found.group(1)
+    caches = []
+    if os.environ.get("PUB_CACHE"):
+        caches.append(pathlib.Path(os.environ["PUB_CACHE"]))
+    caches.append(pathlib.Path.home() / ".pub-cache")
+    dart = None
+    for cache in caches:
+        candidate = (
+            cache / "hosted" / "pub.dev" / f"sentry_flutter-{version}"
+            / "lib" / "src" / "web" / "sentry_js_sdk_version.dart"
+        )
+        if candidate.is_file():
+            dart = candidate
+            break
+    if dart is None:
+        return
+    source = dart.read_text()
+    js = re.search(r"sentryJsSdkVersion = '([^']+)'", source)
+    prod = re.search(r"productionIntegrity =\s*'([^']+)'", source)
+    debug = re.search(r"debugIntegrity =\s*'([^']+)'", source)
+    if not js or not prod or not debug:
+        raise SystemExit(f"não li a versão do JS SDK em {dart}")
+    if js.group(1) != sdk_version:
+        raise SystemExit(
+            f"sentry_flutter {version} pede o JS {js.group(1)}; "
+            f"o repo publica {sdk_version}"
+        )
+    if prod.group(1) != sdk_bundles["bundle.tracing.min.js"]:
+        raise SystemExit(
+            f"integrity de release mudou em {dart}: {prod.group(1)}"
+        )
+    if debug.group(1) != sdk_bundles["bundle.tracing.js"]:
+        raise SystemExit(
+            f"integrity de debug mudou em {dart}: {debug.group(1)}"
+        )
+
 def check_flutter(path, csp):
     text = path.read_text()
     require(text, referrer, path)
     require(text, f'<meta http-equiv="Content-Security-Policy" content="{csp}">', path)
+    if "browser.sentry-cdn.com" in csp:
+        raise SystemExit(f"{path} libera a CDN do Sentry na CSP")
     require(text, 'id="scape-frame-guard"', path)
     require(text, "flutter_bootstrap.js", path)
     require(text, 'rel="manifest"', path)
@@ -104,6 +201,8 @@ def check_flutter(path, csp):
     elif "api.pwnedpasswords.com" in text or "tile.openstreetmap.org" in text:
         raise SystemExit(f"{path} abre rede que o Admin não usa")
     reject(text, path)
+    check_sentry_sdk(path)
+    check_sentry_package()
 
 def check_landing(directory, csp):
     if (directory / "_headers").exists():

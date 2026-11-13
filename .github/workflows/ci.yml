@@ -300,6 +300,7 @@ jobs:
           bash tool/check_security_meta.sh landing apps/landing
           bash tool/check_security_meta.sh flutter web/index.html
           bash tool/check_security_meta.sh flutter apps/parceiro/web/index.html
+          bash tool/check_security_meta.sh admin apps/admin/web/index.html
           test -f apps/landing/assets/logo-simbolo.svg
           test -f apps/landing/assets/og.png
           test -f apps/landing/assets/favicon.svg
