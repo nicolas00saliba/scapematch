@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
+  asaasStatus,
   cardDeclined,
   clientFailure,
   isCardDeclined,
@@ -42,7 +43,13 @@ import {
   readEnv,
   settlePaidChargeReserve,
 } from "../_shared/points_reserve_asaas.ts";
-import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
+import {
+  cardReregisterCode,
+  chargeAsksNewCard,
+  playerCpfDigits,
+  resolveCustomerWithCpf,
+  storeReplacedCustomer,
+} from "../_shared/player_cpf.ts";
 import {
   bindJson,
   corsHeadersFor,
@@ -52,6 +59,7 @@ import {
 import { hasRawCardData } from "../_shared/raw_card.ts";
 import {
   cardForCharge,
+  isMissingCard,
   loadOwnedCard,
   requestedSavedCardId,
   type SavedCard,
@@ -336,19 +344,22 @@ export async function createCharge(
       });
     }
     const previousCustomer = profile?.asaas_customer_id as string | null;
-    const customerId = await customerWithCpf(asaas, {
+    const resolvedCustomer = await resolveCustomerWithCpf(asaas, {
       customerId: previousCustomer,
       name: profile?.display_name ?? "Jogador",
       email: user.email ?? "",
       externalReference: user.id,
       cpf,
     });
-    if (customerId !== previousCustomer) {
-      await admin.from("profiles").update({ asaas_customer_id: customerId }).eq(
-        "id",
-        user.id,
-      );
-    }
+    const storedCustomer = await storeReplacedCustomer(
+      admin,
+      user.id,
+      previousCustomer,
+      resolvedCustomer.id,
+      asaas,
+    );
+    const customerId = storedCustomer.id;
+    const replacedCustomer = storedCustomer.replacedId;
 
     const dueDate = todayInSaoPaulo();
     const description = `${venue.name}`;
@@ -419,10 +430,20 @@ export async function createCharge(
           pixExternalReference(groupId, user.id),
         );
         if (found) {
-          const full = await asaas.readPayment(found.id);
-          if (!pixMatchesCharge(full, expected)) {
+          const full = await paymentOrGone(asaas, found.id);
+          if (asaasPaymentGone(full)) {
+            const claimed = await claimExpiredPixReservation(
+              admin,
+              reserved.id,
+            );
+            if (!claimed) {
+              return json({ error: "pagamento em andamento" }, 409);
+            }
+            attemptId = claimed;
+            createPix = true;
+          } else if (!pixMatchesCharge(full, expected)) {
             return json({ error: "pix_reuse_mismatch" }, 409);
-          }
+          } else {
           const stored = await attachPixProvider(
             admin,
             reserved.id,
@@ -432,7 +453,7 @@ export async function createCharge(
           if (!stored) return json({ error: "pagamento em andamento" }, 409);
           const remote = stored === found.id
             ? full
-            : await asaas.readPayment(stored);
+            : await paymentOrGone(asaas, stored);
           if (stored !== found.id && !pixMatchesCharge(remote, expected)) {
             return json({ error: "pix_reuse_mismatch" }, 409);
           }
@@ -467,6 +488,7 @@ export async function createCharge(
             qrCode = existing?.qr_code ?? null;
             qrImage = existing?.qr_code_base64 ?? null;
           }
+          }
         } else {
           const claimed = await claimExpiredPixReservation(admin, reserved.id);
           if (!claimed) return json({ error: "pagamento em andamento" }, 409);
@@ -475,7 +497,7 @@ export async function createCharge(
         }
       }
       if (action === "reuse" && reserved.provider_ref) {
-        const full = await asaas.readPayment(reserved.provider_ref);
+        const full = await paymentOrGone(asaas, reserved.provider_ref);
         if (asaasPaymentGone(full)) {
           const reopened = await detachGonePix(
             admin,
@@ -615,15 +637,36 @@ export async function createCharge(
       if (!savedCardId) {
         return json({ error: "saved_card_id é obrigatório" }, 400);
       }
-      const owned = await cardForCharge(
-        {
-          findOwned: (userId, customerIdForCard, cardId) =>
-            findOwnedCard(admin, userId, customerIdForCard, cardId),
-        },
-        user.id,
-        customerId,
-        savedCardId,
-      );
+      if (chargeAsksNewCard(replacedCustomer, savedCardId)) {
+        return json({ error: cardReregisterCode }, 409);
+      }
+      let owned;
+      try {
+        owned = await cardForCharge(
+          {
+            findOwned: (userId, customerIdForCard, cardId) =>
+              findOwnedCard(admin, userId, customerIdForCard, cardId),
+          },
+          user.id,
+          customerId,
+          savedCardId,
+        );
+      } catch (error) {
+        if (
+          isMissingCard(error) &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+            .test(savedCardId)
+        ) {
+          const stale = await admin.rpc("saved_card_needs_reregister", {
+            p_user_id: user.id,
+            p_card_id: savedCardId,
+          });
+          if (!stale.error && stale.data === true) {
+            return json({ error: cardReregisterCode }, 409);
+          }
+        }
+        throw error;
+      }
       let cardChargeId = existing?.id ?? "";
       let attemptId = "";
       const switchInput = existing
@@ -1228,6 +1271,20 @@ async function recordOrphanPayment(
   if (error) throw new Error("erro");
 }
 
+async function paymentOrGone(
+  asaas: AsaasProvider,
+  paymentId: string,
+): Promise<Record<string, unknown>> {
+  try {
+    return await asaas.readPayment(paymentId);
+  } catch (error) {
+    if (asaasStatus(error) === 404) {
+      return { id: paymentId, deleted: true, status: "DELETED" };
+    }
+    throw error;
+  }
+}
+
 async function dropExpiredReservation(
   asaas: AsaasProvider,
   admin: ChargeDb,
@@ -1278,7 +1335,8 @@ async function compensateLostPayment(
   try {
     if (action === "refund") await asaas.refund(input.providerRef);
     else await asaas.cancelAuthorization(input.providerRef);
-  } catch (_error) {
+  } catch (error) {
+    if (asaasStatus(error) === 404) return;
     await recordOrphanPayment(admin, {
       providerRef: input.providerRef,
       chargeId: input.chargeId,

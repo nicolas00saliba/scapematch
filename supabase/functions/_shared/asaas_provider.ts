@@ -507,11 +507,24 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
-  getCustomer(id: string): Promise<{ id: string; cpfCnpj: string }> {
+  getCustomer(
+    id: string,
+  ): Promise<{ id: string; cpfCnpj: string; deleted: boolean }> {
     return this.#send(`/customers/${id}`, undefined, "GET").then((body) => ({
       id: stringField(body, "id"),
       cpfCnpj: optionalString(body, "cpfCnpj").replace(/\D/g, ""),
+      deleted: body.deleted === true,
     }));
+  }
+
+  /// Apaga o customer que perdeu a corrida. 404 já está fora da conta.
+  async deleteCustomer(id: string): Promise<void> {
+    try {
+      await this.#send(`/customers/${id}`, undefined, "DELETE");
+    } catch (error) {
+      if (asaasStatus(error) === 404) return;
+      throw error;
+    }
   }
 
   /// Só o documento. Não manda nome, e-mail nem o corpo antigo.
