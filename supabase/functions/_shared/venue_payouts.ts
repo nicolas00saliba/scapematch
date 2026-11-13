@@ -3,6 +3,7 @@
 
 import { clientFailure, logCaught, storedFailure } from "./asaas_client_error.ts";
 import { AsaasProvider, asaasSandboxBaseUrl, tokensMatch } from "./asaas_provider.ts";
+import { captureOpsAlert } from "./sentry_ops.ts";
 import {
   isPixRejected,
   isPointsReserve,
@@ -320,6 +321,12 @@ export async function handleScheduledWithdrawals(
   }
   const secret = deps.env.get("VENUE_WITHDRAWALS_SECRET") ?? "";
   const header = req.headers.get("x-venue-withdrawals-secret") ?? "";
+  if (secret.trim() === "") {
+    await captureOpsAlert(deps.env, deps.fetchFn ?? fetch, {
+      scope: "schedule-venue-withdrawals",
+      code: "venue_withdrawals_config_ausente",
+    });
+  }
   if (!(await secretMatches(header, secret))) {
     return json({ error: "not authenticated" }, 401);
   }
