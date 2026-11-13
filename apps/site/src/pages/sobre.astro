@@ -2,13 +2,16 @@
 import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import CtaBlock from '../components/CtaBlock.astro';
-import { definicao } from '../data/seo';
+import FaqMarca from '../components/FaqMarca.astro';
+import { definicao, faqPage } from '../data/seo';
+import { desambiguacaoMarca } from '../data/perguntas-marca';
 ---
 
 <Base
   title="Sobre o EscapeMatch | quem está sozinho"
   description="O EscapeMatch conecta pessoas para jogar escape room em grupo. Lançamento em Curitiba. Não é um jogo de celular."
   path="/sobre"
+  jsonLd={faqPage(desambiguacaoMarca)}
 >
   <PageTop
     titulo="Sobre o EscapeMatch"
@@ -17,10 +20,12 @@ import { definicao } from '../data/seo';
   <p class="miolo definicao-marca">{definicao}</p>
   <article class="miolo pagina leitura">
     <h2>Por que existimos</h2>
+    <p>O EscapeMatch se chamava ScapeMatch até novembro de 2026; é o mesmo aplicativo, só o nome mudou. Não é um jogo de celular nem um jogo de quebra-cabeça ou match-3. É um app que junta pessoas para jogar escape room presencial.</p>
     <p>Tem gente que quer jogar e para porque o grupo não fecha. O EscapeMatch junta essa pessoa a um time. O jogo confirma quando o grupo bate o mínimo, e cada um paga a própria vaga. O lançamento começa em Curitiba, com escape room.</p>
     <p>As respostas diretas estão no <a href="/guia/escape-room-sozinho">guia de escape room sozinho</a>, em <a href="/guia/escape-room-sozinho-curitiba">escape room sozinho em Curitiba</a> e em <a href="/guia/como-achar-grupo-escape-room">onde achar grupo</a>. A lista dos recortes está nos <a href="/guia">guias</a>.</p>
     <h2>Missão</h2>
     <p>Colocar quem está sozinho num time e confirmar o jogo no mínimo. Quem já tem turma pode completar as vagas que faltam. Esse é o uso secundário.</p>
+    <FaqMarca />
   </article>
   <CtaBlock titulo="Conheça o app" acoes={[{ rotulo: 'Conheça o app', href: '/app' }]} />
 </Base>

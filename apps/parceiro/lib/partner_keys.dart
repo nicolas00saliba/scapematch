@@ -151,4 +151,8 @@ abstract final class PartnerKeys {
   static const withdrawalWeekday = Key('venue-withdrawal-weekday');
   static const withdrawalPassword = Key('venue-withdrawal-password');
   static const withdrawalConfirm = Key('venue-withdrawal-confirm');
+  static const venueDocuments = Key('venue-documents');
+  static const venueDocumentOnboarding = Key('venue-document-onboarding');
+  static const venueDocumentUpload = Key('venue-document-upload');
+  static const venueDocumentRefresh = Key('venue-document-refresh');
 }

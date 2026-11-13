@@ -26,6 +26,9 @@ verify_jwt = false
 [functions.venue-payouts]
 verify_jwt = true
 
+[functions.venue-documents]
+verify_jwt = true
+
 # O cron manda x-venue-withdrawals-secret, não um JWT.
 [functions.schedule-venue-withdrawals]
 verify_jwt = false
