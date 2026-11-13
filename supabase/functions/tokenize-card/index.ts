@@ -1,7 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
-import { customerWithCpf, playerCpfDigits } from "../_shared/player_cpf.ts";
+import {
+  playerCpfDigits,
+  resolveCustomerWithCpf,
+  storeReplacedCustomer,
+} from "../_shared/player_cpf.ts";
 import { clientIp } from "../_shared/client_ip.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { cardKey, documentHash } from "../_shared/payer_identity.ts";
@@ -62,18 +66,21 @@ Deno.serve(async (req) => {
       async () => {
         const asaas = AsaasProvider.fromEnv(Deno.env);
         const previousCustomer = profile?.asaas_customer_id as string | null;
-        const customerId = await customerWithCpf(asaas, {
+        const resolvedCustomer = await resolveCustomerWithCpf(asaas, {
           customerId: previousCustomer,
           name: profile?.display_name ?? "Jogador",
           email: user.email ?? "",
           externalReference: user.id,
           cpf,
         });
-        if (customerId !== previousCustomer) {
-          await admin.from("profiles").update({
-            asaas_customer_id: customerId,
-          }).eq("id", user.id);
-        }
+        const storedCustomer = await storeReplacedCustomer(
+          admin,
+          user.id,
+          previousCustomer,
+          resolvedCustomer.id,
+          asaas,
+        );
+        const customerId = storedCustomer.id;
 
         const tokenized = await asaas.tokenizeCard({
           customer: customerId,

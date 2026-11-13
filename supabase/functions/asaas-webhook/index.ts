@@ -32,12 +32,13 @@ Deno.serve(async (req) => {
     return json({ error: "unauthorized" }, 401);
   }
 
+  let paymentId = "";
   try {
     const payload = await req.json().catch(() => null) as {
       event?: string;
       payment?: { id?: string; status?: string; billingType?: string };
     } | null;
-    const paymentId = payload?.payment?.id;
+    paymentId = payload?.payment?.id ?? "";
     if (!paymentId) return json({ ok: true });
 
     const admin = createClient(
@@ -118,9 +119,30 @@ Deno.serve(async (req) => {
     return json({ ok: true });
   } catch (error) {
     const failure = clientFailure(error, "asaas-webhook");
+    await noteWebhookError(failure.body.error, paymentId);
     return json(failure.body, failure.status);
   }
 });
+
+async function noteWebhookError(
+  code: string,
+  providerRef: string,
+): Promise<void> {
+  try {
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+    const { error } = await admin.rpc("note_webhook_error", {
+      p_source: "asaas-webhook",
+      p_code: code,
+      p_provider_ref: providerRef,
+    });
+    if (error) logCaught("asaas-webhook", new Error("note_webhook_error"));
+  } catch (error) {
+    logCaught("asaas-webhook", error);
+  }
+}
 
 function safeAsaas(): AsaasProvider | undefined {
   try {

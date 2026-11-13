@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch_admin/admin_format.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -45,6 +46,9 @@ abstract class AdminApi {
   Future<List<VenueClaimRow>> venueClaims();
   Future<void> reviewVenueClaim(String id, String decision);
   Future<void> setVenueContacts(String venueId, String email, String phone);
+  Future<PaymentsBoard> payments();
+  Future<bool> setVenuePayoutsEnabled(bool enabled);
+  Future<DivergenceBoard> divergences();
 }
 
 /// O banco recusou o pedido. A mensagem é a do `raise` (SQLSTATE 22023).
@@ -325,6 +329,115 @@ class HighlightsBoard {
   final List<NamedRank> venues;
   final List<NamedRank> rooms;
   final List<NamedRank> news;
+}
+
+class PaymentLine {
+  const PaymentLine({
+    required this.id,
+    required this.title,
+    required this.detail,
+    required this.when,
+  });
+
+  final String id;
+  final String title;
+  final String detail;
+  final DateTime? when;
+}
+
+class WebhookErrorLine {
+  const WebhookErrorLine({
+    required this.id,
+    required this.source,
+    required this.code,
+    required this.providerRef,
+    required this.when,
+  });
+
+  final String id;
+  final String source;
+  final String code;
+  final String providerRef;
+  final DateTime? when;
+}
+
+class PaymentsBoard {
+  const PaymentsBoard({
+    required this.asaasApiKey,
+    required this.asaasBaseUrlProduction,
+    required this.asaasWebhookToken,
+    required this.asaasWebhookEmail,
+    required this.venueWithdrawalsSecret,
+    required this.vaultUrl,
+    required this.vaultSecret,
+    required this.payoutsEnabled,
+    required this.cronLastFailed,
+    required this.cronFailureCode,
+    required this.charges,
+    required this.refunds,
+    required this.withdrawals,
+    required this.webhookErrors,
+  });
+
+  final bool? asaasApiKey;
+  final bool? asaasBaseUrlProduction;
+  final bool? asaasWebhookToken;
+  final bool? asaasWebhookEmail;
+  final bool? venueWithdrawalsSecret;
+  final bool vaultUrl;
+  final bool vaultSecret;
+  final bool payoutsEnabled;
+  final bool? cronLastFailed;
+  final String? cronFailureCode;
+  final List<PaymentLine> charges;
+  final List<PaymentLine> refunds;
+  final List<PaymentLine> withdrawals;
+  final List<WebhookErrorLine> webhookErrors;
+}
+
+class DivergenceRow {
+  const DivergenceRow({
+    required this.kind,
+    required this.providerRef,
+    required this.localId,
+    required this.expected,
+    required this.actual,
+    required this.when,
+  });
+
+  final String kind;
+  final String providerRef;
+  final String localId;
+  final String expected;
+  final String actual;
+  final DateTime? when;
+}
+
+class DivergenceBoard {
+  const DivergenceBoard({
+    required this.startedAt,
+    required this.paymentCount,
+    required this.transferCount,
+    required this.divergenceCount,
+    required this.truncated,
+    required this.rows,
+  });
+
+  final DateTime? startedAt;
+  final int paymentCount;
+  final int transferCount;
+  final int divergenceCount;
+  final bool truncated;
+  final List<DivergenceRow> rows;
+
+  static const empty = DivergenceBoard(
+    startedAt: null,
+    paymentCount: 0,
+    transferCount: 0,
+    divergenceCount: 0,
+    truncated: false,
+    rows: [],
+  );
 }
 
 class AuditRow {
@@ -746,6 +859,113 @@ class SupabaseAdminApi implements AdminApi {
       'p_email': email,
       'p_phone': phone,
     });
+  }
+
+  @override
+  Future<PaymentsBoard> payments() async {
+    final row = _map(await _rpc('admin_payments_board'));
+    final ready = _map(row['readiness']);
+    var asaasApiKey = _optionalBool(null);
+    var asaasBase = _optionalBool(null);
+    var asaasToken = _optionalBool(null);
+    var asaasEmail = _optionalBool(null);
+    var withdrawalsSecret = _optionalBool(null);
+    try {
+      final response = await _client.functions.invoke('payments-readiness');
+      final data = response.data;
+      if (data is Map) {
+        asaasApiKey = _optionalBool(data['asaas_api_key']);
+        asaasBase = _optionalBool(data['asaas_base_url_production']);
+        asaasToken = _optionalBool(data['asaas_webhook_token']);
+        asaasEmail = _optionalBool(data['asaas_webhook_email']);
+        withdrawalsSecret = _optionalBool(data['venue_withdrawals_secret']);
+      }
+    } on Object {
+      // A função ainda pode não estar publicada. O RPC cobre o Vault e a flag.
+    }
+    return PaymentsBoard(
+      asaasApiKey: asaasApiKey,
+      asaasBaseUrlProduction: asaasBase,
+      asaasWebhookToken: asaasToken,
+      asaasWebhookEmail: asaasEmail,
+      venueWithdrawalsSecret: withdrawalsSecret,
+      vaultUrl: ready['vault_venue_withdrawals_url'] == true,
+      vaultSecret: ready['vault_venue_withdrawals_secret'] == true,
+      payoutsEnabled: ready['venue_payouts_enabled'] == true,
+      cronLastFailed: _optionalBool(ready['cron_last_failed']),
+      cronFailureCode: ready['cron_failure_code'] == null
+          ? null
+          : _text(ready['cron_failure_code']),
+      charges: _paymentLines(_list(row['charges'])),
+      refunds: _paymentLines(_list(row['refunds'])),
+      withdrawals: [
+        for (final item in _list(row['withdrawals']))
+          PaymentLine(
+            id: _text(item['id']),
+            title: _text(item['venue_name'], 'Casa'),
+            detail:
+                '${_text(item['status'])} · ${_text(item['source'])} · ${reais(_int(item['amount_cents']))}',
+            when: DateTime.tryParse(_text(item['created_at'])),
+          ),
+      ],
+      webhookErrors: [
+        for (final item in _list(row['webhook_errors']))
+          WebhookErrorLine(
+            id: _text(item['id']),
+            source: _text(item['source']),
+            code: _text(item['code']),
+            providerRef: _text(item['provider_ref']),
+            when: DateTime.tryParse(_text(item['created_at'])),
+          ),
+      ],
+    );
+  }
+
+  List<PaymentLine> _paymentLines(List<Map<String, dynamic>> rows) {
+    return [
+      for (final item in rows)
+        PaymentLine(
+          id: _text(item['id']),
+          title:
+              '${_text(item['venue_name'], 'Casa')} · ${_text(item['billing_type'])}',
+          detail:
+              '${_text(item['status'])} · ${reais(_int(item['amount_cents']))}',
+          when: DateTime.tryParse(_text(item['created_at'])),
+        ),
+    ];
+  }
+
+  @override
+  Future<bool> setVenuePayoutsEnabled(bool enabled) async {
+    final value = await _rpc('admin_set_venue_payouts_enabled', {
+      'p_enabled': enabled,
+    });
+    return value == true;
+  }
+
+  @override
+  Future<DivergenceBoard> divergences() async {
+    final row = _map(await _rpc('admin_payment_divergences'));
+    final run = row['run'];
+    final ready = run is Map ? _map(run) : <String, dynamic>{};
+    return DivergenceBoard(
+      startedAt: DateTime.tryParse(_text(ready['started_at'])),
+      paymentCount: _int(ready['payment_count']),
+      transferCount: _int(ready['transfer_count']),
+      divergenceCount: _int(ready['divergence_count']),
+      truncated: ready['truncated'] == true,
+      rows: [
+        for (final item in _list(row['rows']))
+          DivergenceRow(
+            kind: _text(item['kind']),
+            providerRef: _text(item['provider_ref']),
+            localId: _text(item['local_id']),
+            expected: _text(item['expected']),
+            actual: _text(item['actual']),
+            when: DateTime.tryParse(_text(item['created_at'])),
+          ),
+      ],
+    );
   }
 
   @override
@@ -1261,6 +1481,63 @@ class MemoryAdminApi implements AdminApi {
     _note('set_venue_contacts', venueId, '${email.isNotEmpty}:${phone.isNotEmpty}');
   }
 
+  bool payoutsEnabled = false;
+  PaymentsBoard? paymentsFixture;
+  DivergenceBoard divergenceFixture = DivergenceBoard.empty;
+
+  @override
+  Future<PaymentsBoard> payments() async {
+    final fixture = paymentsFixture;
+    if (fixture != null) {
+      return PaymentsBoard(
+        asaasApiKey: fixture.asaasApiKey,
+        asaasBaseUrlProduction: fixture.asaasBaseUrlProduction,
+        asaasWebhookToken: fixture.asaasWebhookToken,
+        asaasWebhookEmail: fixture.asaasWebhookEmail,
+        venueWithdrawalsSecret: fixture.venueWithdrawalsSecret,
+        vaultUrl: fixture.vaultUrl,
+        vaultSecret: fixture.vaultSecret,
+        payoutsEnabled: payoutsEnabled,
+        cronLastFailed: fixture.cronLastFailed,
+        cronFailureCode: fixture.cronFailureCode,
+        charges: fixture.charges,
+        refunds: fixture.refunds,
+        withdrawals: fixture.withdrawals,
+        webhookErrors: fixture.webhookErrors,
+      );
+    }
+    return PaymentsBoard(
+      asaasApiKey: null,
+      asaasBaseUrlProduction: null,
+      asaasWebhookToken: null,
+      asaasWebhookEmail: null,
+      venueWithdrawalsSecret: null,
+      vaultUrl: false,
+      vaultSecret: false,
+      payoutsEnabled: payoutsEnabled,
+      cronLastFailed: null,
+      cronFailureCode: null,
+      charges: const [],
+      refunds: const [],
+      withdrawals: const [],
+      webhookErrors: const [],
+    );
+  }
+
+  @override
+  Future<bool> setVenuePayoutsEnabled(bool enabled) async {
+    payoutsEnabled = enabled;
+    _note(
+      'set_venue_payouts_enabled',
+      '1',
+      'enabled:$enabled',
+    );
+    return enabled;
+  }
+
+  @override
+  Future<DivergenceBoard> divergences() async => divergenceFixture;
+
   void _note(String action, String id, String after) {
     audits.add(
       AuditRow(
@@ -1308,4 +1585,10 @@ int _int(Object? value, {int fallback = 0}) {
 int? _intOrNull(Object? value) {
   if (value == null) return null;
   return _int(value);
+}
+
+bool? _optionalBool(Object? value) {
+  if (value == true) return true;
+  if (value == false) return false;
+  return null;
 }

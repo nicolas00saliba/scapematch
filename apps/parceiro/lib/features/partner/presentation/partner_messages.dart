@@ -284,4 +284,36 @@ abstract final class PartnerMessages {
   static const withdrawalCancelled = 'Cancelado';
   static const withdrawalManual = 'Manual';
   static const withdrawalAutomatic = 'Automático';
+  static const documentsTitle = 'Documentos da subconta';
+  static const documentsBody =
+      'O Asaas só libera o saque com os documentos aprovados.';
+  static const documentsApproved = 'Documentos e conta aprovados';
+  static const documentsPending = 'Aguardando aprovação do Asaas';
+  static const documentsHosted =
+      'O envio é no site do Asaas. O EscapeMatch não guarda o arquivo.';
+  static const documentsOpen = 'Enviar no site do Asaas';
+  static const documentsUnsafe =
+      'O Asaas pediu um link que não reconhecemos. Atualize a tela.';
+  static const documentsUpload =
+      'Este documento não tem link do Asaas. O arquivo segue direto e não fica aqui.';
+  static const documentsSend = 'Enviar arquivo';
+  static const documentsRefresh = 'Atualizar status';
+  static const documentsUnavailable =
+      'Não foi possível consultar os documentos.';
+  static const documentsWait =
+      'Conta nova: espere uns 15 segundos e atualize. O Asaas ainda está definindo o que é obrigatório.';
+  static const documentsBlockWithdraw =
+      'O saque libera quando o Asaas aprovar os documentos e a conta.';
+  static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
+
+  static String documentStatus(String status) {
+    return switch (status) {
+      'APPROVED' => 'Aprovado',
+      'AWAITING_APPROVAL' => 'Em análise',
+      'PENDING' => 'Pendente',
+      'REJECTED' => 'Recusado',
+      'NOT_SENT' => 'Não enviado',
+      _ => 'Indisponível',
+    };
+  }
 }

@@ -26,12 +26,23 @@ verify_jwt = true
 [functions.reconcile-payments]
 verify_jwt = false
 
+# O cron manda x-ledger-reconcile-secret, não um JWT. A função só faz GET.
+[functions.ledger-reconcile]
+verify_jwt = false
+
 [functions.venue-payouts]
+verify_jwt = true
+
+[functions.venue-documents]
 verify_jwt = true
 
 # O cron manda x-venue-withdrawals-secret, não um JWT.
 [functions.schedule-venue-withdrawals]
 verify_jwt = false
+
+# O admin chama com o JWT (aal2). A resposta não traz valor de segredo.
+[functions.payments-readiness]
+verify_jwt = true
 
 # O Asaas manda asaas-access-token, o mesmo segredo do webhook de cobrança.
 [functions.asaas-transfer-webhook]

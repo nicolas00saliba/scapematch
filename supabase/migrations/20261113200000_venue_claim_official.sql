@@ -157,6 +157,11 @@ begin
     new.official_email := old.official_email;
     new.official_phone := old.official_phone;
     new.claimed_at := old.claimed_at;
+    if old.status is distinct from 'pending'
+      or old.asaas_wallet_id is not null
+    then
+      new.company_type := old.company_type;
+    end if;
     if current_setting('scapematch.referral_link', true) is distinct from 'on'
       or old.referred_by is not null
     then

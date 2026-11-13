@@ -58,6 +58,68 @@ begin
   end if;
 end $$;
 
+do $$
+declare
+  v_default text;
+begin
+  if has_function_privilege(
+    'authenticated',
+    'public.deactivate_customer_saved_cards(uuid, text)',
+    'execute'
+  ) or has_function_privilege(
+    'authenticated',
+    'public.saved_card_needs_reregister(uuid, uuid)',
+    'execute'
+  ) then
+    raise exception 'authenticated desativa cartão ou lê recadastro';
+  end if;
+  select column_default into v_default
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'venues'
+    and column_name = 'company_type';
+  if v_default is null or position('LIMITED' in v_default) = 0 then
+    raise exception 'company_type sem default LIMITED: %', v_default;
+  end if;
+end $$;
+
+-- A troca do customer da Ana não pode vazar para card_token_crypto.sql.
+begin;
+
+update public.profiles
+set asaas_customer_id = 'cus_ana_nova'
+where id = 'd1111111-1111-1111-1111-111111111111';
+
+select public.deactivate_customer_saved_cards(
+  'd1111111-1111-1111-1111-111111111111',
+  'cus_ana'
+);
+
+do $$
+begin
+  if not public.saved_card_needs_reregister(
+    'd1111111-1111-1111-1111-111111111111',
+    'e1111111-1111-1111-1111-111111111111'
+  ) then
+    raise exception 'cartão órfão não pediu recadastro';
+  end if;
+  if public.saved_card_needs_reregister(
+    'd2222222-2222-2222-2222-222222222222',
+    'e2222222-2222-2222-2222-222222222222'
+  ) then
+    raise exception 'cartão ativo pediu recadastro';
+  end if;
+  if exists (
+    select 1 from public.saved_cards
+    where id = 'e1111111-1111-1111-1111-111111111111'
+      and deactivated_at is null
+  ) then
+    raise exception 'cartão da Ana seguiu ativo depois da troca';
+  end if;
+end $$;
+
+rollback;
+
 begin;
 select set_config('request.jwt.claim.sub', 'd2222222-2222-2222-2222-222222222222', true);
 set local role authenticated;
@@ -95,3 +157,86 @@ end $$;
 
 reset role;
 commit;
+
+-- Tipo de empresa: o dono corrige enquanto não há subconta.
+-- Depois da aprovação com wallet, só admin aal2 muda.
+begin;
+
+insert into auth.users (id, email, raw_user_meta_data)
+values
+  ('d3333333-3333-4333-8333-333333333333', 'tipo@example.com', '{"display_name":"Dono"}'),
+  ('d4444444-4444-4444-8444-444444444444', 'tipo-admin@example.com', '{"display_name":"Admin"}');
+
+insert into public.admins (user_id)
+values ('d4444444-4444-4444-8444-444444444444');
+
+insert into public.venues (
+  id, owner_id, city_id, name, neighborhood, street_address, address_number,
+  postal_code, latitude, longitude, income_value, document_kind,
+  document_number, phone, status, company_type
+) values (
+  'd5555555-5555-4555-8555-555555555555',
+  'd3333333-3333-4333-8333-333333333333',
+  'curitiba', 'Casa Tipo', 'Centro', 'Rua Tipo', '9', '80010000',
+  -25.43, -49.27, 5000, 'cnpj', '11222333000181', '4130000199',
+  'pending', 'LIMITED'
+);
+
+select set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', true);
+select set_config('request.jwt.claim.aal', 'aal1', true);
+
+update public.venues
+set company_type = 'MEI'
+where id = 'd5555555-5555-4555-8555-555555555555';
+
+do $$
+begin
+  if (
+    select company_type from public.venues
+    where id = 'd5555555-5555-4555-8555-555555555555'
+  ) is distinct from 'MEI' then
+    raise exception 'dono pendente não corrigiu o tipo';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', '', true);
+
+update public.venues
+set status = 'approved', asaas_wallet_id = 'wal_tipo_empresa_teste'
+where id = 'd5555555-5555-4555-8555-555555555555';
+
+select set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', true);
+select set_config('request.jwt.claim.aal', 'aal1', true);
+
+update public.venues
+set company_type = 'ASSOCIATION'
+where id = 'd5555555-5555-4555-8555-555555555555';
+
+do $$
+begin
+  if (
+    select company_type from public.venues
+    where id = 'd5555555-5555-4555-8555-555555555555'
+  ) is distinct from 'MEI' then
+    raise exception 'dono aprovado mudou o tipo da empresa';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'd4444444-4444-4444-8444-444444444444', true);
+select set_config('request.jwt.claim.aal', 'aal2', true);
+
+update public.venues
+set company_type = 'INDIVIDUAL'
+where id = 'd5555555-5555-4555-8555-555555555555';
+
+do $$
+begin
+  if (
+    select company_type from public.venues
+    where id = 'd5555555-5555-4555-8555-555555555555'
+  ) is distinct from 'INDIVIDUAL' then
+    raise exception 'admin aal2 não corrigiu o tipo';
+  end if;
+end $$;
+
+rollback;

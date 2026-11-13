@@ -145,6 +145,9 @@ Future<VenueSignupResult> submitVenue(
           'income_value': income,
           'document_kind': draft.documentKind,
           'document_number': VenueDraft.digits(draft.documentNumber),
+          'company_type': draft.documentKind == 'cnpj'
+              ? draft.companyType
+              : 'LIMITED',
           'phone': VenueDraft.digits(draft.phone),
           'category': draft.category,
           'invite_id': ?inviteId,

@@ -223,6 +223,12 @@ export function isAsaasSandbox(baseUrl: string): boolean {
   }
 }
 
+/// Só as duas bases documentadas. Um host parecido não entra na reserva.
+export function isOfficialAsaasBase(baseUrl: string): boolean {
+  const base = baseUrl.trim().replace(/\/$/, "");
+  return base === asaasSandboxBaseUrl || base === asaasProductionBaseUrl;
+}
+
 export function centsToReais(cents: number): number {
   if (!Number.isInteger(cents) || cents < 0) {
     throw new Error("invalid cents");
@@ -378,6 +384,11 @@ export class AsaasProvider implements PaymentProvider {
     return isAsaasSandbox(this.baseUrl);
   }
 
+  /// Sandbox ou produção, no host exato da API. Proxy e host parecido ficam de fora.
+  get official(): boolean {
+    return isOfficialAsaasBase(this.baseUrl);
+  }
+
   /// Outra chave, a mesma base URL. A subconta emite com a apiKey dela.
   withKey(apiKey: string): AsaasProvider {
     return new AsaasProvider(apiKey, this.baseUrl, this.fetchFn, this.sleep);
@@ -435,6 +446,42 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
+  /// A listagem de notas filtra por externalReference. Ainda assim a
+  /// comparação é no código, e a página anda se hasMore vier ligado.
+  findInvoiceByReference(
+    externalReference: string,
+  ): Promise<{ id: string; status: string } | null> {
+    const reference = externalReference.trim();
+    if (!/^[\w:.-]{1,100}$/.test(reference)) return Promise.resolve(null);
+    const load = (
+      offset: number,
+    ): Promise<{ id: string; status: string } | null> => {
+      const query = new URLSearchParams({
+        externalReference: reference,
+        limit: "100",
+        offset: String(offset),
+      });
+      return this.#send(`/invoices?${query}`, undefined, "GET").then((body) => {
+        const rows = Array.isArray(body.data) ? body.data : [];
+        for (const row of rows) {
+          if (!row || typeof row !== "object") continue;
+          const item = row as Record<string, unknown>;
+          if (item.externalReference !== reference) continue;
+          if (typeof item.id !== "string" || item.id.length === 0) continue;
+          return {
+            id: item.id,
+            status: typeof item.status === "string" ? item.status : "",
+          };
+        }
+        if (body.hasMore === true && rows.length > 0 && offset < 400) {
+          return load(offset + rows.length);
+        }
+        return null;
+      });
+    };
+    return load(0);
+  }
+
   getInvoice(invoiceId: string): Promise<InvoiceView> {
     return this.#send(`/invoices/${invoiceId}`, undefined, "GET").then(
       (body) => ({
@@ -460,11 +507,24 @@ export class AsaasProvider implements PaymentProvider {
     }));
   }
 
-  getCustomer(id: string): Promise<{ id: string; cpfCnpj: string }> {
+  getCustomer(
+    id: string,
+  ): Promise<{ id: string; cpfCnpj: string; deleted: boolean }> {
     return this.#send(`/customers/${id}`, undefined, "GET").then((body) => ({
       id: stringField(body, "id"),
       cpfCnpj: optionalString(body, "cpfCnpj").replace(/\D/g, ""),
+      deleted: body.deleted === true,
     }));
+  }
+
+  /// Apaga o customer que perdeu a corrida. 404 já está fora da conta.
+  async deleteCustomer(id: string): Promise<void> {
+    try {
+      await this.#send(`/customers/${id}`, undefined, "DELETE");
+    } catch (error) {
+      if (asaasStatus(error) === 404) return;
+      throw error;
+    }
   }
 
   /// Só o documento. Não manda nome, e-mail nem o corpo antigo.

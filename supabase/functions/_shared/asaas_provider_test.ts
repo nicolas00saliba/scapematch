@@ -9,6 +9,7 @@ import {
   commissionCents,
   houseSplitPercent,
   isAsaasSandbox,
+  isOfficialAsaasBase,
   pickReusablePix,
   PixQrUnavailableError,
   PixReservationLost,
@@ -851,6 +852,11 @@ Deno.test("sandbox só quando o host é api-sandbox.asaas.com", () => {
   assertEquals(isAsaasSandbox("https://not-api-sandbox.asaas.com/v3"), false);
   assertEquals(isAsaasSandbox("not a url"), false);
   assertEquals(isAsaasSandbox(""), false);
+  assertEquals(isOfficialAsaasBase("https://api.asaas.com/v3"), true);
+  assertEquals(isOfficialAsaasBase("https://api-sandbox.asaas.com/v3/"), true);
+  assertEquals(isOfficialAsaasBase("https://api.asaas.com/v3/extra"), false);
+  assertEquals(isOfficialAsaasBase("https://api.asaas.com.evil.com/v3"), false);
+  assertEquals(isOfficialAsaasBase("http://api.asaas.com/v3"), false);
 });
 
 Deno.test("webhook sem o token certo é recusado", () => {

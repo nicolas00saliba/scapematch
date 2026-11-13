@@ -1,6 +1,13 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { AsaasProvider } from "./asaas_provider.ts";
-import { customerWithCpf, playerCpfDigits } from "./player_cpf.ts";
+import {
+  cardReregisterCode,
+  chargeAsksNewCard,
+  customerWithCpf,
+  playerCpfDigits,
+  resolveCustomerWithCpf,
+  storeReplacedCustomer,
+} from "./player_cpf.ts";
 
 const cpf = "52998224725";
 
@@ -112,6 +119,264 @@ Deno.test("resposta do Asaas não deixa o cpf no erro", async () => {
   const message = error instanceof Error ? error.message : String(error);
   assertEquals(message.includes(cpf), false);
   assert(message.startsWith("Asaas 400"));
+});
+
+Deno.test("customer 404 ou deleted é recriado e o cartão antigo pede recadastro", async () => {
+  const calls: { url: string; method: string }[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    calls.push({ url, method: init?.method ?? "GET" });
+    if (url.endsWith("/customers/cus_404")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ errors: [{ code: "not_found" }] }), {
+          status: 404,
+        }),
+      );
+    }
+    if (url.endsWith("/customers/cus_gone") && (init?.method ?? "GET") === "GET") {
+      return Promise.resolve(
+        json({ id: "cus_gone", cpfCnpj: cpf, deleted: true }),
+      );
+    }
+    if (url.endsWith("/customers") && init?.method === "POST") {
+      const id = calls.some((call) => call.url.endsWith("/customers/cus_404"))
+        ? "cus_404_novo"
+        : "cus_gone_novo";
+      return Promise.resolve(json({ id }));
+    }
+    return Promise.resolve(new Response("no", { status: 500 }));
+  };
+  const asaas = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    fetchFn,
+  );
+  const input = {
+    name: "Ana",
+    email: "ana@example.com",
+    externalReference: "user-1",
+    cpf,
+  };
+  const missing = await resolveCustomerWithCpf(asaas, {
+    ...input,
+    customerId: "cus_404",
+  });
+  assertEquals(missing, { id: "cus_404_novo", replacedId: "cus_404" });
+  assertEquals(
+    calls.filter((call) => call.url.endsWith("/customers/cus_404")).map((c) =>
+      c.method
+    ),
+    ["GET"],
+  );
+
+  calls.length = 0;
+  const deleted = await resolveCustomerWithCpf(asaas, {
+    ...input,
+    customerId: "cus_gone",
+  });
+  assertEquals(deleted, { id: "cus_gone_novo", replacedId: "cus_gone" });
+  assertEquals(calls.map((call) => call.method), ["GET", "POST"]);
+  assertEquals(
+    calls.some((call) => call.method === "PUT"),
+    false,
+  );
+
+  const order: string[] = [];
+  const replaced = await storeReplacedCustomer(
+    {
+      rpc(name) {
+        order.push(name);
+        return Promise.resolve({ data: 1, error: null });
+      },
+      from() {
+        return {
+          update() {
+            const chain = {
+              eq() {
+                return chain;
+              },
+              is() {
+                return chain;
+              },
+              select() {
+                order.push("profile");
+                return Promise.resolve({
+                  data: [{ asaas_customer_id: "cus_404_novo" }],
+                  error: null,
+                });
+              },
+              maybeSingle() {
+                return Promise.resolve({ data: null, error: null });
+              },
+            };
+            return chain;
+          },
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle() {
+                    return Promise.resolve({ data: null, error: null });
+                  },
+                };
+              },
+              is() {
+                return this;
+              },
+              select() {
+                return Promise.resolve({ data: [], error: null });
+              },
+              maybeSingle() {
+                return Promise.resolve({ data: null, error: null });
+              },
+            };
+          },
+        };
+      },
+    },
+    "user-1",
+    "cus_404",
+    "cus_404_novo",
+  );
+  assertEquals(replaced, { id: "cus_404_novo", replacedId: "cus_404" });
+  assertEquals(order, ["deactivate_customer_saved_cards", "profile"]);
+  assertEquals(chargeAsksNewCard(replaced.replacedId, "card-1"), true);
+  assertEquals(chargeAsksNewCard(replaced.replacedId, ""), false);
+  assertEquals(chargeAsksNewCard(null, "card-1"), false);
+  assertEquals(cardReregisterCode, "card_reregister");
+});
+
+Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", async () => {
+  let profile = "cus_old";
+  const deleted: string[] = [];
+  const db = {
+    rpc() {
+      return Promise.resolve({ data: 1, error: null });
+    },
+    from() {
+      return {
+        update(values: Record<string, unknown>) {
+          const next = String(values.asaas_customer_id);
+          const filters: Record<string, string> = {};
+          const chain = {
+            eq(column: string, value: string) {
+              filters[column] = value;
+              return chain;
+            },
+            is() {
+              return chain;
+            },
+            select() {
+              const previous = filters.asaas_customer_id;
+              if (profile === previous) {
+                profile = next;
+                return Promise.resolve({
+                  data: [{ asaas_customer_id: next }],
+                  error: null,
+                });
+              }
+              return Promise.resolve({ data: [], error: null });
+            },
+            maybeSingle() {
+              return Promise.resolve({ data: null, error: null });
+            },
+          };
+          return chain;
+        },
+        select() {
+          return {
+            eq() {
+              return {
+                maybeSingle() {
+                  return Promise.resolve({
+                    data: { asaas_customer_id: profile },
+                    error: null,
+                  });
+                },
+              };
+            },
+            is() {
+              return this;
+            },
+            select() {
+              return Promise.resolve({ data: [], error: null });
+            },
+            maybeSingle() {
+              return Promise.resolve({
+                data: { asaas_customer_id: profile },
+                error: null,
+              });
+            },
+          };
+        },
+      };
+    },
+  };
+  const asaas = {
+    deleteCustomer(id: string) {
+      deleted.push(id);
+      return Promise.reject(new Error("Asaas 400: sem apagar"));
+    },
+  };
+  const [first, second] = await Promise.all([
+    storeReplacedCustomer(db, "user-1", "cus_old", "cus_a", asaas),
+    storeReplacedCustomer(db, "user-1", "cus_old", "cus_b", asaas),
+  ]);
+  assertEquals(first.id, second.id);
+  assertEquals(first.replacedId, "cus_old");
+  assertEquals(second.replacedId, "cus_old");
+  assertEquals(profile, first.id);
+  assertEquals(deleted, [first.id === "cus_a" ? "cus_b" : "cus_a"]);
+  assertEquals(chargeAsksNewCard(second.replacedId, "card-1"), true);
+
+  deleted.length = 0;
+  profile = "cus_old";
+  const loserDeletes = {
+    deleteCustomer(id: string) {
+      deleted.push(id);
+      return Promise.resolve();
+    },
+  };
+  const winner = await storeReplacedCustomer(
+    db,
+    "user-1",
+    "cus_old",
+    "cus_win",
+    loserDeletes,
+  );
+  const loser = await storeReplacedCustomer(
+    db,
+    "user-1",
+    "cus_old",
+    "cus_lose",
+    loserDeletes,
+  );
+  assertEquals(winner.id, "cus_win");
+  assertEquals(loser.id, "cus_win");
+  assertEquals(deleted, ["cus_lose"]);
+  assertEquals(profile, "cus_win");
+});
+
+Deno.test("customer 500 não recria e não troca o id", async () => {
+  let posts = 0;
+  const asaas = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    (url, init) => {
+      if (init?.method === "POST") posts += 1;
+      return Promise.resolve(new Response("no", { status: 500 }));
+    },
+  );
+  const error = await resolveCustomerWithCpf(asaas, {
+    customerId: "cus_off",
+    name: "Ana",
+    email: "ana@example.com",
+    externalReference: "user-1",
+    cpf,
+  }).catch((caught: unknown) => caught);
+  assert(error instanceof Error);
+  assert(error.message.startsWith("Asaas 500"));
+  assertEquals(posts, 0);
+  assertEquals(error.message.includes(cpf), false);
 });
 
 function json(body: unknown): Response {

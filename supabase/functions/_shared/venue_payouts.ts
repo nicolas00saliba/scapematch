@@ -287,6 +287,7 @@ export async function handleTransferWebhook(
   if (!tokensMatch(req.headers.get("asaas-access-token"), expected)) {
     return json({ error: "unauthorized" }, 401);
   }
+  let transferId = "";
   try {
     const payload = await req.json().catch(() => null) as {
       event?: string;
@@ -295,6 +296,7 @@ export async function handleTransferWebhook(
     const status = mapTransferEvent(payload?.event ?? "");
     if (!status || !payload?.transfer) return json({ ok: true });
     const transfer = payload.transfer;
+    transferId = text(transfer.id);
     const applied = await deps.store.rpc("apply_transfer_event", {
       p_external_reference: text(transfer.externalReference),
       p_transfer_id: text(transfer.id),
@@ -306,6 +308,15 @@ export async function handleTransferWebhook(
     return json({ ok: true });
   } catch (error) {
     const failure = clientFailure(error, "asaas-transfer-webhook");
+    try {
+      await deps.store.rpc("note_webhook_error", {
+        p_source: "asaas-transfer-webhook",
+        p_code: failure.body.error,
+        p_provider_ref: transferId,
+      });
+    } catch (noteError) {
+      logCaught("asaas-transfer-webhook", noteError);
+    }
     return json(failure.body, failure.status);
   }
 }
@@ -320,6 +331,11 @@ export async function handleScheduledWithdrawals(
   }
   const secret = deps.env.get("VENUE_WITHDRAWALS_SECRET") ?? "";
   const header = req.headers.get("x-venue-withdrawals-secret") ?? "";
+  // verify_jwt = false. Sem o segredo, qualquer um chama esta URL.
+  // 503 e nenhum evento: o alerta sai uma vez no cron, não por request.
+  if (secret.trim() === "") {
+    return json({ error: "config_ausente" }, 503);
+  }
   if (!(await secretMatches(header, secret))) {
     return json({ error: "not authenticated" }, 401);
   }

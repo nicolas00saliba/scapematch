@@ -1,5 +1,26 @@
 # Decisões provisórias
 
+## A nota fiscal nasce desligada em produção
+
+- **Data:** 2026-11-13
+- **Decisão:** sem certificado A1 a NFS-e da comissão falha em produção. A emissão fica desligada até a variável `ASAAS_INVOICE_EMISSION` valer `on`. Qualquer outro valor, inclusive vazio, desliga. Desligada, a cobrança não chama `/v3/invoices`. A nota que seria enviada fica `scheduled`, sem `provider_invoice_id`, para sair quando a chave ligar. Com a chave ligada, só quem ganha o update condicional para `processing` (ainda `scheduled` e sem id) chama o Asaas. Falha volta para `error` com `sem_certificado` ou `asaas_unavailable`. Esses dois motivos podem ser reprocessados, no máximo 5 vezes. `processing` parado há mais de 15 minutos procura a nota por `externalReference` antes de criar outra. Uma falha na emissão não desfaz a cobrança. O sandbox continua gravando `simulated`.
+- **Onde está no código:** `supabase/functions/_shared/issue_invoices.ts`, chamado por `asaas-webhook` e `settle-charges`. `retryFailedInvoices` varre as notas em `error`.
+- **Como trocar depois:** a migration `20261113181000_fiscal_invoice_retry.sql` não foi aplicada no remoto. Depois do certificado A1, o Nícolas aplica essa migration, grava `ASAAS_INVOICE_EMISSION=on` e publica as funções. Rodar de novo o settle emite as `scheduled` e tenta de novo as `error` transitórias.
+
+## A reserva de pontos vale na API oficial
+
+- **Data:** 2026-11-13
+- **Decisão:** o lastro da indicação e o pagamento da vaga grátis deixam de existir só no sandbox. O split e a transferência usam a mesma conta, no sandbox ou em `https://api.asaas.com/v3`. Outra URL não chama a rede. O valor do jogador não muda: a linha é o centavo que o banco já calculou, em `fixedValue`, e só entra se esse valor cabe no líquido. O claim grava a linha `pending` antes de qualquer chamada ao Asaas. A listagem `GET /v3/transfers` não filtra por `externalReference` (só `dateCreated`, `transferDate` e `type`), então a busca usa `dateCreated[ge]` a partir do dia dessa linha, percorre `offset`/`hasMore` e compara a referência no código. Status `AWAITING_CRITICAL_ACTION_AUTHORIZATION` ou `authorized: false` não liquida a reserva: a linha fica `awaiting_authorization`, com o id gravado, e o log avisa. Sem a carteira `ASAAS_POINTS_RESERVE_WALLET_ID` ou sem a chave, nada é enviado.
+- **Onde está no código:** `supabase/functions/_shared/points_reserve_asaas.ts` e `create-charge`.
+- **Como trocar depois:** as funções não foram publicadas por esta mudança. Produção precisa da subconta Reserva de pontos, da carteira e da chave no painel. Sem isso o split não entra e a cobrança segue como hoje.
+
+## Documentos da subconta seguem o link do Asaas
+
+- **Data:** 2026-11-13
+- **Decisão:** o saque da casa espera a aprovação cadastral. A tela de saque do Parceiro consulta `GET /v3/myAccount/documents` e `GET /v3/myAccount/status` pela Edge Function `venue-documents`, com a chave da subconta. O Asaas devolve `onboardingUrl` (em geral `https://cadastro.io/...`) quando o envio é no site dele. Esse link é o caminho: a documentação diz que `POST /v3/myAccount/documents/{id}` é recusado se o grupo tem `onboardingUrl`. O app abre o link e não guarda o arquivo. Só o grupo sem link aceita upload (PDF, JPG ou PNG), direto para o Asaas, depois de reautenticar. O saque fica desligado enquanto `documentation` ou `general` não estão `APPROVED`. Uma consulta nos primeiros 15 segundos depois de criar a subconta pode listar documento que ainda não é obrigatório; a tela pede para atualizar.
+- **Onde está no código:** `supabase/functions/venue-documents`, `supabase/functions/_shared/venue_documents.ts`, `apps/parceiro` na tela de saque.
+- **Como trocar depois:** esta função não foi publicada. O Nícolas publica `venue-documents` junto com o app, sem migration. A chave da subconta continua só em `venue_asaas_keys`.
+
 ## O host escolhe o mínimo e o máximo
 
 - **Data:** 2026-11-10
@@ -669,3 +690,11 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 - **Motivo:** o dono pediu um lugar de conta no espírito de um app de passagens, com o visual do EscapeMatch e os nomes adaptados (viajantes viram parceiros de jogo).
 - **Onde está no código:** ramo 2 do `StatefulShellRoute` (`/account`), `AccountScreen` e `AccountDestinationScreen`. O nome vem de `currentUserProvider`.
 - **Como trocar depois:** login de verdade substitui o provider. O saldo e os cartões seguem o plano em [PAGAMENTOS_PLANO.md](PAGAMENTOS_PLANO.md). Os textos de “fictício” saem dessas telas.
+
+## Customer que sumiu da conta e o tipo da empresa
+
+- **Data:** 2026-11-13
+- **Decisão:** se o customer salvo do jogador responde 404 ou vem com `deleted`, a cobrança e a tokenização criam outro customer na conta Asaas atual, gravam o id novo e desativam os cartões do id antigo. O jogador vê “Este cartão não vale mais nesta conta. Cadastre o cartão de novo.” A desativação acontece antes de trocar o id no perfil. Duas chamadas ao mesmo tempo gravam o id com `where asaas_customer_id = id anterior`: quem perde relê o perfil, usa o customer que ficou e tenta apagar o próprio no Asaas. Um erro que não é 404 continua sem criar outro customer. Cobrança pendente do customer antigo que responde 404 no cancelamento ou na leitura conta como já cancelada: o livro solta a reserva e segue, sem órfão. A subconta da casa manda `companyType` só no CNPJ, lido de `venues.company_type` (`MEI`, `LIMITED`, `INDIVIDUAL`, `ASSOCIATION`). Valor desconhecido vira `LIMITED`. CPF não envia a chave. O cadastro da casa pergunta o tipo quando o documento é CNPJ. A coluna nasce `LIMITED`. O dono só altera o tipo enquanto a casa está pendente e sem subconta; depois, só admin com aal2. As migrations `20261113193000_customer_company_type.sql` e `20261113194000_company_type_guard.sql` não são aplicadas no remoto por este PR.
+- **Motivo:** clientes criados no sandbox, ou antes da troca da chave de CPF para a conta PJ, não existem na conta atual. A cobrança respondia 502 e o cartão tokenizado ficava órfão. A provisão mandava `LIMITED` para todo CNPJ, inclusive MEI.
+- **Onde está no código:** `resolveCustomerWithCpf` e `storeReplacedCustomer` em `player_cpf.ts`, usados por `create-charge` e `tokenize-card`. O código `card_reregister` vira texto em `liveChargeErrorMessage`. `companyTypeForSubaccount` entra em `provision-venue-wallet`. A pergunta fica em `CompanyTypeField`, no cadastro da casa.
+- **Como trocar depois:** outro tipo da API entra no check da coluna, em `asaasCompanyTypes` e em `VenueDraft.companyTypes`. Aplicar a migration antes de publicar `create-charge`, `tokenize-card` e `provision-venue-wallet`.

@@ -12,6 +12,7 @@ class VenueDraft {
     required this.documentNumber,
     required this.category,
     required this.incomeReais,
+    this.companyType = 'LIMITED',
     this.inviteCode = '',
     this.referralCode = '',
   });
@@ -27,6 +28,7 @@ class VenueDraft {
   final String documentNumber;
   final String category;
   final String incomeReais;
+  final String companyType;
   final String inviteCode;
   final String referralCode;
 
@@ -59,6 +61,9 @@ class VenueDraft {
     if (documentKind != 'cpf' && documentKind != 'cnpj') {
       return 'Escolha CPF ou CNPJ.';
     }
+    if (documentKind == 'cnpj' && !companyTypes.containsKey(companyType)) {
+      return 'Escolha o tipo da empresa.';
+    }
     if (!categories.containsKey(category)) return 'Escolha a categoria.';
     final income = double.tryParse(incomeReais.trim().replaceAll(',', '.'));
     if (income == null || income <= 0) {
@@ -75,6 +80,14 @@ class VenueDraft {
     }
     return null;
   }
+
+  /// Tipos aceitos pela API de subcontas do Asaas. LIMITED é o padrão.
+  static const companyTypes = <String, String>{
+    'MEI': 'MEI',
+    'LIMITED': 'Sociedade limitada (LTDA)',
+    'INDIVIDUAL': 'Empresário individual',
+    'ASSOCIATION': 'Associação',
+  };
 
   static const categories = <String, String>{
     'escape-room': 'Escape room',

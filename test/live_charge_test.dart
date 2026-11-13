@@ -115,6 +115,10 @@ void main() {
       liveCardDeclined,
     );
     expect(
+      liveChargeErrorMessage({'error': 'card_reregister'}),
+      'Este cartão não vale mais nesta conta. Cadastre o cartão de novo.',
+    );
+    expect(
       liveChargeErrorMessage({'error': 'asaas_unavailable'}),
       contains('Asaas'),
     );

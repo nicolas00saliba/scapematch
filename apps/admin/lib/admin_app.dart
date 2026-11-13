@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch_admin/admin_mfa.dart';
 import 'package:scapematch_admin/admin_pages.dart';
+import 'package:scapematch_admin/admin_payments.dart';
+import 'package:scapematch_admin/admin_reconcile.dart';
 import 'package:scapematch_admin/admin_ranking.dart';
 import 'package:scapematch_admin/admin_reviews.dart';
 import 'package:scapematch_admin/admin_place.dart';
@@ -46,6 +48,8 @@ class AdminShell extends ConsumerWidget {
     (AdminSection.jogadores, 'Jogadores', Icons.people_outline),
     (AdminSection.regras, 'Regras', Icons.tune),
     (AdminSection.ganhos, 'Ganhos', Icons.payments_outlined),
+    (AdminSection.pagamentos, 'Pagamentos', Icons.account_balance_outlined),
+    (AdminSection.conciliacao, 'Conciliação', Icons.fact_check_outlined),
     (AdminSection.destaques, 'Destaques', Icons.star_outline),
     (AdminSection.auditoria, 'Auditoria', Icons.history),
     (AdminSection.avaliacoes, 'Avaliações', Icons.reviews_outlined),
@@ -67,6 +71,8 @@ class AdminShell extends ConsumerWidget {
         place.id == null ? const JogadoresPage() : JogadorPage(id: place.id!),
       AdminSection.regras => const RegrasPage(),
       AdminSection.ganhos => const GanhosPage(),
+      AdminSection.pagamentos => const PagamentosPage(),
+      AdminSection.conciliacao => const ConciliacaoPage(),
       AdminSection.destaques => const DestaquesPage(),
       AdminSection.auditoria => const AuditoriaPage(),
       AdminSection.avaliacoes => const AvaliacoesPage(),

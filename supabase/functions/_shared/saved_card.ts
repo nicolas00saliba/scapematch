@@ -75,6 +75,11 @@ export function assertOwnedCard(
   return card;
 }
 
+/// O texto é estável. A cobrança não lê `error.message` no próprio arquivo.
+export function isMissingCard(error: unknown): boolean {
+  return error instanceof Error && error.message === "cartão não encontrado";
+}
+
 export type CardRpc = {
   rpc(
     name: string,

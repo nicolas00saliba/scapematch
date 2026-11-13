@@ -888,6 +888,43 @@ Deno.test("troca Pix para cartão com deleted:true e PENDING", async () => {
   assertEquals(store.payments[0].status, "PENDING");
 });
 
+Deno.test("troca para cartão trata Pix 404 como já cancelado", async () => {
+  const store = makeStore({});
+  openPix(store, "pay_sumiu");
+  store.payments.length = 0;
+  const response = await createCharge(
+    request("CREDIT_CARD", "idem-switch-404"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.billing_type, "CREDIT_CARD");
+  assertEquals(body.status, "authorized");
+  assertEquals(store.orphans.length, 0);
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].billing_type, "CREDIT_CARD");
+  assertEquals(store.charges[0].provider_ref, body.provider_ref);
+  assert(store.calls.some((call) => call.startsWith("DELETE ")));
+});
+
+Deno.test("Pix pendente 404 abre outra cobrança sem órfão", async () => {
+  const store = makeStore({});
+  openPix(store, "pay_sumiu");
+  store.payments.length = 0;
+  const response = await createCharge(
+    request("PIX", "idem-pix-404"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.billing_type, "PIX");
+  assertEquals(body.status, "pending");
+  assertEquals(store.orphans.length, 0);
+  assert(body.provider_ref !== "pay_sumiu");
+  assertEquals(store.charges.length, 1);
+  assertEquals(store.charges[0].provider_ref, body.provider_ref);
+});
+
 Deno.test("cartão recusado não cancela o Pix nem reserva a vaga", async () => {
   const store = makeStore({});
   openPix(store);
