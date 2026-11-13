@@ -312,6 +312,73 @@ Deno.test("segredo errado responde 401 e não chama o Asaas", async () => {
   assertEquals(seen, []);
 });
 
+Deno.test("sem env a conciliação aceita o segredo do vault", async () => {
+  const seen: string[] = [];
+  const calls: string[] = [];
+  const cache = new Map<string, { value: string; until: number }>();
+  const store = {
+    rpc(name: string) {
+      calls.push(name);
+      if (name === "cron_vault_secret") {
+        return Promise.resolve({ data: "segredo-vault", error: null });
+      }
+      if (name === "ledger_reconcile_snapshot") {
+        return Promise.resolve({
+          data: { charges: [], withdrawals: [], capped: false },
+          error: null,
+        });
+      }
+      if (name === "record_payment_divergences") {
+        return Promise.resolve({ data: "run-vault", error: null });
+      }
+      return Promise.resolve({ data: null, error: { message: "inesperado" } });
+    },
+  };
+  const wrong = await handleLedgerReconcile(
+    new Request("https://example.test/ledger", {
+      method: "POST",
+      headers: { "x-ledger-reconcile-secret": "outro" },
+    }),
+    {
+      env: envFor(""),
+      secretCache: cache,
+      now: new Date(1_000),
+      fetchFn: (input) => {
+        seen.push(String(input));
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      },
+      store,
+    },
+  );
+  assertEquals(wrong.status, 401);
+  assertEquals(seen.length, 0);
+  const ok = await handleLedgerReconcile(
+    new Request("https://example.test/ledger", {
+      method: "POST",
+      headers: { "x-ledger-reconcile-secret": "segredo-vault" },
+    }),
+    {
+      env: envFor(""),
+      secretCache: cache,
+      now: new Date(2_000),
+      fetchFn: (input) => {
+        seen.push(String(input));
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: [], hasMore: false }), {
+            status: 200,
+          }),
+        );
+      },
+      store,
+    },
+  );
+  assertEquals(ok.status, 200);
+  assert(seen.length > 0);
+  assertEquals(calls.filter((name) => name === "cron_vault_secret").length, 1);
+  const body = await ok.json();
+  assert(!JSON.stringify(body).includes("segredo-vault"));
+});
+
 Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () => {
   const seen: Array<{ url: string; key: string }> = [];
   const calls: string[] = [];

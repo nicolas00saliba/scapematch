@@ -4,7 +4,7 @@ O cron `venue-withdrawals` dispara todo dia às 08:20 em Brasília (`20 11 * * *
 
 Sem `venue_withdrawals_url` ou sem `venue_withdrawals_secret`, a função levanta `venue_withdrawals_config_ausente` e cita só o nome do item que falta. O pg_cron grava o job como `failed` em `cron.job_run_details`. A mensagem não leva o valor.
 
-`schedule-venue-withdrawals` não verifica JWT. Sem a env `VENUE_WITHDRAWALS_SECRET`, a função responde `503` e não envia evento ao Sentry, nem por chamada anônima. Com a env preenchida e o header errado ou vazio, a resposta é `401`, também sem evento.
+`schedule-venue-withdrawals` não verifica JWT. Sem a env `VENUE_WITHDRAWALS_SECRET` e sem o item `venue_withdrawals_secret` no Vault, a função responde `503` e não envia evento ao Sentry, nem por chamada anônima. Com um dos dois preenchido e o header errado ou vazio, a resposta é `401`, também sem evento. A env tem prioridade. O valor do Vault fica em cache na memória por um minuto e não entra em log.
 
 O alerta de configuração sai só do cron `venue-withdrawals-config`, uma vez por execução (`20 11 * * *`). Ele lê o item opcional `sentry_dsn` no Vault e manda um único POST quando falta `venue_withdrawals_url` ou `venue_withdrawals_secret`. O evento usa o fingerprint fixo `venue_withdrawals_config_ausente` e cita só o nome do item. Sem `sentry_dsn`, ou com um host que não seja `*.ingest.sentry.io` (nem `ingest.us` / `ingest.de`), não há POST. O job `venue-withdrawals` continua falhando e gravando o erro. O DSN não entra no corpo.
 
@@ -20,16 +20,18 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 | `asaas_base_url_production` | env `ASAAS_BASE_URL` é exatamente `https://api.asaas.com/v3` |
 | `asaas_webhook_token` | env `ASAAS_WEBHOOK_TOKEN` não vazia |
 | `asaas_webhook_email` | env `ASAAS_WEBHOOK_EMAIL` não vazia |
-| `venue_withdrawals_secret` | env `VENUE_WITHDRAWALS_SECRET` não vazia |
+| `venue_withdrawals_secret` | env `VENUE_WITHDRAWALS_SECRET` não vazia, ou Vault `venue_withdrawals_secret` não vazio |
+| `ledger_reconcile_secret` | env `LEDGER_RECONCILE_SECRET` não vazia, ou Vault `ledger_reconcile_secret` não vazio |
 | `vault_venue_withdrawals_url` | Vault `venue_withdrawals_url` não vazio |
 | `vault_venue_withdrawals_secret` | Vault `venue_withdrawals_secret` não vazio |
+| `vault_ledger_reconcile_secret` | Vault `ledger_reconcile_secret` não vazio |
 | `venue_payouts_enabled` | `venue_payouts_settings.enabled` |
 
 Sandbox (`https://api-sandbox.asaas.com/v3`), URL vazia e qualquer outro host contam como não.
 
 ## Migration
 
-Arquivo: `supabase/migrations/20261113160000_payments_readiness.sql`.
+Arquivo: `supabase/migrations/20261113160000_payments_readiness.sql`. O fallback do Vault está em `supabase/migrations/20261113210000_cron_vault_secret.sql`.
 
 Aplicar no projeto antes de publicar a função `payments-readiness` e antes de contar com o cron novo. Este agente não roda `supabase db push` nem cola SQL no banco remoto.
 
@@ -46,7 +48,7 @@ supabase secrets set --project-ref <project-ref> \
   VENUE_WITHDRAWALS_SECRET='<segredo longo, o mesmo do Vault>'
 ```
 
-`VENUE_WITHDRAWALS_SECRET` e o item `venue_withdrawals_secret` do Vault têm de ser o mesmo texto. `ASAAS_WEBHOOK_TOKEN` não é a chave da API.
+`VENUE_WITHDRAWALS_SECRET` é opcional. Sem ela, a função usa o item `venue_withdrawals_secret` do Vault, o mesmo texto que o cron manda no header. Se a env existir, ela ganha e tem de ser esse texto. `ASAAS_WEBHOOK_TOKEN` não é a chave da API.
 
 Publicar as funções, sem fazer isso daqui:
 

@@ -68,6 +68,7 @@ Deno.test("a prontidão descarta texto e só guarda sim ou não", () => {
   assertEquals(report.asaas_webhook_token, true);
   assertEquals(report.asaas_webhook_email, true);
   assertEquals(report.venue_withdrawals_secret, false);
+  assertEquals(report.ledger_reconcile_secret, false);
   assertEquals(report.vault_venue_withdrawals_url, true);
   assertEquals(report.vault_venue_withdrawals_secret, false);
   assertEquals(report.venue_payouts_enabled, false);
@@ -75,6 +76,20 @@ Deno.test("a prontidão descarta texto e só guarda sim ou não", () => {
   assertEquals(report.cron_failure_code, null);
   assert(!JSON.stringify(report).includes(secret));
   assert(!JSON.stringify(report).includes("ops@example.com"));
+});
+
+Deno.test("segredo só no vault conta como presente", () => {
+  const report = buildReadiness(
+    { get: () => "" },
+    {
+      vault_venue_withdrawals_secret: true,
+      vault_ledger_reconcile_secret: true,
+    },
+  );
+  assertEquals(report.venue_withdrawals_secret, true);
+  assertEquals(report.ledger_reconcile_secret, true);
+  assertEquals(report.vault_venue_withdrawals_secret, true);
+  assertEquals(report.vault_ledger_reconcile_secret, true);
 });
 
 Deno.test("produção ligada aparece sem devolver a URL", () => {
@@ -219,6 +234,50 @@ Deno.test("segredo errado responde 401 e não chama o Sentry", async () => {
   assertEquals(response.status, 401);
   assertEquals((await response.json()).error, "not authenticated");
   assertEquals(seen.length, 0);
+});
+
+Deno.test("sem env o cron de saques aceita o segredo do vault", async () => {
+  const calls: string[] = [];
+  const cache = new Map<string, { value: string; until: number }>();
+  const deps: PayoutDeps = {
+    env: { get: () => "" },
+    secretCache: cache,
+    nowSec: 10,
+    store: {
+      actor: () => Promise.resolve(null),
+      verifiedTotp: () => Promise.resolve(false),
+      isAdmin: () => Promise.resolve(false),
+      ownerEmail: () => Promise.resolve(""),
+      rpc: (fn) => {
+        calls.push(fn);
+        if (fn === "cron_vault_secret") return Promise.resolve("segredo-vault");
+        if (fn === "venue_payouts_enabled") return Promise.resolve(false);
+        return Promise.resolve([]);
+      },
+    },
+    clientFor: () => {
+      throw new Error("nao devia");
+    },
+    fetchFn: () => Promise.reject(new Error("nao devia")),
+  };
+  const wrong = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", {
+      method: "POST",
+      headers: { "x-venue-withdrawals-secret": "outro" },
+    }),
+    deps,
+  );
+  const again = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", {
+      method: "POST",
+      headers: { "x-venue-withdrawals-secret": "segredo-vault" },
+    }),
+    deps,
+  );
+  assertEquals(wrong.status, 401);
+  assertEquals(again.status, 200);
+  assertEquals(calls.filter((name) => name === "cron_vault_secret").length, 1);
+  assert(!JSON.stringify(await again.json()).includes("segredo-vault"));
 });
 
 Deno.test("a migration do cron levanta erro em vez de retornar calada", async () => {
