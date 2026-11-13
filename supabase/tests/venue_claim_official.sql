@@ -20,6 +20,16 @@ values
     'c3c3c3c3-c3c3-43c3-83c3-c3c3c3c3c3c3',
     'admin-claim@example.com',
     '{"display_name":"Admin Claim"}'
+  ),
+  (
+    'd4d4d4d4-d4d4-44d4-84d4-d4d4d4d4d4d4',
+    'primeiro-pedido@example.com',
+    '{"display_name":"Primeiro Pedido"}'
+  ),
+  (
+    'a4a4a4a4-a4a4-44a4-84a4-a4a4a4a4a4a4',
+    'segundo-pedido@example.com',
+    '{"display_name":"Segundo Pedido"}'
   )
 on conflict (id) do nothing;
 
@@ -76,6 +86,28 @@ insert into public.venues (
   'cnpj',
   '33445566000198',
   '41910001993',
+  'approved'
+);
+
+insert into public.venues (
+  id, owner_id, city_id, name, neighborhood, street_address, address_number,
+  postal_code, latitude, longitude, income_value, document_kind,
+  document_number, phone, status
+) values (
+  'e7e7e7e7-e7e7-47e7-87e7-e7e7e7e7e7e7',
+  'a1a1a1a1-a1a1-41a1-81a1-a1a1a1a1a1a1',
+  'curitiba',
+  'Casa Dois Pedidos',
+  'Centro',
+  'Rua Dois Pedidos',
+  '7',
+  '80010010',
+  -25.43,
+  -49.28,
+  4000,
+  'cnpj',
+  '33445566000197',
+  '41910001994',
   'approved'
 );
 
@@ -325,6 +357,29 @@ begin
   end if;
 end $$;
 
+select set_config('scapematch.claim_issue', 'on', false);
+insert into public.venue_claims (id, venue_id, claimant_id, note)
+values
+  (
+    'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1',
+    'e7e7e7e7-e7e7-47e7-87e7-e7e7e7e7e7e7',
+    'd4d4d4d4-d4d4-44d4-84d4-d4d4d4d4d4d4',
+    'primeiro'
+  ),
+  (
+    'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2',
+    'e7e7e7e7-e7e7-47e7-87e7-e7e7e7e7e7e7',
+    'a4a4a4a4-a4a4-44a4-84a4-a4a4a4a4a4a4',
+    'segundo'
+  ),
+  (
+    'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4',
+    'e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5',
+    'd4d4d4d4-d4d4-44d4-84d4-d4d4d4d4d4d4',
+    'casa ja reivindicada'
+  );
+select set_config('scapematch.claim_issue', 'off', false);
+
 begin;
 select set_config(
   'request.jwt.claim.sub',
@@ -358,11 +413,66 @@ begin
   end if;
 end $$;
 
+do $$
+declare
+  v_owner uuid;
+  v_status text;
+begin
+  perform public.admin_review_venue_claim(
+    'c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1',
+    'approved'
+  );
+  select owner_id into v_owner
+  from public.venues
+  where id = 'e7e7e7e7-e7e7-47e7-87e7-e7e7e7e7e7e7';
+  if v_owner is distinct from 'd4d4d4d4-d4d4-44d4-84d4-d4d4d4d4d4d4' then
+    raise exception 'o primeiro pedido não virou dono';
+  end if;
+  select status into v_status
+  from public.venue_claims
+  where id = 'c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2';
+  if v_status is distinct from 'rejected' then
+    raise exception 'o outro pedido pendente não foi recusado: %', v_status;
+  end if;
+
+  begin
+    perform public.admin_review_venue_claim(
+      'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4',
+      'approved'
+    );
+    raise exception 'casa já reivindicada foi aprovada';
+  exception
+    when sqlstate 'P0001' then
+      if sqlerrm is distinct from 'already_claimed' then
+        raise;
+      end if;
+  end;
+
+  if (
+    select status from public.venue_claims
+    where id = 'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4'
+  ) is distinct from 'pending' then
+    raise exception 'already_claimed marcou o pedido como aprovado';
+  end if;
+  if (
+    select owner_id from public.venues
+    where id = 'e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5'
+  ) is distinct from 'b2b2b2b2-b2b2-42b2-82b2-b2b2b2b2b2b2' then
+    raise exception 'a casa já reivindicada trocou de dono';
+  end if;
+end $$;
+
 reset role;
 commit;
 
 do $$
 begin
+  if (
+    select claimed_at is null from public.venues
+    where id = 'e7e7e7e7-e7e7-47e7-87e7-e7e7e7e7e7e7'
+  ) then
+    raise exception 'a casa de dois pedidos ficou sem claimed_at';
+  end if;
   if public.venue_finance_ready('e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5') then
     raise exception 'casa sem subconta e sem banco já recebe';
   end if;

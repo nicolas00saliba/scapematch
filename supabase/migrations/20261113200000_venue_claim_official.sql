@@ -34,6 +34,11 @@ comment on column public.venues.official_phone is
 comment on column public.venues.claimed_at is
   'Nulo enquanto o perfil não foi reivindicado. O cadastro do Parceiro preenche na hora. Seed e admin deixam nulo.';
 
+-- authenticated tem INSERT e UPDATE na tabela public.venues.
+-- No Postgres o privilégio da tabela cobre a coluna: o revoke
+-- abaixo não tira o que a tabela já deu. Quem trava
+-- official_email, official_phone e claimed_at é o trigger
+-- private.venues_guard.
 revoke insert (official_email, official_phone, claimed_at)
   on table public.venues from anon, authenticated;
 revoke update (official_email, official_phone, claimed_at)
@@ -716,6 +721,7 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_claim public.venue_claims%rowtype;
+  v_updated integer;
 begin
   if v_uid is null then
     raise exception 'not authenticated' using errcode = '28000';
@@ -741,20 +747,41 @@ begin
     raise exception 'claim not pending' using errcode = 'P0001';
   end if;
 
-  update public.venue_claims as claim
-  set
-    status = p_decision,
-    reviewed_by = v_uid,
-    reviewed_at = pg_catalog.now()
-  where claim.id = p_claim_id;
-
   if p_decision = 'approved' then
+    perform 1
+    from public.venues house
+    where house.id = v_claim.venue_id
+    for update;
+
     update public.venues as house
     set
       owner_id = v_claim.claimant_id,
       claimed_at = pg_catalog.now()
     where house.id = v_claim.venue_id
-      and house.status = 'approved';
+      and house.status = 'approved'
+      and house.claimed_at is null
+      and house.owner_id is distinct from v_claim.claimant_id;
+    get diagnostics v_updated = row_count;
+    if v_updated <> 1 then
+      raise exception 'already_claimed' using errcode = 'P0001';
+    end if;
+
+    update public.venue_claims as claim
+    set
+      status = 'approved',
+      reviewed_by = v_uid,
+      reviewed_at = pg_catalog.now()
+    where claim.id = p_claim_id;
+
+    perform pg_catalog.set_config('scapematch.claim_issue', 'on', true);
+    update public.venue_claims claim
+    set
+      status = 'rejected',
+      reviewed_at = pg_catalog.now()
+    where claim.venue_id = v_claim.venue_id
+      and claim.status = 'pending'
+      and claim.claimant_id is distinct from v_claim.claimant_id;
+    perform pg_catalog.set_config('scapematch.claim_issue', 'off', true);
 
     if v_claim.pending_venue_id is not null then
       update public.venues as pending_house
@@ -771,6 +798,13 @@ begin
       v_claim.venue_id, v_claim.claimant_id, v_uid, 'approve'
     );
   else
+    update public.venue_claims as claim
+    set
+      status = 'rejected',
+      reviewed_by = v_uid,
+      reviewed_at = pg_catalog.now()
+    where claim.id = p_claim_id;
+
     perform private.venue_claim_audit(
       v_claim.venue_id, v_claim.claimant_id, v_uid, 'reject'
     );

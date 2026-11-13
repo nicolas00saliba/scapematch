@@ -31,7 +31,9 @@ Depois do código, a tela pede a subconta Asaas (`provision-venue-wallet`, agora
 
 ## Admin
 
-Na lista de casas, **Reivindicações pendentes** aprova ou recusa (`admin_list_venue_claims` e `admin_review_venue_claim`). Na ficha da casa, **Gravar contato oficial** chama `admin_set_venue_contacts`. A auditoria guarda só se havia e-mail e telefone, não o valor. As três funções exigem admin com `aal2`.
+Na lista de casas, **Reivindicações pendentes** aprova ou recusa (`admin_list_venue_claims` e `admin_review_venue_claim`). Aprovar só segue se a casa está aprovada, `claimed_at` está nulo e o dono não é quem pediu. Se o update não pega uma linha, o erro é `already_claimed` e o pedido continua pendente. Os outros pedidos pendentes da mesma casa são recusados. Na ficha da casa, **Gravar contato oficial** chama `admin_set_venue_contacts`. A auditoria guarda só se havia e-mail e telefone, não o valor. As três funções exigem admin com `aal2`.
+
+`authenticated` tem `INSERT` e `UPDATE` na tabela `venues`. O revoke dessas colunas não vale por cima do privilégio da tabela. Quem trava `official_email`, `official_phone` e `claimed_at` é o trigger `private.venues_guard`.
 
 ## Ordem
 

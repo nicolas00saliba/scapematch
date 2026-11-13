@@ -94,5 +94,6 @@ run -f "$root/tests/room_passport.sql"
 echo "room passport ok"
 run -f "$root/tests/venue_withdrawals.sql"
 echo "venue withdrawals ok"
+# supabase/migrations/20261113200000_venue_claim_official.sql
 run -f "$root/tests/venue_claim_official.sql"
 echo "venue claim official ok"
