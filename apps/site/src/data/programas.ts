@@ -12,7 +12,9 @@ export type Icone =
   | 'pessoas'
   | 'casa'
   | 'niveis'
-  | 'relogio';
+  | 'relogio'
+  | 'carimbo'
+  | 'estrela';
 
 export type Programa = {
   id: string;
@@ -139,6 +141,49 @@ export const programas: Programa[] = [
     },
   },
   {
+    id: 'passaporte',
+    rota: '/vantagens/passaporte',
+    publico: 'jogador',
+    icone: 'carimbo',
+    titulo: 'Passaporte de salas',
+    beneficio: 'Um carimbo por sala',
+    apoio: 'Cada sala confirmada pela casa ganha um carimbo. Nos marcos, entram pontos bônus.',
+    passos: ['Jogue a sala', 'A casa confirma', 'Feche os marcos'],
+    regras:
+      'O carimbo entra quando a casa confirma o comparecimento da reserva paga, a partir do horário da sessão. Sem essa confirmação não há carimbo. Jogar de novo conta a visita, sem um segundo carimbo. Os pontos do marco são desconto, até o teto, e não pagam a vaga inteira. Se a reserva for estornada, o carimbo sai. Enquanto o passaporte estiver desligado, não há carimbo.',
+    seoTitulo: 'Passaporte de salas | EscapeMatch',
+    seoDescricao:
+      'Um carimbo para cada sala que você joga e pontos bônus nos marcos. O carimbo não se repete.',
+    og: '/assets/og/vantagens.png',
+    cta: {
+      rotulo: 'Ver o passaporte no app',
+      href: 'https://app.escapematch.com.br/login',
+      externo: true,
+    },
+  },
+  {
+    id: 'avaliacoes',
+    rota: '/vantagens/avaliacoes',
+    publico: 'jogador',
+    icone: 'estrela',
+    titulo: 'Avalie a sala',
+    beneficio: 'Um toque por item',
+    apoio:
+      'História, enigmas, cenário, atendimento, limpeza e custo-benefício. As melhores casas aparecem nos rankings.',
+    passos: ['Termine o jogo', 'Toque em cada item', 'Veja os rankings'],
+    regras:
+      'Avaliar é rápido: um toque por item. Os itens são História, Enigmas, Cenário e imersão, Atendimento, Limpeza e conforto e Custo-benefício. Os rankings de cidade, país e mundo reúnem as casas mais bem avaliadas. Sem avaliação de verdade, não há nota.',
+    seoTitulo: 'Avalie a sala em um toque | EscapeMatch',
+    seoDescricao:
+      'Depois do jogo, um toque por item. Os rankings mostram as casas mais bem avaliadas na cidade, no país e no mundo.',
+    og: '/assets/og/vantagens.png',
+    cta: {
+      rotulo: 'Avaliar no app',
+      href: 'https://app.escapematch.com.br/login',
+      externo: true,
+    },
+  },
+  {
     id: 'casa-indique-casa',
     rota: '/para-casas/indique-uma-casa',
     publico: 'casa',
@@ -203,6 +248,70 @@ export const programas: Programa[] = [
       externo: true,
     },
   },
+  {
+    id: 'avaliacoes-casa',
+    rota: '/para-casas/avaliacoes',
+    publico: 'casa',
+    icone: 'estrela',
+    titulo: 'Avaliações e insights',
+    beneficio: 'Nota por categoria',
+    apoio:
+      'O que a cidade acha da sua casa, em tempo real, e os rankings de cidade, país e mundo.',
+    passos: ['Jogador avalia', 'Você vê os pontos', 'Compare com a cidade'],
+    regras:
+      'As categorias são História, Enigmas, Cenário e imersão, Atendimento, Limpeza e conforto e Custo-benefício. O painel mostra pontos fortes e fracos em relação à cidade. A nota só existe quando há avaliações recebidas.',
+    seoTitulo: 'Avaliações e insights da casa | EscapeMatch',
+    seoDescricao:
+      'Nota por categoria e comparação com a cidade, em tempo real. Rankings de cidade, país e mundo, sem número inventado.',
+    og: '/assets/og/para-casas.png',
+    cta: {
+      rotulo: 'Ver no Parceiro',
+      href: 'https://parceiro.escapematch.com.br/',
+      externo: true,
+    },
+  },
+  {
+    id: 'mimos',
+    rota: '/para-casas/mimos',
+    publico: 'casa',
+    icone: 'presente',
+    titulo: 'Mimos do passaporte',
+    beneficio: 'Opcional, por sua conta',
+    apoio: 'Um brinde, uma foto ou um desconto seu, para o cliente voltar.',
+    passos: ['Cadastre o mimo', 'Jogador ganha o código', 'Você marca a entrega'],
+    regras:
+      'Nada é obrigatório. Você liga e desliga no Parceiro. O mimo pode valer ao carimbar uma sala ou ao fechar a casa. O custo é da casa.',
+    seoTitulo: 'Mimos do passaporte | EscapeMatch',
+    seoDescricao:
+      'A casa cadastra um mimo opcional no passaporte. O jogador mostra o código e a casa marca a entrega.',
+    og: '/assets/og/para-casas.png',
+    cta: {
+      rotulo: 'Cadastrar no Parceiro',
+      href: 'https://parceiro.escapematch.com.br/',
+      externo: true,
+    },
+  },
+  {
+    id: 'passaporte-casa',
+    rota: '/para-casas/passaporte',
+    publico: 'casa',
+    icone: 'carimbo',
+    titulo: 'Passaporte de salas',
+    beneficio: 'O jogador volta',
+    apoio: 'Quem começou a carimbar tende a voltar até fechar todas as salas da casa.',
+    passos: ['Ele joga a sala', 'A casa confirma', 'Ele volta pelas outras'],
+    regras:
+      'A casa confirma o comparecimento no Parceiro, a partir do horário da sessão. O carimbo e os pontos são do EscapeMatch. Fechar a casa, quando ela tem mais de uma sala, rende pontos de desconto para o jogador. A casa não paga esses pontos.',
+    seoTitulo: 'O passaporte traz o jogador de volta | EscapeMatch',
+    seoDescricao:
+      'Cada sala jogada vira um carimbo. O jogador tem motivo para voltar até fechar a casa.',
+    og: '/assets/og/para-casas.png',
+    cta: {
+      rotulo: 'Abrir o Parceiro',
+      href: 'https://parceiro.escapematch.com.br/',
+      externo: true,
+    },
+  },
 ];
 
 export const programasJogador = programas.filter((item) => item.publico === 'jogador');
@@ -220,7 +329,7 @@ export const regrasVagaGratis = [
 ];
 
 export const regrasJogador = [
-  '1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Só as boas-vindas dão desconto. Não viram dinheiro para saque.',
+  '1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Boas-vindas e passaporte dão desconto, até o teto. Não viram dinheiro para saque.',
   'Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.',
   'O código de quem indicou entra no cadastro ou nas primeiras 24 horas. Uma indicação vale por 1 ano.',
   'Se a reserva for cancelada, os pontos ganhos nela também saem da conta.',

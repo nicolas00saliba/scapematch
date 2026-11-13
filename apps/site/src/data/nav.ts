@@ -23,6 +23,8 @@ export const vantagensLinks: Link[] = [
   { rotulo: 'Indique amigos', href: '/vantagens/indique-amigos' },
   { rotulo: 'Indique uma casa', href: '/vantagens/indique-uma-casa' },
   { rotulo: 'Níveis', href: '/vantagens/niveis' },
+  { rotulo: 'Passaporte de salas', href: '/vantagens/passaporte' },
+  { rotulo: 'Avalie a sala', href: '/vantagens/avaliacoes' },
   { rotulo: 'Regulamento', href: '/vantagens/regulamento' },
 ];
 
@@ -38,6 +40,9 @@ export const casaParceiraLinks: Link[] = [
   { rotulo: 'Indique uma casa', href: '/para-casas/indique-uma-casa' },
   { rotulo: 'Indique jogadores', href: '/para-casas/indique-jogadores' },
   { rotulo: 'Horário vazio', href: '/para-casas/horario-vazio' },
+  { rotulo: 'Avaliações e insights', href: '/para-casas/avaliacoes' },
+  { rotulo: 'Mimos do passaporte', href: '/para-casas/mimos' },
+  { rotulo: 'Passaporte de salas', href: '/para-casas/passaporte' },
 ];
 
 export const empresaLinks: Link[] = [
@@ -66,6 +71,8 @@ export const rodape: Coluna[] = [
       { rotulo: 'Indique amigos', href: '/vantagens/indique-amigos' },
       { rotulo: 'Indique uma casa', href: '/vantagens/indique-uma-casa' },
       { rotulo: 'Níveis', href: '/vantagens/niveis' },
+      { rotulo: 'Passaporte de salas', href: '/vantagens/passaporte' },
+      { rotulo: 'Avalie a sala', href: '/vantagens/avaliacoes' },
       { rotulo: 'Regulamento dos pontos', href: '/vantagens/regulamento' },
     ],
   },
@@ -78,6 +85,9 @@ export const rodape: Coluna[] = [
       { rotulo: 'Indique uma casa', href: '/para-casas/indique-uma-casa' },
       { rotulo: 'Indique jogadores', href: '/para-casas/indique-jogadores' },
       { rotulo: 'Horário vazio', href: '/para-casas/horario-vazio' },
+      { rotulo: 'Avaliações e insights', href: '/para-casas/avaliacoes' },
+      { rotulo: 'Mimos do passaporte', href: '/para-casas/mimos' },
+      { rotulo: 'Passaporte de salas', href: '/para-casas/passaporte' },
     ],
   },
   {
@@ -114,6 +124,8 @@ const nomes: Record<string, string> = {
   '/vantagens/indique-amigos': 'Indique amigos',
   '/vantagens/indique-uma-casa': 'Indique uma casa',
   '/vantagens/niveis': 'Níveis',
+  '/vantagens/passaporte': 'Passaporte de salas',
+  '/vantagens/avaliacoes': 'Avalie a sala',
   '/vantagens/regulamento': 'Regulamento dos pontos',
   '/para-casas': 'Para casas',
   '/para-casas/como-funciona': 'Como funciona',
@@ -123,6 +135,9 @@ const nomes: Record<string, string> = {
   '/para-casas/indique-uma-casa': 'Indique uma casa',
   '/para-casas/indique-jogadores': 'Indique jogadores',
   '/para-casas/horario-vazio': 'Horário vazio',
+  '/para-casas/avaliacoes': 'Avaliações e insights',
+  '/para-casas/mimos': 'Mimos do passaporte',
+  '/para-casas/passaporte': 'Passaporte de salas',
   '/ajuda': 'Ajuda',
   '/ajuda/grupo': 'Grupo',
   '/ajuda/pagamento': 'Pagamento',

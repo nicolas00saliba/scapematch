@@ -9,7 +9,7 @@ Não há perfil oficial de Instagram, TikTok ou LinkedIn publicado neste reposit
 ## Preços
 
 - O preço da vaga é o da sala, por pessoa, mostrado no app. Não há um ingresso único do EscapeMatch.
-- Jogue e ganhe pontos. Indique amigos e ganhe a cada jogo deles. Junte pontos e jogue de graça. Cashback de até 5% em pontos a cada jogo. 1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Quem mais indica, mais joga de graça. Só as boas-vindas dão desconto. Não viram saque. A indicação vale 2,5% em pontos de cada reserva do amigo.
+- Jogue e ganhe pontos. Indique amigos e ganhe a cada jogo deles. Junte pontos e jogue de graça. Cashback de até 5% em pontos a cada jogo. 1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Quem mais indica, mais joga de graça. Boas-vindas e passaporte dão desconto, até o teto. Não viram saque. A indicação vale 2,5% em pontos de cada reserva do amigo. O passaporte dá um carimbo por sala quando a casa confirma o comparecimento, e pontos bônus nos marcos. Avaliar a sala é um toque por item. Há rankings de cidade, país e mundo, só com avaliações reais.
 - Dá para usar a partir de 1.000 pontos. Se a reserva for cancelada, os pontos usados são devolvidos.
 - Comissão da casa: 25% só sobre o que o app vender. Exemplo publicado: vaga de R$ 100, comissão de R$ 25, casa com R$ 75.
 
@@ -19,10 +19,12 @@ Não há perfil oficial de Instagram, TikTok ou LinkedIn publicado neste reposit
 - [Escape room sozinho](https://escapematch.com.br/guia/escape-room-sozinho): respostas diretas sobre jogar sem grupo.
 - [Como funciona](https://escapematch.com.br/como-funciona): como o grupo se forma e quando o jogo confirma.
 - [Escape room](https://escapematch.com.br/experiencias/escape-room): a modalidade disponível.
-- [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo e vaga grátis indicando amigos.
+- [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo, passaporte de salas e vaga grátis indicando amigos.
+- [Passaporte de salas](https://escapematch.com.br/vantagens/passaporte): um carimbo por sala e pontos bônus nos marcos.
+- [Avalie a sala](https://escapematch.com.br/vantagens/avaliacoes): um toque por item e rankings das casas.
 - [Regulamento dos pontos](https://escapematch.com.br/vantagens/regulamento): regras completas dos pontos.
 - [Ajuda](https://escapematch.com.br/ajuda): perguntas frequentes.
-- [Para casas](https://escapematch.com.br/para-casas): casas parceiras e preços.
+- [Para casas](https://escapematch.com.br/para-casas): casas parceiras, avaliações, mimos do passaporte e preços.
 - [Sobre](https://escapematch.com.br/sobre): o que a plataforma é.
 - [Escape room em Curitiba](https://escapematch.com.br/escape-room-curitiba): achar grupo, reservar, avaliações e ranking de tempo.
 - [Contato](https://escapematch.com.br/contato): e-mail, CNPJ e links do app e do Parceiro.
