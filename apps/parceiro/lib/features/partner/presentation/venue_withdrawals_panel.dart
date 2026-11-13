@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/sharing/external_url_launch.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_documents_repository.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repository.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_documents_card.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
@@ -27,6 +29,7 @@ class VenueWithdrawalsPanel extends ConsumerStatefulWidget {
 
 class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   VenuePayoutSnapshot? _snapshot;
+  VenueDocumentsView _documents = VenueDocumentsView.hidden;
   var _loading = true;
   var _editingBank = false;
   var _busy = false;
@@ -70,11 +73,77 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
     final snapshot = await ref
         .read(venueWithdrawalRepositoryProvider)
         .load(widget.venueId);
+    final documents = await _readDocuments();
     if (!mounted) return;
     setState(() {
       _loading = false;
       _apply(snapshot);
+      _documents = documents;
     });
+  }
+
+  Future<VenueDocumentsView> _readDocuments() async {
+    try {
+      return await ref
+          .read(venueDocumentsRepositoryProvider)
+          .load(widget.venueId);
+    } on VenueDocumentsFailure catch (error) {
+      if (error.code == 'not owner') return VenueDocumentsView.hidden;
+      return VenueDocumentsView.unavailable;
+    } on Object {
+      return VenueDocumentsView.unavailable;
+    }
+  }
+
+  Future<void> _refreshDocuments() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final documents = await _readDocuments();
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _documents = documents;
+      });
+    } on VenueDocumentsFailure catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = venueDocumentFailureMessage(error.code);
+      });
+    }
+  }
+
+  Future<void> _uploadDocument(VenueDocumentItem item) async {
+    final file = await ref.read(venueDocumentPickerProvider).pick();
+    if (file == null || !mounted) return;
+    if (!await _guard()) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final documents = await ref
+          .read(venueDocumentsRepositoryProvider)
+          .upload(
+            venueId: widget.venueId,
+            documentId: item.id,
+            bytes: file.bytes,
+          );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _documents = documents;
+      });
+    } on VenueDocumentsFailure catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = venueDocumentFailureMessage(error.code);
+      });
+    }
   }
 
   void _apply(VenuePayoutSnapshot snapshot) {
@@ -209,6 +278,14 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
         const SizedBox(height: 6),
         Text(PartnerMessages.withdrawalsBody),
         const SizedBox(height: 16),
+        VenueDocumentsCard(
+          view: _documents,
+          busy: _busy,
+          onOpen: launchExternalUrl,
+          onUpload: _uploadDocument,
+          onRefresh: _refreshDocuments,
+        ),
+        if (_documents.visible) const SizedBox(height: 16),
         if (staff)
           const _PayoutCard(child: Text(PartnerMessages.withdrawalStaff))
         else ...[
@@ -269,7 +346,10 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
                 ),
                 FilledButton(
                   key: PartnerKeys.withdrawalSubmit,
-                  onPressed: _busy || snapshot.withdrawalsBlocked
+                  onPressed:
+                      _busy ||
+                          snapshot.withdrawalsBlocked ||
+                          _documents.blocksWithdraw
                       ? null
                       : _withdraw,
                   child: const Text(PartnerMessages.withdrawalSubmit),

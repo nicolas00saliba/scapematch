@@ -1,5 +1,12 @@
 # Decisões provisórias
 
+## Documentos da subconta seguem o link do Asaas
+
+- **Data:** 2026-11-13
+- **Decisão:** o saque da casa espera a aprovação cadastral. A tela de saque do Parceiro consulta `GET /v3/myAccount/documents` e `GET /v3/myAccount/status` pela Edge Function `venue-documents`, com a chave da subconta. O Asaas devolve `onboardingUrl` (em geral `https://cadastro.io/...`) quando o envio é no site dele. Esse link é o caminho: a documentação diz que `POST /v3/myAccount/documents/{id}` é recusado se o grupo tem `onboardingUrl`. O app abre o link e não guarda o arquivo. Só o grupo sem link aceita upload (PDF, JPG ou PNG), direto para o Asaas, depois de reautenticar. O saque fica desligado enquanto `documentation` ou `general` não estão `APPROVED`. Uma consulta nos primeiros 15 segundos depois de criar a subconta pode listar documento que ainda não é obrigatório; a tela pede para atualizar.
+- **Onde está no código:** `supabase/functions/venue-documents`, `supabase/functions/_shared/venue_documents.ts`, `apps/parceiro` na tela de saque.
+- **Como trocar depois:** esta função não foi publicada. O Nícolas publica `venue-documents` junto com o app, sem migration. A chave da subconta continua só em `venue_asaas_keys`.
+
 ## O host escolhe o mínimo e o máximo
 
 - **Data:** 2026-11-10
