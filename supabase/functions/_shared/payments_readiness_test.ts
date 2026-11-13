@@ -10,6 +10,28 @@ import {
   type PayoutDeps,
 } from "./venue_payouts.ts";
 
+const officialAsaasHosts = new Set([
+  "api.asaas.com",
+  "api-sandbox.asaas.com",
+  "asaas.com",
+]);
+
+function leaksOfficialAsaasHost(value: unknown): boolean {
+  if (typeof value === "string") {
+    if (officialAsaasHosts.has(value)) return true;
+    try {
+      return officialAsaasHosts.has(new URL(value).hostname);
+    } catch {
+      return false;
+    }
+  }
+  if (Array.isArray(value)) return value.some(leaksOfficialAsaasHost);
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).some(leaksOfficialAsaasHost);
+  }
+  return false;
+}
+
 Deno.test("a base de produção é só a URL oficial, sem barra", () => {
   assert(asaasBaseUrlIsProduction(asaasProductionBaseUrl));
   assert(asaasBaseUrlIsProduction(`${asaasProductionBaseUrl}/`));
@@ -73,7 +95,7 @@ Deno.test("produção ligada aparece sem devolver a URL", () => {
   assertEquals(report.venue_payouts_enabled, true);
   assertEquals(report.cron_last_failed, false);
   assertEquals(report.cron_failure_code, null);
-  assert(!JSON.stringify(report).includes("asaas.com"));
+  assertEquals(leaksOfficialAsaasHost(report), false);
 });
 
 Deno.test("sem JWT a prontidão não revela o que está configurado", async () => {
