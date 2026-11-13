@@ -41,6 +41,10 @@ abstract final class PartnerKeys {
   static const venueClaimConfirm = Key('venue-claim-confirm');
   static const venueClaimFinance = Key('venue-claim-finance');
   static const venueClaimProvision = Key('venue-claim-provision');
+  static const venueClaimChecklist = Key('venue-claim-checklist');
+  static const venueClaimStepSubaccount = Key('venue-claim-step-subaccount');
+  static const venueClaimStepDocuments = Key('venue-claim-step-documents');
+  static const venueClaimStepPix = Key('venue-claim-step-pix');
   static const venueSignupSent = Key('venue-signup-sent');
   static const venueFormError = Key('venue-form-error');
   static const venueApproval = Key('venue-approval');

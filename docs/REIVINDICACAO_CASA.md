@@ -25,7 +25,7 @@ O envio usa Resend (`RESEND_API_KEY` e `CLAIM_MAIL_FROM` ou `PAYOUT_MAIL_FROM`).
 
 ## Subconta e conta bancária
 
-Depois do código, a tela pede a subconta Asaas (`provision-venue-wallet`, agora também para o dono da própria casa quando `asaas_wallet_id` está vazio) e indica a chave Pix na tela de saldo. O #133 ainda não está no `main`. Quando ele entrar, o rebase deste PR liga o passo seguinte à tela de documentos da subconta (`VenueDocumentsCard`, na tela de saque).
+Depois do código, o checklist segue nesta ordem, cada item com status: subconta Asaas (`provision-venue-wallet`, também para o dono da própria casa quando `asaas_wallet_id` está vazio), documentos da subconta (`VenueDocumentsCard`, função `venue-documents`) e chave Pix. A chave se cadastra na tela de saldo. O status da chave usa `venue_finance_ready` (subconta e conta bancária). Sem migration nova. A função `venue-documents` continua a publicar à parte, como no #133.
 
 `public.venue_finance_ready` é verdadeiro só com casa aprovada, não suspensa, subconta preenchida e linha em `venue_bank_accounts`. A vitrine expõe `finance_ready`. `create-charge` chama essa função (a service role não lê `venue_bank_accounts`) e responde 409 sem subconta ou sem conta bancária. Saque já recusava os dois. O botão de pagar no app jogador e o aviso no Parceiro seguem essa função. A casa continua na vitrine: o catálogo não some só porque o recebimento está desligado.
 
