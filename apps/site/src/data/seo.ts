@@ -13,13 +13,15 @@ export const definicao =
 
 export const emailContato = 'contato@escapematch.com.br';
 
+export const nomesAlternativos = ['ScapeMatch', 'Scape Match', 'Escape Match'];
+
 export const organizacao = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'EscapeMatch',
   legalName: 'ESCAPEMATCH TECNOLOGIA LTDA',
   taxID: '70.100.608/0001-73',
-  alternateName: ['Escape Match'],
+  alternateName: nomesAlternativos,
   url: `${origem}/`,
   // PNG quadrado de 512 px. O Google pede, no logo da Organization,
   // pelo menos 112 px, em formato que o Google Imagens rastreia, e
@@ -59,6 +61,7 @@ export const aplicativo = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
   name: 'EscapeMatch',
+  alternateName: nomesAlternativos,
   url: 'https://app.escapematch.com.br/',
   applicationCategory: 'SocialNetworkingApplication',
   operatingSystem: 'Web, Android, iOS',

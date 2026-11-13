@@ -1,8 +1,9 @@
 ---
 import Base from '../../layouts/Base.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
+import FaqMarca from '../../components/FaqMarca.astro';
 import { definicao, faqPage } from '../../data/seo';
-import { oQueE } from '../../data/perguntas-marca';
+import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
 
 const respostas = [
   {
@@ -26,6 +27,7 @@ const respostas = [
       'Não. A vaga que falta pode ficar com alguém que você não conhecia e que também chegou sozinho. Vocês se encontram na casa, no horário marcado, e a casa conduz a sessão.',
   },
   oQueE,
+  ...desambiguacaoMarca,
 ];
 ---
 
@@ -85,6 +87,7 @@ const respostas = [
         A lista dos guias está em <a href="/guia">guias</a>.
       </p>
     </section>
+    <FaqMarca />
   </article>
   <CtaBlock titulo="Entrar em dupla num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
 </Base>

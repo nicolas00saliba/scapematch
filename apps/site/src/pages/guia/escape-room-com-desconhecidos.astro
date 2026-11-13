@@ -1,8 +1,9 @@
 ---
 import Base from '../../layouts/Base.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
+import FaqMarca from '../../components/FaqMarca.astro';
 import { definicao, faqPage } from '../../data/seo';
-import { oQueE } from '../../data/perguntas-marca';
+import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
 
 const respostas = [
   {
@@ -26,6 +27,7 @@ const respostas = [
       'Cada pessoa paga só a própria vaga. A cobrança só acontece quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado.',
   },
   oQueE,
+  ...desambiguacaoMarca,
 ];
 ---
 
@@ -85,6 +87,7 @@ const respostas = [
         Para abrir o app, a página é <a href="/app">Baixar o app</a>.
       </p>
     </section>
+    <FaqMarca />
   </article>
   <CtaBlock titulo="Entrar num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
 </Base>

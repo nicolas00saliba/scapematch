@@ -72,6 +72,44 @@ DEFINICAO = (
     "e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. "
     "Lançamento em Curitiba. Não é um jogo de celular."
 )
+NOMES_ALTERNATIVOS = ["ScapeMatch", "Scape Match", "Escape Match"]
+HOME_DESCRICAO = (
+    "Aplicativo brasileiro para jogar escape room em grupo quando se está sozinho. "
+    "Chamava-se ScapeMatch. Lançamento em Curitiba. Não é um jogo de celular."
+)
+FRASE_NOME = (
+    "O EscapeMatch se chamava ScapeMatch até novembro de 2026; "
+    "é o mesmo aplicativo, só o nome mudou."
+)
+REFORCO_PRESENCIAL = (
+    "Não é um jogo de celular nem um jogo de quebra-cabeça ou match-3. "
+    "É um app que junta pessoas para jogar escape room presencial."
+)
+RESPOSTA_ANTIGO = (
+    "Sim. O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
+    "É o mesmo aplicativo, só o nome mudou."
+)
+RESPOSTA_QUEBRA = (
+    "Não. O jogo acontece presencialmente na casa de escape room. "
+    "O app só forma o grupo e cobra a vaga quando o grupo confirma."
+)
+PERGUNTA_ANTIGO = "O EscapeMatch é o antigo ScapeMatch?"
+PERGUNTA_QUEBRA = "O EscapeMatch é um jogo de quebra-cabeça de celular?"
+LINHA_NOME_ANTIGO = (
+    "O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
+    "Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles."
+)
+GUIAS_MARCA = (
+    "/guia/escape-room-sozinho",
+    "/guia/escape-room-sozinho-curitiba",
+    "/guia/como-achar-grupo-escape-room",
+    "/guia/escape-room-com-desconhecidos",
+    "/guia/escape-room-para-2-pessoas",
+    "/guia/nao-tenho-amigos-para-escape-room",
+    "/guia/escape-room-em-grupo-curitiba",
+    "/guia/primeira-vez-em-escape-room",
+    "/sobre",
+)
 SELO = "Escape room agora. Jogos de tabuleiro e laser tag em breve."
 CHAVE_INDEXNOW = re.compile(r"^[0-9a-f]{32}\.txt$")
 TOKEN_BUSCADOR = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
@@ -158,6 +196,20 @@ def exigir_faq(html: str, rota: str, perguntas: tuple[str, ...]) -> None:
             falha(f"{rota} não mostra a pergunta: {pergunta}")
         if pergunta not in nomes:
             falha(f"{rota} FAQPage sem a pergunta: {pergunta}")
+
+
+def exigir_resposta(html: str, rota: str, pergunta: str, resposta: str) -> None:
+    faqs = [bloco for bloco in blocos_ld(html) if bloco.get("@type") == "FAQPage"]
+    if len(faqs) != 1:
+        falha(f"{rota} saiu com {len(faqs)} FAQPage")
+    for item in faqs[0].get("mainEntity", []):
+        if item.get("name") != pergunta:
+            continue
+        texto = (item.get("acceptedAnswer") or {}).get("text", "")
+        if texto != resposta or resposta not in html:
+            falha(f"{rota} resposta divergiu: {pergunta}")
+        return
+    falha(f"{rota} FAQPage sem a pergunta: {pergunta}")
 
 
 def falha(msg: str) -> None:
@@ -412,8 +464,8 @@ def main() -> None:
         falha("legalName ausente")
     if org.get("taxID") != "70.100.608/0001-73":
         falha("taxID ausente")
-    if org.get("alternateName") != ["Escape Match"]:
-        falha("alternateName ausente")
+    if org.get("alternateName") != NOMES_ALTERNATIVOS:
+        falha("alternateName da Organization divergiu")
     if org.get("email") != EMAIL_CONTATO:
         falha("Organization sem o e-mail já publicado")
     if org.get("sameAs") != [INSTAGRAM]:
@@ -435,6 +487,8 @@ def main() -> None:
     if len(apps) != 1:
         falha(f"/app saiu com {len(apps)} WebApplication")
     oferta = apps[0].get("offers") or {}
+    if apps[0].get("alternateName") != NOMES_ALTERNATIVOS:
+        falha("alternateName do WebApplication divergiu")
     if apps[0].get("applicationCategory") != "SocialNetworkingApplication":
         falha("applicationCategory divergiu")
     if apps[0].get("operatingSystem") != "Web, Android, iOS":
@@ -457,6 +511,18 @@ def main() -> None:
         falha("o guia saiu sem FAQPage")
     if DEFINICAO not in guia or DEFINICAO not in arquivo("/sobre").read_text():
         falha("definição canônica ausente no guia ou no sobre")
+    if f'<meta name="description" content="{HOME_DESCRICAO}">' not in home_html:
+        falha("descrição da home divergiu")
+    if len(HOME_DESCRICAO) > 155:
+        falha(f"descrição da home com {len(HOME_DESCRICAO)} caracteres")
+    for rota in GUIAS_MARCA:
+        html_marca = arquivo(rota).read_text()
+        if rota == "/sobre":
+            if FRASE_NOME not in html_marca or REFORCO_PRESENCIAL not in html_marca:
+                falha("sobre sem a frase do nome antigo ou o reforço presencial")
+        exigir_faq(html_marca, rota, (PERGUNTA_ANTIGO, PERGUNTA_QUEBRA))
+        exigir_resposta(html_marca, rota, PERGUNTA_ANTIGO, RESPOSTA_ANTIGO)
+        exigir_resposta(html_marca, rota, PERGUNTA_QUEBRA, RESPOSTA_QUEBRA)
     exigir_faq(
         guia,
         "/guia/escape-room-sozinho",
@@ -596,6 +662,8 @@ def main() -> None:
             falha(f"{nome} incompleto")
         if DEFINICAO not in texto or "Não confundir com jogos de celular chamados Escape Match." not in texto:
             falha(f"{nome} sem a definição ou a desambiguação")
+        if LINHA_NOME_ANTIGO not in texto:
+            falha(f"{nome} sem o nome antigo")
         if INSTAGRAM not in texto:
             falha(f"{nome} sem o Instagram oficial")
         if "Não há perfil oficial de Instagram" in texto:

@@ -1,8 +1,9 @@
 ---
 import Base from '../../layouts/Base.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
+import FaqMarca from '../../components/FaqMarca.astro';
 import { definicao, faqPage } from '../../data/seo';
-import { oQueE } from '../../data/perguntas-marca';
+import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
 
 const respostas = [
   {
@@ -26,6 +27,7 @@ const respostas = [
       'A sessão é presencial. Vocês se encontram na casa, no horário marcado, e a casa conduz o jogo. O EscapeMatch forma o grupo e cobra a sua vaga. Não é um jogo de celular. Jogos de tabuleiro e laser tag estão em breve.',
   },
   oQueE,
+  ...desambiguacaoMarca,
 ];
 ---
 
@@ -84,6 +86,7 @@ const respostas = [
         Para abrir o app, a página é <a href="/app">Baixar o app</a>.
       </p>
     </section>
+    <FaqMarca />
     <section>
       <h2>Onde tirar dúvidas</h2>
       <p>
