@@ -45,6 +45,7 @@ abstract class AdminApi {
   Future<String?> provisionWallet(String venueId);
   Future<PaymentsBoard> payments();
   Future<bool> setVenuePayoutsEnabled(bool enabled);
+  Future<DivergenceBoard> divergences();
 }
 
 /// O banco recusou o pedido. A mensagem é a do `raise` (SQLSTATE 22023).
@@ -373,6 +374,51 @@ class PaymentsBoard {
   final List<PaymentLine> refunds;
   final List<PaymentLine> withdrawals;
   final List<WebhookErrorLine> webhookErrors;
+}
+
+class DivergenceRow {
+  const DivergenceRow({
+    required this.kind,
+    required this.providerRef,
+    required this.localId,
+    required this.expected,
+    required this.actual,
+    required this.when,
+  });
+
+  final String kind;
+  final String providerRef;
+  final String localId;
+  final String expected;
+  final String actual;
+  final DateTime? when;
+}
+
+class DivergenceBoard {
+  const DivergenceBoard({
+    required this.startedAt,
+    required this.paymentCount,
+    required this.transferCount,
+    required this.divergenceCount,
+    required this.truncated,
+    required this.rows,
+  });
+
+  final DateTime? startedAt;
+  final int paymentCount;
+  final int transferCount;
+  final int divergenceCount;
+  final bool truncated;
+  final List<DivergenceRow> rows;
+
+  static const empty = DivergenceBoard(
+    startedAt: null,
+    paymentCount: 0,
+    transferCount: 0,
+    divergenceCount: 0,
+    truncated: false,
+    rows: [],
+  );
 }
 
 class AuditRow {
@@ -841,6 +887,31 @@ class SupabaseAdminApi implements AdminApi {
       'p_enabled': enabled,
     });
     return value == true;
+  }
+
+  @override
+  Future<DivergenceBoard> divergences() async {
+    final row = _map(await _rpc('admin_payment_divergences'));
+    final run = row['run'];
+    final ready = run is Map ? _map(run) : <String, dynamic>{};
+    return DivergenceBoard(
+      startedAt: DateTime.tryParse(_text(ready['started_at'])),
+      paymentCount: _int(ready['payment_count']),
+      transferCount: _int(ready['transfer_count']),
+      divergenceCount: _int(ready['divergence_count']),
+      truncated: ready['truncated'] == true,
+      rows: [
+        for (final item in _list(row['rows']))
+          DivergenceRow(
+            kind: _text(item['kind']),
+            providerRef: _text(item['provider_ref']),
+            localId: _text(item['local_id']),
+            expected: _text(item['expected']),
+            actual: _text(item['actual']),
+            when: DateTime.tryParse(_text(item['created_at'])),
+          ),
+      ],
+    );
   }
 
   @override
@@ -1326,6 +1397,7 @@ class MemoryAdminApi implements AdminApi {
 
   bool payoutsEnabled = false;
   PaymentsBoard? paymentsFixture;
+  DivergenceBoard divergenceFixture = DivergenceBoard.empty;
 
   @override
   Future<PaymentsBoard> payments() async {
@@ -1376,6 +1448,9 @@ class MemoryAdminApi implements AdminApi {
     );
     return enabled;
   }
+
+  @override
+  Future<DivergenceBoard> divergences() async => divergenceFixture;
 
   void _note(String action, String id, String after) {
     audits.add(

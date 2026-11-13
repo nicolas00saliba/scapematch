@@ -23,6 +23,10 @@ verify_jwt = true
 [functions.reconcile-payments]
 verify_jwt = false
 
+# O cron manda x-ledger-reconcile-secret, não um JWT. A função só faz GET.
+[functions.ledger-reconcile]
+verify_jwt = false
+
 [functions.venue-payouts]
 verify_jwt = true
 

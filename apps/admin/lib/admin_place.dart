@@ -6,6 +6,7 @@ enum AdminSection {
   regras,
   ganhos,
   pagamentos,
+  conciliacao,
   destaques,
   auditoria,
   avaliacoes,
