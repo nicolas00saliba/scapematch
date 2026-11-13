@@ -253,6 +253,9 @@ function adminFor(store: Store) {
     },
     rpc(name: string, args: Record<string, unknown>) {
       return lock(() => {
+        if (name === "venue_finance_ready") {
+          return { data: true, error: null };
+        }
         if (name === "commission_bps_for_venue") {
           return { data: 1000, error: null };
         }

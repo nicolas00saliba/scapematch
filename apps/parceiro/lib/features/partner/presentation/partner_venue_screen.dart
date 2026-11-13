@@ -5,9 +5,12 @@ import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
+import 'package:scapematch_parceiro/features/partner/domain/venue_claim.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/company_type_field.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_possession_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
@@ -39,6 +42,9 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
   var _accepted = false;
   var _confirmDuplicate = false;
   List<String> _warnings = const [];
+  ClaimableVenue? _claim;
+  var _claiming = false;
+  final _claims = const VenueClaimClient();
 
   @override
   void initState() {
@@ -111,6 +117,14 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       });
       return;
     }
+    if (result.claim != null) {
+      setState(() {
+        _busy = false;
+        _claim = result.claim;
+        _error = null;
+      });
+      return;
+    }
     if (result.error != null) {
       setState(() {
         _busy = false;
@@ -123,6 +137,21 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final claim = _claim;
+    if (claim != null && _claiming) {
+      return AppScaffold(
+        appBar: AppBar(title: Text(claim.name)),
+        body: VenueClaimDesk(
+          venue: claim,
+          onSend: () => _claims.send(claim.venueId),
+          onConfirm: (code) => _claims.confirm(claim.venueId, code),
+          onProvision: () => _claims.provision(claim.venueId),
+          onOpenHouse: () {
+            ref.read(partnerSessionProvider.notifier).reload();
+          },
+        ),
+      );
+    }
     return AppScaffold(
       desktopMaxWidth: 640,
       appBar: AppBar(
@@ -303,6 +332,13 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
               'Li e aceito os termos do Parceiro, a privacidade e o reembolso.',
             ),
           ),
+          if (claim != null) ...[
+            const SizedBox(height: 12),
+            VenueClaimOffer(
+              venue: claim,
+              onClaim: () => setState(() => _claiming = true),
+            ),
+          ],
           if (_warnings.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(PartnerMessages.duplicateTitle),

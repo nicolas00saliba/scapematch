@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
+  financeBlockedMessage,
+  paymentBlock,
+} from "../_shared/venue_finance.ts";
+import {
   asaasStatus,
   cardDeclined,
   clientFailure,
@@ -198,8 +202,23 @@ export async function createCharge(
       .select("id, name, asaas_wallet_id, status")
       .eq("id", group.venue_id)
       .maybeSingle();
-    if (!venue || venue.status !== "approved" || !venue.asaas_wallet_id) {
-      return json({ error: "A casa ainda não tem subconta Asaas." }, 409);
+    const blocked = paymentBlock({
+      status: (venue?.status as string | null) ?? null,
+      walletId: (venue?.asaas_wallet_id as string | null) ?? null,
+      hasBankAccount: true,
+    });
+    if (!venue || blocked) {
+      return json({
+        error: blocked ?? "A casa ainda não tem subconta Asaas.",
+      }, 409);
+    }
+    // service_role não lê venue_bank_accounts. A função vê a conta.
+    const { data: ready, error: readyError } = await admin.rpc(
+      "venue_finance_ready",
+      { p_venue_id: group.venue_id },
+    );
+    if (readyError || ready !== true) {
+      return json({ error: financeBlockedMessage }, 409);
     }
 
     const asaas = deps?.asaas ?? AsaasProvider.fromEnv(Deno.env);

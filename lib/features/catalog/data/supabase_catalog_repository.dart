@@ -14,7 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 const venueVitrineColumns =
     'id, city_id, name, neighborhood, street_address, address_number, '
     'postal_code, latitude, longitude, category, badge, status, created_at, '
-    'receives_payments, featured_rank';
+    'receives_payments, featured_rank, finance_ready';
 
 const roomColumns =
     'id, venue_id, name, theme, category, game_type, capacity, '
@@ -183,6 +183,7 @@ EscapeHouse houseFromRow(Map<String, dynamic> row) {
       number: textOf(row['address_number']),
     ),
     receivesPayments: venueReceivesGroups(row),
+    financeReady: venueFinanceReady(row),
     featuredRank: optionalRank(row['featured_rank']),
   );
 }

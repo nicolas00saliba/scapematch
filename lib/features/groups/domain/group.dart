@@ -42,6 +42,7 @@ class Group {
     this.phaseOverride,
     this.streetAddress = '',
     this.coverAsset = '',
+    this.houseAcceptsPayment = true,
   });
 
   final String id;
@@ -109,6 +110,9 @@ class Group {
 
   /// Capa da sala. Vazio quando o grupo de teste não trouxe foto.
   final String coverAsset;
+
+  /// Falso enquanto a casa não tem subconta e conta bancária.
+  final bool houseAcceptsPayment;
 
   int get openSeats =>
       GroupRules.openSeats(filledSpots: filledSpots, totalSpots: totalSpots);
@@ -245,6 +249,7 @@ class Group {
     Object? phaseOverride = _absent,
     String? streetAddress,
     String? coverAsset,
+    bool? houseAcceptsPayment,
   }) {
     return Group(
       id: id,
@@ -283,6 +288,7 @@ class Group {
           : phaseOverride as GroupPhase?,
       streetAddress: streetAddress ?? this.streetAddress,
       coverAsset: coverAsset ?? this.coverAsset,
+      houseAcceptsPayment: houseAcceptsPayment ?? this.houseAcceptsPayment,
     );
   }
 }

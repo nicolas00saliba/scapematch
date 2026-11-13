@@ -106,6 +106,9 @@ abstract final class GroupMessages {
 
   static String payMyShare(String price) => 'Pagar minha parte ($price)';
 
+  static const houseCannotReceive =
+      'A casa ainda não pode receber';
+
   static const yourSharePending = 'Sua parte está pendente';
   static const yourShareReserved =
       'Valor reservado. Você só é cobrado se o grupo confirmar.';

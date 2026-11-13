@@ -100,3 +100,6 @@ run -f "$root/tests/admin_payments.sql"
 echo "admin payments ok"
 run -f "$root/tests/ledger_reconcile.sql"
 echo "ledger reconcile ok"
+# supabase/migrations/20261113200000_venue_claim_official.sql
+run -f "$root/tests/venue_claim_official.sql"
+echo "venue claim official ok"

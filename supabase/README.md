@@ -58,7 +58,7 @@ tool/apply_auth_email_templates.sh
 
 - A casa só lê e escreve salas, fotos, horários, notícias e promoções dela. Falta não tem insert direto: entra por `mark_absence`. O gatilho `venues_guard` impede a casa de se aprovar.
 - Documento repetido (só os dígitos) não entra de novo enquanto a casa não foi recusada nem mesclada. `check_venue_duplicates` devolve o tipo do conflito e, se a casa já foi aprovada, o id e o nome público. Não devolve documento, telefone nem dados de casa pendente de outra pessoa. CEP + número, ou nome parecido na mesma cidade, não bloqueia: o cadastro segue com `possible_duplicate_of`.
-- "Esta casa é minha?" grava `venue_claims`. Anon não lê essa tabela. A pessoa vê o próprio pedido; o admin vê a fila, aprova, recusa ou mescla. Aprovar a reivindicação passa a casa aprovada para quem pediu.
+- "Esta casa é minha?" grava `venue_claims`. Anon não lê essa tabela. A pessoa vê o próprio pedido; o admin vê a fila, aprova, recusa ou mescla. Aprovar a reivindicação passa a casa aprovada para quem pediu. A prova de posse do perfil que já existe está em `20261113200000_venue_claim_official.sql`: o código sai do contato oficial, e a aprovação só liga a casa se ela estiver aprovada, com `claimed_at` nulo e dono diferente de quem pediu.
 - O jogador anônimo lê cidade e o que é de casa aprovada. Em `venues`, não lê `document_number`, `phone`, `income_value`, `asaas_wallet_id`, `referred_by`, `reviewed_by`, `invite_id` nem `owner_id`. O catálogo usa a view `venues_vitrine` (o `select *` na tabela falha para o anon). Grupo, cadeira e falta não têm `insert` direto.
 - Quem está logado também não lê documento, telefone, renda, wallet nem quem indicou. O dono ou um admin lê isso em `venue_private`. A Edge Function lê a tabela com `service_role`. O logado continua vendo `owner_id`.
 - `delete_group` recusa quando falta menos de 2 horas para o início. No instante exato das 2 horas ainda exclui.
@@ -93,7 +93,8 @@ A service role ignora o RLS. Cada função abaixo chama `getUser()` com a chave 
 | `create-charge` | Lê o token com `load_owned_card` e grava a cobrança. O jogador não lê a coluna. | JWT e, em seguida, a vaga dele em `group_members`. |
 | `settle-charges` | Captura, estorna e lança o extrato de grupos que o cliente não pode varrer. | JWT. `canSettle`: admin, quem criou o grupo ou o dono da casa. A varredura `sweep` exige admin. |
 | `cancel-house-group` | Estorna as cobranças depois do cancelamento. | JWT. O cancelamento passa por `house_cancel_group` no cliente do usuário. Liberar um grupo já cancelado exige admin, criador ou dono da casa. |
-| `provision-venue-wallet` | Cria a subconta e grava `walletId` e a chave da subconta, que o app não lê. | JWT e linha em `admins`. |
+| `provision-venue-wallet` | Cria a subconta e grava `walletId` e a chave da subconta, que o app não lê. | JWT. Admin pode provisionar em lote. O dono provisiona só a casa dele, e só quando `asaas_wallet_id` está vazio. |
+| `venue-claim` | Emite e confirma o código de reivindicação. O código e o contato oficial não voltam na resposta. | JWT. O usuário do código é o `getUser()`, nunca o body. |
 | `configure-venue-fiscal` | Grava a configuração fiscal e chama o Asaas com a chave da subconta. | JWT e dono da casa ou admin. |
 | `asaas-webhook` | Atualiza cobrança, extrato e nota a partir do evento do Asaas. Não há JWT de usuário: é servidor a servidor, com `verify_jwt = false`. | Header `asaas-access-token` comparado com `ASAAS_WEBHOOK_TOKEN` (`tokensMatch`) antes de criar o cliente. |
 
@@ -116,6 +117,7 @@ Deploy, na sua máquina, depois da revisão:
 
 ```bash
 supabase functions deploy provision-venue-wallet
+supabase functions deploy venue-claim
 supabase functions deploy tokenize-card
 supabase functions deploy create-charge
 supabase functions deploy settle-charges

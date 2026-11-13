@@ -103,7 +103,18 @@ class SupabasePartnerRepository implements PartnerDesk {
     for (final row in memberRows) {
       membersByGroup.putIfAbsent(textOf(row['group_id']), () => []).add(row);
     }
-    final house = houseFromRow(venue);
+    final venueRow = Map<String, dynamic>.from(venue);
+    try {
+      final ready = await scapeSupabase.rpc(
+        'venue_finance_ready',
+        params: {'p_venue_id': houseId},
+      );
+      venueRow['finance_ready'] = ready == true;
+      if (ready != true) venueRow['receives_payments'] = false;
+    } on Object {
+      // Sem a função publicada, a faixa segue o que a vitrine já sabe.
+    }
+    final house = houseFromRow(venueRow);
     final local = scapeSupabase.auth.currentUser?.id;
     final groups = [
       for (final row in groupRows)

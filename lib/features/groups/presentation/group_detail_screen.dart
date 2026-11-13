@@ -608,9 +608,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         buttons.add(
           FilledButton(
             key: AppKeys.payMyShare,
-            onPressed: _busy ? null : () => _pay(group),
+            onPressed: _busy || !group.houseAcceptsPayment
+                ? null
+                : () => _pay(group),
             child: Text(
-              GroupMessages.payMyShare(formatPrice(group.priceCents)),
+              group.houseAcceptsPayment
+                  ? GroupMessages.payMyShare(formatPrice(group.priceCents))
+                  : GroupMessages.houseCannotReceive,
             ),
           ),
         );
