@@ -1,8 +1,9 @@
 ---
 import Base from '../../layouts/Base.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
+import FaqMarca from '../../components/FaqMarca.astro';
 import { definicao, faqPage } from '../../data/seo';
-import { oQueE } from '../../data/perguntas-marca';
+import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
 
 const respostas = [
   {
@@ -26,6 +27,7 @@ const respostas = [
       'Se o mínimo não bater, o jogo não confirma e nada é cobrado. A cobrança da sua vaga só acontece quando o grupo confirma.',
   },
   oQueE,
+  ...desambiguacaoMarca,
 ];
 ---
 
@@ -85,6 +87,7 @@ const respostas = [
         Para abrir o app, a página é <a href="/app">Baixar o app</a>.
       </p>
     </section>
+    <FaqMarca />
   </article>
   <CtaBlock titulo="Escolher a primeira sala" acoes={[{ rotulo: 'Ver o app', href: '/app' }]} />
 </Base>

@@ -589,6 +589,29 @@ begin
   ) is distinct from 'done' then
     raise exception 'a transferencia da reserva repetiu';
   end if;
+  if public.claim_points_reserve_transfer(
+    'e7f11111-1111-4111-8111-111111111111', 'platform_return', 2500, 'wallet-raiz'
+  ) is distinct from 'send' then
+    raise exception 'a segunda perna nao foi reservada';
+  end if;
+  if public.points_reserve_transfer_anchor(
+    'e7f11111-1111-4111-8111-111111111111', 'platform_return'
+  ) is distinct from (
+    select (created_at at time zone 'America/Sao_Paulo')::date
+    from public.point_reserve_transfers
+    where payment_charge_id = 'e7f11111-1111-4111-8111-111111111111'
+      and purpose = 'platform_return'
+  ) then
+    raise exception 'a data da reserva nao segue a linha pending';
+  end if;
+  perform public.note_points_reserve_awaiting(
+    'e7f11111-1111-4111-8111-111111111111', 'platform_return', 'tr_auth'
+  );
+  if public.claim_points_reserve_transfer(
+    'e7f11111-1111-4111-8111-111111111111', 'platform_return', 2500, 'wallet-raiz'
+  ) is distinct from 'skip' then
+    raise exception 'autorizacao pendente voltou a enviar';
+  end if;
 
   update public.platform_settings
   set pix_receipt_fee_cents = v_pix,

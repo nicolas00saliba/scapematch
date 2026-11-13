@@ -1,8 +1,9 @@
 ---
 import Base from '../../layouts/Base.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
+import FaqMarca from '../../components/FaqMarca.astro';
 import { definicao, faqPage } from '../../data/seo';
-import { oQueE } from '../../data/perguntas-marca';
+import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
 
 const respostas = [
   {
@@ -26,6 +27,7 @@ const respostas = [
       'No app. Lá estão as salas abertas, os horários e o preço por pessoa. A grade muda. Este site não lista casas parceiras, endereço nem preço.',
   },
   oQueE,
+  ...desambiguacaoMarca,
 ];
 ---
 
@@ -86,6 +88,7 @@ const respostas = [
         Para abrir o app, a página é <a href="/app">Baixar o app</a>.
       </p>
     </section>
+    <FaqMarca />
   </article>
   <CtaBlock titulo="Entrar num grupo em Curitiba" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
 </Base>

@@ -81,6 +81,7 @@ A implementação é `AsaasProvider` em `supabase/functions/_shared/asaas_provid
 | `asaas-webhook` | não | Exige o header `asaas-access-token` igual a `ASAAS_WEBHOOK_TOKEN`. Quando a cobrança fica paga e o grupo já confirmou, emite as NFS-e. |
 | `configure-venue-fiscal` | dono ou admin | Grava inscrição municipal, código de serviço e alíquota. Casa com CPF fica `sem_emissao`. Com a chave da subconta, chama `POST /v3/fiscalInfo`. A senha da prefeitura não é gravada. |
 | `invoice-document` | dono, jogador ou admin | Baixa PDF ou XML da nota que o RLS deixa ver. No sandbox o arquivo é de teste. Não usa service role. |
+| `venue-documents` | dono ou sócio | `GET /v3/myAccount/documents` e `GET /v3/myAccount/status` com a chave da subconta. Se o grupo traz `onboardingUrl`, a tela abre esse link (cadastro.io) e não faz upload. Sem o link, `POST /v3/myAccount/documents/{id}` manda o arquivo. A chave não volta na resposta. |
 
 ## service role
 

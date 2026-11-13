@@ -4,6 +4,8 @@
 
 A marca também é escrita Escape Match. Não confundir com jogos de celular chamados Escape Match.
 
+O EscapeMatch se chamava ScapeMatch até novembro de 2026. Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles.
+
 O EscapeMatch junta pessoas sozinhas em grupos de escape room. A pessoa escolhe a sala e o horário, entra num grupo com outros jogadores e paga só a própria vaga. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado. Jogos de tabuleiro e laser tag estão previstos e ainda não estão disponíveis.
 
 O Instagram oficial é https://www.instagram.com/escapematch/. Não há perfil oficial de TikTok ou LinkedIn publicado neste repositório.

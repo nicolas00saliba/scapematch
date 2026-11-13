@@ -33,3 +33,17 @@ export const eJogo: PerguntaMarca = {
   resposta:
     'Não. O EscapeMatch não é um jogo de celular. É o aplicativo brasileiro que conecta pessoas para jogar escape room presencial em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. O lançamento é em Curitiba. Jogos de tabuleiro e laser tag ainda não estão disponíveis.',
 };
+
+export const antigoScapeMatch: PerguntaMarca = {
+  pergunta: 'O EscapeMatch é o antigo ScapeMatch?',
+  resposta:
+    'Sim. O EscapeMatch se chamava ScapeMatch até novembro de 2026. É o mesmo aplicativo, só o nome mudou.',
+};
+
+export const quebraCabecaCelular: PerguntaMarca = {
+  pergunta: 'O EscapeMatch é um jogo de quebra-cabeça de celular?',
+  resposta:
+    'Não. O jogo acontece presencialmente na casa de escape room. O app só forma o grupo e cobra a vaga quando o grupo confirma.',
+};
+
+export const desambiguacaoMarca: PerguntaMarca[] = [antigoScapeMatch, quebraCabecaCelular];

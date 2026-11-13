@@ -7,6 +7,20 @@
 - **Onde está no código:** `supabase/functions/_shared/issue_invoices.ts`, chamado por `asaas-webhook` e `settle-charges`. `retryFailedInvoices` varre as notas em `error`.
 - **Como trocar depois:** a migration `20261113181000_fiscal_invoice_retry.sql` não foi aplicada no remoto. Depois do certificado A1, o Nícolas aplica essa migration, grava `ASAAS_INVOICE_EMISSION=on` e publica as funções. Rodar de novo o settle emite as `scheduled` e tenta de novo as `error` transitórias.
 
+## A reserva de pontos vale na API oficial
+
+- **Data:** 2026-11-13
+- **Decisão:** o lastro da indicação e o pagamento da vaga grátis deixam de existir só no sandbox. O split e a transferência usam a mesma conta, no sandbox ou em `https://api.asaas.com/v3`. Outra URL não chama a rede. O valor do jogador não muda: a linha é o centavo que o banco já calculou, em `fixedValue`, e só entra se esse valor cabe no líquido. O claim grava a linha `pending` antes de qualquer chamada ao Asaas. A listagem `GET /v3/transfers` não filtra por `externalReference` (só `dateCreated`, `transferDate` e `type`), então a busca usa `dateCreated[ge]` a partir do dia dessa linha, percorre `offset`/`hasMore` e compara a referência no código. Status `AWAITING_CRITICAL_ACTION_AUTHORIZATION` ou `authorized: false` não liquida a reserva: a linha fica `awaiting_authorization`, com o id gravado, e o log avisa. Sem a carteira `ASAAS_POINTS_RESERVE_WALLET_ID` ou sem a chave, nada é enviado.
+- **Onde está no código:** `supabase/functions/_shared/points_reserve_asaas.ts` e `create-charge`.
+- **Como trocar depois:** as funções não foram publicadas por esta mudança. Produção precisa da subconta Reserva de pontos, da carteira e da chave no painel. Sem isso o split não entra e a cobrança segue como hoje.
+
+## Documentos da subconta seguem o link do Asaas
+
+- **Data:** 2026-11-13
+- **Decisão:** o saque da casa espera a aprovação cadastral. A tela de saque do Parceiro consulta `GET /v3/myAccount/documents` e `GET /v3/myAccount/status` pela Edge Function `venue-documents`, com a chave da subconta. O Asaas devolve `onboardingUrl` (em geral `https://cadastro.io/...`) quando o envio é no site dele. Esse link é o caminho: a documentação diz que `POST /v3/myAccount/documents/{id}` é recusado se o grupo tem `onboardingUrl`. O app abre o link e não guarda o arquivo. Só o grupo sem link aceita upload (PDF, JPG ou PNG), direto para o Asaas, depois de reautenticar. O saque fica desligado enquanto `documentation` ou `general` não estão `APPROVED`. Uma consulta nos primeiros 15 segundos depois de criar a subconta pode listar documento que ainda não é obrigatório; a tela pede para atualizar.
+- **Onde está no código:** `supabase/functions/venue-documents`, `supabase/functions/_shared/venue_documents.ts`, `apps/parceiro` na tela de saque.
+- **Como trocar depois:** esta função não foi publicada. O Nícolas publica `venue-documents` junto com o app, sem migration. A chave da subconta continua só em `venue_asaas_keys`.
+
 ## O host escolhe o mínimo e o máximo
 
 - **Data:** 2026-11-10
