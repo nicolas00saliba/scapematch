@@ -68,6 +68,7 @@ class VenueClaimDesk extends StatefulWidget {
     this.onLoadDocuments,
     this.onUploadDocument,
     this.onOpenUrl,
+    this.onSubaccountReady,
     this.onPixReady,
   });
 
@@ -80,6 +81,7 @@ class VenueClaimDesk extends StatefulWidget {
   final Future<VenueDocumentsView?> Function(VenueDocumentItem item)?
   onUploadDocument;
   final void Function(Uri uri)? onOpenUrl;
+  final Future<bool> Function()? onSubaccountReady;
   final Future<bool> Function()? onPixReady;
 
   @override
@@ -182,6 +184,7 @@ class _VenueClaimDeskState extends State<VenueClaimDesk> {
         onLoadDocuments: widget.onLoadDocuments,
         onUploadDocument: widget.onUploadDocument,
         onOpenUrl: widget.onOpenUrl,
+        onSubaccountReady: widget.onSubaccountReady,
         onPixReady: widget.onPixReady,
       );
     }
@@ -244,6 +247,7 @@ class VenueFinanceStep extends StatefulWidget {
     this.onLoadDocuments,
     this.onUploadDocument,
     this.onOpenUrl,
+    this.onSubaccountReady,
     this.onPixReady,
   });
 
@@ -253,6 +257,7 @@ class VenueFinanceStep extends StatefulWidget {
   final Future<VenueDocumentsView?> Function(VenueDocumentItem item)?
   onUploadDocument;
   final void Function(Uri uri)? onOpenUrl;
+  final Future<bool> Function()? onSubaccountReady;
   final Future<bool> Function()? onPixReady;
 
   @override
@@ -269,19 +274,22 @@ class _VenueFinanceStepState extends State<VenueFinanceStep> {
   @override
   void initState() {
     super.initState();
-    if (widget.onPixReady != null) _refreshPix();
+    if (widget.onPixReady != null || widget.onSubaccountReady != null) {
+      _refreshReady();
+    }
   }
 
-  Future<void> _refreshPix() async {
-    final ready = widget.onPixReady == null
+  Future<void> _refreshReady() async {
+    final subaccount = widget.onSubaccountReady == null
         ? false
-        : await widget.onPixReady!();
+        : await widget.onSubaccountReady!();
+    final pix = widget.onPixReady == null ? false : await widget.onPixReady!();
     if (!mounted) return;
     setState(() {
-      _pixReady = ready;
-      if (ready) _subaccount = true;
+      _pixReady = pix;
+      if (subaccount || pix) _subaccount = true;
     });
-    if (ready) await _loadDocuments();
+    if (subaccount || pix || _subaccount) await _loadDocuments();
   }
 
   Future<void> _provision() async {
@@ -299,7 +307,7 @@ class _VenueFinanceStepState extends State<VenueFinanceStep> {
     });
     if (failure == null) {
       await _loadDocuments();
-      await _refreshPix();
+      await _refreshReady();
     }
   }
 

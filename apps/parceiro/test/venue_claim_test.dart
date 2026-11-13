@@ -192,6 +192,49 @@ void main() {
     );
     expect(button.onPressed, isNull);
   });
+
+  testWidgets('subconta pronta sem Pix mostra documentos e trava o botão', (
+    tester,
+  ) async {
+    var provisions = 0;
+    await tester.pumpWidget(
+      _app(
+        VenueFinanceStep(
+          onProvision: () async {
+            provisions += 1;
+            return null;
+          },
+          onLoadDocuments: () async => _pendingDocuments,
+          onSubaccountReady: () async => true,
+          onPixReady: () async => false,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(provisions, 0);
+    expect(find.text(PartnerMessages.claimStepWait), findsNothing);
+    expect(find.byKey(PartnerKeys.venueDocuments), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(PartnerKeys.venueClaimStepSubaccount),
+        matching: find.text(PartnerMessages.claimStepReady),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(PartnerKeys.venueClaimStepPix),
+        matching: find.text(PartnerMessages.claimStepPending),
+      ),
+      findsOneWidget,
+    );
+    final button = tester.widget<FilledButton>(
+      find.byKey(PartnerKeys.venueClaimProvision),
+    );
+    expect(button.onPressed, isNull);
+  });
 }
 
 const _pendingDocuments = VenueDocumentsView(

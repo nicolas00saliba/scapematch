@@ -162,6 +162,18 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
                 );
           },
           onOpenUrl: launchExternalUrl,
+          onSubaccountReady: () async {
+            try {
+              final row = await scapeSupabase
+                  .from('venues')
+                  .select('receives_payments')
+                  .eq('id', claim.venueId)
+                  .maybeSingle();
+              return row?['receives_payments'] == true;
+            } on Object {
+              return false;
+            }
+          },
           onPixReady: () async {
             try {
               final ready = await scapeSupabase.rpc(
