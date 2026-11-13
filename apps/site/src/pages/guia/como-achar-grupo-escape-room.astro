@@ -1,0 +1,95 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import { definicao, faqPage } from '../../data/seo';
+import { oQueE } from '../../data/perguntas-marca';
+
+const respostas = [
+  {
+    pergunta: 'Como achar um grupo para jogar escape room?',
+    resposta:
+      'Dá para chamar amigos, publicar num grupo de WhatsApp, no Reddit ou no Meetup, perguntar se a casa completa a sala, ou entrar num grupo pelo EscapeMatch. O EscapeMatch foi feito para quem não tem grupo. Você escolhe a sala e o horário, entra no grupo e paga só a sua vaga.',
+  },
+  {
+    pergunta: 'Dá para montar o grupo com amigos?',
+    resposta:
+      'Dá, e é o caminho direto quando as pessoas já se conhecem e combinam data e sala. Cada um paga a própria vaga. Se faltar gente, o EscapeMatch completa as vagas que restam.',
+  },
+  {
+    pergunta: 'Grupos de WhatsApp, Reddit ou Meetup servem?',
+    resposta:
+      'Dá para publicar, num grupo de WhatsApp, no Reddit ou no Meetup, que você precisa de gente ou que quer entrar num horário. Alguém livre no mesmo dia pode topar. A casa ainda precisa ter a sessão, e a reserva fica com quem combinou. O site do EscapeMatch não publica um grupo nesses espaços.',
+  },
+  {
+    pergunta: 'A casa pode completar a sala?',
+    resposta:
+      'Algumas casas aceitam quem chega sozinho e sentam essa pessoa com outras. Isso depende da casa e do horário. Pergunte à casa antes de contar com a vaga. O EscapeMatch forma o grupo no app, nas salas que estão abertas.',
+  },
+  {
+    pergunta: 'Como o EscapeMatch acha o grupo?',
+    resposta:
+      'Você escolhe a sala e o horário no app. O EscapeMatch te coloca num grupo com outras pessoas. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado. O lançamento é em Curitiba. Escape room é o que está disponível. Jogos de tabuleiro e laser tag estão em breve. Não é um jogo de celular.',
+  },
+  oQueE,
+];
+---
+
+<Base
+  title="Onde achar grupo de escape room | EscapeMatch"
+  description="Amigos, WhatsApp, Reddit, Meetup ou a casa. O EscapeMatch foi feito para achar o grupo. Não é um jogo de celular."
+  path="/guia/como-achar-grupo-escape-room"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+>
+  <header class="miolo pagina-topo">
+    <h1>{respostas[0].pergunta}</h1>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="resposta-direta">{respostas[0].resposta}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    <section>
+      <h2>{respostas[1].pergunta}</h2>
+      <p>{respostas[1].resposta}</p>
+      <p>Quem já tem turma vê o caminho em <a href="/como-funciona">Como funciona</a>.</p>
+    </section>
+    <section>
+      <h2>{respostas[2].pergunta}</h2>
+      <p>{respostas[2].resposta}</p>
+    </section>
+    <section>
+      <h2>{respostas[3].pergunta}</h2>
+      <p>{respostas[3].resposta}</p>
+    </section>
+    <section>
+      <h2>{respostas[4].pergunta}</h2>
+      <p>{respostas[4].resposta}</p>
+      <p>
+        Em Curitiba, o recorte está em
+        <a href="/guia/escape-room-sozinho-curitiba">escape room sozinho em Curitiba</a>
+        e em <a href="/escape-room-curitiba">Escape room em Curitiba</a>.
+        A modalidade está em <a href="/experiencias/escape-room">Escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>O que muda na prática</h2>
+      <p>
+        Nos grupos de mensagem e na casa, a reserva depende de alguém responder e de a sessão existir.
+        No EscapeMatch, a sala e o horário estão no app, cada pessoa paga a própria vaga e o jogo só confirma no mínimo.
+      </p>
+      <p>
+        Jogar com gente que você não conhecia tem regra: respeito, chegar no horário e seguir a casa.
+        O texto está em <a href="/seguranca">Segurança</a>.
+        A cobrança está em <a href="/como-funciona/pagamento">Pagamento e regras</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{oQueE.pergunta}</h2>
+      <p>{oQueE.resposta}</p>
+      <p>
+        O guia curto é <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
+        Dúvidas de grupo, pagamento e pontos estão na <a href="/ajuda">central de ajuda</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock titulo="Entrar num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
+</Base>

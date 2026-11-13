@@ -20,6 +20,8 @@ ROTAS = [
     "/experiencias",
     "/experiencias/escape-room",
     "/guia/escape-room-sozinho",
+    "/guia/escape-room-sozinho-curitiba",
+    "/guia/como-achar-grupo-escape-room",
     "/escape-room-curitiba",
     "/seguranca",
     "/app",
@@ -58,6 +60,7 @@ NOINDEX = {"/convite", "/404"}
 FORA_DO_BUILD = ("/cidades/curitiba",)
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 EMAIL_CONTATO = "contato@escapematch.com.br"
+INSTAGRAM = "https://www.instagram.com/escapematch/"
 DEFINICAO = (
     "O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room "
     "e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. "
@@ -271,7 +274,16 @@ def main() -> None:
     for rota in ("/convite", "/404", *FORA_DO_BUILD):
         if f"{SITE}{rota}<" in sitemap or f"{SITE}{rota}/" in sitemap:
             falha(f"{rota} entrou no sitemap")
-    for rota in ("/termos", "/privacidade", "/cancelamento", "/contato", "/escape-room-curitiba"):
+    for rota in (
+        "/termos",
+        "/privacidade",
+        "/cancelamento",
+        "/contato",
+        "/escape-room-curitiba",
+        "/guia/escape-room-sozinho",
+        "/guia/escape-room-sozinho-curitiba",
+        "/guia/como-achar-grupo-escape-room",
+    ):
         if f"{SITE}{rota}<" not in sitemap and f"{SITE}{rota}/" not in sitemap:
             falha(f"{rota} saiu do sitemap")
 
@@ -329,8 +341,17 @@ def main() -> None:
                 blocos_ld(texto)
             except json.JSONDecodeError:
                 falha(f"{html.relative_to(DIST)} tem JSON-LD inválido")
-            if "sameAs" in texto or "streetAddress" in texto or "GameApplication" in texto:
-                falha(f"{html.relative_to(DIST)} tem sameAs, rua ou GameApplication")
+            if "streetAddress" in texto or "GameApplication" in texto:
+                falha(f"{html.relative_to(DIST)} tem rua ou GameApplication")
+            blocos = blocos_ld(texto)
+            same = [bloco.get("sameAs") for bloco in blocos if "sameAs" in bloco]
+            if any(item != [INSTAGRAM] for item in same):
+                falha(f"{html.relative_to(DIST)} tem sameAs fora do Instagram oficial")
+            tem_org = any(
+                bloco.get("@type") == "Organization" and bloco.get("legalName") for bloco in blocos
+            )
+            if tem_org and same != [[INSTAGRAM]]:
+                falha(f"{html.relative_to(DIST)} sem o Instagram oficial em sameAs")
         for rota in FORA_DO_BUILD:
             if f'href="{rota}"' in texto or f"href='{rota}'" in texto:
                 falha(f"{html.relative_to(DIST)} aponta para {rota}")
@@ -366,8 +387,6 @@ def main() -> None:
         falha("a home saiu sem Organization ou WebSite")
     if '"@type":"FAQPage"' not in home_html:
         falha("a home saiu sem FAQPage")
-    if "sameAs" in home_html:
-        falha("Organization com sameAs sem perfil publicado no repositório")
     orgs = [
         bloco
         for bloco in blocos_ld(home_html)
@@ -385,6 +404,8 @@ def main() -> None:
         falha("alternateName ausente")
     if org.get("email") != EMAIL_CONTATO:
         falha("Organization sem o e-mail já publicado")
+    if org.get("sameAs") != [INSTAGRAM]:
+        falha("sameAs da Organization divergiu")
     if org.get("description") != DEFINICAO:
         falha("description da Organization divergiu")
     if not str(org.get("logo", "")).endswith("/assets/logo-512.png"):
@@ -433,6 +454,39 @@ def main() -> None:
             "O que é o EscapeMatch?",
         ),
     )
+    guia_curitiba = arquivo("/guia/escape-room-sozinho-curitiba").read_text()
+    guia_grupo = arquivo("/guia/como-achar-grupo-escape-room").read_text()
+    for rota, html_guia in (
+        ("/guia/escape-room-sozinho-curitiba", guia_curitiba),
+        ("/guia/como-achar-grupo-escape-room", guia_grupo),
+    ):
+        if DEFINICAO not in html_guia:
+            falha(f"definição canônica ausente em {rota}")
+        if '"@type":"FAQPage"' not in html_guia:
+            falha(f"{rota} saiu sem FAQPage")
+    exigir_faq(
+        guia_curitiba,
+        "/guia/escape-room-sozinho-curitiba",
+        (
+            "Onde jogar escape room sozinho em Curitiba?",
+            "Como o EscapeMatch junta o grupo em Curitiba?",
+            "O que esperar da sessão?",
+            "O que é o EscapeMatch?",
+        ),
+    )
+    exigir_faq(
+        guia_grupo,
+        "/guia/como-achar-grupo-escape-room",
+        (
+            "Dá para montar o grupo com amigos?",
+            "Grupos de WhatsApp, Reddit ou Meetup servem?",
+            "A casa pode completar a sala?",
+            "Como o EscapeMatch acha o grupo?",
+            "O que é o EscapeMatch?",
+        ),
+    )
+    if "não lista casas parceiras" not in guia_curitiba.lower():
+        falha("o guia de Curitiba não avisa que o site não lista casas")
     exigir_faq(como, "/como-funciona", ("Como completar o grupo de uma sala de escape?",))
     exigir_faq(arquivo("/ajuda/grupo").read_text(), "/ajuda/grupo", ("O EscapeMatch é um jogo?",))
     cidade = arquivo("/escape-room-curitiba").read_text()
@@ -477,6 +531,16 @@ def main() -> None:
             falha(f"{nome} incompleto")
         if DEFINICAO not in texto or "Não confundir com jogos de celular chamados Escape Match." not in texto:
             falha(f"{nome} sem a definição ou a desambiguação")
+        if INSTAGRAM not in texto:
+            falha(f"{nome} sem o Instagram oficial")
+        if "Não há perfil oficial de Instagram" in texto:
+            falha(f"{nome} ainda diz que não há Instagram")
+        for rota in (
+            "/guia/escape-room-sozinho-curitiba",
+            "/guia/como-achar-grupo-escape-room",
+        ):
+            if rota not in texto:
+                falha(f"{nome} sem {rota}")
         if "limite mensal" in texto:
             falha(f"{nome} ainda cita limite mensal")
     def chaves_indexnow(pasta: pathlib.Path) -> list[str]:

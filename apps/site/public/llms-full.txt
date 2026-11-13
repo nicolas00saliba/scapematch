@@ -2,7 +2,7 @@
 
 > O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. Lançamento em Curitiba. Não é um jogo de celular. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
 
-Este arquivo descreve o que o site e as regras publicadas afirmam. Não há perfil oficial de Instagram, TikTok, LinkedIn ou outra rede publicado no repositório.
+Este arquivo descreve o que o site e as regras publicadas afirmam. O Instagram oficial é https://www.instagram.com/escapematch/. Não há perfil oficial de TikTok, LinkedIn ou outra rede publicado no repositório.
 
 A marca também é escrita Escape Match. Não confundir com jogos de celular chamados Escape Match.
 
@@ -58,6 +58,8 @@ Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no r
 
 - [Início](https://escapematch.com.br/): proposta para quem está sozinho e quer jogar.
 - [Guia: escape room sozinho](https://escapematch.com.br/guia/escape-room-sozinho): dá para jogar sozinho, como achar grupo e o que é o EscapeMatch.
+- [Guia: escape room sozinho em Curitiba](https://escapematch.com.br/guia/escape-room-sozinho-curitiba): onde jogar sozinho na cidade do lançamento, como o app junta o grupo e o que esperar da sessão presencial. O site não lista casas parceiras, endereço nem preço.
+- [Guia: onde achar grupo de escape room](https://escapematch.com.br/guia/como-achar-grupo-escape-room): amigos, grupos de WhatsApp, Reddit ou Meetup, casas que completam a sala, e o EscapeMatch, que foi feito para isso.
 - [Como funciona](https://escapematch.com.br/como-funciona): formação do grupo.
 - [Pagamento e regras](https://escapematch.com.br/como-funciona/pagamento): quando a cobrança acontece.
 - [Experiências](https://escapematch.com.br/experiencias): escape room disponível, tabuleiro e laser tag em breve.
