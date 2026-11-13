@@ -23,6 +23,9 @@ jobs:
       - name: Check install identities
         run: bash tool/test_web_install_identity.sh
 
+      - name: Check web noindex
+        run: bash tool/test_check_web_robots.sh
+
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -85,6 +88,7 @@ jobs:
           bash tool/check_web_service_worker.sh apps/admin/build/web admin
           bash tool/check_web_manifest.sh apps/admin/build/web admin real
           bash tool/check_security_meta.sh admin apps/admin/build/web/index.html
+          bash tool/check_web_robots.sh apps/admin/build/web/index.html
           python3 - <<'PY'
           import base64, json, pathlib, re, sys
           root = pathlib.Path("apps/admin/build/web")
@@ -128,6 +132,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/web player
           bash tool/check_web_manifest.sh build/web player real
           bash tool/check_security_meta.sh flutter build/web/index.html
+          bash tool/check_web_robots.sh build/web/index.html
           bash tool/check_splash_pin.sh build/web player
 
       - name: Player bundle excludes the partner app
@@ -165,6 +170,7 @@ jobs:
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
           bash tool/check_web_manifest.sh apps/parceiro/build/web partner real
           bash tool/check_security_meta.sh flutter apps/parceiro/build/web/index.html
+          bash tool/check_web_robots.sh apps/parceiro/build/web/index.html
           bash tool/check_splash_pin.sh apps/parceiro/build/web partner
           if grep -R -F -q 'xv@scapematch.exemplo' apps/parceiro/build/web --include='*.js'; then
             echo 'O bundle do Parceiro ainda tem o login de demonstração.'
@@ -197,6 +203,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/player-demo player
           bash tool/check_web_manifest.sh build/player-demo player demo
           bash tool/check_security_meta.sh flutter build/player-demo/index.html
+          bash tool/check_web_robots.sh build/player-demo/index.html
           bash tool/check_splash_pin.sh build/player-demo player
           grep -F -q 'base href="/"' build/player-demo/index.html
           bash tool/js_contains.sh build/player-demo 'Demonstração'
@@ -225,6 +232,7 @@ jobs:
           bash tool/check_web_service_worker.sh apps/parceiro/build/parceiro-demo-root partner
           bash tool/check_web_manifest.sh apps/parceiro/build/parceiro-demo-root partner demo
           bash tool/check_security_meta.sh flutter apps/parceiro/build/parceiro-demo-root/index.html
+          bash tool/check_web_robots.sh apps/parceiro/build/parceiro-demo-root/index.html
           bash tool/check_splash_pin.sh apps/parceiro/build/parceiro-demo-root partner
           grep -F -q 'base href="/"' apps/parceiro/build/parceiro-demo-root/index.html
           grep -F -q 'https://parceiro-demo.escapematch.com.br/' apps/parceiro/build/parceiro-demo-root/manifest.json
@@ -301,6 +309,7 @@ jobs:
           bash tool/check_security_meta.sh flutter web/index.html
           bash tool/check_security_meta.sh flutter apps/parceiro/web/index.html
           bash tool/check_security_meta.sh admin apps/admin/web/index.html
+          bash tool/test_check_web_robots.sh
           test -f apps/landing/assets/logo-simbolo.svg
           test -f apps/landing/assets/og.png
           test -f apps/landing/assets/favicon.svg
