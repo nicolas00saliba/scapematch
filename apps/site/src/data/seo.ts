@@ -1,5 +1,5 @@
-// sameAs fica de fora: o repositório não publica Instagram, TikTok,
-// LinkedIn nem outro perfil oficial.
+// sameAs publica só o Instagram oficial. TikTok, LinkedIn e outras
+// redes continuam de fora: o repositório não tem esses perfis.
 // A nota de casa e de sala sai por aggregateRatingLd, e só com o mínimo.
 // O app não leva aggregateRating nem review: não há avaliação publicada.
 
@@ -28,6 +28,7 @@ export const organizacao = {
   logo: `${origem}/assets/logo-512.png`,
   description: definicao,
   email: emailContato,
+  sameAs: ['https://www.instagram.com/escapematch/'],
   address: {
     '@type': 'PostalAddress',
     addressLocality: 'Curitiba',

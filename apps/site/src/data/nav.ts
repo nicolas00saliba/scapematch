@@ -11,6 +11,8 @@ export type Coluna = {
 
 export const jogarLinks: Link[] = [
   { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
+  { rotulo: 'Escape room sozinho em Curitiba', href: '/guia/escape-room-sozinho-curitiba' },
+  { rotulo: 'Onde achar grupo', href: '/guia/como-achar-grupo-escape-room' },
   { rotulo: 'Escape room em Curitiba', href: '/escape-room-curitiba' },
   { rotulo: 'Como funciona', href: '/como-funciona' },
   { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
@@ -50,6 +52,8 @@ export const rodape: Coluna[] = [
     titulo: 'Quero jogar',
     links: [
       { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
+      { rotulo: 'Escape room sozinho em Curitiba', href: '/guia/escape-room-sozinho-curitiba' },
+      { rotulo: 'Onde achar grupo', href: '/guia/como-achar-grupo-escape-room' },
       { rotulo: 'Escape room em Curitiba', href: '/escape-room-curitiba' },
       { rotulo: 'Como funciona', href: '/como-funciona' },
       { rotulo: 'Pagamento e regras', href: '/como-funciona/pagamento' },
@@ -102,6 +106,8 @@ export const rodape: Coluna[] = [
 
 const nomes: Record<string, string> = {
   '/guia/escape-room-sozinho': 'Escape room sozinho',
+  '/guia/escape-room-sozinho-curitiba': 'Escape room sozinho em Curitiba',
+  '/guia/como-achar-grupo-escape-room': 'Onde achar grupo',
   '/escape-room-curitiba': 'Escape room em Curitiba',
   '/como-funciona': 'Como funciona',
   '/como-funciona/pagamento': 'Pagamento e regras',
