@@ -1,6 +1,5 @@
 // sameAs fica de fora: o repositório não publica Instagram, TikTok,
 // LinkedIn nem outro perfil oficial.
-// O campo logo continua no símbolo atual. Outro PR troca o arquivo.
 // A nota de casa e de sala sai por aggregateRatingLd, e só com o mínimo.
 // O app não leva aggregateRating nem review: não há avaliação publicada.
 
@@ -22,7 +21,11 @@ export const organizacao = {
   taxID: '70.100.608/0001-73',
   alternateName: ['Escape Match'],
   url: `${origem}/`,
-  logo: `${origem}/assets/logo-simbolo.svg`,
+  // PNG quadrado de 512 px. O Google pede, no logo da Organization,
+  // pelo menos 112 px, em formato que o Google Imagens rastreia, e
+  // que continue legível em fundo branco. O SVG do símbolo fica no
+  // cabeçalho; não entra neste campo.
+  logo: `${origem}/assets/logo-512.png`,
   description: definicao,
   email: emailContato,
   address: {
