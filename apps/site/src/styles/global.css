@@ -494,6 +494,17 @@ main {
   color: var(--tinta);
 }
 
+.definicao-marca {
+  max-width: 42rem;
+  margin-top: 1rem;
+  font-size: 1.15rem;
+  line-height: 1.45;
+}
+
+.hero-apoio.definicao-marca {
+  max-width: 42rem;
+}
+
 .hero-ganho {
   margin: 0.85rem 0 0;
   max-width: 28rem;

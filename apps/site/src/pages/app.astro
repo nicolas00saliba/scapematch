@@ -3,18 +3,24 @@ import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import CtaBlock from '../components/CtaBlock.astro';
 import PhoneShot from '../components/PhoneShot.astro';
+import { aplicativo, definicao } from '../data/seo';
 ---
 
 <Base
   title="Baixe o app e ache um grupo | EscapeMatch"
-  description="Abra o EscapeMatch para achar gente e jogar escape room quando se está sozinho. Dá para instalar no celular."
+  description="App gratuito para achar um grupo de escape room. Navegador, Android e iPhone. Não é um jogo de celular."
   path="/app"
+  jsonLd={aplicativo}
 >
   <PageTop
     titulo="Baixe o app"
     frase="Abra no navegador ou instale na tela inicial do celular."
   />
+  <p class="miolo definicao-marca">{definicao}</p>
   <article class="miolo pagina leitura">
+    <p>O aplicativo é gratuito. A vaga da sala tem o preço por pessoa mostrado no app.</p>
+    <p>Funciona no navegador. No Android, instala pelo Chrome. No iPhone, adiciona à Tela de Início pelo Safari.</p>
+
     <h2>Abrir no navegador</h2>
     <p>O app do jogador está em <a href="https://app.escapematch.com.br/" target="_blank" rel="noopener noreferrer">app.escapematch.com.br</a>.</p>
 

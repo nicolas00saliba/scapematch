@@ -1,10 +1,14 @@
 # EscapeMatch
 
-> Plataforma brasileira criada para quem quer jogar e não tem grupo. O lançamento começa em Curitiba. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
+> O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. Lançamento em Curitiba. Não é um jogo de celular. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
 
 Este arquivo descreve o que o site e as regras publicadas afirmam. Não há perfil oficial de Instagram, TikTok, LinkedIn ou outra rede publicado no repositório.
 
+A marca também é escrita Escape Match. Não confundir com jogos de celular chamados Escape Match.
+
 ## O que é
+
+O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. Lançamento em Curitiba. Não é um jogo de celular.
 
 O EscapeMatch junta pessoas que querem jogar e não têm um grupo. O uso principal é chegar sozinho e entrar num time. Quem já tem turma pode completar as vagas que faltam. Esse uso é secundário.
 

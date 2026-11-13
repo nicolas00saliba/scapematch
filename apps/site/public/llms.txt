@@ -1,6 +1,8 @@
 # EscapeMatch
 
-> Plataforma brasileira criada para quem quer jogar e não tem grupo. O lançamento começa em Curitiba, com escape room. O site é https://escapematch.com.br e o app do jogador é https://app.escapematch.com.br/
+> O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. Lançamento em Curitiba. Não é um jogo de celular. O site é https://escapematch.com.br e o app do jogador é https://app.escapematch.com.br/
+
+A marca também é escrita Escape Match. Não confundir com jogos de celular chamados Escape Match.
 
 O EscapeMatch junta pessoas sozinhas em grupos de escape room. A pessoa escolhe a sala e o horário, entra num grupo com outros jogadores e paga só a própria vaga. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado. Jogos de tabuleiro e laser tag estão previstos e ainda não estão disponíveis.
 
