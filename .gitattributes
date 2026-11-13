@@ -1,0 +1,5 @@
+# Os bundles do Sentry JS entram com o SHA-384 do sentry_flutter.
+# Conversão de fim de linha mudaria o hash e a SRI falharia.
+web/sentry/11.0.0/*.js -text linguist-generated
+apps/parceiro/web/sentry/11.0.0/*.js -text linguist-generated
+apps/admin/web/sentry/11.0.0/*.js -text linguist-generated

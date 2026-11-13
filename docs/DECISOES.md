@@ -43,6 +43,14 @@
 - **Onde está no código:** `web/index.html`, `apps/parceiro/web/index.html`, `apps/landing/` e `tool/check_security_meta.sh`. O CodeQL default setup do GitHub já cobre actions, JavaScript/TypeScript e Python; um workflow extra no repo seria duplicado e foi retirado. Dart continua fora do CodeQL. A landing de produção copia `apps/landing` no `sync.sh` de `nicolas00saliba/scapematch-site` depois do merge. O deploy deste monorepo publica os apps e a cópia legada em `/scapematch/site/`.
 - **Como trocar depois:** um host que deixe cabeçalho (na frente do Pages) é o único jeito de mandar HSTS, `nosniff`, `X-Frame-Options` e de tirar o `*` do Pages. Aí a CSP pode sair da meta e ganhar `frame-ancestors`.
 
+## O SDK JS do Sentry sai do próprio site
+
+- **Data:** 2026-11-13
+- **Decisão:** o `sentry_flutter` 10.3.0 carrega o JavaScript 11.0.0 de `browser.sentry-cdn.com`. A CSP dos apps não libera essa origem: `script-src` continua `'self'` mais o que já estava, e o `connect-src` do ingest (`*.ingest.sentry.io`, `*.ingest.us.sentry.io`, `*.ingest.de.sentry.io`) não muda. Jogador, Parceiro e Admin publicam `bundle.tracing.min.js` e `bundle.tracing.js` em `sentry/11.0.0/`, com o SHA-384 que o pacote grava. O `index.html` inclui o bundle minificado antes do Flutter. Um gancho troca, ao inserir o script, o endereço da CDN pela cópia local, para o `init` do Dart achar o SDK sem pedido à CDN. Sem `SENTRY_DSN`, o Dart não chama `SentryFlutter.init`. Replay na web continua desligado; esses bundles não entram.
+- **Motivo:** o pacote não tem opção de URL local. Liberar a CDN em `script-src` alargaria a política. O beacon do Cloudflare (`static.cloudflareinsights.com`) fica de fora: a injeção se desliga na Cloudflare.
+- **Onde está no código:** `web/sentry/`, `apps/parceiro/web/sentry/`, `apps/admin/web/sentry/`, os três `web/index.html` e `tool/check_security_meta.sh`.
+- **Como trocar depois:** ao subir o `sentry_flutter`, ler `sentry_js_sdk_version.dart` e trocar os arquivos se a versão ou o hash mudar. O check falha se o pub-cache divergir.
+
 ## Os apps saem do github.io para subdomínios próprios
 
 - **Data:** 2026-11-05
