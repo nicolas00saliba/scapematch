@@ -1,5 +1,12 @@
 # Decisões provisórias
 
+## A reserva de pontos vale na API oficial
+
+- **Data:** 2026-11-13
+- **Decisão:** o lastro da indicação e o pagamento da vaga grátis deixam de existir só no sandbox. O split e a transferência usam a mesma conta, no sandbox ou em `https://api.asaas.com/v3`. Outra URL não chama a rede. O valor do jogador não muda: a linha é o centavo que o banco já calculou, em `fixedValue`, e só entra se esse valor cabe no líquido. Antes de criar a transferência, a função procura `externalReference`. Se ela já existe, não cria outra. Sem a carteira `ASAAS_POINTS_RESERVE_WALLET_ID` ou sem a chave, nada é enviado.
+- **Onde está no código:** `supabase/functions/_shared/points_reserve_asaas.ts` e `create-charge`.
+- **Como trocar depois:** as funções não foram publicadas por esta mudança. Produção precisa da subconta Reserva de pontos, da carteira e da chave no painel. Sem isso o split não entra e a cobrança segue como hoje.
+
 ## O host escolhe o mínimo e o máximo
 
 - **Data:** 2026-11-10

@@ -1,14 +1,19 @@
-// Subconta "Reserva de pontos" no Asaas. Só o sandbox, e só com a flag ligada.
+// Subconta "Reserva de pontos" no Asaas. Sandbox e produção usam o mesmo
+// contrato, só nas bases oficiais (api-sandbox.asaas.com e api.asaas.com).
 // A documentação não oferece um bloqueio de saque: a subconta fica sem conta
 // bancária e a apiKey dela não sai do backend.
 //
 // O percentual do Asaas incide no líquido depois da taxa. Por isso o lastro
 // vai em fixedValue, no valor em centavos da indicação (2,5% do bruto).
+// O valor da cobrança do jogador não muda: a linha só reparte o que já foi
+// calculado. Antes de transferir, a função procura o externalReference.
+// Se a transferência já existe, não cria outra.
 
+import { findTransferInList } from "./asaas_transfers.ts";
 import {
   asaasSandboxBaseUrl,
   fixedReaisFromCents,
-  isAsaasSandbox,
+  isOfficialAsaasBase,
   type AsaasFetch,
   type ChargeSplit,
 } from "./asaas_provider.ts";
@@ -26,7 +31,6 @@ export function readEnv(
 }
 
 export type ReserveSplitLineInput = {
-  sandbox: boolean;
   reserveWalletId: string | null;
   rootWalletId: string | null;
   houseWalletId: string;
@@ -35,20 +39,20 @@ export type ReserveSplitLineInput = {
 
 /// Linha extra do split. `referralCents` já é zero quando a flag está
 /// desligada, não há indicação ou o valor não cabe no líquido.
+/// O fixedValue tem de voltar aos mesmos centavos. Se não voltar, a linha
+/// não entra: a cobrança segue sem a reserva, em vez de mandar outro valor.
 export function pointsReserveSplitLine(
   input: ReserveSplitLineInput,
 ): ChargeSplit | null {
-  if (!input.sandbox) return null;
   const wallet = (input.reserveWalletId ?? "").trim();
   const root = (input.rootWalletId ?? "").trim();
   if (!wallet || wallet === input.houseWalletId || wallet === root) return null;
   if (!Number.isInteger(input.referralCents) || input.referralCents <= 0) {
     return null;
   }
-  return {
-    walletId: wallet,
-    fixedValue: fixedReaisFromCents(input.referralCents),
-  };
+  const fixedValue = fixedReaisFromCents(input.referralCents);
+  if (Math.round(fixedValue * 100) !== input.referralCents) return null;
+  return { walletId: wallet, fixedValue };
 }
 
 export type ReserveMoves = {
@@ -90,7 +94,7 @@ export function backedCentsOf(entry: {
 }
 
 export function reserveTransferAllowed(baseUrl: string, apiKey: string): boolean {
-  return isAsaasSandbox(baseUrl) && apiKey.trim().length > 0;
+  return isOfficialAsaasBase(baseUrl) && apiKey.trim().length > 0;
 }
 
 type RpcResult = { data: unknown; error: { message: string } | null };
@@ -112,7 +116,7 @@ export type ReservePayoutInput = {
   fetchFn: AsaasFetch;
 };
 
-/// Transfere da subconta da reserva. Recusa qualquer URL que não seja o sandbox
+/// Transfere da subconta da reserva. Recusa URL que não seja a API oficial
 /// antes de chamar a rede. Devolve true quando a casa foi paga por aqui e o
 /// crédito no repasse pode ser anulado.
 export async function settlePointsReservePayout(
@@ -164,16 +168,32 @@ async function sendLeg(
   });
   if (claim.error) return false;
   if (claim.data === "done") return true;
+  const transfer = {
+    baseUrl: input.baseUrl,
+    apiKey: input.reserveApiKey,
+    fetchFn: input.fetchFn,
+    valueCents: leg.cents,
+    destinationWalletId: leg.walletId,
+    externalReference: `reserve:${input.chargeId}:${leg.purpose}`,
+  };
+  if (claim.data === "skip") {
+    try {
+      const id = await findReserveTransfer(transfer);
+      if (!id) return false;
+      const saved = await input.rpc("complete_points_reserve_transfer", {
+        p_charge_id: input.chargeId,
+        p_purpose: leg.purpose,
+        p_provider_ref: id,
+        p_ok: true,
+      });
+      return !saved.error;
+    } catch {
+      return false;
+    }
+  }
   if (claim.data !== "send") return false;
   try {
-    const id = await postSandboxTransfer({
-      baseUrl: input.baseUrl,
-      apiKey: input.reserveApiKey,
-      fetchFn: input.fetchFn,
-      valueCents: leg.cents,
-      destinationWalletId: leg.walletId,
-      externalReference: `reserve:${input.chargeId}:${leg.purpose}`,
-    });
+    const id = await postReserveTransfer(transfer);
     const saved = await input.rpc("complete_points_reserve_transfer", {
       p_charge_id: input.chargeId,
       p_purpose: leg.purpose,
@@ -192,41 +212,76 @@ async function sendLeg(
   }
 }
 
-export async function postSandboxTransfer(input: {
+export type ReserveTransferInput = {
   baseUrl: string;
   apiKey: string;
   fetchFn: AsaasFetch;
   valueCents: number;
   destinationWalletId: string;
   externalReference: string;
-}): Promise<string> {
-  if (!isAsaasSandbox(input.baseUrl)) {
-    throw new Error("reserva de pontos só no sandbox");
-  }
+};
+
+const reservePurposes = new Set([
+  "house",
+  "platform_return",
+  "cashback_in",
+  "cashback_out",
+  "cashback_excess",
+]);
+
+/// Nome antigo. Vale no sandbox e na produção oficial.
+export const postSandboxTransfer = postReserveTransfer;
+
+/// Procura a transferência pelo externalReference. Não cria outra.
+export async function findReserveTransfer(
+  input: ReserveTransferInput,
+): Promise<string | null> {
+  const base = officialBase(input.baseUrl);
   const key = input.apiKey.trim();
   if (!key) throw new Error("chave da reserva ausente");
-  const base = input.baseUrl.replace(/\/$/, "");
-  if (base !== asaasSandboxBaseUrl) {
-    throw new Error("reserva de pontos só no sandbox");
+  assertReference(input.externalReference);
+  const query = encodeURIComponent(input.externalReference);
+  const response = await input.fetchFn(
+    `${base}/transfers?externalReference=${query}&limit=10`,
+    { method: "GET", headers: asaasHeaders(key) },
+  );
+  if (!response.ok) throw new Error(`Asaas ${response.status}`);
+  const body = await response.json().catch(() => null);
+  if (!body || typeof body !== "object") return null;
+  return findTransferInList(
+    body as Record<string, unknown>,
+    input.externalReference,
+  )?.id ?? null;
+}
+
+export async function postReserveTransfer(
+  input: ReserveTransferInput,
+): Promise<string> {
+  const existing = await findReserveTransfer(input);
+  if (existing) return existing;
+  const wallet = input.destinationWalletId.trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(wallet)) {
+    throw new Error("carteira da reserva");
   }
+  const value = fixedReaisFromCents(input.valueCents);
+  if (Math.round(value * 100) !== input.valueCents) {
+    throw new Error("valor da reserva");
+  }
+  const base = officialBase(input.baseUrl);
   const response = await input.fetchFn(`${base}/transfers`, {
     method: "POST",
     headers: {
-      access_token: key,
-      "User-Agent": "EscapeMatch",
-      Accept: "application/json",
+      ...asaasHeaders(input.apiKey.trim()),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      value: fixedReaisFromCents(input.valueCents),
-      walletId: input.destinationWalletId,
+      value,
+      walletId: wallet,
       externalReference: input.externalReference,
     }),
   });
   const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`Asaas ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`Asaas ${response.status}`);
   const body = JSON.parse(text) as { id?: unknown };
   if (typeof body.id !== "string" || body.id.length === 0) {
     throw new Error("Resposta do Asaas sem id");
@@ -234,9 +289,36 @@ export async function postSandboxTransfer(input: {
   return body.id;
 }
 
+function officialBase(baseUrl: string): string {
+  const base = baseUrl.trim().replace(/\/$/, "");
+  if (!isOfficialAsaasBase(base)) {
+    throw new Error("reserva de pontos fora da API Asaas");
+  }
+  return base;
+}
+
+function assertReference(reference: string): void {
+  const parts = reference.split(":");
+  if (
+    parts.length !== 3 || parts[0] !== "reserve" ||
+    !/^[A-Za-z0-9_-]{1,80}$/.test(parts[1]) ||
+    !reservePurposes.has(parts[2])
+  ) {
+    throw new Error("referência da reserva");
+  }
+}
+
+function asaasHeaders(apiKey: string): Record<string, string> {
+  return {
+    access_token: apiKey,
+    "User-Agent": "EscapeMatch",
+    Accept: "application/json",
+  };
+}
+
 /// Move o lastro do cashback para a mesma subconta, e devolve no estorno.
 /// O valor só existe depois do sorteio, então não entra no split da cobrança.
-/// Sem sandbox ou sem as chaves, não chama a rede nem o banco.
+/// Sem a API oficial ou sem as chaves, não chama a rede nem o banco.
 export async function fundCashbackReserve(
   admin: unknown,
   env: { get(name: string): string | undefined },
@@ -249,7 +331,7 @@ export async function fundCashbackReserve(
   const reserveKey = readEnv(env, "ASAAS_POINTS_RESERVE_API_KEY");
   const reserveWallet = readEnv(env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
   const rootWallet = readEnv(env, "ASAAS_ROOT_WALLET_ID").trim();
-  if (!isAsaasSandbox(baseUrl) || !chargeId) return;
+  if (!isOfficialAsaasBase(baseUrl) || !chargeId) return;
   if (!reserveWallet || !rootWallet || reserveWallet === rootWallet) return;
   if (!rootKey.trim() && !reserveKey.trim()) return;
   const client = admin as { rpc: ReserveRpc };
@@ -304,8 +386,8 @@ type ReserveQuery = {
   } | null;
 };
 
-/// Lê o crédito da vaga e, no sandbox, paga a casa a partir da subconta.
-/// Fora do sandbox não chama a rede e não anula o crédito do repasse.
+/// Lê o crédito da vaga e paga a casa a partir da subconta.
+/// Fora da API oficial não chama a rede e não anula o crédito do repasse.
 export async function settlePaidChargeReserve(
   admin: unknown,
   env: { get(name: string): string | undefined },

@@ -5,37 +5,34 @@ import {
   fundCashbackReserve,
   pointsReserveMoves,
   pointsReserveSplitLine,
-  postSandboxTransfer,
+  postReserveTransfer,
   readEnv,
   settlePointsReservePayout,
 } from "./points_reserve_asaas.ts";
 
-Deno.test("sem sandbox ou sem carteira o split da reserva não entra", () => {
+Deno.test("sem carteira, centavo inválido ou carteira repetida o split não entra", () => {
   const base = {
     reserveWalletId: "wal_reserva",
     rootWalletId: "wal_raiz",
     houseWalletId: "wal_casa",
     referralCents: 250,
   };
-  assertEquals(pointsReserveSplitLine({ ...base, sandbox: false }), null);
+  assertEquals(pointsReserveSplitLine({ ...base, referralCents: 0 }), null);
+  assertEquals(pointsReserveSplitLine({ ...base, referralCents: 1.5 }), null);
   assertEquals(
-    pointsReserveSplitLine({ ...base, sandbox: true, referralCents: 0 }),
+    pointsReserveSplitLine({ ...base, reserveWalletId: "wal_raiz" }),
     null,
   );
   assertEquals(
-    pointsReserveSplitLine({
-      ...base,
-      sandbox: true,
-      reserveWalletId: "wal_raiz",
-    }),
+    pointsReserveSplitLine({ ...base, reserveWalletId: "wal_casa" }),
     null,
   );
+  assertEquals(pointsReserveSplitLine({ ...base, reserveWalletId: "" }), null);
 });
 
 Deno.test("2,5% de R$ 100 entram como R$ 2,50 fixos na subconta", () => {
   assertEquals(
     pointsReserveSplitLine({
-      sandbox: true,
       reserveWalletId: "wal_reserva",
       rootWalletId: "wal_raiz",
       houseWalletId: "wal_casa",
@@ -61,12 +58,12 @@ Deno.test("vaga de R$ 100 paga R$ 75 à casa e devolve R$ 25 à raiz", () => {
   }), 8000);
 });
 
-Deno.test("transferência da reserva recusa produção sem chamar a rede", async () => {
+Deno.test("URL que não é a API Asaas não chama a rede", async () => {
   let called = false;
   await assertRejects(
     () =>
-      postSandboxTransfer({
-        baseUrl: asaasProductionBaseUrl,
+      postReserveTransfer({
+        baseUrl: "https://api.asaas.com.evil.com/v3",
         apiKey: "chave",
         fetchFn: () => {
           called = true;
@@ -74,20 +71,63 @@ Deno.test("transferência da reserva recusa produção sem chamar a rede", async
         },
         valueCents: 7500,
         destinationWalletId: "wal_casa",
-        externalReference: "reserve:1:house",
+        externalReference: "reserve:abc:house",
       }),
     Error,
-    "sandbox",
+    "Asaas",
   );
   assertEquals(called, false);
 });
 
+Deno.test("produção transfere o valor exato e a repetição não cria outra", async () => {
+  let posts = 0;
+  const reference = "reserve:abc:house";
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET") {
+      const data = posts === 0
+        ? []
+        : [{
+          id: "tr_prod",
+          externalReference: reference,
+          status: "PENDING",
+          value: 75,
+        }];
+      return Promise.resolve(new Response(JSON.stringify({ data })));
+    }
+    posts += 1;
+    const body = JSON.parse(String(init?.body));
+    assertEquals(body, {
+      value: 75,
+      walletId: "wal_casa",
+      externalReference: reference,
+    });
+    assertEquals(String(url), `${asaasProductionBaseUrl}/transfers`);
+    assertEquals(new Headers(init?.headers).get("access_token"), "chave-reserva");
+    return Promise.resolve(new Response(JSON.stringify({ id: "tr_prod" })));
+  };
+  const input = {
+    baseUrl: asaasProductionBaseUrl,
+    apiKey: "chave-reserva",
+    fetchFn,
+    valueCents: 7500,
+    destinationWalletId: "wal_casa",
+    externalReference: reference,
+  };
+  assertEquals(await postReserveTransfer(input), "tr_prod");
+  assertEquals(await postReserveTransfer(input), "tr_prod");
+  assertEquals(posts, 1);
+});
+
 Deno.test("no sandbox a transferência usa a chave da subconta", async () => {
   const seen: { url?: string; key?: string; body?: string } = {};
-  const id = await postSandboxTransfer({
+  const id = await postReserveTransfer({
     baseUrl: asaasSandboxBaseUrl,
     apiKey: "chave-reserva",
     fetchFn: (url, init) => {
+      if ((init?.method ?? "GET") === "GET") {
+        return Promise.resolve(new Response(JSON.stringify({ data: [] })));
+      }
       seen.url = String(url);
       seen.key = new Headers(init?.headers).get("access_token") ?? "";
       seen.body = String(init?.body);
@@ -118,14 +158,14 @@ Deno.test("sem permissão de ambiente a reserva fica desligada", () => {
   }, "ASAAS_POINTS_RESERVE_WALLET_ID"), "");
 });
 
-Deno.test("produção não move a reserva nem anula o crédito", async () => {
+Deno.test("host parecido não move a reserva nem anula o crédito", async () => {
   let calls = 0;
   const paid = await settlePointsReservePayout({
     rpc: () => {
       calls += 1;
       return Promise.resolve({ data: "send", error: null });
     },
-    baseUrl: asaasProductionBaseUrl,
+    baseUrl: "https://api.asaas.com.evil.com/v3",
     reserveApiKey: "chave",
     rootWalletId: "wal_raiz",
     houseWalletId: "wal_casa",
@@ -138,7 +178,47 @@ Deno.test("produção não move a reserva nem anula o crédito", async () => {
   assertEquals(calls, 0);
 });
 
-Deno.test("cashback entra na subconta pela conta raiz, só no sandbox", async () => {
+Deno.test("produção paga a casa uma vez; repetição acha a transferência", async () => {
+  let posts = 0;
+  const reference = "reserve:abc:house";
+  const rpc = (fn: string) => {
+    if (fn === "claim_points_reserve_transfer") {
+      return Promise.resolve({ data: posts === 0 ? "send" : "skip", error: null });
+    }
+    return Promise.resolve({ data: null, error: null });
+  };
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "POST") {
+      posts += 1;
+      const body = JSON.parse(String(init?.body));
+      assertEquals(body.value, 75);
+      assertEquals(body.walletId, "wal_casa");
+      assertEquals(String(url), `${asaasProductionBaseUrl}/transfers`);
+      return Promise.resolve(new Response(JSON.stringify({ id: "tr_casa" })));
+    }
+    const data = posts === 0
+      ? []
+      : [{ id: "tr_casa", externalReference: reference, status: "DONE" }];
+    return Promise.resolve(new Response(JSON.stringify({ data })));
+  };
+  const input = {
+    rpc,
+    baseUrl: asaasProductionBaseUrl,
+    reserveApiKey: "chave",
+    rootWalletId: "wal_raiz",
+    houseWalletId: "wal_casa",
+    chargeId: "abc",
+    backedCents: 7500,
+    houseOwedCents: 7500,
+    fetchFn,
+  };
+  assertEquals(await settlePointsReservePayout(input), true);
+  assertEquals(await settlePointsReservePayout(input), true);
+  assertEquals(posts, 1);
+});
+
+Deno.test("cashback entra na subconta pela conta raiz na API oficial", async () => {
   let calls = 0;
   await fundCashbackReserve(
     { rpc: () => {
@@ -146,7 +226,8 @@ Deno.test("cashback entra na subconta pela conta raiz, só no sandbox", async ()
       return Promise.resolve({ data: [], error: null });
     } },
     {
-      get: (name) => name === "ASAAS_BASE_URL" ? asaasProductionBaseUrl : "x",
+      get: (name) =>
+        name === "ASAAS_BASE_URL" ? "https://evil.example/v3" : "x",
     },
     "charge-1",
   );
@@ -182,6 +263,9 @@ Deno.test("cashback entra na subconta pela conta raiz, só no sandbox", async ()
     },
     "charge-2",
     (url, init) => {
+      if ((init?.method ?? "GET") === "GET") {
+        return Promise.resolve(new Response(JSON.stringify({ data: [] })));
+      }
       seen.key = new Headers(init?.headers).get("access_token") ?? "";
       seen.body = String(init?.body);
       assertEquals(String(url), `${asaasSandboxBaseUrl}/transfers`);
