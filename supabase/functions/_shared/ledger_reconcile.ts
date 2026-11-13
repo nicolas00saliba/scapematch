@@ -1,17 +1,16 @@
 // Conciliação diária. Só GET no Asaas. Não cria cobrança, estorno nem transferência.
 
-import { mapAsaasTransferStatus } from "./asaas_transfers.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 
 export type RemotePayment = {
   id: string;
-  status: string;
+  status: string | null;
   valueCents: number;
 };
 
 export type RemoteTransfer = {
   id: string;
-  status: string;
+  status: string | null;
   valueCents: number;
   externalReference: string;
 };
@@ -26,6 +25,7 @@ export type LocalCharge = {
 
 export type LocalWithdrawal = {
   id: string;
+  venueId: string;
   externalReference: string;
   asaasTransferId: string;
   status: string;
@@ -52,23 +52,100 @@ export function reaisToCents(value: unknown): number | null {
   return cents;
 }
 
-export function mapPaymentStatus(status: string): string {
-  switch (status) {
-    case "RECEIVED":
-    case "CONFIRMED":
-    case "RECEIVED_IN_CASH":
-      return "paid";
-    case "REFUNDED":
-      return "refunded";
+/// null = o Asaas mandou um status que o livro não tem.
+export function mapPaymentStatus(status: string): string | null {
+  switch (status.trim().toUpperCase()) {
     case "PENDING":
     case "OVERDUE":
     case "AWAITING_RISK_ANALYSIS":
+    case "DUNNING_REQUESTED":
       return "pending";
+    case "AUTHORIZED":
+      return "authorized";
+    case "RECEIVED":
+    case "CONFIRMED":
+    case "RECEIVED_IN_CASH":
+    case "DUNNING_RECEIVED":
+      return "paid";
+    case "REFUNDED":
+    case "REFUND_REQUESTED":
+    case "REFUND_IN_PROGRESS":
+      return "refunded";
     case "DELETED":
       return "cancelled";
     default:
-      return /^[A-Z_]{1,40}$/.test(status) ? status : "unknown";
+      return null;
   }
+}
+
+/// null = status de transferência fora do livro. Não vira "pending".
+export function mapTransferStatus(status: string): string | null {
+  switch (status.trim().toUpperCase()) {
+    case "PENDING":
+    case "BANK_PROCESSING":
+      return "pending";
+    case "DONE":
+      return "done";
+    case "CANCELLED":
+      return "cancelled";
+    case "FAILED":
+      return "failed";
+    default:
+      return null;
+  }
+}
+
+export function saoPauloWindow(now: Date): {
+  sinceDay: string;
+  untilDay: string;
+  sinceIso: string;
+  untilIso: string;
+} {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+  }).format(now);
+  const sinceDay = shiftIsoDate(today, -1);
+  const nextDay = shiftIsoDate(today, 1);
+  return {
+    sinceDay,
+    untilDay: today,
+    sinceIso: saoPauloMidnightUtc(sinceDay),
+    untilIso: saoPauloMidnightUtc(nextDay),
+  };
+}
+
+function shiftIsoDate(day: string, days: number): string {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, date + days)).toISOString()
+    .slice(0, 10);
+}
+
+function saoPauloMidnightUtc(day: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  for (let hour = 0; hour < 8; hour++) {
+    const instant = new Date(Date.UTC(year, month - 1, date, hour, 0, 0));
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(instant);
+    const value = (type: string) =>
+      parts.find((part) => part.type === type)?.value ?? "";
+    const monthText = String(month).padStart(2, "0");
+    const dateText = String(date).padStart(2, "0");
+    if (
+      value("year") === String(year) &&
+      value("month") === monthText &&
+      value("day") === dateText &&
+      value("hour") === "00"
+    ) {
+      return instant.toISOString();
+    }
+  }
+  return new Date(Date.UTC(year, month - 1, date, 3, 0, 0)).toISOString();
 }
 
 export function compareLedger(input: {
@@ -77,6 +154,8 @@ export function compareLedger(input: {
   charges: LocalCharge[];
   withdrawals: LocalWithdrawal[];
   truncated: boolean;
+  uncheckedChargeRefs?: ReadonlySet<string>;
+  uncheckedWithdrawalIds?: ReadonlySet<string>;
 }): Divergence[] {
   const found: Divergence[] = [];
   const chargesByRef = new Map(
@@ -90,10 +169,24 @@ export function compareLedger(input: {
     seenPayments.add(payment.id);
     const local = chargesByRef.get(payment.id);
     if (!local) {
-      found.push(row("charge_missing_local", payment.id, "", "", payment.status));
+      found.push(row(
+        "charge_missing_local",
+        payment.id,
+        "",
+        "",
+        payment.status ?? "",
+      ));
       continue;
     }
-    if (local.status !== payment.status) {
+    if (payment.status == null) {
+      found.push(row(
+        "charge_status_unknown",
+        payment.id,
+        local.id,
+        local.status,
+        "",
+      ));
+    } else if (local.status !== payment.status) {
       found.push(row(
         "charge_status",
         payment.id,
@@ -114,10 +207,12 @@ export function compareLedger(input: {
   }
 
   if (!input.truncated) {
+    const uncheckedCharges = input.uncheckedChargeRefs ?? new Set<string>();
     for (const local of input.charges) {
       if (local.providerRef === "" || seenPayments.has(local.providerRef)) {
         continue;
       }
+      if (uncheckedCharges.has(local.providerRef)) continue;
       found.push(row(
         "charge_missing_asaas",
         local.providerRef,
@@ -162,11 +257,19 @@ export function compareLedger(input: {
         transfer.id,
         "",
         "",
-        transfer.status,
+        transfer.status ?? "",
       ));
       continue;
     }
-    if (local.status !== transfer.status) {
+    if (transfer.status == null) {
+      found.push(row(
+        "transfer_status_unknown",
+        transfer.id,
+        local.id,
+        local.status,
+        "",
+      ));
+    } else if (local.status !== transfer.status) {
       found.push(row(
         "transfer_status",
         transfer.id,
@@ -187,7 +290,9 @@ export function compareLedger(input: {
   }
 
   if (!input.truncated) {
+    const unchecked = input.uncheckedWithdrawalIds ?? new Set<string>();
     for (const local of withdrawals) {
+      if (unchecked.has(local.id)) continue;
       if (local.asaasTransferId === "") continue;
       if (
         seenTransfers.has(local.asaasTransferId) ||
@@ -251,6 +356,7 @@ export type LedgerDeps = {
   env: EnvLike;
   fetchFn?: FetchFn;
   store?: Store;
+  now?: Date;
 };
 
 const pageLimit = 100;
@@ -281,44 +387,43 @@ export async function handleLedgerReconcile(
   const store = deps.store;
   if (!store) return json({ error: "indisponivel" }, 500);
   try {
-    const since = utcDay(-1);
-    const until = utcDay(0);
-    const payments = await listCollection(
-      fetchFn,
-      base,
-      apiKey,
-      "/payments",
-      since,
-      until,
-      parsePayment,
-    );
-    const transfers = await listCollection(
-      fetchFn,
-      base,
-      apiKey,
-      "/transfers",
-      since,
-      until,
-      parseTransfer,
-    );
+    const window = saoPauloWindow(deps.now ?? new Date());
+    const payments = await listPayments(fetchFn, base, apiKey, window);
     const snapshot = await store.rpc("ledger_reconcile_snapshot", {
-      p_since: `${since}T00:00:00Z`,
+      p_since: window.sinceIso,
+      p_until: window.untilIso,
       p_payment_ids: payments.rows.map((item) => item.id),
-      p_transfer_ids: transfers.rows.map((item) => item.id),
+      p_transfer_ids: [],
     });
     if (snapshot.error) return json({ error: "indisponivel" }, 500);
     const local = readSnapshot(snapshot.data);
+    const filled = await fillMissingPayments(
+      fetchFn,
+      base,
+      apiKey,
+      payments,
+      local.charges,
+    );
+    const transfers = await readSubaccountTransfers(
+      fetchFn,
+      base,
+      store,
+      window,
+      local.withdrawals,
+    );
     const divergences = compareLedger({
-      payments: payments.rows,
+      payments: filled.rows,
       transfers: transfers.rows,
       charges: local.charges,
       withdrawals: local.withdrawals,
-      truncated: payments.truncated || transfers.truncated || local.capped,
+      truncated: filled.truncated || transfers.truncated || local.capped,
+      uncheckedChargeRefs: filled.unchecked,
+      uncheckedWithdrawalIds: transfers.unchecked,
     });
     const saved = await store.rpc("record_payment_divergences", {
-      p_payment_count: payments.rows.length,
+      p_payment_count: filled.rows.length,
       p_transfer_count: transfers.rows.length,
-      p_truncated: payments.truncated || transfers.truncated || local.capped,
+      p_truncated: filled.truncated || transfers.truncated || local.capped,
       p_rows: divergences,
     });
     if (saved.error) return json({ error: "indisponivel" }, 500);
@@ -328,10 +433,169 @@ export async function handleLedgerReconcile(
   }
 }
 
-function utcDay(offset: number): string {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() + offset);
-  return date.toISOString().slice(0, 10);
+async function listPayments(
+  fetchFn: FetchFn,
+  base: string,
+  apiKey: string,
+  window: { sinceDay: string; untilDay: string },
+): Promise<{ rows: RemotePayment[]; truncated: boolean }> {
+  const created = await listCollection(
+    fetchFn,
+    base,
+    apiKey,
+    "/payments",
+    "dateCreated",
+    window.sinceDay,
+    window.untilDay,
+    parsePayment,
+  );
+  const paid = await listCollection(
+    fetchFn,
+    base,
+    apiKey,
+    "/payments",
+    "paymentDate",
+    window.sinceDay,
+    window.untilDay,
+    parsePayment,
+  );
+  const byId = new Map<string, RemotePayment>();
+  for (const row of [...created.rows, ...paid.rows]) byId.set(row.id, row);
+  return {
+    rows: [...byId.values()],
+    truncated: created.truncated || paid.truncated,
+  };
+}
+
+async function fillMissingPayments(
+  fetchFn: FetchFn,
+  base: string,
+  apiKey: string,
+  listed: { rows: RemotePayment[]; truncated: boolean },
+  charges: LocalCharge[],
+): Promise<{
+  rows: RemotePayment[];
+  truncated: boolean;
+  unchecked: Set<string>;
+}> {
+  const byId = new Map(listed.rows.map((row) => [row.id, row]));
+  const unchecked = new Set<string>();
+  for (const charge of charges) {
+    const ref = charge.providerRef;
+    if (ref === "" || byId.has(ref)) continue;
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(ref)) {
+      unchecked.add(ref);
+      continue;
+    }
+    const read = await readOne(
+      fetchFn,
+      `${base}/payments/${ref}`,
+      apiKey,
+      parsePayment,
+    );
+    if (read === "missing") continue;
+    if (read === "unchecked") {
+      unchecked.add(ref);
+      continue;
+    }
+    byId.set(read.id, read);
+  }
+  return { rows: [...byId.values()], truncated: listed.truncated, unchecked };
+}
+
+async function readSubaccountTransfers(
+  fetchFn: FetchFn,
+  base: string,
+  store: Store,
+  window: { sinceDay: string; untilDay: string },
+  withdrawals: LocalWithdrawal[],
+): Promise<{
+  rows: RemoteTransfer[];
+  truncated: boolean;
+  unchecked: Set<string>;
+}> {
+  const rows: RemoteTransfer[] = [];
+  const seen = new Set<string>();
+  const unchecked = new Set<string>();
+  let truncated = false;
+  const byVenue = new Map<string, LocalWithdrawal[]>();
+  for (const withdrawal of withdrawals) {
+    const venueId = withdrawal.venueId;
+    if (!/^[0-9a-f-]{36}$/i.test(venueId)) {
+      unchecked.add(withdrawal.id);
+      continue;
+    }
+    const group = byVenue.get(venueId) ?? [];
+    group.push(withdrawal);
+    byVenue.set(venueId, group);
+  }
+  for (const [venueId, group] of byVenue) {
+    const keyResult = await store.rpc("read_venue_asaas_key", {
+      p_venue_id: venueId,
+    });
+    const apiKey = keyResult.error ? "" : text(keyResult.data).trim();
+    if (apiKey === "") {
+      for (const withdrawal of group) unchecked.add(withdrawal.id);
+      continue;
+    }
+    const listed = await listCollection(
+      fetchFn,
+      base,
+      apiKey,
+      "/transfers",
+      "dateCreated",
+      window.sinceDay,
+      window.untilDay,
+      parseTransfer,
+    );
+    if (listed.truncated) truncated = true;
+    for (const transfer of listed.rows) {
+      if (seen.has(transfer.id)) continue;
+      seen.add(transfer.id);
+      rows.push(transfer);
+    }
+    for (const withdrawal of group) {
+      const id = withdrawal.asaasTransferId;
+      if (id === "" || seen.has(id)) continue;
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
+        unchecked.add(withdrawal.id);
+        continue;
+      }
+      const read = await readOne(
+        fetchFn,
+        `${base}/transfers/${id}`,
+        apiKey,
+        parseTransfer,
+      );
+      if (read === "unchecked") {
+        unchecked.add(withdrawal.id);
+        continue;
+      }
+      if (read === "missing") continue;
+      seen.add(read.id);
+      rows.push(read);
+    }
+  }
+  return { rows, truncated, unchecked };
+}
+
+async function readOne<T>(
+  fetchFn: FetchFn,
+  url: string,
+  apiKey: string,
+  parse: (row: Record<string, unknown>) => T | null,
+): Promise<T | "missing" | "unchecked"> {
+  const response = await fetchFn(url, {
+    method: "GET",
+    redirect: "manual",
+    headers: { access_token: apiKey },
+  });
+  if (response.status === 404) return "missing";
+  if (response.status >= 300 && response.status < 400) return "unchecked";
+  if (!response.ok) return "unchecked";
+  const body = await response.json();
+  if (!body || typeof body !== "object") return "unchecked";
+  return parse(body as Record<string, unknown>) ?? "unchecked";
 }
 
 async function listCollection<T>(
@@ -339,6 +603,7 @@ async function listCollection<T>(
   base: string,
   apiKey: string,
   path: "/payments" | "/transfers",
+  dateField: "dateCreated" | "paymentDate",
   since: string,
   until: string,
   parse: (row: Record<string, unknown>) => T | null,
@@ -349,8 +614,8 @@ async function listCollection<T>(
     const params = new URLSearchParams({
       limit: String(pageLimit),
       offset: String(page * pageLimit),
-      "dateCreated[ge]": since,
-      "dateCreated[le]": until,
+      [`${dateField}[ge]`]: since,
+      [`${dateField}[le]`]: until,
     });
     const url = `${base}${path}?${params}`;
     const response = await fetchFn(url, {
@@ -400,7 +665,7 @@ function parseTransfer(row: Record<string, unknown>): RemoteTransfer | null {
   const status = typeof row.status === "string" ? row.status : "";
   return {
     id,
-    status: mapAsaasTransferStatus(status),
+    status: mapTransferStatus(status),
     valueCents,
     externalReference: safeReference,
   };
@@ -451,6 +716,7 @@ function readWithdrawal(value: unknown): LocalWithdrawal[] {
   if (!id || amount == null) return [];
   return [{
     id,
+    venueId: text(row.venue_id),
     externalReference: text(row.external_reference),
     asaasTransferId: text(row.asaas_transfer_id),
     status: text(row.status),

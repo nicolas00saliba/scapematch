@@ -17,12 +17,14 @@ create table public.payment_divergences (
     'charge_missing_local',
     'charge_missing_asaas',
     'charge_status',
+    'charge_status_unknown',
     'charge_amount',
     'ledger_missing',
     'ledger_refund_missing',
     'transfer_missing_local',
     'transfer_missing_asaas',
     'transfer_status',
+    'transfer_status_unknown',
     'transfer_amount',
     'asaas_truncated'
   )),
@@ -49,6 +51,7 @@ revoke all on table public.payment_divergences
 
 create or replace function public.ledger_reconcile_snapshot(
   p_since timestamptz,
+  p_until timestamptz,
   p_payment_ids text[],
   p_transfer_ids text[]
 )
@@ -68,9 +71,9 @@ begin
   from public.payment_charges c
   where c.provider = 'asaas'
     and (
-      c.created_at >= p_since
-      or c.paid_at >= p_since
-      or c.refunded_at >= p_since
+      (c.created_at >= p_since and c.created_at < p_until)
+      or (c.paid_at >= p_since and c.paid_at < p_until)
+      or (c.refunded_at >= p_since and c.refunded_at < p_until)
       or c.provider_ref = any (coalesce(p_payment_ids, array[]::text[]))
     );
 
@@ -90,9 +93,9 @@ begin
     from public.payment_charges c
     where c.provider = 'asaas'
       and (
-        c.created_at >= p_since
-        or c.paid_at >= p_since
-        or c.refunded_at >= p_since
+        (c.created_at >= p_since and c.created_at < p_until)
+        or (c.paid_at >= p_since and c.paid_at < p_until)
+        or (c.refunded_at >= p_since and c.refunded_at < p_until)
         or c.provider_ref = any (coalesce(p_payment_ids, array[]::text[]))
       )
     order by c.created_at desc
@@ -101,8 +104,8 @@ begin
 
   select count(*) into v_withdrawal_count
   from public.venue_withdrawals w
-  where w.created_at >= p_since
-    or w.updated_at >= p_since
+  where (w.created_at >= p_since and w.created_at < p_until)
+    or (w.updated_at >= p_since and w.updated_at < p_until)
     or w.asaas_transfer_id = any (coalesce(p_transfer_ids, array[]::text[]))
     or w.external_reference = any (coalesce(p_transfer_ids, array[]::text[]));
 
@@ -111,13 +114,14 @@ begin
   from (
     select
       w.id,
+      w.venue_id,
       w.external_reference,
       coalesce(w.asaas_transfer_id, '') as asaas_transfer_id,
       w.status,
       w.amount_cents
     from public.venue_withdrawals w
-    where w.created_at >= p_since
-      or w.updated_at >= p_since
+    where (w.created_at >= p_since and w.created_at < p_until)
+      or (w.updated_at >= p_since and w.updated_at < p_until)
       or w.asaas_transfer_id = any (coalesce(p_transfer_ids, array[]::text[]))
       or w.external_reference = any (coalesce(p_transfer_ids, array[]::text[]))
     order by w.created_at desc
@@ -132,9 +136,9 @@ begin
 end;
 $$;
 
-revoke all on function public.ledger_reconcile_snapshot(timestamptz, text[], text[])
+revoke all on function public.ledger_reconcile_snapshot(timestamptz, timestamptz, text[], text[])
   from public, anon, authenticated;
-grant execute on function public.ledger_reconcile_snapshot(timestamptz, text[], text[])
+grant execute on function public.ledger_reconcile_snapshot(timestamptz, timestamptz, text[], text[])
   to service_role;
 
 create or replace function public.record_payment_divergences(
@@ -178,9 +182,10 @@ begin
       v_actual := pg_catalog.left(coalesce(v_row ->> 'actual', ''), 40);
       if v_kind not in (
         'charge_missing_local', 'charge_missing_asaas', 'charge_status',
-        'charge_amount', 'ledger_missing', 'ledger_refund_missing',
-        'transfer_missing_local', 'transfer_missing_asaas', 'transfer_status',
-        'transfer_amount', 'asaas_truncated'
+        'charge_status_unknown', 'charge_amount', 'ledger_missing',
+        'ledger_refund_missing', 'transfer_missing_local',
+        'transfer_missing_asaas', 'transfer_status',
+        'transfer_status_unknown', 'transfer_amount', 'asaas_truncated'
       ) then
         continue;
       end if;
@@ -261,6 +266,7 @@ declare
   v_url text;
   v_secret text;
   v_missing text := '';
+  v_request bigint;
 begin
   select pg_catalog.btrim(s.decrypted_secret) into v_url
   from vault.decrypted_secrets s
@@ -281,7 +287,7 @@ begin
       pg_catalog.btrim(v_missing)
       using errcode = 'P0001';
   end if;
-  perform net.http_post(
+  v_request := net.http_post(
     url := v_url,
     body := '{}'::jsonb,
     headers := pg_catalog.jsonb_build_object(
@@ -290,8 +296,56 @@ begin
     ),
     timeout_milliseconds := 90000
   );
+  insert into public.ledger_reconcile_dispatches (request_id)
+  values (v_request);
 end;
 $$;
+
+create table public.ledger_reconcile_dispatches (
+  id uuid primary key default pg_catalog.gen_random_uuid(),
+  request_id bigint not null,
+  created_at timestamptz not null default pg_catalog.now()
+);
+
+alter table public.ledger_reconcile_dispatches enable row level security;
+
+revoke all on table public.ledger_reconcile_dispatches
+  from public, anon, authenticated, service_role;
+
+comment on table public.ledger_reconcile_dispatches is
+  'Id do pedido pg_net. Sem URL, segredo ou corpo da resposta.';
+
+create or replace function private.check_ledger_reconcile_response()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_request bigint;
+  v_status integer;
+  v_timeout boolean;
+begin
+  select d.request_id into v_request
+  from public.ledger_reconcile_dispatches d
+  order by d.created_at desc
+  limit 1;
+  if v_request is null then
+    return;
+  end if;
+  select r.status_code, r.timed_out
+    into v_status, v_timeout
+  from net._http_response r
+  where r.id = v_request;
+  if v_timeout is true or v_status is null or v_status >= 400 then
+    raise exception 'ledger_reconcile_http_erro'
+      using errcode = 'P0001';
+  end if;
+end;
+$$;
+
+revoke all on function private.check_ledger_reconcile_response()
+  from public, anon, authenticated, service_role;
 
 revoke all on function private.invoke_ledger_reconcile()
   from public, anon, authenticated, service_role;
@@ -312,6 +366,16 @@ begin
       'ledger-reconcile',
       '30 11 * * *',
       'select private.invoke_ledger_reconcile()'
+    );
+    if exists (
+      select 1 from cron.job where jobname = 'ledger-reconcile-result'
+    ) then
+      perform cron.unschedule('ledger-reconcile-result');
+    end if;
+    perform cron.schedule(
+      'ledger-reconcile-result',
+      '40 11 * * *',
+      'select private.check_ledger_reconcile_response()'
     );
   else
     raise notice 'pg_cron ou pg_net ausente; ledger-reconcile não foi agendado';

@@ -46,7 +46,7 @@ void main() {
     expect(find.byKey(const Key('admin-conciliacao')), findsOneWidget);
     expect(find.text('Status da cobrança diferente'), findsOneWidget);
     expect(find.textContaining('pay_conciliacao'), findsOneWidget);
-    expect(find.textContaining('paid → pending'), findsOneWidget);
+    expect(find.textContaining('paga → pendente'), findsOneWidget);
     expect(find.textContaining('2 cobranças'), findsOneWidget);
   });
 }

@@ -110,11 +110,11 @@ insert into public.venue_withdrawals (
 do $$
 begin
   if has_function_privilege(
-    'anon', 'public.ledger_reconcile_snapshot(timestamptz,text[],text[])', 'execute'
+    'anon', 'public.ledger_reconcile_snapshot(timestamptz,timestamptz,text[],text[])', 'execute'
   ) or has_function_privilege(
-    'authenticated', 'public.ledger_reconcile_snapshot(timestamptz,text[],text[])', 'execute'
+    'authenticated', 'public.ledger_reconcile_snapshot(timestamptz,timestamptz,text[],text[])', 'execute'
   ) or not has_function_privilege(
-    'service_role', 'public.ledger_reconcile_snapshot(timestamptz,text[],text[])', 'execute'
+    'service_role', 'public.ledger_reconcile_snapshot(timestamptz,timestamptz,text[],text[])', 'execute'
   ) or has_function_privilege(
     'anon', 'public.admin_payment_divergences()', 'execute'
   ) or has_function_privilege(
@@ -135,6 +135,7 @@ begin
   set local role service_role;
   v_snap := public.ledger_reconcile_snapshot(
     timestamptz '2026-11-01 00:00:00+00',
+    timestamptz '2026-11-14 00:00:00+00',
     array['pay_conciliacao'],
     array['tra_conciliacao']
   );
@@ -229,3 +230,72 @@ exception
       raise;
     end if;
 end $$;
+
+create schema if not exists net;
+
+create table if not exists net._http_response (
+  id bigint primary key,
+  status_code integer,
+  timed_out boolean,
+  error_msg text
+);
+
+create or replace function net.http_post(
+  url text,
+  body jsonb,
+  headers jsonb,
+  timeout_milliseconds integer
+) returns bigint
+language plpgsql
+as $$
+begin
+  if url not like 'https://%' then
+    raise exception 'url do cron invalida';
+  end if;
+  return 77;
+end;
+$$;
+
+select vault.create_secret(
+  'https://example.test/ledger-reconcile',
+  'ledger_reconcile_url',
+  'url de teste'
+);
+
+select vault.create_secret(
+  'segredo-do-cron-teste',
+  'ledger_reconcile_secret',
+  'segredo de teste'
+);
+
+select private.invoke_ledger_reconcile();
+
+do $$
+begin
+  if not exists (
+    select 1 from public.ledger_reconcile_dispatches where request_id = 77
+  ) or exists (
+    select 1 from public.ledger_reconcile_dispatches
+    where request_id::text like '%segredo%'
+  ) then
+    raise exception 'o cron não guardou só o id do pedido';
+  end if;
+end $$;
+
+insert into net._http_response (id, status_code, timed_out)
+values (77, 500, false);
+
+do $$
+begin
+  perform private.check_ledger_reconcile_response();
+  raise exception 'resposta de erro não falhou';
+exception
+  when others then
+    if sqlerrm is distinct from 'ledger_reconcile_http_erro' then
+      raise;
+    end if;
+end $$;
+
+update net._http_response set status_code = 200 where id = 77;
+
+select private.check_ledger_reconcile_response();

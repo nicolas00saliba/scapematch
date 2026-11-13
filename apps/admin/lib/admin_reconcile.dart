@@ -81,23 +81,40 @@ String _kindLabel(String kind) {
     'charge_missing_local' => 'Cobrança no Asaas sem livro',
     'charge_missing_asaas' => 'Cobrança no livro sem Asaas',
     'charge_status' => 'Status da cobrança diferente',
+    'charge_status_unknown' => 'Status desconhecido',
     'charge_amount' => 'Valor da cobrança diferente',
     'ledger_missing' => 'Cobrança paga sem lançamento',
     'ledger_refund_missing' => 'Estorno sem lançamento',
     'transfer_missing_local' => 'Transferência no Asaas sem saque',
     'transfer_missing_asaas' => 'Saque sem transferência no Asaas',
     'transfer_status' => 'Status do saque diferente',
+    'transfer_status_unknown' => 'Status desconhecido',
     'transfer_amount' => 'Valor do saque diferente',
     'asaas_truncated' => 'A lista do Asaas veio incompleta',
     _ => kind,
   };
 }
 
+String _statusLabel(String status) {
+  return switch (status) {
+    'creating' => 'criando',
+    'pending' => 'pendente',
+    'authorized' => 'autorizada',
+    'paid' => 'paga',
+    'refunded' => 'estornada',
+    'cancelled' => 'cancelada',
+    'failed' => 'falhou',
+    'done' => 'concluído',
+    'unknown' => 'desconhecido',
+    '' => '',
+    _ => int.tryParse(status) != null ? status : 'desconhecido',
+  };
+}
 String _detail(DivergenceRow row) {
   final parts = <String>[
     if (row.providerRef.isNotEmpty) row.providerRef,
     if (row.expected.isNotEmpty || row.actual.isNotEmpty)
-      '${row.expected} → ${row.actual}',
+      '${_statusLabel(row.expected)} → ${_statusLabel(row.actual)}',
     whenLabel(row.when),
   ];
   return parts.join(' · ');
