@@ -9,6 +9,7 @@ class EscapeHouse {
     required this.longitude,
     this.streetAddress = 'Rua de exemplo, 100',
     this.receivesPayments = true,
+    this.financeReady = true,
     this.featuredRank,
   });
 
@@ -28,6 +29,9 @@ class EscapeHouse {
   /// segue verdadeira para não esconder sala de exemplo.
   final bool receivesPayments;
 
+  /// Falso sem subconta ou sem conta bancária. A casa continua na vitrine.
+  final bool financeReady;
+
   /// Ordem de destaque escolhida no Admin. Nulo fica na ordem comum.
   final int? featuredRank;
 }
@@ -36,4 +40,11 @@ class EscapeHouse {
 bool venueReceivesGroups(Map<dynamic, dynamic> row) {
   if (!row.containsKey('receives_payments')) return true;
   return row['receives_payments'] != false;
+}
+
+/// Sem a coluna, a demonstração segue podendo pagar. No banco, as duas
+/// contas precisam existir.
+bool venueFinanceReady(Map<dynamic, dynamic> row) {
+  if (!row.containsKey('finance_ready')) return venueReceivesGroups(row);
+  return row['finance_ready'] == true;
 }

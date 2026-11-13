@@ -611,6 +611,7 @@ class SupabaseGroupRepository implements GroupRepository {
         minutes: intOf(row['cancel_window_minutes'], fallback: 120),
       ),
       streetAddress: house?.streetAddress ?? '',
+      houseAcceptsPayment: house?.financeReady ?? true,
       coverAsset: room == null ? '' : roomCategoryImage(room.category),
     );
   }

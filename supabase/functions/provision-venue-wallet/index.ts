@@ -55,9 +55,10 @@ Deno.serve(async (req) => {
       .select("user_id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
-    if (!adminRow) return json({ error: "not admin" }, 403);
 
     const body = await req.json().catch(() => ({})) as { venue_id?: string };
+    const venueId = (body.venue_id ?? "").trim();
+    if (!adminRow && !venueId) return json({ error: "not admin" }, 403);
     let query = admin
       .from("venues")
       .select(
@@ -65,7 +66,8 @@ Deno.serve(async (req) => {
       )
       .eq("status", "approved")
       .is("asaas_wallet_id", null);
-    if (body.venue_id) query = query.eq("id", body.venue_id);
+    if (venueId) query = query.eq("id", venueId);
+    if (!adminRow) query = query.eq("owner_id", userData.user.id);
     const { data: venues, error } = await query;
     if (error) return json({ error: "erro" }, 400);
 

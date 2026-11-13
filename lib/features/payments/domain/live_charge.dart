@@ -69,6 +69,7 @@ String liveChargeErrorMessage(Object? details) {
   if (code == null || code.isEmpty) return liveChargeFailed;
   return switch (code) {
     'A casa ainda não tem subconta Asaas.' => code,
+    'A casa ainda não pode receber.' => code,
     'A cobrança não recebe dados do cartão.' => code,
     'card_declined' => liveCardDeclined,
     'cpf_required' => 'Para pagar, o Asaas precisa do seu CPF.',

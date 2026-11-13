@@ -92,7 +92,8 @@ A service role ignora o RLS. Cada função abaixo chama `getUser()` com a chave 
 | `create-charge` | Lê o token com `load_owned_card` e grava a cobrança. O jogador não lê a coluna. | JWT e, em seguida, a vaga dele em `group_members`. |
 | `settle-charges` | Captura, estorna e lança o extrato de grupos que o cliente não pode varrer. | JWT. `canSettle`: admin, quem criou o grupo ou o dono da casa. A varredura `sweep` exige admin. |
 | `cancel-house-group` | Estorna as cobranças depois do cancelamento. | JWT. O cancelamento passa por `house_cancel_group` no cliente do usuário. Liberar um grupo já cancelado exige admin, criador ou dono da casa. |
-| `provision-venue-wallet` | Cria a subconta e grava `walletId` e a chave da subconta, que o app não lê. | JWT e linha em `admins`. |
+| `provision-venue-wallet` | Cria a subconta e grava `walletId` e a chave da subconta, que o app não lê. | JWT. Admin pode provisionar em lote. O dono provisiona só a casa dele, e só quando `asaas_wallet_id` está vazio. |
+| `venue-claim` | Emite e confirma o código de reivindicação. O código e o contato oficial não voltam na resposta. | JWT. O usuário do código é o `getUser()`, nunca o body. |
 | `configure-venue-fiscal` | Grava a configuração fiscal e chama o Asaas com a chave da subconta. | JWT e dono da casa ou admin. |
 | `asaas-webhook` | Atualiza cobrança, extrato e nota a partir do evento do Asaas. Não há JWT de usuário: é servidor a servidor, com `verify_jwt = false`. | Header `asaas-access-token` comparado com `ASAAS_WEBHOOK_TOKEN` (`tokensMatch`) antes de criar o cliente. |
 
@@ -115,6 +116,7 @@ Deploy, na sua máquina, depois da revisão:
 
 ```bash
 supabase functions deploy provision-venue-wallet
+supabase functions deploy venue-claim
 supabase functions deploy tokenize-card
 supabase functions deploy create-charge
 supabase functions deploy settle-charges

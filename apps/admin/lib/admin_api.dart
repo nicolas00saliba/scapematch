@@ -42,6 +42,9 @@ abstract class AdminApi {
   Future<void> setHighlight(String kind, String id, int? rank);
   Future<List<AuditRow>> audit();
   Future<String?> provisionWallet(String venueId);
+  Future<List<VenueClaimRow>> venueClaims();
+  Future<void> reviewVenueClaim(String id, String decision);
+  Future<void> setVenueContacts(String venueId, String email, String phone);
 }
 
 /// O banco recusou o pedido. A mensagem é a do `raise` (SQLSTATE 22023).
@@ -161,6 +164,22 @@ class NamedRank {
   final String name;
   final String subtitle;
   final int? rank;
+}
+
+class VenueClaimRow {
+  const VenueClaimRow({
+    required this.id,
+    required this.venueId,
+    required this.venueName,
+    required this.claimantLabel,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String venueId;
+  final String venueName;
+  final String claimantLabel;
+  final DateTime? createdAt;
 }
 
 class ReviewResult {
@@ -695,6 +714,41 @@ class SupabaseAdminApi implements AdminApi {
   }
 
   @override
+  Future<List<VenueClaimRow>> venueClaims() async {
+    return [
+      for (final item in _list(await _rpc('admin_list_venue_claims')))
+        VenueClaimRow(
+          id: _text(item['id']),
+          venueId: _text(item['venue_id']),
+          venueName: _text(item['venue_name']),
+          claimantLabel: _text(item['claimant_label']),
+          createdAt: DateTime.tryParse(_text(item['created_at'])),
+        ),
+    ];
+  }
+
+  @override
+  Future<void> reviewVenueClaim(String id, String decision) async {
+    await _rpc('admin_review_venue_claim', {
+      'p_claim_id': id,
+      'p_decision': decision,
+    });
+  }
+
+  @override
+  Future<void> setVenueContacts(
+    String venueId,
+    String email,
+    String phone,
+  ) async {
+    await _rpc('admin_set_venue_contacts', {
+      'p_venue_id': venueId,
+      'p_email': email,
+      'p_phone': phone,
+    });
+  }
+
+  @override
   Future<String?> provisionWallet(String venueId) async {
     final response = await _client.functions.invoke(
       'provision-venue-wallet',
@@ -847,6 +901,16 @@ class MemoryAdminApi implements AdminApi {
   final List<ReviewRow> queue;
   final Map<String, Object?> settings;
   final Map<String, Object?> passport;
+  final List<VenueClaimRow> claims = [
+    VenueClaimRow(
+      id: 'claim-ninja',
+      venueId: 'casa-ninja',
+      venueName: 'Ninja Escape Room',
+      claimantLabel: 'Dono novo',
+      createdAt: DateTime.utc(2026, 11, 13),
+    ),
+  ];
+
   final List<Map<String, Object?>> history = [];
   final List<AuditRow> audits = [];
   int platformBps = 2500;
@@ -1173,6 +1237,28 @@ class MemoryAdminApi implements AdminApi {
     final house = await venue(venueId);
     _replace(_copy(house, hasWallet: true));
     return null;
+  }
+
+  @override
+  Future<List<VenueClaimRow>> venueClaims() async => List.of(claims);
+
+  @override
+  Future<void> reviewVenueClaim(String id, String decision) async {
+    if (decision != 'approved' && decision != 'rejected') {
+      throw const AdminRejected('decisao invalida');
+    }
+    claims.removeWhere((claim) => claim.id == id);
+    _note('review_venue_claim', id, decision);
+  }
+
+  @override
+  Future<void> setVenueContacts(
+    String venueId,
+    String email,
+    String phone,
+  ) async {
+    await venue(venueId);
+    _note('set_venue_contacts', venueId, '${email.isNotEmpty}:${phone.isNotEmpty}');
   }
 
   void _note(String action, String id, String after) {

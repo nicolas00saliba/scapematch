@@ -1,5 +1,7 @@
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/domain/venue_claim.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 
 /// Colunas que o authenticated pode ler. Documento, telefone e renda ficam
@@ -50,13 +52,15 @@ class VenueSignupResult {
     this.error,
     this.warnings = const [],
     this.duplicateOf,
+    this.claim,
   });
 
   final String? error;
   final List<String> warnings;
   final String? duplicateOf;
+  final ClaimableVenue? claim;
 
-  bool get saved => error == null && warnings.isEmpty;
+  bool get saved => error == null && warnings.isEmpty && claim == null;
 }
 
 /// Lê `check_venue_duplicates` e, se puder, grava a casa como pending.
@@ -76,6 +80,18 @@ Future<VenueSignupResult> submitVenue(
   }
   final error = draft.validate();
   if (error != null) return VenueSignupResult(error: error);
+  var claim = const ClaimableVenue(path: VenueClaimPath.none);
+  try {
+    claim = await const VenueClaimClient().lookup(draft.documentNumber);
+  } on Object {
+    claim = const ClaimableVenue(path: VenueClaimPath.none);
+  }
+  if (claim.offersClaim) return VenueSignupResult(claim: claim);
+  if (claim.path == VenueClaimPath.alreadyOwner) {
+    return const VenueSignupResult(
+      error: 'Esta casa já está na sua conta.',
+    );
+  }
   final duplicates = await _venueDuplicates(draft);
   if (duplicates.error != null) {
     return VenueSignupResult(error: duplicates.error);

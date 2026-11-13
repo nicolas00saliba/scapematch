@@ -170,6 +170,28 @@ abstract final class PartnerMessages {
       'O pedido vai para o admin. Documento, telefone e casas pendentes de outras pessoas não aparecem aqui.';
   static const claimNote = 'Por que a casa é sua?';
   static const claimNoteHint = 'Sem documento e sem telefone.';
+  static const claimOfferTitle = 'Esta é a sua casa?';
+  static const claimOfferBody =
+      'Este CNPJ já tem um perfil. Reivindicar liga a sua conta a essa casa e mantém fotos, salas e avaliações. Não abre outra casa.';
+  static const claimOfferButton = 'Reivindicar';
+  static const claimCodeTitle = 'Código da casa';
+  static const claimCodeBody =
+      'O código de 6 dígitos vai para o e-mail ou o telefone oficial já cadastrados no perfil. O que você digitar aqui não recebe o código.';
+  static const claimSendCode = 'Enviar código';
+  static const claimConfirmCode = 'Confirmar código';
+  static const claimCodeHint = '6 dígitos';
+  static const claimManualSent =
+      'Este perfil não tem contato oficial. O pedido ficou pendente para o admin aprovar.';
+  static const claimRate =
+      'Espere um pouco antes de pedir outro código.';
+  static const claimMismatch = 'Código incorreto ou vencido.';
+  static const claimLinked = 'A casa é sua. Fotos, salas e avaliações continuam no mesmo perfil.';
+  static const claimFinanceBody =
+      'Para receber no app, complete a subconta Asaas e a chave Pix. Enquanto as duas não estiverem prontas, pagamento e saque ficam desligados.';
+  static const claimProvision = 'Criar subconta Asaas';
+  static const claimProvisionDone = 'Pedido de subconta enviado.';
+  static const claimBankHint =
+      'A chave Pix fica na tela de saldo, em conta de saque. Os documentos da subconta entram quando essa tela estiver publicada.';
   static const sendClaim = 'Pedir reivindicação';
   static const claimSent =
       'Pedido enviado. O admin decide se a casa passa para você.';

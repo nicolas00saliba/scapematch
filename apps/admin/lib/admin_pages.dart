@@ -19,6 +19,7 @@ class _CasasPageState extends ConsumerState<CasasPage> {
   String _status = '';
   final _query = TextEditingController();
   VenueBoard? _board;
+  List<VenueClaimRow> _claims = const [];
   String? _error;
 
   @override
@@ -35,12 +36,16 @@ class _CasasPageState extends ConsumerState<CasasPage> {
 
   Future<void> _load() async {
     try {
-      final board = await ref
-          .read(adminApiProvider)
-          .venues(status: _status.isEmpty ? null : _status, query: _query.text);
+      final api = ref.read(adminApiProvider);
+      final board = await api.venues(
+        status: _status.isEmpty ? null : _status,
+        query: _query.text,
+      );
+      final claims = await api.venueClaims();
       if (!mounted) return;
       setState(() {
         _board = board;
+        _claims = claims;
         _error = null;
       });
     } on Object catch (error) {
@@ -107,9 +112,52 @@ class _CasasPageState extends ConsumerState<CasasPage> {
                       ref.read(adminPlaceProvider.notifier).open(house.id),
                 ),
               ),
+          if (_claims.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text(
+              'Reivindicações pendentes',
+              key: const Key('admin-reivindicacoes'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            for (final claim in _claims)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(claim.venueName),
+                      Text(claim.claimantLabel),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          FilledButton(
+                            key: Key('admin-aprovar-claim-${claim.id}'),
+                            onPressed: () => _reviewClaim(claim.id, 'approved'),
+                            child: const Text('Aprovar'),
+                          ),
+                          OutlinedButton(
+                            key: Key('admin-recusar-claim-${claim.id}'),
+                            onPressed: () => _reviewClaim(claim.id, 'rejected'),
+                            child: const Text('Recusar'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _reviewClaim(String id, String decision) async {
+    await ref.read(adminApiProvider).reviewVenueClaim(id, decision);
+    await _load();
   }
 }
 
@@ -127,6 +175,8 @@ class _CasaPageState extends ConsumerState<CasaPage> {
   String? _message;
   final _neighborhood = TextEditingController();
   final _bps = TextEditingController();
+  final _officialEmail = TextEditingController();
+  final _officialPhone = TextEditingController();
 
   @override
   void initState() {
@@ -138,6 +188,8 @@ class _CasaPageState extends ConsumerState<CasaPage> {
   void dispose() {
     _neighborhood.dispose();
     _bps.dispose();
+    _officialEmail.dispose();
+    _officialPhone.dispose();
     super.dispose();
   }
 
@@ -252,6 +304,37 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                   Text(
                     '${snap.status} · ${percentBps(snap.commissionBps)} · ${snap.id}',
                   ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Contato oficial da reivindicação. O código vai só para estes campos, não para o que o dono digitar no cadastro.',
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  key: const Key('admin-contato-email'),
+                  controller: _officialEmail,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'E-mail oficial',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  key: const Key('admin-contato-telefone'),
+                  controller: _officialPhone,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Telefone oficial',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton(
+                    key: const Key('admin-gravar-contato'),
+                    onPressed: _contacts,
+                    child: const Text('Gravar contato oficial'),
+                  ),
+                ),
                 if (_message != null) ...[
                   const SizedBox(height: 12),
                   Text(_message!, key: const Key('admin-casa-aviso')),
@@ -259,6 +342,27 @@ class _CasaPageState extends ConsumerState<CasaPage> {
               ],
             ),
     );
+  }
+
+  Future<void> _contacts() async {
+    final email = _officialEmail.text.trim();
+    final phone = _officialPhone.text.trim();
+    if (email.isEmpty && phone.isEmpty) {
+      setState(() {
+        _message = 'Informe o e-mail ou o telefone oficial.';
+      });
+      return;
+    }
+    try {
+      await ref
+          .read(adminApiProvider)
+          .setVenueContacts(widget.id, email, phone);
+      if (!mounted) return;
+      setState(() => _message = 'Contato oficial gravado.');
+    } on AdminRejected catch (error) {
+      if (!mounted) return;
+      setState(() => _message = error.message);
+    }
   }
 
   Future<void> _commission() async {
