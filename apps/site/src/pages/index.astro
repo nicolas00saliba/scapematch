@@ -4,7 +4,7 @@ import PhoneShot from '../components/PhoneShot.astro';
 import ProgramCard from '../components/ProgramCard.astro';
 import DescontoPontos from '../components/DescontoPontos.astro';
 import { programaPorId } from '../data/programas';
-import { faqPage } from '../data/seo';
+import { definicao, faqPage } from '../data/seo';
 
 const cartoes = ['boas-vindas', 'pontos-de-volta', 'indique-amigos'].map(programaPorId);
 
@@ -34,7 +34,7 @@ const perguntas = [
 
 <Base
   title="EscapeMatch: ninguém pra jogar? Agora tem."
-  description="Plataforma criada para achar gente e jogar escape room quando se está sozinho. Lançamento em Curitiba. Você paga só a sua vaga."
+  description="Aplicativo brasileiro para jogar escape room em grupo quando se está sozinho. Lançamento em Curitiba. Não é um jogo de celular."
   path="/"
   ogImage="/assets/og/home.png"
   jsonLd={faqPage(perguntas)}
@@ -45,8 +45,8 @@ const perguntas = [
     <div class="miolo hero-grade">
       <div>
         <h1>Ninguém pra jogar?<br>Agora tem.</h1>
-        <p class="hero-badge">Escape rooms, jogos de tabuleiro, laser tag e muito mais!</p>
-        <p class="hero-apoio">O EscapeMatch junta quem está sozinho em grupos de escape room. Você paga só a sua vaga.</p>
+        <p class="hero-badge">Escape room agora. Jogos de tabuleiro e laser tag em breve.</p>
+        <p class="hero-apoio definicao-marca">{definicao}</p>
         <p class="hero-ganho">Jogue e ganhe pontos.<br>Indique amigos e ganhe a cada jogo deles.<br>Junte pontos e jogue de graça.</p>
       </div>
       <PhoneShot cena="grupo" />

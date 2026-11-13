@@ -58,6 +58,13 @@ NOINDEX = {"/convite", "/404"}
 FORA_DO_BUILD = ("/cidades/curitiba",)
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 EMAIL_CONTATO = "contato@escapematch.com.br"
+DEFINICAO = (
+    "O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room "
+    "e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. "
+    "Lançamento em Curitiba. Não é um jogo de celular."
+)
+SELO = "Escape room agora. Jogos de tabuleiro e laser tag em breve."
+CHAVE_INDEXNOW = re.compile(r"^[0-9a-f]{32}\.txt$")
 TOKEN_BUSCADOR = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 TOKEN_BLOQUEADO = re.compile(
     r"(example|exemplo|changeme|placeholder|fake|teste|sample|your[-_]?token)",
@@ -120,6 +127,30 @@ def arquivo(rota: str) -> pathlib.Path:
     return DIST / f"{rota.lstrip('/')}.html"
 
 
+def blocos_ld(html: str) -> list:
+    saida = []
+    for bruto in re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>',
+        html,
+        flags=re.S,
+    ):
+        dado = json.loads(bruto)
+        saida.extend(dado if isinstance(dado, list) else [dado])
+    return saida
+
+
+def exigir_faq(html: str, rota: str, perguntas: tuple[str, ...]) -> None:
+    faqs = [bloco for bloco in blocos_ld(html) if bloco.get("@type") == "FAQPage"]
+    if len(faqs) != 1:
+        falha(f"{rota} saiu com {len(faqs)} FAQPage")
+    nomes = [item.get("name") for item in faqs[0].get("mainEntity", [])]
+    for pergunta in perguntas:
+        if pergunta not in html:
+            falha(f"{rota} não mostra a pergunta: {pergunta}")
+        if pergunta not in nomes:
+            falha(f"{rota} FAQPage sem a pergunta: {pergunta}")
+
+
 def falha(msg: str) -> None:
     print(msg, file=sys.stderr)
     raise SystemExit(1)
@@ -153,8 +184,12 @@ def main() -> None:
         falha("título da home ausente")
     if 'class="hero-badge"' not in home:
         falha("selo sem a classe hero-badge")
-    if "Escape rooms, jogos de tabuleiro, laser tag e muito mais!" not in home:
+    if SELO not in home:
         falha("texto do selo ausente")
+    if "muito mais!" in home:
+        falha("o selo ainda anuncia tabuleiro e laser tag como disponíveis")
+    if DEFINICAO not in home:
+        falha("a home não mostra a definição canônica")
     if home.find("<h1>") > home.find("hero-badge"):
         falha("o selo ficou antes do título")
 
@@ -195,11 +230,8 @@ def main() -> None:
         if re.search(r"\b(C2C|B2B|B2C|C2B|bps)\b", texto):
             falha(f"{rota} usa sigla interna")
         sem_selo = re.sub(r"<!doctype html>", "", texto, flags=re.I)
-        sem_selo = sem_selo.replace(
-            "Escape rooms, jogos de tabuleiro, laser tag e muito mais!", ""
-        )
         if "!" in sem_selo:
-            falha(f"{rota} tem exclamação fora do selo")
+            falha(f"{rota} tem exclamação")
         if "comissão" in texto.lower() or "comissao" in texto.lower():
             permitida = rota == "/ajuda" or any(
                 rota == ok or rota.startswith(ok + "/") for ok in COMISSAO_OK
@@ -288,8 +320,17 @@ def main() -> None:
                     falha(f"contato sem {trecho}")
             if "<form" in texto.lower() or "tel:" in texto.lower():
                 falha("contato tem formulário ou telefone")
-        elif "mailto:" in texto or EMAIL.search(texto):
-            falha(f"{html.relative_to(DIST)} mostra e-mail")
+        else:
+            sem_email_org = texto.replace(f'"email":"{EMAIL_CONTATO}"', "")
+            if "mailto:" in sem_email_org or EMAIL.search(sem_email_org):
+                falha(f"{html.relative_to(DIST)} mostra e-mail")
+        if not (html.name.startswith("google") and html.suffix == ".html"):
+            try:
+                blocos_ld(texto)
+            except json.JSONDecodeError:
+                falha(f"{html.relative_to(DIST)} tem JSON-LD inválido")
+            if "sameAs" in texto or "streetAddress" in texto or "GameApplication" in texto:
+                falha(f"{html.relative_to(DIST)} tem sameAs, rua ou GameApplication")
         for rota in FORA_DO_BUILD:
             if f'href="{rota}"' in texto or f"href='{rota}'" in texto:
                 falha(f"{html.relative_to(DIST)} aponta para {rota}")
@@ -327,6 +368,50 @@ def main() -> None:
         falha("a home saiu sem FAQPage")
     if "sameAs" in home_html:
         falha("Organization com sameAs sem perfil publicado no repositório")
+    orgs = [
+        bloco
+        for bloco in blocos_ld(home_html)
+        if bloco.get("@type") == "Organization" and bloco.get("legalName")
+    ]
+    if len(orgs) != 1:
+        falha(f"a home saiu com {len(orgs)} Organization com legalName")
+    org = orgs[0]
+    endereco = org.get("address") or {}
+    if org.get("legalName") != "ESCAPEMATCH TECNOLOGIA LTDA":
+        falha("legalName ausente")
+    if org.get("taxID") != "70.100.608/0001-73":
+        falha("taxID ausente")
+    if org.get("alternateName") != ["Escape Match"]:
+        falha("alternateName ausente")
+    if org.get("email") != EMAIL_CONTATO:
+        falha("Organization sem o e-mail já publicado")
+    if org.get("description") != DEFINICAO:
+        falha("description da Organization divergiu")
+    if not str(org.get("logo", "")).endswith("/assets/logo-512.png"):
+        falha("logo da Organization mudou")
+    if (
+        endereco.get("@type") != "PostalAddress"
+        or endereco.get("addressLocality") != "Curitiba"
+        or endereco.get("addressRegion") != "PR"
+        or endereco.get("addressCountry") != "BR"
+        or "streetAddress" in endereco
+    ):
+        falha("endereço da Organization divergiu")
+    app_html = arquivo("/app").read_text()
+    apps = [bloco for bloco in blocos_ld(app_html) if bloco.get("@type") == "WebApplication"]
+    if len(apps) != 1:
+        falha(f"/app saiu com {len(apps)} WebApplication")
+    oferta = apps[0].get("offers") or {}
+    if apps[0].get("applicationCategory") != "SocialNetworkingApplication":
+        falha("applicationCategory divergiu")
+    if apps[0].get("operatingSystem") != "Web, Android, iOS":
+        falha("operatingSystem divergiu")
+    if oferta.get("price") != 0 or oferta.get("priceCurrency") != "BRL":
+        falha("offers do app divergiu")
+    if any(campo in apps[0] for campo in ("aggregateRating", "review")):
+        falha("o app publicou avaliação")
+    if DEFINICAO not in app_html or "O aplicativo é gratuito." not in app_html:
+        falha("a página do app não mostra o que o WebApplication afirma")
     if 'rel="preload"' not in home_html or "woff2" not in home_html:
         falha("fonte sem preload")
     como = arquivo("/como-funciona").read_text()
@@ -337,6 +422,19 @@ def main() -> None:
     guia = arquivo("/guia/escape-room-sozinho").read_text()
     if '"@type":"FAQPage"' not in guia:
         falha("o guia saiu sem FAQPage")
+    if DEFINICAO not in guia or DEFINICAO not in arquivo("/sobre").read_text():
+        falha("definição canônica ausente no guia ou no sobre")
+    exigir_faq(
+        guia,
+        "/guia/escape-room-sozinho",
+        (
+            "Onde achar gente para jogar escape room sozinho?",
+            "Dá para jogar escape room sem conhecer ninguém?",
+            "O que é o EscapeMatch?",
+        ),
+    )
+    exigir_faq(como, "/como-funciona", ("Como completar o grupo de uma sala de escape?",))
+    exigir_faq(arquivo("/ajuda/grupo").read_text(), "/ajuda/grupo", ("O EscapeMatch é um jogo?",))
     cidade = arquivo("/escape-room-curitiba").read_text()
     for trecho in (
         '"@type":"WebPage"',
@@ -377,8 +475,20 @@ def main() -> None:
         texto = (DIST / nome).read_text()
         if "Curitiba" not in texto or "R$ 0,01" not in texto:
             falha(f"{nome} incompleto")
+        if DEFINICAO not in texto or "Não confundir com jogos de celular chamados Escape Match." not in texto:
+            falha(f"{nome} sem a definição ou a desambiguação")
         if "limite mensal" in texto:
             falha(f"{nome} ainda cita limite mensal")
+    def chaves_indexnow(pasta: pathlib.Path) -> list[str]:
+        return sorted(
+            path.name
+            for path in pasta.iterdir()
+            if path.is_file() and CHAVE_INDEXNOW.fullmatch(path.name) and path.read_text().strip() == path.stem
+        )
+
+    chaves = chaves_indexnow(DIST)
+    if chaves != chaves_indexnow(ROOT / "apps/site/public") or len(chaves) != 1:
+        falha("chave IndexNow ausente ou divergente entre public e dist")
     robots = (DIST / "robots.txt").read_text()
     for bot in (
         "Googlebot",

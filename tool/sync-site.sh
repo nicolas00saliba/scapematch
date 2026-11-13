@@ -14,6 +14,12 @@
 # O Pages de scapematch-site é Jekyll na raiz da main. Sem .nojekyll ele
 # descarta dist/_astro e o site sobe sem CSS. O arquivo é preservado no
 # destino e recriado se faltar. O script nunca o apaga.
+#
+# INDEXNOW=1, e só depois do --push, espera a chave em
+# https://escapematch.com.br/<chave>.txt (até 5 min, a cada 15 s) e
+# então envia as URLs do sitemap. Se a chave não aparecer, avisa e
+# segue com código 0: o site já foi publicado. Fica desligado por
+# padrão. Ligue só depois de verificar o domínio no Bing Webmaster Tools.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -118,3 +124,11 @@ fi
 git -C "$DESTINO" add -A
 git -C "$DESTINO" commit -m "Publica o site Astro de apps/site."
 git -C "$DESTINO" push origin HEAD
+
+if [ "${INDEXNOW:-}" != "1" ]; then
+  echo "IndexNow desligado. Verifique o domínio no Bing Webmaster Tools e exporte INDEXNOW=1 para enviar o sitemap."
+  exit 0
+fi
+python3 "$ROOT/tool/indexnow_ping.py" \
+  --dist "$ROOT/apps/site/dist" \
+  --public "$ROOT/apps/site/public"

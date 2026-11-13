@@ -384,6 +384,7 @@ jobs:
       - name: Check routes, title and badge
         run: |
           python3 tool/check_site.py
+          python3 tool/test_indexnow_ping.py
           bash tool/check_security_meta.sh site apps/site/dist
           test ! -e apps/site/dist/_headers
           test ! -e apps/site/public/_headers

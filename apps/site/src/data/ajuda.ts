@@ -1,3 +1,5 @@
+import { eJogo } from './perguntas-marca';
+
 export type Pergunta = {
   pergunta: string;
   resposta: string;
@@ -53,6 +55,7 @@ export const temas: Tema[] = [
         resposta:
           'Pelo app: escolha a sala e o horário e entre no grupo. O guia de escape room sozinho descreve o caminho.',
       },
+      eJogo,
     ],
   },
   {
