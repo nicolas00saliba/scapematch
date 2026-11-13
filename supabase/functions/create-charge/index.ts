@@ -262,7 +262,7 @@ export async function createCharge(
       houseFixedCents: number,
       chargeId: string,
     ) => {
-      if (!asaas.sandbox) return [];
+      if (!asaas.official) return [];
       const wallet = readEnv(Deno.env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
       if (!wallet) return [];
       const gross = grossForReserve ?? grossCents;
@@ -274,9 +274,10 @@ export async function createCharge(
         p_house_fixed: houseFixedCents,
         p_billing_type: billingType,
       });
-      if (error || typeof data !== "number" || data <= 0) return [];
+      if (error || typeof data !== "number" || !Number.isInteger(data) || data <= 0) {
+        return [];
+      }
       const line = pointsReserveSplitLine({
-        sandbox: true,
         reserveWalletId: wallet,
         rootWalletId: readEnv(Deno.env, "ASAAS_ROOT_WALLET_ID"),
         houseWalletId: venue.asaas_wallet_id as string,

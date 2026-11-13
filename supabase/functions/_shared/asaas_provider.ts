@@ -223,6 +223,12 @@ export function isAsaasSandbox(baseUrl: string): boolean {
   }
 }
 
+/// Só as duas bases documentadas. Um host parecido não entra na reserva.
+export function isOfficialAsaasBase(baseUrl: string): boolean {
+  const base = baseUrl.trim().replace(/\/$/, "");
+  return base === asaasSandboxBaseUrl || base === asaasProductionBaseUrl;
+}
+
 export function centsToReais(cents: number): number {
   if (!Number.isInteger(cents) || cents < 0) {
     throw new Error("invalid cents");
@@ -376,6 +382,11 @@ export class AsaasProvider implements PaymentProvider {
 
   get sandbox(): boolean {
     return isAsaasSandbox(this.baseUrl);
+  }
+
+  /// Sandbox ou produção, no host exato da API. Proxy e host parecido ficam de fora.
+  get official(): boolean {
+    return isOfficialAsaasBase(this.baseUrl);
   }
 
   /// Outra chave, a mesma base URL. A subconta emite com a apiKey dela.
