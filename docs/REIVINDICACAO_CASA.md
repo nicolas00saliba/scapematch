@@ -25,7 +25,7 @@ O envio usa Resend (`RESEND_API_KEY` e `CLAIM_MAIL_FROM` ou `PAYOUT_MAIL_FROM`).
 
 ## Subconta e conta bancária
 
-Depois do código, a tela pede a subconta Asaas (`provision-venue-wallet`, agora também para o dono da própria casa quando `asaas_wallet_id` está vazio) e indica a chave Pix na tela de saldo. A tela de documentos do PR #133 ainda não está no `main`.
+Depois do código, a tela pede a subconta Asaas (`provision-venue-wallet`, agora também para o dono da própria casa quando `asaas_wallet_id` está vazio) e indica a chave Pix na tela de saldo. O #133 ainda não está no `main`. Quando ele entrar, o rebase deste PR liga o passo seguinte à tela de documentos da subconta (`VenueDocumentsCard`, na tela de saque).
 
 `public.venue_finance_ready` é verdadeiro só com casa aprovada, não suspensa, subconta preenchida e linha em `venue_bank_accounts`. A vitrine expõe `finance_ready`. `create-charge` chama essa função (a service role não lê `venue_bank_accounts`) e responde 409 sem subconta ou sem conta bancária. Saque já recusava os dois. O botão de pagar no app jogador e o aviso no Parceiro seguem essa função. A casa continua na vitrine: o catálogo não some só porque o recebimento está desligado.
 
@@ -33,11 +33,17 @@ Depois do código, a tela pede a subconta Asaas (`provision-venue-wallet`, agora
 
 Na lista de casas, **Reivindicações pendentes** aprova ou recusa (`admin_list_venue_claims` e `admin_review_venue_claim`). Na ficha da casa, **Gravar contato oficial** chama `admin_set_venue_contacts`. A auditoria guarda só se havia e-mail e telefone, não o valor. As três funções exigem admin com `aal2`.
 
+## Ordem
+
+Este PR entra no `main` depois de #133, #134, #135, #136, #137 e #139. A migration é `supabase/migrations/20261113200000_venue_claim_official.sql`, depois de `20261113180000_points_reserve_outbox.sql` (#134) e de `20261113190000` da conciliação (#139). #135 usa `20261113181000`. #133 não tem migration.
+
+No rebase, os arquivos em comum são `create-charge/index.ts` (#134), `admin_api.dart` (#137 e #139), `run_local.sh` (#136, #137 e #139), `config.toml` e `supabase/README.md`, e no Parceiro `partner_messages.dart` e `partner_keys.dart` (#133).
+
 ## Publicar
 
 Esta migration não foi aplicada no projeto remoto. Nenhuma função foi publicada. O Asaas de produção não foi chamado.
 
-1. Aplicar `supabase/migrations/20261113180000_venue_claim_official.sql`.
+1. Aplicar `supabase/migrations/20261113200000_venue_claim_official.sql`.
 2. Publicar `venue-claim` (nova), `provision-venue-wallet` e `create-charge` (as duas já existiam e mudaram).
 3. Publicar os apps Parceiro, jogador e Admin.
 

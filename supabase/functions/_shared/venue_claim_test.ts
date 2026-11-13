@@ -154,5 +154,7 @@ Deno.test("a função exige JWT e não devolve o código", async () => {
   assert(source.includes("getUser"));
   assertEquals(source.includes("body.email"), false);
   assertEquals(source.includes("body.phone"), false);
-  assertEquals(source.includes("asaas.com"), false);
+  assertEquals(source.includes("AsaasProvider"), false);
+  assertEquals(source.includes("ASAAS_"), false);
+  assertEquals(source.includes("asaas_provider"), false);
 });
