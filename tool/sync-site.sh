@@ -15,9 +15,11 @@
 # descarta dist/_astro e o site sobe sem CSS. O arquivo é preservado no
 # destino e recriado se faltar. O script nunca o apaga.
 #
-# INDEXNOW=1, e só depois do --push, envia as URLs do sitemap para
-# https://api.indexnow.org/indexnow. Fica desligado por padrão. Ligue
-# só depois que o domínio estiver verificado no Bing Webmaster Tools.
+# INDEXNOW=1, e só depois do --push, espera a chave em
+# https://escapematch.com.br/<chave>.txt (até 5 min, a cada 15 s) e
+# então envia as URLs do sitemap. Se a chave não aparecer, avisa e
+# segue com código 0: o site já foi publicado. Fica desligado por
+# padrão. Ligue só depois de verificar o domínio no Bing Webmaster Tools.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

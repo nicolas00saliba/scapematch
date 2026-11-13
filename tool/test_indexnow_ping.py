@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -86,6 +89,122 @@ class IndexNowTeste(unittest.TestCase):
             self.assertEqual(codigo, 0)
             payload = json.loads(buf.getvalue())
             self.assertEqual(payload["urlList"], ["https://escapematch.com.br/app"])
+
+    def test_espera_ate_a_chave_aparecer(self) -> None:
+        relogio = {"t": 0.0}
+
+        def agora() -> float:
+            return relogio["t"]
+
+        def dormir(segundos: float) -> None:
+            relogio["t"] += segundos
+
+        respostas = iter([urllib.error.URLError("404"), urllib.error.URLError("404"), corpo_http(200, CHAVE)])
+
+        def abrir(url: str, timeout: int = 10):
+            self.assertEqual(url, f"https://escapematch.com.br/{CHAVE}.txt")
+            item = next(respostas)
+            if isinstance(item, Exception):
+                raise item
+            return item
+
+        ok = indexnow_ping.esperar_chave(CHAVE, abrir, dormir=dormir, relogio=agora, limite=60, intervalo=15)
+        self.assertTrue(ok)
+        self.assertEqual(relogio["t"], 30)
+
+    def test_corpo_errado_ou_status_diferente_nao_libera(self) -> None:
+        self.assertFalse(indexnow_ping.chave_publicada(CHAVE, lambda url, timeout=10: corpo_http(200, "outra")))
+        self.assertFalse(indexnow_ping.chave_publicada(CHAVE, lambda url, timeout=10: corpo_http(404, CHAVE)))
+        self.assertTrue(indexnow_ping.chave_publicada(CHAVE, lambda url, timeout=10: corpo_http(200, f"{CHAVE}\n")))
+
+    def test_desiste_aos_cinco_minutos_sem_passar_do_prazo(self) -> None:
+        relogio = {"t": 0.0}
+        dormidas: list[float] = []
+
+        def agora() -> float:
+            return relogio["t"]
+
+        def dormir(segundos: float) -> None:
+            dormidas.append(segundos)
+            relogio["t"] += segundos
+
+        def abrir(url: str, timeout: int = 10):
+            raise urllib.error.URLError("ainda não")
+
+        ok = indexnow_ping.esperar_chave(CHAVE, abrir, dormir=dormir, relogio=agora)
+        self.assertFalse(ok)
+        self.assertEqual(relogio["t"], 300)
+        self.assertEqual(sum(dormidas), 300)
+        self.assertTrue(all(item <= 15 for item in dormidas))
+
+    def test_ultimo_intervalo_nao_passa_do_prazo(self) -> None:
+        relogio = {"t": 0.0}
+        dormidas: list[float] = []
+
+        def agora() -> float:
+            return relogio["t"]
+
+        def dormir(segundos: float) -> None:
+            dormidas.append(segundos)
+            relogio["t"] += segundos
+
+        def abrir(url: str, timeout: int = 10):
+            raise urllib.error.URLError("ainda não")
+
+        ok = indexnow_ping.esperar_chave(
+            CHAVE, abrir, dormir=dormir, relogio=agora, limite=20, intervalo=15
+        )
+        self.assertFalse(ok)
+        self.assertEqual(dormidas, [15, 5])
+        self.assertEqual(relogio["t"], 20)
+
+    def test_sem_chave_no_ar_nao_envia_e_sai_zero(self) -> None:
+        enviados: list[object] = []
+        esperar = indexnow_ping.esperar_chave
+        enviar = indexnow_ping.enviar
+        indexnow_ping.esperar_chave = lambda chave: False
+        indexnow_ping.enviar = lambda payload: enviados.append(payload) or 200
+        try:
+            with tempfile.TemporaryDirectory() as bruto:
+                raiz = Path(bruto)
+                dist = raiz / "dist"
+                publico = raiz / "public"
+                dist.mkdir()
+                publico.mkdir()
+                (publico / f"{CHAVE}.txt").write_text(CHAVE, encoding="utf-8")
+                (dist / "sitemap-0.xml").write_text(
+                    "<urlset><url><loc>https://escapematch.com.br/app</loc></url></urlset>",
+                    encoding="utf-8",
+                )
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err):
+                    codigo = indexnow_ping.main(["--dist", str(dist), "--public", str(publico)])
+            self.assertEqual(codigo, 0)
+            self.assertEqual(enviados, [])
+            self.assertIn("O site já foi publicado", err.getvalue())
+            self.assertIn(CHAVE, err.getvalue())
+        finally:
+            indexnow_ping.esperar_chave = esperar
+            indexnow_ping.enviar = enviar
+
+
+class RespostaHttp:
+    def __init__(self, status: int, texto: str) -> None:
+        self.status = status
+        self._texto = texto
+
+    def read(self) -> bytes:
+        return self._texto.encode("utf-8")
+
+    def __enter__(self) -> "RespostaHttp":
+        return self
+
+    def __exit__(self, *args: object) -> bool:
+        return False
+
+
+def corpo_http(status: int, texto: str) -> RespostaHttp:
+    return RespostaHttp(status, texto)
 
 
 if __name__ == "__main__":

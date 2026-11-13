@@ -3,6 +3,8 @@
 
 O passo só deve rodar depois que o site foi publicado. A chave fica no
 arquivo público da raiz, que é o jeito do protocolo provar o domínio.
+O GitHub Pages pode demorar a servir esse arquivo, então o envio espera
+a URL da chave responder 200 com o próprio texto da chave.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ import argparse
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -20,6 +23,8 @@ API = "https://api.indexnow.org/indexnow"
 CHAVE = re.compile(r"^[0-9a-f]{8,128}$")
 SITEMAP = re.compile(r"^https://escapematch\.com\.br/sitemap(?:-index|-\d+)?\.xml$")
 LIMITE = 10_000
+ESPERA_SEGUNDOS = 300
+INTERVALO_SEGUNDOS = 15
 
 
 def achar_chave(publico: Path) -> str:
@@ -72,6 +77,36 @@ def corpo(chave: str, urls: list[str]) -> dict[str, object]:
     }
 
 
+def chave_publicada(chave: str, abrir) -> bool:
+    url = f"https://{HOST}/{chave}.txt"
+    try:
+        with abrir(url, timeout=10) as resp:
+            if int(resp.status) != 200:
+                return False
+            texto = resp.read().decode("utf-8", "replace").strip()
+            return texto == chave
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return False
+
+
+def esperar_chave(
+    chave: str,
+    abrir=urllib.request.urlopen,
+    dormir=time.sleep,
+    relogio=time.monotonic,
+    limite: float = ESPERA_SEGUNDOS,
+    intervalo: float = INTERVALO_SEGUNDOS,
+) -> bool:
+    prazo = relogio() + limite
+    while True:
+        if chave_publicada(chave, abrir):
+            return True
+        agora = relogio()
+        if agora >= prazo:
+            return False
+        dormir(min(intervalo, prazo - agora))
+
+
 def enviar(payload: dict[str, object]) -> int:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     pedido = urllib.request.Request(
@@ -98,6 +133,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         json.dump(payload, sys.stdout, ensure_ascii=False)
         sys.stdout.write("\n")
+        return 0
+    chave = str(payload["key"])
+    print(
+        f"IndexNow: esperando https://{HOST}/{chave}.txt "
+        f"(até {ESPERA_SEGUNDOS // 60} min, a cada {INTERVALO_SEGUNDOS} s)."
+    )
+    if not esperar_chave(chave):
+        print(
+            f"IndexNow: a chave ainda não respondeu 200 em https://{HOST}/{chave}.txt. "
+            "O site já foi publicado. Aviso não enviado.",
+            file=sys.stderr,
+        )
         return 0
     status = enviar(payload)
     if status not in (200, 202):
