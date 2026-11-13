@@ -1,0 +1,9 @@
+---
+import { desambiguacaoMarca } from '../data/perguntas-marca';
+---
+{desambiguacaoMarca.map((item) => (
+  <section>
+    <h2>{item.pergunta}</h2>
+    <p>{item.resposta}</p>
+  </section>
+))}
