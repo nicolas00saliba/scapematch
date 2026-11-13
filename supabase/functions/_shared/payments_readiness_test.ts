@@ -136,12 +136,15 @@ Deno.test("admin aal2 recebe só o mapa de sim ou não", async () => {
   assert(!JSON.stringify(body).includes("valor-que-nao-sai"));
 });
 
-Deno.test("cron sem VENUE_WITHDRAWALS_SECRET alerta e não autentica", async () => {
+function cronDeps(secret: string): { deps: PayoutDeps; seen: string[] } {
   const seen: string[] = [];
   const deps: PayoutDeps = {
     env: {
-      get: (name) =>
-        name === "SENTRY_DSN" ? "https://publickey@o1.ingest.sentry.io/123" : "",
+      get: (name) => {
+        if (name === "SENTRY_DSN") return "https://publickey@o1.ingest.sentry.io/123";
+        if (name === "VENUE_WITHDRAWALS_SECRET") return secret;
+        return "";
+      },
     },
     store: {
       actor: () => Promise.resolve(null),
@@ -158,15 +161,42 @@ Deno.test("cron sem VENUE_WITHDRAWALS_SECRET alerta e não autentica", async () 
       return Promise.resolve(new Response("ok", { status: 200 }));
     },
   };
-  const response = await handleScheduledWithdrawals(
+  return { deps, seen };
+}
+
+Deno.test("sem segredo configurado responde 503 e não chama o Sentry", async () => {
+  const first = cronDeps("");
+  const again = cronDeps("   ");
+  const empty = await handleScheduledWithdrawals(
     new Request("https://example.test/cron", { method: "POST" }),
+    first.deps,
+  );
+  const blank = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", {
+      method: "POST",
+      headers: { "x-venue-withdrawals-secret": "qualquer" },
+    }),
+    again.deps,
+  );
+  assertEquals(empty.status, 503);
+  assertEquals((await empty.json()).error, "config_ausente");
+  assertEquals(blank.status, 503);
+  assertEquals(first.seen.length, 0);
+  assertEquals(again.seen.length, 0);
+});
+
+Deno.test("segredo errado responde 401 e não chama o Sentry", async () => {
+  const { deps, seen } = cronDeps("cron-secret");
+  const response = await handleScheduledWithdrawals(
+    new Request("https://example.test/cron", {
+      method: "POST",
+      headers: { "x-venue-withdrawals-secret": "outro" },
+    }),
     deps,
   );
   assertEquals(response.status, 401);
   assertEquals((await response.json()).error, "not authenticated");
-  assertEquals(seen.length, 1);
-  assert(seen[0].includes("venue_withdrawals_config_ausente"));
-  assert(!seen[0].includes("publickey"));
+  assertEquals(seen.length, 0);
 });
 
 Deno.test("a migration do cron levanta erro em vez de retornar calada", async () => {

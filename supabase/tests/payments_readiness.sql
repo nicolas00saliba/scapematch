@@ -28,6 +28,12 @@ begin
     'anon', 'private.invoke_venue_withdrawals()', 'execute'
   ) or has_function_privilege(
     'service_role', 'private.invoke_venue_withdrawals()', 'execute'
+  ) or has_function_privilege(
+    'anon', 'private.notify_venue_withdrawals_config()', 'execute'
+  ) or has_function_privilege(
+    'authenticated', 'private.notify_venue_withdrawals_config()', 'execute'
+  ) or has_function_privilege(
+    'service_role', 'private.notify_venue_withdrawals_config()', 'execute'
   ) then
     raise exception 'a função do cron ficou executável pela API';
   end if;
@@ -134,6 +140,7 @@ create schema if not exists net;
 
 create table net.ready_calls (
   url text,
+  body jsonb,
   headers jsonb
 );
 
@@ -147,7 +154,7 @@ create or replace function net.http_post(
 language plpgsql
 as $$
 begin
-  insert into net.ready_calls (url, headers) values (url, headers);
+  insert into net.ready_calls (url, body, headers) values (url, body, headers);
   return 1;
 end;
 $$;
@@ -196,6 +203,108 @@ begin
   v_report := public.admin_payments_readiness();
   if v_report ->> 'venue_payouts_enabled' is distinct from 'false' then
     raise exception 'desligar a flag não apareceu na prontidão';
+  end if;
+end $$;
+
+do $$
+declare
+  v_count integer;
+begin
+  select count(*) into v_count from net.ready_calls;
+  perform private.notify_venue_withdrawals_config();
+  if (select count(*) from net.ready_calls) <> v_count then
+    raise exception 'config completa disparou alerta';
+  end if;
+end $$;
+
+select vault.create_secret(
+  'https://publickey@o1.ingest.sentry.io/123',
+  'sentry_dsn',
+  'teste'
+);
+
+do $$
+declare
+  v_count integer;
+begin
+  select count(*) into v_count from net.ready_calls;
+  perform private.notify_venue_withdrawals_config();
+  if (select count(*) from net.ready_calls) <> v_count then
+    raise exception 'config completa com DSN disparou alerta';
+  end if;
+end $$;
+
+update vault.secrets
+set secret = ''
+where name = 'venue_withdrawals_secret';
+
+do $$
+declare
+  v_before integer;
+  v_url text;
+  v_body text;
+  v_header text;
+begin
+  select count(*) into v_before from net.ready_calls;
+  begin
+    perform private.invoke_venue_withdrawals();
+    raise exception 'falta de segredo não falhou';
+  exception
+    when others then
+      if sqlerrm not like 'venue_withdrawals_config_ausente:%' then
+        raise;
+      end if;
+  end;
+  if (select count(*) from net.ready_calls) <> v_before then
+    raise exception 'a falha do cron deixou pedido para trás';
+  end if;
+
+  perform private.notify_venue_withdrawals_config();
+  perform private.notify_venue_withdrawals_config();
+  if (select count(*) from net.ready_calls) <> v_before + 2 then
+    raise exception 'o alerta não saiu uma vez por execução';
+  end if;
+
+  select url, body::text, headers ->> 'X-Sentry-Auth'
+    into v_url, v_body, v_header
+  from net.ready_calls
+  order by ctid
+  offset v_before
+  limit 1;
+  if v_url is distinct from 'https://o1.ingest.sentry.io/api/123/store/' then
+    raise exception 'o alerta não foi para o ingest: %', v_url;
+  end if;
+  if v_url like '%publickey%'
+    or v_body like '%publickey%'
+    or v_body like '%segredo-cron-nao-vazar%'
+    or v_body like '%url-secreta-nao-vazar%'
+    or v_body like '%https://publickey%'
+  then
+    raise exception 'o alerta vazou segredo';
+  end if;
+  if v_body not like '%venue_withdrawals_config_ausente%'
+    or v_body not like '%"fingerprint": ["venue_withdrawals_config_ausente"]%'
+    or v_body not like '%venue_withdrawals_secret%'
+  then
+    raise exception 'o alerta não fixou o fingerprint: %', v_body;
+  end if;
+  if v_header not like 'Sentry sentry_version=7, sentry_key=publickey,%' then
+    raise exception 'o alerta não autenticou no Sentry';
+  end if;
+end $$;
+
+update vault.secrets
+set secret = 'https://publickey@169.254.169.254/123'
+where name = 'sentry_dsn';
+
+do $$
+declare
+  v_count integer;
+begin
+  select count(*) into v_count from net.ready_calls;
+  perform private.notify_venue_withdrawals_config();
+  if (select count(*) from net.ready_calls) <> v_count then
+    raise exception 'DSN fora do ingest disparou pedido';
   end if;
 end $$;
 

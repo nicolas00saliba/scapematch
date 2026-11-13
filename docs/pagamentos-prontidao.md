@@ -4,7 +4,9 @@ O cron `venue-withdrawals` dispara todo dia às 08:20 em Brasília (`20 11 * * *
 
 Sem `venue_withdrawals_url` ou sem `venue_withdrawals_secret`, a função levanta `venue_withdrawals_config_ausente` e cita só o nome do item que falta. O pg_cron grava o job como `failed` em `cron.job_run_details`. A mensagem não leva o valor.
 
-Se a função chega a rodar sem a env `VENUE_WITHDRAWALS_SECRET`, ela registra o mesmo código no log. Com a env `SENTRY_DSN` apontando para um host `*.ingest.sentry.io` (ou `ingest.us` / `ingest.de`), o mesmo código segue para o Sentry. O DSN não entra no corpo do evento. A resposta HTTP continua `401`, para não contar para fora se o segredo existe.
+`schedule-venue-withdrawals` não verifica JWT. Sem a env `VENUE_WITHDRAWALS_SECRET`, a função responde `503` e não envia evento ao Sentry, nem por chamada anônima. Com a env preenchida e o header errado ou vazio, a resposta é `401`, também sem evento.
+
+O alerta de configuração sai só do cron `venue-withdrawals-config`, uma vez por execução (`20 11 * * *`). Ele lê o item opcional `sentry_dsn` no Vault e manda um único POST quando falta `venue_withdrawals_url` ou `venue_withdrawals_secret`. O evento usa o fingerprint fixo `venue_withdrawals_config_ausente` e cita só o nome do item. Sem `sentry_dsn`, ou com um host que não seja `*.ingest.sentry.io` (nem `ingest.us` / `ingest.de`), não há POST. O job `venue-withdrawals` continua falhando e gravando o erro. O DSN não entra no corpo.
 
 Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o Nícolas, no projeto de produção, depois de revisar.
 
@@ -41,8 +43,7 @@ supabase secrets set --project-ref <project-ref> \
   ASAAS_BASE_URL='https://api.asaas.com/v3' \
   ASAAS_WEBHOOK_TOKEN='<token de 32 a 255 caracteres, sem espaço>' \
   ASAAS_WEBHOOK_EMAIL='<email que o Asaas usa no webhook>' \
-  VENUE_WITHDRAWALS_SECRET='<segredo longo, o mesmo do Vault>' \
-  SENTRY_DSN='<DSN https do ingest do Sentry; opcional>'
+  VENUE_WITHDRAWALS_SECRET='<segredo longo, o mesmo do Vault>'
 ```
 
 `VENUE_WITHDRAWALS_SECRET` e o item `venue_withdrawals_secret` do Vault têm de ser o mesmo texto. `ASAAS_WEBHOOK_TOKEN` não é a chave da API.
@@ -72,6 +73,13 @@ select vault.create_secret(
   new_name := 'venue_withdrawals_url',
   new_description := 'URL da Edge Function schedule-venue-withdrawals'
 );
+
+-- Opcional. Sem este item o cron de saques ainda falha alto, mas não há POST ao Sentry.
+select vault.create_secret(
+  new_secret := '<DSN https://<chave>@<host>.ingest.sentry.io/<projeto>>',
+  new_name := 'sentry_dsn',
+  new_description := 'DSN do Sentry para o alerta único do cron venue-withdrawals-config'
+);
 ```
 
 Se o nome já existe, atualizar pelo id. O `select` em `vault.secrets` devolve o id, não o valor:
@@ -85,6 +93,11 @@ select vault.update_secret(
 select vault.update_secret(
   secret_id := (select id from vault.secrets where name = 'venue_withdrawals_url'),
   new_secret := 'https://<project-ref>.supabase.co/functions/v1/schedule-venue-withdrawals'
+);
+
+select vault.update_secret(
+  secret_id := (select id from vault.secrets where name = 'sentry_dsn'),
+  new_secret := '<DSN https://<chave>@<host>.ingest.sentry.io/<projeto>>'
 );
 ```
 
