@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Confere o build estático de apps/site/dist."""
 
+import json
 import pathlib
 import re
+import struct
 import sys
 from html.parser import HTMLParser
 
@@ -394,8 +396,156 @@ def main() -> None:
             falha(f"robots.txt não libera {bot}")
     if "Sitemap: https://escapematch.com.br/sitemap-index.xml" not in robots:
         falha("robots.txt sem o sitemap")
+    conferir_icones(robots)
 
     print(f"site ok: {len(ROTAS)} rotas")
+
+
+LOGO_PNG = "assets/logo-512.png"
+LOGO_JSON = '"logo":"https://escapematch.com.br/assets/logo-512.png"'
+LOGO_SVG_JSON = '"logo":"https://escapematch.com.br/assets/logo-simbolo.svg"'
+LINKS_ICONE = (
+    '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48 64x64 96x96 128x128 192x192 256x256">',
+    '<link rel="icon" href="/assets/favicon-48.png" type="image/png" sizes="48x48">',
+    '<link rel="icon" href="/assets/favicon-96.png" type="image/png" sizes="96x96">',
+    '<link rel="icon" href="/assets/favicon-192.png" type="image/png" sizes="192x192">',
+    '<link rel="icon" href="/assets/favicon-512.png" type="image/png" sizes="512x512">',
+    '<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">',
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">',
+)
+CAMINHOS_ICONE = (
+    "/favicon.ico",
+    "/apple-touch-icon.png",
+    "/assets/logo-512.png",
+    "/assets/favicon-48.png",
+    "/assets/favicon-96.png",
+    "/assets/favicon-192.png",
+    "/assets/favicon-512.png",
+    "/assets/favicon.svg",
+)
+AGENTES_ICONE = ("Googlebot", "Googlebot-Image", "*")
+
+
+def png_tamanho(path: pathlib.Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    if len(data) < 24 or not data.startswith(b"\x89PNG\r\n\x1a\n") or data[12:16] != b"IHDR":
+        falha(f"{path.relative_to(DIST)} não é PNG")
+    return struct.unpack(">II", data[16:24])
+
+
+def tamanhos_ico(path: pathlib.Path) -> list[tuple[int, int]]:
+    data = path.read_bytes()
+    if len(data) < 6 or data[:4] != b"\x00\x00\x01\x00":
+        falha("favicon.ico ausente ou inválido")
+    quantidade = struct.unpack_from("<H", data, 4)[0]
+    if quantidade < 1 or len(data) < 6 + 16 * quantidade:
+        falha("favicon.ico sem imagens")
+    tamanhos = []
+    for indice in range(quantidade):
+        entrada = 6 + 16 * indice
+        largura = data[entrada] or 256
+        altura = data[entrada + 1] or 256
+        tamanhos.append((largura, altura))
+    return tamanhos
+
+
+def regras_disallow(texto: str) -> dict[str, list[str]]:
+    atual = "*"
+    regras: dict[str, list[str]] = {}
+    for linha in texto.splitlines():
+        linha = linha.split("#", 1)[0].strip()
+        if not linha or ":" not in linha:
+            continue
+        chave, valor = (parte.strip() for parte in linha.split(":", 1))
+        if chave.lower() == "user-agent":
+            atual = valor
+            regras.setdefault(atual, [])
+        elif chave.lower() == "disallow":
+            regras.setdefault(atual, []).append(valor)
+    return regras
+
+
+def caminho_bloqueado(regras: dict[str, list[str]], agente: str, caminho: str) -> bool:
+    if agente in regras:
+        lista = regras[agente]
+    else:
+        lista = regras.get("*", [])
+    for regra in lista:
+        if regra and caminho.startswith(regra):
+            return True
+    return False
+
+
+def conferir_icones(robots: str) -> None:
+    """O Google ignora favicon SVG e pede quadrado acima de 48 px.
+
+    O logo da Organization precisa de PNG com pelo menos 112 px.
+    """
+    ico = DIST / "favicon.ico"
+    if not ico.is_file():
+        falha("favicon.ico sumiu do build")
+    tamanhos = tamanhos_ico(ico)
+    if (48, 48) not in tamanhos or any(largura != altura for largura, altura in tamanhos):
+        falha(f"favicon.ico sem o quadrado de 48 px: {tamanhos}")
+
+    logo = DIST / LOGO_PNG
+    if not logo.is_file():
+        falha("logo PNG sumiu do build")
+    largura, altura = png_tamanho(logo)
+    if largura != altura or largura < 112:
+        falha(f"logo PNG {largura}x{altura}; o Google pede quadrado de pelo menos 112 px")
+
+    for lado in (48, 96, 192, 512):
+        arquivo_png = DIST / "assets" / f"favicon-{lado}.png"
+        if not arquivo_png.is_file():
+            falha(f"favicon-{lado}.png sumiu do build")
+        if png_tamanho(arquivo_png) != (lado, lado):
+            falha(f"favicon-{lado}.png não tem {lado} px")
+    toque = DIST / "apple-touch-icon.png"
+    if not toque.is_file() or png_tamanho(toque) != (180, 180):
+        falha("apple-touch-icon.png ausente ou fora de 180 px")
+
+    regras = regras_disallow(robots)
+    for agente in AGENTES_ICONE:
+        for caminho in CAMINHOS_ICONE:
+            if caminho_bloqueado(regras, agente, caminho):
+                falha(f"robots.txt bloqueia {caminho} para {agente}")
+
+    manifestos = {
+        path.resolve()
+        for path in DIST.rglob("*")
+        if path.is_file()
+        and (path.name == "manifest.json" or path.suffix == ".webmanifest")
+    }
+    for path in manifestos:
+        dados = json.loads(path.read_text())
+        origens = " ".join(str(icone.get("src", "")) for icone in dados.get("icons") or [])
+        if not any(
+            nome in origens
+            for nome in ("favicon-192.png", "favicon-512.png", "logo-512.png")
+        ):
+            falha(f"{path.relative_to(DIST)} não aponta para os ícones novos")
+
+    for html in DIST.rglob("*.html"):
+        if html.name.startswith("google") and html.suffix == ".html":
+            continue
+        texto = html.read_text()
+        if "<head>" not in texto:
+            continue
+        for link in LINKS_ICONE:
+            if link not in texto:
+                falha(f"{html.relative_to(DIST)} sem {link}")
+        for tag in re.findall(r'<link[^>]*rel="manifest"[^>]*>', texto):
+            href = re.search(r'href="([^"]+)"', tag)
+            if not href or not href.group(1).startswith("/"):
+                falha(f"{html.relative_to(DIST)} tem manifest sem URL no site")
+            alvo = (DIST / href.group(1).lstrip("/").split("?", 1)[0]).resolve()
+            if alvo not in manifestos:
+                falha(f"{html.relative_to(DIST)} aponta manifest sem os ícones novos")
+        if LOGO_SVG_JSON in texto:
+            falha(f"{html.relative_to(DIST)} ainda declara o logo SVG na Organization")
+        if LOGO_JSON not in texto:
+            falha(f"{html.relative_to(DIST)} sem o logo PNG na Organization")
 
 
 if __name__ == "__main__":
