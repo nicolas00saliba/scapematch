@@ -20,7 +20,7 @@ Nada abaixo foi aplicado neste repositório no projeto remoto.
 
 ## Migration
 
-Arquivo: `supabase/migrations/20261113180000_ledger_reconcile.sql`.
+Arquivo: `supabase/migrations/20261113190000_ledger_reconcile.sql`.
 
 ## Envs da Edge Function
 

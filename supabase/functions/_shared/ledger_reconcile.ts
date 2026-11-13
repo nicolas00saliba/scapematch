@@ -72,10 +72,21 @@ export function mapPaymentStatus(status: string): string | null {
     case "REFUND_IN_PROGRESS":
       return "refunded";
     case "DELETED":
+    case "CANCELED":
+    case "CANCELLED":
       return "cancelled";
     default:
       return null;
   }
+}
+
+/// Pix apagado volta deleted:true e status PENDING. Isso é cancelamento.
+export function remotePaymentStatus(
+  row: Record<string, unknown>,
+): string | null {
+  if (row.deleted === true) return "cancelled";
+  const status = typeof row.status === "string" ? row.status : "";
+  return mapPaymentStatus(status);
 }
 
 /// null = status de transferência fora do livro. Não vira "pending".
@@ -186,7 +197,7 @@ export function compareLedger(input: {
         local.status,
         "",
       ));
-    } else if (local.status !== payment.status) {
+    } else if (!chargeStatusesMatch(local, payment.status)) {
       found.push(row(
         "charge_status",
         payment.id,
@@ -228,7 +239,11 @@ export function compareLedger(input: {
     if (local.status === "paid" && !overlaps(kinds, paidLedger)) {
       found.push(row("ledger_missing", local.providerRef, local.id, "paid", ""));
     }
-    if (local.status === "refunded" && !overlaps(kinds, refundLedger)) {
+    if (
+      local.status === "refunded" &&
+      overlaps(kinds, paidLedger) &&
+      !overlaps(kinds, refundLedger)
+    ) {
       found.push(row(
         "ledger_refund_missing",
         local.providerRef,
@@ -314,6 +329,15 @@ export function compareLedger(input: {
     found.push(row("asaas_truncated", "", "", "", ""));
   }
   return found;
+}
+
+/// Pré-autorização cancelada: o Asaas estorna e devolve REFUNDED.
+/// O livro grava cancelled porque o valor não foi capturado.
+function chargeStatusesMatch(local: LocalCharge, remote: string): boolean {
+  if (local.status === remote) return true;
+  return local.status === "cancelled" &&
+    remote === "refunded" &&
+    !overlaps(new Set(local.ledgerKinds), paidLedger);
 }
 
 function overlaps(left: Set<string>, right: Set<string>): boolean {
@@ -649,8 +673,7 @@ function parsePayment(row: Record<string, unknown>): RemotePayment | null {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
   const valueCents = reaisToCents(row.value);
   if (valueCents == null) return null;
-  const status = typeof row.status === "string" ? row.status : "";
-  return { id, status: mapPaymentStatus(status), valueCents };
+  return { id, status: remotePaymentStatus(row), valueCents };
 }
 
 function parseTransfer(row: Record<string, unknown>): RemoteTransfer | null {

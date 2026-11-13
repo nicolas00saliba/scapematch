@@ -4,6 +4,7 @@ import {
   handleLedgerReconcile,
   mapPaymentStatus,
   mapTransferStatus,
+  remotePaymentStatus,
   saoPauloWindow,
   type LocalCharge,
   type LocalWithdrawal,
@@ -31,6 +32,7 @@ Deno.test("compara status, valor, livro e transferência", () => {
     payments: [
       { id: "pay_1", status: "pending", valueCents: 7900 },
       { id: "pay_fora", status: "paid", valueCents: 1000 },
+      { id: "pay_credito", status: "refunded", valueCents: 500 },
     ],
     transfers: [
       {
@@ -54,6 +56,13 @@ Deno.test("compara status, valor, livro e transferência", () => {
         status: "refunded",
         amountCents: 500,
         ledgerKinds: [],
+      },
+      {
+        id: "local-3",
+        providerRef: "pay_credito",
+        status: "refunded",
+        amountCents: 500,
+        ledgerKinds: ["house_net"],
       },
     ],
     withdrawals: [
@@ -126,6 +135,124 @@ Deno.test("a janela usa o dia de São Paulo", () => {
   assertEquals(window.untilDay, "2026-11-12");
   assertEquals(window.sinceIso, "2026-11-11T03:00:00.000Z");
   assertEquals(window.untilIso, "2026-11-13T03:00:00.000Z");
+});
+
+Deno.test("pré-autorização cancelada bate com REFUNDED", () => {
+  const rows = compareLedger({
+    payments: [{ id: "pay_card", status: "refunded", valueCents: 8000 }],
+    transfers: [],
+    charges: [{
+      id: "card-1",
+      providerRef: "pay_card",
+      status: "cancelled",
+      amountCents: 8000,
+      ledgerKinds: [],
+    }],
+    withdrawals: [],
+    truncated: false,
+  });
+  assertEquals(rows, []);
+});
+
+Deno.test("Pix apagado bate com cobrança cancelada", () => {
+  assertEquals(
+    remotePaymentStatus({ status: "PENDING", deleted: true, value: 80 }),
+    "cancelled",
+  );
+  assertEquals(mapPaymentStatus("PENDING"), "pending");
+  const rows = compareLedger({
+    payments: [{ id: "pay_pix", status: "cancelled", valueCents: 8000 }],
+    transfers: [],
+    charges: [{
+      id: "pix-1",
+      providerRef: "pay_pix",
+      status: "cancelled",
+      amountCents: 8000,
+      ledgerKinds: [],
+    }],
+    withdrawals: [],
+    truncated: false,
+  });
+  assertEquals(rows, []);
+});
+
+Deno.test("Pix estornado antes da confirmação não exige lançamento", () => {
+  const rows = compareLedger({
+    payments: [{ id: "pay_pix", status: "refunded", valueCents: 8000 }],
+    transfers: [],
+    charges: [{
+      id: "pix-1",
+      providerRef: "pay_pix",
+      status: "refunded",
+      amountCents: 8000,
+      ledgerKinds: [],
+    }],
+    withdrawals: [],
+    truncated: false,
+  });
+  assertEquals(rows, []);
+});
+
+function settled(id: string, ref: string, status: string, kinds: string[]) {
+  return {
+    id,
+    providerRef: ref,
+    status,
+    amountCents: 8000,
+    ledgerKinds: kinds,
+  };
+}
+
+Deno.test("roteiro: grupo confirma Pix e cartão", () => {
+  const rows = compareLedger({
+    payments: [
+      { id: "pay_pix", status: "paid", valueCents: 8000 },
+      { id: "pay_card", status: "paid", valueCents: 8000 },
+    ],
+    transfers: [],
+    charges: [
+      settled("pix", "pay_pix", "paid", ["house_net", "commission"]),
+      settled("card", "pay_card", "paid", ["house_net", "commission"]),
+    ],
+    withdrawals: [],
+    truncated: false,
+  });
+  assertEquals(rows, []);
+});
+
+Deno.test("roteiro: grupo expira estorna o Pix e cancela a pré-auth", () => {
+  const rows = compareLedger({
+    payments: [
+      { id: "pay_pix", status: "refunded", valueCents: 8000 },
+      { id: "pay_card", status: "refunded", valueCents: 8000 },
+    ],
+    transfers: [],
+    charges: [
+      settled("pix", "pay_pix", "refunded", []),
+      settled("card", "pay_card", "cancelled", []),
+    ],
+    withdrawals: [],
+    truncated: false,
+  });
+  assertEquals(rows, []);
+});
+
+Deno.test("roteiro: casa cancela depois da captura", () => {
+  const kinds = ["house_net", "commission", "house_refund", "commission_refund"];
+  const rows = compareLedger({
+    payments: [
+      { id: "pay_pix", status: "refunded", valueCents: 8000 },
+      { id: "pay_card", status: "refunded", valueCents: 8000 },
+    ],
+    transfers: [],
+    charges: [
+      settled("pix", "pay_pix", "refunded", kinds),
+      settled("card", "pay_card", "refunded", kinds),
+    ],
+    withdrawals: [],
+    truncated: false,
+  });
+  assertEquals(rows, []);
 });
 
 Deno.test("lista incompleta não acusa ausência e marca o corte", () => {
