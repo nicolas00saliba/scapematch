@@ -320,6 +320,11 @@ export async function handleScheduledWithdrawals(
   }
   const secret = deps.env.get("VENUE_WITHDRAWALS_SECRET") ?? "";
   const header = req.headers.get("x-venue-withdrawals-secret") ?? "";
+  // verify_jwt = false. Sem o segredo, qualquer um chama esta URL.
+  // 503 e nenhum evento: o alerta sai uma vez no cron, não por request.
+  if (secret.trim() === "") {
+    return json({ error: "config_ausente" }, 503);
+  }
   if (!(await secretMatches(header, secret))) {
     return json({ error: "not authenticated" }, 401);
   }
