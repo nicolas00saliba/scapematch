@@ -90,6 +90,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/app-root player
           bash tool/check_web_manifest.sh build/app-root player real
           bash tool/check_security_meta.sh flutter build/app-root/index.html
+          bash tool/check_web_robots.sh build/app-root/index.html
           grep -F 'base href="/"' build/app-root/index.html
           cp build/app-root/index.html build/app-root/404.html
           touch build/app-root/.nojekyll
@@ -105,6 +106,7 @@ jobs:
           bash ../../tool/check_web_service_worker.sh build/parceiro-root partner
           bash ../../tool/check_web_manifest.sh build/parceiro-root partner real
           bash ../../tool/check_security_meta.sh flutter build/parceiro-root/index.html
+          bash ../../tool/check_web_robots.sh build/parceiro-root/index.html
           grep -F 'base href="/"' build/parceiro-root/index.html
           cp build/parceiro-root/index.html build/parceiro-root/404.html
           touch build/parceiro-root/.nojekyll
@@ -120,6 +122,7 @@ jobs:
           bash ../../tool/check_web_service_worker.sh build/admin-root admin
           bash ../../tool/check_web_manifest.sh build/admin-root admin real
           bash ../../tool/check_security_meta.sh admin build/admin-root/index.html
+          bash ../../tool/check_web_robots.sh build/admin-root/index.html
           grep -F 'base href="/"' build/admin-root/index.html
           cp build/admin-root/index.html build/admin-root/404.html
           touch build/admin-root/.nojekyll
@@ -133,6 +136,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/demo-player player
           bash tool/check_web_manifest.sh build/demo-player player demo
           bash tool/check_security_meta.sh flutter build/demo-player/index.html
+          bash tool/check_web_robots.sh build/demo-player/index.html
           grep -F 'base href="/"' build/demo-player/index.html
 
       - name: Build partner web (demo, parceiro-demo.escapematch.com.br)
@@ -144,6 +148,7 @@ jobs:
           bash ../../tool/check_web_service_worker.sh build/parceiro-demo-root partner
           bash ../../tool/check_web_manifest.sh build/parceiro-demo-root partner demo
           bash ../../tool/check_security_meta.sh flutter build/parceiro-demo-root/index.html
+          bash ../../tool/check_web_robots.sh build/parceiro-demo-root/index.html
           grep -F 'base href="/"' build/parceiro-demo-root/index.html
           cp build/parceiro-demo-root/index.html build/parceiro-demo-root/404.html
           touch build/parceiro-demo-root/.nojekyll
@@ -164,6 +169,7 @@ jobs:
           test -f build/demo-root/parceiro/404.html
           test ! -e build/demo-root/parceiro/manifest.json
           test ! -e build/demo-root/parceiro/flutter_service_worker.js
+          bash tool/check_web_robots.sh build/demo-root/index.html build/demo-root/parceiro/index.html
           grep -F -q 'https://parceiro-demo.escapematch.com.br/' build/demo-root/parceiro/index.html
           grep -F -q 'http-equiv="refresh"' build/demo-root/parceiro/index.html
           ! grep -F -q 'rel="manifest"' build/demo-root/parceiro/index.html
@@ -190,6 +196,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/legacy-player player
           bash tool/check_web_manifest.sh build/legacy-player player real
           bash tool/check_security_meta.sh flutter build/legacy-player/index.html
+          bash tool/check_web_robots.sh build/legacy-player/index.html
           (
             cd apps/parceiro
             flutter build web --release --base-href /scapematch/parceiro/ --dart-define=APP_MODE=real --pwa-strategy=none -o build/legacy-parceiro $(bash ../../tool/sentry_defines.sh parceiro production)
@@ -199,6 +206,7 @@ jobs:
             bash ../../tool/check_web_service_worker.sh build/legacy-parceiro partner
             bash ../../tool/check_web_manifest.sh build/legacy-parceiro partner real
             bash ../../tool/check_security_meta.sh flutter build/legacy-parceiro/index.html
+            bash ../../tool/check_web_robots.sh build/legacy-parceiro/index.html
           )
           flutter build web --release --base-href /scapematch/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-player-demo $(bash tool/sentry_defines.sh app demo)
           bash tool/install_cleanup_service_worker.sh build/legacy-player-demo
@@ -206,6 +214,7 @@ jobs:
           bash tool/check_web_service_worker.sh build/legacy-player-demo player
           bash tool/check_web_manifest.sh build/legacy-player-demo player demo
           bash tool/check_security_meta.sh flutter build/legacy-player-demo/index.html
+          bash tool/check_web_robots.sh build/legacy-player-demo/index.html
           (
             cd apps/parceiro
             flutter build web --release --base-href /scapematch/parceiro/demo/ --dart-define=APP_MODE=demo --pwa-strategy=none -o build/legacy-parceiro-demo $(bash ../../tool/sentry_defines.sh parceiro demo)
@@ -214,6 +223,7 @@ jobs:
             bash ../../tool/check_web_service_worker.sh build/legacy-parceiro-demo partner
             bash ../../tool/check_web_manifest.sh build/legacy-parceiro-demo partner demo
             bash ../../tool/check_security_meta.sh flutter build/legacy-parceiro-demo/index.html
+            bash ../../tool/check_web_robots.sh build/legacy-parceiro-demo/index.html
           )
           (
             cd apps/admin
@@ -224,6 +234,7 @@ jobs:
             bash ../../tool/check_web_service_worker.sh build/legacy-admin admin
             bash ../../tool/check_web_manifest.sh build/legacy-admin admin real
             bash ../../tool/check_security_meta.sh admin build/legacy-admin/index.html
+            bash ../../tool/check_web_robots.sh build/legacy-admin/index.html
           )
           mkdir -p build/legacy/parceiro/demo build/legacy/demo build/legacy/admin build/legacy/site
           cp -a build/legacy-player/. build/legacy/
