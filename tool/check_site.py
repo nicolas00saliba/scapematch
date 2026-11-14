@@ -67,23 +67,37 @@ FORA_DO_BUILD = ("/cidades/curitiba",)
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 EMAIL_CONTATO = "contato@escapematch.com.br"
 INSTAGRAM = "https://www.instagram.com/escapematch/"
+MEETUP = "https://www.meetup.com/pt-br/escaperoomcuritiba/"
+SAME_AS = [INSTAGRAM, MEETUP]
+ORG_ID = "https://escapematch.com.br/#organization"
+SITE_ID = "https://escapematch.com.br/#website"
+APP_ID = "https://app.escapematch.com.br/#app"
+PREFIXO_HOME = "EscapeMatch — app de escape room em Curitiba"
+TITULO_HOME = PREFIXO_HOME
 DEFINICAO = (
-    "O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room "
-    "e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. "
-    "Lançamento em Curitiba. Não é um jogo de celular."
+    "EscapeMatch é um app de escape room em Curitiba que forma grupos "
+    "para jogar com pessoas desconhecidas."
 )
-NOMES_ALTERNATIVOS = ["ScapeMatch", "Scape Match", "Escape Match"]
+DEFINICAO_VISIVEL = (
+    DEFINICAO + " Você chega sozinho, entra num grupo e paga só a sua vaga. "
+    "Não é um modo de jogo de tiro nem um jogo de celular."
+)
+DESCRICAO_MARCA = (
+    "App que forma grupos para jogar escape room em Curitiba com pessoas desconhecidas."
+)
+NOMES_ALTERNATIVOS = ["Escape Match", "escapematch", "ScapeMatch", "Scape Match"]
 HOME_DESCRICAO = (
-    "Aplicativo brasileiro para jogar escape room em grupo quando se está sozinho. "
-    "Chamava-se ScapeMatch. Lançamento em Curitiba. Não é um jogo de celular."
+    "EscapeMatch — app de escape room em Curitiba que forma grupos para jogar "
+    "com pessoas desconhecidas. Você chega sozinho e paga só a sua vaga."
 )
 FRASE_NOME = (
-    "O EscapeMatch se chamava ScapeMatch até novembro de 2026; "
-    "é o mesmo aplicativo, só o nome mudou."
+    "O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
+    "É o mesmo aplicativo, só o nome mudou."
 )
-REFORCO_PRESENCIAL = (
-    "Não é um jogo de celular nem um jogo de quebra-cabeça ou match-3. "
-    "É um app que junta pessoas para jogar escape room presencial."
+REFORCO_PRESENCIAL = "Não é um jogo de celular nem um jogo de quebra-cabeça ou match-3."
+FRASE_TIRO = (
+    "Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, "
+    "são outra coisa."
 )
 RESPOSTA_ANTIGO = (
     "Sim. O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
@@ -95,6 +109,7 @@ RESPOSTA_QUEBRA = (
 )
 PERGUNTA_ANTIGO = "O EscapeMatch é o antigo ScapeMatch?"
 PERGUNTA_QUEBRA = "O EscapeMatch é um jogo de quebra-cabeça de celular?"
+PERGUNTA_TIRO = "O EscapeMatch é um modo de jogo de tiro?"
 LINHA_NOME_ANTIGO = (
     "O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
     "Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles."
@@ -135,6 +150,8 @@ EXTERNOS = {
     "https://app.escapematch.com.br/login",
     "https://app.escapematch.com.br/cadastro",
     "https://parceiro.escapematch.com.br/",
+    INSTAGRAM,
+    MEETUP,
 }
 
 
@@ -241,15 +258,17 @@ def main() -> None:
         falha(f"CNAME é {cname!r}")
 
     home = (DIST / "index.html").read_text()
-    if "<title>EscapeMatch: ninguém pra jogar? Agora tem.</title>" not in home:
+    if f"<title>{TITULO_HOME}</title>" not in home:
         falha("título da home ausente")
+    if not TITULO_HOME.startswith(PREFIXO_HOME) or not HOME_DESCRICAO.startswith(PREFIXO_HOME):
+        falha("título ou descrição da home não começam pela marca")
     if 'class="hero-badge"' not in home:
         falha("selo sem a classe hero-badge")
     if SELO not in home:
         falha("texto do selo ausente")
     if "muito mais!" in home:
         falha("o selo ainda anuncia tabuleiro e laser tag como disponíveis")
-    if DEFINICAO not in home:
+    if DEFINICAO_VISIVEL not in home:
         falha("a home não mostra a definição canônica")
     if home.find("<h1>") > home.find("hero-badge"):
         falha("o selo ficou antes do título")
@@ -266,6 +285,10 @@ def main() -> None:
         titulo = "".join(parser.title).strip()
         if not titulo:
             falha(f"{rota} sem título")
+        if "ScapeMatch" in titulo:
+            falha(f"{rota} título ainda usa ScapeMatch")
+        if '<meta property="og:site_name" content="EscapeMatch">' not in texto:
+            falha(f"{rota} og:site_name não é EscapeMatch")
         if len(titulo) > 60:
             falha(f"{rota} título com {len(titulo)} caracteres: {titulo}")
         descricao = ""
@@ -347,6 +370,7 @@ def main() -> None:
         "/guia/nao-tenho-amigos-para-escape-room",
         "/guia/escape-room-em-grupo-curitiba",
         "/guia/primeira-vez-em-escape-room",
+        "/sobre",
     ):
         if f"{SITE}{rota}<" not in sitemap and f"{SITE}{rota}/" not in sitemap:
             falha(f"{rota} saiu do sitemap")
@@ -409,13 +433,13 @@ def main() -> None:
                 falha(f"{html.relative_to(DIST)} tem rua ou GameApplication")
             blocos = blocos_ld(texto)
             same = [bloco.get("sameAs") for bloco in blocos if "sameAs" in bloco]
-            if any(item != [INSTAGRAM] for item in same):
-                falha(f"{html.relative_to(DIST)} tem sameAs fora do Instagram oficial")
+            if any(item != SAME_AS for item in same):
+                falha(f"{html.relative_to(DIST)} tem sameAs fora do Instagram e do Meetup")
             tem_org = any(
                 bloco.get("@type") == "Organization" and bloco.get("legalName") for bloco in blocos
             )
-            if tem_org and same != [[INSTAGRAM]]:
-                falha(f"{html.relative_to(DIST)} sem o Instagram oficial em sameAs")
+            if tem_org and same != [SAME_AS]:
+                falha(f"{html.relative_to(DIST)} sem o Instagram oficial e o Meetup em sameAs")
         for rota in FORA_DO_BUILD:
             if f'href="{rota}"' in texto or f"href='{rota}'" in texto:
                 falha(f"{html.relative_to(DIST)} aponta para {rota}")
@@ -468,10 +492,42 @@ def main() -> None:
         falha("alternateName da Organization divergiu")
     if org.get("email") != EMAIL_CONTATO:
         falha("Organization sem o e-mail já publicado")
-    if org.get("sameAs") != [INSTAGRAM]:
+    if org.get("@id") != ORG_ID:
+        falha("Organization sem @id estável")
+    if org.get("sameAs") != SAME_AS:
         falha("sameAs da Organization divergiu")
     if org.get("description") != DEFINICAO:
         falha("description da Organization divergiu")
+    if not str(org.get("disambiguatingDescription", "")).startswith(DESCRICAO_MARCA):
+        falha("disambiguatingDescription sem a definição da marca")
+    fundacao = org.get("foundingLocation") or {}
+    endereco_fundacao = fundacao.get("address") or {}
+    if (
+        fundacao.get("@type") != "Place"
+        or fundacao.get("name") != "Curitiba"
+        or endereco_fundacao.get("addressLocality") != "Curitiba"
+        or endereco_fundacao.get("addressRegion") != "PR"
+        or endereco_fundacao.get("addressCountry") != "BR"
+        or "streetAddress" in endereco_fundacao
+    ):
+        falha("foundingLocation sem Curitiba/PR/BR")
+    area = org.get("areaServed") or {}
+    endereco_area = area.get("address") or {}
+    if (
+        area.get("@type") != "City"
+        or area.get("name") != "Curitiba"
+        or endereco_area.get("addressLocality") != "Curitiba"
+        or endereco_area.get("addressRegion") != "PR"
+        or endereco_area.get("addressCountry") != "BR"
+    ):
+        falha("areaServed sem Curitiba/PR/BR")
+    if any(campo in org for campo in ("telephone", "award", "duns")):
+        falha("Organization com dado que o repositório não publica")
+    sites = [bloco for bloco in blocos_ld(home_html) if bloco.get("@type") == "WebSite"]
+    if len(sites) != 1 or sites[0].get("@id") != SITE_ID:
+        falha("WebSite sem @id estável")
+    if (sites[0].get("publisher") or {}).get("@id") != ORG_ID:
+        falha("WebSite sem publisher da Organization")
     if not str(org.get("logo", "")).endswith("/assets/logo-512.png"):
         falha("logo da Organization mudou")
     if (
@@ -497,8 +553,16 @@ def main() -> None:
         falha("offers do app divergiu")
     if any(campo in apps[0] for campo in ("aggregateRating", "review")):
         falha("o app publicou avaliação")
-    if DEFINICAO not in app_html or "O aplicativo é gratuito." not in app_html:
+    if apps[0].get("@id") != APP_ID:
+        falha("WebApplication sem @id estável")
+    for campo in ("provider", "author", "publisher"):
+        if (apps[0].get(campo) or {}).get("@id") != ORG_ID:
+            falha(f"WebApplication sem {campo} da Organization")
+    if DEFINICAO_VISIVEL not in app_html or "O aplicativo é gratuito." not in app_html:
         falha("a página do app não mostra o que o WebApplication afirma")
+    home_apps = [bloco for bloco in blocos_ld(home_html) if bloco.get("@type") == "WebApplication"]
+    if len(home_apps) != 1 or home_apps[0].get("@id") != APP_ID:
+        falha("a home saiu sem o WebApplication da marca")
     if 'rel="preload"' not in home_html or "woff2" not in home_html:
         falha("fonte sem preload")
     como = arquivo("/como-funciona").read_text()
@@ -509,8 +573,18 @@ def main() -> None:
     guia = arquivo("/guia/escape-room-sozinho").read_text()
     if '"@type":"FAQPage"' not in guia:
         falha("o guia saiu sem FAQPage")
-    if DEFINICAO not in guia or DEFINICAO not in arquivo("/sobre").read_text():
+    if DEFINICAO_VISIVEL not in guia or DEFINICAO_VISIVEL not in arquivo("/sobre").read_text():
         falha("definição canônica ausente no guia ou no sobre")
+    sobre_html = arquivo("/sobre").read_text()
+    if not re.search(
+        r'<p class="hero-apoio">EscapeMatch é um app de escape room em Curitiba que',
+        sobre_html,
+    ):
+        falha("a primeira frase do sobre não define a marca")
+    if f'<meta property="og:title" content="{TITULO_HOME}">' not in home_html:
+        falha("og:title da home divergiu")
+    if f'<meta property="og:description" content="{HOME_DESCRICAO}">' not in home_html:
+        falha("og:description da home divergiu")
     if f'<meta name="description" content="{HOME_DESCRICAO}">' not in home_html:
         falha("descrição da home divergiu")
     if len(HOME_DESCRICAO) > 155:
@@ -520,7 +594,16 @@ def main() -> None:
         if rota == "/sobre":
             if FRASE_NOME not in html_marca or REFORCO_PRESENCIAL not in html_marca:
                 falha("sobre sem a frase do nome antigo ou o reforço presencial")
-        exigir_faq(html_marca, rota, (PERGUNTA_ANTIGO, PERGUNTA_QUEBRA))
+            if FRASE_TIRO not in html_marca or 'href="/sobre"' not in arquivo("/").read_text():
+                falha("sobre sem a diferença para o modo de tiro, ou a home sem o link")
+        tipo_pagina = "AboutPage" if rota == "/sobre" else "Article"
+        paginas = [bloco for bloco in blocos_ld(html_marca) if bloco.get("@type") == tipo_pagina]
+        if len(paginas) != 1:
+            falha(f"{rota} saiu com {len(paginas)} {tipo_pagina}")
+        for campo in ("author", "publisher"):
+            if (paginas[0].get(campo) or {}).get("@id") != ORG_ID:
+                falha(f"{rota} sem {campo} da Organization")
+        exigir_faq(html_marca, rota, (PERGUNTA_ANTIGO, PERGUNTA_QUEBRA, PERGUNTA_TIRO))
         exigir_resposta(html_marca, rota, PERGUNTA_ANTIGO, RESPOSTA_ANTIGO)
         exigir_resposta(html_marca, rota, PERGUNTA_QUEBRA, RESPOSTA_QUEBRA)
     exigir_faq(
@@ -538,7 +621,7 @@ def main() -> None:
         ("/guia/escape-room-sozinho-curitiba", guia_curitiba),
         ("/guia/como-achar-grupo-escape-room", guia_grupo),
     ):
-        if DEFINICAO not in html_guia:
+        if DEFINICAO_VISIVEL not in html_guia:
             falha(f"definição canônica ausente em {rota}")
         if '"@type":"FAQPage"' not in html_guia:
             falha(f"{rota} saiu sem FAQPage")
@@ -604,7 +687,7 @@ def main() -> None:
     }
     for rota, perguntas in guias_novos.items():
         html_guia = arquivo(rota).read_text()
-        if DEFINICAO not in html_guia:
+        if DEFINICAO_VISIVEL not in html_guia:
             falha(f"definição canônica ausente em {rota}")
         if '"@type":"FAQPage"' not in html_guia:
             falha(f"{rota} saiu sem FAQPage")
@@ -613,7 +696,7 @@ def main() -> None:
     if "não lista casas parceiras" not in guia_grupo_cidade.lower():
         falha("o guia de grupo em Curitiba não avisa que o site não lista casas")
     hub = arquivo("/guia").read_text()
-    if DEFINICAO not in hub:
+    if DEFINICAO_VISIVEL not in hub:
         falha("definição canônica ausente no índice de guias")
     for rota in guias_novos:
         if f'href="{rota}"' not in hub:
@@ -660,12 +743,14 @@ def main() -> None:
         texto = (DIST / nome).read_text()
         if "Curitiba" not in texto or "R$ 0,01" not in texto:
             falha(f"{nome} incompleto")
-        if DEFINICAO not in texto or "Não confundir com jogos de celular chamados Escape Match." not in texto:
+        if DEFINICAO_VISIVEL not in texto or "Não confundir com jogos de celular chamados Escape Match." not in texto:
             falha(f"{nome} sem a definição ou a desambiguação")
+        if FRASE_TIRO not in texto or DESCRICAO_MARCA not in texto:
+            falha(f"{nome} sem a definição da marca ou a diferença para o modo de tiro")
         if LINHA_NOME_ANTIGO not in texto:
             falha(f"{nome} sem o nome antigo")
-        if INSTAGRAM not in texto:
-            falha(f"{nome} sem o Instagram oficial")
+        if INSTAGRAM not in texto or MEETUP not in texto:
+            falha(f"{nome} sem o Instagram oficial ou o Meetup")
         if "Não há perfil oficial de Instagram" in texto:
             falha(f"{nome} ainda diz que não há Instagram")
         for rota in (
@@ -709,6 +794,15 @@ def main() -> None:
             falha(f"robots.txt não libera {bot}")
     if "Sitemap: https://escapematch.com.br/sitemap-index.xml" not in robots:
         falha("robots.txt sem o sitemap")
+    manifesto = DIST / "manifest.webmanifest"
+    if not manifesto.is_file():
+        falha("manifest do site ausente")
+    else:
+        dados_manifesto = json.loads(manifesto.read_text())
+        if dados_manifesto.get("name") != "EscapeMatch" or dados_manifesto.get("short_name") != "EscapeMatch":
+            falha("manifest sem o nome EscapeMatch")
+        if "ScapeMatch" in json.dumps(dados_manifesto):
+            falha("manifest cita ScapeMatch")
     conferir_icones(robots)
 
     print(f"site ok: {len(ROTAS)} rotas")

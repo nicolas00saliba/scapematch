@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import CtaBlock from '../components/CtaBlock.astro';
-import { faqPage } from '../data/seo';
+import { faqPage, idOrganizacao } from '../data/seo';
 
 const descricao =
   'Como jogar escape room em Curitiba pelo EscapeMatch: achar grupo, reservar a vaga, avaliar a sala e ver o ranking de tempo.';
@@ -30,40 +30,24 @@ const perguntas = [
   },
 ];
 
-const pagina = {
+const servico = {
   '@context': 'https://schema.org',
-  '@type': 'WebPage',
-  name: 'Escape room em Curitiba',
-  url: 'https://escapematch.com.br/escape-room-curitiba',
-  inLanguage: 'pt-BR',
+  '@type': 'Service',
+  name: 'Grupo de escape room em Curitiba',
+  serviceType: 'Formação de grupos para escape room',
   description: descricao,
-  isPartOf: {
-    '@type': 'WebSite',
-    name: 'EscapeMatch',
-    url: 'https://escapematch.com.br/',
-  },
-  about: {
-    '@type': 'Service',
-    name: 'Grupo de escape room em Curitiba',
-    serviceType: 'Formação de grupos para escape room',
-    description: descricao,
-    areaServed: {
-      '@type': 'City',
-      name: 'Curitiba',
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: 'Curitiba',
-        addressRegion: 'PR',
-        addressCountry: 'BR',
-      },
+  url: 'https://escapematch.com.br/escape-room-curitiba',
+  areaServed: {
+    '@type': 'City',
+    name: 'Curitiba',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Curitiba',
+      addressRegion: 'PR',
+      addressCountry: 'BR',
     },
-    provider: {
-      '@type': 'Organization',
-      name: 'EscapeMatch',
-      url: 'https://escapematch.com.br/',
-    },
-    url: 'https://escapematch.com.br/escape-room-curitiba',
   },
+  provider: { '@id': idOrganizacao },
 };
 ---
 
@@ -71,7 +55,7 @@ const pagina = {
   title="Escape room em Curitiba | EscapeMatch"
   description={descricao}
   path="/escape-room-curitiba"
-  jsonLd={[pagina, faqPage(perguntas)]}
+  jsonLd={[servico, faqPage(perguntas)]}
 >
   <PageTop
     titulo="Escape room em Curitiba"

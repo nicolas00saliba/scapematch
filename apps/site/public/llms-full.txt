@@ -1,16 +1,16 @@
 # EscapeMatch
 
-> O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. Lançamento em Curitiba. Não é um jogo de celular. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
+> EscapeMatch é um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
 
-Este arquivo descreve o que o site e as regras publicadas afirmam. O Instagram oficial é https://www.instagram.com/escapematch/. Não há perfil oficial de TikTok, LinkedIn ou outra rede publicado no repositório.
+Este arquivo descreve o que o site e as regras publicadas afirmam. App que forma grupos para jogar escape room em Curitiba com pessoas desconhecidas. O Instagram oficial é https://www.instagram.com/escapematch/. O grupo de quem não tem equipe para jogar escape room em Curitiba está em https://www.meetup.com/pt-br/escaperoomcuritiba/. Não há perfil oficial de TikTok ou LinkedIn publicado no repositório.
 
-A marca também é escrita Escape Match. Não confundir com jogos de celular chamados Escape Match.
+A marca também é escrita Escape Match e escapematch. Não confundir com jogos de celular chamados Escape Match. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa.
 
 O EscapeMatch se chamava ScapeMatch até novembro de 2026. Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles.
 
 ## O que é
 
-O EscapeMatch é o aplicativo brasileiro que conecta pessoas para jogar escape room e, em breve, outros jogos em grupo. Você chega sozinho, entra num grupo e paga só a sua vaga. Lançamento em Curitiba. Não é um jogo de celular.
+EscapeMatch é um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular. App que forma grupos para jogar escape room em Curitiba com pessoas desconhecidas.
 
 O EscapeMatch junta pessoas que querem jogar e não têm um grupo. O uso principal é chegar sozinho e entrar num time. Quem já tem turma pode completar as vagas que faltam. Esse uso é secundário.
 
@@ -79,7 +79,7 @@ Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no r
 - [Ajuda](https://escapematch.com.br/ajuda): perguntas frequentes.
 - [Segurança](https://escapematch.com.br/seguranca): convivência no grupo.
 - [Baixar o app](https://escapematch.com.br/app): abrir no navegador ou instalar no celular.
-- [Sobre](https://escapematch.com.br/sobre): por que a plataforma existe.
+- [Sobre a EscapeMatch](https://escapematch.com.br/sobre): a marca, o app de escape room em Curitiba e a diferença para modos de jogo de tiro com nome parecido.
 - [Escape room em Curitiba](https://escapematch.com.br/escape-room-curitiba): como achar grupo, reservar a vaga, avaliar a sala e ver o ranking de tempo. As salas ficam no app.
 - [Contato](https://escapematch.com.br/contato): e-mail, razão social, CNPJ, Curitiba-PR, app e Parceiro.
 - [Para casas](https://escapematch.com.br/para-casas): encher horário que ficaria vazio.

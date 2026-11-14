@@ -4,7 +4,7 @@ import PhoneShot from '../components/PhoneShot.astro';
 import ProgramCard from '../components/ProgramCard.astro';
 import DescontoPontos from '../components/DescontoPontos.astro';
 import { programaPorId } from '../data/programas';
-import { definicao, faqPage } from '../data/seo';
+import { definicao, descricaoHome, faqPage, tituloHome } from '../data/seo';
 
 const cartoes = ['boas-vindas', 'pontos-de-volta', 'indique-amigos'].map(programaPorId);
 
@@ -33,8 +33,8 @@ const perguntas = [
 ---
 
 <Base
-  title="EscapeMatch: ninguém pra jogar? Agora tem."
-  description="Aplicativo brasileiro para jogar escape room em grupo quando se está sozinho. Chamava-se ScapeMatch. Lançamento em Curitiba. Não é um jogo de celular."
+  title={tituloHome}
+  description={descricaoHome}
   path="/"
   ogImage="/assets/og/home.png"
   jsonLd={faqPage(perguntas)}
