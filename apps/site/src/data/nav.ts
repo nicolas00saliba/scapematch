@@ -49,7 +49,7 @@ export const casaParceiraLinks: Link[] = [
 ];
 
 export const empresaLinks: Link[] = [
-  { rotulo: 'Sobre', href: '/sobre' },
+  { rotulo: 'Sobre a EscapeMatch', href: '/sobre' },
   { rotulo: 'Contato', href: '/contato' },
 ];
 
@@ -95,7 +95,7 @@ export const rodape: Coluna[] = [
     titulo: 'Ajuda e empresa',
     links: [
       { rotulo: 'Central de ajuda', href: '/ajuda' },
-      { rotulo: 'Sobre', href: '/sobre' },
+      { rotulo: 'Sobre a EscapeMatch', href: '/sobre' },
       { rotulo: 'Contato', href: '/contato' },
     ],
   },

@@ -5,7 +5,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Breadcrumb from '../components/Breadcrumb.astro';
 import { semTrilha, trilha } from '../data/nav';
-import { organizacao, website } from '../data/seo';
+import { grafoDaPagina } from '../data/seo';
 import { tokenBuscador } from '../../scripts/verificacao-buscadores.mjs';
 
 interface Props {
@@ -41,9 +41,9 @@ const image = `https://escapematch.com.br${ogImage}`;
 const mostrarTrilha = !semTrilha(path);
 const itens = mostrarTrilha ? trilha(path) : [];
 
-const blocos: Record<string, unknown>[] = [organizacao, website];
+const extras: Record<string, unknown>[] = [];
 if (mostrarTrilha) {
-  blocos.push({
+  extras.push({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: itens.map((item, indice) => ({
@@ -57,8 +57,9 @@ if (mostrarTrilha) {
   });
 }
 if (jsonLd) {
-  blocos.push(...(Array.isArray(jsonLd) ? jsonLd : [jsonLd]));
+  extras.push(...(Array.isArray(jsonLd) ? jsonLd : [jsonLd]));
 }
+const blocos = grafoDaPagina({ path, title, description, extra: extras });
 const json = JSON.stringify(blocos).replace(/</g, '\\u003c');
 const googleVerificacao = tokenBuscador(GOOGLE_SITE_VERIFICATION);
 const bingVerificacao = tokenBuscador(BING_SITE_VERIFICATION);
@@ -104,6 +105,7 @@ const bingVerificacao = tokenBuscador(BING_SITE_VERIFICATION);
     <link rel="icon" href="/assets/favicon-512.png" type="image/png" sizes="512x512">
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="/manifest.webmanifest">
     {blocos.length > 0 && <script type="application/ld+json" set:html={json} />}
   </head>
   <body>
