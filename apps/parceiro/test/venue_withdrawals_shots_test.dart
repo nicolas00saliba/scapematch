@@ -7,8 +7,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dominio/dominio.dart';
+import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/theme.dart';
+import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repository.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_home_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_withdrawals_panel.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
@@ -61,7 +66,103 @@ void main() {
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     await _shot(tester, dir, 'saldo-saques-desktop.png', panel: true);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _home(tester, const Size(412, 915), Brightness.light);
+    await tester.ensureVisible(find.byKey(PartnerKeys.withdrawalsTab));
+    await tester.tap(find.byKey(PartnerKeys.withdrawalsTab));
+    await tester.pumpAndSettle();
+    await _frame(tester, dir, 'saques-aba-celular.png');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _home(tester, const Size(1280, 1000), Brightness.light);
+    await tester.tap(find.byKey(PartnerKeys.withdrawalsTab));
+    await tester.pumpAndSettle();
+    await _frame(tester, dir, 'saques-aba-desktop.png');
   });
+}
+
+Future<void> _home(
+  WidgetTester tester,
+  Size size,
+  Brightness brightness,
+) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    ProviderScope(
+      retry: noAutomaticRetry,
+      overrides: [
+        venueWithdrawalRepositoryProvider.overrideWithValue(
+          MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
+        ),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(brightness),
+        locale: const Locale('pt', 'BR'),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: PartnerHome(snapshot: _house()),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+PartnerSnapshot _house() {
+  return PartnerSnapshot(
+    house: const EscapeHouse(
+      id: 'casa-1',
+      cityId: 'curitiba',
+      name: 'Casa do Saque',
+      neighborhood: 'Centro',
+      latitude: -25.4,
+      longitude: -49.2,
+      receivesPayments: true,
+    ),
+    now: DateTime(2026, 11, 12, 12),
+    grossCents: 20000,
+    commissionCents: 2000,
+    netCents: 18000,
+    reservedCents: 4000,
+    lines: const [],
+    moneyByGroup: const {},
+    groups: const [],
+    rooms: const [],
+    slotsByRoom: const {},
+    absenceCounts: const {},
+    absenceMarks: const {},
+    standings: const {},
+    invoices: const [],
+    fiscal: demoHouseFiscal,
+  );
+}
+
+Future<void> _frame(WidgetTester tester, Directory dir, String name) async {
+  expect(find.byKey(PartnerKeys.withdrawals), findsOneWidget);
+  await tester.pump();
+  final view = tester.binding.renderViews.first;
+  // ignore: invalid_use_of_protected_member
+  final layer = view.layer;
+  expect(layer, isA<OffsetLayer>());
+  final image = await tester.runAsync(
+    () =>
+        (layer! as OffsetLayer).toImage(Offset.zero & view.size, pixelRatio: 1),
+  );
+  if (image == null) throw StateError(name);
+  final bytes = await tester.runAsync(
+    () => image.toByteData(format: ui.ImageByteFormat.png),
+  );
+  File('${dir.path}/$name').writeAsBytesSync(bytes!.buffer.asUint8List());
+  image.dispose();
 }
 
 Future<void> _pump(
@@ -108,6 +209,7 @@ Future<void> _loadFonts() async {
   const candidates = [
     '/tmp/flutter/bin/cache/artifacts/material_fonts',
     '/home/ubuntu/flutter/bin/cache/artifacts/material_fonts',
+    '/home/ubuntu/sdk/flutter/bin/cache/artifacts/material_fonts',
   ];
   String? dir;
   for (final candidate in candidates) {

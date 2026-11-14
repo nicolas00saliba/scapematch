@@ -149,6 +149,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.cancelled), findsWidgets);
 
+    await tester.ensureVisible(find.text(PartnerMessages.agenda).first);
     await tester.tap(find.text(PartnerMessages.agenda).first);
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.agendaList), findsNothing);
