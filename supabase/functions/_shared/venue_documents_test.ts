@@ -5,8 +5,10 @@ import {
   handleVenueDocuments,
   officialAsaasBase,
   presentDocuments,
+  roleOf,
   safeOnboardingUrl,
   type DocumentAccess,
+  type DocumentRoleStore,
   type VenueDocumentDeps,
 } from "./venue_documents.ts";
 
@@ -292,6 +294,66 @@ Deno.test("URL que não é a API oficial não é chamada", async () => {
   assertEquals(called, false);
 });
 
+Deno.test("admin sem MFA não lista nem executa outra ação", async () => {
+  let called = false;
+  const fetchFn = () => {
+    called = true;
+    return Promise.resolve(new Response(""));
+  };
+  const store = roleStore({ admin: true });
+  const jwt = sessionJwt("aal1");
+  for (const action of ["list", "upload", "remove"]) {
+    const response = await handleVenueDocuments(
+      request({
+        action,
+        venue_id: venueId,
+        document_id: "doc_sem_link_1",
+        content_base64: png(),
+      }, jwt),
+      deps({
+        fetchFn,
+        strong: true,
+        role: (id, userId, token) => roleOf(store, id, userId, token),
+      }),
+    );
+    assertEquals(response.status, 403);
+    assertEquals(await response.json(), { error: "not owner" });
+  }
+  assertEquals(called, false);
+  assertEquals(store.adminChecks, 0);
+});
+
+Deno.test("admin com aal2 lista os documentos", async () => {
+  const store = roleStore({ admin: true });
+  const response = await handleVenueDocuments(
+    request({ action: "list", venue_id: venueId }, sessionJwt("aal2")),
+    deps({
+      fetchFn: asaasDocuments(),
+      role: (id, userId, token) => roleOf(store, id, userId, token),
+    }),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.approved, true);
+  assertEquals(store.adminChecks, 1);
+  assertEquals(store.asAdmin, false);
+});
+
+Deno.test("o dono da casa lista sem MFA", async () => {
+  const store = roleStore({ snapshotRole: "owner", admin: false });
+  const response = await handleVenueDocuments(
+    request({ action: "list", venue_id: venueId }, sessionJwt("aal1")),
+    deps({
+      fetchFn: asaasDocuments(),
+      role: (id, userId, token) => roleOf(store, id, userId, token),
+    }),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.approved, true);
+  assertEquals(store.adminChecks, 0);
+});
+
 Deno.test("a reserva de pontos não consulta documentos", async () => {
   let called = false;
   const response = await handleVenueDocuments(
@@ -323,6 +385,52 @@ function png(): string {
   ));
 }
 
+function sessionJwt(aal: string): string {
+  const payload = btoa(JSON.stringify({ sub: "user-1", aal }))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+  return `h.${payload}.s`;
+}
+
+function roleStore(input: {
+  snapshotRole?: string;
+  admin?: boolean;
+}): DocumentRoleStore & { adminChecks: number; asAdmin: boolean } {
+  const store = {
+    adminChecks: 0,
+    asAdmin: false,
+    rpc(_fn: string, args: Record<string, unknown>) {
+      store.asAdmin = args.p_as_admin === true;
+      return Promise.resolve({ role: input.snapshotRole ?? "" });
+    },
+    isAdmin() {
+      store.adminChecks += 1;
+      return Promise.resolve(input.admin ?? false);
+    },
+  };
+  return store;
+}
+
+function asaasDocuments(): VenueDocumentDeps["fetchFn"] {
+  return (url) => {
+    if (String(url).endsWith("/myAccount/status")) {
+      return jsonResponse({
+        documentation: "APPROVED",
+        general: "APPROVED",
+      });
+    }
+    return jsonResponse({
+      data: [{
+        id: "doc_sem_link_1",
+        status: "APPROVED",
+        type: "IDENTIFICATION",
+        title: "RG",
+      }],
+    });
+  };
+}
+
 function request(body: Record<string, unknown>, jwt = "token"): Request {
   return new Request("https://example.test/venue-documents", {
     method: "POST",
@@ -337,13 +445,14 @@ function jsonResponse(body: unknown): Promise<Response> {
 
 function deps(input: {
   fetchFn: VenueDocumentDeps["fetchFn"];
-  role?: DocumentAccess;
+  role?: DocumentAccess | VenueDocumentDeps["role"];
   actorId?: string;
   strong?: boolean;
   base?: string;
   apiKey?: string;
 }): VenueDocumentDeps {
   const apiKey = input.apiKey ?? secret;
+  const role = input.role ?? "owner";
   return {
     env: {
       get: (name) => {
@@ -357,7 +466,7 @@ function deps(input: {
       Promise.resolve(
         input.actorId === "" ? null : { id: input.actorId ?? "user-1" },
       ),
-    role: () => Promise.resolve(input.role ?? "owner"),
+    role: typeof role === "function" ? role : () => Promise.resolve(role),
     subaccount: () => Promise.resolve({ apiKey, walletId: "wal_casa" }),
     strongAuth: () => Promise.resolve(input.strong ?? false),
   };
