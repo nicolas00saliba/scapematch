@@ -4,6 +4,8 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_admin_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_home_screen.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_google_account.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_login_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_pending_screen.dart';
@@ -21,6 +23,17 @@ class PartnerScreen extends ConsumerWidget {
     if (session == null) {
       return const PartnerLoginScreen();
     }
+    return PartnerGoogleAccountGate(child: _PartnerSignedIn(session: session));
+  }
+}
+
+class _PartnerSignedIn extends ConsumerWidget {
+  const _PartnerSignedIn({required this.session});
+
+  final PartnerAccount session;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     if (session.venueStatus == 'loading') {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

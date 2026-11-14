@@ -71,3 +71,15 @@ content_path = "./supabase/templates/email_change.html"
 [auth.email.template.invite]
 subject = "Você foi convidado para o EscapeMatch"
 content_path = "./supabase/templates/invite.html"
+
+# Google. O segredo não fica neste arquivo. Exporte
+# SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID e
+# SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET e só então mude enabled para true.
+# Se houver client id de Android ou iOS, o da web vem primeiro, separado
+# por vírgula. skip_nonce_check fica falso: o fluxo é o redirect do Auth,
+# não o id token no app.
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+skip_nonce_check = false

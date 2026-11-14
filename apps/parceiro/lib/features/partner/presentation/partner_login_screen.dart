@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
+import 'package:scapematch/features/auth/data/google_oauth.dart';
+import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_google_account.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_signup_screen.dart';
@@ -27,10 +31,41 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
   var _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    _error = takeGoogleAuthNotice();
+  }
+
+  @override
   void dispose() {
     _email.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = await partnerSignInWithGoogle();
+    if (!mounted) return;
+    if (error != null) {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
+      return;
+    }
+    if (!scapeUsesLiveBackend || scapeSupabase.auth.currentUser == null) {
+      setState(() => _busy = false);
+      return;
+    }
+    final account = await loadPartnerAccount();
+    if (!mounted) return;
+    if (account != null) {
+      ref.read(partnerSessionProvider.notifier).adopt(account);
+    }
   }
 
   Future<void> _submit() async {
@@ -88,6 +123,12 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
           ),
           if (kAllowSampleLogin) const _PartnerDemoHints(),
           const SizedBox(height: 20),
+          GoogleSignInButton(
+            key: PartnerKeys.googleSignIn,
+            busy: _busy,
+            onPressed: _google,
+          ),
+          const GoogleOrDivider(),
           TextField(
             key: PartnerKeys.partnerEmail,
             controller: _email,

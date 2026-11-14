@@ -76,6 +76,8 @@ abstract final class AppKeys {
   static const loginEmail = Key('login-email');
   static const loginPassword = Key('login-password');
   static const loginSubmit = Key('login-submit');
+  static const googleSignIn = Key('google-sign-in');
+  static const completeSignup = Key('complete-signup');
   static const goToSignup = Key('go-to-signup');
   static const signupName = Key('signup-name');
   static const signupEmail = Key('signup-email');

@@ -64,6 +64,39 @@ class AuthController extends Notifier<CurrentUser?> {
     return ref.read(authRepositoryProvider).changePassword(password: password);
   }
 
+  Future<String?> signInWithGoogle() async {
+    final repo = ref.read(authRepositoryProvider);
+    final error = await repo.signInWithGoogle();
+    await repo.refresh();
+    state = repo.signedInUser;
+    _rememberCity();
+    return error;
+  }
+
+  Future<String?> completeGoogleProfile({
+    required String name,
+    required DateTime birthDate,
+    required bool acceptedTerms,
+    String? cityId,
+    String? referralCode,
+    String? phone,
+  }) async {
+    final repo = ref.read(authRepositoryProvider);
+    final error = await repo.completeGoogleProfile(
+      name: name,
+      birthDate: birthDate,
+      now: ref.read(clockProvider).now(),
+      acceptedTerms: acceptedTerms,
+      cityId: cityId,
+      referralCode: referralCode,
+      phone: phone,
+    );
+    await repo.refresh();
+    state = repo.signedInUser;
+    _rememberCity();
+    return error;
+  }
+
   Future<void> signOut() async {
     final repo = ref.read(authRepositoryProvider);
     await repo.signOut();

@@ -11,6 +11,7 @@ class CurrentUser {
     this.username,
     this.birthDate,
     this.cityId,
+    this.googleProfilePending = false,
   });
 
   /// Stable id for this person. Today it is local. Tomorrow it is the
@@ -28,6 +29,10 @@ class CurrentUser {
 
   /// Cidade escolhida no cadastro. O seletor da Home usa este id.
   final String? cityId;
+
+  /// Conta só do Google que ainda não tem nascimento no perfil e no metadado.
+  /// O app não abre o resto enquanto isto for verdadeiro.
+  final bool googleProfilePending;
 }
 
 /// Fictional signed-in user used until login replaces the provider.

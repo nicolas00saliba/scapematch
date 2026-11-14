@@ -332,6 +332,9 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
     await tester.scrollUntilVisible(finder, 250, scrollable: scrollable.last);
   }
   await tester.ensureVisible(finder);
+  // ensureVisible agenda o scroll. Sem este quadro, o toque acerta a posição
+  // antiga, fora da tela, quando o botão do Google empurra o alvo para baixo.
+  await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
