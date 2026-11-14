@@ -28,6 +28,8 @@ abstract final class PartnerMessages {
   static const backToAdmin = 'Voltar às aprovações';
   static const signOut = 'Sair';
   static const balance = 'Saldo';
+  static const withdrawals = 'Saques';
+  static const openWithdrawals = 'Ver saques';
   static const reservations = 'Reservas';
   static const invoices = 'Notas fiscais';
   static const reviews = 'Avaliações';
@@ -200,7 +202,7 @@ abstract final class PartnerMessages {
   static const claimProvision = 'Criar subconta Asaas';
   static const claimProvisionDone = 'Pedido de subconta enviado.';
   static const claimBankHint =
-      'A chave Pix se cadastra na tela de saldo, em conta de saque.';
+      'A chave Pix se cadastra na aba Saques, em conta de saque.';
   static const sendClaim = 'Pedir reivindicação';
   static const claimSent =
       'Pedido enviado. O admin decide se a casa passa para você.';
@@ -247,11 +249,20 @@ abstract final class PartnerMessages {
 
   static String perPerson(String price) => '$price por pessoa';
 
-  static const withdrawalsTitle = 'Saldo e saques';
+  static const withdrawalsTitle = 'Saques';
   static const withdrawalsBody =
       'O saldo disponível já está na subconta da casa. O saque vai para uma conta com o mesmo CPF ou CNPJ.';
+  static const withdrawalBalanceSection = 'Saldo da subconta';
   static const withdrawalPixNotice =
       'Os saques saem por Pix. Em conta CNPJ, o Asaas dá 30 Pix grátis por mês.';
+  static const withdrawalHowTitle = 'Como funciona';
+  static const withdrawalHowCard =
+      'Pagamento por Pix entra na subconta assim que compensa e pode ser sacado. Pagamento no cartão fica em A receber e costuma entrar em cerca de 30 dias, na data que o Asaas informa.';
+  static const withdrawalHowDocs =
+      'Os documentos da subconta precisam estar aprovados para o saque ligar.';
+  static const withdrawalsUnavailable = 'Os saques ainda não estão liberados.';
+  static const withdrawalsLoading = 'Carregando saques';
+  static const withdrawalsLoadError = 'Não foi possível carregar os saques.';
   static const availableLabel = 'Disponível para saque';
   static const receivableLabel = 'A receber';
   static const receivableEmpty = 'Nada a receber no momento.';
