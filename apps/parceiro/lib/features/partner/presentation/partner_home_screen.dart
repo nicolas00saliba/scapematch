@@ -46,6 +46,7 @@ class PartnerHome extends ConsumerWidget {
     final wide = isScapeDesktop(context);
     final body = switch (section) {
       PartnerSection.balance => _BalanceSection(snapshot: snapshot),
+      PartnerSection.withdrawals => _WithdrawalsSection(snapshot: snapshot),
       PartnerSection.reservations => _ReservationsSection(snapshot: snapshot),
       PartnerSection.agenda => PartnerAgenda(snapshot: snapshot),
       PartnerSection.rooms => _RoomsSection(snapshot: snapshot),
@@ -176,6 +177,7 @@ class _PartnerBar extends ConsumerWidget {
 String _sectionLabel(PartnerSection section) {
   return switch (section) {
     PartnerSection.balance => PartnerMessages.balance,
+    PartnerSection.withdrawals => PartnerMessages.withdrawals,
     PartnerSection.reservations => PartnerMessages.reservations,
     PartnerSection.agenda => PartnerMessages.agenda,
     PartnerSection.rooms => PartnerMessages.rooms,
@@ -213,6 +215,7 @@ class _PartnerRail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     return NavigationRail(
+      scrollable: true,
       selectedIndex: selected.index,
       onDestinationSelected: (index) {
         ref
@@ -226,6 +229,14 @@ class _PartnerRail extends ConsumerWidget {
           icon: Icon(Icons.account_balance_wallet_outlined),
           selectedIcon: Icon(Icons.account_balance_wallet),
           label: Text(PartnerMessages.balance),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.payments_outlined),
+          selectedIcon: Icon(Icons.payments),
+          label: Text(
+            PartnerMessages.withdrawals,
+            key: PartnerKeys.withdrawalsTab,
+          ),
         ),
         NavigationRailDestination(
           icon: Icon(Icons.event_note_outlined),
@@ -279,6 +290,9 @@ class _PartnerTabs extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
+                  key: section == PartnerSection.withdrawals
+                      ? PartnerKeys.withdrawalsTab
+                      : null,
                   showCheckmark: false,
                   visualDensity: VisualDensity.compact,
                   labelStyle: const TextStyle(
@@ -322,6 +336,8 @@ class _BalanceSection extends StatelessWidget {
           PartnerMessages.balanceBody,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.35),
         ),
+        const SizedBox(height: 8),
+        const _OpenWithdrawalsLink(),
         const SizedBox(height: 16),
         const VenueReferralCode(),
         const SizedBox(height: 16),
@@ -342,9 +358,46 @@ class _BalanceSection extends StatelessWidget {
             _StatementTile(line: line),
             const SizedBox(height: 10),
           ],
-        const SizedBox(height: 24),
-        VenueWithdrawalsPanel(venueId: snapshot.house.id),
       ],
+    );
+  }
+}
+
+class _OpenWithdrawalsLink extends ConsumerWidget {
+  const _OpenWithdrawalsLink();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        key: PartnerKeys.openWithdrawals,
+        style: TextButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          alignment: Alignment.centerLeft,
+        ),
+        onPressed: () {
+          ref
+              .read(partnerSectionProvider.notifier)
+              .select(PartnerSection.withdrawals);
+        },
+        child: const Text(PartnerMessages.openWithdrawals),
+      ),
+    );
+  }
+}
+
+class _WithdrawalsSection extends StatelessWidget {
+  const _WithdrawalsSection({required this.snapshot});
+
+  final PartnerSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = isScapeDesktop(context);
+    return ListView(
+      padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 20, wide ? 32 : 16, 32),
+      children: [VenueWithdrawalsPanel(venueId: snapshot.house.id)],
     );
   }
 }
