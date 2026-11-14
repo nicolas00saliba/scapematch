@@ -60,7 +60,7 @@ export type VenueDocumentDeps = {
   env: EnvLike;
   fetchFn: AsaasFetch;
   actor(jwt: string): Promise<{ id: string } | null>;
-  role(venueId: string, userId: string): Promise<DocumentAccess>;
+  role(venueId: string, userId: string, jwt: string): Promise<DocumentAccess>;
   subaccount(venueId: string): Promise<{ apiKey: string; walletId: string }>;
   strongAuth(jwt: string): Promise<boolean>;
 };
@@ -157,7 +157,7 @@ export async function handleVenueDocuments(
     const jwt = bearer(req);
     const actor = await deps.actor(jwt);
     if (!actor) return json({ error: "not authenticated" }, 401);
-    const role = await deps.role(venueId, actor.id);
+    const role = await deps.role(venueId, actor.id, jwt);
     if (role === "none") return json({ error: "not owner" }, 403);
     if (action !== "list" && action !== "upload") {
       return json({ error: "valor" }, 400);

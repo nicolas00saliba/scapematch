@@ -15,7 +15,7 @@ if (import.meta.main) {
       env: Deno.env,
       fetchFn: fetch,
       actor: (jwt) => store.actor(jwt),
-      role: (venueId, userId) => roleOf(store, venueId, userId),
+      role: (venueId, userId, jwt) => roleOf(store, venueId, userId, jwt),
       subaccount: async (venueId) => {
         const apiKey = await store.rpc("read_venue_asaas_key", {
           p_venue_id: venueId,
@@ -46,6 +46,7 @@ async function roleOf(
   store: ReturnType<typeof payoutStore>,
   venueId: string,
   userId: string,
+  jwt: string,
 ): Promise<DocumentAccess> {
   try {
     const data = await store.rpc("venue_payout_snapshot", {
@@ -58,6 +59,8 @@ async function roleOf(
   } catch {
     // Dono ausente cai no admin abaixo.
   }
+  // Igual ao venue-payouts: admin só entra com sessão aal2 (MFA).
+  if (readJwtClaims(jwt).aal !== "aal2") return "none";
   if (await store.isAdmin(userId)) return "admin";
   return "none";
 }
