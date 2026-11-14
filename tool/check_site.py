@@ -150,6 +150,8 @@ EXTERNOS = {
     "https://app.escapematch.com.br/login",
     "https://app.escapematch.com.br/cadastro",
     "https://parceiro.escapematch.com.br/",
+    "https://www.escapersbr.com/",
+    "https://www.meetup.com/escaperoomcuritiba/",
     INSTAGRAM,
     MEETUP,
 }
@@ -664,10 +666,16 @@ def main() -> None:
             "O que é o EscapeMatch?",
         ),
         "/guia/nao-tenho-amigos-para-escape-room": (
-            "Não tenho amigos para jogar escape room. Dá para ir?",
-            "Preciso levar uma turma?",
-            "Vou ficar de fora do grupo?",
-            "E se faltar gente no grupo?",
+            "Não tenho ninguém pra jogar escape room. O que fazer?",
+            "Como jogar escape room sem amigos?",
+            "Dá para jogar escape room sem amigos?",
+            "Como entrar em comunidades de jogadores?",
+            "A casa pode me colocar com outras pessoas?",
+            "Como a EscapeMatch junta o grupo?",
+            "Funciona fora de Curitiba?",
+            "É a mesma coisa que jogo de celular?",
+            "É seguro jogar com desconhecidos?",
+            "Quanto custa a vaga?",
             "O que é o EscapeMatch?",
         ),
         "/guia/escape-room-em-grupo-curitiba": (
@@ -692,6 +700,40 @@ def main() -> None:
         if '"@type":"FAQPage"' not in html_guia:
             falha(f"{rota} saiu sem FAQPage")
         exigir_faq(html_guia, rota, perguntas)
+    sem_ninguem = arquivo("/guia/nao-tenho-amigos-para-escape-room").read_text()
+    if "<title>Não tenho ninguém pra jogar escape room | EscapeMatch</title>" not in sem_ninguem:
+        falha("título de quem não tem ninguém divergiu")
+    if "<h1>Não tenho ninguém pra jogar escape room. O que fazer?</h1>" not in sem_ninguem:
+        falha("h1 de quem não tem ninguém divergiu")
+    if 'aria-current="page">Não tenho ninguém pra jogar escape room</span>' not in sem_ninguem:
+        falha("trilha de quem não tem ninguém divergiu")
+    if "https://www.escapersbr.com/" not in sem_ninguem or "https://www.meetup.com/escaperoomcuritiba/" not in sem_ninguem:
+        falha("a página de quem não tem ninguém saiu sem Escapers BR ou Meetup")
+    if "Por enquanto, só em Curitiba." not in sem_ninguem:
+        falha("a página de quem não tem ninguém não limita a cidade")
+    ancora = 'href="/guia/nao-tenho-amigos-para-escape-room">Não tenho ninguém pra jogar escape room</a>'
+    if ancora not in arquivo("/guia").read_text():
+        falha("o índice de guias não usa a frase da busca")
+    painel = home.split('id="painel-jogar"', 1)[1].split('id="painel-cliente"', 1)[0]
+    if ancora not in painel:
+        falha("o painel Quero jogar saiu sem a âncora")
+    bloco_guias = home.split("<h2>Guias</h2>", 1)
+    if len(bloco_guias) != 2 or ancora not in bloco_guias[1].split("</section>", 1)[0]:
+        falha("o bloco de guias da home saiu sem a âncora")
+    for rota in (
+        "/sobre",
+        "/ajuda",
+        "/guia/como-achar-grupo-escape-room",
+        "/guia/escape-room-sozinho",
+    ):
+        if ancora not in arquivo(rota).read_text():
+            falha(f"{rota} saiu sem a âncora da busca")
+    grupo_html = arquivo("/guia/como-achar-grupo-escape-room").read_text()
+    if "https://www.escapersbr.com/" not in grupo_html or "https://www.meetup.com/escaperoomcuritiba/" not in grupo_html:
+        falha("onde achar grupo saiu sem Escapers BR ou Meetup")
+    sozinho_html = arquivo("/guia/escape-room-sozinho").read_text()
+    if "sala presencial, não um jogo de navegador" not in sozinho_html:
+        falha("o guia sozinho não separa sala presencial de jogo de navegador")
     guia_grupo_cidade = arquivo("/guia/escape-room-em-grupo-curitiba").read_text()
     if "não lista casas parceiras" not in guia_grupo_cidade.lower():
         falha("o guia de grupo em Curitiba não avisa que o site não lista casas")
