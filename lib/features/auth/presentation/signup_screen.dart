@@ -12,6 +12,7 @@ import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/domain/signup_result.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/features/auth/presentation/signup_success_view.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -97,6 +98,36 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       return null;
     }
     return date;
+  }
+
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = await ref.read(authSessionProvider.notifier).signInWithGoogle();
+    if (!mounted) return;
+    if (error != null) {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
+      return;
+    }
+    final user = ref.read(authSessionProvider);
+    if (user == null) {
+      setState(() => _busy = false);
+      return;
+    }
+    final next = GoRouterState.of(context).uri.queryParameters['next'];
+    final location = next == null || next.isEmpty
+        ? '/cadastro/completar'
+        : '/cadastro/completar?next=${Uri.encodeQueryComponent(next)}';
+    if (user.googleProfilePending) {
+      context.go(location);
+      return;
+    }
+    context.go(afterAuthLocation(next));
   }
 
   Future<void> _submit() async {
@@ -256,6 +287,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   : 'O cadastro só segue com o aceite. A versão do texto e a data ficam registradas.',
             ),
             const SizedBox(height: 16),
+            GoogleSignInButton(
+              key: AppKeys.googleSignIn,
+              busy: _busy,
+              onPressed: _google,
+            ),
+            const GoogleOrDivider(),
             TextField(
               key: AppKeys.signupName,
               controller: _name,

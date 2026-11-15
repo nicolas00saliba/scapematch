@@ -2,12 +2,15 @@ import 'package:dominio/dominio.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/domain/signup_result.dart';
 import 'package:scapematch/features/auth/presentation/signup_success_view.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_google_account.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_signup_gateway.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
@@ -67,6 +70,40 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
     _privacyTap.dispose();
     _refundTap.dispose();
     super.dispose();
+  }
+
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = await partnerSignInWithGoogle();
+    if (!mounted) return;
+    if (error != null) {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
+      return;
+    }
+    if (!scapeUsesLiveBackend || scapeSupabase.auth.currentUser == null) {
+      setState(() => _busy = false);
+      return;
+    }
+    try {
+      final account = await loadPartnerAccount();
+      if (!mounted) return;
+      if (account != null) {
+        ref.read(partnerSessionProvider.notifier).adopt(account);
+      }
+      Navigator.of(context).pop();
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Não foi possível abrir a conta. Tente entrar.';
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -166,6 +203,12 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
         children: [
+          GoogleSignInButton(
+            key: PartnerKeys.googleSignIn,
+            busy: _busy,
+            onPressed: _google,
+          ),
+          const GoogleOrDivider(),
           TextField(
             key: PartnerKeys.partnerEmail,
             controller: _name,

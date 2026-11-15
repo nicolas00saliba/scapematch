@@ -12,6 +12,10 @@ abstract final class PartnerKeys {
   static const partnerTermsDemo = Key('partner-terms-demo');
   static const partnerAdminDemo = Key('partner-admin-demo');
   static const partnerSignUp = Key('partner-sign-up');
+  static const googleSignIn = Key('partner-google-sign-in');
+  static const partnerGoogleName = Key('partner-google-name');
+  static const partnerGoogleTerms = Key('partner-google-terms');
+  static const partnerGoogleSubmit = Key('partner-google-submit');
   static const partnerVenueName = Key('partner-venue-name');
   static const partnerVenueDocument = Key('partner-venue-document');
   static const partnerVenueSubmit = Key('partner-venue-submit');

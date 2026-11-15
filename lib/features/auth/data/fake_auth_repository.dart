@@ -1,6 +1,7 @@
 import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
 import 'package:scapematch/features/auth/domain/auth_repository.dart';
+import 'package:scapematch/features/auth/data/google_oauth.dart';
 import 'package:scapematch/features/auth/domain/signup_result.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
@@ -33,6 +34,12 @@ class FakeAuthRepository implements AuthRepository {
 
   /// Quando preenchido, [resendSignupEmail] devolve esta frase.
   String? resendSignupError;
+
+  /// Toques em Continuar com Google.
+  int googleSignInCalls = 0;
+
+  /// Quando preenchido, [signInWithGoogle] devolve esta frase.
+  String? googleSignInError;
 
   @override
   CurrentUser? get signedInUser => _user;
@@ -136,6 +143,63 @@ class FakeAuthRepository implements AuthRepository {
     }
     return 'Entre para trocar a senha.';
   }
+
+  @override
+  Future<String?> signInWithGoogle() async {
+    googleSignInCalls += 1;
+    return googleSignInError ?? googleExampleMessage;
+  }
+
+  @override
+  Future<String?> completeGoogleProfile({
+    required String name,
+    required DateTime birthDate,
+    required DateTime now,
+    required bool acceptedTerms,
+    String? cityId,
+    String? referralCode,
+    String? phone,
+  }) async {
+    if (!acceptedTerms) return LegalDocuments.termsRequired;
+    if (!GroupRules.isAdult(birthDate: birthDate, now: now)) {
+      return LegalDocuments.under18;
+    }
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'Informe o nome.';
+    final current = _user;
+    _user = CurrentUser(
+      id: current?.id ?? 'user-google',
+      displayName: trimmed,
+      username: current?.username,
+      birthDate: birthDate,
+      cityId: cityId,
+    );
+    final acceptedAt = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    );
+    for (final code in playerAcceptanceCodes) {
+      _acceptances.add(
+        LegalAcceptance(
+          userId: _user!.id,
+          audience: 'player',
+          documentCode: code,
+          documentVersion: legalDocumentVersion,
+          acceptedAt: acceptedAt,
+        ),
+      );
+    }
+    return null;
+  }
+
+  @override
+  String get suggestedName => _user?.displayName ?? 'Jogador';
+
+  @override
+  String? get sessionEmail => null;
 
   @override
   Future<void> signOut() async {

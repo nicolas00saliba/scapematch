@@ -6,8 +6,10 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/features/auth/data/google_oauth.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -22,6 +24,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _password = TextEditingController();
   String? _error;
   var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _error = takeGoogleAuthNotice();
+  }
 
   @override
   void dispose() {
@@ -46,6 +54,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _busy = false;
         _error = error;
       });
+      return;
+    }
+    await _enterPendingGroup();
+  }
+
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = await ref.read(authSessionProvider.notifier).signInWithGoogle();
+    if (!mounted) return;
+    if (error != null) {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
+      return;
+    }
+    final user = ref.read(authSessionProvider);
+    if (user == null) {
+      setState(() => _busy = false);
+      return;
+    }
+    if (user.googleProfilePending) {
+      final next = GoRouterState.of(context).uri.queryParameters['next'];
+      final location = next == null || next.isEmpty
+          ? '/cadastro/completar'
+          : '/cadastro/completar?next=${Uri.encodeQueryComponent(next)}';
+      context.go(location);
       return;
     }
     await _enterPendingGroup();
@@ -158,6 +196,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 : 'Conta de exemplo. Nada disso vai para um servidor.',
           ),
           const SizedBox(height: 16),
+          GoogleSignInButton(
+            key: AppKeys.googleSignIn,
+            busy: _busy,
+            onPressed: _google,
+          ),
+          const GoogleOrDivider(),
           TextField(
             key: AppKeys.loginEmail,
             controller: _email,

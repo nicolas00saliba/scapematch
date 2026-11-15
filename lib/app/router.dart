@@ -6,6 +6,8 @@ import 'package:scapematch/features/account/presentation/account_destination_scr
 import 'package:scapematch/features/account/presentation/account_screen.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/auth/data/google_oauth.dart';
+import 'package:scapematch/features/auth/presentation/complete_signup_screen.dart';
 import 'package:scapematch/features/auth/presentation/login_screen.dart';
 import 'package:scapematch/features/auth/presentation/signup_screen.dart';
 import 'package:scapematch/features/groups/presentation/invite_screen.dart';
@@ -44,6 +46,23 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     redirect: (context, state) {
       final path = state.uri.path;
+      final session = ref.read(authSessionProvider);
+      if (pendingGoogleAuthNotice != null &&
+          session == null &&
+          path != '/login' &&
+          path != '/cadastro') {
+        return '/login';
+      }
+      final pending = session?.googleProfilePending ?? false;
+      final completing = path == '/cadastro/completar';
+      if (pending && !completing && !path.startsWith('/legal/')) {
+        final next = state.uri.queryParameters['next'];
+        if (next == null || next.isEmpty) return '/cadastro/completar';
+        return '/cadastro/completar?next=${Uri.encodeQueryComponent(next)}';
+      }
+      if (!pending && completing) {
+        return afterAuthLocation(state.uri.queryParameters['next']);
+      }
       // No app real, a primeira abertura é a introdução. A demonstração
       // abre na Home. Um convite direto não passa por aqui: só `/`
       // redireciona, e só enquanto ninguém viu.
@@ -157,6 +176,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/cadastro',
         name: 'signup',
         builder: (context, state) => const SignupScreen(),
+      ),
+      GoRoute(
+        path: '/cadastro/completar',
+        name: 'complete-signup',
+        builder: (context, state) => const CompleteSignupScreen(),
       ),
       GoRoute(
         path: '/legal/:document',

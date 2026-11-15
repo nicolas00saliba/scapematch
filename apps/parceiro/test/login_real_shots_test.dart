@@ -26,11 +26,41 @@ import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_home_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_login_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_pending_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_screen.dart';
 
 void main() {
+  testWidgets('saves the house login at 1440 and 390', (tester) async {
+    if (Platform.environment['SCAPEMATCH_LOGIN_REAL_SHOTS'] != '1') return;
+    final dir = Directory('/opt/cursor/artifacts/login-real')
+      ..createSync(recursive: true);
+    addTearDown(() => scapeUsesLiveBackend = false);
+    scapeUsesLiveBackend = false;
+    await tester.runAsync(_loadFonts);
+    final database = buildSampleDatabase(now: DateTime(2026, 11, 4, 15));
+    final cities = cityRepositoryProvider.overrideWithValue(
+      FakeCityRepository(database, latency: Duration.zero),
+    );
+    for (final size in const [Size(1440, 1200), Size(390, 1400)]) {
+      await _pump(
+        tester,
+        size,
+        home: const PartnerLoginScreen(),
+        session: _SignedOut.new,
+        cities: cities,
+      );
+      expect(tester.takeException(), isNull);
+      await _capture(
+        tester,
+        find.byKey(PartnerKeys.partnerSubmit),
+        dir,
+        'parceiro-login-${size.width.round()}',
+      );
+    }
+  });
+
   testWidgets('saves house signup, waiting and the approved desk', (
     tester,
   ) async {
@@ -88,6 +118,11 @@ void main() {
       );
     }
   });
+}
+
+class _SignedOut extends PartnerSessionController {
+  @override
+  PartnerAccount? build() => null;
 }
 
 class _ApprovedSession extends PartnerSessionController {
