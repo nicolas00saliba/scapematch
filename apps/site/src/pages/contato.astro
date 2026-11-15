@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import CtaBlock from '../components/CtaBlock.astro';
+import { idOrganizacao } from '../data/seo';
 
 const descricao =
   'Fale com a ESCAPEMATCH TECNOLOGIA LTDA em Curitiba-PR. CNPJ 70.100.608/0001-73, e-mail, app e Parceiro.';
@@ -13,20 +14,7 @@ const contatoLd = {
   url: 'https://escapematch.com.br/contato',
   inLanguage: 'pt-BR',
   description: descricao,
-  mainEntity: {
-    '@type': 'Organization',
-    name: 'EscapeMatch',
-    legalName: 'ESCAPEMATCH TECNOLOGIA LTDA',
-    taxID: '70.100.608/0001-73',
-    email: 'contato@escapematch.com.br',
-    url: 'https://escapematch.com.br/',
-    address: {
-      '@type': 'PostalAddress',
-      addressLocality: 'Curitiba',
-      addressRegion: 'PR',
-      addressCountry: 'BR',
-    },
-  },
+  mainEntity: { '@id': idOrganizacao },
 };
 ---
 

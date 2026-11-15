@@ -4,7 +4,7 @@ import PhoneShot from '../components/PhoneShot.astro';
 import ProgramCard from '../components/ProgramCard.astro';
 import DescontoPontos from '../components/DescontoPontos.astro';
 import { programaPorId } from '../data/programas';
-import { definicao, faqPage } from '../data/seo';
+import { definicao, descricaoHome, faqPage, tituloHome } from '../data/seo';
 
 const cartoes = ['boas-vindas', 'pontos-de-volta', 'indique-amigos'].map(programaPorId);
 
@@ -33,8 +33,8 @@ const perguntas = [
 ---
 
 <Base
-  title="EscapeMatch: ninguém pra jogar? Agora tem."
-  description="Aplicativo brasileiro para jogar escape room em grupo quando se está sozinho. Chamava-se ScapeMatch. Lançamento em Curitiba. Não é um jogo de celular."
+  title={tituloHome}
+  description={descricaoHome}
   path="/"
   ogImage="/assets/og/home.png"
   jsonLd={faqPage(perguntas)}
@@ -64,6 +64,7 @@ const perguntas = [
       <div class="painel" role="tabpanel" id="painel-jogar" aria-labelledby="tab-jogar">
         <p class="painel-frase">Para quem ainda não jogou: entender, escolher e criar a conta.</p>
         <ul class="destinos">
+          <li><a href="/guia/nao-tenho-amigos-para-escape-room">Não tenho ninguém pra jogar escape room</a></li>
           <li><a href="/guia/escape-room-sozinho">Escape room sozinho</a></li>
           <li><a href="/guia/escape-room-sozinho-curitiba">Sozinho em Curitiba</a></li>
           <li><a href="/guia/como-achar-grupo-escape-room">Onde achar grupo</a></li>
@@ -206,6 +207,22 @@ const perguntas = [
         <p>Respeito com todos. Nada de discriminação ou assédio. Chegue no horário e siga as regras da casa.</p>
         <p><a href="/seguranca">Jogar com segurança</a></p>
       </div>
+    </div>
+  </section>
+
+  <section class="secao">
+    <div class="miolo">
+      <div class="secao-topo">
+        <h2>Guias</h2>
+        <a href="/guia">Todos os guias</a>
+      </div>
+      <ul class="destinos">
+        <li><a href="/guia/nao-tenho-amigos-para-escape-room">Não tenho ninguém pra jogar escape room</a></li>
+        <li><a href="/guia/escape-room-sozinho">Escape room sozinho</a></li>
+        <li><a href="/guia/escape-room-sozinho-curitiba">Escape room sozinho em Curitiba</a></li>
+        <li><a href="/guia/como-achar-grupo-escape-room">Onde achar grupo</a></li>
+        <li><a href="/guia/escape-room-com-desconhecidos">Escape room com desconhecidos</a></li>
+      </ul>
     </div>
   </section>
 

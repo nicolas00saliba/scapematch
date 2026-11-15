@@ -188,6 +188,12 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
           onOpenHouse: () {
             ref.read(partnerSessionProvider.notifier).reload();
           },
+          onOpenWithdrawals: () {
+            ref
+                .read(partnerSectionProvider.notifier)
+                .select(PartnerSection.withdrawals);
+            ref.read(partnerSessionProvider.notifier).reload();
+          },
         ),
       );
     }

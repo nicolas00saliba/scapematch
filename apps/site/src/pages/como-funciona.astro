@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import CtaBlock from '../components/CtaBlock.astro';
 import PhoneShot from '../components/PhoneShot.astro';
-import { faqPage } from '../data/seo';
+import { faqPage, idOrganizacao } from '../data/seo';
 import { completarGrupo } from '../data/perguntas-marca';
 
 const servico = {
@@ -13,11 +13,7 @@ const servico = {
   serviceType: 'Formação de grupos para escape room',
   description:
     'O EscapeMatch junta pessoas que querem jogar escape room e não têm grupo. Cada pessoa paga a própria vaga. O lançamento começa em Curitiba.',
-  provider: {
-    '@type': 'Organization',
-    name: 'EscapeMatch',
-    url: 'https://escapematch.com.br/',
-  },
+  provider: { '@id': idOrganizacao },
   areaServed: { '@type': 'City', name: 'Curitiba' },
   url: 'https://escapematch.com.br/como-funciona',
 };

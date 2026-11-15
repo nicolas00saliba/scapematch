@@ -5,34 +5,34 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 7
   - package-ecosystem: pub
     directory: /apps/parceiro
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 7
   - package-ecosystem: pub
     directory: /packages/dominio
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 7
   - package-ecosystem: pub
     directory: /apps/admin
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 7
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 7
   - package-ecosystem: npm
     directory: /apps/site
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 7

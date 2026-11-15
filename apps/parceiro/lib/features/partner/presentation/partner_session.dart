@@ -15,6 +15,7 @@ import 'package:scapematch/providers/repositories.dart';
 
 enum PartnerSection {
   balance,
+  withdrawals,
   reservations,
   agenda,
   rooms,

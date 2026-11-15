@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -27,6 +28,10 @@ void main() {
     expect(find.text(PartnerMessages.withdrawalsTitle), findsOneWidget);
     expect(find.byKey(PartnerKeys.withdrawalBalance), findsOneWidget);
     expect(find.text(formatPrice(128050)), findsOneWidget);
+    expect(find.text(formatPrice(32000)), findsOneWidget);
+    expect(find.text(PartnerMessages.withdrawalHowTitle), findsOneWidget);
+    expect(find.text(PartnerMessages.withdrawalHowCard), findsOneWidget);
+    expect(find.byKey(PartnerKeys.withdrawalExpected), findsOneWidget);
     expect(find.textContaining('18 nov 2026'), findsOneWidget);
     expect(find.textContaining('Grupo da quinta'), findsOneWidget);
     expect(find.textContaining(PartnerMessages.withdrawalDone), findsOneWidget);
@@ -217,12 +222,64 @@ void main() {
     expect(repo.actions, isEmpty);
   });
 
-  testWidgets('hides the screen when payouts are off', (tester) async {
+  testWidgets('shows an empty state when payouts are off', (tester) async {
     final repo = MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.hidden);
     await _pump(tester, repo);
 
-    expect(find.text(PartnerMessages.withdrawalsTitle), findsNothing);
+    expect(find.text(PartnerMessages.withdrawalsTitle), findsOneWidget);
+    expect(find.text(PartnerMessages.withdrawalsUnavailable), findsOneWidget);
     expect(find.byKey(PartnerKeys.withdrawalSubmit), findsNothing);
+    expect(find.text(PartnerMessages.withdrawalHowTitle), findsNothing);
+  });
+
+  testWidgets('empty history, receivables and bank stay in Portuguese', (
+    tester,
+  ) async {
+    final sample = VenuePayoutSnapshot.sample();
+    final repo = MemoryVenueWithdrawalRepository(
+      VenuePayoutSnapshot(
+        enabled: true,
+        canWithdraw: true,
+        role: 'owner',
+        availableCents: 0,
+        pendingCents: 0,
+        schedule: sample.schedule,
+        receivables: const [],
+        withdrawals: const [],
+      ),
+    );
+    await _pump(tester, repo);
+
+    expect(find.text(PartnerMessages.withdrawalEmpty), findsOneWidget);
+    expect(find.text(PartnerMessages.receivableEmpty), findsOneWidget);
+    expect(find.text(PartnerMessages.withdrawalNoBank), findsOneWidget);
+    expect(find.text(formatPrice(0)), findsNWidgets(2));
+    expect(find.byKey(PartnerKeys.withdrawalSubmit), findsOneWidget);
+  });
+
+  testWidgets('shows a loading line and an error with retry', (tester) async {
+    final gate = Completer<void>();
+    final pending = _PendingRepo(gate);
+    await _pump(tester, pending, settle: false);
+    await tester.pump();
+    expect(find.text(PartnerMessages.withdrawalsLoading), findsOneWidget);
+    expect(find.byKey(PartnerKeys.withdrawalSubmit), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.withdrawalsTitle), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    final failing = _FailingRepo();
+    await _pump(tester, failing);
+    expect(find.text(PartnerMessages.withdrawalsLoadError), findsOneWidget);
+    expect(find.byKey(PartnerKeys.withdrawalSubmit), findsNothing);
+
+    failing.fail = false;
+    await tester.tap(find.byKey(PartnerKeys.withdrawalsReload));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PartnerKeys.withdrawalBalance), findsOneWidget);
+    expect(find.text(PartnerMessages.withdrawalsLoadError), findsNothing);
   });
 
   testWidgets('saves the automatic schedule after reauth', (tester) async {
@@ -275,7 +332,35 @@ VenuePayoutSnapshot _staff() {
   );
 }
 
-Future<void> _pump(WidgetTester tester, VenueWithdrawalRepository repo) async {
+class _PendingRepo extends MemoryVenueWithdrawalRepository {
+  _PendingRepo(this.gate) : super(VenuePayoutSnapshot.sample());
+
+  final Completer<void> gate;
+
+  @override
+  Future<VenuePayoutSnapshot> load(String venueId) async {
+    await gate.future;
+    return super.load(venueId);
+  }
+}
+
+class _FailingRepo extends MemoryVenueWithdrawalRepository {
+  _FailingRepo() : super(VenuePayoutSnapshot.sample());
+
+  var fail = true;
+
+  @override
+  Future<VenuePayoutSnapshot> load(String venueId) async {
+    if (fail) throw StateError('rede');
+    return super.load(venueId);
+  }
+}
+
+Future<void> _pump(
+  WidgetTester tester,
+  VenueWithdrawalRepository repo, {
+  bool settle = true,
+}) async {
   tester.view.physicalSize = const Size(800, 3200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -301,7 +386,7 @@ Future<void> _pump(WidgetTester tester, VenueWithdrawalRepository repo) async {
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
 }
 
 double _contrast(Color foreground, Color background) {

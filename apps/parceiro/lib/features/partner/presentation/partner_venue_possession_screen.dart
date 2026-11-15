@@ -65,6 +65,7 @@ class VenueClaimDesk extends StatefulWidget {
     required this.onConfirm,
     required this.onProvision,
     this.onOpenHouse,
+    this.onOpenWithdrawals,
     this.onLoadDocuments,
     this.onUploadDocument,
     this.onOpenUrl,
@@ -77,6 +78,7 @@ class VenueClaimDesk extends StatefulWidget {
   final Future<bool> Function(String code) onConfirm;
   final Future<String?> Function() onProvision;
   final VoidCallback? onOpenHouse;
+  final VoidCallback? onOpenWithdrawals;
   final Future<VenueDocumentsView> Function()? onLoadDocuments;
   final Future<VenueDocumentsView?> Function(VenueDocumentItem item)?
   onUploadDocument;
@@ -181,6 +183,7 @@ class _VenueClaimDeskState extends State<VenueClaimDesk> {
       return VenueFinanceStep(
         onProvision: widget.onProvision,
         onOpenHouse: widget.onOpenHouse,
+        onOpenWithdrawals: widget.onOpenWithdrawals,
         onLoadDocuments: widget.onLoadDocuments,
         onUploadDocument: widget.onUploadDocument,
         onOpenUrl: widget.onOpenUrl,
@@ -244,6 +247,7 @@ class VenueFinanceStep extends StatefulWidget {
     super.key,
     required this.onProvision,
     this.onOpenHouse,
+    this.onOpenWithdrawals,
     this.onLoadDocuments,
     this.onUploadDocument,
     this.onOpenUrl,
@@ -253,6 +257,7 @@ class VenueFinanceStep extends StatefulWidget {
 
   final Future<String?> Function() onProvision;
   final VoidCallback? onOpenHouse;
+  final VoidCallback? onOpenWithdrawals;
   final Future<VenueDocumentsView> Function()? onLoadDocuments;
   final Future<VenueDocumentsView?> Function(VenueDocumentItem item)?
   onUploadDocument;
@@ -413,7 +418,27 @@ class _VenueFinanceStepState extends State<VenueFinanceStep> {
               titleKey: PartnerKeys.venueClaimStepPix,
               title: PartnerMessages.claimStepPix,
               status: _pixStatus,
-              child: const Text(PartnerMessages.claimBankHint),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(PartnerMessages.claimBankHint),
+                  if (widget.onOpenWithdrawals != null) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        key: PartnerKeys.claimOpenWithdrawals,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          alignment: Alignment.centerLeft,
+                        ),
+                        onPressed: widget.onOpenWithdrawals,
+                        child: const Text(PartnerMessages.openWithdrawals),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
+import re
 import tempfile
 import unittest
 from pathlib import Path
 
 import disponibilidade
 from disponibilidade import Alvo, Resultado, carregar_alvos, decidir
+
+RAIZ = Path(__file__).resolve().parents[1]
+SEO_DO_SITE = RAIZ / "apps" / "site" / "src" / "data" / "seo.ts"
 
 
 class DecidirTeste(unittest.TestCase):
@@ -44,6 +48,18 @@ class AlvosTeste(unittest.TestCase):
                 "demo.escapematch.com.br",
                 "parceiro-demo.escapematch.com.br",
             },
+        )
+
+    def test_marcador_do_site_bate_com_o_title_do_codigo(self):
+        fonte = SEO_DO_SITE.read_text(encoding="utf-8")
+        encontrado = re.search(r"export const tituloHome = '([^']*)';", fonte)
+        self.assertIsNotNone(encontrado, "tituloHome ausente em apps/site/src/data/seo.ts")
+        assert encontrado is not None
+        titulo = encontrado.group(1)
+        alvos = {alvo.host: alvo.texto for alvo in carregar_alvos(disponibilidade.ALVOS_PADRAO)}
+        self.assertEqual(
+            alvos["escapematch.com.br"],
+            f"<title>{titulo}</title>",
         )
 
 

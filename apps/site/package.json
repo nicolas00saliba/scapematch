@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test src/data/avaliacoes.test.ts scripts/verificacao-buscadores.test.mjs src/scripts/redigir-pii.test.ts",
+    "test": "node --experimental-strip-types --test src/data/avaliacoes.test.ts src/data/seo.test.ts scripts/verificacao-buscadores.test.mjs src/scripts/redigir-pii.test.ts",
     "dev": "astro dev",
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build && node scripts/carimbar-redirecionamentos.mjs",
     "preview": "astro preview"

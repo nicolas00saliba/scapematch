@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/sharing/external_url_launch.dart';
+import 'package:scapematch/core/ui/window_class.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_documents_repository.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repository.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
@@ -31,6 +32,7 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   VenuePayoutSnapshot? _snapshot;
   VenueDocumentsView _documents = VenueDocumentsView.hidden;
   var _loading = true;
+  var _loadFailed = false;
   var _editingBank = false;
   var _busy = false;
   String? _error;
@@ -70,16 +72,31 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   }
 
   Future<void> _load() async {
-    final snapshot = await ref
-        .read(venueWithdrawalRepositoryProvider)
-        .load(widget.venueId);
-    final documents = await _readDocuments();
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _apply(snapshot);
-      _documents = documents;
-    });
+    if (mounted && !_loading) {
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+      });
+    }
+    try {
+      final snapshot = await ref
+          .read(venueWithdrawalRepositoryProvider)
+          .load(widget.venueId);
+      final documents = await _readDocuments();
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = false;
+        _apply(snapshot);
+        _documents = documents;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
+    }
   }
 
   Future<VenueDocumentsView> _readDocuments() async {
@@ -261,34 +278,34 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   @override
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
-    if (_loading) return const LinearProgressIndicator();
-    if (snapshot == null || !snapshot.enabled) return const SizedBox.shrink();
+    if (_loading) return const _WithdrawalsLoading();
+    if (_loadFailed) return _WithdrawalsLoadError(onRetry: _load);
+    if (snapshot == null || !snapshot.enabled) {
+      return const _WithdrawalsUnavailable();
+    }
     final theme = Theme.of(context);
     final staff = snapshot.role == 'staff' || !snapshot.canWithdraw;
     return Column(
       key: PartnerKeys.withdrawals,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
+        _Heading(
           PartnerMessages.withdrawalsTitle,
-          style: theme.textTheme.titleLarge?.copyWith(
+          style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 6),
         Text(PartnerMessages.withdrawalsBody),
         const SizedBox(height: 16),
-        VenueDocumentsCard(
-          view: _documents,
-          busy: _busy,
-          onOpen: launchExternalUrl,
-          onUpload: _uploadDocument,
-          onRefresh: _refreshDocuments,
-        ),
-        if (_documents.visible) const SizedBox(height: 16),
-        if (staff)
-          const _PayoutCard(child: Text(PartnerMessages.withdrawalStaff))
-        else ...[
+        if (!staff) ...[
+          _Heading(
+            PartnerMessages.withdrawalBalanceSection,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
           _BalanceCard(snapshot: snapshot),
           if (snapshot.withdrawalsBlocked) ...[
             const SizedBox(height: 12),
@@ -302,25 +319,20 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
             ),
           ],
           const SizedBox(height: 16),
+          VenueDocumentsCard(
+            view: _documents,
+            busy: _busy,
+            onOpen: launchExternalUrl,
+            onUpload: _uploadDocument,
+            onRefresh: _refreshDocuments,
+          ),
+          if (_documents.visible) const SizedBox(height: 16),
+          _ReceivablesCard(snapshot: snapshot),
+          const SizedBox(height: 16),
           _PayoutCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  PartnerMessages.receivableLabel,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (snapshot.receivables.isEmpty)
-                  const Text(PartnerMessages.receivableEmpty)
-                else
-                  for (final item in snapshot.receivables)
-                    Text(
-                      '${formatPrice(item.cents)} · ${_day(item.creditDate)} · ${item.description}',
-                    ),
-                const SizedBox(height: 12),
                 TextField(
                   key: PartnerKeys.withdrawalAmount,
                   controller: _amount,
@@ -357,7 +369,16 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
+          _HistoryCard(
+            snapshot: snapshot,
+            canRetry: _canRetry,
+            onRetry: (item) {
+              _amount.text = _reais(item.amountCents);
+              _withdraw();
+            },
+          ),
+          const SizedBox(height: 24),
           _PayoutCard(
             child: _BankSection(
               snapshot: snapshot,
@@ -390,44 +411,215 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
               onSave: _saveSchedule,
             ),
           ),
-          const SizedBox(height: 16),
-          _PayoutCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  PartnerMessages.withdrawalHistory,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (snapshot.withdrawals.isEmpty)
-                  const Text(PartnerMessages.withdrawalEmpty)
-                else
-                  for (var i = 0; i < snapshot.withdrawals.length; i++) ...[
-                    _WithdrawalTile(
-                      item: snapshot.withdrawals[i],
-                      canRetry: _canRetry(snapshot, snapshot.withdrawals[i]),
-                      onRetry: () {
-                        _amount.text = _reais(
-                          snapshot.withdrawals[i].amountCents,
-                        );
-                        _withdraw();
-                      },
-                    ),
-                    if (i != snapshot.withdrawals.length - 1)
-                      Divider(
-                        height: 24,
-                        color: theme.colorScheme.outlineVariant,
-                      ),
-                  ],
-              ],
+          const SizedBox(height: 24),
+        ] else ...[
+          VenueDocumentsCard(
+            view: _documents,
+            busy: _busy,
+            onOpen: launchExternalUrl,
+            onUpload: _uploadDocument,
+            onRefresh: _refreshDocuments,
+          ),
+          if (_documents.visible) const SizedBox(height: 16),
+          const _PayoutCard(child: Text(PartnerMessages.withdrawalStaff)),
+        ],
+        const SizedBox(height: 24),
+        const _HowItWorks(),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Semantics(liveRegion: true, child: Text(_error!)),
+        ],
+      ],
+    );
+  }
+}
+
+class _WithdrawalsLoading extends StatelessWidget {
+  const _WithdrawalsLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(child: LinearProgressIndicator()),
+          SizedBox(height: 12),
+          Text(PartnerMessages.withdrawalsLoading),
+        ],
+      ),
+    );
+  }
+}
+
+class _WithdrawalsLoadError extends StatelessWidget {
+  const _WithdrawalsLoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: PartnerKeys.withdrawals,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Heading(
+          PartnerMessages.withdrawalsTitle,
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 12),
+        const Text(PartnerMessages.withdrawalsLoadError),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton(
+            key: PartnerKeys.withdrawalsReload,
+            onPressed: onRetry,
+            child: const Text(PartnerMessages.retry),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WithdrawalsUnavailable extends StatelessWidget {
+  const _WithdrawalsUnavailable();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: PartnerKeys.withdrawals,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Heading(
+          PartnerMessages.withdrawalsTitle,
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        const Text(PartnerMessages.withdrawalsUnavailable),
+      ],
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading(this.text, {required this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(header: true, child: Text(text, style: style));
+  }
+}
+
+class _ReceivablesCard extends StatelessWidget {
+  const _ReceivablesCard({required this.snapshot});
+
+  final VenuePayoutSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _PayoutCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Heading(
+            PartnerMessages.receivableLabel,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
             ),
           ),
+          const SizedBox(height: 8),
+          if (snapshot.receivables.isEmpty)
+            const Text(PartnerMessages.receivableEmpty)
+          else
+            for (final item in snapshot.receivables)
+              Text(
+                '${formatPrice(item.cents)} · ${_day(item.creditDate)} · ${item.description}',
+              ),
         ],
-        if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
-      ],
+      ),
+    );
+  }
+}
+
+class _HistoryCard extends StatelessWidget {
+  const _HistoryCard({
+    required this.snapshot,
+    required this.canRetry,
+    required this.onRetry,
+  });
+
+  final VenuePayoutSnapshot snapshot;
+  final bool Function(VenuePayoutSnapshot snapshot, VenueWithdrawal item)
+  canRetry;
+  final ValueChanged<VenueWithdrawal> onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _PayoutCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Heading(
+            PartnerMessages.withdrawalHistory,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (snapshot.withdrawals.isEmpty)
+            const Text(PartnerMessages.withdrawalEmpty)
+          else
+            for (var i = 0; i < snapshot.withdrawals.length; i++) ...[
+              _WithdrawalTile(
+                item: snapshot.withdrawals[i],
+                canRetry: canRetry(snapshot, snapshot.withdrawals[i]),
+                onRetry: () => onRetry(snapshot.withdrawals[i]),
+              ),
+              if (i != snapshot.withdrawals.length - 1)
+                Divider(height: 24, color: theme.colorScheme.outlineVariant),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HowItWorks extends StatelessWidget {
+  const _HowItWorks();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _PayoutCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Heading(
+            PartnerMessages.withdrawalHowTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(PartnerMessages.withdrawalPixNotice),
+          const SizedBox(height: 8),
+          const Text(PartnerMessages.withdrawalHowCard),
+          const SizedBox(height: 8),
+          const Text(PartnerMessages.withdrawalBlocked),
+          const SizedBox(height: 8),
+          const Text(PartnerMessages.withdrawalHowDocs),
+        ],
+      ),
     );
   }
 }
@@ -469,6 +661,30 @@ class _BalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final expected = snapshot.receivables.fold<int>(
+      0,
+      (sum, item) => sum + item.cents,
+    );
+    final tiles = <Widget>[
+      _BalanceTile(
+        label: PartnerMessages.availableLabel,
+        amount: formatPrice(snapshot.availableCents),
+        amountKey: PartnerKeys.withdrawalBalance,
+        emphasized: true,
+      ),
+      if (snapshot.pendingCents > 0)
+        _BalanceTile(
+          label: 'Pendente',
+          amount: formatPrice(snapshot.pendingCents),
+          amountKey: PartnerKeys.withdrawalPendingBalance,
+        ),
+      _BalanceTile(
+        label: PartnerMessages.receivableLabel,
+        amount: formatPrice(expected),
+        amountKey: PartnerKeys.withdrawalExpected,
+      ),
+    ];
+    final wide = isScapeDesktop(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer,
@@ -476,22 +692,63 @@ class _BalanceCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
+        child: wide
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var index = 0; index < tiles.length; index++) ...[
+                    if (index > 0) const SizedBox(width: 16),
+                    Expanded(child: tiles[index]),
+                  ],
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var index = 0; index < tiles.length; index++) ...[
+                    if (index > 0) const SizedBox(height: 12),
+                    tiles[index],
+                  ],
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _BalanceTile extends StatelessWidget {
+  const _BalanceTile({
+    required this.label,
+    required this.amount,
+    required this.amountKey,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String amount;
+  final Key amountKey;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      label: '$label. $amount',
+      child: ExcludeSemantics(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(PartnerMessages.availableLabel),
+            Text(label),
             const SizedBox(height: 4),
             Text(
-              formatPrice(snapshot.availableCents),
-              key: PartnerKeys.withdrawalBalance,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              amount,
+              key: amountKey,
+              style:
+                  (emphasized
+                          ? theme.textTheme.headlineSmall
+                          : theme.textTheme.titleLarge)
+                      ?.copyWith(fontWeight: FontWeight.w800),
             ),
-            if (snapshot.pendingCents > 0)
-              Text('Pendente ${formatPrice(snapshot.pendingCents)}'),
-            const SizedBox(height: 8),
-            Text(PartnerMessages.withdrawalPixNotice),
           ],
         ),
       ),
@@ -544,7 +801,7 @@ class _BankSection extends StatelessWidget {
       key: PartnerKeys.withdrawalBank,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
+        _Heading(
           PartnerMessages.withdrawalBank,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
@@ -687,7 +944,7 @@ class _ScheduleSection extends StatelessWidget {
       key: PartnerKeys.withdrawalAuto,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
+        _Heading(
           PartnerMessages.withdrawalAuto,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
@@ -948,7 +1205,7 @@ class _StatusChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: foreground),
+              ExcludeSemantics(child: Icon(icon, size: 18, color: foreground)),
               const SizedBox(width: 6),
               Text(
                 label,

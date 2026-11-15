@@ -234,6 +234,28 @@ void main() {
       find.byKey(PartnerKeys.venueClaimProvision),
     );
     expect(button.onPressed, isNull);
+    expect(find.text(PartnerMessages.claimBankHint), findsOneWidget);
+    expect(find.byKey(PartnerKeys.claimOpenWithdrawals), findsNothing);
+  });
+
+  testWidgets('o passo da chave Pix abre a aba Saques', (tester) async {
+    var opened = 0;
+    await tester.pumpWidget(
+      _app(
+        VenueFinanceStep(
+          onProvision: () async => null,
+          onOpenWithdrawals: () => opened += 1,
+          onPixReady: () async => false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text(PartnerMessages.claimBankHint), findsOneWidget);
+    final button = find.byKey(PartnerKeys.claimOpenWithdrawals);
+    expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+    await tester.tap(button);
+    expect(opened, 1);
   });
 }
 

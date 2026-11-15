@@ -15,7 +15,7 @@ export const jogarLinks: Link[] = [
   { rotulo: 'Onde achar grupo', href: '/guia/como-achar-grupo-escape-room' },
   { rotulo: 'Escape room com desconhecidos', href: '/guia/escape-room-com-desconhecidos' },
   { rotulo: 'Escape room para 2 pessoas', href: '/guia/escape-room-para-2-pessoas' },
-  { rotulo: 'Sem amigos para jogar', href: '/guia/nao-tenho-amigos-para-escape-room' },
+  { rotulo: 'Não tenho ninguém pra jogar escape room', href: '/guia/nao-tenho-amigos-para-escape-room' },
   { rotulo: 'Escape room em grupo em Curitiba', href: '/guia/escape-room-em-grupo-curitiba' },
   { rotulo: 'Primeira vez em escape room', href: '/guia/primeira-vez-em-escape-room' },
   { rotulo: 'Guias', href: '/guia' },
@@ -49,7 +49,7 @@ export const casaParceiraLinks: Link[] = [
 ];
 
 export const empresaLinks: Link[] = [
-  { rotulo: 'Sobre', href: '/sobre' },
+  { rotulo: 'Sobre a EscapeMatch', href: '/sobre' },
   { rotulo: 'Contato', href: '/contato' },
 ];
 
@@ -95,7 +95,7 @@ export const rodape: Coluna[] = [
     titulo: 'Ajuda e empresa',
     links: [
       { rotulo: 'Central de ajuda', href: '/ajuda' },
-      { rotulo: 'Sobre', href: '/sobre' },
+      { rotulo: 'Sobre a EscapeMatch', href: '/sobre' },
       { rotulo: 'Contato', href: '/contato' },
     ],
   },
@@ -118,7 +118,7 @@ const nomes: Record<string, string> = {
   '/guia/como-achar-grupo-escape-room': 'Onde achar grupo',
   '/guia/escape-room-com-desconhecidos': 'Escape room com desconhecidos',
   '/guia/escape-room-para-2-pessoas': 'Escape room para 2 pessoas',
-  '/guia/nao-tenho-amigos-para-escape-room': 'Sem amigos para jogar',
+  '/guia/nao-tenho-amigos-para-escape-room': 'Não tenho ninguém pra jogar escape room',
   '/guia/escape-room-em-grupo-curitiba': 'Escape room em grupo em Curitiba',
   '/guia/primeira-vez-em-escape-room': 'Primeira vez em escape room',
   '/escape-room-curitiba': 'Escape room em Curitiba',
