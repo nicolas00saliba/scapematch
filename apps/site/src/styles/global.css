@@ -1313,6 +1313,11 @@ main {
   font-size: 1.15rem;
 }
 
+.leitura a,
+.resposta-direta a {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 1079px) {
   html.js .menu-abre {
     display: inline-flex;
