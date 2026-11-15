@@ -2,22 +2,31 @@
 import Base from '../../layouts/Base.astro';
 import CtaBlock from '../../components/CtaBlock.astro';
 import FaqMarca from '../../components/FaqMarca.astro';
-import { definicao, faqPage } from '../../data/seo';
+import { definicao, faqPage, textoAtualizado } from '../../data/seo';
 import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
+import {
+  modificadoGuiaSemNinguem,
+  publicadoGuiaSemNinguem,
+} from '../../../scripts/lastmod.mjs';
 
 const escapers = 'https://www.escapersbr.com/';
 const meetupCuritiba = 'https://www.meetup.com/escaperoomcuritiba/';
 
+const respostaDireta =
+  'Não ter ninguém pra jogar escape room não te impede de ir à sessão presencial. Dá para entrar numa comunidade de jogadores, perguntar se a casa completa a sala com outras pessoas, ou usar um app que forma o grupo. Em Curitiba, o EscapeMatch junta quem chegou sozinho na mesma sala e no mesmo horário; você paga só a sua vaga, a cobrança é confirmada quando o grupo bate o mínimo e, se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado. Isso não é jogo de celular, simulador online nem kit para montar em casa.';
+
+const descricao =
+  'Não tenho ninguém pra jogar escape room? Em Curitiba o EscapeMatch forma o grupo presencial: sala e horário, paga só a vaga. Não é virtual nem kit em casa.';
+
 const respostas = [
   {
     pergunta: 'Não tenho ninguém pra jogar escape room. O que fazer?',
-    resposta:
-      'Dá para entrar numa comunidade de jogadores, como a Escapers BR (https://www.escapersbr.com/), perguntar se a casa completa a sala com outras pessoas, ou usar um app que forma o grupo. Em Curitiba, o EscapeMatch junta quem chegou sozinho na mesma sala e no mesmo horário. É escape room presencial, não jogo de celular.',
+    resposta: respostaDireta,
   },
   {
     pergunta: 'Como jogar escape room sem amigos?',
     resposta:
-      'Entre numa comunidade de jogadores, pergunte à casa se ela completa a sala com outras pessoas, ou use um app que forma o grupo. Em Curitiba, no EscapeMatch, você escolhe a sala e o horário, entra no grupo e paga só a sua vaga. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado.',
+      'Entre numa comunidade de jogadores, pergunte à casa se ela completa a sala com outras pessoas, ou use um app que forma o grupo. Em Curitiba, no EscapeMatch, você escolhe a sala e o horário, entra no grupo e paga só a sua vaga. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado.',
   },
   {
     pergunta: 'Dá para jogar escape room sem amigos?',
@@ -37,7 +46,7 @@ const respostas = [
   {
     pergunta: 'Como a EscapeMatch junta o grupo?',
     resposta:
-      'Em Curitiba, você escolhe a sala e o horário no app. O EscapeMatch te coloca num grupo com outras pessoas que também chegaram sozinhas, na mesma sala e no mesmo horário. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado. Cada pessoa paga a própria vaga.',
+      'Em Curitiba, você escolhe a sala e o horário no app. O EscapeMatch te coloca num grupo com outras pessoas que também chegaram sozinhas, na mesma sala e no mesmo horário. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado. Cada pessoa paga a própria vaga.',
   },
   {
     pergunta: 'Funciona fora de Curitiba?',
@@ -45,9 +54,9 @@ const respostas = [
       'Por enquanto, só em Curitiba. O lançamento é nessa cidade. Escape room é o que está disponível. Jogos de tabuleiro e laser tag estão em breve.',
   },
   {
-    pergunta: 'É a mesma coisa que jogo de celular?',
+    pergunta: 'Jogar escape room sem ninguém é a mesma coisa que jogar sozinho no computador?',
     resposta:
-      'Não. É escape room presencial, numa casa. O app só forma o grupo e cobra a vaga quando o grupo confirma. Não é um jogo de celular nem um modo de jogo de tiro.',
+      'Não. Escape room presencial acontece numa casa, em grupo. Jogos virtuais, simuladores e kits para montar em casa são outra coisa. Se você não tem ninguém pra ir com você, o caminho é achar um grupo (comunidade, a casa ou um app), não trocar a sessão por um jogo de tela.',
   },
   {
     pergunta: 'É seguro jogar com desconhecidos?',
@@ -57,7 +66,7 @@ const respostas = [
   {
     pergunta: 'Quanto custa a vaga?',
     resposta:
-      'A vaga tem o preço de uma pessoa, o da sala, mostrado no app. Você paga só a sua vaga. Não existe um ingresso único do EscapeMatch. A cobrança só acontece quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado. Quem entra depois que o jogo confirmou paga a própria vaga na hora, até lotar.',
+      'A vaga tem o preço de uma pessoa, o da sala, mostrado no app. Você paga só a sua vaga. Não existe um ingresso único do EscapeMatch. A cobrança é confirmada quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado. Quem entra depois que o jogo confirmou paga a própria vaga na hora, até lotar.',
   },
   oQueE,
   ...desambiguacaoMarca,
@@ -65,21 +74,26 @@ const respostas = [
 
 const direta = respostas[0];
 const comunidades = respostas[3];
+const artigo = {
+  headline: direta.pergunta,
+  datePublished: publicadoGuiaSemNinguem,
+  dateModified: modificadoGuiaSemNinguem,
+};
 ---
 
 <Base
   title="Não tenho ninguém pra jogar escape room | EscapeMatch"
-  description="Dá para jogar sem ninguém: comunidade, a casa ou um app. Em Curitiba, o EscapeMatch junta quem chegou sozinho. É presencial."
+  description={descricao}
   path="/guia/nao-tenho-amigos-para-escape-room"
   ogImage="/assets/og/home.png"
   jsonLd={faqPage(respostas)}
+  artigo={artigo}
 >
   <header class="miolo pagina-topo">
     <h1>{direta.pergunta}</h1>
+    <p class="resposta-direta">{direta.resposta}</p>
     <p class="definicao-marca">{definicao}</p>
-    <p class="resposta-direta">
-      Dá para entrar numa comunidade de jogadores, como a <a href={escapers} target="_blank" rel="noopener noreferrer">Escapers BR ({escapers})</a>, perguntar se a casa completa a sala com outras pessoas, ou usar um app que forma o grupo. Em Curitiba, o EscapeMatch junta quem chegou sozinho na mesma sala e no mesmo horário. É escape room presencial, não jogo de celular.
-    </p>
+    <p class="versao">{textoAtualizado(artigo.dateModified)}</p>
   </header>
   <article class="miolo pagina leitura">
     <section>

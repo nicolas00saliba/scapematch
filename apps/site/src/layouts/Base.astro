@@ -16,6 +16,11 @@ interface Props {
   imageAlt?: string;
   noindex?: boolean;
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  artigo?: {
+    headline?: string;
+    datePublished?: string;
+    dateModified?: string;
+  };
   publico?: boolean;
   convite?: boolean;
   hash?: boolean;
@@ -29,6 +34,7 @@ const {
   imageAlt = 'EscapeMatch, plataforma para jogar escape room quando se está sozinho.',
   noindex = false,
   jsonLd,
+  artigo,
   publico = false,
   convite = false,
   hash = false,
@@ -59,7 +65,7 @@ if (mostrarTrilha) {
 if (jsonLd) {
   extras.push(...(Array.isArray(jsonLd) ? jsonLd : [jsonLd]));
 }
-const blocos = grafoDaPagina({ path, title, description, extra: extras });
+const blocos = grafoDaPagina({ path, title, description, extra: extras, artigo });
 const json = JSON.stringify(blocos).replace(/</g, '\\u003c');
 const googleVerificacao = tokenBuscador(GOOGLE_SITE_VERIFICATION);
 const bingVerificacao = tokenBuscador(BING_SITE_VERIFICATION);

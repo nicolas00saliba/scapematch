@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, envField } from 'astro/config';
 import sentry from '@sentry/astro';
 import sitemap from '@astrojs/sitemap';
+import { lastmodDaRota } from './scripts/lastmod.mjs';
 import {
   arquivoGoogle,
   linhaArquivoGoogle,
@@ -101,7 +102,8 @@ export default defineConfig({
         return rota !== '/convite' && rota !== '/404' && rota !== '/cidades/curitiba';
       },
       serialize(item) {
-        item.lastmod = new Date('2026-11-14T00:00:00.000Z');
+        const rota = new URL(item.url).pathname.replace(/\/$/, '') || '/';
+        item.lastmod = lastmodDaRota(rota);
         return item;
       },
     }),
