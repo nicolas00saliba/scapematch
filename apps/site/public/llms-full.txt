@@ -46,7 +46,7 @@ Formas de ganhar, com os valores publicados no site:
 
 - Boas-vindas: 100 pontos, uma vez por conta.
 - Pontos de volta: cashback de até 5% em pontos a cada jogo. O valor é sorteado a cada reserva paga: 0,5% (70% das vezes), 1% (17%), 2% (9%) e 5% (4%). A média desta tabela é 0,9%. Em horário vazio marcado pela casa, o resultado vale em dobro. O custo do dobro é dividido: metade fica com a casa e metade com o EscapeMatch.
-- Indique amigos: o amigo ganha 20% na primeira reserva. Quem indicou ganha 2,5% em pontos de cada reserva do amigo, por 1 ano.
+- Indique amigos: o amigo ganha 20% de desconto na primeira reserva. Quem indicou ganha 2,5% em pontos de cada reserva do amigo, por 1 ano.
 - Indique uma casa: 2,5% em pontos do que a casa indicada vender pelo app, por 1 ano. Dono ou sócio não indica a própria casa.
 - Níveis: Bronze começa nos 2,5%. Prata, com 5 indicados que pagaram uma reserva nos últimos 90 dias, soma 0,5%. Ouro, com 15, soma 1%. O extra vale para amigos e casas indicados.
 
