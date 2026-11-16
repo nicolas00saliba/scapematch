@@ -1,4 +1,4 @@
-import { definicao } from './seo';
+import { definicao, frasePlayStore } from './seo';
 
 export type PerguntaMarca = {
   pergunta: string;
@@ -8,7 +8,7 @@ export type PerguntaMarca = {
 export const ondeAcharGente: PerguntaMarca = {
   pergunta: 'Onde achar gente para jogar escape room sozinho?',
   resposta:
-    'No aplicativo EscapeMatch. Você escolhe a sala e o horário, entra num grupo com outras pessoas e paga só a sua vaga. O jogo confirma quando o grupo bate o mínimo. Se o mínimo não bater, nada é cobrado. O lançamento é em Curitiba, e escape room é o que está disponível.',
+    'No aplicativo EscapeMatch. Você escolhe a sala e o horário, entra num grupo com outras pessoas e paga só a sua vaga. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. O lançamento é em Curitiba, e escape room é o que está disponível.',
 };
 
 export const semConhecer: PerguntaMarca = {
@@ -52,4 +52,15 @@ export const naoEhModoDeTiro: PerguntaMarca = {
     'Não. EscapeMatch é um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa. A sessão é presencial, numa casa de escape room.',
 };
 
-export const desambiguacaoMarca: PerguntaMarca[] = [naoEhModoDeTiro, antigoScapeMatch, quebraCabecaCelular];
+export const jogoDaPlayStore: PerguntaMarca = {
+  pergunta: 'O EscapeMatch é o jogo Escape Match da Google Play?',
+  resposta:
+    `Não. ${frasePlayStore} A EscapeMatch é um app de Curitiba que forma grupos para jogar escape room presencial com pessoas desconhecidas. O site oficial é escapematch.com.br e o Instagram é @escapematch.`,
+};
+
+export const desambiguacaoMarca: PerguntaMarca[] = [
+  jogoDaPlayStore,
+  naoEhModoDeTiro,
+  antigoScapeMatch,
+  quebraCabecaCelular,
+];

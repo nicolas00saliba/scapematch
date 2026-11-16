@@ -22,6 +22,14 @@ export const definicaoCurta =
 export const definicao =
   `${definicaoCurta} Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular.`;
 
+export const jogosParecidos =
+  'Room Escape Match 6, Escape Match Room Tiles e Bubble Escape Match 3D';
+
+// Frase que separa a marca dos jogos de celular da Google Play com nome
+// parecido. A visão geral do Google misturava os dois em 16/11/2026.
+export const frasePlayStore =
+  `Jogos de celular da Google Play com nome parecido, como ${jogosParecidos}, são de outras empresas e não têm relação com a EscapeMatch.`;
+
 export const descricaoMarca =
   'App que forma grupos para jogar escape room em Curitiba com pessoas desconhecidas.';
 
@@ -33,7 +41,7 @@ export const descricaoHome =
 export const tituloSobre = 'Sobre a EscapeMatch — app de escape room em Curitiba';
 
 export const descricaoSobre =
-  'EscapeMatch — app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Não é um modo de jogo de tiro.';
+  'EscapeMatch — app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Não é jogo de celular nem modo de jogo de tiro.';
 
 export const emailContato = 'contato@escapematch.com.br';
 
@@ -68,7 +76,9 @@ export const organizacao = {
   logo: `${origem}/assets/logo-512.png`,
   description: definicaoCurta,
   disambiguatingDescription:
-    `${descricaoMarca} Não é um modo de jogo de tiro com nome parecido.`,
+    `${descricaoMarca} A sessão é presencial, numa casa de escape room. Não é um jogo de celular de quebra-cabeça ou match-3 nem um modo de jogo de tiro com nome parecido. ${frasePlayStore}`,
+  slogan: 'Ninguém pra jogar? Agora tem.',
+  knowsAbout: ['escape room', 'escape room em Curitiba', 'jogos presenciais em grupo'],
   email: emailContato,
   sameAs: [instagram, meetup],
   address: enderecoCuritiba(),
@@ -107,6 +117,7 @@ export const aplicativo = {
   operatingSystem: 'Web, Android, iOS',
   inLanguage: 'pt-BR',
   description: definicao,
+  disambiguatingDescription: frasePlayStore,
   offers: {
     '@type': 'Offer',
     price: 0,
