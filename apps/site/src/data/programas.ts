@@ -79,9 +79,9 @@ export const programas: Programa[] = [
     publico: 'jogador',
     icone: 'pessoas',
     titulo: 'Indique amigos',
-    beneficio: '20% para ele, pontos para você',
+    beneficio: '20% de desconto para ele, pontos para você',
     apoio:
-      'Seu amigo ganha 20% na primeira reserva. Você ganha 2,5% em pontos de cada reserva dele, por 1 ano.',
+      'Seu amigo ganha 20% de desconto na primeira reserva. Você ganha 2,5% em pontos de cada reserva dele, por 1 ano.',
     passos: ['Mande seu código', 'Amigo entra e joga', 'Vocês ganham'],
     regras:
       'O amigo usa o seu código no cadastro. Conta da mesma pessoa não vale: mesmo CPF, telefone ou cartão.',
@@ -168,7 +168,7 @@ export const programas: Programa[] = [
     titulo: 'Indique jogadores',
     beneficio: '2,5% em crédito',
     apoio:
-      'Do que o seu cliente pagar em outras casas, por 1 ano. Ele ganha 20% na primeira reserva.',
+      'Do que o seu cliente pagar em outras casas, por 1 ano. Ele ganha 20% de desconto na primeira reserva.',
     passos: ['Mostre seu código', 'Cliente entra', 'Vocês ganham'],
     regras:
       'Reservas na sua própria casa não geram crédito. O cliente usa o seu código no cadastro.',
