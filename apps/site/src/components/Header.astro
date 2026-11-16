@@ -21,6 +21,10 @@ const grupos = [
   { nome: 'Ajuda', atual: atual(['/ajuda']), href: '/ajuda' },
   { nome: 'Empresa', atual: atual(['/sobre', '/contato']) },
 ];
+
+function lista(total: number) {
+  return total > 7 ? 'mega-links mega-colunas' : 'mega-links';
+}
 ---
 
 <a class="pula" href="#conteudo">Ir para o conteúdo</a>
@@ -38,7 +42,7 @@ const grupos = [
         <summary class={grupos[0].atual ? 'is-atual' : undefined}>Quero jogar</summary>
         <div class="mega">
           <div class="mega-miolo">
-            <ul class="mega-links">
+            <ul class={lista(jogarLinks.length)}>
               {jogarLinks.map((link) => (
                 <li><a href={link.href}>{link.rotulo}</a></li>
               ))}
@@ -54,7 +58,7 @@ const grupos = [
         <summary class={grupos[1].atual ? 'is-atual' : undefined}>Vantagens</summary>
         <div class="mega">
           <div class="mega-miolo">
-            <ul class="mega-links">
+            <ul class={lista(vantagensLinks.length)}>
               {vantagensLinks.map((link) => (
                 <li><a href={link.href}>{link.rotulo}</a></li>
               ))}
@@ -68,7 +72,7 @@ const grupos = [
           <div class="mega-miolo mega-duas">
             <div class="mega-col">
               <h3>Quero ser parceiro</h3>
-              <ul class="mega-links">
+              <ul class={lista(casaNovaLinks.length)}>
                 {casaNovaLinks.map((link) => (
                   <li><a href={link.href}>{link.rotulo}</a></li>
                 ))}
@@ -76,7 +80,7 @@ const grupos = [
             </div>
             <div class="mega-col">
               <h3>Já sou parceiro</h3>
-              <ul class="mega-links">
+              <ul class={lista(casaParceiraLinks.length)}>
                 {casaParceiraLinks.map((link) => (
                   <li>
                     <a href={link.href} {...(link.externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
