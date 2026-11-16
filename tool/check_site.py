@@ -702,7 +702,7 @@ def main() -> None:
             "A casa pode me colocar com outras pessoas?",
             "Como a EscapeMatch junta o grupo?",
             "Funciona fora de Curitiba?",
-            "É a mesma coisa que jogo de celular?",
+            "Jogar escape room sem ninguém é a mesma coisa que jogar sozinho no computador?",
             "É seguro jogar com desconhecidos?",
             "Quanto custa a vaga?",
             "O que é o EscapeMatch?",
@@ -740,6 +740,54 @@ def main() -> None:
         falha("a página de quem não tem ninguém saiu sem Escapers BR ou Meetup")
     if "Por enquanto, só em Curitiba." not in sem_ninguem:
         falha("a página de quem não tem ninguém não limita a cidade")
+    resposta_direta = (
+        "Não ter ninguém pra jogar escape room não te impede de ir à sessão presencial. "
+        "Dá para entrar numa comunidade de jogadores, perguntar se a casa completa a sala com outras pessoas, "
+        "ou usar um app que forma o grupo. Em Curitiba, o EscapeMatch junta quem chegou sozinho na mesma sala "
+        "e no mesmo horário; você paga só a sua vaga, a cobrança é confirmada quando o grupo bate o mínimo e, "
+        "se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado. "
+        "Isso não é jogo de celular, simulador online nem kit para montar em casa."
+    )
+    descricao_sem_ninguem = (
+        "Não tenho ninguém pra jogar escape room? Em Curitiba o EscapeMatch forma o grupo presencial: "
+        "sala e horário, paga só a vaga. Não é virtual nem kit em casa."
+    )
+    if f'<meta name="description" content="{descricao_sem_ninguem}">' not in sem_ninguem:
+        falha("descrição de quem não tem ninguém divergiu")
+    if len(descricao_sem_ninguem) > 155:
+        falha(f"descrição de quem não tem ninguém com {len(descricao_sem_ninguem)} caracteres")
+    ordem_resposta = sem_ninguem.find('class="resposta-direta"')
+    ordem_definicao = sem_ninguem.find('class="definicao-marca"')
+    if ordem_resposta < 0 or ordem_definicao < 0 or ordem_resposta > ordem_definicao:
+        falha("a resposta direta não vem antes da definição da marca")
+    if "É a mesma coisa que jogo de celular?" in sem_ninguem:
+        falha("a pergunta de jogo de celular ficou duplicada")
+    if "Atualizado em 15/11/2026" not in sem_ninguem:
+        falha("a data visível de quem não tem ninguém divergiu")
+    exigir_resposta(
+        sem_ninguem,
+        "/guia/nao-tenho-amigos-para-escape-room",
+        "Não tenho ninguém pra jogar escape room. O que fazer?",
+        resposta_direta,
+    )
+    exigir_resposta(
+        sem_ninguem,
+        "/guia/nao-tenho-amigos-para-escape-room",
+        "Jogar escape room sem ninguém é a mesma coisa que jogar sozinho no computador?",
+        "Não. Escape room presencial acontece numa casa, em grupo. "
+        "Jogos virtuais, simuladores e kits para montar em casa são outra coisa. "
+        "Se você não tem ninguém pra ir com você, o caminho é achar um grupo "
+        "(comunidade, a casa ou um app), não trocar a sessão por um jogo de tela.",
+    )
+    artigos = [bloco for bloco in blocos_ld(sem_ninguem) if bloco.get("@type") == "Article"]
+    if len(artigos) != 1:
+        falha(f"quem não tem ninguém saiu com {len(artigos)} Article")
+    if artigos[0].get("headline") != "Não tenho ninguém pra jogar escape room. O que fazer?":
+        falha("headline do guia sem ninguém divergiu")
+    if artigos[0].get("datePublished") != "2026-11-13T00:00:00-03:00":
+        falha("datePublished do guia sem ninguém divergiu")
+    if artigos[0].get("dateModified") != "2026-11-15T00:00:00-03:00":
+        falha("dateModified do guia sem ninguém divergiu")
     ancora = 'href="/guia/nao-tenho-amigos-para-escape-room">Não tenho ninguém pra jogar escape room</a>'
     if ancora not in arquivo("/guia").read_text():
         falha("o índice de guias não usa a frase da busca")
@@ -810,6 +858,20 @@ def main() -> None:
         falha("token do Bing foi parar no código")
     if "<lastmod>" not in sitemap:
         falha("sitemap sem lastmod")
+    datas_lastmod = set()
+    lastmod_guia = ""
+    for bloco in re.findall(r"<url>(.*?)</url>", sitemap, re.S):
+        loc = re.search(r"<loc>([^<]+)</loc>", bloco)
+        last = re.search(r"<lastmod>([^<]+)</lastmod>", bloco)
+        if not loc or not last:
+            falha("url do sitemap sem loc ou lastmod")
+        datas_lastmod.add(last.group(1))
+        if loc.group(1).rstrip("/") == f"{SITE}/guia/nao-tenho-amigos-para-escape-room":
+            lastmod_guia = last.group(1)
+    if not lastmod_guia.startswith("2026-11-15"):
+        falha(f"lastmod do guia sem ninguém divergiu: {lastmod_guia}")
+    if len(datas_lastmod) < 2:
+        falha("sitemap ainda usa a mesma lastmod em todas as URLs")
     for nome in ("llms.txt", "llms-full.txt"):
         texto = (DIST / nome).read_text()
         if "Curitiba" not in texto or "R$ 0,01" not in texto:
