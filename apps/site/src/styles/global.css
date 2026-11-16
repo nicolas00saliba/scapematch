@@ -555,6 +555,13 @@ main {
   color: var(--petroleo);
 }
 
+.destaque-gratis {
+  color: var(--cobre);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .faixa {
   padding: 1.25rem 0 0.25rem;
 }
