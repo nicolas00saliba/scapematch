@@ -1483,6 +1483,17 @@ main {
   }
 }
 
+/* No desktop, .leitura vence a largura do .miolo e o margin auto centraliza
+   os 42rem. Quando há um topo largo antes, a coluna encosta na mesma
+   borda esquerda. Abaixo de 721px a regra do .miolo já alinha os dois. */
+@media (min-width: 721px) {
+  .pagina-topo ~ .miolo.leitura {
+    width: min(42rem, calc(100% - 2.5rem));
+    margin-left: max(1.25rem, calc((100% - var(--miolo)) / 2));
+    margin-right: auto;
+  }
+}
+
 @media (max-width: 720px) {
   .miolo,
   .barra {
