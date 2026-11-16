@@ -16,6 +16,7 @@ import {
   nomesAlternativos,
   organizacao,
   paginaLd,
+  textoAtualizado,
   tituloHome,
   tituloSobre,
   website,
@@ -157,6 +158,31 @@ test('o grafo da home fecha as referências e o JSON é válido', () => {
     assert.equal(definidos.has(id), true, id);
   }
   assert.equal(definidos.has(idOrganizacao), true);
+});
+
+test('o artigo aceita manchete e datas sem mudar os outros guias', () => {
+  const guia = paginaLd('/guia/escape-room-sozinho', 'Guia | EscapeMatch', definicaoCurta);
+  assert.equal(guia.headline, 'Guia | EscapeMatch');
+  assert.equal('datePublished' in guia, false);
+  assert.equal('dateModified' in guia, false);
+  const comData = paginaLd(
+    '/guia/nao-tenho-amigos-para-escape-room',
+    'Não tenho ninguém pra jogar escape room | EscapeMatch',
+    definicaoCurta,
+    {
+      headline: 'Não tenho ninguém pra jogar escape room. O que fazer?',
+      datePublished: '2026-11-13T00:00:00-03:00',
+      dateModified: '2026-11-15T00:00:00-03:00',
+    },
+  );
+  assert.equal(comData.headline, 'Não tenho ninguém pra jogar escape room. O que fazer?');
+  assert.equal(comData.datePublished, '2026-11-13T00:00:00-03:00');
+  assert.equal(comData.dateModified, '2026-11-15T00:00:00-03:00');
+  assert.equal(textoAtualizado('2026-11-15T00:00:00-03:00'), 'Atualizado em 15/11/2026');
+  const home = paginaLd('/', tituloHome, descricaoHome, {
+    datePublished: '2026-11-13T00:00:00-03:00',
+  });
+  assert.equal('datePublished' in home, false);
 });
 
 test('título e descrição da home cabem e começam pela marca', () => {

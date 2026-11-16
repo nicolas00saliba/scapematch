@@ -6,65 +6,109 @@ interface Props {
 const { cena } = Astro.props;
 
 const alt = {
-  escolhe: 'Ilustração da escolha de horário, com dois horários de exemplo e vagas abertas.',
-  grupo: 'Ilustração de um grupo de exemplo. As vagas preenchem até o mínimo e o jogo confirma.',
-  confirmado: 'Ilustração de um grupo de exemplo já confirmado.',
-  parceiro: 'Ilustração da agenda do Parceiro, com um horário aberto e um horário vazio.',
+  escolhe:
+    'Exemplo. Tela do app para escolher a sala O Cofre do Café, na casa Mistério da Rua XV, no horário de 19:00. Também aparece 21:00.',
+  grupo:
+    'Exemplo. Grupo do Cofre do Café se formando: 2 jogadores, mínimo de 4 e máximo de 6. Faltam 2 para confirmar. Você paga só a sua vaga.',
+  confirmado:
+    'Exemplo. O grupo do Cofre do Café bateu o mínimo: 4 jogadores, máximo de 6. O jogo está confirmado e ainda cabem 2.',
+  parceiro:
+    'Exemplo. Agenda do Parceiro com o horário de 19:00 aberto e o de 21:00 vazio.',
 }[cena];
 ---
 
 <figure class="telefone" aria-label={alt}>
-  <div class="telefone-tela">
+  <div class="telefone-tela" aria-hidden="true">
+    <div class="telefone-bico"></div>
+    <p class="selo-exemplo">Exemplo</p>
+
     {cena === 'escolhe' && (
       <>
-        <p class="telefone-app">EscapeMatch</p>
-        <h3>Hoje</h3>
-        <p class="sub">Escolha o horário. Você entra sozinho.</p>
-        <div class="linha-hora"><span>19:00</span><strong>Vagas abertas</strong></div>
-        <div class="linha-hora"><span>21:00</span><strong>Vagas abertas</strong></div>
+        <p class="tela-titulo">Escolha o horário</p>
+        <div class="campo">
+          <p class="campo-rotulo">Sala</p>
+          <p class="campo-valor">O Cofre do Café</p>
+          <p class="campo-meta">Mistério da Rua XV</p>
+        </div>
+        <div class="hora hora-escolhida">
+          <span>Seg · 19:00</span>
+          <strong class="pill pill-aberto">Escolhido</strong>
+        </div>
+        <div class="hora">
+          <span>Seg · 21:00</span>
+        </div>
+        <p class="nota">Você entra sozinho.</p>
       </>
     )}
+
     {cena === 'grupo' && (
       <>
-        <p class="telefone-app">EscapeMatch</p>
-        <p class="status status-antes">Faltam 2 para confirmar</p>
-        <p class="status status-depois">Confirmado — ainda cabem&nbsp;2</p>
-        <p class="sub">Grupo de exemplo, com jogadores que não se conheciam.</p>
-        <div class="vagas" aria-hidden="true">
-          <span class="vaga cheia">A</span>
-          <span class="vaga cheia">L</span>
-          <span class="vaga enche">M</span>
-          <span class="vaga enche">R</span>
-          <span class="vaga"></span>
-          <span class="vaga"></span>
+        <div class="cartao-grupo">
+          <p class="pill pill-aberto">Aberto</p>
+          <p class="sala-nome">O Cofre do Café</p>
+          <p class="campo-meta">Mistério da Rua XV</p>
+          <p class="quando">
+            <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"></circle>
+              <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+            Seg · 19:00
+          </p>
+          <p class="contagem">2 jogadores</p>
+          <p class="campo-meta">mín. 4 · máx. 6</p>
+          <div class="faixa"><span class="faixa-2"></span></div>
+          <p class="estado">Faltam 2 para confirmar</p>
+          <div class="pessoas">
+            <span class="rosto rosto-a">A</span>
+            <span class="rosto rosto-l">L</span>
+            <strong>2</strong>
+          </div>
         </div>
-        <div class="regua" aria-hidden="true"><span></span></div>
-        <p class="sub">Você paga só a sua vaga.</p>
+        <p class="nota">Você paga só a sua vaga.</p>
       </>
     )}
+
     {cena === 'confirmado' && (
       <>
-        <p class="telefone-app">EscapeMatch</p>
-        <h3>O jogo está confirmado</h3>
-        <p class="sub">O grupo bateu o mínimo.</p>
-        <div class="vagas" aria-hidden="true">
-          <span class="vaga cheia">A</span>
-          <span class="vaga cheia">L</span>
-          <span class="vaga cheia">M</span>
-          <span class="vaga cheia">R</span>
-          <span class="vaga"></span>
-          <span class="vaga"></span>
+        <div class="cartao-grupo">
+          <p class="pill pill-ok">Confirmado</p>
+          <p class="sala-nome">O Cofre do Café</p>
+          <p class="campo-meta">Mistério da Rua XV</p>
+          <p class="quando">
+            <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"></circle>
+              <path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+            Seg · 19:00
+          </p>
+          <p class="contagem">4 jogadores</p>
+          <p class="campo-meta">mín. 4 · máx. 6</p>
+          <div class="faixa"><span class="faixa-4"></span></div>
+          <p class="estado">Confirmado — ainda cabem&nbsp;2</p>
+          <div class="pessoas">
+            <span class="rosto rosto-a">A</span>
+            <span class="rosto rosto-l">L</span>
+            <span class="rosto rosto-m">M</span>
+            <span class="rosto rosto-r">R</span>
+            <strong>4</strong>
+          </div>
         </div>
-        <p class="sub">Quem chega depois paga na hora, até lotar.</p>
+        <p class="nota">O jogo está confirmado.</p>
       </>
     )}
+
     {cena === 'parceiro' && (
       <>
-        <p class="telefone-app">Parceiro</p>
-        <h3>Agenda de hoje</h3>
-        <div class="linha-hora"><span>19:00</span><strong>Aberto</strong></div>
-        <div class="linha-hora"><span>21:00</span><strong>Horário vazio</strong></div>
-        <p class="sub">Salas, grupos e o extrato ficam no Parceiro.</p>
+        <p class="tela-titulo">Agenda de hoje</p>
+        <div class="hora">
+          <span>19:00</span>
+          <strong class="pill pill-aberto">Aberto</strong>
+        </div>
+        <div class="hora">
+          <span>21:00</span>
+          <strong class="pill pill-vazio">Horário vazio</strong>
+        </div>
+        <p class="nota">Salas, grupos e o extrato ficam no Parceiro.</p>
       </>
     )}
   </div>

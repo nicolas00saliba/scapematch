@@ -122,7 +122,25 @@ export function idPagina(path: string): string {
   return `${canonical}#webpage`;
 }
 
-export function paginaLd(path: string, title: string, description: string) {
+export type ArtigoLd = {
+  headline?: string;
+  datePublished?: string;
+  dateModified?: string;
+};
+
+// A data visível usa o dia escrito no ISO com fuso, sem passar pelo UTC.
+export function textoAtualizado(iso: string): string {
+  const data = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!data) throw new Error('data de artigo inválida');
+  return `Atualizado em ${data[3]}/${data[2]}/${data[1]}`;
+}
+
+export function paginaLd(
+  path: string,
+  title: string,
+  description: string,
+  artigo?: ArtigoLd,
+) {
   const canonical = path === '/' ? `${origem}/` : `${origem}${path}`;
   const tipo = path === '/sobre' ? 'AboutPage' : path.startsWith('/guia/') ? 'Article' : 'WebPage';
   const no: Record<string, unknown> = {
@@ -139,8 +157,10 @@ export function paginaLd(path: string, title: string, description: string) {
     author: { '@id': idOrganizacao },
   };
   if (tipo === 'Article' || tipo === 'AboutPage') {
-    no.headline = title;
+    no.headline = artigo?.headline ?? title;
     no.mainEntityOfPage = canonical;
+    if (artigo?.datePublished) no.datePublished = artigo.datePublished;
+    if (artigo?.dateModified) no.dateModified = artigo.dateModified;
   }
   return no;
 }
@@ -150,6 +170,7 @@ export function grafoDaPagina(entrada: {
   title: string;
   description: string;
   extra?: Record<string, unknown> | Record<string, unknown>[];
+  artigo?: ArtigoLd;
 }) {
   const extra = entrada.extra
     ? (Array.isArray(entrada.extra) ? entrada.extra : [entrada.extra])
@@ -158,7 +179,7 @@ export function grafoDaPagina(entrada: {
     organizacao,
     website,
     aplicativo,
-    paginaLd(entrada.path, entrada.title, entrada.description),
+    paginaLd(entrada.path, entrada.title, entrada.description, entrada.artigo),
     ...extra,
   ];
 }
