@@ -222,6 +222,31 @@ def texto_visivel(html: str) -> str:
     return re.sub(r"\s+", " ", "".join(parser.partes)).strip()
 
 
+# O Astro descarta a quebra de linha entre um texto e uma tag ou expressão
+# na linha seguinte. Sem {' '} no fonte, "é\n<a>" vira "é<a>" e a página
+# mostra palavras coladas. O <span> fica de fora: a marca é
+# Escape<span>Match</span> de propósito.
+TAG_INLINE = r"(?:a|strong|em|b|i|code|abbr|mark|small|time)"
+COLADO_ANTES = re.compile(rf"[0-9A-Za-zÀ-ÿ]<{TAG_INLINE}\b[^>]*>")
+COLADO_DEPOIS = re.compile(rf"</{TAG_INLINE}>[0-9A-Za-zÀ-ÿ(]")
+COLADO_FRASE = re.compile(r"[a-zà-ÿ0-9][.!?;][A-ZÀ-Ý][a-zà-ÿ]")
+
+
+def palavras_coladas(html: str) -> list[str]:
+    sem_codigo = re.sub(r"<(script|style)\b.*?</\1>", "", html, flags=re.S)
+    achados = [
+        sem_codigo[max(0, m.start() - 30) : m.end() + 30]
+        for padrao in (COLADO_ANTES, COLADO_DEPOIS)
+        for m in padrao.finditer(sem_codigo)
+    ]
+    # Frase colada dentro do mesmo trecho de texto, como "{frase}\nModos"
+    # virando "EscapeMatch.Modos". Cada nó de texto é olhado sozinho, para
+    # não juntar blocos vizinhos.
+    for no in re.findall(r">([^<>]+)<", sem_codigo):
+        achados += [no.strip()[:90] for m in COLADO_FRASE.finditer(no)]
+    return achados
+
+
 def arquivo(rota: str) -> pathlib.Path:
     if rota == "/":
         return DIST / "index.html"
@@ -346,6 +371,9 @@ def main() -> None:
             falha(f"{rota} cita o domínio antigo")
         if re.search(r"divid\w* a reserva", texto, re.I):
             falha(f"{rota} usa a promessa antiga")
+        coladas = palavras_coladas(texto)
+        if coladas:
+            falha(f"{rota} tem palavras coladas (falta {{' '}} no fonte): {coladas[0]!r}")
         if "exemplo.invalid" in texto or "Placeholder" in texto:
             falha(f"{rota} tem placeholder")
         if re.search(r"\b(C2C|B2B|B2C|C2B|bps)\b", texto):
