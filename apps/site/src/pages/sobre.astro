@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import PageTop from '../components/PageTop.astro';
 import CtaBlock from '../components/CtaBlock.astro';
 import FaqMarca from '../components/FaqMarca.astro';
-import { definicao, descricaoSobre, faqPage, frasePlayStore, instagram, meetup, tituloSobre } from '../data/seo';
+import { definicao, descricaoSobre, faqPage, frasePlayStore, fraseFundador, instagram, meetup, tituloSobre } from '../data/seo';
 import { desambiguacaoMarca, oQueE } from '../data/perguntas-marca';
 ---
 
@@ -25,6 +25,7 @@ import { desambiguacaoMarca, oQueE } from '../data/perguntas-marca';
       O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
       O lançamento começa em Curitiba.
     </p>
+    <p>{fraseFundador}</p>
     <h2>O nome e a sessão presencial</h2>
     <p>
       {frasePlayStore}

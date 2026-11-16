@@ -49,6 +49,11 @@ export const instagram = 'https://www.instagram.com/escapematch/';
 
 export const meetup = 'https://www.meetup.com/pt-br/escaperoomcuritiba/';
 
+export const nomeFundador = 'Nícolas R. Saliba';
+
+export const fraseFundador =
+  `A EscapeMatch foi fundada por ${nomeFundador}, organizador do Meetup Escape Room Curitiba.`;
+
 export const nomesAlternativos = ['Escape Match', 'escapematch', 'ScapeMatch', 'Scape Match'];
 
 function enderecoCuritiba() {
@@ -81,6 +86,13 @@ export const organizacao = {
   knowsAbout: ['escape room', 'escape room em Curitiba', 'jogos presenciais em grupo'],
   email: emailContato,
   sameAs: [instagram, meetup],
+  founder: {
+    '@type': 'Person',
+    '@id': `${origem}/#fundador`,
+    name: nomeFundador,
+    description: 'Fundador da EscapeMatch e organizador do Meetup Escape Room Curitiba.',
+    url: meetup,
+  },
   address: enderecoCuritiba(),
   foundingLocation: {
     '@type': 'Place',
