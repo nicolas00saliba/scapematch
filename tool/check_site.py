@@ -187,6 +187,32 @@ class Links(HTMLParser):
             self.title.append(data)
 
 
+class TextoVisivel(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.partes: list[str] = []
+        self._oculto = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style"):
+            self._oculto += 1
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style") and self._oculto:
+            self._oculto -= 1
+
+    def handle_data(self, data):
+        if not self._oculto:
+            self.partes.append(data)
+
+
+def texto_visivel(html: str) -> str:
+    parser = TextoVisivel()
+    parser.feed(html)
+    parser.close()
+    return re.sub(r"\s+", " ", "".join(parser.partes)).strip()
+
+
 def arquivo(rota: str) -> pathlib.Path:
     if rota == "/":
         return DIST / "index.html"
@@ -459,8 +485,11 @@ def main() -> None:
         falha("cancelamento voltou à regra antiga")
 
     home_html = (DIST / "index.html").read_text()
-    if "Jogue e ganhe pontos." not in home_html or "Junte pontos e jogue de graça." not in home_html:
+    home_visivel = texto_visivel(home_html)
+    if "Jogue e ganhe pontos." not in home_visivel or "Junte pontos e jogue de graça." not in home_visivel:
         falha("a home não mostra a mensagem dos pontos")
+    if not re.search(r'class="destaque-gratis"[^>]*>\s*jogue de graça\s*<', home_html):
+        falha("a home saiu sem o destaque de jogue de graça")
     if "Cashback de até 5% em pontos a cada jogo." not in home_html:
         falha("a home não mostra o teto do cashback")
     if "limite mensal" in home_html:
