@@ -110,6 +110,15 @@ RESPOSTA_QUEBRA = (
 PERGUNTA_ANTIGO = "O EscapeMatch é o antigo ScapeMatch?"
 PERGUNTA_QUEBRA = "O EscapeMatch é um jogo de quebra-cabeça de celular?"
 PERGUNTA_TIRO = "O EscapeMatch é um modo de jogo de tiro?"
+PERGUNTA_PLAY = "O EscapeMatch é o jogo Escape Match da Google Play?"
+FRASE_PLAY = (
+    "Jogos de celular da Google Play com nome parecido, como Room Escape Match 6, "
+    "Escape Match Room Tiles e Bubble Escape Match 3D, são de outras empresas e "
+    "não têm relação com a EscapeMatch."
+)
+# A regra do pagamento: se o grupo não confirma, o Pix é estornado e o
+# cartão não é capturado. "Nada é cobrado" contradiz o Pix já pago.
+PAGAMENTO_PROIBIDO = ("nada é cobrado", "cobrança só acontece")
 LINHA_NOME_ANTIGO = (
     "O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
     "Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles."
@@ -135,8 +144,8 @@ TOKEN_BLOQUEADO = re.compile(
 ARQUIVO_GOOGLE = re.compile(r"google[A-Za-z0-9]{16,}\.html")
 CANCELAMENTO = (
     "Não há reembolso depois que o grupo é confirmado.",
-    "se o grupo não fechar, nada é cobrado",
-    "O Pix é estornado e o cartão não é capturado.",
+    "se o grupo não fechar, o Pix é estornado",
+    "o Pix é estornado e o cartão não é capturado.",
     "Se a casa cancelar, o valor é devolvido integralmente.",
 )
 COMISSAO_OK = (
@@ -471,6 +480,8 @@ def main() -> None:
         for rota in FORA_DO_BUILD:
             if f'href="{rota}"' in texto or f"href='{rota}'" in texto:
                 falha(f"{html.relative_to(DIST)} aponta para {rota}")
+        if any(t in texto.lower() for t in PAGAMENTO_PROIBIDO):
+            falha(f"{html.relative_to(DIST)} diz que nada é cobrado; o certo é Pix estornado e cartão não capturado")
     for js in (DIST / "scripts").glob("*.js"):
         texto = js.read_text()
         for rota in FORA_DO_BUILD:
@@ -627,6 +638,8 @@ def main() -> None:
                 falha("sobre sem a frase do nome antigo ou o reforço presencial")
             if FRASE_TIRO not in html_marca or 'href="/sobre"' not in arquivo("/").read_text():
                 falha("sobre sem a diferença para o modo de tiro, ou a home sem o link")
+            if FRASE_PLAY not in html_marca or PERGUNTA_PLAY not in html_marca:
+                falha("sobre sem a diferença para os jogos da Google Play")
         tipo_pagina = "AboutPage" if rota == "/sobre" else "Article"
         paginas = [bloco for bloco in blocos_ld(html_marca) if bloco.get("@type") == tipo_pagina]
         if len(paginas) != 1:
@@ -880,6 +893,10 @@ def main() -> None:
             falha(f"{nome} sem a definição ou a desambiguação")
         if FRASE_TIRO not in texto or DESCRICAO_MARCA not in texto:
             falha(f"{nome} sem a definição da marca ou a diferença para o modo de tiro")
+        if FRASE_PLAY not in texto:
+            falha(f"{nome} sem a diferença para os jogos da Google Play")
+        if any(t in texto.lower() for t in PAGAMENTO_PROIBIDO):
+            falha(f"{nome} diz que nada é cobrado; o certo é Pix estornado e cartão não capturado")
         if LINHA_NOME_ANTIGO not in texto:
             falha(f"{nome} sem o nome antigo")
         if INSTAGRAM not in texto or MEETUP not in texto:

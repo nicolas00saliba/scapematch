@@ -91,6 +91,9 @@ test('a Organization tem um @id estável e os fatos já publicados', () => {
     'https://www.instagram.com/escapematch/',
     meetup,
   ]);
+  assert.equal(organizacao.founder['@type'], 'Person');
+  assert.equal(organizacao.founder.name, 'Nícolas R. Saliba');
+  assert.equal(organizacao.founder.url, meetup);
   assert.equal(organizacao.address.addressLocality, 'Curitiba');
   assert.equal(organizacao.address.addressRegion, 'PR');
   assert.equal(organizacao.address.addressCountry, 'BR');

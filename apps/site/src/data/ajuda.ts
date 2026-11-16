@@ -48,7 +48,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'E se o grupo não bater o mínimo?',
         resposta:
-          'O jogo não confirma. Nada é cobrado: o Pix é estornado e o cartão não é capturado.',
+          'O jogo não confirma. O Pix é estornado e o cartão não é capturado.',
       },
       {
         pergunta: 'Como achar gente para jogar escape room sozinho?',
@@ -78,7 +78,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'Quando a cobrança acontece?',
         resposta:
-          'Quando o grupo bate o mínimo e o jogo confirma. Quem entra depois paga a própria vaga na hora.',
+          'Quando o grupo bate o mínimo e o jogo confirma. Quem entra depois paga a própria vaga na hora. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.',
       },
       {
         pergunta: 'O app guarda o meu cartão?',
@@ -91,13 +91,13 @@ export const temas: Tema[] = [
     nome: 'Cancelamento',
     frase: 'O que acontece se você, o grupo ou a casa cancelar.',
     seoTitulo: 'Cancelamento: dúvidas frequentes | EscapeMatch',
-    seoDescricao: 'Antes da confirmação nada é cobrado. Depois dela não há reembolso.',
+    seoDescricao: 'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. Depois da confirmação não há reembolso.',
     relacionados: ['pagamento', 'grupo'],
     perguntas: [
       {
         pergunta: 'E se o grupo não confirmar?',
         resposta:
-          'Nada é cobrado. O Pix é estornado e o cartão não é capturado.',
+          'O Pix é estornado e o cartão não é capturado.',
       },
       {
         pergunta: 'Tem reembolso depois que o grupo confirma?',
