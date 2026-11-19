@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Confere se os workflows marcados com `# saude: agenda` passaram nas últimas 24h.
+"""Confere se os workflows marcados com `# saude: agenda` passaram dentro da janela.
 
-Workflows só de pull request ficam de fora: num dia sem PR eles não rodam,
-e a rotina diária olha a agenda. O marcador fica no próprio arquivo do workflow.
+A janela cobre a agenda diária com margem para o atraso do agendador do GitHub.
+O próprio `saude-ferramentas.yml` fica de fora: depois de uma falha ele nunca
+mais acharia o próprio sucesso e permaneceria vermelho. Workflows só de pull
+request também ficam de fora: num dia sem PR eles não rodam, e a rotina diária
+olha a agenda. O marcador fica no próprio arquivo do workflow.
 """
 
 from __future__ import annotations
@@ -14,15 +17,27 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-JANELA = timedelta(hours=24)
+JANELA = timedelta(hours=30)
 MARCADOR = "# saude: agenda"
+# O comentário do arquivo cita o marcador, então a busca por texto o incluiria.
+# Avaliar a si mesmo vira um laço: uma falha impede o próximo sucesso.
+PROPRIO_WORKFLOW = "saude-ferramentas.yml"
 RAIZ = Path(__file__).resolve().parents[1]
 WORKFLOWS = RAIZ / ".github" / "workflows"
+
+
+def rotulo_janela(janela: timedelta = JANELA) -> str:
+    horas = janela.total_seconds() / 3600
+    if horas.is_integer():
+        return f"{int(horas)}h"
+    return f"{horas:g}h"
 
 
 def workflows_agendados(diretorio: Path) -> list[str]:
     nomes: list[str] = []
     for caminho in sorted(diretorio.glob("*.yml")):
+        if caminho.name == PROPRIO_WORKFLOW:
+            continue
         if MARCADOR in caminho.read_text(encoding="utf-8"):
             nomes.append(caminho.name)
     return nomes
@@ -46,7 +61,7 @@ def avaliar(execucoes: list[dict], agora: datetime) -> list[str]:
         return []
     if not execucoes:
         return ["nenhuma execução encontrada"]
-    return ["nenhum sucesso nas últimas 24h"]
+    return [f"nenhum sucesso nas últimas {rotulo_janela()}"]
 
 
 def listar_execucoes(workflow: str) -> list[dict]:
@@ -87,7 +102,7 @@ def main() -> int:
         if problemas:
             falhas.append(f"{nome}: {problemas[0]}")
         else:
-            print(f"{nome}: sucesso nas últimas 24h")
+            print(f"{nome}: sucesso nas últimas {rotulo_janela()}")
     if falhas:
         for linha in falhas:
             print(linha, file=sys.stderr)
