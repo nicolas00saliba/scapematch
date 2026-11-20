@@ -3,6 +3,7 @@ import { clientDbError, clientFailure } from "../_shared/asaas_client_error.ts";
 import { AsaasProvider } from "../_shared/asaas_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { releaseCancelledCharges } from "../_shared/release_charges.ts";
+import { adminWithMfa } from "../_shared/admin_session.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -30,7 +31,12 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, service);
     if (body.action === "release") {
-      const allowed = await canRelease(admin, groupId, userData.user.id);
+      const allowed = await canRelease(
+        admin,
+        groupId,
+        userData.user.id,
+        authHeader,
+      );
       if (!allowed) return json({ error: "not owner" }, 403);
       const { data: group } = await admin
         .from("groups")
@@ -65,13 +71,14 @@ async function canRelease(
   admin: ReturnType<typeof createClient>,
   groupId: string,
   userId: string,
+  authHeader: string,
 ): Promise<boolean> {
   const { data: adminRow } = await admin
     .from("admins")
     .select("user_id")
     .eq("user_id", userId)
     .maybeSingle();
-  if (adminRow) return true;
+  if (adminWithMfa(Boolean(adminRow), authHeader)) return true;
   const { data: group } = await admin
     .from("groups")
     .select("created_by, venue_id")

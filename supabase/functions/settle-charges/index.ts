@@ -7,6 +7,7 @@ import {
   maySettle,
   settleGroup,
 } from "../_shared/settle_group.ts";
+import { adminWithMfa } from "../_shared/admin_session.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -29,11 +30,12 @@ Deno.serve(async (req) => {
       group_id?: string;
       sweep?: boolean;
     };
-    const { data: adminRow } = await admin
+    const { data: adminLookup } = await admin
       .from("admins")
       .select("user_id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
+    const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
 
     const ids: string[] = [];
     if (body.sweep) {
