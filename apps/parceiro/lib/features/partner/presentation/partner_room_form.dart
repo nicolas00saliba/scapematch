@@ -146,8 +146,15 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
   }
 
   Future<void> _addPhotos() async {
-    final files = await ref.read(photoPickerProvider).pick();
-    if (!mounted || files.isEmpty) {
+    final picked = await ref.read(photoPickerProvider).pick();
+    if (!mounted) {
+      return;
+    }
+    if (picked.error != null) {
+      setState(() => _error = picked.error);
+    }
+    final files = picked.photos;
+    if (files.isEmpty) {
       return;
     }
     for (var index = 0; index < files.length; index++) {

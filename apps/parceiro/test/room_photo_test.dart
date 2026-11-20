@@ -195,7 +195,7 @@ class _BytesPicker implements PhotoPicker {
   final List<Uint8List> photos;
 
   @override
-  Future<List<Uint8List>> pick() async => photos;
+  Future<RoomPhotoPick> pick() async => RoomPhotoPick(photos);
 }
 
 Future<Uint8List> _portrait() async {
