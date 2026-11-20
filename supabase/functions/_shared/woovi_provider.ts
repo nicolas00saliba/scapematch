@@ -109,9 +109,9 @@ export class WooviProvider implements PaymentProvider {
     ).then(() => ({ id: providerRef, status: "cancelled" }));
   }
 
-  /// Estorno total ou parcial. Em seguida debita a parte da casa,
-  /// porque o reembolso não sai da subconta.
-  async refund(input: RefundInput): Promise<ActionResult> {
+  /// Só o Pix de volta. O débito da subconta fica no despacho, que
+  /// grava o estorno antes e repete só o débito se ele falhar.
+  async refundPayment(input: RefundInput): Promise<ActionResult> {
     this.#assertMoney(input.valueCents);
     if (!input.endToEndId?.trim()) throw new Error("endToEndId ausente");
     const refunded = await this.#send("/api/v1/refund", {
@@ -121,22 +121,31 @@ export class WooviProvider implements PaymentProvider {
       comment: groupUnconfirmedNotice.slice(0, 140),
     });
     const refund = record(refunded.refund);
-    const debit = input.houseDebitCents ?? 0;
-    if (debit > 0) {
-      if (!input.housePixKey?.trim()) throw new Error("pix da casa ausente");
-      const full = input.chargeCents == null ||
-        input.valueCents >= input.chargeCents;
-      await this.debitSubaccount(
-        input.housePixKey,
-        debit,
-        full ? "Estorno" : "Estorno parcial",
-      );
-    }
     return {
       id: text(refund.correlationID) || input.correlationId,
       status: "refunded",
       endToEndId: input.endToEndId,
     };
+  }
+
+  /// Estorno e, em seguida, o débito da casa. Se o débito falha, o
+  /// Pix já foi devolvido e a função não lança: o débito fica pendente.
+  async refund(input: RefundInput): Promise<ActionResult> {
+    const result = await this.refundPayment(input);
+    const debit = input.houseDebitCents ?? 0;
+    if (debit > 0) {
+      if (!input.housePixKey?.trim()) throw new Error("pix da casa ausente");
+      try {
+        await this.debitSubaccount(
+          input.housePixKey,
+          debit,
+          refundDebitDescription(input),
+        );
+      } catch {
+        return result;
+      }
+    }
+    return result;
   }
 
   getPayment(providerRef: string): Promise<ActionResult> {
@@ -270,6 +279,14 @@ export function wooviEventStatus(event: string): string | null {
   if (name === "OPENPIX:CHARGE_EXPIRED") return "cancelled";
   if (name.includes("REFUND")) return "refunded";
   return null;
+}
+
+export function refundDebitDescription(input: {
+  valueCents: number;
+  chargeCents?: number | null;
+}): string {
+  const full = input.chargeCents == null || input.valueCents >= input.chargeCents;
+  return full ? "Estorno" : "Estorno parcial";
 }
 
 function record(value: unknown): Json {

@@ -4,7 +4,7 @@
 import { commissionCents } from "./scape_points.ts";
 import { cardDecisionAt, planCardHold } from "./card_hold.ts";
 import { commissionBpsForVenue } from "./commission_rate.ts";
-import { MercadoPagoProvider } from "./mercadopago_provider.ts";
+import { MercadoPagoProvider, storedCardStatus } from "./mercadopago_provider.ts";
 import {
   denoEnv,
   groupUnconfirmedNotice,
@@ -195,7 +195,7 @@ export async function createAlternateCharge(
       venue_id: venueId,
       amount_cents: amountCents,
       billing_type: "CREDIT_CARD",
-      status: authorized.status === "authorized" ? "authorized" : "failed",
+      status: storedCardStatus(authorized.status),
       provider: "mercadopago",
       provider_ref: authorized.id,
       idempotency_key: input.idempotencyKey,

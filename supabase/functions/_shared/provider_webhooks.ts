@@ -75,6 +75,7 @@ export async function handleWooviWebhook(
     await applyPaymentTransition(deps.admin, row.id, next, credit);
     return json({ ok: true, notice: groupUnconfirmedNotice });
   } catch (error) {
+    await releaseEvent(deps.admin, "woovi", eventId);
     logCaught("woovi-webhook", error);
     return json({ error: "erro" }, 500);
   }
@@ -125,10 +126,14 @@ export async function handleMpWebhook(
     );
     const credit = remote.status === "paid" &&
       await groupConfirmed(deps.admin, row.group_id);
-    if (remote.status === "pending") return json({ ok: true });
+    if (remote.status === "pending") {
+      await releaseEvent(deps.admin, "mercadopago", eventId);
+      return json({ ok: true, pending: true });
+    }
     await applyPaymentTransition(deps.admin, row.id, remote.status, credit);
     return json({ ok: true });
   } catch (error) {
+    await releaseEvent(deps.admin, "mercadopago", eventId);
     logCaught("mp-webhook", error);
     return json({ error: "erro" }, 500);
   }
@@ -220,6 +225,21 @@ function pemList(value: string): string[] {
   return [value];
 }
 
+async function releaseEvent(
+  admin: Admin,
+  provider: string,
+  eventId: string,
+): Promise<void> {
+  try {
+    await admin.rpc("release_provider_webhook", {
+      p_provider: provider,
+      p_event_id: eventId,
+    });
+  } catch (error) {
+    logCaught("provider-webhook", error);
+  }
+}
+
 async function claimEvent(
   admin: Admin,
   provider: string,
@@ -257,11 +277,17 @@ async function houseToken(deps: WebhookDeps, venueId: string): Promise<string> {
       p_provider: "mercadopago",
     });
     const token = loaded?.data?.access_token;
-    if (typeof token === "string" && token.trim()) return token;
-  } catch {
-    // Sem a função no banco, o token de teste da plataforma cobre o sandbox.
+    if (typeof token === "string" && token.trim()) return token.trim();
+  } catch (error) {
+    logCaught("mp-webhook", error);
   }
-  return readEnv(deps.env, "MP_ACCESS_TOKEN");
+  const fallback = readEnv(deps.env, "MP_ACCESS_TOKEN");
+  if (fallback.startsWith("TEST-") && fallback.length >= 20) return fallback;
+  console.error(JSON.stringify({
+    scope: "mp-webhook",
+    code: "oauth_da_casa_ausente",
+  }));
+  throw new Error("oauth da casa ausente");
 }
 
 async function groupConfirmed(admin: Admin, groupId: string): Promise<boolean> {

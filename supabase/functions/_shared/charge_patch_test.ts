@@ -126,12 +126,20 @@ Deno.test("a migração trava a cobrança e falha se houver duplicata", async ()
   assert(sql.includes("set search_path = ''"));
   assert(sql.includes("to service_role"));
   assertEquals(sql.includes("delete from public.ledger_entries"), false);
+  const extra = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20261120160000_provider_money_guards.sql",
+      import.meta.url,
+    ),
+  );
+  const combined = `${sql}\n${extra}`;
   for (const [from, targets] of Object.entries(chargeTransitions)) {
-    assert(sql.includes(`p_from = '${from}'`), from);
+    assert(combined.includes(`p_from = '${from}'`), from);
     for (const target of targets) {
-      assert(sql.includes(`'${target}'`), `${from}->${target}`);
+      assert(combined.includes(`'${target}'`), `${from}->${target}`);
     }
   }
+  assert(extra.includes("p_from = 'paid' and p_to in ('refunded', 'charged_back')"));
 });
 
 Deno.test("o webhook da Woovi usa a transição", async () => {

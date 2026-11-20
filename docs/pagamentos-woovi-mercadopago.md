@@ -43,11 +43,17 @@ Mercado Pago, mesma API de sandbox e produção (`https://api.mercadopago.com`).
 
 O webhook da Woovi aceita `x-openpix-signature` (HMAC SHA-256 do corpo cru, segredo `WOOVI_WEBHOOK_SECRET`) ou `x-webhook-signature` (RSA SHA-256 com a chave pública). Sem uma das duas, a função responde 401. O webhook do Mercado Pago exige `x-signature` e `x-request-id`. O manifest é `id:<data.id em minúsculas>;request-id:<x-request-id>;ts:<ts>;`, HMAC SHA-256 com `MP_WEBHOOK_SECRET`.
 
-Os dois gravam o evento em `provider_webhook_events`. A segunda entrega responde ok e não mexe no livro.
+Os dois gravam o evento em `provider_webhook_events` só quando o processamento termina. Se a função responde 500, a linha do evento é apagada e o reenvio entra de novo. A segunda entrega de um evento já processado responde ok e não mexe no livro. `in_process` e `pending` do Mercado Pago ficam pendentes. Chargeback grava `charged_back`, sem `refunded_at`.
+
+O `state` do OAuth do Mercado Pago é `v1.<casa>.<expira>.<nonce>.<hmac>`, vale 10 minutos e é conferido no callback. Sem o token OAuth da casa, o webhook e a captura só usam `MP_ACCESS_TOKEN` quando ele começa com `TEST-`. Em produção a função responde 500 e registra `oauth_da_casa_ausente`.
 
 ## Saque da casa
 
-O saldo da subconta aparece no EscapeMatch Parceiro. A casa não abre a Woovi. O botão saca para a chave Pix da subconta. O saque automático, com `auto_withdraw` na conta de repasse, dispara quando o grupo confirma, no valor da parte da casa. O cron diário não varre o saldo: o Pix já caiu na subconta antes da confirmação, e varrer esse saldo pagaria a casa cedo demais.
+O EscapeMatch Parceiro mostra o líquido do livro da casa, não o saldo da subconta. O botão saca no máximo esse líquido menos saques pendentes e concluídos. O Pix de grupo ainda não confirmado não entra no livro, então não entra no saque. Dois saques ao mesmo tempo travam a conta da casa (`SELECT ... FOR UPDATE` e advisory lock). O saque automático, com `auto_withdraw` na conta de repasse, dispara quando o grupo confirma, no valor da parte da casa. O cron diário não varre o saldo.
+
+O aviso Reservado diz: “Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.”
+
+O estorno Woovi grava a devolução antes do débito da subconta. Se o débito falha, o Pix não é estornado de novo; a tentativa seguinte só debita.
 
 ## Migration
 

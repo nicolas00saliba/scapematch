@@ -27,13 +27,12 @@ export async function wooviHouseBalance(
   actorId: string,
 ): Promise<Record<string, unknown>> {
   const account = await accountFor(deps, venueId, actorId);
-  const woovi = WooviProvider.fromEnv(deps.env, deps.fetchFn);
-  const balance = await woovi.balance(text(account.pix_key));
+  const available = await withdrawable(deps, venueId, actorId);
   return {
     provider: "woovi",
-    balance_cents: balance,
+    balance_cents: available,
     pix_key_masked: maskPix(text(account.pix_key)),
-    can_withdraw: text(account.status) === "active",
+    can_withdraw: text(account.status) === "active" && available > 0,
     notice: groupUnconfirmedNotice,
   };
 }
@@ -48,14 +47,13 @@ export async function wooviHouseWithdraw(
   const account = await accountFor(deps, input.venueId, input.actorId);
   const pixKey = text(account.pix_key);
   const woovi = WooviProvider.fromEnv(deps.env, deps.fetchFn);
-  const available = await woovi.balance(pixKey);
   const claimed = record(await deps.store.rpc("claim_provider_withdrawal", {
     p_venue_id: input.venueId,
     p_actor: input.actorId,
     p_source: "manual",
     p_period_key: "",
     p_amount_cents: input.amountCents,
-    p_available_cents: available,
+    p_available_cents: 0,
     p_provider: "woovi",
   }));
   const id = text(claimed.id);
@@ -107,6 +105,20 @@ export function wooviScheduledReport(): Record<string, unknown> {
     mode: "depois_da_sessao",
     notice: groupUnconfirmedNotice,
   };
+}
+
+async function withdrawable(
+  deps: HouseDeps,
+  venueId: string,
+  actorId: string,
+): Promise<number> {
+  const value = await deps.store.rpc("provider_house_withdrawable", {
+    p_venue_id: venueId,
+    p_actor: actorId,
+  });
+  const cents = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(cents) || cents < 0) return 0;
+  return cents;
 }
 
 async function accountFor(

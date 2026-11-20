@@ -96,8 +96,8 @@ abstract final class PartnerMessages {
   static const groupUnconfirmed =
       'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
   static const reservedBody =
-      'Ainda não entrou no saldo. $groupUnconfirmed';
-  static const wooviBalanceTitle = 'Saldo na Woovi';
+      'Ainda não entrou no saldo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
+  static const wooviBalanceTitle = 'Disponível para saque';
   static const wooviWithdraw = 'Sacar pela Woovi';
   static const mpConnect = 'Conectar Mercado Pago';
   static const mpConnected = 'Mercado Pago conectado nesta sessão.';

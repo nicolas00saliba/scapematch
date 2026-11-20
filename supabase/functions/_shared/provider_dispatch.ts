@@ -15,7 +15,7 @@ import {
   isAlternateProvider,
   readEnv,
 } from "./payment_provider.ts";
-import { WooviProvider } from "./woovi_provider.ts";
+import { refundDebitDescription, WooviProvider } from "./woovi_provider.ts";
 import type { EnvLike } from "./http.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -102,15 +102,69 @@ export async function refundAlternate(
   });
   if (row.provider === "woovi") {
     const woovi = gate.woovi ?? WooviProvider.fromEnv(envOf(gate));
-    await woovi.refund({
-      providerRef: row.provider_ref,
-      valueCents: refundCents,
-      chargeCents: row.amount_cents,
-      correlationId: `refund:${row.id}:${refundCents}`,
-      endToEndId: row.provider_end_to_end_id ?? "",
-      housePixKey: row.house_pix_key ?? "",
-      houseDebitCents: debit,
+    const endToEndId = row.provider_end_to_end_id ?? "";
+    const correlationId = `refund:${row.id}:${refundCents}`;
+    const phase = await refundPhase(admin, {
+      p_provider: "woovi",
+      p_end_to_end_id: endToEndId,
+      p_refund_cents: refundCents,
+      p_charge_id: row.id,
+      p_correlation_id: correlationId,
+      p_debit_cents: debit,
+      p_pix_key: row.house_pix_key ?? "",
     });
+    if (phase === "busy") throw new Error("estorno em andamento");
+    if (phase === "done") return;
+    if (phase === "refund") {
+      try {
+        await woovi.refundPayment({
+          providerRef: row.provider_ref,
+          valueCents: refundCents,
+          chargeCents: row.amount_cents,
+          correlationId,
+          endToEndId,
+          housePixKey: row.house_pix_key ?? "",
+          houseDebitCents: debit,
+        });
+      } catch (error) {
+        await admin.rpc("release_provider_refund", {
+          p_provider: "woovi",
+          p_end_to_end_id: endToEndId,
+          p_refund_cents: refundCents,
+        }).catch(() => undefined);
+        throw error;
+      }
+      await admin.rpc("mark_provider_refund_recorded", {
+        p_provider: "woovi",
+        p_end_to_end_id: endToEndId,
+        p_refund_cents: refundCents,
+      });
+    }
+    if (debit <= 0) {
+      await admin.rpc("mark_provider_debit_done", {
+        p_provider: "woovi",
+        p_end_to_end_id: endToEndId,
+        p_refund_cents: refundCents,
+      });
+      return;
+    }
+    try {
+      await woovi.debitSubaccount(
+        row.house_pix_key ?? "",
+        debit,
+        refundDebitDescription({
+          valueCents: refundCents,
+          chargeCents: row.amount_cents,
+        }),
+      );
+      await admin.rpc("mark_provider_debit_done", {
+        p_provider: "woovi",
+        p_end_to_end_id: endToEndId,
+        p_refund_cents: refundCents,
+      });
+    } catch (error) {
+      logCaught("woovi-debit", error);
+    }
     return;
   }
   const token = await accessToken(admin, gate, row.venue_id);
@@ -123,6 +177,18 @@ export async function refundAlternate(
     accessToken: token,
     idempotencyKey: `refund:${row.id}:${refundCents}`,
   });
+}
+
+async function refundPhase(
+  admin: Admin,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const result = await admin.rpc("claim_provider_refund", args);
+  const data = result?.data ?? result;
+  if (data === "refund" || data === "debit" || data === "done" || data === "busy") {
+    return data;
+  }
+  throw new Error("estorno");
 }
 
 async function withdrawAfterSession(
@@ -161,8 +227,12 @@ async function accessToken(
     if (typeof token === "string" && token.trim()) return token;
   }
   const fallback = readEnv(envOf(gate), "MP_ACCESS_TOKEN");
-  if (!fallback.trim()) throw new Error("oauth ausente");
-  return fallback.trim();
+  if (fallback.startsWith("TEST-") && fallback.length >= 20) return fallback;
+  console.error(JSON.stringify({
+    scope: "mp-cobranca",
+    code: "oauth_da_casa_ausente",
+  }));
+  throw new Error("oauth da casa ausente");
 }
 
 function envOf(gate: AlternateGate): EnvLike {

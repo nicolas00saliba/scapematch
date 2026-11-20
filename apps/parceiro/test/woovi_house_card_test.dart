@@ -7,6 +7,19 @@ import 'package:scapematch_parceiro/features/partner/presentation/woovi_house_ca
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 void main() {
+  test('o aviso Reservado descreve o Pix estornado e o cartão não capturado', () {
+    expect(
+      PartnerMessages.reservedBody,
+      contains(PartnerMessages.groupUnconfirmed),
+    );
+    expect(PartnerMessages.reservedBody, isNot(contains('Asaas')));
+    expect(PartnerMessages.reservedBody, isNot(contains('nada é cobrado')));
+    expect(
+      PartnerMessages.groupUnconfirmed,
+      'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.',
+    );
+  });
+
   testWidgets('o saldo da Woovi aparece sem flag de provedor', (tester) async {
     await tester.pumpWidget(_app(stack: 'woovi', repo: _FakePayments()));
     await tester.pumpAndSettle();

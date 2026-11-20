@@ -255,8 +255,18 @@ export function mapMpStatus(status: string): string {
   if (value === "authorized") return "authorized";
   if (value === "cancelled") return "cancelled";
   if (value === "rejected") return "failed";
-  if (value === "refunded" || value === "charged_back") return "refunded";
+  if (value === "refunded") return "refunded";
+  if (value === "charged_back" || value === "in_mediation") return "charged_back";
+  if (value === "pending" || value === "in_process") return "pending";
   return "pending";
+}
+
+/// Reserva ainda em análise continua pending. Chargeback não vira failed.
+export function storedCardStatus(remote: string): string {
+  if (remote === "authorized" || remote === "pending" || remote === "charged_back") {
+    return remote;
+  }
+  return "failed";
 }
 
 function mapPayment(payload: Record<string, unknown>): ActionResult {

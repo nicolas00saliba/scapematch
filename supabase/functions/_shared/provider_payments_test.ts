@@ -2,7 +2,7 @@ import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
 import { commissionCents } from "./scape_points.ts";
 import { createAlternateCharge } from "./alternate_charge.ts";
 import { cardAuthWindowMs, planCardHold } from "./card_hold.ts";
-import { MercadoPagoProvider, mpSignatureMatches, mpWebhookManifest, parseSignatureHeader, shouldRefreshOauth } from "./mercadopago_provider.ts";
+import { MercadoPagoProvider, mapMpStatus, mpSignatureMatches, mpWebhookManifest, parseSignatureHeader, shouldRefreshOauth, storedCardStatus } from "./mercadopago_provider.ts";
 import {
   groupUnconfirmedNotice,
   houseDebitForRefund,
@@ -13,6 +13,8 @@ import {
 import { buildReadiness } from "./payments_readiness.ts";
 import { handleMpWebhook, handleWooviWebhook, verifyWooviWebhook } from "./provider_webhooks.ts";
 import { refundAlternate } from "./provider_dispatch.ts";
+import { wooviHouseWithdraw } from "./provider_house.ts";
+import { signState, verifyState } from "./mp_oauth.ts";
 import { WooviProvider } from "./woovi_provider.ts";
 import { createCharge } from "../create-charge/index.ts";
 
@@ -272,8 +274,24 @@ Deno.test("o estorno Woovi do despacho debita a subconta", async () => {
     }
     return Promise.resolve(new Response(JSON.stringify({ success: "ok" })));
   };
+  let phase = "refund";
   await refundAlternate(
-    { rpc: () => Promise.resolve({ data: null, error: null }) },
+    {
+      rpc(fn: string) {
+        if (fn === "claim_provider_refund") {
+          return Promise.resolve({ data: phase, error: null });
+        }
+        if (fn === "mark_provider_refund_recorded") {
+          phase = "debit";
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (fn === "mark_provider_debit_done") {
+          phase = "done";
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      },
+    },
     {
       id: "c1",
       group_id: "g1",
@@ -553,9 +571,15 @@ function fakeAdmin(inserted: Record<string, unknown>[]) {
   };
 }
 
-function webhookAdmin(seen: string[], provider = "woovi") {
+function webhookAdmin(
+  seen: string[],
+  provider = "woovi",
+  options: { fail?: boolean } = {},
+) {
   const events = new Set<string>();
-  return {
+  const admin = {
+    fail: options.fail === true,
+    released: [] as string[],
     rpc(fn: string, args: Record<string, unknown>) {
       if (fn === "claim_provider_webhook") {
         const key = `${args.p_provider}:${args.p_event_id}`;
@@ -563,7 +587,14 @@ function webhookAdmin(seen: string[], provider = "woovi") {
         events.add(key);
         return Promise.resolve({ data: true, error: null });
       }
+      if (fn === "release_provider_webhook") {
+        const key = `${args.p_provider}:${args.p_event_id}`;
+        events.delete(key);
+        admin.released.push(key);
+        return Promise.resolve({ data: true, error: null });
+      }
       if (fn === "apply_payment_transition") {
+        if (admin.fail) return Promise.reject(new Error("livro"));
         seen.push(String(args.p_next_status));
         return Promise.resolve({
           data: {
@@ -609,6 +640,7 @@ function webhookAdmin(seen: string[], provider = "woovi") {
       return api;
     },
   };
+  return admin;
 }
 
 async function hmac(raw: string, secret: string): Promise<string> {
@@ -628,3 +660,208 @@ async function hmac(raw: string, secret: string): Promise<string> {
     byte.toString(16).padStart(2, "0")
   ).join("");
 }
+
+Deno.test("in_process fica pendente e chargeback não é estorno", () => {
+  assertEquals(mapMpStatus("in_process"), "pending");
+  assertEquals(mapMpStatus("pending"), "pending");
+  assertEquals(mapMpStatus("charged_back"), "charged_back");
+  assertEquals(mapMpStatus("in_mediation"), "charged_back");
+  assertEquals(mapMpStatus("refunded"), "refunded");
+  assertEquals(storedCardStatus("pending"), "pending");
+  assertEquals(storedCardStatus("in_process"), "failed");
+  assertEquals(storedCardStatus(mapMpStatus("in_process")), "pending");
+  assertEquals(storedCardStatus("charged_back"), "charged_back");
+  assertEquals(storedCardStatus("rejected"), "failed");
+});
+
+Deno.test("falha no webhook libera o evento para o reenvio", async () => {
+  const secret = "webhook-secret-woovi-32chars";
+  const raw = JSON.stringify({
+    event: "OPENPIX:CHARGE_COMPLETED",
+    charge: { correlationID: "idem-woovi-1", status: "COMPLETED" },
+    pix: { endToEndId: "E2E999" },
+  });
+  const header = await hmac(raw, secret);
+  const seen: string[] = [];
+  const admin = webhookAdmin(seen, "woovi", { fail: true });
+  const env = { get: (name: string) => name === "WOOVI_WEBHOOK_SECRET" ? secret : "" };
+  const req = new Request("https://exemplo.test/woovi-webhook", {
+    method: "POST",
+    headers: { "x-openpix-signature": header },
+    body: raw,
+  });
+  const failed = await handleWooviWebhook(req, { env, admin, rawBody: raw });
+  assertEquals(failed.status, 500);
+  assertEquals(admin.released.length, 1);
+  admin.fail = false;
+  const again = await handleWooviWebhook(req, { env, admin, rawBody: raw });
+  assertEquals(again.status, 200);
+  assertEquals(seen, ["paid"]);
+});
+
+Deno.test("mp-webhook em produção não usa o token da plataforma", async () => {
+  const secret = "mp-webhook-secret-32chars";
+  const dataId = "99";
+  const requestId = "req-prod";
+  const ts = "1700000000";
+  const manifest = mpWebhookManifest({ dataId, requestId, ts });
+  const v1 = await hmac(manifest, secret);
+  const raw = JSON.stringify({ id: "evt-prod", action: "payment.updated", data: { id: dataId } });
+  const seen: string[] = [];
+  const urls: string[] = [];
+  const admin = webhookAdmin(seen, "mercadopago");
+  const env = {
+    get: (name: string) => {
+      if (name === "MP_WEBHOOK_SECRET") return secret;
+      if (name === "MP_ACCESS_TOKEN") return "APP_USR-plataforma-nao-usar";
+      return "";
+    },
+  };
+  const response = await handleMpWebhook(
+    new Request(`https://exemplo.test/mp-webhook?data.id=${dataId}`, {
+      method: "POST",
+      headers: { "x-signature": `ts=${ts},v1=${v1}`, "x-request-id": requestId },
+      body: raw,
+    }),
+    {
+      env,
+      admin,
+      rawBody: raw,
+      fetchFn: (url) => {
+        urls.push(url);
+        return Promise.resolve(new Response("{}"));
+      },
+    },
+  );
+  assertEquals(response.status, 500);
+  assertEquals(urls, []);
+  assertEquals(admin.released.length, 1);
+  assertEquals(seen, []);
+});
+
+Deno.test("o state do Mercado Pago muda e vence", async () => {
+  const secret = "state-secret-16chars";
+  const venueId = "11111111-1111-4111-8111-111111111111";
+  const now = new Date("2026-11-20T12:00:00.000Z");
+  const first = await signState({
+    venueId,
+    secret,
+    nonce: "a".repeat(32),
+    expiresAt: now.getTime() + 60_000,
+  });
+  const second = await signState({
+    venueId,
+    secret,
+    nonce: "b".repeat(32),
+    expiresAt: now.getTime() + 60_000,
+  });
+  assert(first !== second);
+  assertEquals(await verifyState({ state: first, venueId, secret, now }), true);
+  assertEquals(await verifyState({
+    state: first,
+    venueId,
+    secret,
+    now: new Date(now.getTime() + 11 * 60 * 1000),
+  }), false);
+  assertEquals(await verifyState({
+    state: `${venueId}.assinatura-fixa`,
+    venueId,
+    secret,
+    now,
+  }), false);
+});
+
+Deno.test("o saque manual não lê o saldo da subconta", async () => {
+  const urls: string[] = [];
+  const fetchFn = (url: string) => {
+    urls.push(url);
+    return Promise.resolve(new Response(JSON.stringify({
+      withdrawal: { status: "success", value: 3000 },
+      SubAccount: { balance: 999999 },
+    })));
+  };
+  const result = await wooviHouseWithdraw({
+    env: { get: (name: string) => name === "WOOVI_APP_ID" ? "app" : name === "WOOVI_BASE_URL" ? "https://api.woovi-sandbox.com" : "" },
+    fetchFn,
+    store: {
+      rpc(fn: string, args: Record<string, unknown>) {
+        if (fn === "provider_house_account") {
+          return Promise.resolve({ pix_key: "casa@pix", status: "active" });
+        }
+        if (fn === "claim_provider_withdrawal") {
+          assertEquals(args.p_amount_cents, 3000);
+          assertEquals(args.p_available_cents, 0);
+          return Promise.resolve({
+            id: "11111111-1111-4111-8111-111111111111",
+            amount_cents: 3000,
+          });
+        }
+        if (fn === "begin_withdrawal_dispatch") return Promise.resolve(true);
+        if (fn === "attach_venue_transfer") return Promise.resolve(true);
+        return Promise.resolve(null);
+      },
+    },
+  }, {
+    venueId: "22222222-2222-4222-8222-222222222222",
+    actorId: "33333333-3333-4333-8333-333333333333",
+    amountCents: 3000,
+  });
+  assertEquals(result.status, 200);
+  assertEquals(urls.some((url) => url.includes("/subaccount/") && !url.endsWith("/withdraw")), false);
+  assert(urls.some((url) => url.endsWith("/withdraw")));
+});
+
+Deno.test("débito da subconta falho não estorna o Pix de novo", async () => {
+  const refunds: string[] = [];
+  let phase = "refund";
+  const fetchFn = (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/refund")) {
+      refunds.push(String(init?.body));
+      return Promise.resolve(new Response(JSON.stringify({
+        refund: { correlationID: "r", status: "PROCESSING" },
+      })));
+    }
+    if (url.endsWith("/debit")) {
+      return Promise.resolve(new Response("falhou", { status: 500 }));
+    }
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  };
+  const admin = {
+    rpc(fn: string) {
+      if (fn === "claim_provider_refund") {
+        return Promise.resolve({ data: phase, error: null });
+      }
+      if (fn === "mark_provider_refund_recorded") {
+        phase = "debit";
+        return Promise.resolve({ data: true, error: null });
+      }
+      if (fn === "release_provider_refund") {
+        phase = "refund";
+        return Promise.resolve({ data: true, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    },
+  };
+  const row = {
+    id: "c1",
+    group_id: "g1",
+    user_id: "u1",
+    venue_id: "v1",
+    amount_cents: 10000,
+    commission_bps: 2000,
+    status: "paid",
+    provider: "woovi",
+    provider_ref: "charge-1",
+    billing_type: "PIX",
+    provider_end_to_end_id: "E2E999",
+    house_pix_key: "casa@pix",
+    house_fixed_cents: 8000,
+  };
+  const gate = {
+    woovi: new WooviProvider("app", "https://api.woovi-sandbox.com", fetchFn),
+  };
+  await refundAlternate(admin, row, gate, 10000);
+  await refundAlternate(admin, row, gate, 10000);
+  assertEquals(refunds.length, 1);
+  assertEquals(phase, "debit");
+});

@@ -53,7 +53,12 @@ async function start(
   if (!clientId || !redirect || secret.length < 16) {
     return { status: 503, body: { error: "config_ausente" } };
   }
-  const state = await signState(venueId, secret);
+  const state = await signState({
+    venueId,
+    secret,
+    nonce: randomNonce(),
+    expiresAt: (deps.now ?? new Date()).getTime() + stateTtlMs,
+  });
   return {
     status: 200,
     body: {
@@ -70,8 +75,13 @@ async function callback(
   state: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const secret = stateSecret(deps);
-  const expected = await signState(venueId, secret);
-  if (!code || !timingSafeEqualText(state, expected)) {
+  const valid = await verifyState({
+    state,
+    venueId,
+    secret,
+    now: deps.now ?? new Date(),
+  });
+  if (!code || !valid) {
     return { status: 401, body: { error: "unauthorized" } };
   }
   const token = await exchangeAuthorizationCode({
@@ -103,7 +113,46 @@ async function callback(
   };
 }
 
-export async function signState(venueId: string, secret: string): Promise<string> {
+const stateTtlMs = 10 * 60 * 1000;
+
+export async function signState(input: {
+  venueId: string;
+  secret: string;
+  nonce: string;
+  expiresAt: number;
+}): Promise<string> {
+  const payload = `v1.${input.venueId}.${input.expiresAt}.${input.nonce}`;
+  const hex = await hmacHex(input.secret, payload);
+  return `${payload}.${hex}`;
+}
+
+export async function verifyState(input: {
+  state: string;
+  venueId: string;
+  secret: string;
+  now: Date;
+}): Promise<boolean> {
+  const parts = input.state.split(".");
+  if (parts.length !== 5 || parts[0] !== "v1") return false;
+  const [, venueId, expText, nonce, signature] = parts;
+  const expiresAt = Number(expText);
+  if (venueId !== input.venueId || !nonce || !Number.isInteger(expiresAt)) {
+    return false;
+  }
+  if (expiresAt <= input.now.getTime()) return false;
+  if (expiresAt > input.now.getTime() + stateTtlMs) return false;
+  const payload = `v1.${venueId}.${expiresAt}.${nonce}`;
+  const expected = await hmacHex(input.secret, payload);
+  return timingSafeEqualText(signature, expected);
+}
+
+function randomNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function hmacHex(secret: string, payload: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -114,12 +163,11 @@ export async function signState(venueId: string, secret: string): Promise<string
   const signed = await crypto.subtle.sign(
     "HMAC",
     key,
-    new TextEncoder().encode(venueId),
+    new TextEncoder().encode(payload),
   );
-  const hex = [...new Uint8Array(signed)].map((byte) =>
+  return [...new Uint8Array(signed)].map((byte) =>
     byte.toString(16).padStart(2, "0")
   ).join("");
-  return `${venueId}.${hex}`;
 }
 
 function stateSecret(deps: OauthDeps): string {
