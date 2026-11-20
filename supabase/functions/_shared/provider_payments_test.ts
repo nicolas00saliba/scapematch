@@ -10,6 +10,8 @@ import {
   providerForBilling,
   wooviSplits,
 } from "./payment_provider.ts";
+import { loggedErrorMessage } from "./client_error.ts";
+import { handleMpPublicKey } from "./mp_public_key.ts";
 import { buildReadiness } from "./payments_readiness.ts";
 import { handleMpWebhook, handleWooviWebhook, verifyWooviWebhook } from "./provider_webhooks.ts";
 import { refundAlternate } from "./provider_dispatch.ts";
@@ -385,6 +387,97 @@ Deno.test("cartão longe da decisão não reserva no Mercado Pago", async () => 
   assertEquals(called, false);
 });
 
+const platformToken = "APP_USR-sandbox-token-20";
+
+Deno.test("create-charge em sandbox usa o token da plataforma sem OAuth da casa", async () => {
+  const seen: string[] = [];
+  const response = await cardCharge({
+    env: {
+      get: (name) => {
+        if (name === "MP_ENV") return "sandbox";
+        if (name === "MP_ACCESS_TOKEN") return platformToken;
+        return "";
+      },
+    },
+    onAuth: (header) => seen.push(header),
+  });
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.provider, "mercadopago");
+  assertEquals(body.status, "authorized");
+  assertEquals(body.notice, phrase);
+  assertEquals(seen, [`Bearer ${platformToken}`]);
+});
+
+Deno.test("create-charge sem MP_ENV não usa o token APP_USR- da plataforma", async () => {
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+  try {
+    let called = false;
+    const response = await cardCharge({
+      env: {
+        get: (name) => name === "MP_ACCESS_TOKEN" ? platformToken : "",
+      },
+      onAuth: () => {
+        called = true;
+      },
+    });
+    const body = await response.json();
+    assertEquals(response.status, 500);
+    assertEquals(body.error, "internal_error");
+    assertEquals(typeof body.ref, "string");
+    assertEquals(called, false);
+    const log = lines.join("\n");
+    assertEquals(log.includes("oauth da casa ausente"), true);
+    assertEquals(log.includes(String(body.ref)), true);
+    assertEquals(log.includes(platformToken), false);
+    assertEquals(log.includes("APP_USR-"), false);
+  } finally {
+    console.error = original;
+  }
+});
+
+Deno.test("o log do create-charge não guarda cartão nem token", () => {
+  const message = loggedErrorMessage(new Error(
+    `falha 4111111111111111 Bearer ${platformToken}`,
+  ));
+  assertEquals(message.includes("4111111111111111"), false);
+  assertEquals(message.includes(platformToken), false);
+  assertEquals(message.includes("APP_USR-"), false);
+  assertEquals(message.includes("falha"), true);
+});
+
+Deno.test("mp-public-key devolve só a Public Key", () => {
+  const key = "TEST-public-key-123456";
+  const env = {
+    get: (name: string) => {
+      if (name === "MP_PUBLIC_KEY") return key;
+      if (name === "MP_ACCESS_TOKEN") return platformToken;
+      return "";
+    },
+  };
+  const ok = handleMpPublicKey(
+    new Request("https://exemplo.test/mp-public-key"),
+    env,
+  );
+  return ok.json().then((body) => {
+    assertEquals(ok.status, 200);
+    assertEquals(body.public_key, key);
+    assertEquals(JSON.stringify(body).includes(platformToken), false);
+    const missing = handleMpPublicKey(
+      new Request("https://exemplo.test/mp-public-key", { method: "POST" }),
+      { get: () => "" },
+    );
+    return missing.json().then((empty) => {
+      assertEquals(missing.status, 503);
+      assertEquals(empty.error, "config_ausente");
+    });
+  });
+});
+
 Deno.test("webhook Woovi exige assinatura e é idempotente", async () => {
   const secret = "webhook-secret-woovi-32chars";
   const raw = JSON.stringify({
@@ -493,6 +586,7 @@ Deno.test("a prontidão por provedor não devolve segredo", () => {
       if (name === "MP_WEBHOOK_SECRET") return secret;
       if (name === "MP_OAUTH_REDIRECT_URI") return "https://parceiro.scapematch.com.br/mp";
       if (name === "MP_ACCESS_TOKEN") return "TEST-token-da-casa-123456";
+      if (name === "MP_PUBLIC_KEY") return "TEST-public-key-123456";
       return "";
     },
   }, {});
@@ -503,7 +597,9 @@ Deno.test("a prontidão por provedor não devolve segredo", () => {
   assertEquals(report.mp_client_secret, true);
   assertEquals(report.mp_env_sandbox, false);
   assertEquals(report.mp_access_token_test, true);
+  assertEquals(report.mp_public_key, true);
   assertEquals(JSON.stringify(report).includes(secret), false);
+  assertEquals(JSON.stringify(report).includes("TEST-public-key"), false);
   assertEquals(JSON.stringify(report).includes("TEST-token"), false);
 });
 
@@ -518,7 +614,59 @@ function request(): Request {
   });
 }
 
-function fakeAdmin(inserted: Record<string, unknown>[]) {
+function cardCharge(input: {
+  env: { get(name: string): string };
+  onAuth: (header: string) => void;
+}): Promise<Response> {
+  return createCharge(
+    new Request("https://exemplo.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: "group-1",
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-card-oauth",
+        card_token: "tok_aparelho",
+        payment_method_id: "visa",
+      }),
+    }),
+    {
+      user: { id: "user-1", email: "a@b.co" },
+      admin: fakeAdmin([], {
+        group: {
+          starts_at: "2099-01-01T18:00:00.000Z",
+          closes_at: "2026-11-21T12:00:00.000Z",
+        },
+        rpc(name) {
+          if (name === "read_provider_oauth") {
+            return Promise.reject(new Error("oauth ausente"));
+          }
+          return undefined;
+        },
+      }),
+      now: new Date("2026-11-20T12:00:00.000Z"),
+      env: input.env,
+      mercadoPago: new MercadoPagoProvider((_url, init) => {
+        const headers = new Headers(init?.headers);
+        input.onAuth(headers.get("Authorization") ?? "");
+        return Promise.resolve(new Response(JSON.stringify({
+          id: 99,
+          status: "authorized",
+          captured: false,
+        })));
+      }),
+    },
+  );
+}
+
+function fakeAdmin(
+  inserted: Record<string, unknown>[],
+  options: {
+    group?: Record<string, unknown>;
+    rpc?: (
+      name: string,
+    ) => Promise<{ data: unknown; error: { message?: string } | null }> | undefined;
+  } = {},
+) {
   const tables: Record<string, Record<string, unknown>> = {
     groups: {
       id: "group-1",
@@ -527,6 +675,7 @@ function fakeAdmin(inserted: Record<string, unknown>[]) {
       cancelled_at: null,
       starts_at: "2027-06-01T18:00:00.000Z",
       closes_at: "2027-06-01T12:00:00.000Z",
+      ...options.group,
     },
     group_members: { id: "member-1", attendance: "confirmed" },
     venues: { id: "venue-1", name: "Casa", status: "approved" },
@@ -561,6 +710,8 @@ function fakeAdmin(inserted: Record<string, unknown>[]) {
       return api;
     },
     rpc(name: string) {
+      const custom = options.rpc?.(name);
+      if (custom) return custom;
       if (name === "commission_bps_for_venue") {
         return Promise.resolve({ data: 2000, error: null });
       }

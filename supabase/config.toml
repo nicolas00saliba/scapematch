@@ -54,6 +54,10 @@ verify_jwt = false
 [functions.mp-oauth]
 verify_jwt = true
 
+# A Public Key não é segredo. O app lê antes de tokenizar no Mercado Pago.
+[functions.mp-public-key]
+verify_jwt = false
+
 # E-mails do Auth, em pt-BR. O CLI local lê subject e content_path.
 # O projeto remoto não muda sozinho. Cole cada assunto e o HTML em
 # Authentication > Email Templates, ou rode tool/apply_auth_email_templates.sh

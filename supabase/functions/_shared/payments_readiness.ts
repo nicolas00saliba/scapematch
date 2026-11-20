@@ -33,6 +33,7 @@ export type ReadinessReport = {
   mp_oauth_redirect_uri: boolean;
   mp_env_sandbox: boolean;
   mp_access_token_test: boolean;
+  mp_public_key: boolean;
 };
 
 export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
@@ -74,6 +75,7 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
     mp_oauth_redirect_uri: secretPresent(env.get("MP_OAUTH_REDIRECT_URI")),
     mp_env_sandbox: mpEnvMode(env) === "sandbox",
     mp_access_token_test: mpPlatformFallback(env) !== null,
+    mp_public_key: secretPresent(env.get("MP_PUBLIC_KEY")),
   };
 }
 

@@ -4,7 +4,11 @@
 import { commissionCents } from "./scape_points.ts";
 import { cardDecisionAt, planCardHold } from "./card_hold.ts";
 import { commissionBpsForVenue } from "./commission_rate.ts";
-import { MercadoPagoProvider, storedCardStatus } from "./mercadopago_provider.ts";
+import {
+  MercadoPagoProvider,
+  mpPlatformFallback,
+  storedCardStatus,
+} from "./mercadopago_provider.ts";
 import {
   denoEnv,
   groupUnconfirmedNotice,
@@ -281,38 +285,50 @@ async function houseAccessToken(
   now: Date,
   fetchFn?: FetchLike,
 ): Promise<string> {
-  const loaded = await admin.rpc("read_provider_oauth", {
-    p_venue_id: venueId,
-    p_provider: "mercadopago",
-  });
-  if (loaded.error || !loaded.data || typeof loaded.data !== "object") {
-    throw new Error("oauth ausente");
+  let access = "";
+  try {
+    const loaded = await admin.rpc("read_provider_oauth", {
+      p_venue_id: venueId,
+      p_provider: "mercadopago",
+    });
+    if (!loaded.error && loaded.data && typeof loaded.data === "object") {
+      const row = loaded.data as Json;
+      access = text(row.access_token);
+      if (access) {
+        const refresh = text(row.refresh_token);
+        const expires = new Date(text(row.expires_at));
+        const { shouldRefreshOauth, refreshAccessToken } = await import(
+          "./mercadopago_provider.ts"
+        );
+        if (
+          refresh && !Number.isNaN(expires.getTime()) &&
+          shouldRefreshOauth(expires, now)
+        ) {
+          const renewed = await refreshAccessToken({
+            clientId: readEnv(env, "MP_CLIENT_ID"),
+            clientSecret: readEnv(env, "MP_CLIENT_SECRET"),
+            refreshToken: refresh,
+            now,
+          }, fetchFn);
+          await admin.rpc("store_provider_oauth", {
+            p_venue_id: venueId,
+            p_provider: "mercadopago",
+            p_access_token: renewed.accessToken,
+            p_refresh_token: renewed.refreshToken,
+            p_expires_at: renewed.expiresAt,
+          });
+          return renewed.accessToken;
+        }
+        return access;
+      }
+    }
+  } catch {
+    // 42501 "oauth ausente" não tem token. Falha na renovação usa o atual.
+    if (access) return access;
   }
-  const row = loaded.data as Json;
-  const access = text(row.access_token);
-  const refresh = text(row.refresh_token);
-  const expires = new Date(text(row.expires_at));
-  const { shouldRefreshOauth, refreshAccessToken } = await import(
-    "./mercadopago_provider.ts"
-  );
-  if (!access) throw new Error("oauth ausente");
-  if (!refresh || Number.isNaN(expires.getTime()) || !shouldRefreshOauth(expires, now)) {
-    return access;
-  }
-  const renewed = await refreshAccessToken({
-    clientId: readEnv(env, "MP_CLIENT_ID"),
-    clientSecret: readEnv(env, "MP_CLIENT_SECRET"),
-    refreshToken: refresh,
-    now,
-  }, fetchFn);
-  await admin.rpc("store_provider_oauth", {
-    p_venue_id: venueId,
-    p_provider: "mercadopago",
-    p_access_token: renewed.accessToken,
-    p_refresh_token: renewed.refreshToken,
-    p_expires_at: renewed.expiresAt,
-  });
-  return renewed.accessToken;
+  const fallback = mpPlatformFallback(env);
+  if (fallback) return fallback;
+  throw new Error("oauth da casa ausente");
 }
 
 async function saveCharge(admin: Admin, row: Json): Promise<void> {

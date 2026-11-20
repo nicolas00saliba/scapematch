@@ -6,12 +6,24 @@ export type ClientBody = { error: string; ref?: string };
 
 export type ClientResult = { status: number; body: ClientBody };
 
-/// Log de falha interna: função, tipo curto e id. Sem mensagem nem corpo.
+/// Mensagem curta para o log do create-charge. PAN, token e segredo saem.
+export function loggedErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "";
+  return redactSensitive(raw)
+    .replace(/\b(?:APP_USR|TEST)-[A-Za-z0-9_-]+/g, "[redacted]")
+    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+    .slice(0, 240);
+}
+
+/// Log de falha interna: função, tipo curto e id. O create-charge também
+/// grava a mensagem já mascarada. Os outros escopos continuam sem mensagem.
 export function logInternalError(scope: string, error: unknown): string {
   const ref = crypto.randomUUID();
   const name = error instanceof Error ? error.name : "";
   const code = safeCode.test(name) ? name : "unknown";
-  console.error(redactSensitive(JSON.stringify({ scope, code, ref })));
+  const entry: Record<string, string> = { scope, code, ref };
+  if (scope === "create-charge") entry.message = loggedErrorMessage(error);
+  console.error(redactSensitive(JSON.stringify(entry)));
   return ref;
 }
 
