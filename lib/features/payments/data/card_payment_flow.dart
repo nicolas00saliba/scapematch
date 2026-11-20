@@ -60,9 +60,7 @@ typedef FunctionInvoker = Future<Map<String, dynamic>> Function(
 /// O número, o CVV e a validade não entram em pedido nenhum.
 Map<String, dynamic> tokenizeCardBody(CardDraft card) {
   if (card.number.isNotEmpty || card.number.isEmpty) {
-    throw StateError(
-      'O token do cartão nasce no aparelho, no Mercado Pago.',
-    );
+    throw StateError('O token do cartão nasce no aparelho, no Mercado Pago.');
   }
   return const {};
 }
@@ -74,6 +72,7 @@ Map<String, dynamic> createChargeBody({
   required PaymentMethodKind kind,
   String? savedCardId,
   String? cardToken,
+  String? paymentMethodId,
   int points = 0,
 }) {
   return {
@@ -83,6 +82,8 @@ Map<String, dynamic> createChargeBody({
     if (kind == PaymentMethodKind.card && savedCardId != null)
       'saved_card_id': savedCardId,
     if (cardToken != null && cardToken.isNotEmpty) 'card_token': cardToken,
+    if (paymentMethodId != null && paymentMethodId.isNotEmpty)
+      'payment_method_id': paymentMethodId,
     if (points > 0) 'points': points,
   };
 }
@@ -105,15 +106,17 @@ bool chargeBodyHasRawCard(Map<String, dynamic> body) {
 
 /// Tokeniza e só então cobra com o id interno devolvido.
 class CardPaymentFlow {
-  const CardPaymentFlow(this.invoke);
+  const CardPaymentFlow(this.invoke, {this.tokenizeCard});
 
   final FunctionInvoker invoke;
 
+  /// Tokeniza no Mercado Pago, no aparelho. Sem isto, o fluxo não cobra.
+  final Future<({String id, String paymentMethodId})> Function(CardDraft card)?
+  tokenizeCard;
+
   Future<SavedCardRef> tokenize(CardDraft card) async {
     tokenizeCardBody(card);
-    throw StateError(
-      'O token do cartão nasce no aparelho, no Mercado Pago.',
-    );
+    throw StateError('O token do cartão nasce no aparelho, no Mercado Pago.');
   }
 
   Future<Map<String, dynamic>> charge({
@@ -140,18 +143,25 @@ class CardPaymentFlow {
     required CardDraft card,
     required String groupId,
     required String idempotencyKey,
-  }) {
-    return tokenize(card).then((_) {
-      throw StateError(
-        'O token do cartão nasce no aparelho, no Mercado Pago.',
-      );
-    });
+  }) async {
+    final mint = tokenizeCard;
+    if (mint == null) {
+      throw StateError('O token do cartão nasce no aparelho, no Mercado Pago.');
+    }
+    final device = await mint(card);
+    return chargeToken(
+      groupId: groupId,
+      idempotencyKey: idempotencyKey,
+      cardToken: device.id,
+      paymentMethodId: device.paymentMethodId,
+    );
   }
 
   Future<Map<String, dynamic>> chargeToken({
     required String groupId,
     required String idempotencyKey,
     required String cardToken,
+    String? paymentMethodId,
     int points = 0,
   }) {
     final body = createChargeBody(
@@ -159,6 +169,7 @@ class CardPaymentFlow {
       idempotencyKey: idempotencyKey,
       kind: PaymentMethodKind.card,
       cardToken: cardToken,
+      paymentMethodId: paymentMethodId,
       points: points,
     );
     if (chargeBodyHasRawCard(body)) {

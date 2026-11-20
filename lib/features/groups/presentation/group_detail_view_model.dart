@@ -28,7 +28,7 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
   }
 
   /// [savedCardId] é o id interno de um cartão já tokenizado. Um cartão novo
-  /// passa por [payWithNewCard], que chama `tokenize-card` antes da cobrança.
+  /// passa por [payWithNewCard], que tokeniza no Mercado Pago antes da cobrança.
   Future<PayShareResult> payShare(
     PaymentMethodKind kind, {
     String? savedCardId,

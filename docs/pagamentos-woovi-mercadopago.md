@@ -84,7 +84,8 @@ supabase secrets set --project-ref <project-ref> \
   MP_OAUTH_STATE_SECRET='<segredo do state OAuth, 16 caracteres ou mais; se vazio, usa MP_CLIENT_SECRET>' \
   MP_OAUTH_REDIRECT_URI='https://parceiro.escapematch.com.br/mp-retorno' \
   MP_WEBHOOK_SECRET='<assinatura secreta do webhook Mercado Pago>' \
-  MP_ACCESS_TOKEN='<access token da aba Teste, prefixo APP_USR- ou TEST-, só com MP_ENV=sandbox e se a casa ainda não conectou>'
+  MP_ACCESS_TOKEN='<access token da aba Teste, prefixo APP_USR- ou TEST-, só com MP_ENV=sandbox e se a casa ainda não conectou>' \
+  MP_PUBLIC_KEY='<Public Key da mesma aplicação; vai para o aparelho>'
 ```
 
 Não existe `PAYMENTS_PROVIDER`. O Parceiro mostra saldo e saque da Woovi sem `--dart-define`.
@@ -92,6 +93,15 @@ Não existe `PAYMENTS_PROVIDER`. O Parceiro mostra saldo e saque da Woovi sem `-
 `WOOVI_BASE_URL` de produção é `https://api.woovi.com`. Não é segredo. Enquanto a revisão não termina, deixe a URL de sandbox.
 
 O access token OAuth da casa não é variável de ambiente. A função grava o par cifrado e renova antes de 180 dias.
+
+`MP_PUBLIC_KEY` é a Public Key do Mercado Pago. Ela pode ir no cliente. O número, o CVV e a validade saem do aparelho direto para `https://api.mercadopago.com/v1/card_tokens`. O `create-charge` recebe só `card_token` e `payment_method_id`. Sem `MP_ENV`, o token `APP_USR-` da plataforma não autoriza a cobrança: a casa precisa do OAuth.
+
+Duas formas de entregar a chave, a primeira que existir ganha:
+
+- no build do app jogador, `--dart-define=MP_PUBLIC_KEY=<Public Key>`;
+- senão, a função pública `mp-public-key` lê `MP_PUBLIC_KEY` do ambiente e devolve só `{ "public_key": "..." }`. Não leva JWT (`verify_jwt = false`). Sem a variável, responde 503 `config_ausente`.
+
+A frase continua: “Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.”
 
 ## Prontidão
 
@@ -110,6 +120,7 @@ O access token OAuth da casa não é variável de ambiente. A função grava o p
 | `mp_oauth_redirect_uri` | `MP_OAUTH_REDIRECT_URI` não vazia |
 | `mp_env_sandbox` | `MP_ENV` é exatamente `sandbox` |
 | `mp_access_token_test` | o token da plataforma pode entrar no lugar do OAuth: `MP_ENV=sandbox` e `MP_ACCESS_TOKEN` com pelo menos 20 caracteres, ou `MP_ENV` vazia e token começando com `TEST-`. `production` ou outro valor deixa o campo falso |
+| `mp_public_key` | `MP_PUBLIC_KEY` não vazia. O valor não sai nesta resposta; o aparelho lê a função `mp-public-key` ou o `--dart-define` |
 
 O valor não sai na resposta.
 
@@ -159,6 +170,7 @@ Republicar com o código novo antes de deixar o cron bater na versão antiga:
 - `invoice-document`
 - `payments-readiness`
 - `cancel-house-group`
+- `mp-public-key`
 
 Crons para desligar depois que a função nova estiver no ar, ou assim que a versão antiga ainda estiver publicada:
 
@@ -170,5 +182,6 @@ Crons para desligar depois que a função nova estiver no ar, ou assim que a ver
 
 - O saldo da subconta vem em centavos.
 - O `endToEndId` do Pix pago chega no webhook `OPENPIX:CHARGE_COMPLETED` e o estorno parcial debita a subconta de verdade.
-- O access token OAuth da casa, da aba Teste (`APP_USR-` ou `TEST-`), autoriza com `capture=false` e a comissão cai em `application_fee`. `MP_ENV=sandbox` precisa estar definido para o token `APP_USR-` da plataforma servir de fallback.
+- O access token OAuth da casa, da aba Teste (`APP_USR-` ou `TEST-`), autoriza com `capture=false` e a comissão cai em `application_fee`. `MP_ENV=sandbox` precisa estar definido para o token `APP_USR-` da plataforma servir de fallback no `create-charge`, no webhook e na captura. Sem `MP_ENV`, esse fallback não vale.
+- A Public Key da mesma aplicação tokeniza o cartão no aparelho. Sem ela, o app não envia o número para lugar nenhum.
 - A assinatura real da Woovi com a chave publicada em `/api/v1/webhook/public-keys`, se o HMAC do painel não for usado.
