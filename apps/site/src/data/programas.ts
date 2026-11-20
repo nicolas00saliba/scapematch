@@ -48,7 +48,7 @@ export const programas: Programa[] = [
     og: '/assets/og/vantagens.png',
     cta: {
       rotulo: 'Criar conta e ganhar 100 pontos',
-      href: 'https://app.escapematch.com.br/cadastro',
+      href: 'https://app.escapematch.com.br/',
       externo: true,
     },
   },
@@ -69,7 +69,7 @@ export const programas: Programa[] = [
     og: '/assets/og/vantagens.png',
     cta: {
       rotulo: 'Criar conta e ganhar 100 pontos',
-      href: 'https://app.escapematch.com.br/cadastro',
+      href: 'https://app.escapematch.com.br/',
       externo: true,
     },
   },
