@@ -126,7 +126,7 @@ class _WooviHouseCardState extends ConsumerState<WooviHouseCard> {
           .mpConnectUrl(widget.venueId);
       final launch = widget.launchUrl ?? launchExternalUrl;
       await launch(uri);
-      if (mounted) setState(() => _message = PartnerMessages.mpConnected);
+      if (mounted) setState(() => _message = PartnerMessages.mpConnectOpened);
     } on Object {
       if (mounted) {
         setState(() => _message = PartnerMessages.withdrawalsLoadError);

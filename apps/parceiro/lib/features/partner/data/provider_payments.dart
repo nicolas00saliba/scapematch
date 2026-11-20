@@ -26,6 +26,12 @@ abstract class ProviderPaymentsRepository {
   Future<void> withdraw({required String venueId, required int amountCents});
 
   Future<Uri> mpConnectUrl(String venueId);
+
+  Future<void> completeMpOauth({
+    required String venueId,
+    required String code,
+    required String state,
+  });
 }
 
 class SupabaseProviderPaymentsRepository implements ProviderPaymentsRepository {
@@ -65,6 +71,20 @@ class SupabaseProviderPaymentsRepository implements ProviderPaymentsRepository {
     });
     final url = data['url'] as String? ?? '';
     return Uri.parse(url);
+  }
+
+  @override
+  Future<void> completeMpOauth({
+    required String venueId,
+    required String code,
+    required String state,
+  }) async {
+    await _invoke('mp-oauth', {
+      'action': 'callback',
+      'venue_id': venueId,
+      'code': code,
+      'state': state,
+    });
   }
 
   Future<Map<String, dynamic>> _invoke(

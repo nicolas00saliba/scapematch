@@ -47,6 +47,8 @@ Os dois gravam o evento em `provider_webhook_events` só quando o processamento 
 
 O `state` do OAuth do Mercado Pago é `v1.<casa>.<expira>.<nonce>.<hmac>`, vale 10 minutos e é conferido no callback. Sem o token OAuth da casa, o webhook e a captura só usam `MP_ACCESS_TOKEN` quando ele começa com `TEST-`. Em produção a função responde 500 e registra `oauth_da_casa_ausente`.
 
+O build real do Parceiro está em `https://parceiro.escapematch.com.br/`. O valor exato de `MP_OAUTH_REDIRECT_URI` é `https://parceiro.escapematch.com.br/mp-retorno`. Cadastre essa URL igual na aplicação do Mercado Pago, sem barra no fim e sem query. A rota `/mp-retorno` lê `code` e `state`, chama `mp-oauth` com `action` `callback` e grava o token da casa. `error=access_denied` não grava token. A demonstração em `parceiro-demo` não usa esse valor.
+
 ## Saque da casa
 
 O EscapeMatch Parceiro mostra o líquido do livro da casa, não o saldo da subconta. O botão saca no máximo esse líquido menos saques pendentes e concluídos. O Pix de grupo ainda não confirmado não entra no livro, então não entra no saque. Dois saques ao mesmo tempo travam a conta da casa (`SELECT ... FOR UPDATE` e advisory lock). O saque automático, com `auto_withdraw` na conta de repasse, dispara quando o grupo confirma, no valor da parte da casa. O cron diário não varre o saldo.
@@ -79,7 +81,7 @@ supabase secrets set --project-ref <project-ref> \
   MP_CLIENT_ID='<client id da aplicação Mercado Pago>' \
   MP_CLIENT_SECRET='<client secret da aplicação>' \
   MP_OAUTH_STATE_SECRET='<segredo do state OAuth, 16 caracteres ou mais; se vazio, usa MP_CLIENT_SECRET>' \
-  MP_OAUTH_REDIRECT_URI='<URL de retorno cadastrada na aplicação>' \
+  MP_OAUTH_REDIRECT_URI='https://parceiro.escapematch.com.br/mp-retorno' \
   MP_WEBHOOK_SECRET='<assinatura secreta do webhook Mercado Pago>' \
   MP_ACCESS_TOKEN='<access token TEST- da plataforma, só se a casa ainda não conectou>'
 ```

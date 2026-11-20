@@ -100,7 +100,15 @@ abstract final class PartnerMessages {
   static const wooviBalanceTitle = 'Disponível para saque';
   static const wooviWithdraw = 'Sacar pela Woovi';
   static const mpConnect = 'Conectar Mercado Pago';
-  static const mpConnected = 'Mercado Pago conectado nesta sessão.';
+  static const mpConnectOpened =
+      'Autorize no Mercado Pago. A conexão termina quando você voltar.';
+  static const mpReturnSuccess = 'Mercado Pago conectado.';
+  static const mpReturnDenied = 'Você cancelou a conexão com o Mercado Pago.';
+  static const mpReturnMissing =
+      'Não foi possível concluir a conexão. O retorno do Mercado Pago veio incompleto.';
+  static const mpReturnFailed =
+      'Não foi possível gravar a conexão com o Mercado Pago. Tente de novo.';
+  static const mpReturnBack = 'Voltar aos recebimentos';
   static const statement = 'Extrato';
   static const statementEmpty =
       'Nenhuma captura ainda. Quando um grupo confirma, o valor aparece aqui.';

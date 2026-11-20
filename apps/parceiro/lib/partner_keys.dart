@@ -180,4 +180,7 @@ abstract final class PartnerKeys {
   static const wooviBalance = Key('woovi-balance');
   static const wooviWithdraw = Key('woovi-withdraw');
   static const mpConnect = Key('mp-connect');
+  static const mpReturn = Key('mp-return');
+  static const mpReturnMessage = Key('mp-return-message');
+  static const mpReturnBack = Key('mp-return-back');
 }

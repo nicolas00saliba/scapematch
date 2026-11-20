@@ -47,7 +47,7 @@ void main() {
     await tester.tap(find.byKey(PartnerKeys.mpConnect));
     await tester.pumpAndSettle();
     expect(repo.opened, 'https://auth.mercadopago.com.br/authorization');
-    expect(find.text(PartnerMessages.mpConnected), findsOneWidget);
+    expect(find.text(PartnerMessages.mpConnectOpened), findsOneWidget);
   });
 }
 
@@ -87,6 +87,13 @@ class _FakePayments implements ProviderPaymentsRepository {
     opened = 'https://auth.mercadopago.com.br/authorization';
     return Uri.parse(opened!);
   }
+
+  @override
+  Future<void> completeMpOauth({
+    required String venueId,
+    required String code,
+    required String state,
+  }) async {}
 
   @override
   Future<void> withdraw({
