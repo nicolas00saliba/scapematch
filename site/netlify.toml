@@ -1,0 +1,4 @@
+# Use este arquivo se a base directory no painel da Netlify for apps/landing.
+[build]
+  publish = "."
+  command = ""

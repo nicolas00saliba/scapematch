@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base href="/scapematch/parceiro/">
+
+  <meta charset="UTF-8">
+  <!--
+    O GitHub Pages não aplica _headers e não deixa escolher cabeçalhos.
+    CSP e Referrer-Policy valem nesta meta. O navegador ignora
+    frame-ancestors, sandbox e report-uri quando a CSP vem em meta, então
+    eles não entram aqui. HSTS, X-Frame-Options, X-Content-Type-Options e o
+    Access-Control-Allow-Origin: * do Pages não têm equivalente no HTML.
+    O estilo some quando a janela não está num iframe. unsafe-eval e
+    wasm-unsafe-eval são do dart2js e do CanvasKit (gstatic ou a pasta
+    local). O mapa pede o tile do OpenStreetMap. A senha consulta a API
+    do Pwned Passwords. O Asaas fica nas Edge Functions: o navegador só
+    abre o PDF da nota, não chama a API. O CanvasKit baixa a Roboto e as
+    Noto de fallback com fetch em fonts.gstatic.com/s/ — isso é
+    connect-src. font-src continua 'self' e data:. O SDK JS do Sentry
+    sai de sentry/11.0.0/ neste site, antes do Flutter. script-src não
+    ganha origem nova. Quando o build recebe SENTRY_DSN, o envelope
+    segue para *.ingest.sentry.io.
+  -->
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://www.gstatic.com/flutter-canvaskit/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://eujlhicairvksvmssruz.supabase.co wss://eujlhicairvksvmssruz.supabase.co https://api.pwnedpasswords.com https://www.gstatic.com/flutter-canvaskit/ https://fonts.gstatic.com/s/ https://tile.openstreetmap.org https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io; worker-src 'self' blob:; frame-src 'none'; manifest-src 'self'; form-action 'self'">
+  <style id="scape-frame-guard">html{display:none !important}</style>
+  <script>
+    // Flutter já exige script. Enquanto esta janela for a de cima, o
+    // estilo sai. Num iframe o conteúdo continua escondido: frame-ancestors
+    // não funciona em meta, e o Pages não envia X-Frame-Options.
+    (function () {
+      if (window.top !== window.self) {
+        try { window.top.location = window.self.location; } catch (e) {}
+        return;
+      }
+      var guard = document.getElementById('scape-frame-guard');
+      if (guard) guard.remove();
+    })();
+  </script>
+  <script id="sentry-cdn-rewrite" src="sentry/sentry-cdn-rewrite.js"></script>
+  <script id="sentry-sdk-local" src="sentry/11.0.0/bundle.tracing.min.js" integrity="sha384-TcpSGbL8WtdpR8lXDGGaurUtinn44aaUcN/5iratedpnLQZYJpnJlzK4pdS8sBn5" crossorigin="anonymous"></script>
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- O Pages não envia X-Robots-Tag. O noindex fica nesta meta. -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="EscapeMatch Parceiro é o painel da casa. Saldo, reservas e agenda.">
+  <meta name="scapematch-parceiro" content="separate-app">
+  <meta name="theme-color" content="#111111">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="EscapeMatch Parceiro">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>EscapeMatch Parceiro</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    html, body {
+      overscroll-behavior: none;
+      background: #111111;
+    }
+    #scape-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111111;
+    }
+    #scape-splash a {
+      color: #F2F2F2;
+      font-family: sans-serif;
+      font-size: 16px;
+    }
+  </style>
+  <script>
+    // O Flutter 3.47 reescreve o viewport e tira o viewport-fit.
+    // Sem cover, o iOS não informa a safe area do notch.
+    (function () {
+      function cover() {
+        var meta = document.querySelector('meta[name="viewport"]');
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('name', 'viewport');
+          meta.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+          document.head.appendChild(meta);
+          return;
+        }
+        var content = meta.getAttribute('content') || '';
+        if (content.indexOf('viewport-fit=cover') !== -1) return;
+        var next = content.replace(/,?\s*viewport-fit=[^,]+/gi, '').replace(/,\s*$/, '');
+        meta.setAttribute('content', next + ', viewport-fit=cover');
+      }
+      cover();
+      new MutationObserver(cover).observe(document.head, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['content']
+      });
+    })();
+  </script>
+  <script>
+    // O Chrome dispara beforeinstallprompt uma vez. O app real guarda
+    // o evento para o aviso "Instalar o app". A demonstração não leva
+    // a meta scapematch-install e deixa o navegador mostrar o seu.
+    (function () {
+      window.scapeInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (event) {
+        var meta = document.querySelector('meta[name="scapematch-install"]');
+        if (!meta || meta.getAttribute('content') !== 'real') return;
+        event.preventDefault();
+        window.scapeInstallPrompt = event;
+        window.dispatchEvent(new Event('scape-install-prompt'));
+      });
+      window.scapeLaunchInstall = function () {
+        var event = window.scapeInstallPrompt;
+        if (!event || typeof event.prompt !== 'function') {
+          return Promise.resolve('missing');
+        }
+        window.scapeInstallPrompt = null;
+        return event.prompt().then(function () {
+          return event.userChoice;
+        }).then(function (choice) {
+          return choice && choice.outcome ? choice.outcome : 'dismissed';
+        });
+      };
+    })();
+  </script>
+  <meta name="scapematch-install" content="real">
+</head>
+<body>
+  <div id="scape-splash">
+    <a href="https://escapematch.com.br/">Site oficial do EscapeMatch</a>
+  </div>
+  <script>
+    // A abertura sai no primeiro frame. O link não fica atrás do canvas
+    // nem na ordem do Tab depois que o app abre.
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('scape-splash');
+      if (splash) splash.remove();
+    });
+  </script>
+  <script>
+    // Não registra um worker novo. Se a casa ainda tiver o worker de
+    // cache, esta visita pede a versão que se desregistra e limpa o cache.
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.getRegistration().then(function (reg) {
+        if (reg) reg.update();
+      });
+    })();
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
