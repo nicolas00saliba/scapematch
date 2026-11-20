@@ -10,6 +10,10 @@ const roomPhotoJpegQuality = 85;
 /// Teto do bucket proposto no PR #169 (10 MB).
 const roomPhotoMaxBytes = 10 * 1024 * 1024;
 
+/// Teto de pixels na abertura. 16k×16k cabe no padrão da biblioteca (~1 GB)
+/// e fica de fora deste limite.
+const roomPhotoMaxPixels = 50000000;
+
 /// Foto que o codificador não conseguiu abrir.
 class RoomPhotoReadException implements Exception {
   const RoomPhotoReadException([this.message = messageText]);
@@ -80,12 +84,7 @@ Future<RoomPhotoPick> prepareRoomPhotos(
 }
 
 Uint8List _encodeRoomPhoto(Uint8List bytes, int maxBytes) {
-  img.Image? decoded;
-  try {
-    decoded = img.decodeImage(bytes);
-  } on Object {
-    decoded = null;
-  }
+  final decoded = _decodeRoomPhoto(bytes);
   if (decoded == null || decoded.width < 1 || decoded.height < 1) {
     throw const RoomPhotoReadException();
   }
@@ -93,6 +92,20 @@ Uint8List _encodeRoomPhoto(Uint8List bytes, int maxBytes) {
   fitted.exif = img.ExifData();
   fitted.iccProfile = null;
   return _jpegUnder(fitted, maxBytes);
+}
+
+// decodeImage no image 4.13.1 só aceita frame. O teto de pixels é o
+// estático que os decoders criados por essa função leem na construção.
+img.Image? _decodeRoomPhoto(Uint8List bytes) {
+  final previous = img.Decoder.defaultMaxPixels;
+  img.Decoder.defaultMaxPixels = roomPhotoMaxPixels;
+  try {
+    return img.decodeImage(bytes, frame: 0);
+  } on Object {
+    return null;
+  } finally {
+    img.Decoder.defaultMaxPixels = previous;
+  }
 }
 
 img.Image _fitLongestSide(img.Image image, int maxSide) {
@@ -137,6 +150,9 @@ Uint8List _jpegUnder(img.Image image, int maxBytes) {
       break;
     }
     jpeg = img.encodeJpg(current, quality: quality);
+  }
+  if (jpeg.length >= maxBytes) {
+    throw const RoomPhotoReadException();
   }
   return jpeg;
 }

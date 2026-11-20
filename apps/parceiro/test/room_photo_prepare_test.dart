@@ -81,6 +81,84 @@ void main() {
     expect(_hasAscii(jpeg, secret), isFalse);
   });
 
+  test('foto grande com EXIF 6 e GPS passa pelo redimensionamento', () async {
+    const secret = 'SEGREDO-GPS-25.4284-49.2733';
+    final source = img.Image(width: 3000, height: 1200);
+    img.fillRect(
+      source,
+      x1: 0,
+      y1: 0,
+      x2: 1499,
+      y2: 1199,
+      color: img.ColorRgb8(220, 10, 10),
+    );
+    img.fillRect(
+      source,
+      x1: 1500,
+      y1: 0,
+      x2: 2999,
+      y2: 1199,
+      color: img.ColorRgb8(10, 40, 220),
+    );
+    final plain = img.encodeJpg(source, quality: 95);
+    final exif = img.ExifData();
+    exif.imageIfd.orientation = 6;
+    exif.imageIfd.imageDescription = secret;
+    exif.gpsIfd.gpsLatitudeRef = 'S';
+    final oriented = img.injectJpgExif(plain, exif);
+    expect(oriented, isNotNull);
+    final before = img.decodeJpgExif(oriented!);
+    expect(before, isNotNull);
+    expect(before!.imageIfd.orientation, 6);
+    expect(before.gpsIfd.gpsLatitudeRef, 'S');
+    expect(_hasAscii(oriented, secret), isTrue);
+
+    final jpeg = await prepareRoomPhoto(oriented);
+    expect(jpeg[0], 0xFF);
+    expect(jpeg[1], 0xD8);
+    final decoded = img.decodeJpg(jpeg);
+    expect(decoded, isNotNull);
+    expect(decoded!.width, 819);
+    expect(decoded.height, 2048);
+    final red = decoded.getPixel(400, 300);
+    final blue = decoded.getPixel(400, 1700);
+    expect(red.r, greaterThan(red.b));
+    expect(blue.b, greaterThan(blue.r));
+    expect(img.decodeJpgExif(jpeg), isNull);
+    expect(_hasAscii(jpeg, secret), isFalse);
+  });
+
+  test('acima de 50 milhões de pixels cai no erro amigável', () async {
+    expect(
+      prepareRoomPhoto(_pngClaim(width: 8000, height: 8000)),
+      throwsA(
+        isA<RoomPhotoReadException>().having(
+          (error) => error.message,
+          'message',
+          'Não consegui abrir esta foto. Tente uma foto JPG ou PNG.',
+        ),
+      ),
+    );
+  });
+
+  test('64 px na qualidade 20 acima do limite vira erro', () async {
+    final source = _png(width: 96, height: 96);
+    final fits = await prepareRoomPhoto(source, maxBytes: 200000);
+    expect(fits[0], 0xFF);
+    expect(fits[1], 0xD8);
+    expect(fits.length, greaterThan(32));
+    expect(
+      prepareRoomPhoto(source, maxBytes: 32),
+      throwsA(
+        isA<RoomPhotoReadException>().having(
+          (error) => error.message,
+          'message',
+          'Não consegui abrir esta foto. Tente uma foto JPG ou PNG.',
+        ),
+      ),
+    );
+  });
+
   test('se ainda passar do limite, a foto encolhe até caber', () async {
     final noisy = img.Image(width: 180, height: 180);
     img.fill(noisy, color: img.ColorRgb8(128, 128, 128));
@@ -134,4 +212,21 @@ Uint8List _png({required int width, required int height, img.Color? color}) {
   final image = img.Image(width: width, height: height);
   img.fill(image, color: color ?? img.ColorRgb8(30, 90, 140));
   return img.encodePng(image);
+}
+
+/// PNG com IHDR enorme e sem pixels. O teto precisa recusar antes de alocar.
+Uint8List _pngClaim({required int width, required int height}) {
+  final ihdr = Uint8List(13);
+  final data = ByteData.sublistView(ihdr);
+  data.setUint32(0, width);
+  data.setUint32(4, height);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  final bytes = BytesBuilder(copy: false);
+  bytes.add(const [137, 80, 78, 71, 13, 10, 26, 10]);
+  bytes.add(const [0, 0, 0, 13]);
+  bytes.add(const [73, 72, 68, 82]);
+  bytes.add(ihdr);
+  bytes.add(const [0, 0, 0, 0]);
+  return bytes.takeBytes();
 }
