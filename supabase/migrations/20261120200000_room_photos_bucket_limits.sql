@@ -1,7 +1,8 @@
 -- Limita o bucket room-photos a fotos de até 10 MB, só jpeg, png e webp.
 -- Achado 2 da varredura de impacto de 20/11/2026 (Securitron).
--- O app Parceiro já envia sempre image/jpeg. O bucket estava vazio quando
--- esta migração foi aplicada, então nenhum arquivo existente fica fora da regra.
+-- PROPOSTA, ainda não aplicada em produção. Só entra depois do PR do app
+-- Parceiro que reduz a foto (~2048 px, JPEG q85): hoje o photo_picker.dart
+-- envia a foto crua com contentType image/jpeg fixo.
 update storage.buckets
 set
   file_size_limit = 10485760,
