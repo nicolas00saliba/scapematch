@@ -20,6 +20,7 @@ ROTAS = [
     "/experiencias",
     "/experiencias/escape-room",
     "/guia",
+    "/guia/como-jogar-escape-room-sozinho",
     "/guia/escape-room-sozinho",
     "/guia/escape-room-sozinho-curitiba",
     "/guia/como-achar-grupo-escape-room",
@@ -118,12 +119,13 @@ FRASE_PLAY = (
 )
 # A regra do pagamento: se o grupo não confirma, o Pix é estornado e o
 # cartão não é capturado. "Nada é cobrado" contradiz o Pix já pago.
-PAGAMENTO_PROIBIDO = ("nada é cobrado", "cobrança só acontece")
+PAGAMENTO_PROIBIDO = ("nada é cobrado", "cobrança só acontece", "só cobra quando")
 LINHA_NOME_ANTIGO = (
     "O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
     "Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles."
 )
 GUIAS_MARCA = (
+    "/guia/como-jogar-escape-room-sozinho",
     "/guia/escape-room-sozinho",
     "/guia/escape-room-sozinho-curitiba",
     "/guia/como-achar-grupo-escape-room",
@@ -427,6 +429,7 @@ def main() -> None:
         "/contato",
         "/escape-room-curitiba",
         "/guia",
+        "/guia/como-jogar-escape-room-sozinho",
         "/guia/escape-room-sozinho",
         "/guia/escape-room-sozinho-curitiba",
         "/guia/como-achar-grupo-escape-room",
@@ -721,6 +724,15 @@ def main() -> None:
     if "não lista casas parceiras" not in guia_curitiba.lower():
         falha("o guia de Curitiba não avisa que o site não lista casas")
     guias_novos = {
+        "/guia/como-jogar-escape-room-sozinho": (
+            "Como jogar escape room sozinho?",
+            "Escape room sozinho dá para jogar?",
+            "Sala solo é a mesma coisa que chegar sem grupo?",
+            "Onde achar gente para jogar escape room?",
+            "Não tenho ninguém pra jogar escape room. Consigo ir?",
+            "Como entrar num grupo aberto e pagar só a minha vaga?",
+            "O que é o EscapeMatch?",
+        ),
         "/guia/escape-room-com-desconhecidos": (
             "Dá para jogar escape room com desconhecidos?",
             "Como é a sessão com desconhecidos?",
@@ -803,7 +815,7 @@ def main() -> None:
         falha("a resposta direta não vem antes da definição da marca")
     if "É a mesma coisa que jogo de celular?" in sem_ninguem:
         falha("a pergunta de jogo de celular ficou duplicada")
-    if "Atualizado em 15/11/2026" not in sem_ninguem:
+    if "Atualizado em 20/11/2026" not in sem_ninguem:
         falha("a data visível de quem não tem ninguém divergiu")
     exigir_resposta(
         sem_ninguem,
@@ -827,7 +839,7 @@ def main() -> None:
         falha("headline do guia sem ninguém divergiu")
     if artigos[0].get("datePublished") != "2026-11-13T00:00:00-03:00":
         falha("datePublished do guia sem ninguém divergiu")
-    if artigos[0].get("dateModified") != "2026-11-15T00:00:00-03:00":
+    if artigos[0].get("dateModified") != "2026-11-20T00:00:00-03:00":
         falha("dateModified do guia sem ninguém divergiu")
     ancora = 'href="/guia/nao-tenho-amigos-para-escape-room">Não tenho ninguém pra jogar escape room</a>'
     if ancora not in arquivo("/guia").read_text():
@@ -861,6 +873,66 @@ def main() -> None:
     for rota in guias_novos:
         if f'href="{rota}"' not in hub:
             falha(f"o índice de guias não aponta para {rota}")
+    como_jogar = arquivo("/guia/como-jogar-escape-room-sozinho").read_text()
+    if "<title>Como jogar escape room sozinho | EscapeMatch</title>" not in como_jogar:
+        falha("título de como jogar sozinho divergiu")
+    if "Curitiba" in como_jogar.split("</title>", 1)[0]:
+        falha("o título de como jogar sozinho cita Curitiba")
+    if "<h1>Como jogar escape room sozinho?</h1>" not in como_jogar:
+        falha("h1 de como jogar sozinho divergiu")
+    if 'aria-current="page">Como jogar escape room sozinho</span>' not in como_jogar:
+        falha("trilha de como jogar sozinho divergiu")
+    descricao_como_jogar = (
+        "Como jogar escape room sozinho: sala para uma pessoa, amigos, comunidade ou grupo aberto. "
+        "No EscapeMatch você paga só a sua vaga."
+    )
+    if f'<meta name="description" content="{descricao_como_jogar}">' not in como_jogar:
+        falha("descrição de como jogar sozinho divergiu")
+    if len(descricao_como_jogar) > 155:
+        falha(f"descrição de como jogar sozinho com {len(descricao_como_jogar)} caracteres")
+    if "Atualizado em 20/11/2026" not in como_jogar:
+        falha("a data visível de como jogar sozinho divergiu")
+    if "https://www.escapersbr.com/" not in como_jogar or "https://www.meetup.com/escaperoomcuritiba/" not in como_jogar:
+        falha("como jogar sozinho saiu sem Escapers BR ou Meetup")
+    if "Asaas" in como_jogar.split("<footer", 1)[0]:
+        falha("o guia de como jogar sozinho cita Asaas")
+    if "Por enquanto, o app só confirma grupo lá." not in como_jogar:
+        falha("como jogar sozinho não limita a cidade disponível")
+    exigir_resposta(
+        como_jogar,
+        "/guia/como-jogar-escape-room-sozinho",
+        "Como entrar num grupo aberto e pagar só a minha vaga?",
+        "No EscapeMatch, você escolhe a sala e o horário no app. "
+        "O app te coloca num grupo com outras pessoas que também chegaram sem a turma completa. "
+        "Cada pessoa paga só a própria vaga, o preço da sala por pessoa, mostrado no app. "
+        "O jogo confirma quando o grupo bate o mínimo. "
+        "Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. "
+        "A primeira cidade disponível é Curitiba. Por enquanto, o app só confirma grupo lá. "
+        "Escape room é o que está disponível. Jogos de tabuleiro e laser tag estão em breve. "
+        "O site não lista casas parceiras, endereço nem preço.",
+    )
+    artigos_como = [bloco for bloco in blocos_ld(como_jogar) if bloco.get("@type") == "Article"]
+    if len(artigos_como) != 1:
+        falha(f"como jogar sozinho saiu com {len(artigos_como)} Article")
+    if artigos_como[0].get("headline") != "Como jogar escape room sozinho?":
+        falha("headline de como jogar sozinho divergiu")
+    if artigos_como[0].get("datePublished") != "2026-11-20T00:00:00-03:00":
+        falha("datePublished de como jogar sozinho divergiu")
+    if artigos_como[0].get("dateModified") != "2026-11-20T00:00:00-03:00":
+        falha("dateModified de como jogar sozinho divergiu")
+    for rota in (
+        "/",
+        "/guia",
+        "/guia/escape-room-sozinho",
+        "/guia/escape-room-sozinho-curitiba",
+        "/guia/como-achar-grupo-escape-room",
+        "/guia/nao-tenho-amigos-para-escape-room",
+        "/guia/primeira-vez-em-escape-room",
+        "/como-funciona",
+        "/ajuda",
+    ):
+        if 'href="/guia/como-jogar-escape-room-sozinho"' not in arquivo(rota).read_text():
+            falha(f"{rota} saiu sem o guia de como jogar sozinho")
     exigir_faq(como, "/como-funciona", ("Como completar o grupo de uma sala de escape?",))
     exigir_faq(arquivo("/ajuda/grupo").read_text(), "/ajuda/grupo", ("O EscapeMatch é um jogo?",))
     cidade = arquivo("/escape-room-curitiba").read_text()
@@ -909,7 +981,7 @@ def main() -> None:
         datas_lastmod.add(last.group(1))
         if loc.group(1).rstrip("/") == f"{SITE}/guia/nao-tenho-amigos-para-escape-room":
             lastmod_guia = last.group(1)
-    if not lastmod_guia.startswith("2026-11-15"):
+    if not lastmod_guia.startswith("2026-11-20"):
         falha(f"lastmod do guia sem ninguém divergiu: {lastmod_guia}")
     if len(datas_lastmod) < 2:
         falha("sitemap ainda usa a mesma lastmod em todas as URLs")
@@ -933,6 +1005,7 @@ def main() -> None:
             falha(f"{nome} ainda diz que não há Instagram")
         for rota in (
             "/guia",
+            "/guia/como-jogar-escape-room-sozinho",
             "/guia/escape-room-sozinho-curitiba",
             "/guia/como-achar-grupo-escape-room",
             "/guia/escape-room-com-desconhecidos",

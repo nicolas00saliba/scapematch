@@ -1,0 +1,144 @@
+---
+import Base from '../../layouts/Base.astro';
+import CtaBlock from '../../components/CtaBlock.astro';
+import FaqMarca from '../../components/FaqMarca.astro';
+import { definicao, faqPage, textoAtualizado } from '../../data/seo';
+import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
+import {
+  modificadoGuiaComoJogarSozinho,
+  publicadoGuiaComoJogarSozinho,
+} from '../../../scripts/lastmod.mjs';
+
+const escapers = 'https://www.escapersbr.com/';
+const meetupCuritiba = 'https://www.meetup.com/escaperoomcuritiba/';
+
+const descricao =
+  'Como jogar escape room sozinho: sala para uma pessoa, amigos, comunidade ou grupo aberto. No EscapeMatch você paga só a sua vaga.';
+
+const respostas = [
+  {
+    pergunta: 'Como jogar escape room sozinho?',
+    resposta:
+      'Dá para jogar escape room sozinho de dois jeitos. Algumas casas têm sala solo, feita para uma pessoa: você reserva essa sala e joga sem grupo. A maioria das salas pede um grupo. Nesse caso, sozinho é chegar sem a sua turma e entrar com outras pessoas. Dá para chamar amigos, procurar uma comunidade ou entrar num grupo aberto. O EscapeMatch é o jeito de entrar num grupo aberto e pagar só a sua vaga. A primeira cidade disponível é Curitiba. Não é um jogo de celular.',
+  },
+  {
+    pergunta: 'Escape room sozinho dá para jogar?',
+    resposta:
+      'Dá, quando a sala é para uma pessoa ou quando há um grupo para completar. Não dá para entrar em qualquer sala e jogar sem mais ninguém: a casa define o mínimo. Pergunte à casa se a sala é solo ou se ela junta outras pessoas naquele horário. No EscapeMatch, o grupo se forma no app e o jogo confirma quando bate o mínimo.',
+  },
+  {
+    pergunta: 'Sala solo é a mesma coisa que chegar sem grupo?',
+    resposta:
+      'Não. Sala solo é um escape room feito para uma pessoa. Chegar sem grupo é ocupar uma vaga numa sala que ainda pede outras pessoas. As duas existem. A sala solo é menos comum. A sessão em grupo é o formato da maioria das casas.',
+  },
+  {
+    pergunta: 'Onde achar gente para jogar escape room?',
+    resposta:
+      'Dá para chamar amigos, entrar numa comunidade de jogadores, perguntar se a casa completa a sala, ou entrar num grupo aberto. Amigos combinam a sala e a data, e cada um paga a própria vaga. A Escapers BR (https://www.escapersbr.com/) reúne jogadores no Brasil. Também dá para publicar num grupo de WhatsApp, no Reddit ou num Meetup da sua cidade. Em Curitiba, o Meetup Escape Room Curitiba (https://www.meetup.com/escaperoomcuritiba/) é um ponto de encontro. Essas comunidades são independentes. O site do EscapeMatch não publica um grupo nesses espaços. Algumas casas completam a sala com quem chegou sem turma. Isso depende da casa e do horário. Pergunte antes de contar com a vaga. No EscapeMatch, você escolhe a sala e o horário, entra no grupo aberto e paga só a sua vaga.',
+  },
+  {
+    pergunta: 'Não tenho ninguém pra jogar escape room. Consigo ir?',
+    resposta:
+      'Consegue, se achar um grupo. Comunidade, a casa ou um grupo aberto cobrem a falta de turma. A sessão continua presencial, numa casa. Não é jogo de celular, simulador nem kit para montar em casa.',
+  },
+  {
+    pergunta: 'Como entrar num grupo aberto e pagar só a minha vaga?',
+    resposta:
+      'No EscapeMatch, você escolhe a sala e o horário no app. O app te coloca num grupo com outras pessoas que também chegaram sem a turma completa. Cada pessoa paga só a própria vaga, o preço da sala por pessoa, mostrado no app. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. A primeira cidade disponível é Curitiba. Por enquanto, o app só confirma grupo lá. Escape room é o que está disponível. Jogos de tabuleiro e laser tag estão em breve. O site não lista casas parceiras, endereço nem preço.',
+  },
+  oQueE,
+  ...desambiguacaoMarca,
+];
+
+const direta = respostas[0];
+const artigo = {
+  headline: direta.pergunta,
+  datePublished: publicadoGuiaComoJogarSozinho,
+  dateModified: modificadoGuiaComoJogarSozinho,
+};
+---
+
+<Base
+  title="Como jogar escape room sozinho | EscapeMatch"
+  description={descricao}
+  path="/guia/como-jogar-escape-room-sozinho"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+  artigo={artigo}
+>
+  <header class="miolo pagina-topo">
+    <h1>{direta.pergunta}</h1>
+    <p class="resposta-direta">{direta.resposta}</p>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="versao">{textoAtualizado(artigo.dateModified)}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    <section>
+      <h2>{respostas[1].pergunta}</h2>
+      <p>{respostas[1].resposta}</p>
+      <p>
+        As respostas curtas estão em <a href="/guia/escape-room-sozinho">escape room sozinho</a>.
+        A primeira sessão está em <a href="/guia/primeira-vez-em-escape-room">primeira vez em escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[2].pergunta}</h2>
+      <p>{respostas[2].resposta}</p>
+      <p>
+        Ir em duas pessoas está em <a href="/guia/escape-room-para-2-pessoas">escape room para 2 pessoas</a>.
+        A modalidade está em <a href="/experiencias/escape-room">Escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[3].pergunta}</h2>
+      <p>
+        Dá para chamar amigos, entrar numa comunidade de jogadores, perguntar se a casa completa a sala, ou entrar num grupo aberto.
+        Amigos combinam a sala e a data, e cada um paga a própria vaga.
+        A <a href={escapers} target="_blank" rel="noopener noreferrer">Escapers BR ({escapers})</a> reúne jogadores no Brasil.
+        Também dá para publicar num grupo de WhatsApp, no Reddit ou num Meetup da sua cidade.
+        Em Curitiba, o <a href={meetupCuritiba} target="_blank" rel="noopener noreferrer">Meetup Escape Room Curitiba ({meetupCuritiba})</a> é um ponto de encontro.
+        Essas comunidades são independentes.
+        O site do EscapeMatch não publica um grupo nesses espaços.
+        Algumas casas completam a sala com quem chegou sem turma.
+        Isso depende da casa e do horário.
+        Pergunte antes de contar com a vaga.
+        No EscapeMatch, você escolhe a sala e o horário, entra no grupo aberto e paga só a sua vaga.
+      </p>
+      <p>
+        A comparação está em <a href="/guia/como-achar-grupo-escape-room">onde achar grupo de escape room</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[4].pergunta}</h2>
+      <p>{respostas[4].resposta}</p>
+      <p>
+        O texto dessa busca está em <a href="/guia/nao-tenho-amigos-para-escape-room">Não tenho ninguém pra jogar escape room</a>.
+        Jogar com gente que você não conhecia está em <a href="/guia/escape-room-com-desconhecidos">escape room com desconhecidos</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[5].pergunta}</h2>
+      <p>{respostas[5].resposta}</p>
+      <p>
+        O passo a passo está em <a href="/como-funciona">Como funciona</a>.
+        A primeira cidade está em <a href="/escape-room-curitiba">Escape room em Curitiba</a> e no recorte <a href="/guia/escape-room-sozinho-curitiba">escape room sozinho em Curitiba</a>.
+      </p>
+      <p>
+        Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
+        A cobrança está em <a href="/como-funciona/pagamento">Pagamento e regras</a> e em <a href="/cancelamento">Regras de cancelamento</a>.
+        O combinado de convivência está em <a href="/seguranca">Segurança</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{oQueE.pergunta}</h2>
+      <p>{oQueE.resposta}</p>
+      <p>
+        A lista dos guias está em <a href="/guia">guias</a>.
+        Dúvidas de grupo, pagamento e pontos estão na <a href="/ajuda">central de ajuda</a>.
+        Para abrir o app, a página é <a href="/app">Baixar o app</a>.
+      </p>
+    </section>
+    <FaqMarca />
+  </article>
+  <CtaBlock titulo="Entrar num grupo" acoes={[{ rotulo: 'Entrar num grupo', href: '/app' }]} />
+</Base>
