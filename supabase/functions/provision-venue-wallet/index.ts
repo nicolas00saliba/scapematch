@@ -16,6 +16,7 @@ import {
   ensureTransferWebhook,
   transferClient,
 } from "../_shared/venue_payouts.ts";
+import { adminWithMfa } from "../_shared/admin_session.ts";
 
 type VenueRow = {
   id: string;
@@ -52,11 +53,12 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(url, service);
-    const { data: adminRow } = await admin
+    const { data: adminLookup } = await admin
       .from("admins")
       .select("user_id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
+    const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
 
     const body = await req.json().catch(() => ({})) as { venue_id?: string };
     const venueId = (body.venue_id ?? "").trim();
