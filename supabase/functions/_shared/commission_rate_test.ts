@@ -13,7 +13,7 @@ Deno.test("a cobrança lê a taxa configurada e não o 10% fixo", async () => {
   assertEquals(calls, ["commission_bps_for_venue:venue-1"]);
 
   const charge = await Deno.readTextFile(
-    new URL("../create-charge/index.ts", import.meta.url),
+    new URL("./alternate_charge.ts", import.meta.url),
   );
   assert(charge.includes("commissionBpsForVenue"));
   assertEquals(charge.includes("?? 1000"), false);

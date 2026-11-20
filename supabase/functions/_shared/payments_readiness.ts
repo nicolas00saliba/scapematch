@@ -1,30 +1,19 @@
 // Prontidão dos pagamentos. Cada campo é sim ou não.
 // Nenhum valor de segredo, URL ou e-mail sai daqui.
 
-import { asaasProductionBaseUrl } from "./asaas_provider.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
-import { logCaught } from "./asaas_client_error.ts";
+import { logCaught } from "./client_error.ts";
 import { mpAccessTokenIsTest } from "./mercadopago_provider.ts";
-import { paymentsStack, type PaymentsStack } from "./payment_provider.ts";
+import type { PaymentsStack } from "./payment_provider.ts";
 import { isWooviSandbox, wooviSandboxBaseUrl } from "./woovi_provider.ts";
 
 export function secretPresent(value: string | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-/// Só a base oficial de produção, sem barra no fim. Sandbox e vazio são não.
-export function asaasBaseUrlIsProduction(value: string | undefined): boolean {
-  const normalized = (value ?? "").trim().replace(/\/+$/, "");
-  return normalized === asaasProductionBaseUrl;
-}
-
 const failureCodes = new Set(["config_ausente", "cron_failed"]);
 
 export type ReadinessReport = {
-  asaas_api_key: boolean;
-  asaas_base_url_production: boolean;
-  asaas_webhook_token: boolean;
-  asaas_webhook_email: boolean;
   venue_withdrawals_secret: boolean;
   ledger_reconcile_secret: boolean;
   vault_venue_withdrawals_url: boolean;
@@ -59,12 +48,6 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
     ? false
     : null;
   return {
-    asaas_api_key: secretPresent(env.get("ASAAS_API_KEY")),
-    asaas_base_url_production: asaasBaseUrlIsProduction(
-      env.get("ASAAS_BASE_URL"),
-    ),
-    asaas_webhook_token: secretPresent(env.get("ASAAS_WEBHOOK_TOKEN")),
-    asaas_webhook_email: secretPresent(env.get("ASAAS_WEBHOOK_EMAIL")),
     venue_withdrawals_secret: secretPresent(
       env.get("VENUE_WITHDRAWALS_SECRET"),
     ) || row.vault_venue_withdrawals_secret === true,
@@ -77,7 +60,7 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
     venue_payouts_enabled: row.venue_payouts_enabled === true,
     cron_last_failed: failed,
     cron_failure_code: failed === true ? code : null,
-    payments_provider: paymentsStack(env),
+    payments_provider: "woovi" satisfies PaymentsStack,
     woovi_app_id: secretPresent(env.get("WOOVI_APP_ID")),
     woovi_base_url_sandbox: isWooviSandbox(
       (env.get("WOOVI_BASE_URL") ?? "").trim() || wooviSandboxBaseUrl,

@@ -2,7 +2,7 @@
 // de qualquer gravação. O evento entra uma vez: a segunda entrega
 // responde ok e não muda o livro.
 
-import { logCaught } from "./asaas_client_error.ts";
+import { logCaught } from "./client_error.ts";
 import { bandConfirmed } from "./group_band.ts";
 import { applyPaymentTransition } from "./ledger.ts";
 import {

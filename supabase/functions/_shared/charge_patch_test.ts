@@ -134,18 +134,16 @@ Deno.test("a migração trava a cobrança e falha se houver duplicata", async ()
   }
 });
 
-Deno.test("o webhook confirma no Asaas e usa a transição", async () => {
+Deno.test("o webhook da Woovi usa a transição", async () => {
   const source = await Deno.readTextFile(
-    new URL("../asaas-webhook/index.ts", import.meta.url),
+    new URL("../woovi-webhook/index.ts", import.meta.url),
   );
-  assert(source.includes("getPayment"));
-  assert(source.includes("paymentRefForRead"));
-  assert(source.includes("applyPaymentTransition"));
-  assert(source.includes("note_split_divergence"));
-  assert(source.includes("split_divergence"));
-  assert(source.includes("confirmedChargeStatus"));
-  assertEquals(source.includes("paymentChargePatch"), false);
-  assertEquals(source.includes("payment_status"), false);
+  assert(source.includes("handleWooviWebhook"));
+  const handler = await Deno.readTextFile(
+    new URL("./provider_webhooks.ts", import.meta.url),
+  );
+  assert(handler.includes("applyPaymentTransition"));
+  assertEquals(handler.includes("payment_status"), false);
   const release = await Deno.readTextFile(
     new URL("./release_charges.ts", import.meta.url),
   );
@@ -154,7 +152,7 @@ Deno.test("o webhook confirma no Asaas e usa a transição", async () => {
   );
   assertEquals(release.includes("payment_status"), false);
   assertEquals(settle.includes("payment_status"), false);
-  assert(release.includes("applyPaymentTransition"));
-  assert(settle.includes("applyPaymentTransition"));
+  assert(release.includes("releaseAlternateCharge"));
+  assert(settle.includes("settleAlternateCharge"));
   assertEquals(source.includes("error.message"), false);
 });

@@ -7,10 +7,11 @@ import 'package:scapematch_parceiro/features/partner/presentation/woovi_house_ca
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 void main() {
-  testWidgets('a flag asaas esconde saldo e saque da Woovi', (tester) async {
-    await tester.pumpWidget(_app(stack: 'asaas', repo: _FakePayments()));
-    expect(find.byKey(PartnerKeys.wooviBalance), findsNothing);
-    expect(find.text(PartnerMessages.groupUnconfirmed), findsNothing);
+  testWidgets('o saldo da Woovi aparece sem flag de provedor', (tester) async {
+    await tester.pumpWidget(_app(stack: 'woovi', repo: _FakePayments()));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PartnerKeys.wooviBalance), findsOneWidget);
+    expect(find.text(PartnerMessages.groupUnconfirmed), findsOneWidget);
     expect(find.textContaining('nada é cobrado'), findsNothing);
   });
 

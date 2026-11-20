@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
+import { clientFailure } from "../_shared/client_error.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { isRemoteAsaasFile } from "./remote_asaas_file.ts";
 
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
 
   const stored = format === "xml" ? data.xml_url as string | null : data.pdf_url as string | null;
   if (stored && isRemoteAsaasFile(stored)) {
-    return Response.redirect(stored, 302);
+    return json({ error: "arquivo_historico" }, 410);
   }
 
   const number = (data.number as string | null) ?? data.id as string;

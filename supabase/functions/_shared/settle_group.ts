@@ -1,14 +1,7 @@
-import { logCaught } from "./asaas_client_error.ts";
-import { asaasPaymentGone, AsaasProvider } from "./asaas_provider.ts";
-import { issuePaidInvoices } from "./issue_invoices.ts";
-import {
-  applyPaymentTransition,
-  type ChargeRow,
-  creditLedger,
-} from "./ledger.ts";
-import { syncPayerDocument } from "./payer_document.ts";
+import { logCaught } from "./client_error.ts";
+import { type ChargeRow } from "./ledger.ts";
 import { bandConfirmed, bandMissed, bandSettlement } from "./group_band.ts";
-import { isAlternateProvider } from "./payment_provider.ts";
+import { isAlternateProvider, isHistoricalAsaas } from "./payment_provider.ts";
 import {
   settleAlternateCharge,
   type AlternateGate,
@@ -80,7 +73,6 @@ export async function maySettle(
 
 export async function settleGroup(
   admin: Admin,
-  asaas: AsaasProvider,
   groupId: string,
   gate?: AlternateGate,
 ): Promise<void> {
@@ -107,7 +99,7 @@ export async function settleGroup(
         .is("cancelled_at", null)
         .is("confirmed_at", null);
     }
-    await releaseCancelledCharges(admin, asaas, groupId, gate);
+    await releaseCancelledCharges(admin, groupId, gate);
     return;
   }
   if (decision === "wait") return;
@@ -122,29 +114,11 @@ export async function settleGroup(
 
   for (const charge of charges ?? []) {
     const item = charge as ChargeView;
+    if (isHistoricalAsaas(item.provider)) continue;
     if (isAlternateProvider(item.provider)) {
       if (item.status === "authorized" || item.status === "paid") {
         await settleAlternateCharge(admin, item, gate);
       }
-      continue;
-    }
-    if (!item.provider_ref) continue;
-    if (item.status === "authorized" && item.billing_type === "CREDIT_CARD") {
-      await captureAuthorizedCard(admin, asaas, item);
-      continue;
-    }
-    if (item.status === "paid") {
-      await syncPayerDocument(admin, asaas, {
-        id: item.id,
-        user_id: item.user_id,
-        billing_type: item.billing_type,
-        provider_ref: item.provider_ref,
-      });
-      await creditLedger(admin, item);
-      await issuePaidInvoices(admin, item, {
-        sandbox: asaas.sandbox,
-        asaas: asaas.sandbox ? undefined : asaas,
-      });
     }
   }
 }
@@ -168,7 +142,6 @@ export async function expireUnconfirmedGroups(admin: Admin): Promise<string[]> {
 /// Um grupo que falha não impede o próximo.
 export async function settleAuthorizedCards(
   admin: Admin,
-  asaas: AsaasProvider,
 ): Promise<void> {
   if (typeof admin?.from !== "function") return;
   const { data, error } = await admin
@@ -185,98 +158,11 @@ export async function settleAuthorizedCards(
   }
   for (const id of ids) {
     try {
-      await settleGroup(admin, asaas, id);
+      await settleGroup(admin, id);
     } catch (error) {
       logCaught("settle-charges", error);
     }
   }
-}
-
-async function captureAuthorizedCard(
-  admin: Admin,
-  asaas: AsaasProvider,
-  row: ChargeView,
-): Promise<void> {
-  if (!row.provider_ref) return;
-  const claimed = await claimCardCapture(admin, row.id);
-  if (!claimed) return;
-  try {
-    const remote = await asaas.getPayment(row.provider_ref);
-    if (asaasPaymentGone(remote)) {
-      await releaseCardCaptureClaim(admin, row.id);
-      const transition = await applyPaymentTransition(
-        admin,
-        row.id,
-        goneProviderLocalStatus(remote.status),
-        false,
-      );
-      if (transition.status === "authorized") throw new Error("erro");
-      return;
-    }
-    const already = remote.status === "CONFIRMED" ||
-      remote.status === "RECEIVED";
-    let paid = already;
-    if (!already) {
-      const captured = await asaas.capture(row.provider_ref);
-      paid = captured.status === "CONFIRMED" || captured.status === "RECEIVED";
-    }
-    if (!paid) {
-      await releaseCardCaptureClaim(admin, row.id);
-      return;
-    }
-    const transition = await applyPaymentTransition(
-      admin,
-      row.id,
-      "paid",
-      true,
-    );
-    if (transition.status !== "paid") return;
-    await issuePaidInvoices(admin, row, {
-      sandbox: asaas.sandbox,
-      asaas: asaas.sandbox ? undefined : asaas,
-    });
-  } catch (error) {
-    await releaseCardCaptureClaim(admin, row.id);
-    throw error;
-  }
-}
-
-/// REFUNDED vira estorno. deleted, CANCELED e CANCELLED viram cancelamento.
-/// O membro sai de reserved/paid e fica released pela transição do ledger.
-export function goneProviderLocalStatus(
-  status: string,
-): "refunded" | "cancelled" {
-  return status.trim().toUpperCase() === "REFUNDED" ? "refunded" : "cancelled";
-}
-
-/// Sem a função no banco, segue em frente: a leitura do status no Asaas
-/// evita uma segunda captura na tentativa seguinte.
-async function claimCardCapture(
-  admin: Admin,
-  chargeId: string,
-): Promise<boolean> {
-  const { data, error } = await admin.rpc("claim_card_capture", {
-    p_charge_id: chargeId,
-  });
-  if (error) {
-    const code = typeof error.code === "string" ? error.code : "";
-    if (claimMissing.has(code)) return true;
-    throw new Error("erro");
-  }
-  return data === true;
-}
-
-async function releaseCardCaptureClaim(
-  admin: Admin,
-  chargeId: string,
-): Promise<void> {
-  const { error } = await admin.rpc("release_card_capture_claim", {
-    p_charge_id: chargeId,
-  });
-  if (!error) return;
-  const code = typeof error.code === "string" ? error.code : "";
-  if (claimMissing.has(code)) return;
-  throw new Error("erro");
 }
 
 async function filledSpots(admin: Admin, groupId: string): Promise<number> {

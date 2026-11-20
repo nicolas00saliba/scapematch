@@ -1,14 +1,12 @@
-// Porta única dos provedores novos. O Asaas continua em AsaasProvider
-// e segue como padrão enquanto PAYMENTS_PROVIDER não for `woovi`.
-// Pix novo vai para a Woovi. Cartão novo vai para o Mercado Pago.
-// A cobrança gravada decide o resto: payment_charges.provider.
+// Porta única dos provedores. Pix vai para a Woovi. Cartão vai para
+// o Mercado Pago. Cobrança gravada com provider asaas é só leitura.
 
 import type { EnvLike } from "./http.ts";
 
 export const groupUnconfirmedNotice =
   "Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.";
 
-export type PaymentsStack = "asaas" | "woovi";
+export type PaymentsStack = "woovi";
 
 export type ChargeProviderName =
   | "asaas"
@@ -113,33 +111,18 @@ export function readEnv(env: EnvLike, name: string): string {
   }
 }
 
-/// `woovi` liga Pix na Woovi e cartão no Mercado Pago. Qualquer outro
-/// valor, inclusive vazio, permanece no Asaas.
-export function paymentsStack(env: EnvLike): PaymentsStack {
-  const raw = readEnv(env, "PAYMENTS_PROVIDER").trim().toLowerCase();
-  if (raw === "woovi" || raw === "woovi_mp") return "woovi";
-  return "asaas";
-}
-
+/// Pix vai para a Woovi. Cartão vai para o Mercado Pago.
+/// `asaas` não é opção: cobrança antiga com esse provider é só leitura.
 export function providerForBilling(
-  stack: PaymentsStack,
   billingType: string,
-): ChargeProviderName {
-  if (stack !== "woovi") return "asaas";
+): "woovi" | "mercadopago" {
   return billingType === "CREDIT_CARD" ? "mercadopago" : "woovi";
 }
 
-/// Cobrança já gravada no Asaas ou em pontos não muda de trilho.
-/// Cobrança nova segue a flag. Cobrança Woovi ou Mercado Pago fica neles.
-export function shouldRouteToAlternate(input: {
-  stack: PaymentsStack;
-  provider: string | null;
-}): boolean {
-  if (input.provider === "woovi" || input.provider === "mercadopago") {
-    return true;
-  }
-  if (input.provider === "asaas" || input.provider === "points") return false;
-  return input.stack === "woovi";
+export function isHistoricalAsaas(
+  provider: string | null | undefined,
+): boolean {
+  return provider === "asaas";
 }
 
 export function isAlternateProvider(provider: string | null | undefined): boolean {

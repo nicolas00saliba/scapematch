@@ -7,7 +7,6 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_messag
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 /// Saldo e saque da subconta Woovi, e a conexão com o Mercado Pago.
-/// Some quando a flag PAYMENTS_PROVIDER não é woovi.
 class WooviHouseCard extends ConsumerStatefulWidget {
   const WooviHouseCard({super.key, required this.venueId, this.launchUrl});
 

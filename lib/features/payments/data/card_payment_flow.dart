@@ -1,6 +1,6 @@
 import 'package:dominio/dominio.dart';
 
-/// Cartão ainda não tokenizado. Só a função `tokenize-card` recebe estes campos.
+/// Dados digitados no aparelho. O número não segue para o servidor.
 class CardDraft {
   const CardDraft({
     required this.holderName,
@@ -57,21 +57,14 @@ typedef FunctionInvoker = Future<Map<String, dynamic>> Function(
   Map<String, dynamic> body,
 );
 
-/// Body da tokenização. É o único pedido do app com número, CVV e validade.
+/// O número, o CVV e a validade não entram em pedido nenhum.
 Map<String, dynamic> tokenizeCardBody(CardDraft card) {
-  return {
-    'holder_name': card.holderName,
-    'number': card.number,
-    'expiry_month': card.expiryMonth,
-    'expiry_year': card.expiryYear,
-    'ccv': card.ccv,
-    if (card.holderCpfCnpj.isNotEmpty) 'holder_cpf_cnpj': card.holderCpfCnpj,
-    if (card.holderPostalCode.isNotEmpty)
-      'holder_postal_code': card.holderPostalCode,
-    if (card.holderAddressNumber.isNotEmpty)
-      'holder_address_number': card.holderAddressNumber,
-    if (card.holderPhone.isNotEmpty) 'holder_phone': card.holderPhone,
-  };
+  if (card.number.isNotEmpty || card.number.isEmpty) {
+    throw StateError(
+      'O token do cartão nasce no aparelho, no Mercado Pago.',
+    );
+  }
+  return const {};
 }
 
 /// Body da cobrança. Não tem número, CVV nem validade.
@@ -80,13 +73,16 @@ Map<String, dynamic> createChargeBody({
   required String idempotencyKey,
   required PaymentMethodKind kind,
   String? savedCardId,
+  String? cardToken,
   int points = 0,
 }) {
   return {
     'group_id': groupId,
     'idempotency_key': idempotencyKey,
     'billing_type': kind == PaymentMethodKind.card ? 'CREDIT_CARD' : 'PIX',
-    if (kind == PaymentMethodKind.card) 'saved_card_id': savedCardId,
+    if (kind == PaymentMethodKind.card && savedCardId != null)
+      'saved_card_id': savedCardId,
+    if (cardToken != null && cardToken.isNotEmpty) 'card_token': cardToken,
     if (points > 0) 'points': points,
   };
 }
@@ -114,8 +110,10 @@ class CardPaymentFlow {
   final FunctionInvoker invoke;
 
   Future<SavedCardRef> tokenize(CardDraft card) async {
-    final body = await invoke('tokenize-card', tokenizeCardBody(card));
-    return SavedCardRef.fromResponse(body);
+    tokenizeCardBody(card);
+    throw StateError(
+      'O token do cartão nasce no aparelho, no Mercado Pago.',
+    );
   }
 
   Future<Map<String, dynamic>> charge({
@@ -142,13 +140,30 @@ class CardPaymentFlow {
     required CardDraft card,
     required String groupId,
     required String idempotencyKey,
-  }) async {
-    final saved = await tokenize(card);
-    return charge(
+  }) {
+    return tokenize(card).then((_) {
+      throw StateError(
+        'O token do cartão nasce no aparelho, no Mercado Pago.',
+      );
+    });
+  }
+
+  Future<Map<String, dynamic>> chargeToken({
+    required String groupId,
+    required String idempotencyKey,
+    required String cardToken,
+    int points = 0,
+  }) {
+    final body = createChargeBody(
       groupId: groupId,
       idempotencyKey: idempotencyKey,
       kind: PaymentMethodKind.card,
-      savedCardId: saved.savedCardId,
+      cardToken: cardToken,
+      points: points,
     );
+    if (chargeBodyHasRawCard(body)) {
+      throw StateError('create-charge não recebe dados do cartão');
+    }
+    return invoke('create-charge', body);
   }
 }

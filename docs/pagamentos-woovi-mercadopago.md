@@ -1,12 +1,12 @@
-# Woovi e Mercado Pago, em sandbox
+# Woovi e Mercado Pago
 
-O Asaas continua funcionando e é o provedor padrão. Nada desta troca vai para produção enquanto `PAYMENTS_PROVIDER` não for `woovi`. Este agente não aplica a migration no projeto remoto, não publica Edge Function e não cria conta na Woovi nem no Mercado Pago.
+O provedor anterior saiu do código em 20/11/2026. Não há flag e não há reserva. Pix novo vai para a Woovi. Cartão novo vai para o Mercado Pago. Este agente não aplica migration no projeto remoto, não publica Edge Function, não apaga segredo e não cria conta na Woovi nem no Mercado Pago.
 
-Pix novo usa a Woovi. Cartão novo usa o Mercado Pago. A cobrança já gravada segue `payment_charges.provider`: uma cobrança Asaas não muda de trilho.
+Cobrança antiga com `payment_charges.provider = 'asaas'` fica só leitura. O código não captura, não estorna e não muda o status dela. Dinheiro ainda preso na conta antiga precisa de ação manual no painel daquele provedor.
 
 Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
 
-A NFS-e fica fora deste PR. Continua no Asaas e está pendente para Woovi e Mercado Pago.
+A NFS-e continua pendente. Nenhuma função emite nota em provedor de pagamento.
 
 ## Janela de 5 dias do cartão
 
@@ -47,13 +47,15 @@ Os dois gravam o evento em `provider_webhook_events`. A segunda entrega responde
 
 ## Saque da casa
 
-O saldo da subconta aparece no EscapeMatch Parceiro quando `PAYMENTS_PROVIDER=woovi`. A casa não abre a Woovi. O botão saca para a chave Pix da subconta. O saque automático, com `auto_withdraw` na conta de repasse, dispara quando o grupo confirma, no valor da parte da casa. O cron diário não varre o saldo: o Pix já caiu na subconta antes da confirmação, e varrer esse saldo pagaria a casa cedo demais.
+O saldo da subconta aparece no EscapeMatch Parceiro. A casa não abre a Woovi. O botão saca para a chave Pix da subconta. O saque automático, com `auto_withdraw` na conta de repasse, dispara quando o grupo confirma, no valor da parte da casa. O cron diário não varre o saldo: o Pix já caiu na subconta antes da confirmação, e varrer esse saldo pagaria a casa cedo demais.
 
 ## Migration
 
 Arquivo: `supabase/migrations/20261120140000_provider_payout_accounts.sql`.
 
 Cria `provider_payout_accounts`, `provider_webhook_events` e `private.provider_oauth_tokens`. O token do Mercado Pago fica cifrado com uma chave gerada no Vault (`provider_token_key`). A migration não contém credencial de provedor.
+
+`supabase/migrations/20261120150000_asaas_columns_readonly.sql` só comenta colunas antigas e troca o default de `payment_charges.provider` para `woovi`. Não dá `DROP`, não apaga linha e não desliga cron. O `DROP` dessas colunas fica para um passo separado, depois que ninguém lê o histórico por elas.
 
 Aplicar no projeto só depois da revisão, junto com as funções novas. Este agente não roda `supabase db push`.
 
@@ -63,7 +65,6 @@ Nenhum valor entra no git. Trocar os placeholders. Sandbox primeiro.
 
 ```bash
 supabase secrets set --project-ref <project-ref> \
-  PAYMENTS_PROVIDER='asaas' \
   WOOVI_APP_ID='<AppID da conta sandbox Woovi>' \
   WOOVI_BASE_URL='https://api.woovi-sandbox.com' \
   WOOVI_WEBHOOK_SECRET='<segredo HMAC do webhook Woovi, 16 caracteres ou mais>' \
@@ -77,19 +78,19 @@ supabase secrets set --project-ref <project-ref> \
   MP_ACCESS_TOKEN='<access token TEST- da plataforma, só se a casa ainda não conectou>'
 ```
 
-`PAYMENTS_PROVIDER=asaas` é o padrão e pode ficar ausente. `woovi` (ou `woovi_mp`) liga o trilho novo. O app Parceiro lê a mesma flag em compilação: `--dart-define=PAYMENTS_PROVIDER=woovi`. Sem isso, o saldo Woovi e o botão de conexão não aparecem.
+Não existe `PAYMENTS_PROVIDER`. O Parceiro mostra saldo e saque da Woovi sem `--dart-define`.
 
-`WOOVI_BASE_URL` de produção, quando a troca for aprovada, é `https://api.woovi.com`. Não é segredo. Enquanto a revisão não termina, deixe a URL de sandbox.
+`WOOVI_BASE_URL` de produção é `https://api.woovi.com`. Não é segredo. Enquanto a revisão não termina, deixe a URL de sandbox.
 
 O access token OAuth da casa não é variável de ambiente. A função grava o par cifrado e renova antes de 180 dias.
 
 ## Prontidão
 
-`payments-readiness` continua respondendo só sim ou não, mais `payments_provider` (`asaas` ou `woovi`). Os campos novos:
+`payments-readiness` responde só sim ou não, mais `payments_provider` (`woovi`). Os campos:
 
 | Campo | Onde olha |
 | --- | --- |
-| `payments_provider` | `PAYMENTS_PROVIDER`. Vazio e qualquer outro valor contam como `asaas` |
+| `payments_provider` | sempre `woovi` |
 | `woovi_app_id` | `WOOVI_APP_ID` não vazia |
 | `woovi_base_url_sandbox` | `WOOVI_BASE_URL` vazia ou exatamente `https://api.woovi-sandbox.com` |
 | `woovi_webhook_secret` | `WOOVI_WEBHOOK_SECRET` não vazia |
@@ -101,6 +102,59 @@ O access token OAuth da casa não é variável de ambiente. A função grava o p
 | `mp_access_token_test` | `MP_ACCESS_TOKEN` começa com `TEST-` e tem pelo menos 20 caracteres |
 
 O valor não sai na resposta.
+
+## Depois do merge, apagar estes segredos
+
+Não apagar neste PR. Apagar no Supabase depois que as funções novas estiverem publicadas:
+
+- `ASAAS_API_KEY`
+- `ASAAS_BASE_URL`
+- `ASAAS_WEBHOOK_TOKEN`
+- `ASAAS_WEBHOOK_EMAIL`
+- `ASAAS_SUBACCOUNT_EMAIL_DOMAIN`
+- `ASAAS_POINTS_RESERVE_API_KEY`
+- `ASAAS_POINTS_RESERVE_WALLET_ID`
+- `ASAAS_ROOT_WALLET_ID`
+- `ASAAS_INVOICE_EMISSION`
+- `ASAAS_FISCAL_SERVICE_CODE`
+- `ASAAS_FISCAL_SERVICE_NAME`
+- `ASAAS_FISCAL_ISS`
+- `ASAAS_TRANSFER_WEBHOOK_URL`
+- `PAYMENTS_PROVIDER`, se existir
+- Itens do Vault: `asaas_subaccount_key` e qualquer outro nome que comece com `asaas_`
+
+Não apagar `WOOVI_*`, `MP_*`, `VENUE_WITHDRAWALS_SECRET` nem `LEDGER_RECONCILE_SECRET`.
+
+## Depois do merge, despublicar ou desligar
+
+Não fazer neste PR. A cópia publicada antiga continua chamando o provedor anterior até alguém agir.
+
+Despublicar, porque o código saiu do repositório:
+
+- `asaas-webhook`
+- `asaas-transfer-webhook`
+
+Republicar com o código novo antes de deixar o cron bater na versão antiga:
+
+- `create-charge`
+- `settle-charges`
+- `provision-venue-wallet`
+- `tokenize-card`
+- `reconcile-payments`
+- `ledger-reconcile`
+- `venue-payouts`
+- `schedule-venue-withdrawals`
+- `venue-documents`
+- `configure-venue-fiscal`
+- `invoice-document`
+- `payments-readiness`
+- `cancel-house-group`
+
+Crons para desligar depois que a função nova estiver no ar, ou assim que a versão antiga ainda estiver publicada:
+
+- `reconcile-payments`, a cada 5 minutos
+- `venue-withdrawals`, todo dia às 08:20 em Brasília
+- `ledger-reconcile`, todo dia às 08:30 em Brasília
 
 ## O que só a conta sandbox confirma
 

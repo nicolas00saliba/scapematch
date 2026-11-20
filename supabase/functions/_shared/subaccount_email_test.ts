@@ -1,5 +1,4 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { logAsaasFailure } from "./asaas_client_error.ts";
 import {
   fallbackSubaccountDomain,
   nextSubaccountEmail,
@@ -46,7 +45,7 @@ Deno.test("domínio do alias vem do env e o inválido cai no fallback", () => {
   try {
     const custom = subaccountEmailPlan({ id: venueId }, {
       get: (name) =>
-        name === "ASAAS_SUBACCOUNT_EMAIL_DOMAIN"
+        name === "SUBACCOUNT_EMAIL_DOMAIN"
           ? "mail.escapematch.com.br"
           : undefined,
     });
@@ -103,53 +102,16 @@ Deno.test("sem ASAAS_SUBACCOUNT_EMAIL_DOMAIN avisa e usa escapematch.com.br", ()
   }
 });
 
-Deno.test("e-mail duplicado no Asaas pede o alias; outro 400 não", () => {
+Deno.test("não há segunda tentativa de e-mail", () => {
   const alias = venueAliasEmail(venueId, fallbackSubaccountDomain);
-  const duplicate = new Error(
-    `Asaas 400: ${
-      JSON.stringify({
-        errors: [{
-          code: "invalid_object",
-          description: "Já existe uma conta com o e-mail dono@casa.com",
-        }],
-      })
-    }`,
-  );
-  assertEquals(
-    nextSubaccountEmail("dono@casa.com", alias, duplicate),
-    alias,
-  );
-  assertEquals(nextSubaccountEmail(alias, alias, duplicate), null);
-  const other = new Error(
-    `Asaas 400: ${
-      JSON.stringify({
-        errors: [{ code: "invalid_object", description: "CEP inválido" }],
-      })
-    }`,
-  );
-  assertEquals(nextSubaccountEmail("dono@casa.com", alias, other), null);
-  const logs: string[] = [];
-  const original = console.error;
-  console.error = (...args: unknown[]) => {
-    logs.push(args.map(String).join(" "));
-  };
-  try {
-    logAsaasFailure("provision-venue-wallet", duplicate);
-  } finally {
-    console.error = original;
-  }
-  const parsed = JSON.parse(logs[0]);
-  assertEquals(parsed.errors, [{ code: "invalid_object" }]);
-  assertEquals(logs[0].includes("dono@casa.com"), false);
-  assertEquals(logs[0].includes("Já existe"), false);
+  assertEquals(nextSubaccountEmail("dono@casa.com", alias, new Error("x")), null);
 });
 
 Deno.test("provision-venue-wallet não usa o e-mail de login", async () => {
   const source = await Deno.readTextFile(
     new URL("../provision-venue-wallet/index.ts", import.meta.url),
   );
-  assert(source.includes("subaccountEmailPlan"));
-  assert(source.includes("nextSubaccountEmail"));
+  assert(source.includes("createSubaccount"));
   assertEquals(source.includes("owner.data.user?.email"), false);
   assertEquals(source.includes("error.message"), false);
   assertEquals(source.includes("console."), false);

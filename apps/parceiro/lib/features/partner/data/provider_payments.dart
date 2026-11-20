@@ -1,11 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 
-/// `asaas` é o padrão. `woovi` liga o saldo Woovi e o Mercado Pago.
-final paymentsStackProvider = Provider<String>(
-  (ref) =>
-      const String.fromEnvironment('PAYMENTS_PROVIDER', defaultValue: 'asaas'),
-);
+/// Pix na Woovi e cartão no Mercado Pago. Não há flag de provedor antigo.
+final paymentsStackProvider = Provider<String>((ref) => 'woovi');
 
 bool wooviPaymentsOn(String stack) => stack == 'woovi';
 

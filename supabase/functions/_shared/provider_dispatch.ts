@@ -1,7 +1,7 @@
 // Captura, cancelamento e estorno das cobranças que não são Asaas.
 // O livro continua em applyPaymentTransition. NFS-e não é emitida aqui.
 
-import { logCaught } from "./asaas_client_error.ts";
+import { logCaught } from "./client_error.ts";
 import { MercadoPagoProvider } from "./mercadopago_provider.ts";
 import {
   applyPaymentTransition,

@@ -1,13 +1,13 @@
 import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
-import { commissionCents } from "./asaas_provider.ts";
+import { commissionCents } from "./scape_points.ts";
 import { createAlternateCharge } from "./alternate_charge.ts";
 import { cardAuthWindowMs, planCardHold } from "./card_hold.ts";
 import { MercadoPagoProvider, mpSignatureMatches, mpWebhookManifest, parseSignatureHeader, shouldRefreshOauth } from "./mercadopago_provider.ts";
 import {
   groupUnconfirmedNotice,
   houseDebitForRefund,
-  paymentsStack,
-  shouldRouteToAlternate,
+  isHistoricalAsaas,
+  providerForBilling,
   wooviSplits,
 } from "./payment_provider.ts";
 import { buildReadiness } from "./payments_readiness.ts";
@@ -21,12 +21,10 @@ const phrase = "Se o grupo não confirmar, o Pix é estornado e o cartão não �
 Deno.test("a frase do grupo fica exata e a flag nasce no Asaas", () => {
   assertEquals(groupUnconfirmedNotice, phrase);
   assertEquals(phrase.includes("nada é cobrado"), false);
-  assertEquals(paymentsStack({ get: () => undefined }), "asaas");
-  assertEquals(paymentsStack({ get: (name) => name === "PAYMENTS_PROVIDER" ? "woovi" : "" }), "woovi");
-  assertEquals(shouldRouteToAlternate({ stack: "asaas", provider: null }), false);
-  assertEquals(shouldRouteToAlternate({ stack: "woovi", provider: "asaas" }), false);
-  assertEquals(shouldRouteToAlternate({ stack: "woovi", provider: null }), true);
-  assertEquals(shouldRouteToAlternate({ stack: "asaas", provider: "mercadopago" }), true);
+  assertEquals(providerForBilling("PIX"), "woovi");
+  assertEquals(providerForBilling("CREDIT_CARD"), "mercadopago");
+  assertEquals(isHistoricalAsaas("asaas"), true);
+  assertEquals(isHistoricalAsaas("woovi"), false);
 });
 
 Deno.test("o split Woovi manda a parte da casa e a reserva que cabe", () => {
@@ -316,12 +314,6 @@ Deno.test("create-charge no trilho woovi não chama o Asaas", async () => {
   const response = await createCharge(request(), {
     user: { id: "user-1", email: "a@b.co" },
     admin: fakeAdmin(inserted),
-    asaas: new Proxy({}, {
-      get: () => () => {
-        throw new Error("asaas chamado");
-      },
-    }) as never,
-    stack: "woovi",
     now: new Date("2026-11-20T12:00:00.000Z"),
     env: {
       get: (name) => name === "WOOVI_APP_ID" ? "app-id" : "",

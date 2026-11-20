@@ -1,6 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { clientFailure } from "../_shared/client_error.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 
 type Body = {
@@ -54,8 +53,6 @@ Deno.serve(async (req) => {
       return json({ error: "not owner" }, 403);
     }
 
-    const owner = await admin.auth.admin.getUserById(venue.owner_id as string);
-    const email = owner.data.user?.email ?? "";
     const inscription = (body.municipal_inscription ?? "").trim();
     const serviceCode = (body.service_code ?? "").trim();
     const serviceName = (body.service_name ?? "").trim();
@@ -82,7 +79,7 @@ Deno.serve(async (req) => {
         venue_id: venueId,
         emission: "sem_emissao",
         reason: "cpf",
-        asaas: "nao_aplicavel",
+        nfs_e: "pendente",
       });
     }
 
@@ -108,45 +105,10 @@ Deno.serve(async (req) => {
     });
     if (saveError) return json({ error: "erro" }, 400);
 
-    const { data: apiKey, error: keyError } = await admin.rpc(
-      "read_venue_asaas_key",
-      { p_venue_id: venueId },
-    );
-    if (keyError || typeof apiKey !== "string" || apiKey.length === 0) {
-      return json({
-        venue_id: venueId,
-        emission: "habilitada",
-        asaas: "sem_chave",
-      });
-    }
-
-    try {
-      const asaas = AsaasProvider.fromEnv(Deno.env).withKey(apiKey);
-      await asaas.configureFiscalInfo({
-        email,
-        municipalInscription: inscription,
-        simplesNacional: simples,
-        cnae: (body.cnae ?? "").trim() || undefined,
-        rpsSerie: body.rps_serie,
-        rpsNumber: body.rps_number,
-        serviceListItem: serviceCode,
-        username: body.municipal_username,
-        password: body.municipal_password,
-      });
-    } catch (error) {
-      const failure = clientFailure(error, "configure-venue-fiscal");
-      return json({
-        venue_id: venueId,
-        emission: "habilitada",
-        asaas: "erro",
-        ...failure.body,
-      }, failure.status);
-    }
-
     return json({
       venue_id: venueId,
       emission: "habilitada",
-      asaas: "configured",
+      nfs_e: "pendente",
     });
   } catch (error) {
     const failure = clientFailure(error, "configure-venue-fiscal");

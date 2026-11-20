@@ -38,7 +38,7 @@ void main() {
 
     expect(find.text('CPF'), findsWidgets);
     expect(
-      find.text('Para pagar com Pix ou cartão, o Asaas precisa do seu CPF.'),
+      find.text('Para pagar com Pix ou cartão, precisamos do seu CPF.'),
       findsOneWidget,
     );
     await tester.enterText(find.byKey(AppKeys.playerCpf), '111.111.111-11');

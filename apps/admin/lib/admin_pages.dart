@@ -423,7 +423,7 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     setState(() {
       _message = result.needsSubaccount
           ? (wallet ??
-                'Aprovada. A subconta Asaas foi pedida no fluxo que já existe.')
+                'Aprovada. A subconta Woovi segue no fluxo da chave Pix.')
           : 'Decisão gravada: ${result.status}.';
     });
   }
@@ -994,13 +994,13 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                 const SizedBox(height: 16),
                 if (report.asaasFeeCents == null)
                   const Text(
-                    'A taxa do Asaas ainda não chegou neste recorte. O painel não estima esse valor.',
+                    'A taxa histórica do provedor anterior ainda não chegou neste recorte. O painel não estima esse valor.',
                     key: Key('admin-taxa-ausente'),
                   )
                 else
                   Text(
-                    'Taxa do Asaas, paga pela comissão do EscapeMatch: ${reais(report.asaasFeeCents!)} em ${report.asaasFeeRows} cobranças.',
-                    key: const Key('admin-taxa-asaas'),
+                    'Taxa histórica do provedor anterior, paga pela comissão do EscapeMatch: ${reais(report.asaasFeeCents!)} em ${report.asaasFeeRows} cobranças.',
+                    key: const Key('admin-taxa-historica'),
                   ),
                 const SizedBox(height: 16),
                 Text(

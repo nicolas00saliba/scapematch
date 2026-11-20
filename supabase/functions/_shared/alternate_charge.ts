@@ -1,8 +1,7 @@
-// Cobrança fora do Asaas. A flag PAYMENTS_PROVIDER=woovi manda o Pix
-// para a Woovi e o cartão para o Mercado Pago. Cobrança Asaas já
-// gravada não entra aqui.
+// Pix na Woovi e cartão no Mercado Pago. Cobrança com provider asaas
+// não entra aqui: ela fica só como registro.
 
-import { commissionCents } from "./asaas_provider.ts";
+import { commissionCents } from "./scape_points.ts";
 import { cardDecisionAt, planCardHold } from "./card_hold.ts";
 import { commissionBpsForVenue } from "./commission_rate.ts";
 import { MercadoPagoProvider } from "./mercadopago_provider.ts";
@@ -83,7 +82,7 @@ export async function createAlternateCharge(
     return input.json({ error: "A casa ainda não recebe por este provedor." }, 409);
   }
 
-  const provider = providerForBilling("woovi", input.billingType);
+  const provider = providerForBilling(input.billingType);
   const accountProvider = provider === "mercadopago" ? "mercadopago" : "woovi";
   const { data: account, error: accountError } = await input.admin
     .from("provider_payout_accounts")

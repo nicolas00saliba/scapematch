@@ -3,7 +3,7 @@
 // o Pix cai na subconta antes da confirmação do grupo. Ele sai na
 // liquidação, só da parte da casa, quando auto_withdraw está ligado.
 
-import { groupUnconfirmedNotice, paymentsStack, type FetchLike } from "./payment_provider.ts";
+import { groupUnconfirmedNotice, type FetchLike } from "./payment_provider.ts";
 import { WooviProvider } from "./woovi_provider.ts";
 import type { EnvLike } from "./http.ts";
 
@@ -17,8 +17,8 @@ export type HouseDeps = {
   fetchFn?: FetchLike;
 };
 
-export function wooviStackOn(env: EnvLike): boolean {
-  return paymentsStack(env) === "woovi";
+export function wooviStackOn(_env: EnvLike): boolean {
+  return true;
 }
 
 export async function wooviHouseBalance(

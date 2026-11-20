@@ -1,4 +1,4 @@
-export const walletBlockedMessage = "A casa ainda não tem subconta Asaas.";
+export const walletBlockedMessage = "A casa ainda não tem subconta.";
 export const financeBlockedMessage = "A casa ainda não pode receber.";
 
 /// Subconta e conta bancária (Pix ou conta) juntas. Sem as duas, não cobra.
