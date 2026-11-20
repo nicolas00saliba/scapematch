@@ -60,7 +60,17 @@ import {
   publicError,
   todayInSaoPaulo,
 } from "../_shared/http.ts";
+import { createAlternateCharge } from "../_shared/alternate_charge.ts";
+import type { MercadoPagoProvider } from "../_shared/mercadopago_provider.ts";
+import {
+  denoEnv,
+  paymentsStack,
+  shouldRouteToAlternate,
+  type PaymentsStack,
+} from "../_shared/payment_provider.ts";
+import type { EnvLike } from "../_shared/http.ts";
 import { hasRawCardData } from "../_shared/raw_card.ts";
+import type { WooviProvider } from "../_shared/woovi_provider.ts";
 import {
   cardForCharge,
   isMissingCard,
@@ -84,6 +94,11 @@ export type ChargeRuntime = {
   user: ChargeUser;
   admin: ChargeDb;
   asaas: AsaasProvider;
+  stack?: PaymentsStack;
+  woovi?: WooviProvider;
+  mercadoPago?: MercadoPagoProvider;
+  now?: Date;
+  env?: EnvLike;
 };
 
 export async function createCharge(
@@ -194,6 +209,30 @@ export async function createCharge(
         qr_code_base64: existing.qr_code_base64,
         billing_type: existing.billing_type,
         amount_cents: existing.amount_cents,
+      });
+    }
+
+    const stack = deps?.stack ?? paymentsStack(deps?.env ?? denoEnv());
+    if (
+      shouldRouteToAlternate({
+        stack,
+        provider: typeof existing?.provider === "string" ? existing.provider : null,
+      })
+    ) {
+      return await createAlternateCharge({
+        json,
+        admin,
+        user,
+        group: group as Record<string, unknown>,
+        existing: (existing as Record<string, unknown> | null) ?? null,
+        body: body as Record<string, unknown>,
+        groupId,
+        billingType,
+        idempotencyKey,
+        woovi: deps?.woovi,
+        mercadoPago: deps?.mercadoPago,
+        now: deps?.now,
+        env: deps?.env ?? denoEnv(),
       });
     }
 

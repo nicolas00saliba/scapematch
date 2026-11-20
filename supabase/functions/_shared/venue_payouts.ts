@@ -21,6 +21,13 @@ import {
   type WebhookView,
 } from "./asaas_transfers.ts";
 import { bindJson, corsHeadersFor, todayInSaoPaulo } from "./http.ts";
+import { paymentsStack } from "./payment_provider.ts";
+import {
+  wooviHouseBalance,
+  wooviHouseWithdraw,
+  wooviScheduledReport,
+  wooviStackOn,
+} from "./provider_house.ts";
 
 const reauthWindowSec = 300;
 
@@ -218,6 +225,10 @@ export async function handleVenuePayouts(
     const actor = await deps.store.actor(jwt);
     if (!actor) return json({ error: "not authenticated" }, 401);
     const claims = readJwtClaims(jwt);
+    if (action === "woovi_balance") {
+      if (!wooviStackOn(deps.env)) return json({ error: "provider_asaas" }, 409);
+      return json(await wooviHouseBalance(deps, venueId, actor.id));
+    }
     if (action === "snapshot") {
       return json(await loadSnapshot(deps, actor, claims, venueId));
     }
@@ -255,6 +266,17 @@ export async function handleVenuePayouts(
         p_min_amount_cents: integerOrNull(body?.min_amount_cents) ?? -1,
       });
       return json(await loadSnapshot(deps, actor, claims, venueId));
+    }
+    if (action === "woovi_withdraw") {
+      if (!wooviStackOn(deps.env)) return json({ error: "provider_asaas" }, 409);
+      const amount = integerOrNull(body?.amount_cents);
+      if (amount == null || amount <= 0) return json({ error: "valor" }, 400);
+      const result = await wooviHouseWithdraw(deps, {
+        venueId,
+        actorId: actor.id,
+        amountCents: amount,
+      });
+      return json(result.body, result.status);
     }
     if (action === "withdraw") {
       const amount = integerOrNull(body?.amount_cents);
@@ -349,6 +371,9 @@ export async function handleScheduledWithdrawals(
   }
   if (!(await secretMatches(header, secret))) {
     return json({ error: "not authenticated" }, 401);
+  }
+  if (paymentsStack(deps.env) === "woovi") {
+    return json(wooviScheduledReport());
   }
   try {
     const webhooks = await syncTransferWebhooks(deps);

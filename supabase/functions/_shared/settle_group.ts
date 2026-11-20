@@ -8,6 +8,11 @@ import {
 } from "./ledger.ts";
 import { syncPayerDocument } from "./payer_document.ts";
 import { bandConfirmed, bandMissed, bandSettlement } from "./group_band.ts";
+import { isAlternateProvider } from "./payment_provider.ts";
+import {
+  settleAlternateCharge,
+  type AlternateGate,
+} from "./provider_dispatch.ts";
 import { releaseCancelledCharges } from "./release_charges.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -29,8 +34,12 @@ type GroupRow = {
 
 type ChargeView = ChargeRow & {
   status: string;
+  provider?: string | null;
   provider_ref: string | null;
   billing_type: string;
+  provider_end_to_end_id?: string | null;
+  house_pix_key?: string | null;
+  house_fixed_cents?: number | null;
 };
 
 /// Admin, criador e dono da casa liquidam ou liberam.
@@ -73,6 +82,7 @@ export async function settleGroup(
   admin: Admin,
   asaas: AsaasProvider,
   groupId: string,
+  gate?: AlternateGate,
 ): Promise<void> {
   const { data: group } = await admin
     .from("groups")
@@ -97,7 +107,7 @@ export async function settleGroup(
         .is("cancelled_at", null)
         .is("confirmed_at", null);
     }
-    await releaseCancelledCharges(admin, asaas, groupId);
+    await releaseCancelledCharges(admin, asaas, groupId, gate);
     return;
   }
   if (decision === "wait") return;
@@ -106,12 +116,18 @@ export async function settleGroup(
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type",
+      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider, provider_ref, billing_type, provider_end_to_end_id, house_pix_key, house_fixed_cents",
     )
     .eq("group_id", groupId);
 
   for (const charge of charges ?? []) {
     const item = charge as ChargeView;
+    if (isAlternateProvider(item.provider)) {
+      if (item.status === "authorized" || item.status === "paid") {
+        await settleAlternateCharge(admin, item, gate);
+      }
+      continue;
+    }
     if (!item.provider_ref) continue;
     if (item.status === "authorized" && item.billing_type === "CREDIT_CARD") {
       await captureAuthorizedCard(admin, asaas, item);

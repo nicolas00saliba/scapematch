@@ -29,6 +29,8 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 
 Sandbox (`https://api-sandbox.asaas.com/v3`), URL vazia e qualquer outro host contam como não.
 
+Woovi e Mercado Pago acrescentam campos na mesma resposta. A lista e as variáveis estão em `docs/pagamentos-woovi-mercadopago.md`. O padrão continua `asaas`.
+
 ## Migration
 
 Arquivo: `supabase/migrations/20261113160000_payments_readiness.sql`. O fallback do Vault está em `supabase/migrations/20261113210000_cron_vault_secret.sql`.

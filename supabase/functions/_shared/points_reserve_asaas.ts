@@ -462,6 +462,7 @@ export async function fundCashbackReserve(
   chargeId: string,
   fetchFn: AsaasFetch = fetch,
 ): Promise<void> {
+  if (await chargeUsesAlternateProvider(admin, chargeId)) return;
   const baseUrl = (readEnv(env, "ASAAS_BASE_URL") || asaasSandboxBaseUrl)
     .replace(/\/$/, "");
   const rootKey = readEnv(env, "ASAAS_API_KEY");
@@ -531,6 +532,7 @@ export async function settlePaidChargeReserve(
   chargeId: string,
   fetchFn: AsaasFetch = fetch,
 ): Promise<void> {
+  if (await chargeUsesAlternateProvider(admin, chargeId)) return;
   const client = admin as { rpc: ReserveRpc; from: (table: string) => unknown };
   const baseUrl = (readEnv(env, "ASAAS_BASE_URL") || asaasSandboxBaseUrl)
     .replace(/\/$/, "");
@@ -565,6 +567,29 @@ export async function settlePaidChargeReserve(
   });
   if (!paid) return;
   await client.rpc("void_unapplied_points_reserve", { p_charge_id: chargeId });
+}
+
+async function chargeUsesAlternateProvider(
+  admin: unknown,
+  chargeId: string,
+): Promise<boolean> {
+  const client = admin as { from?: (table: string) => unknown };
+  if (typeof client.from !== "function") return false;
+  try {
+    const row = await readRow(
+      client as { from: (table: string) => unknown },
+      "payment_charges",
+      "id",
+      chargeId,
+      "provider",
+    );
+    const provider = row && typeof row === "object"
+      ? (row as { provider?: unknown }).provider
+      : "";
+    return provider === "woovi" || provider === "mercadopago";
+  } catch {
+    return false;
+  }
 }
 
 async function readRow(

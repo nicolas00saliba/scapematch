@@ -93,8 +93,14 @@ abstract final class PartnerMessages {
   static const grossLabel = 'Bruto';
   static const commissionLabel = 'Comissão';
   static const reservedLabel = 'Reservado';
+  static const groupUnconfirmed =
+      'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
   static const reservedBody =
-      'Ainda não entrou no saldo. Se o grupo não confirmar, o valor é liberado e nada é cobrado.';
+      'Ainda não entrou no saldo. $groupUnconfirmed';
+  static const wooviBalanceTitle = 'Saldo na Woovi';
+  static const wooviWithdraw = 'Sacar pela Woovi';
+  static const mpConnect = 'Conectar Mercado Pago';
+  static const mpConnected = 'Mercado Pago conectado nesta sessão.';
   static const statement = 'Extrato';
   static const statementEmpty =
       'Nenhuma captura ainda. Quando um grupo confirma, o valor aparece aqui.';

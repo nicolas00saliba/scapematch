@@ -48,6 +48,18 @@ verify_jwt = true
 [functions.asaas-transfer-webhook]
 verify_jwt = false
 
+# A Woovi assina o corpo. Sem JWT de usuário.
+[functions.woovi-webhook]
+verify_jwt = false
+
+# O Mercado Pago assina com x-signature. Sem JWT de usuário.
+[functions.mp-webhook]
+verify_jwt = false
+
+# A casa conecta o Mercado Pago com o JWT do Parceiro.
+[functions.mp-oauth]
+verify_jwt = true
+
 # E-mails do Auth, em pt-BR. O CLI local lê subject e content_path.
 # O projeto remoto não muda sozinho. Cole cada assunto e o HTML em
 # Authentication > Email Templates, ou rode tool/apply_auth_email_templates.sh

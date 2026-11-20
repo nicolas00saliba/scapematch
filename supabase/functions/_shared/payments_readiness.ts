@@ -4,6 +4,9 @@
 import { asaasProductionBaseUrl } from "./asaas_provider.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { logCaught } from "./asaas_client_error.ts";
+import { mpAccessTokenIsTest } from "./mercadopago_provider.ts";
+import { paymentsStack, type PaymentsStack } from "./payment_provider.ts";
+import { isWooviSandbox, wooviSandboxBaseUrl } from "./woovi_provider.ts";
 
 export function secretPresent(value: string | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0;
@@ -30,6 +33,16 @@ export type ReadinessReport = {
   venue_payouts_enabled: boolean;
   cron_last_failed: boolean | null;
   cron_failure_code: string | null;
+  payments_provider: PaymentsStack;
+  woovi_app_id: boolean;
+  woovi_base_url_sandbox: boolean;
+  woovi_webhook_secret: boolean;
+  woovi_webhook_public_key: boolean;
+  mp_client_id: boolean;
+  mp_client_secret: boolean;
+  mp_webhook_secret: boolean;
+  mp_oauth_redirect_uri: boolean;
+  mp_access_token_test: boolean;
 };
 
 export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
@@ -64,6 +77,18 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
     venue_payouts_enabled: row.venue_payouts_enabled === true,
     cron_last_failed: failed,
     cron_failure_code: failed === true ? code : null,
+    payments_provider: paymentsStack(env),
+    woovi_app_id: secretPresent(env.get("WOOVI_APP_ID")),
+    woovi_base_url_sandbox: isWooviSandbox(
+      (env.get("WOOVI_BASE_URL") ?? "").trim() || wooviSandboxBaseUrl,
+    ),
+    woovi_webhook_secret: secretPresent(env.get("WOOVI_WEBHOOK_SECRET")),
+    woovi_webhook_public_key: secretPresent(env.get("WOOVI_WEBHOOK_PUBLIC_KEY")),
+    mp_client_id: secretPresent(env.get("MP_CLIENT_ID")),
+    mp_client_secret: secretPresent(env.get("MP_CLIENT_SECRET")),
+    mp_webhook_secret: secretPresent(env.get("MP_WEBHOOK_SECRET")),
+    mp_oauth_redirect_uri: secretPresent(env.get("MP_OAUTH_REDIRECT_URI")),
+    mp_access_token_test: mpAccessTokenIsTest(env.get("MP_ACCESS_TOKEN")),
   };
 }
 
