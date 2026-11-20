@@ -48,7 +48,7 @@ export const programas: Programa[] = [
     og: '/assets/og/vantagens.png',
     cta: {
       rotulo: 'Criar conta e ganhar 100 pontos',
-      href: 'https://app.escapematch.com.br/cadastro',
+      href: 'https://app.escapematch.com.br/',
       externo: true,
     },
   },
@@ -69,7 +69,7 @@ export const programas: Programa[] = [
     og: '/assets/og/vantagens.png',
     cta: {
       rotulo: 'Criar conta e ganhar 100 pontos',
-      href: 'https://app.escapematch.com.br/cadastro',
+      href: 'https://app.escapematch.com.br/',
       externo: true,
     },
   },
@@ -91,7 +91,7 @@ export const programas: Programa[] = [
     og: '/assets/og/indique-amigos.png',
     cta: {
       rotulo: 'Pegar meu código no app',
-      href: 'https://app.escapematch.com.br/login',
+      href: 'https://app.escapematch.com.br/',
       externo: true,
     },
   },
@@ -112,7 +112,7 @@ export const programas: Programa[] = [
     og: '/assets/og/indique-uma-casa.png',
     cta: {
       rotulo: 'Pegar meu código no app',
-      href: 'https://app.escapematch.com.br/login',
+      href: 'https://app.escapematch.com.br/',
       externo: true,
     },
   },
@@ -134,7 +134,7 @@ export const programas: Programa[] = [
     og: '/assets/og/niveis.png',
     cta: {
       rotulo: 'Ver meu nível no app',
-      href: 'https://app.escapematch.com.br/login',
+      href: 'https://app.escapematch.com.br/',
       externo: true,
     },
   },
