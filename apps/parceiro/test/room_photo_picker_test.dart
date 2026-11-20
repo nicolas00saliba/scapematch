@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:dominio/dominio.dart';
@@ -29,6 +30,7 @@ void main() {
 
     await tester.ensureVisible(find.byKey(PartnerKeys.roomAddPhotos));
     await tester.tap(find.byKey(PartnerKeys.roomAddPhotos));
+    await tester.pump(Duration.zero);
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 100)),
     );
@@ -38,8 +40,63 @@ void main() {
 
     await tester.ensureVisible(find.byKey(PartnerKeys.roomAddPhotos));
     await tester.tap(find.byKey(PartnerKeys.roomAddPhotos));
+    await tester.pump(Duration.zero);
     await tester.pumpAndSettle();
     expect(find.text(PartnerMessages.roomPhotoUnread), findsOneWidget);
+    expect(find.byKey(PartnerKeys.roomFramePreview), findsOneWidget);
+  });
+
+  testWidgets('preparar fotos avisa e desativa os botões', (tester) async {
+    final good = _png(width: 24, height: 36);
+    final gate = Completer<RoomPhotoPick>();
+    var started = false;
+    final picker = _GatedPicker(gate.future, () {
+      started = true;
+      expect(find.text(PartnerMessages.roomPhotosPreparing), findsOneWidget);
+      expect(
+        tester.widget<OutlinedButton>(find.byKey(PartnerKeys.roomAddPhotos)).onPressed,
+        isNull,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byKey(PartnerKeys.agendaSaveRoom)).onPressed,
+        isNull,
+      );
+    });
+    await _pump(tester, picker);
+
+    await tester.ensureVisible(find.byKey(PartnerKeys.roomAddPhotos));
+    await tester.tap(find.byKey(PartnerKeys.roomAddPhotos));
+    expect(started, isFalse);
+    expect(find.text(PartnerMessages.roomPhotosPreparing), findsNothing);
+
+    await tester.pump(Duration.zero);
+
+    expect(started, isTrue);
+    expect(find.text(PartnerMessages.roomPhotosPreparing), findsOneWidget);
+    expect(
+      tester.widget<OutlinedButton>(find.byKey(PartnerKeys.roomAddPhotos)).onPressed,
+      isNull,
+    );
+    expect(
+      tester.widget<FilledButton>(find.byKey(PartnerKeys.agendaSaveRoom)).onPressed,
+      isNull,
+    );
+
+    gate.complete(RoomPhotoPick([good]));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(PartnerMessages.roomPhotosPreparing), findsNothing);
+    expect(
+      tester.widget<OutlinedButton>(find.byKey(PartnerKeys.roomAddPhotos)).onPressed,
+      isNotNull,
+    );
+    expect(
+      tester.widget<FilledButton>(find.byKey(PartnerKeys.agendaSaveRoom)).onPressed,
+      isNotNull,
+    );
     expect(find.byKey(PartnerKeys.roomFramePreview), findsOneWidget);
   });
 }
@@ -95,6 +152,19 @@ PartnerSnapshot _snapshot() {
     invoices: const [],
     fiscal: demoHouseFiscal,
   );
+}
+
+class _GatedPicker implements PhotoPicker {
+  _GatedPicker(this.pending, this.onPick);
+
+  final Future<RoomPhotoPick> pending;
+  final void Function() onPick;
+
+  @override
+  Future<RoomPhotoPick> pick() {
+    onPick();
+    return pending;
+  }
 }
 
 class _ScriptedPicker implements PhotoPicker {

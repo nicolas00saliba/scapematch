@@ -59,6 +59,7 @@ abstract final class PartnerMessages {
   static const roomPhotosBody =
       'A capa é a primeira foto. Cada moldura é a proporção real do card, da capa e da galeria.';
   static const roomAddPhotos = 'Enviar fotos';
+  static const roomPhotosPreparing = 'Preparando fotos…';
   static const roomCover = 'Capa';
   static const roomMakeCover = 'Usar como capa';
   static const roomRemovePhoto = 'Remover';
