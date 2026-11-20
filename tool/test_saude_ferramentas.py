@@ -84,5 +84,55 @@ class MarcadorTeste(unittest.TestCase):
             )
 
 
+class LinksProducaoTeste(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        caminho = (
+            Path(__file__).resolve().parents[1]
+            / ".github"
+            / "workflows"
+            / "links-quebrados.yml"
+        )
+        cls.texto = caminho.read_text(encoding="utf-8")
+
+    def args_producao(self):
+        marcador = "LYCHEE_ARGS_PRODUCAO: >-\n"
+        inicio = self.texto.index(marcador) + len(marcador)
+        fim = self.texto.index("\n    steps:", inicio)
+        return self.texto[inicio:fim]
+
+    def test_retries_espera_e_concorrencia(self):
+        args = self.args_producao()
+        self.assertIn("--max-retries 4", args)
+        self.assertIn("--retry-wait-time 10", args)
+        self.assertIn("--max-concurrency 8", args)
+        self.assertIn("--timeout 20", args)
+
+    def test_nao_aceita_503_nem_tira_url(self):
+        args = self.args_producao()
+        self.assertIn("--accept 200,206,429", args)
+        self.assertNotIn("503", args)
+        self.assertIn("'https://escapematch.com.br'", args)
+        self.assertIn("app|parceiro|parceiro-demo|demo|admin", args)
+
+    def test_build_agendado_segue_com_duas_tentativas(self):
+        trecho = self.texto.split("name: Links do build", 1)[1]
+        trecho = trecho.split("\n      # continue-on-error:", 1)[0]
+        self.assertIn("--max-retries 2", trecho)
+        self.assertIn("--accept 200,206,429", trecho)
+        self.assertNotIn("--retry-wait-time", trecho)
+        self.assertNotIn("503", trecho)
+
+    def test_repete_por_fora_quando_o_binario_nao_retenta_503(self):
+        trecho = self.texto.split("name: Links de produção", 1)[1]
+        self.assertIn("continue-on-error: true", trecho)
+        self.assertIn("steps.links_producao.outcome == 'failure'", trecho)
+        repetir = trecho.split("name: Repetir produção se a borda falhou", 1)[1]
+        self.assertIn("for i in 1 2 3 4", repetir)
+        self.assertIn("sleep 10", repetir)
+        self.assertIn("lychee ${LYCHEE_ARGS_PRODUCAO}", repetir)
+        self.assertIn("exit 1", repetir)
+
+
 if __name__ == "__main__":
     unittest.main()
