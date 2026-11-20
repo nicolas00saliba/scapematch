@@ -129,6 +129,41 @@ export function mpAccessTokenIsTest(value: string | undefined): boolean {
   return token.startsWith("TEST-") && token.length >= 20;
 }
 
+/// `sandbox` só com o valor exato. Vazio, `production` ou qualquer outro
+/// valor fica em produção.
+export function mpEnvMode(env: EnvLike): "sandbox" | "production" {
+  try {
+    const raw = (env.get("MP_ENV") ?? "").trim().toLowerCase();
+    if (raw === "sandbox") return "sandbox";
+  } catch {
+    return "production";
+  }
+  return "production";
+}
+
+/// Token da plataforma no lugar do OAuth da casa.
+/// Em `MP_ENV=sandbox` vale o token do painel, inclusive `APP_USR-`.
+/// Sem a variável, `TEST-` continua sinal de sandbox.
+/// `MP_ENV=production` ou outro valor não usa o token da plataforma.
+export function mpPlatformFallback(env: EnvLike): string | null {
+  let declared = "";
+  try {
+    declared = (env.get("MP_ENV") ?? "").trim().toLowerCase();
+  } catch {
+    return null;
+  }
+  let token = "";
+  try {
+    token = (env.get("MP_ACCESS_TOKEN") ?? "").trim();
+  } catch {
+    return null;
+  }
+  if (token.length < 20) return null;
+  if (declared === "sandbox") return token;
+  if (declared === "" && mpAccessTokenIsTest(token)) return token;
+  return null;
+}
+
 export class MercadoPagoProvider implements PaymentProvider {
   readonly name = "mercadopago" as const;
 

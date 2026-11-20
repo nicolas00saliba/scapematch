@@ -2,7 +2,7 @@
 // O livro continua em applyPaymentTransition. NFS-e não é emitida aqui.
 
 import { logCaught } from "./client_error.ts";
-import { MercadoPagoProvider } from "./mercadopago_provider.ts";
+import { MercadoPagoProvider, mpPlatformFallback } from "./mercadopago_provider.ts";
 import {
   applyPaymentTransition,
   creditLedger,
@@ -13,7 +13,6 @@ import {
   denoEnv,
   houseDebitForRefund,
   isAlternateProvider,
-  readEnv,
 } from "./payment_provider.ts";
 import { refundDebitDescription, WooviProvider } from "./woovi_provider.ts";
 import type { EnvLike } from "./http.ts";
@@ -226,8 +225,8 @@ async function accessToken(
     const token = loaded?.data?.access_token;
     if (typeof token === "string" && token.trim()) return token;
   }
-  const fallback = readEnv(envOf(gate), "MP_ACCESS_TOKEN");
-  if (fallback.startsWith("TEST-") && fallback.length >= 20) return fallback;
+  const fallback = mpPlatformFallback(envOf(gate));
+  if (fallback) return fallback;
   console.error(JSON.stringify({
     scope: "mp-cobranca",
     code: "oauth_da_casa_ausente",

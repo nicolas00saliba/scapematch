@@ -3,7 +3,7 @@
 
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { logCaught } from "./client_error.ts";
-import { mpAccessTokenIsTest } from "./mercadopago_provider.ts";
+import { mpEnvMode, mpPlatformFallback } from "./mercadopago_provider.ts";
 import type { PaymentsStack } from "./payment_provider.ts";
 import { isWooviSandbox, wooviSandboxBaseUrl } from "./woovi_provider.ts";
 
@@ -31,6 +31,7 @@ export type ReadinessReport = {
   mp_client_secret: boolean;
   mp_webhook_secret: boolean;
   mp_oauth_redirect_uri: boolean;
+  mp_env_sandbox: boolean;
   mp_access_token_test: boolean;
 };
 
@@ -71,7 +72,8 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
     mp_client_secret: secretPresent(env.get("MP_CLIENT_SECRET")),
     mp_webhook_secret: secretPresent(env.get("MP_WEBHOOK_SECRET")),
     mp_oauth_redirect_uri: secretPresent(env.get("MP_OAUTH_REDIRECT_URI")),
-    mp_access_token_test: mpAccessTokenIsTest(env.get("MP_ACCESS_TOKEN")),
+    mp_env_sandbox: mpEnvMode(env) === "sandbox",
+    mp_access_token_test: mpPlatformFallback(env) !== null,
   };
 }
 

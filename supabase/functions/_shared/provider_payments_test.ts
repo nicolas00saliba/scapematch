@@ -2,7 +2,7 @@ import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
 import { commissionCents } from "./scape_points.ts";
 import { createAlternateCharge } from "./alternate_charge.ts";
 import { cardAuthWindowMs, planCardHold } from "./card_hold.ts";
-import { MercadoPagoProvider, mapMpStatus, mpSignatureMatches, mpWebhookManifest, parseSignatureHeader, shouldRefreshOauth, storedCardStatus } from "./mercadopago_provider.ts";
+import { MercadoPagoProvider, mapMpStatus, mpEnvMode, mpPlatformFallback, mpSignatureMatches, mpWebhookManifest, parseSignatureHeader, shouldRefreshOauth, storedCardStatus } from "./mercadopago_provider.ts";
 import {
   groupUnconfirmedNotice,
   houseDebitForRefund,
@@ -501,6 +501,7 @@ Deno.test("a prontidão por provedor não devolve segredo", () => {
   assertEquals(report.woovi_base_url_sandbox, true);
   assertEquals(report.woovi_webhook_secret, true);
   assertEquals(report.mp_client_secret, true);
+  assertEquals(report.mp_env_sandbox, false);
   assertEquals(report.mp_access_token_test, true);
   assertEquals(JSON.stringify(report).includes(secret), false);
   assertEquals(JSON.stringify(report).includes("TEST-token"), false);
@@ -696,6 +697,98 @@ Deno.test("falha no webhook libera o evento para o reenvio", async () => {
   admin.fail = false;
   const again = await handleWooviWebhook(req, { env, admin, rawBody: raw });
   assertEquals(again.status, 200);
+  assertEquals(seen, ["paid"]);
+});
+
+Deno.test("o fallback da plataforma segue MP_ENV", () => {
+  const appUsr = "APP_USR-token-de-teste-123456";
+  const test = "TEST-token-da-casa-123456";
+  const env = (vars: Record<string, string>) => ({
+    get: (name: string) => vars[name] ?? "",
+  });
+  assertEquals(mpEnvMode(env({})), "production");
+  assertEquals(mpEnvMode(env({ MP_ENV: "SANDBOX" })), "sandbox");
+  assertEquals(mpEnvMode(env({ MP_ENV: "teste" })), "production");
+  assertEquals(
+    mpPlatformFallback(env({ MP_ENV: "sandbox", MP_ACCESS_TOKEN: appUsr })),
+    appUsr,
+  );
+  assertEquals(mpPlatformFallback(env({ MP_ACCESS_TOKEN: appUsr })), null);
+  assertEquals(mpPlatformFallback(env({ MP_ACCESS_TOKEN: test })), test);
+  assertEquals(
+    mpPlatformFallback(env({ MP_ENV: "production", MP_ACCESS_TOKEN: test })),
+    null,
+  );
+  assertEquals(
+    mpPlatformFallback(env({ MP_ENV: "sandbox", MP_ACCESS_TOKEN: "curto" })),
+    null,
+  );
+
+  const sandbox = buildReadiness({
+    get: (name: string) => {
+      if (name === "MP_ENV") return "sandbox";
+      if (name === "MP_ACCESS_TOKEN") return appUsr;
+      return "";
+    },
+  }, {});
+  assertEquals(sandbox.mp_env_sandbox, true);
+  assertEquals(sandbox.mp_access_token_test, true);
+  assertEquals(JSON.stringify(sandbox).includes(appUsr), false);
+
+  const closed = buildReadiness({
+    get: (name: string) => name === "MP_ACCESS_TOKEN" ? appUsr : "",
+  }, {});
+  assertEquals(closed.mp_env_sandbox, false);
+  assertEquals(closed.mp_access_token_test, false);
+});
+
+Deno.test("mp-webhook em sandbox usa o token APP_USR- da plataforma", async () => {
+  const secret = "mp-webhook-secret-32chars";
+  const token = "APP_USR-token-de-teste-123456";
+  const dataId = "99";
+  const requestId = "req-sandbox";
+  const ts = "1700000000";
+  const manifest = mpWebhookManifest({ dataId, requestId, ts });
+  const v1 = await hmac(manifest, secret);
+  const raw = JSON.stringify({
+    id: "evt-sandbox",
+    action: "payment.updated",
+    data: { id: dataId },
+  });
+  const seen: string[] = [];
+  const headers: string[] = [];
+  const admin = webhookAdmin(seen, "mercadopago");
+  const env = {
+    get: (name: string) => {
+      if (name === "MP_WEBHOOK_SECRET") return secret;
+      if (name === "MP_ENV") return "sandbox";
+      if (name === "MP_ACCESS_TOKEN") return token;
+      return "";
+    },
+  };
+  const response = await handleMpWebhook(
+    new Request(`https://exemplo.test/mp-webhook?data.id=${dataId}`, {
+      method: "POST",
+      headers: { "x-signature": `ts=${ts},v1=${v1}`, "x-request-id": requestId },
+      body: raw,
+    }),
+    {
+      env,
+      admin,
+      rawBody: raw,
+      fetchFn: (_url, init) => {
+        const sent = new Headers(init?.headers).get("Authorization") ?? "";
+        headers.push(sent);
+        return Promise.resolve(new Response(JSON.stringify({
+          id: 99,
+          status: "approved",
+          captured: true,
+        })));
+      },
+    },
+  );
+  assertEquals(response.status, 200);
+  assertEquals(headers, [`Bearer ${token}`]);
   assertEquals(seen, ["paid"]);
 });
 

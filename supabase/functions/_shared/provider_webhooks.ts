@@ -6,6 +6,7 @@ import { logCaught } from "./client_error.ts";
 import { bandConfirmed } from "./group_band.ts";
 import { applyPaymentTransition } from "./ledger.ts";
 import {
+  mpPlatformFallback,
   mpSignatureMatches,
   mpWebhookManifest,
   parseSignatureHeader,
@@ -281,8 +282,8 @@ async function houseToken(deps: WebhookDeps, venueId: string): Promise<string> {
   } catch (error) {
     logCaught("mp-webhook", error);
   }
-  const fallback = readEnv(deps.env, "MP_ACCESS_TOKEN");
-  if (fallback.startsWith("TEST-") && fallback.length >= 20) return fallback;
+  const fallback = mpPlatformFallback(deps.env);
+  if (fallback) return fallback;
   console.error(JSON.stringify({
     scope: "mp-webhook",
     code: "oauth_da_casa_ausente",

@@ -31,7 +31,7 @@ Woovi, header `Authorization` com o APP_ID, sem `Bearer`. Base de sandbox: `http
 
 O saldo que a Woovi devolve é tratado como centavos, no mesmo contrato de `value` da cobrança. Confirmar com a conta sandbox.
 
-Mercado Pago, mesma API de sandbox e produção (`https://api.mercadopago.com`). O que separa o teste é o access token da casa, obtido por OAuth, com prefixo `TEST-`.
+Mercado Pago, mesma API de sandbox e produção (`https://api.mercadopago.com`). O ambiente é `MP_ENV=sandbox` ou `MP_ENV=production`. Sem a variável, ou com outro valor, vale produção. A aplicação de teste do painel entrega o access token com prefixo `APP_USR-`. `TEST-` continua sinal de sandbox quando `MP_ENV` não está definida.
 
 | Ação | Chamada |
 | --- | --- |
@@ -45,7 +45,7 @@ O webhook da Woovi aceita `x-openpix-signature` (HMAC SHA-256 do corpo cru, segr
 
 Os dois gravam o evento em `provider_webhook_events` só quando o processamento termina. Se a função responde 500, a linha do evento é apagada e o reenvio entra de novo. A segunda entrega de um evento já processado responde ok e não mexe no livro. `in_process` e `pending` do Mercado Pago ficam pendentes. Chargeback grava `charged_back`, sem `refunded_at`.
 
-O `state` do OAuth do Mercado Pago é `v1.<casa>.<expira>.<nonce>.<hmac>`, vale 10 minutos e é conferido no callback. Sem o token OAuth da casa, o webhook e a captura só usam `MP_ACCESS_TOKEN` quando ele começa com `TEST-`. Em produção a função responde 500 e registra `oauth_da_casa_ausente`.
+O `state` do OAuth do Mercado Pago é `v1.<casa>.<expira>.<nonce>.<hmac>`, vale 10 minutos e é conferido no callback. Sem o token OAuth da casa, o webhook e a captura usam `MP_ACCESS_TOKEN` só quando `MP_ENV=sandbox`, ou quando a variável está vazia e o token começa com `TEST-`. Em produção a função responde 500 e registra `oauth_da_casa_ausente`.
 
 O build real do Parceiro está em `https://parceiro.escapematch.com.br/`. O valor exato de `MP_OAUTH_REDIRECT_URI` é `https://parceiro.escapematch.com.br/mp-retorno`. Cadastre essa URL igual na aplicação do Mercado Pago, sem barra no fim e sem query. A rota `/mp-retorno` lê `code` e `state`, chama `mp-oauth` com `action` `callback` e grava o token da casa. `error=access_denied` não grava token. A demonstração em `parceiro-demo` não usa esse valor.
 
@@ -78,12 +78,13 @@ supabase secrets set --project-ref <project-ref> \
   WOOVI_WEBHOOK_SECRET='<segredo HMAC do webhook Woovi, 16 caracteres ou mais>' \
   WOOVI_WEBHOOK_PUBLIC_KEY='<PEM público da Woovi, opcional se o HMAC estiver ativo>' \
   WOOVI_POINTS_RESERVE_PIX_KEY='<pixKey da subconta de reserva de pontos, opcional>' \
+  MP_ENV='sandbox' \
   MP_CLIENT_ID='<client id da aplicação Mercado Pago>' \
   MP_CLIENT_SECRET='<client secret da aplicação>' \
   MP_OAUTH_STATE_SECRET='<segredo do state OAuth, 16 caracteres ou mais; se vazio, usa MP_CLIENT_SECRET>' \
   MP_OAUTH_REDIRECT_URI='https://parceiro.escapematch.com.br/mp-retorno' \
   MP_WEBHOOK_SECRET='<assinatura secreta do webhook Mercado Pago>' \
-  MP_ACCESS_TOKEN='<access token TEST- da plataforma, só se a casa ainda não conectou>'
+  MP_ACCESS_TOKEN='<access token da aba Teste, prefixo APP_USR- ou TEST-, só com MP_ENV=sandbox e se a casa ainda não conectou>'
 ```
 
 Não existe `PAYMENTS_PROVIDER`. O Parceiro mostra saldo e saque da Woovi sem `--dart-define`.
@@ -107,7 +108,8 @@ O access token OAuth da casa não é variável de ambiente. A função grava o p
 | `mp_client_secret` | `MP_CLIENT_SECRET` não vazia |
 | `mp_webhook_secret` | `MP_WEBHOOK_SECRET` não vazia |
 | `mp_oauth_redirect_uri` | `MP_OAUTH_REDIRECT_URI` não vazia |
-| `mp_access_token_test` | `MP_ACCESS_TOKEN` começa com `TEST-` e tem pelo menos 20 caracteres |
+| `mp_env_sandbox` | `MP_ENV` é exatamente `sandbox` |
+| `mp_access_token_test` | o token da plataforma pode entrar no lugar do OAuth: `MP_ENV=sandbox` e `MP_ACCESS_TOKEN` com pelo menos 20 caracteres, ou `MP_ENV` vazia e token começando com `TEST-`. `production` ou outro valor deixa o campo falso |
 
 O valor não sai na resposta.
 
@@ -168,5 +170,5 @@ Crons para desligar depois que a função nova estiver no ar, ou assim que a ver
 
 - O saldo da subconta vem em centavos.
 - O `endToEndId` do Pix pago chega no webhook `OPENPIX:CHARGE_COMPLETED` e o estorno parcial debita a subconta de verdade.
-- O access token OAuth da casa, com `TEST-`, autoriza com `capture=false` e a comissão cai em `application_fee`.
+- O access token OAuth da casa, da aba Teste (`APP_USR-` ou `TEST-`), autoriza com `capture=false` e a comissão cai em `application_fee`. `MP_ENV=sandbox` precisa estar definido para o token `APP_USR-` da plataforma servir de fallback.
 - A assinatura real da Woovi com a chave publicada em `/api/v1/webhook/public-keys`, se o HMAC do painel não for usado.
