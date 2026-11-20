@@ -82,6 +82,7 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
   String? _error;
   var _busy = false;
   var _expanding = false;
+  var _preparingPhotos = false;
 
   @override
   void initState() {
@@ -146,32 +147,56 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
   }
 
   Future<void> _addPhotos() async {
-    final files = await ref.read(photoPickerProvider).pick();
-    if (!mounted || files.isEmpty) {
+    if (_preparingPhotos || _busy) {
       return;
     }
-    for (var index = 0; index < files.length; index++) {
-      try {
-        final image = await decodePhoto(files[index]);
-        _photos.add(
-          RoomPhotoDraft(
-            id: 'pic-${DateTime.now().microsecondsSinceEpoch}-$index',
-            source: files[index],
-            image: image,
-          ),
-        );
-      } on Object {
-        if (mounted) {
-          setState(() => _error = PartnerMessages.roomPhotoUnread);
-        }
-      }
-    }
+    setState(() => _preparingPhotos = true);
+    // No web o compute roda na thread da tela. O timer cede o evento e o
+    // fim do quadro seguinte pinta o aviso antes da decodificação.
+    await Future<void>.delayed(Duration.zero);
+    await WidgetsBinding.instance.endOfFrame;
     if (!mounted) {
       return;
     }
-    setState(() {
-      _selectedPhoto ??= _photos.isEmpty ? null : 0;
-    });
+    try {
+      final picked = await ref.read(photoPickerProvider).pick();
+      if (!mounted) {
+        return;
+      }
+      if (picked.error != null) {
+        setState(() => _error = picked.error);
+      }
+      final files = picked.photos;
+      if (files.isEmpty) {
+        return;
+      }
+      for (var index = 0; index < files.length; index++) {
+        try {
+          final image = await decodePhoto(files[index]);
+          _photos.add(
+            RoomPhotoDraft(
+              id: 'pic-${DateTime.now().microsecondsSinceEpoch}-$index',
+              source: files[index],
+              image: image,
+            ),
+          );
+        } on Object {
+          if (mounted) {
+            setState(() => _error = PartnerMessages.roomPhotoUnread);
+          }
+        }
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedPhoto ??= _photos.isEmpty ? null : 0;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _preparingPhotos = false);
+      }
+    }
   }
 
   Future<void> _expand() async {
@@ -433,6 +458,7 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
           selected: _selectedPhoto,
           frame: _frame,
           expanding: _expanding,
+          preparing: _preparingPhotos,
           error: null,
           onAdd: _addPhotos,
           onSelect: (index) => setState(() => _selectedPhoto = index),
@@ -481,7 +507,7 @@ class _PartnerRoomFormState extends ConsumerState<PartnerRoomForm> {
         const SizedBox(height: 16),
         FilledButton(
           key: PartnerKeys.agendaSaveRoom,
-          onPressed: _busy ? null : _save,
+          onPressed: _busy || _preparingPhotos ? null : _save,
           child: const Text(PartnerMessages.saveRoom),
         ),
         ],

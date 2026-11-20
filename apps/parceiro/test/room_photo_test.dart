@@ -157,6 +157,7 @@ void main() {
 
     await _reveal(tester, find.byKey(PartnerKeys.roomAddPhotos));
     await tester.tap(find.byKey(PartnerKeys.roomAddPhotos));
+    await tester.pump(Duration.zero);
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
     await tester.pumpAndSettle();
     await _reveal(tester, find.byKey(PartnerKeys.roomFramePreview));
@@ -195,7 +196,7 @@ class _BytesPicker implements PhotoPicker {
   final List<Uint8List> photos;
 
   @override
-  Future<List<Uint8List>> pick() async => photos;
+  Future<RoomPhotoPick> pick() async => RoomPhotoPick(photos);
 }
 
 Future<Uint8List> _portrait() async {

@@ -2,29 +2,45 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:scapematch_parceiro/features/partner/data/room_photo_prepare.dart';
+
+export 'package:scapematch_parceiro/features/partner/data/room_photo_prepare.dart'
+    show RoomPhotoPick, RoomPhotoReadException;
 
 /// Escolha de fotos no celular e na web. Os testes trocam o provedor.
 abstract class PhotoPicker {
-  Future<List<Uint8List>> pick();
+  Future<RoomPhotoPick> pick();
 }
 
 class FilePhotoPicker implements PhotoPicker {
   const FilePhotoPicker();
 
   @override
-  Future<List<Uint8List>> pick() async {
+  Future<RoomPhotoPick> pick() async {
     final files = await FilePicker.pickFiles(type: FileType.image);
     if (files.isEmpty) {
-      return const [];
+      return const RoomPhotoPick(<Uint8List>[]);
     }
-    final photos = <Uint8List>[];
+    final raw = <Uint8List>[];
+    var unreadable = false;
     for (final file in files) {
-      final bytes = await file.readAsBytes();
-      if (bytes.isNotEmpty) {
-        photos.add(bytes);
+      try {
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          raw.add(bytes);
+        }
+      } on Object {
+        unreadable = true;
       }
     }
-    return photos;
+    final prepared = await prepareRoomPhotos(raw);
+    if (!unreadable || prepared.error != null) {
+      return prepared;
+    }
+    return RoomPhotoPick(
+      prepared.photos,
+      error: RoomPhotoReadException.messageText,
+    );
   }
 }
 

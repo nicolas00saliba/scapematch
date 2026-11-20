@@ -1,4 +1,5 @@
 import 'package:dominio/dominio.dart';
+import 'package:scapematch_parceiro/features/partner/data/room_photo_prepare.dart';
 
 /// Textos do EscapeMatch Parceiro.
 abstract final class PartnerMessages {
@@ -58,6 +59,7 @@ abstract final class PartnerMessages {
   static const roomPhotosBody =
       'A capa é a primeira foto. Cada moldura é a proporção real do card, da capa e da galeria.';
   static const roomAddPhotos = 'Enviar fotos';
+  static const roomPhotosPreparing = 'Preparando fotos…';
   static const roomCover = 'Capa';
   static const roomMakeCover = 'Usar como capa';
   static const roomRemovePhoto = 'Remover';
@@ -67,7 +69,7 @@ abstract final class PartnerMessages {
   static const roomSimulated = 'Simulação';
   static const roomZoom = 'Zoom';
   static const roomFrames = 'Molduras';
-  static const roomPhotoUnread = 'Não foi possível ler essa foto.';
+  static const roomPhotoUnread = RoomPhotoReadException.messageText;
   static const back = 'Voltar';
   static const today = 'Hoje';
   static const viewDay = 'Dia';
