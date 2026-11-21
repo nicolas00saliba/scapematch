@@ -95,8 +95,22 @@ abstract final class PartnerMessages {
   static const grossLabel = 'Bruto';
   static const commissionLabel = 'Comissão';
   static const reservedLabel = 'Reservado';
+  static const groupUnconfirmed =
+      'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
   static const reservedBody =
-      'Ainda não entrou no saldo. Se o grupo não confirmar, o valor é liberado e nada é cobrado.';
+      'Ainda não entrou no saldo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
+  static const wooviBalanceTitle = 'Disponível para saque';
+  static const wooviWithdraw = 'Sacar pela Woovi';
+  static const mpConnect = 'Conectar Mercado Pago';
+  static const mpConnectOpened =
+      'Autorize no Mercado Pago. A conexão termina quando você voltar.';
+  static const mpReturnSuccess = 'Mercado Pago conectado.';
+  static const mpReturnDenied = 'Você cancelou a conexão com o Mercado Pago.';
+  static const mpReturnMissing =
+      'Não foi possível concluir a conexão. O retorno do Mercado Pago veio incompleto.';
+  static const mpReturnFailed =
+      'Não foi possível gravar a conexão com o Mercado Pago. Tente de novo.';
+  static const mpReturnBack = 'Voltar aos recebimentos';
   static const statement = 'Extrato';
   static const statementEmpty =
       'Nenhuma captura ainda. Quando um grupo confirma, o valor aparece aqui.';
@@ -191,8 +205,8 @@ abstract final class PartnerMessages {
   static const claimLinked =
       'A casa é sua. Fotos, salas e avaliações continuam no mesmo perfil.';
   static const claimFinanceBody =
-      'Complete nesta ordem: subconta Asaas, documentos da subconta e chave Pix. Enquanto a subconta e a chave não estiverem prontas, pagamento e saque ficam desligados.';
-  static const claimStepSubaccount = '1. Subconta Asaas';
+      'Complete nesta ordem: chave Pix e subconta Woovi. A casa não abre a Woovi. Enquanto a subconta e a chave não estiverem prontas, pagamento e saque ficam desligados.';
+  static const claimStepSubaccount = '1. Subconta Woovi';
   static const claimStepDocuments = '2. Documentos da subconta';
   static const claimStepPix = '3. Chave Pix';
   static const claimStepPending = 'Pendente';
@@ -201,7 +215,7 @@ abstract final class PartnerMessages {
   static const claimStepPixReady = 'Cadastrada';
   static const claimStepWait = 'Aguardando a subconta';
   static const claimStepUnknown = 'Não foi possível consultar';
-  static const claimProvision = 'Criar subconta Asaas';
+  static const claimProvision = 'Criar subconta Woovi';
   static const claimProvisionDone = 'Pedido de subconta enviado.';
   static const claimBankHint =
       'A chave Pix se cadastra na aba Saques, em conta de saque.';
@@ -256,10 +270,10 @@ abstract final class PartnerMessages {
       'O saldo disponível já está na subconta da casa. O saque vai para uma conta com o mesmo CPF ou CNPJ.';
   static const withdrawalBalanceSection = 'Saldo da subconta';
   static const withdrawalPixNotice =
-      'Os saques saem por Pix. Em conta CNPJ, o Asaas dá 30 Pix grátis por mês.';
+      'Os saques saem por Pix, da subconta Woovi para a chave da casa.';
   static const withdrawalHowTitle = 'Como funciona';
   static const withdrawalHowCard =
-      'Pagamento por Pix entra na subconta assim que compensa e pode ser sacado. Pagamento no cartão fica em A receber e costuma entrar em cerca de 30 dias, na data que o Asaas informa.';
+      'O Pix cai na subconta Woovi. O cartão fica reservado no Mercado Pago e só é capturado quando o grupo confirma. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
   static const withdrawalHowDocs =
       'Os documentos da subconta precisam estar aprovados para o saque ligar.';
   static const withdrawalsUnavailable = 'Os saques ainda não estão liberados.';
@@ -308,24 +322,24 @@ abstract final class PartnerMessages {
   static const withdrawalAutomatic = 'Automático';
   static const documentsTitle = 'Documentos da subconta';
   static const documentsBody =
-      'O Asaas só libera o saque com os documentos aprovados.';
+      'A casa não envia documento para a Woovi.';
   static const documentsApproved = 'Documentos e conta aprovados';
-  static const documentsPending = 'Aguardando aprovação do Asaas';
+  static const documentsPending = 'Documentos não vão para a Woovi';
   static const documentsHosted =
-      'O envio é no site do Asaas. O EscapeMatch não guarda o arquivo.';
-  static const documentsOpen = 'Enviar no site do Asaas';
+      'A casa não abre a Woovi. O EscapeMatch não manda o arquivo para lá.';
+  static const documentsOpen = 'Documentos ficam fora da Woovi';
   static const documentsUnsafe =
-      'O Asaas pediu um link que não reconhecemos. Atualize a tela.';
+      'Não há link externo de documento. Atualize a tela.';
   static const documentsUpload =
-      'Este documento não tem link do Asaas. O arquivo segue direto e não fica aqui.';
+      'Este documento não sai do EscapeMatch para a Woovi.';
   static const documentsSend = 'Enviar arquivo';
   static const documentsRefresh = 'Atualizar status';
   static const documentsUnavailable =
       'Não foi possível consultar os documentos.';
   static const documentsWait =
-      'Conta nova: espere uns 15 segundos e atualize. O Asaas ainda está definindo o que é obrigatório.';
+      'A subconta Woovi não pede este envio.';
   static const documentsBlockWithdraw =
-      'O saque libera quando o Asaas aprovar os documentos e a conta.';
+      'O saque sai quando a subconta Woovi está ativa e a chave Pix é a da casa.';
   static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
 
   static String documentStatus(String status) {

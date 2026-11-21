@@ -27,8 +27,8 @@ Deno.test("provision-venue-wallet deriva o tipo e não fixa LIMITED", async () =
   const source = await Deno.readTextFile(
     new URL("../provision-venue-wallet/index.ts", import.meta.url),
   );
-  assert(source.includes("companyTypeForSubaccount"));
-  assert(source.includes("company_type"));
+  assert(source.includes("createSubaccount"));
+  assert(source.includes("upsert_provider_payout_account"));
   assertEquals(source.includes('"LIMITED" as const'), false);
   assertEquals(source.includes("console."), false);
 });

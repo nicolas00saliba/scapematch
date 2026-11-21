@@ -45,11 +45,11 @@ void main() {
     );
     expect(
       venueDocumentFailureMessage('onboarding'),
-      contains('site do Asaas'),
+      contains('não envia documento'),
     );
   });
 
-  testWidgets('link do Asaas aparece e o saque fica desligado', (tester) async {
+  testWidgets('sem envio externo o saque fica desligado', (tester) async {
     final docs = MemoryVenueDocumentsRepository(
       VenueDocumentsView.fromJson({
         'known': true,

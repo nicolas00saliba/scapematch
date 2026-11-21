@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 /// Cobrança devolvida por `create-charge`. O Pix usa [qrCode] (copia-e-cola)
-/// e [qrImageBase64] (QR do Asaas). O app não inventa payload.
+/// e [qrImageBase64] (QR da Woovi). O app não inventa payload.
 class LiveCharge {
   const LiveCharge({
     required this.status,
@@ -17,7 +17,7 @@ class LiveCharge {
   final String qrCode;
   final String? qrImageBase64;
 
-  /// Vaga paga só com pontos. Não existe cobrança nem QR no Asaas.
+  /// Vaga paga só com pontos. Não existe cobrança nem QR.
   final bool pointsOnly;
 
   bool get isPix => billingType == 'PIX';
@@ -57,7 +57,7 @@ class LiveCharge {
 
 const liveChargeFailed = 'Não foi possível criar a cobrança.';
 const liveChargeRejected = 'A cobrança não foi aceita.';
-const livePixMissing = 'O Asaas não devolveu o código Pix.';
+const livePixMissing = 'A Woovi não devolveu o código Pix.';
 const liveCardPending = 'A cobrança do cartão ainda está pendente.';
 const liveCardDeclined = 'O cartão foi recusado.';
 const liveCardReregister =
@@ -70,13 +70,13 @@ String liveChargeErrorMessage(Object? details) {
   final code = _errorCode(details);
   if (code == null || code.isEmpty) return liveChargeFailed;
   return switch (code) {
-    'A casa ainda não tem subconta Asaas.' => code,
+    'A casa ainda não tem subconta.' => code,
     'A casa ainda não pode receber.' => code,
     'A cobrança não recebe dados do cartão.' => code,
     'card_declined' => liveCardDeclined,
     'card_reregister' => liveCardReregister,
-    'cpf_required' => 'Para pagar, o Asaas precisa do seu CPF.',
-    'asaas_unavailable' => 'O Asaas não respondeu. Tente de novo em instantes.',
+    'cpf_required' => 'Para pagar, precisamos do seu CPF.',
+    'asaas_unavailable' => 'O provedor não respondeu. Tente de novo em instantes.',
     'pix_em_aberto' => 'Já existe um Pix em aberto para esta parte.',
     'pagamento em andamento' =>
       'Há um pagamento em andamento. Espere um instante e tente de novo.',

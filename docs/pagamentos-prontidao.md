@@ -1,4 +1,8 @@
-# Prontidão dos pagamentos no Asaas de produção
+# Prontidão dos pagamentos
+
+O provedor anterior saiu do código em 20/11/2026. A lista de segredos para apagar depois do merge, e as funções para despublicar, está em `docs/pagamentos-woovi-mercadopago.md`. Não rode o `secrets set` antigo desta página.
+
+# Prontidão histórica (não usar)
 
 O cron `venue-withdrawals` dispara todo dia às 08:20 em Brasília (`20 11 * * *` em UTC). Ele chama `private.invoke_venue_withdrawals()`, que lê dois itens do Vault e faz `POST` na Edge Function `schedule-venue-withdrawals` com o header `x-venue-withdrawals-secret`.
 
@@ -28,6 +32,8 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 | `venue_payouts_enabled` | `venue_payouts_settings.enabled` |
 
 Sandbox (`https://api-sandbox.asaas.com/v3`), URL vazia e qualquer outro host contam como não.
+
+Woovi e Mercado Pago acrescentam campos na mesma resposta. A lista e as variáveis estão em `docs/pagamentos-woovi-mercadopago.md`. O padrão continua `asaas`.
 
 ## Migration
 

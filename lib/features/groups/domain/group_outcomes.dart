@@ -249,7 +249,7 @@ final class PayShareSuccess extends PayShareResult {
 
   final Group group;
 
-  /// Cobrança do Asaas. Nula no pagamento simulado da demonstração.
+  /// Cobrança real. Nula no pagamento simulado da demonstração.
   final LiveCharge? charge;
 }
 
