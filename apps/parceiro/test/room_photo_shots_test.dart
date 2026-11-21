@@ -84,6 +84,7 @@ Future<void> _parceiro(
 
   await tester.ensureVisible(find.byKey(PartnerKeys.roomAddPhotos));
   await tester.tap(find.byKey(PartnerKeys.roomAddPhotos));
+  await tester.pump(Duration.zero);
   await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
   await tester.pumpAndSettle();
   await tester.ensureVisible(find.text('Card · 300×168'));
@@ -249,7 +250,7 @@ class _BytesPicker implements PhotoPicker {
   final List<Uint8List> photos;
 
   @override
-  Future<List<Uint8List>> pick() async => photos;
+  Future<RoomPhotoPick> pick() async => RoomPhotoPick(photos);
 }
 
 Future<void> _loadFonts() async {

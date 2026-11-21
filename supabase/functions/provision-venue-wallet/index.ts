@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/client_error.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { WooviProvider } from "../_shared/woovi_provider.ts";
+import { adminWithMfa } from "../_shared/admin_session.ts";
 
 /// Cria a subconta Woovi da casa com a chave Pix já salva. Não abre a Woovi.
 Deno.serve(async (req) => {
@@ -24,11 +25,13 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(url, service);
-    const { data: adminRow } = await admin
+    const { data: adminLookup } = await admin
       .from("admins")
       .select("user_id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
+    const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
+
     const body = await req.json().catch(() => ({})) as {
       venue_id?: string;
       pix_key?: string;

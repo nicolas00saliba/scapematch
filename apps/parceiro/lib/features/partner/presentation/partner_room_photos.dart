@@ -86,6 +86,7 @@ class RoomPhotoStudio extends StatelessWidget {
     required this.selected,
     required this.frame,
     required this.expanding,
+    this.preparing = false,
     required this.onAdd,
     required this.onSelect,
     required this.onFrame,
@@ -101,6 +102,7 @@ class RoomPhotoStudio extends StatelessWidget {
   final int? selected;
   final RoomFrame frame;
   final bool expanding;
+  final bool preparing;
   final VoidCallback onAdd;
   final ValueChanged<int> onSelect;
   final ValueChanged<RoomFrame> onFrame;
@@ -143,10 +145,24 @@ class RoomPhotoStudio extends StatelessWidget {
         const SizedBox(height: 8),
         OutlinedButton.icon(
           key: PartnerKeys.roomAddPhotos,
-          onPressed: onAdd,
+          onPressed: preparing ? null : onAdd,
           icon: const Icon(Icons.add_photo_alternate_outlined),
           label: const Text(PartnerMessages.roomAddPhotos),
         ),
+        if (preparing) ...[
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 8),
+              Text(PartnerMessages.roomPhotosPreparing),
+            ],
+          ),
+        ],
         if (photos.isNotEmpty) ...[
           const SizedBox(height: 12),
           SizedBox(

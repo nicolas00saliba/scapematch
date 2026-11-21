@@ -10,6 +10,7 @@ export type Coluna = {
 };
 
 export const jogarLinks: Link[] = [
+  { rotulo: 'Como jogar escape room sozinho', href: '/guia/como-jogar-escape-room-sozinho' },
   { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
   { rotulo: 'Escape room sozinho em Curitiba', href: '/guia/escape-room-sozinho-curitiba' },
   { rotulo: 'Onde achar grupo', href: '/guia/como-achar-grupo-escape-room' },
@@ -72,7 +73,7 @@ export const rodape: Coluna[] = [
   {
     titulo: 'Já jogo com a gente',
     links: [
-      { rotulo: 'Entrar', href: 'https://app.escapematch.com.br/login', externo: true },
+      { rotulo: 'Entrar', href: 'https://app.escapematch.com.br/', externo: true },
       { rotulo: 'Vantagens', href: '/vantagens' },
       { rotulo: 'Indique amigos', href: '/vantagens/indique-amigos' },
       { rotulo: 'Indique uma casa', href: '/vantagens/indique-uma-casa' },
@@ -113,6 +114,7 @@ export const rodape: Coluna[] = [
 
 const nomes: Record<string, string> = {
   '/guia': 'Guias',
+  '/guia/como-jogar-escape-room-sozinho': 'Como jogar escape room sozinho',
   '/guia/escape-room-sozinho': 'Escape room sozinho',
   '/guia/escape-room-sozinho-curitiba': 'Escape room sozinho em Curitiba',
   '/guia/como-achar-grupo-escape-room': 'Onde achar grupo',

@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/client_error.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
+import { adminWithMfa } from "../_shared/admin_session.ts";
 
 type Body = {
   venue_id?: string;
@@ -38,11 +39,12 @@ Deno.serve(async (req) => {
     if (!venueId) return json({ error: "venue_id obrigatório" }, 400);
 
     const admin = createClient(url, service);
-    const { data: adminRow } = await admin
+    const { data: adminLookup } = await admin
       .from("admins")
       .select("user_id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
+    const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
     const { data: venue } = await admin
       .from("venues")
       .select("id, owner_id, name, document_kind")
