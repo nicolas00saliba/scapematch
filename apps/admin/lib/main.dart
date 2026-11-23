@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/app/url_strategy.dart';
+import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/observability/sentry_boot.dart';
 import 'package:scapematch_admin/admin_app.dart';
@@ -12,6 +13,7 @@ Future<void> main() => iniciarSentry(_abrirApp);
 Future<void> _abrirApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await bootScapeBackend();
+  pendingPagbankConnectReturn = PagbankConnectReturn.fromUri(Uri.base);
   configureUrlStrategy();
   await initializeDateFormatting('pt_BR');
   runApp(

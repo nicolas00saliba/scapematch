@@ -20,7 +20,9 @@ Só por ambiente. Não commitar e não logar.
 - `PAGBANK_ENV=production`.
 - `PAGBANK_ACCOUNT_ID`: `ACCO_` da EscapeMatch. É quem paga as taxas.
 - `PAGBANK_WEBHOOK_SECRET`: se vazio, a assinatura usa `PAGBANK_TOKEN`. Header `x-authenticity-token` = SHA-256 hex de `{segredo}-{corpo cru}`.
-- `PAGBANK_CONNECT_CLIENT_ID`, `PAGBANK_CONNECT_CLIENT_SECRET`, `PAGBANK_CONNECT_REDIRECT_URI` (https).
+- `PAGBANK_CONNECT_CLIENT_ID`, `PAGBANK_CONNECT_CLIENT_SECRET`.
+- `PAGBANK_CONNECT_REDIRECT_URI`: `https://parceiro.escapematch.com.br/pagbank/retorno`. O host tem de servir o `index.html` do Parceiro nesse caminho.
+- `PAGBANK_CONNECT_ADMIN_REDIRECT_URI`: `https://admin.escapematch.com.br/pagbank/retorno`, se o Admin também abre o Connect. Sem ela, o Admin usa a URI do Parceiro.
 - `PAGBANK_POINTS_RESERVE_ACCOUNT_ID` e `PAGBANK_POINTS_RESERVE_TOKEN`, se a reserva de pontos tiver conta própria.
 
 Transferência Pix em produção pode exigir mTLS. O certificado não entra no repositório.
@@ -36,7 +38,9 @@ Não aplicar isto daqui. O dono aprova.
 
 ## Connect da casa
 
-`provision-venue-wallet` devolve `connect_url`. A casa autoriza em `https://connect.pagbank.com.br/oauth2/authorize` com os escopos `payments.read payments.create payments.refund accounts.read`. O retorno manda `code` e `state` (o id da casa) para `pagbank-connect`, que grava `pagbank_account_id` e o access token cifrado. Não cria subconta.
+`provision-venue-wallet` devolve `connect_url`. A casa autoriza em `https://connect.pagbank.com.br/oauth2/authorize` com os escopos `payments.read payments.create payments.refund accounts.read`. O `state` é aleatório, vale 10 minutos, só serve uma vez e fica preso ao usuário que pediu o link. O Parceiro e o Admin leem `code` e `state` em `/pagbank/retorno` e chamam `pagbank-connect`. A função confere o state, grava `pagbank_account_id` e cifra o access token e o refresh token. Não cria subconta. Casa que já tinha carteira antiga fica sem conta PagBank até passar por esse fluxo.
+
+O access token é renovado quando falta menos de dois minutos para vencer, e de novo se a PagBank responde 401.
 
 ## Primeira cobrança de R$ 5
 

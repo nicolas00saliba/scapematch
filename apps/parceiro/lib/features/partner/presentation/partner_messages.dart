@@ -203,6 +203,8 @@ abstract final class PartnerMessages {
   static const claimStepUnknown = 'Não foi possível consultar';
   static const claimProvision = 'Criar subconta PagBank';
   static const claimProvisionDone = 'Pedido de subconta enviado.';
+  static const claimConnectOpened =
+      'Continue na PagBank para ligar a casa. Ela só recebe depois do Connect.';
   static const claimBankHint =
       'A chave Pix se cadastra na aba Saques, em conta de saque.';
   static const sendClaim = 'Pedir reivindicação';

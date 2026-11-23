@@ -168,6 +168,28 @@ void main() {
     expect(find.text(PartnerMessages.claimStepPixReady), findsNothing);
   });
 
+  testWidgets('o Connect abre o link e não marca a casa como ligada', (
+    tester,
+  ) async {
+    Uri? opened;
+    await tester.pumpWidget(
+      _app(
+        VenueFinanceStep(
+          onProvision: () async =>
+              'https://connect.pagbank.com.br/oauth2/authorize?state=abc',
+          onOpenUrl: (uri) => opened = uri,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(PartnerKeys.venueClaimProvision));
+    await tester.pump();
+    await tester.pump();
+    expect(opened?.host, 'connect.pagbank.com.br');
+    expect(find.text(PartnerMessages.claimConnectOpened), findsOneWidget);
+    expect(find.text(PartnerMessages.claimProvisionDone), findsNothing);
+  });
+
   testWidgets('subconta e chave prontas mostram documentos aprovados', (
     tester,
   ) async {

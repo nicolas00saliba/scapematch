@@ -29,7 +29,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if auth.uid() is not null and not public.is_admin() then
+  if auth.uid() is not null and not private.is_admin() then
     if tg_op = 'INSERT' then
       new.pagbank_account_id := null;
     else
@@ -37,18 +37,18 @@ begin
     end if;
     return new;
   end if;
+  -- Só a conta PagBank, gravada depois do Connect, segue para a coluna
+  -- antiga. O id antigo não vira conta PagBank.
   if tg_op = 'INSERT' then
     if new.pagbank_account_id is not null then
       new.asaas_wallet_id := new.pagbank_account_id;
-    else
-      new.pagbank_account_id := new.asaas_wallet_id;
     end if;
     return new;
   end if;
-  if new.pagbank_account_id is distinct from old.pagbank_account_id then
+  if new.pagbank_account_id is not null
+    and new.pagbank_account_id is distinct from old.pagbank_account_id
+  then
     new.asaas_wallet_id := new.pagbank_account_id;
-  elsif new.asaas_wallet_id is distinct from old.asaas_wallet_id then
-    new.pagbank_account_id := new.asaas_wallet_id;
   end if;
   return new;
 end;
@@ -66,7 +66,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if auth.uid() is not null and not public.is_admin() then
+  if auth.uid() is not null and not private.is_admin() then
     if tg_op = 'INSERT' then
       new.pagbank_customer_id := null;
     else
@@ -77,15 +77,13 @@ begin
   if tg_op = 'INSERT' then
     if new.pagbank_customer_id is not null then
       new.asaas_customer_id := new.pagbank_customer_id;
-    else
-      new.pagbank_customer_id := new.asaas_customer_id;
     end if;
     return new;
   end if;
-  if new.pagbank_customer_id is distinct from old.pagbank_customer_id then
+  if new.pagbank_customer_id is not null
+    and new.pagbank_customer_id is distinct from old.pagbank_customer_id
+  then
     new.asaas_customer_id := new.pagbank_customer_id;
-  elsif new.asaas_customer_id is distinct from old.asaas_customer_id then
-    new.pagbank_customer_id := new.asaas_customer_id;
   end if;
   return new;
 end;
@@ -101,12 +99,22 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if new.provider is null
-    or lower(new.provider) in (
-      'asaas', 'woovi', 'openpix', 'mercadopago', 'mercado_pago'
-    )
-  then
-    new.provider := 'pagbank';
+  if tg_op = 'INSERT' then
+    if new.provider is null
+      or lower(new.provider) in (
+        'asaas', 'woovi', 'openpix', 'mercadopago', 'mercado_pago'
+      )
+    then
+      new.provider := 'pagbank';
+    end if;
+  elsif new.provider is distinct from old.provider then
+    if new.provider is null
+      or lower(new.provider) in (
+        'asaas', 'woovi', 'openpix', 'mercadopago', 'mercado_pago'
+      )
+    then
+      new.provider := 'pagbank';
+    end if;
   end if;
   if tg_op = 'UPDATE' then
     if new.provider_fee_cents is distinct from old.provider_fee_cents then
@@ -135,18 +143,16 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if tg_op = 'UPDATE' then
-    if new.pagbank_transfer_id is distinct from old.pagbank_transfer_id then
-      new.asaas_transfer_id := new.pagbank_transfer_id;
-    elsif new.asaas_transfer_id is distinct from old.asaas_transfer_id then
-      new.pagbank_transfer_id := new.asaas_transfer_id;
-    end if;
-  else
+  if tg_op = 'INSERT' then
     if new.pagbank_transfer_id is not null then
       new.asaas_transfer_id := new.pagbank_transfer_id;
-    else
-      new.pagbank_transfer_id := new.asaas_transfer_id;
     end if;
+    return new;
+  end if;
+  if new.pagbank_transfer_id is not null
+    and new.pagbank_transfer_id is distinct from old.pagbank_transfer_id
+  then
+    new.asaas_transfer_id := new.pagbank_transfer_id;
   end if;
   return new;
 end;
@@ -157,26 +163,13 @@ create trigger sync_pagbank_withdrawal
   before insert or update on public.venue_withdrawals
   for each row execute function private.sync_pagbank_withdrawal();
 
-update public.venues
-set pagbank_account_id = asaas_wallet_id
-where pagbank_account_id is null and asaas_wallet_id is not null;
-
-update public.profiles
-set pagbank_customer_id = asaas_customer_id
-where pagbank_customer_id is null and asaas_customer_id is not null;
+-- Não copia wallet, cliente nem transferência antigos para as colunas
+-- PagBank. Casa que já existia fica sem pagbank_account_id e precisa
+-- passar pelo Connect. A chave antiga também não é lida como token.
 
 update public.payment_charges
 set provider_fee_cents = asaas_fee_cents
 where provider_fee_cents is null and asaas_fee_cents is not null;
-
-update public.payment_charges
-set provider = 'pagbank'
-where provider is null
-  or lower(provider) in ('asaas', 'woovi', 'openpix', 'mercadopago', 'mercado_pago');
-
-update public.venue_withdrawals
-set pagbank_transfer_id = asaas_transfer_id
-where pagbank_transfer_id is null and asaas_transfer_id is not null;
 
 create or replace view public.venue_provider_keys as
 select venue_id, api_key from public.venue_asaas_keys;
@@ -900,3 +893,760 @@ begin
   );
 end;
 $$;
+
+
+-- Token do Connect, cifrado com a chave que já está no Vault.
+-- A tabela antiga não é lida: o ciphertext de lá não é token PagBank.
+create table public.venue_pagbank_tokens (
+  venue_id uuid primary key references public.venues(id) on delete cascade,
+  access_token bytea not null,
+  refresh_token bytea,
+  access_expires_at timestamptz,
+  updated_at timestamptz not null default pg_catalog.now()
+);
+
+revoke all on table public.venue_pagbank_tokens
+  from public, anon, authenticated;
+
+create or replace function public.store_venue_pagbank_tokens(
+  p_venue_id uuid,
+  p_access_token text,
+  p_refresh_token text,
+  p_expires_at timestamptz
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_key text := private.asaas_subaccount_key();
+  v_access bytea;
+  v_refresh bytea;
+begin
+  if p_access_token is null or char_length(btrim(p_access_token)) = 0 then
+    raise exception 'api_key ausente' using errcode = '22023';
+  end if;
+  v_access := extensions.pgp_sym_encrypt(btrim(p_access_token), v_key);
+  if p_refresh_token is null or char_length(btrim(p_refresh_token)) = 0 then
+    v_refresh := null;
+  else
+    v_refresh := extensions.pgp_sym_encrypt(btrim(p_refresh_token), v_key);
+  end if;
+  insert into public.venue_pagbank_tokens (
+    venue_id, access_token, refresh_token, access_expires_at
+  ) values (p_venue_id, v_access, v_refresh, p_expires_at)
+  on conflict (venue_id) do update
+  set access_token = excluded.access_token,
+      refresh_token = coalesce(
+        excluded.refresh_token,
+        public.venue_pagbank_tokens.refresh_token
+      ),
+      access_expires_at = coalesce(
+        excluded.access_expires_at,
+        public.venue_pagbank_tokens.access_expires_at
+      ),
+      updated_at = pg_catalog.now();
+end;
+$$;
+
+revoke all on function public.store_venue_pagbank_tokens(uuid, text, text, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.store_venue_pagbank_tokens(uuid, text, text, timestamptz)
+  to service_role;
+
+create or replace function public.read_venue_pagbank_tokens(p_venue_id uuid)
+returns table (
+  access_token text,
+  refresh_token text,
+  access_expires_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_key text := private.asaas_subaccount_key();
+begin
+  return query
+  select
+    extensions.pgp_sym_decrypt(k.access_token, v_key)::text,
+    case
+      when k.refresh_token is null then null
+      else extensions.pgp_sym_decrypt(k.refresh_token, v_key)::text
+    end,
+    k.access_expires_at
+  from public.venue_pagbank_tokens k
+  where k.venue_id = p_venue_id;
+end;
+$$;
+
+revoke all on function public.read_venue_pagbank_tokens(uuid)
+  from public, anon, authenticated;
+grant execute on function public.read_venue_pagbank_tokens(uuid) to service_role;
+
+create or replace view public.venue_provider_keys as
+select venue_id, access_token as api_key
+from public.venue_pagbank_tokens;
+
+revoke all on table public.venue_provider_keys from public, anon, authenticated;
+
+create or replace function public.read_venue_provider_key(p_venue_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select access_token
+  from public.read_venue_pagbank_tokens(p_venue_id);
+$$;
+
+create or replace function public.store_venue_provider_key(
+  p_venue_id uuid,
+  p_api_key text
+)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  select public.store_venue_pagbank_tokens(p_venue_id, p_api_key, null, null);
+$$;
+
+revoke all on function public.read_venue_provider_key(uuid)
+  from public, anon, authenticated;
+revoke all on function public.store_venue_provider_key(uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.read_venue_provider_key(uuid) to service_role;
+grant execute on function public.store_venue_provider_key(uuid, text) to service_role;
+
+-- State do Connect: aleatório, de uso único, expira em 10 minutos
+-- e só o usuário que pediu o link consegue trocar o code.
+create table public.pagbank_connect_states (
+  state text primary key,
+  venue_id uuid not null references public.venues(id) on delete cascade,
+  user_id uuid not null,
+  redirect_uri text not null,
+  expires_at timestamptz not null,
+  used_at timestamptz
+);
+
+revoke all on table public.pagbank_connect_states
+  from public, anon, authenticated;
+
+create or replace function public.begin_pagbank_connect(
+  p_venue_id uuid,
+  p_user_id uuid,
+  p_redirect_uri text
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_state text;
+begin
+  if p_venue_id is null or p_user_id is null then
+    raise exception 'state' using errcode = '22023';
+  end if;
+  if p_redirect_uri is null or left(btrim(p_redirect_uri), 8) <> 'https://' then
+    raise exception 'state' using errcode = '22023';
+  end if;
+  delete from public.pagbank_connect_states
+  where venue_id = p_venue_id
+    and user_id = p_user_id
+    and used_at is null;
+  v_state := encode(extensions.gen_random_bytes(32), 'hex');
+  insert into public.pagbank_connect_states (
+    state, venue_id, user_id, redirect_uri, expires_at
+  ) values (
+    v_state,
+    p_venue_id,
+    p_user_id,
+    btrim(p_redirect_uri),
+    pg_catalog.now() + interval '10 minutes'
+  );
+  return v_state;
+end;
+$$;
+
+revoke all on function public.begin_pagbank_connect(uuid, uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.begin_pagbank_connect(uuid, uuid, text)
+  to service_role;
+
+create or replace function public.consume_pagbank_connect(
+  p_state text,
+  p_user_id uuid
+)
+returns table (venue_id uuid, redirect_uri text)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row public.pagbank_connect_states%rowtype;
+begin
+  if p_state is null or btrim(p_state) = '' or p_user_id is null then
+    raise exception 'state' using errcode = 'P0001';
+  end if;
+  select * into v_row
+  from public.pagbank_connect_states
+  where state = btrim(p_state)
+  for update;
+  if not found
+    or v_row.used_at is not null
+    or v_row.expires_at <= pg_catalog.now()
+    or v_row.user_id is distinct from p_user_id
+  then
+    raise exception 'state' using errcode = 'P0001';
+  end if;
+  update public.pagbank_connect_states
+  set used_at = pg_catalog.now()
+  where state = v_row.state;
+  return query select v_row.venue_id, v_row.redirect_uri;
+end;
+$$;
+
+revoke all on function public.consume_pagbank_connect(text, uuid)
+  from public, anon, authenticated;
+grant execute on function public.consume_pagbank_connect(text, uuid)
+  to service_role;
+
+create or replace function public.transfer_ref_venue(p_reference text)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select venue_id
+  from public.venue_withdrawals
+  where external_reference = btrim(coalesce(p_reference, ''))
+    and btrim(coalesce(p_reference, '')) <> ''
+  limit 1;
+$$;
+
+revoke all on function public.transfer_ref_venue(text)
+  from public, anon, authenticated;
+grant execute on function public.transfer_ref_venue(text) to service_role;
+
+create or replace function private.groups_require_payout_account()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_wallet text;
+  v_status text;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  select v.status, v.pagbank_account_id
+    into v_status, v_wallet
+  from public.venues v
+  where v.id = new.venue_id;
+  if v_status = 'approved'
+    and v_wallet is not null
+    and btrim(v_wallet) <> ''
+  then
+    return new;
+  end if;
+  raise exception 'conta de recebimento pendente' using errcode = 'P0001';
+end;
+$$;
+
+create or replace function public.venue_finance_ready(p_venue_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.venues venue
+    where venue.id = p_venue_id
+      and venue.status = 'approved'
+      and venue.suspended_at is null
+      and venue.pagbank_account_id is not null
+      and pg_catalog.btrim(venue.pagbank_account_id) <> ''
+      and exists (
+        select 1
+        from public.venue_bank_accounts bank
+        where bank.venue_id = venue.id
+      )
+  );
+$$;
+
+create or replace function public.venue_payout_wallet(p_venue_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select pagbank_account_id
+  from public.venues
+  where id = p_venue_id
+    and status = 'approved';
+$$;
+
+create or replace function public.list_due_venue_payouts()
+returns table (
+  venue_id uuid,
+  period_key text,
+  min_amount_cents integer
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select
+    s.venue_id,
+    public.venue_weekly_attempt_key(s.venue_id, pg_catalog.now()),
+    s.min_amount_cents
+  from public.venue_payout_schedules s
+  join public.venues v on v.id = s.venue_id
+  join public.venue_bank_accounts b on b.venue_id = s.venue_id
+  where public.venue_payouts_enabled()
+    and s.enabled
+    and s.frequency = 'weekly'
+    and v.status = 'approved'
+    and v.pagbank_account_id is not null
+    and (
+      b.withdrawals_blocked_until is null
+      or b.withdrawals_blocked_until <= pg_catalog.now()
+    )
+    and public.venue_weekly_attempt_key(s.venue_id, pg_catalog.now()) is not null;
+$$;
+
+create or replace function public.list_venue_subaccounts()
+returns table (venue_id uuid)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select id
+  from public.venues
+  where status = 'approved'
+    and pagbank_account_id is not null;
+$$;
+
+drop function public.list_stale_pending_withdrawals(integer);
+
+create function public.list_stale_pending_withdrawals(p_hours integer)
+returns table (
+  id uuid,
+  venue_id uuid,
+  pagbank_transfer_id text,
+  external_reference text
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if p_hours is null or p_hours < 1 or p_hours > 168 then
+    raise exception 'valor' using errcode = '22023';
+  end if;
+  return query
+  select w.id, w.venue_id, w.pagbank_transfer_id, w.external_reference
+  from public.venue_withdrawals w
+  join public.venues v on v.id = w.venue_id
+  where w.status = 'pending'
+    and v.status = 'approved'
+    and w.updated_at <= pg_catalog.now() - pg_catalog.make_interval(hours => p_hours);
+end;
+$$;
+
+revoke all on function public.list_stale_pending_withdrawals(integer)
+  from public, anon, authenticated;
+grant execute on function public.list_stale_pending_withdrawals(integer)
+  to service_role;
+
+drop view public.venues_vitrine;
+
+alter table public.venues drop column receives_payments;
+
+alter table public.venues
+  add column receives_payments boolean
+  generated always as (
+    pagbank_account_id is not null and btrim(pagbank_account_id) <> ''
+  ) stored;
+
+grant select (receives_payments) on table public.venues to anon, authenticated;
+
+revoke select (pagbank_account_id) on table public.venues
+  from anon, authenticated;
+
+alter table public.payment_webhook_errors
+  drop constraint payment_webhook_errors_source_check;
+
+alter table public.payment_webhook_errors
+  add constraint payment_webhook_errors_source_check
+  check (source in (
+    'pagbank-webhook',
+    'pagbank-transfer-webhook',
+    'asaas-webhook',
+    'asaas-transfer-webhook'
+  ));
+
+create or replace function public.note_webhook_error(
+  p_source text,
+  p_code text,
+  p_provider_ref text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_source text := pg_catalog.btrim(coalesce(p_source, ''));
+  v_code text := pg_catalog.btrim(coalesce(p_code, ''));
+  v_ref text := pg_catalog.btrim(coalesce(p_provider_ref, ''));
+begin
+  if v_source not in ('pagbank-webhook', 'pagbank-transfer-webhook') then
+    return;
+  end if;
+  if v_code !~ '^[a-z0-9_]{1,48}$' then
+    v_code := 'unknown';
+  end if;
+  if v_ref !~ '^[A-Za-z0-9_-]{1,64}$' then
+    v_ref := '';
+  end if;
+  insert into public.payment_webhook_errors (source, code, provider_ref)
+  values (v_source, v_code, v_ref);
+end;
+$$;
+
+create or replace function private.note_split_divergence(
+  p_provider_ref text,
+  p_event text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_event not in (
+    'PAYMENT_SPLIT_DIVERGENCE_BLOCK',
+    'PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED'
+  ) then
+    return false;
+  end if;
+  update public.payment_charges
+  set split_divergence_at = pg_catalog.now(),
+      split_divergence_event = p_event
+  where provider_ref = p_provider_ref
+    and provider = 'pagbank';
+  return found;
+end;
+$$;
+
+grant select (pagbank_customer_id) on table public.profiles to authenticated;
+grant update (pagbank_customer_id) on table public.profiles to authenticated;
+
+create view public.venues_vitrine
+with (security_invoker = true) as
+select
+  id,
+  city_id,
+  name,
+  neighborhood,
+  street_address,
+  address_number,
+  postal_code,
+  latitude,
+  longitude,
+  category,
+  badge,
+  status,
+  created_at,
+  receives_payments,
+  featured_rank,
+  public.venue_finance_ready(id) as finance_ready
+from public.venues;
+
+revoke all on table public.venues_vitrine from public, anon, authenticated;
+grant select on table public.venues_vitrine to anon, authenticated, service_role;
+
+
+create or replace function public.admin_list_venues(
+  p_status text default null,
+  p_query text default null
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := private.admin_require();
+  v_like text := private.admin_like(p_query);
+  v_status text := nullif(btrim(coalesce(p_status, '')), '');
+begin
+  if v_status is not null
+    and v_status not in ('pending', 'approved', 'rejected', 'merged', 'suspended')
+  then
+    raise exception 'status invalido' using errcode = '22023';
+  end if;
+  return pg_catalog.jsonb_build_object(
+    'platform_bps', (select commission_bps from public.platform_settings where id = 1),
+    'houses', coalesce((
+      select pg_catalog.jsonb_agg(row_to_json(s) order by s.name)
+      from (
+        select
+          v.id,
+          v.name,
+          v.city_id,
+          v.status,
+          v.suspended_at is not null as suspended,
+          v.pagbank_account_id is not null as has_wallet,
+          coalesce(c.commission_bps, s.commission_bps) as commission_bps,
+          c.venue_id is not null as commission_override,
+          v.created_at
+        from public.venues v
+        cross join public.platform_settings s
+        left join public.venue_commissions c on c.venue_id = v.id
+        where s.id = 1
+          and (
+            v_status is null
+            or (v_status = 'suspended' and v.suspended_at is not null)
+            or (v_status <> 'suspended' and v.status = v_status)
+          )
+          and (
+            btrim(coalesce(p_query, '')) = ''
+            or v.name ilike v_like
+          )
+        order by v.name
+        limit 200
+      ) s
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+
+create or replace function public.admin_venue(p_venue_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := private.admin_require();
+  v_house public.venues%rowtype;
+  v_platform integer;
+  v_rate integer;
+  v_override boolean;
+begin
+  select * into v_house from public.venues where id = p_venue_id;
+  if not found then
+    raise exception 'casa nao encontrada' using errcode = 'P0002';
+  end if;
+  select commission_bps into v_platform
+  from public.platform_settings where id = 1;
+  select c.commission_bps into v_rate
+  from public.venue_commissions c where c.venue_id = p_venue_id;
+  v_override := v_rate is not null;
+  v_rate := coalesce(v_rate, v_platform);
+  return pg_catalog.jsonb_build_object(
+    'id', v_house.id,
+    'name', v_house.name,
+    'city_id', v_house.city_id,
+    'neighborhood', v_house.neighborhood,
+    'street_address', v_house.street_address,
+    'address_number', v_house.address_number,
+    'postal_code', v_house.postal_code,
+    'phone', v_house.phone,
+    'category', v_house.category,
+    'badge', v_house.badge,
+    'status', v_house.status,
+    'suspended', v_house.suspended_at is not null,
+    'suspended_at', v_house.suspended_at,
+    'has_wallet', v_house.pagbank_account_id is not null,
+    'document_kind', v_house.document_kind,
+    'document_last4', right(v_house.document_number, 4),
+    'owner_id', v_house.owner_id,
+    'owner_name', (select display_name from public.profiles where id = v_house.owner_id),
+    'owner_email', (select email from auth.users where id = v_house.owner_id),
+    'invite_code', (
+      select i.code from public.partner_invites i where i.id = v_house.invite_id
+    ),
+    'platform_bps', v_platform,
+    'commission_bps', v_rate,
+    'commission_override', v_override,
+    'featured_rank', v_house.featured_rank,
+    'snapshots', coalesce((
+      select pg_catalog.jsonb_agg(row_to_json(c) order by c.created_at desc)
+      from (
+        select id, commission_bps, status, created_at
+        from public.payment_charges
+        where venue_id = p_venue_id
+        order by created_at desc
+        limit 8
+      ) c
+    ), '[]'::jsonb),
+    'rooms', coalesce((
+      select pg_catalog.jsonb_agg(row_to_json(r) order by r.name)
+      from (
+        select id, name, featured_rank
+        from public.rooms
+        where venue_id = p_venue_id
+        order by name
+      ) r
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+
+create or replace function public.admin_review_venue(
+  p_venue_id uuid,
+  p_decision text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := private.admin_require();
+  v_before text;
+  v_wallet text;
+begin
+  if p_decision not in ('approved', 'rejected') then
+    raise exception 'decisao invalida' using errcode = '22023';
+  end if;
+  select status into v_before from public.venues where id = p_venue_id for update;
+  if not found then
+    raise exception 'casa nao encontrada' using errcode = 'P0002';
+  end if;
+  if v_before <> 'pending' then
+    raise exception 'casa nao esta pendente' using errcode = 'P0001';
+  end if;
+  update public.venues
+  set status = p_decision,
+      reviewed_by = v_uid,
+      reviewed_at = pg_catalog.now()
+  where id = p_venue_id;
+  select pagbank_account_id into v_wallet from public.venues where id = p_venue_id;
+  perform private.admin_audit(
+    v_uid,
+    'review_venue',
+    'venues',
+    p_venue_id::text,
+    pg_catalog.jsonb_build_object('status', v_before),
+    pg_catalog.jsonb_build_object('status', p_decision)
+  );
+  return pg_catalog.jsonb_build_object(
+    'venue_id', p_venue_id,
+    'status', p_decision,
+    'needs_subaccount', p_decision = 'approved'
+      and (v_wallet is null or btrim(v_wallet) = '')
+  );
+end;
+$$;
+
+
+create or replace function public.admin_payments_board()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_ready jsonb;
+  v_charges jsonb;
+  v_refunds jsonb;
+  v_withdrawals jsonb;
+  v_errors jsonb;
+begin
+  perform private.admin_require();
+  v_ready := public.admin_payments_readiness();
+
+  select coalesce(pg_catalog.jsonb_agg(to_jsonb(s) order by s.created_at desc), '[]'::jsonb)
+    into v_charges
+  from (
+    select
+      c.id,
+      c.status,
+      c.billing_type,
+      c.amount_cents,
+      coalesce(c.provider_ref, '') as provider_ref,
+      c.created_at,
+      v.name as venue_name
+    from public.payment_charges c
+    join public.venues v on v.id = c.venue_id
+    order by c.created_at desc
+    limit 20
+  ) s;
+
+  select coalesce(pg_catalog.jsonb_agg(to_jsonb(s) order by s.created_at desc), '[]'::jsonb)
+    into v_refunds
+  from (
+    select
+      c.id,
+      c.status,
+      c.billing_type,
+      c.amount_cents,
+      coalesce(c.provider_ref, '') as provider_ref,
+      coalesce(c.refunded_at, c.created_at) as created_at,
+      v.name as venue_name
+    from public.payment_charges c
+    join public.venues v on v.id = c.venue_id
+    where c.status = 'refunded'
+    order by coalesce(c.refunded_at, c.created_at) desc
+    limit 20
+  ) s;
+
+  select coalesce(pg_catalog.jsonb_agg(to_jsonb(s) order by s.created_at desc), '[]'::jsonb)
+    into v_withdrawals
+  from (
+    select
+      w.id,
+      w.status,
+      w.source,
+      w.amount_cents,
+      coalesce(w.pagbank_transfer_id, w.asaas_transfer_id, '') as pagbank_transfer_id,
+      w.created_at,
+      v.name as venue_name
+    from public.venue_withdrawals w
+    join public.venues v on v.id = w.venue_id
+    order by w.created_at desc
+    limit 20
+  ) s;
+
+  select coalesce(pg_catalog.jsonb_agg(to_jsonb(s) order by s.created_at desc), '[]'::jsonb)
+    into v_errors
+  from (
+    select e.id, e.source, e.code, e.provider_ref, e.created_at
+    from public.payment_webhook_errors e
+    order by e.created_at desc
+    limit 20
+  ) s;
+
+  return pg_catalog.jsonb_build_object(
+    'readiness', v_ready,
+    'charges', v_charges,
+    'refunds', v_refunds,
+    'withdrawals', v_withdrawals,
+    'webhook_errors', v_errors
+  );
+end;
+$$;
+

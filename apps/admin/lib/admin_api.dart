@@ -867,7 +867,7 @@ class SupabaseAdminApi implements AdminApi {
     final ready = _map(row['readiness']);
     var pagbankToken = _optionalBool(null);
     var pagbankBase = _optionalBool(null);
-    var pagbankToken = _optionalBool(null);
+    var pagbankWebhook = _optionalBool(null);
     var pagbankEmail = _optionalBool(null);
     var withdrawalsSecret = _optionalBool(null);
     try {
@@ -876,7 +876,7 @@ class SupabaseAdminApi implements AdminApi {
       if (data is Map) {
         pagbankToken = _optionalBool(data['pagbank_api_key']);
         pagbankBase = _optionalBool(data['pagbank_base_url_production']);
-        pagbankToken = _optionalBool(data['pagbank_webhook_token']);
+        pagbankWebhook = _optionalBool(data['pagbank_webhook_token']);
         pagbankEmail = _optionalBool(data['pagbank_webhook_email']);
         withdrawalsSecret = _optionalBool(data['venue_withdrawals_secret']);
       }
@@ -889,7 +889,7 @@ class SupabaseAdminApi implements AdminApi {
     return PaymentsBoard(
       pagbankToken: pagbankToken,
       pagbankBaseUrlProduction: pagbankBase,
-      pagbankWebhookSecret: pagbankToken,
+      pagbankWebhookSecret: pagbankWebhook,
       pagbankWebhookEmail: pagbankEmail,
       venueWithdrawalsSecret: withdrawalsSecret,
       vaultUrl: ready['vault_venue_withdrawals_url'] == true,
@@ -975,12 +975,14 @@ class SupabaseAdminApi implements AdminApi {
   Future<String?> provisionWallet(String venueId) async {
     final response = await _client.functions.invoke(
       'provision-venue-wallet',
-      body: {'venue_id': venueId},
+      body: {'venue_id': venueId, 'surface': 'admin'},
     );
     final data = response.data;
     if (data is Map && data['error'] != null) {
       return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
     }
+    final url = data is Map ? data['connect_url'] : null;
+    if (url is String && url.startsWith('https://')) return url;
     return null;
   }
 }

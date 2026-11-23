@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/auth/data/google_oauth.dart';
+import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 import 'package:scapematch/app/url_strategy.dart';
 import 'package:scapematch/features/theme/data/theme_choice_store.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
@@ -17,6 +18,7 @@ Future<void> _abrirApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await bootScapeBackend();
   pendingGoogleAuthNotice = googleAuthNoticeFromUri(Uri.base);
+  pendingPagbankConnectReturn = PagbankConnectReturn.fromUri(Uri.base);
   configureUrlStrategy();
   SemanticsBinding.instance.ensureSemantics();
   await initializeDateFormatting('pt_BR');

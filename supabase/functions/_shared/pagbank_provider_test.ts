@@ -9,6 +9,7 @@ import {
   pagbankSandboxBaseUrl,
   pagbankSignatureMatches,
 } from "./pagbank_provider.ts";
+import { groupPaymentAction } from "./pagbank_rules.ts";
 
 const venue = "ACCO_VENUE";
 const primary = "ACCO_PRIMARY";
@@ -239,6 +240,101 @@ Deno.test("a assinatura do webhook usa o corpo cru", async () => {
   assertEquals(await pagbankSignatureMatches(hex, secret, raw), true);
   assertEquals(await pagbankSignatureMatches(hex, secret, `${raw} `), false);
   assertEquals(await pagbankSignatureMatches(null, secret, raw), false);
+});
+
+Deno.test("abaixo de R$ 150 o cartão não parcela e a casa não perde a taxa", async () => {
+  let posted = 0;
+  const fetchFn = () => {
+    posted += 1;
+    return Promise.resolve(new Response("{}", { status: 500 }));
+  };
+  await assertRejects(
+    () =>
+      provider(fetchFn).authorizeCard({
+        customer: "PB_CUS_1",
+        value: 149.99,
+        dueDate: "2026-11-07",
+        description: "EscapeMatch",
+        externalReference: "card-baixo",
+        split: { walletId: venue, fixedValue: 100 },
+        creditCardToken: "CARD_1",
+        installments: 2,
+      }),
+    Error,
+    "parcelas",
+  );
+  assertEquals(posted, 0);
+
+  const calls: Record<string, unknown>[] = [];
+  const pix = await provider((url, init) => {
+    if ((init?.method ?? "GET") === "POST") {
+      calls.push(JSON.parse(String(init?.body)));
+      return Promise.resolve(new Response(JSON.stringify({
+        charges: [{
+          id: "CHAR_P",
+          status: "WAITING",
+          splits: { id: "SPLI_P" },
+          payment_method: { type: "PIX", pix: { qr_code: { text: "000201PIX" } } },
+        }],
+      }), { status: 200 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({ orders: [] }), { status: 200 }));
+  }).createPix({
+    customer: "PB_CUS_1",
+    value: 15,
+    dueDate: "2026-11-07",
+    description: "EscapeMatch",
+    externalReference: "pix-15",
+    split: { walletId: venue, fixedValue: 13.5 },
+  });
+  assertEquals(pix.splitId, "SPLI_P");
+  const charge = (calls[0].charges as Record<string, unknown>[])[0];
+  const receivers = ((charge.splits as { receivers: Record<string, unknown>[] }).receivers);
+  assertEquals((receivers[0].amount as { value: number }).value, 1350);
+  assertEquals((receivers[1].amount as { value: number }).value, 150);
+  assertEquals(JSON.stringify(receivers[0]).includes("fee"), false);
+});
+
+Deno.test("confirmação solta a custódia; sem confirmação estorna o Pix e cancela o cartão", async () => {
+  const calls: string[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    calls.push(`${init?.method ?? "GET"} ${url}`);
+    if (url.endsWith("/release-custody")) {
+      return Promise.resolve(new Response("", { status: 200 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify({
+      id: "CHAR_1",
+      status: url.includes("cancel") ? "CANCELED" : "PAID",
+    }), { status: 200 }));
+  };
+  const client = provider(fetchFn);
+  const confirm = groupPaymentAction({
+    confirmed: true,
+    billingType: "PIX",
+    status: "paid",
+  });
+  assertEquals(confirm, "release_custody");
+  if (confirm === "release_custody") {
+    await client.releaseCustody("SPLI_OK", [venue, primary]);
+  }
+  const pix = groupPaymentAction({
+    confirmed: false,
+    billingType: "PIX",
+    status: "paid",
+  });
+  assertEquals(pix, "refund_pix");
+  if (pix === "refund_pix") await client.refund("CHAR_PIX");
+  const card = groupPaymentAction({
+    confirmed: false,
+    billingType: "CREDIT_CARD",
+    status: "authorized",
+  });
+  assertEquals(card, "void_card");
+  if (card === "void_card") await client.cancelAuthorization("CHAR_CARD");
+  assert(calls.some((call) => call.endsWith("/splits/SPLI_OK/release-custody")));
+  assert(calls.some((call) => call.endsWith("/charges/CHAR_PIX/cancel")));
+  assert(calls.some((call) => call.endsWith("/charges/CHAR_CARD/cancel")));
+  assertEquals(calls.some((call) => call.includes("/capture")), false);
 });
 
 Deno.test("erro da tokenização não ecoa o cartão", async () => {

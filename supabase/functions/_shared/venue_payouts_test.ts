@@ -51,12 +51,18 @@ type Fake = {
   calls: { fn: string; args: Record<string, unknown> }[];
   created: Record<string, unknown>[];
   keys: string[];
+  refreshers: Array<(() => Promise<string>) | undefined>;
   deps: PayoutDeps;
 };
 
 function fake(options?: {
   wallet?: string;
   apiKey?: string;
+  tokens?: {
+    access_token: string;
+    refresh_token: string;
+    access_expires_at: string | null;
+  };
   begin?: boolean;
   enabled?: boolean;
   role?: string;
@@ -86,6 +92,7 @@ function fake(options?: {
   const calls: Fake["calls"] = [];
   const created: Record<string, unknown>[] = [];
   const keys: string[] = [];
+  const refreshers: Array<(() => Promise<string>) | undefined> = [];
   const wallet = options?.wallet ?? "wal_casa";
   const apiKey = options?.apiKey ?? subKey;
   const client: TransferClient = {
@@ -134,7 +141,11 @@ function fake(options?: {
         });
       }
       if (fn === "venue_payout_wallet") return Promise.resolve(wallet);
+      if (fn === "read_venue_pagbank_tokens") {
+        return Promise.resolve(options?.tokens ?? null);
+      }
       if (fn === "read_venue_provider_key") return Promise.resolve(apiKey);
+      if (fn === "transfer_ref_venue") return Promise.resolve(venue);
       if (fn === "venue_payouts_enabled") {
         return Promise.resolve(options?.enabled ?? true);
       }
@@ -208,15 +219,16 @@ function fake(options?: {
       },
     },
     store,
-    clientFor: (key) => {
+    clientFor: (key, refresh) => {
       keys.push(key);
+      refreshers.push(refresh);
       return client;
     },
     nowSec: now,
     today: "2026-11-12",
     fetchFn: () => Promise.resolve(new Response("{}", { status: 200 })),
   };
-  return { store, calls, created, keys, deps };
+  return { store, calls, created, keys, refreshers, deps };
 }
 
 function post(body: unknown, jwt = freshToken()): Request {
@@ -295,6 +307,49 @@ Deno.test("o saldo nao devolve chave e a equipe nao chama o PagBank", async () =
   const lockedBody = await locked.json();
   assertEquals(lockedBody.can_withdraw, false);
   assertEquals(staff.keys, []);
+});
+
+Deno.test("o 401 do saque renova o refresh token e grava a sessão", async () => {
+  const gate = fake({
+    tokens: {
+      access_token: "access-antigo",
+      refresh_token: "refresh-antigo",
+      access_expires_at: "2099-01-01T00:00:00.000Z",
+    },
+  });
+  gate.deps.env = {
+    get: (name) => {
+      const values: Record<string, string> = {
+        PAGBANK_TOKEN: "token-plataforma",
+        PAGBANK_ENV: "sandbox",
+        PAGBANK_CONNECT_CLIENT_ID: "client",
+        PAGBANK_CONNECT_CLIENT_SECRET: "secret-do-connect",
+      };
+      return values[name];
+    },
+  };
+  gate.deps.fetchFn = () =>
+    Promise.resolve(Response.json({
+      access_token: "access-novo",
+      refresh_token: "refresh-novo",
+      expires_in: 3600,
+      account_id: "ACCO_casa",
+    }));
+  const response = await handleVenuePayouts(
+    post({ action: "snapshot", venue_id: venue }),
+    gate.deps,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(gate.keys, ["access-antigo"]);
+  const refresh = gate.refreshers[0];
+  assert(refresh);
+  assertEquals(await refresh(), "access-novo");
+  const saved = gate.calls.find((call) =>
+    call.fn === "store_venue_pagbank_tokens"
+  );
+  assertEquals(saved?.args.p_access_token, "access-novo");
+  assertEquals(saved?.args.p_refresh_token, "refresh-novo");
+  assertEquals(saved?.args.p_venue_id, venue);
 });
 
 Deno.test("saque manual sem reauth nao transfere", async () => {
@@ -390,8 +445,26 @@ Deno.test("o cron nao repete o periodo e ignora a reserva", async () => {
   assert(!off.calls.some((call) => call.fn === "list_due_venue_payouts"));
 });
 
+async function authenticity(raw: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${webhookToken}-${raw}`),
+  );
+  return [...new Uint8Array(digest)].map((byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+}
+
 Deno.test("webhook de transferencia exige o token e conclui o saque", async () => {
-  const gate = fake();
+  const gate = fake({
+    transfer: {
+      id: "TR_teste",
+      status: "done",
+      receiptUrl: "https://example.com/recibo",
+      externalReference: withdrawal,
+      failReason: "",
+    },
+  });
   const baseEnv = gate.deps.env;
   const mailed: string[] = [];
   gate.deps.env = {
@@ -409,41 +482,45 @@ Deno.test("webhook de transferencia exige o token e conclui o saque", async () =
     new Request("https://example.test/hook", {
       method: "POST",
       headers: { "x-authenticity-token": "curto" },
-      body: JSON.stringify({ event: "TRANSFER_DONE" }),
+      body: JSON.stringify({ id: "TR_teste", reference_id: withdrawal }),
     }),
     gate.deps,
   );
   assertEquals(denied.status, 401);
 
+  const raw = JSON.stringify({
+    id: "TR_teste",
+    reference_id: withdrawal,
+    status: "FAILED",
+  });
   const done = await handleTransferWebhook(
     new Request("https://example.test/hook", {
       method: "POST",
-      headers: { "x-authenticity-token": webhookToken },
-      body: JSON.stringify({
-        event: "TRANSFER_DONE",
-        transfer: {
-          id: "tra_teste",
-          externalReference: withdrawal,
-          transactionReceiptUrl: "https://example.com/recibo",
-        },
-      }),
+      headers: { "x-authenticity-token": await authenticity(raw) },
+      body: raw,
     }),
     gate.deps,
   );
   assertEquals(done.status, 200);
   const applied = gate.calls.find((call) => call.fn === "apply_transfer_event");
   assertEquals(applied?.args.p_status, "done");
+  assertEquals(applied?.args.p_transfer_id, "TR_teste");
   assertEquals(applied?.args.p_receipt, "https://example.com/recibo");
   assert(gate.calls.some((call) => call.fn === "mark_payout_notice_sent"));
   assert(mailed.some((body) => body.includes("Saque concluído no EscapeMatch")));
   assert(!mailed.some((body) => body.includes(subKey) || body.includes(reserveKey)));
 
   const ignored = fake();
+  const noise = JSON.stringify({
+    id: "CHAR_1",
+    status: "PAID",
+    payment_method: { type: "PIX" },
+  });
   const payment = await handleTransferWebhook(
     new Request("https://example.test/hook", {
       method: "POST",
-      headers: { "x-authenticity-token": webhookToken },
-      body: JSON.stringify({ event: "PAYMENT_RECEIVED", payment: { id: "pay" } }),
+      headers: { "x-authenticity-token": await authenticity(noise) },
+      body: noise,
     }),
     ignored.deps,
   );

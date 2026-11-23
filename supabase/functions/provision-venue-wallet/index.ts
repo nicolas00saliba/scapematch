@@ -1,8 +1,9 @@
-// Não cria subconta. Devolve o link do PagBank Connect para a casa
-// autorizar a conta vendedora. O código volta em pagbank-connect.
+// Não cria subconta. Devolve o link do PagBank Connect. O state é
+// aleatório, de uso único, e fica preso ao usuário desta sessão.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure, logCaught } from "../_shared/pagbank_client_error.ts";
+import { connectRedirectUri } from "../_shared/pagbank_connect.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
@@ -33,7 +34,10 @@ Deno.serve(async (req) => {
       .eq("user_id", userData.user.id)
       .maybeSingle();
     const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
-    const body = await req.json().catch(() => ({})) as { venue_id?: string };
+    const body = await req.json().catch(() => ({})) as {
+      venue_id?: string;
+      surface?: string;
+    };
     const venueId = (body.venue_id ?? "").trim();
     if (!venueId) return json({ error: "venue_id" }, 400);
 
@@ -49,15 +53,28 @@ Deno.serve(async (req) => {
     if (venue.status !== "approved") return json({ error: "casa" }, 400);
 
     const clientId = (Deno.env.get("PAGBANK_CONNECT_CLIENT_ID") ?? "").trim();
-    const redirect = (Deno.env.get("PAGBANK_CONNECT_REDIRECT_URI") ?? "").trim();
-    if (!clientId || !redirect.startsWith("https://")) {
-      return json({ error: "pagbank_connect" }, 500);
+    const redirect = connectRedirectUri({
+      partner: Deno.env.get("PAGBANK_CONNECT_REDIRECT_URI") ?? "",
+      admin: Deno.env.get("PAGBANK_CONNECT_ADMIN_REDIRECT_URI") ?? "",
+      surface: body.surface === "admin" ? "admin" : "parceiro",
+    });
+    if (!clientId) return json({ error: "pagbank_connect" }, 500);
+    const { data: state, error: stateError } = await admin.rpc(
+      "begin_pagbank_connect",
+      {
+        p_venue_id: venueId,
+        p_user_id: userData.user.id,
+        p_redirect_uri: redirect,
+      },
+    );
+    const connectState = typeof state === "string" ? state.trim() : "";
+    if (stateError || !connectState || connectState === venueId) {
+      return json({ error: "state" }, 500);
     }
-    const pagbank = PagBankProvider.fromEnv(Deno.env);
-    const connectUrl = pagbank.connectAuthorizeUrl({
+    const connectUrl = PagBankProvider.fromEnv(Deno.env).connectAuthorizeUrl({
       clientId,
       redirectUri: redirect,
-      state: venueId,
+      state: connectState,
     });
     return json({ venue_id: venueId, connect_url: connectUrl });
   } catch (error) {

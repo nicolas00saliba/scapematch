@@ -277,9 +277,10 @@ function defaultSleep(ms: number): Promise<void> {
 export class PagBankProvider {
   readonly sandbox: boolean;
   readonly official: boolean;
+  #refreshAccess: (() => Promise<string>) | null = null;
 
   constructor(
-    private readonly apiKey: string,
+    private apiKey: string,
     private readonly baseUrl: string,
     private readonly fetchFn: PagBankFetch = fetch,
     private readonly sleep: (ms: number) => Promise<void> = defaultSleep,
@@ -296,6 +297,7 @@ export class PagBankProvider {
   static fromEnv(
     env: { get(name: string): string | undefined },
     timeoutMs = 0,
+    fetchImpl?: PagBankFetch,
   ): PagBankProvider {
     const apiKey = env.get("PAGBANK_TOKEN") ?? "";
     const mode = (env.get("PAGBANK_ENV") ?? "production").trim().toLowerCase();
@@ -303,11 +305,17 @@ export class PagBankProvider {
       ? pagbankSandboxBaseUrl
       : pagbankProductionBaseUrl;
     const account = env.get("PAGBANK_ACCOUNT_ID") ?? "";
+    const baseFetch = fetchImpl ?? fetch;
     const fetchFn: PagBankFetch = timeoutMs > 0
       ? (input, init) =>
-        fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) })
-      : fetch;
+        baseFetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+      : baseFetch;
     return new PagBankProvider(apiKey, baseUrl, fetchFn, defaultSleep, account);
+  }
+
+  /// Na resposta 401, troca o access token uma vez e repete a chamada.
+  bindAccessRefresh(refresh: () => Promise<string>): void {
+    this.#refreshAccess = refresh;
   }
 
   withKey(apiKey: string): PagBankProvider {
@@ -343,7 +351,12 @@ export class PagBankProvider {
     clientSecret: string;
     code: string;
     redirectUri: string;
-  }): Promise<{ accessToken: string; refreshToken: string; accountId: string }> {
+  }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    accountId: string;
+  }> {
     return this.#send(
       "/oauth2/token",
       {
@@ -359,7 +372,37 @@ export class PagBankProvider {
     ).then((body) => ({
       accessToken: stringField(body, "access_token"),
       refreshToken: optionalString(body, "refresh_token"),
+      expiresIn: expiresInSeconds(body),
       accountId: stringField(body, "account_id"),
+    }));
+  }
+
+  refreshConnectToken(input: {
+    clientId: string;
+    clientSecret: string;
+    refreshToken: string;
+  }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    accountId: string;
+  }> {
+    return this.#send(
+      "/oauth2/token",
+      {
+        grant_type: "refresh_token",
+        refresh_token: input.refreshToken,
+      },
+      "POST",
+      {
+        X_CLIENT_ID: input.clientId,
+        X_CLIENT_SECRET: input.clientSecret,
+      },
+    ).then((body) => ({
+      accessToken: stringField(body, "access_token"),
+      refreshToken: optionalString(body, "refresh_token") || input.refreshToken,
+      expiresIn: expiresInSeconds(body),
+      accountId: optionalString(body, "account_id"),
     }));
   }
 
@@ -895,6 +938,7 @@ export class PagBankProvider {
     payload: unknown,
     method = "POST",
     extraHeaders: Record<string, string> = {},
+    allowRefresh = true,
   ): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
@@ -908,6 +952,17 @@ export class PagBankProvider {
       init.body = JSON.stringify(payload ?? {});
     }
     const response = await this.fetchFn(`${this.baseUrl}${path}`, init);
+    if (
+      response.status === 401 &&
+      allowRefresh &&
+      this.#refreshAccess
+    ) {
+      const next = (await this.#refreshAccess()).trim();
+      if (next) {
+        this.apiKey = next;
+        return this.#send(path, payload, method, extraHeaders, false);
+      }
+    }
     const text = await response.text();
     const safe = redactOutbound(text, this.apiKey);
     if (!response.ok) {
@@ -928,6 +983,13 @@ function redactOutbound(text: string, apiKey: string): string {
     /"(security_code|exp_month|exp_year|tax_id|number)"\s*:\s*"(?:\\.|[^"\\])*"/gi,
     '"$1":"[redacted]"',
   );
+}
+
+function expiresInSeconds(body: Record<string, unknown>): number {
+  const value = body.expires_in;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.trunc(value)
+    : 0;
 }
 
 function stringField(body: Record<string, unknown>, key: string): string {

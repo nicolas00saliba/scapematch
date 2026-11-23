@@ -78,6 +78,7 @@ export function mapTransferStatus(
   switch (status) {
     case "DONE":
     case "PAID":
+    case "SUCCESS":
     case "AVAILABLE":
       return "done";
     case "FAILED":
@@ -200,7 +201,8 @@ export function findTransferInList(
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     const item = row as Record<string, unknown>;
-    if (text(item.externalReference) !== externalReference) continue;
+    const ref = text(item.reference_id) || text(item.externalReference);
+    if (ref !== externalReference) continue;
     return parseTransfer(item);
   }
   return null;

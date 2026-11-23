@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
@@ -418,12 +419,16 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     String? wallet;
     if (result.needsSubaccount) {
       wallet = await api.provisionWallet(widget.id);
+      if (wallet != null && wallet.startsWith('https://')) {
+        await launchExternalUrl(Uri.parse(wallet));
+        wallet = 'Continue na PagBank para ligar a casa.';
+      }
     }
     await _load();
     setState(() {
       _message = result.needsSubaccount
           ? (wallet ??
-                'Aprovada. A subconta PagBank foi pedida no fluxo que já existe.')
+                'Aprovada. Abra o PagBank Connect para ligar a casa.')
           : 'Decisão gravada: ${result.status}.';
     });
   }
