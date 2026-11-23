@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
@@ -11,16 +12,19 @@ void main() {
   ) async {
     Uri? opened;
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(Brightness.light),
-        home: Scaffold(
-          body: VenueWithdrawalsPanel(
-            venueId: 'casa-1',
-            onOpenPagBank: (uri) => opened = uri,
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildAppTheme(Brightness.light),
+          home: Scaffold(
+            body: VenueWithdrawalsPanel(
+              venueId: 'casa-1',
+              onOpenPagBank: (uri) => opened = uri,
+            ),
           ),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text(PartnerMessages.withdrawalsTitle), findsOneWidget);
     expect(find.text(PartnerMessages.withdrawalsBody), findsOneWidget);

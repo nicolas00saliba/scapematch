@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/sharing/external_url_launch.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_documents_repository.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repository.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_documents_card.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 /// Explica o recebimento na conta PagBank e a Transferência Automática.
 ///
-/// Não pede conta, chave Pix nem valor de saque. O token da casa não
-/// cadastra destino nem transfere.
-class VenueWithdrawalsPanel extends StatelessWidget {
+/// Não pede conta, chave Pix nem valor de saque. Os documentos da subconta
+/// continuam aqui. O token da casa não cadastra destino nem transfere.
+class VenueWithdrawalsPanel extends ConsumerStatefulWidget {
   const VenueWithdrawalsPanel({
     super.key,
     required this.venueId,
@@ -22,10 +27,104 @@ class VenueWithdrawalsPanel extends StatelessWidget {
   static final pagBankUri = Uri.parse(PartnerMessages.receivePagBankUrl);
 
   @override
+  ConsumerState<VenueWithdrawalsPanel> createState() =>
+      _VenueWithdrawalsPanelState();
+}
+
+class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
+  VenueDocumentsView _documents = VenueDocumentsView.hidden;
+  var _busy = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDocuments();
+  }
+
+  Future<void> _loadDocuments() async {
+    final documents = await _readDocuments();
+    if (!mounted) return;
+    setState(() => _documents = documents);
+  }
+
+  Future<VenueDocumentsView> _readDocuments() async {
+    try {
+      return await ref
+          .read(venueDocumentsRepositoryProvider)
+          .load(widget.venueId);
+    } on VenueDocumentsFailure catch (error) {
+      if (error.code == 'not owner') return VenueDocumentsView.hidden;
+      return VenueDocumentsView.unavailable;
+    } on Object {
+      return VenueDocumentsView.unavailable;
+    }
+  }
+
+  Future<void> _refreshDocuments() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final documents = await _readDocuments();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _documents = documents;
+    });
+  }
+
+  Future<void> _uploadDocument(VenueDocumentItem item) async {
+    final file = await ref.read(venueDocumentPickerProvider).pick();
+    if (file == null || !mounted) return;
+    if (!await _guard()) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final documents = await ref
+          .read(venueDocumentsRepositoryProvider)
+          .upload(
+            venueId: widget.venueId,
+            documentId: item.id,
+            bytes: file.bytes,
+          );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _documents = documents;
+      });
+    } on VenueDocumentsFailure catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = venueDocumentFailureMessage(error.code);
+      });
+    }
+  }
+
+  Future<bool> _guard() async {
+    final repo = ref.read(venueWithdrawalRepositoryProvider);
+    final email = widget.email ?? ref.read(partnerSessionProvider)?.email ?? '';
+    final totp = await repo.needsTotp();
+    if (!mounted) return false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => _ReauthDialog(
+        needsTotp: totp,
+        onSubmit: (password, code) =>
+            repo.reauthenticate(email: email, password: password, totp: code),
+      ),
+    );
+    return ok == true;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    assert(venueId.isNotEmpty || email == null);
+    assert(widget.venueId.isNotEmpty || widget.email == null);
     return Column(
       key: PartnerKeys.withdrawals,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,16 +162,109 @@ class VenueWithdrawalsPanel extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: FilledButton.icon(
             key: PartnerKeys.receiveOpenPagBank,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(48, 48),
-            ),
+            style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
             onPressed: () {
-              final open = onOpenPagBank ?? launchExternalUrl;
-              open(pagBankUri);
+              final open = widget.onOpenPagBank ?? launchExternalUrl;
+              open(VenueWithdrawalsPanel.pagBankUri);
             },
             icon: Icon(Icons.open_in_new, color: scheme.onPrimary),
             label: const Text(PartnerMessages.receiveOpenPagBank),
           ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(_error!, style: TextStyle(color: scheme.error)),
+        ],
+        const SizedBox(height: 20),
+        VenueDocumentsCard(
+          view: _documents,
+          busy: _busy,
+          onOpen: launchExternalUrl,
+          onUpload: _uploadDocument,
+          onRefresh: _refreshDocuments,
+        ),
+      ],
+    );
+  }
+}
+
+class _ReauthDialog extends StatefulWidget {
+  const _ReauthDialog({required this.needsTotp, required this.onSubmit});
+
+  final bool needsTotp;
+  final Future<String?> Function(String password, String? totp) onSubmit;
+
+  @override
+  State<_ReauthDialog> createState() => _ReauthDialogState();
+}
+
+class _ReauthDialogState extends State<_ReauthDialog> {
+  final _password = TextEditingController();
+  final _totp = TextEditingController();
+  String? _error;
+  var _busy = false;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _totp.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = await widget.onSubmit(
+      _password.text,
+      widget.needsTotp ? _totp.text : null,
+    );
+    if (!mounted) return;
+    if (error != null) {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
+      return;
+    }
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(PartnerMessages.withdrawalReauth),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            key: PartnerKeys.withdrawalPassword,
+            controller: _password,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: PartnerMessages.withdrawalPassword,
+            ),
+          ),
+          if (widget.needsTotp)
+            TextField(
+              controller: _totp,
+              decoration: const InputDecoration(
+                labelText: PartnerMessages.withdrawalTotp,
+              ),
+            ),
+          if (_error != null) ...[const SizedBox(height: 8), Text(_error!)],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          key: PartnerKeys.withdrawalConfirm,
+          onPressed: _busy ? null : _submit,
+          child: const Text(PartnerMessages.withdrawalConfirm),
         ),
       ],
     );

@@ -49,7 +49,9 @@ void main() {
     );
   });
 
-  testWidgets('link do PagBank aparece e o saque fica desligado', (tester) async {
+  testWidgets('link do PagBank aparece e o saque fica desligado', (
+    tester,
+  ) async {
     final docs = MemoryVenueDocumentsRepository(
       VenueDocumentsView.fromJson({
         'known': true,
@@ -79,12 +81,8 @@ void main() {
     expect(find.textContaining('RG · Não enviado'), findsOneWidget);
     expect(find.byKey(PartnerKeys.venueDocumentOnboarding), findsOneWidget);
     expect(find.byKey(PartnerKeys.venueDocumentUpload), findsNothing);
-    expect(
-      tester
-          .widget<FilledButton>(find.byKey(PartnerKeys.withdrawalSubmit))
-          .onPressed,
-      isNull,
-    );
+    expect(find.byKey(PartnerKeys.withdrawalSubmit), findsNothing);
+    expect(find.text(PartnerMessages.withdrawalBank), findsNothing);
 
     await tester.tap(find.byKey(PartnerKeys.venueDocumentOnboarding));
     await tester.pumpAndSettle();
@@ -129,7 +127,9 @@ void main() {
     expect(find.textContaining('RG · Pendente'), findsOneWidget);
   });
 
-  testWidgets('conta aprovada deixa o saque ligado', (tester) async {
+  testWidgets('conta aprovada mostra os documentos e não pede banco', (
+    tester,
+  ) async {
     final docs = MemoryVenueDocumentsRepository(
       VenueDocumentsView.fromJson({
         'known': true,
@@ -152,12 +152,9 @@ void main() {
 
     expect(find.text(PartnerMessages.documentsApproved), findsOneWidget);
     expect(find.text(PartnerMessages.documentsBlockWithdraw), findsNothing);
-    expect(
-      tester
-          .widget<FilledButton>(find.byKey(PartnerKeys.withdrawalSubmit))
-          .onPressed,
-      isNotNull,
-    );
+    expect(find.text(PartnerMessages.receiveStepDestination), findsOneWidget);
+    expect(find.byKey(PartnerKeys.withdrawalSubmit), findsNothing);
+    expect(find.text(PartnerMessages.withdrawalBank), findsNothing);
   });
 }
 

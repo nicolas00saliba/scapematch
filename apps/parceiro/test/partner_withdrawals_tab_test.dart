@@ -31,7 +31,8 @@ void main() {
 
       expect(find.text(PartnerMessages.balanceTitle), findsNothing);
       expect(find.byKey(PartnerKeys.withdrawals), findsOneWidget);
-      expect(find.text(PartnerMessages.withdrawalsTitle), findsNWidgets(2));
+      expect(find.text(PartnerMessages.withdrawals), findsOneWidget);
+      expect(find.text(PartnerMessages.withdrawalsTitle), findsOneWidget);
       expect(find.text(PartnerMessages.receiveStepsTitle), findsOneWidget);
       expect(find.text(PartnerMessages.receiveStepDestination), findsOneWidget);
       expect(find.byKey(PartnerKeys.receiveOpenPagBank), findsOneWidget);

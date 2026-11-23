@@ -29,7 +29,7 @@ abstract final class PartnerMessages {
   static const backToAdmin = 'Voltar às aprovações';
   static const signOut = 'Sair';
   static const balance = 'Saldo';
-  static const withdrawals = 'Receba no seu banco';
+  static const withdrawals = 'Receber';
   static const openWithdrawals = 'Como receber no banco';
   static const reservations = 'Reservas';
   static const invoices = 'Notas fiscais';
@@ -323,7 +323,7 @@ abstract final class PartnerMessages {
   static const withdrawalAutomatic = 'Automático';
   static const documentsTitle = 'Documentos da subconta';
   static const documentsBody =
-      'O PagBank só libera o saque com os documentos aprovados.';
+      'Os documentos aprovados liberam a conta PagBank da casa. O envio para outro banco é a Transferência Automática no PagBank.';
   static const documentsApproved = 'Documentos e conta aprovados';
   static const documentsPending = 'Aguardando aprovação do PagBank';
   static const documentsHosted =
@@ -340,7 +340,7 @@ abstract final class PartnerMessages {
   static const documentsWait =
       'Conta nova: espere uns 15 segundos e atualize. O PagBank ainda está definindo o que é obrigatório.';
   static const documentsBlockWithdraw =
-      'O saque libera quando o PagBank aprovar os documentos e a conta.';
+      'A conta PagBank ainda não está aprovada. Sem essa aprovação o dinheiro não cai na conta da casa.';
   static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
 
   static String documentStatus(String status) {
