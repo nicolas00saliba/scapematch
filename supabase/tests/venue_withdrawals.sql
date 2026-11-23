@@ -728,6 +728,16 @@ begin
   then
     raise exception 'a lista semanal nao usa a retentativa';
   end if;
+  if pg_catalog.pg_get_functiondef('public.list_due_venue_payouts()'::regprocedure)
+    like '%venue_bank_accounts%'
+  then
+    raise exception 'a lista semanal ainda exige conta bancaria';
+  end if;
+  if pg_catalog.pg_get_functiondef('public.venue_finance_ready(uuid)'::regprocedure)
+    like '%venue_bank_accounts%'
+  then
+    raise exception 'pronta ainda exige conta bancaria';
+  end if;
 
   update public.venue_payout_schedules
   set frequency = 'weekly',

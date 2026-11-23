@@ -29,8 +29,8 @@ abstract final class PartnerMessages {
   static const backToAdmin = 'Voltar às aprovações';
   static const signOut = 'Sair';
   static const balance = 'Saldo';
-  static const withdrawals = 'Saques';
-  static const openWithdrawals = 'Ver saques';
+  static const withdrawals = 'Receba no seu banco';
+  static const openWithdrawals = 'Como receber no banco';
   static const reservations = 'Reservas';
   static const invoices = 'Notas fiscais';
   static const reviews = 'Avaliações';
@@ -191,14 +191,14 @@ abstract final class PartnerMessages {
   static const claimLinked =
       'A casa é sua. Fotos, salas e avaliações continuam no mesmo perfil.';
   static const claimFinanceBody =
-      'Complete nesta ordem: subconta PagBank, documentos da subconta e chave Pix. Enquanto a subconta e a chave não estiverem prontas, pagamento e saque ficam desligados.';
+      'Ligue a conta PagBank da casa. O dinheiro cai nela depois que o grupo confirma. Para o seu banco, use a Transferência Automática no PagBank, numa conta do mesmo CNPJ ou CPF.';
   static const claimStepSubaccount = '1. Subconta PagBank';
   static const claimStepDocuments = '2. Documentos da subconta';
-  static const claimStepPix = '3. Chave Pix';
+  static const claimStepPix = '3. Receba no seu banco';
   static const claimStepPending = 'Pendente';
   static const claimStepReady = 'Pronta';
   static const claimStepApproved = 'Aprovados';
-  static const claimStepPixReady = 'Cadastrada';
+  static const claimStepPixReady = 'No PagBank';
   static const claimStepWait = 'Aguardando a subconta';
   static const claimStepUnknown = 'Não foi possível consultar';
   static const claimProvision = 'Criar subconta PagBank';
@@ -206,7 +206,7 @@ abstract final class PartnerMessages {
   static const claimConnectOpened =
       'Continue na PagBank para ligar a casa. Ela só recebe depois do Connect.';
   static const claimBankHint =
-      'A chave Pix se cadastra na aba Saques, em conta de saque.';
+      'O EscapeMatch não pede dados bancários. No PagBank, abra Transferências, Transferência Automática, e escolha uma conta de qualquer banco com o mesmo CNPJ ou CPF.';
   static const sendClaim = 'Pedir reivindicação';
   static const claimSent =
       'Pedido enviado. O admin decide se a casa passa para você.';
@@ -253,20 +253,31 @@ abstract final class PartnerMessages {
 
   static String perPerson(String price) => '$price por pessoa';
 
-  static const withdrawalsTitle = 'Saques';
+  static const withdrawalsTitle = 'Receba no seu banco';
   static const withdrawalsBody =
-      'O saldo disponível já está na subconta da casa. O saque vai para uma conta com o mesmo CPF ou CNPJ.';
+      'Depois que o grupo confirma, o dinheiro cai na conta PagBank da casa. O EscapeMatch não transfere para outro banco e não pede dados bancários.';
+  static const receiveStepsTitle = 'Transferência Automática';
+  static const receiveStepAccount =
+      '1. Entre na conta PagBank da casa, a mesma ligada pelo Connect.';
+  static const receiveStepMenu =
+      '2. Abra Transferências e depois Transferência Automática.';
+  static const receiveStepDestination =
+      '3. Em Destino da Transferência Automática, escolha uma conta de qualquer banco. O CNPJ ou CPF precisa ser o mesmo da conta PagBank.';
+  static const receiveStepEnable =
+      '4. Ligue a transferência. O PagBank passa a enviar o saldo para essa conta.';
+  static const receiveOpenPagBank = 'Abrir o PagBank';
+  static const receivePagBankUrl = 'https://pagbank.com.br/';
   static const withdrawalBalanceSection = 'Saldo da subconta';
   static const withdrawalPixNotice =
       'Os saques saem por Pix. Em conta CNPJ, o PagBank dá 30 Pix grátis por mês.';
   static const withdrawalHowTitle = 'Como funciona';
   static const withdrawalHowCard =
-      'Pagamento por Pix entra na subconta assim que compensa e pode ser sacado. Pagamento no cartão fica em A receber e costuma entrar em cerca de 30 dias, na data que o PagBank informa.';
+      'Depois que o grupo confirma, o valor cai na conta PagBank da casa. O envio para outro banco é a Transferência Automática no PagBank.';
   static const withdrawalHowDocs =
       'Os documentos da subconta precisam estar aprovados para o saque ligar.';
   static const withdrawalsUnavailable = 'Os saques ainda não estão liberados.';
   static const payoutsPaused =
-      'Os saques pelo EscapeMatch estão desligados. O dinheiro cai na conta PagBank da casa e pode ser sacado pelo aplicativo do PagBank.';
+      'O dinheiro cai na conta PagBank da casa depois que o grupo confirma. O saque para o seu banco é a Transferência Automática no PagBank.';
   static const withdrawalsLoading = 'Carregando saques';
   static const withdrawalsLoadError = 'Não foi possível carregar os saques.';
   static const availableLabel = 'Disponível para saque';

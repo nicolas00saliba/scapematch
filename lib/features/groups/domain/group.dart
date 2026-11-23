@@ -111,7 +111,7 @@ class Group {
   /// Capa da sala. Vazio quando o grupo de teste não trouxe foto.
   final String coverAsset;
 
-  /// Falso enquanto a casa não tem subconta e conta bancária.
+  /// Falso enquanto a casa não tem conta PagBank.
   final bool houseAcceptsPayment;
 
   int get openSeats =>

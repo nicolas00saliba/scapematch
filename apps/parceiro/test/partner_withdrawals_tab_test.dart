@@ -32,14 +32,11 @@ void main() {
       expect(find.text(PartnerMessages.balanceTitle), findsNothing);
       expect(find.byKey(PartnerKeys.withdrawals), findsOneWidget);
       expect(find.text(PartnerMessages.withdrawalsTitle), findsNWidgets(2));
-      expect(
-        find.text(PartnerMessages.withdrawalBalanceSection),
-        findsOneWidget,
-      );
-      expect(find.text(PartnerMessages.withdrawalHistory), findsOneWidget);
-      expect(find.text(PartnerMessages.withdrawalBank), findsOneWidget);
-      expect(find.text(PartnerMessages.withdrawalHowTitle), findsOneWidget);
-      expect(find.byKey(PartnerKeys.withdrawalSubmit), findsOneWidget);
+      expect(find.text(PartnerMessages.receiveStepsTitle), findsOneWidget);
+      expect(find.text(PartnerMessages.receiveStepDestination), findsOneWidget);
+      expect(find.byKey(PartnerKeys.receiveOpenPagBank), findsOneWidget);
+      expect(find.byKey(PartnerKeys.withdrawalSubmit), findsNothing);
+      expect(find.text(PartnerMessages.withdrawalBank), findsNothing);
       if (size.width >= 960) {
         expect(
           tester
@@ -61,7 +58,7 @@ void main() {
       await tester.ensureVisible(find.text(PartnerMessages.balance));
       await tester.tap(find.text(PartnerMessages.balance));
       await tester.pumpAndSettle();
-      expect(find.byKey(PartnerKeys.withdrawalSubmit), findsNothing);
+      expect(find.byKey(PartnerKeys.receiveOpenPagBank), findsNothing);
       expect(find.byKey(PartnerKeys.openWithdrawals), findsOneWidget);
     });
   }

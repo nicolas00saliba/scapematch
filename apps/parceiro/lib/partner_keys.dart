@@ -151,6 +151,7 @@ abstract final class PartnerKeys {
   static const partnerTimeBoard = Key('partner-time-board');
   static const partnerReviewReply = Key('partner-review-reply');
   static const withdrawals = Key('venue-withdrawals');
+  static const receiveOpenPagBank = Key('venue-receive-open-pagbank');
   static const withdrawalsTab = Key('partner-tab-withdrawals');
   static const openWithdrawals = Key('partner-open-withdrawals');
   static const claimOpenWithdrawals = Key('venue-claim-open-withdrawals');

@@ -38,13 +38,13 @@ Não gravar:
 - `PAGBANK_BASE_URL`: não escolhe o host.
 - `PAGBANK_WEBHOOK_EMAIL`: a PagBank não pede e-mail no webhook de Pedidos. O saque está desligado e não cadastra webhook.
 
-O saque da casa fica desligado no código (`venue_payouts_enabled` não liga transferência) até um PR próprio. No Parceiro, a aba Saques explica que o dinheiro cai na conta PagBank da casa e pode ser sacado pelo aplicativo do PagBank. A doc de transferência pede liberação comercial, mTLS e `notification_urls` no próprio POST. O cadastro antigo, com `authToken`, e-mail e `TRANSFER_*`, não é usado.
+O saque pelo EscapeMatch continua desligado (`venuePayoutsForcedOff`). A casa recebe na conta PagBank do Connect. Para o banco dela, a pessoa liga a Transferência Automática no PagBank, numa conta de qualquer banco com o mesmo CNPJ ou CPF. A API documentada não cadastra essa conta nem transfere com o token da casa. A tela do Parceiro explica o passo a passo e não pede dados bancários. `venue_finance_ready` é aprovada, não suspensa e com `pagbank_account_id`. Não exige `venue_bank_accounts`.
 
 ## Ordem para publicar
 
 Não aplicar isto daqui. O dono aprova.
 
-1. Migration `20261123190000_pagbank.sql` no projeto `eujlhicairvksvmssruz`. Ela só adiciona colunas, gatilhos e funções. Não apaga coluna nem tabela.
+1. Migrations no projeto `eujlhicairvksvmssruz`, nesta ordem: `20261123190000_pagbank.sql` e `20261123230000_venue_ready_without_bank.sql`. As duas só substituem funções e acrescentam. Não apagam coluna nem tabela. A segunda tira `venue_bank_accounts` de `venue_finance_ready` e de `list_due_venue_payouts`.
 2. Segredos acima.
 3. As 17 funções do mesmo commit: `pagbank-webhook`, `pagbank-transfer-webhook`, `pagbank-connect`, `create-charge`, `settle-charges`, `tokenize-card`, `provision-venue-wallet`, `venue-payouts`, `payments-readiness`, `reconcile-payments`, `ledger-reconcile`, `cancel-house-group`, `configure-venue-fiscal`, `schedule-venue-withdrawals`, `venue-documents`, `invoice-document`, `venue-claim`. `invoice-document` importa `_shared/pagbank_client_error.ts` e `_shared/http.ts`. `venue-claim` importa `_shared/http.ts` e `_shared/venue_claim.ts`.
 4. Não depende do painel. Cada pedido já manda `notification_urls` para `pagbank-webhook`, e `reconcile-payments` relê o Pix pendente. Só então despublicar `asaas-webhook` e `asaas-transfer-webhook`.

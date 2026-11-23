@@ -272,14 +272,13 @@ export async function createCharge(
     const blocked = paymentBlock({
       status: (venue?.status as string | null) ?? null,
       walletId: (venue?.pagbank_account_id as string | null) ?? null,
-      hasBankAccount: true,
     });
     if (!venue || blocked) {
       return json({
         error: blocked ?? "A casa ainda não tem subconta PagBank.",
       }, 409);
     }
-    // service_role não lê venue_bank_accounts. A função vê a conta.
+    // Pronta é aprovada, não suspensa e com pagbank_account_id.
     const { data: ready, error: readyError } = await admin.rpc(
       "venue_finance_ready",
       { p_venue_id: group.venue_id },

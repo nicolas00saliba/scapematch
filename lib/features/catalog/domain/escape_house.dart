@@ -29,7 +29,7 @@ class EscapeHouse {
   /// segue verdadeira para não esconder sala de exemplo.
   final bool receivesPayments;
 
-  /// Falso sem subconta ou sem conta bancária. A casa continua na vitrine.
+  /// Falso sem conta PagBank. A casa continua na vitrine.
   final bool financeReady;
 
   /// Ordem de destaque escolhida no Admin. Nulo fica na ordem comum.
@@ -42,8 +42,8 @@ bool venueReceivesGroups(Map<dynamic, dynamic> row) {
   return row['receives_payments'] != false;
 }
 
-/// Sem a coluna, a demonstração segue podendo pagar. No banco, as duas
-/// contas precisam existir.
+/// Sem a coluna, a demonstração segue podendo pagar. No banco, basta a
+/// conta PagBank da casa.
 bool venueFinanceReady(Map<dynamic, dynamic> row) {
   if (!row.containsKey('finance_ready')) return venueReceivesGroups(row);
   return row['finance_ready'] == true;

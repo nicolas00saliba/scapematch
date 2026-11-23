@@ -32,39 +32,14 @@ void main() {
     );
     await _shot(tester, dir, 'saldo-saques-celular.png', panel: true);
 
-    await tester.enterText(find.byKey(PartnerKeys.withdrawalAmount), '80,00');
-    await tester.tap(find.byKey(PartnerKeys.withdrawalSubmit));
-    await tester.pumpAndSettle();
-    await _shot(
-      tester,
-      dir,
-      'saldo-saques-senha.png',
-      panel: true,
-      includeDialog: true,
-    );
-
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     await _pump(
       tester,
       MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
-      const Size(412, 3200),
-      Brightness.light,
-    );
-    await tester.tap(find.text(PartnerMessages.withdrawalChangeBank));
-    await tester.pumpAndSettle();
-    await _shot(tester, dir, 'saldo-saques-conta.png', panel: true);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    await _pump(
-      tester,
-      MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
-      const Size(1280, 2400),
+      const Size(1280, 900),
       Brightness.dark,
     );
-    await tester.tap(find.byType(Switch));
-    await tester.pumpAndSettle();
     await _shot(tester, dir, 'saldo-saques-desktop.png', panel: true);
 
     await tester.pumpWidget(const SizedBox.shrink());

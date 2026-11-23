@@ -23,11 +23,11 @@ O código de 6 dígitos sai só para `venues.official_email` e `venues.official_
 
 O envio usa Resend (`RESEND_API_KEY` e `CLAIM_MAIL_FROM` ou `PAYOUT_MAIL_FROM`). SMS só entra se `VENUE_CLAIM_SMS_URL` for `https` e `VENUE_CLAIM_SMS_TOKEN` existir. Sem entrega, o código é consumido e o pedido vai para a fila manual.
 
-## Subconta e conta bancária
+## Subconta PagBank
 
-Depois do código, o checklist segue nesta ordem, cada item com status: subconta PagBank (`provision-venue-wallet`, também para o dono da própria casa quando `pagbank_account_id` está vazio), documentos da subconta (`VenueDocumentsCard`, função `venue-documents`) e chave Pix. A chave se cadastra na aba Saques. O status da subconta usa `receives_payments` (coluna gerada: `pagbank_account_id` preenchido, sem entregar a wallet). Os documentos carregam quando essa coluna é verdadeira, mesmo sem chave Pix. O status da chave continua em `venue_finance_ready`. Se a subconta já existe, `provision-venue-wallet` responde `{ provisioned: [] }` e não chama o PagBank de novo. Sem migration nova. A função `venue-documents` continua a publicar à parte, como no #133.
+O checklist segue nesta ordem: subconta PagBank (`provision-venue-wallet`, também para o dono da própria casa quando `pagbank_account_id` está vazio), documentos da subconta (`VenueDocumentsCard`, função `venue-documents`) e o recebimento no banco. O status da subconta usa `receives_payments` (coluna gerada: `pagbank_account_id` preenchido, sem entregar a wallet). Os documentos carregam quando essa coluna é verdadeira. A casa pronta é `venue_finance_ready`: aprovada, não suspensa e com `pagbank_account_id`. Não exige linha em `venue_bank_accounts`. O saque para outro banco é a Transferência Automática no PagBank, no mesmo CNPJ ou CPF. A tela do Parceiro explica isso e não pede dados bancários.
 
-`public.venue_finance_ready` é verdadeiro só com casa aprovada, não suspensa, subconta preenchida e linha em `venue_bank_accounts`. A vitrine expõe `finance_ready`. `create-charge` chama essa função (a service role não lê `venue_bank_accounts`) e responde 409 sem subconta ou sem conta bancária. Saque já recusava os dois. O botão de pagar no app jogador e o aviso no Parceiro seguem essa função. A casa continua na vitrine: o catálogo não some só porque o recebimento está desligado.
+A vitrine expõe `finance_ready`. `create-charge` chama essa função e responde 409 sem conta PagBank. A casa continua na vitrine: o catálogo não some só porque o recebimento está desligado.
 
 ## Admin
 
