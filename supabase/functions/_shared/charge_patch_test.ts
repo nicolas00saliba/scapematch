@@ -132,13 +132,22 @@ Deno.test("a migração trava a cobrança e falha se houver duplicata", async ()
 });
 
 Deno.test("o webhook confirma no PagBank e usa a transição", async () => {
-  const source = await Deno.readTextFile(
+  const webhook = await Deno.readTextFile(
     new URL("../pagbank-webhook/index.ts", import.meta.url),
   );
+  const source = await Deno.readTextFile(
+    new URL("./charge_notice.ts", import.meta.url),
+  );
+  assert(webhook.includes("applyPagBankNotice"));
+  assert(webhook.includes("PAGBANK_TOKEN"));
   assert(source.includes("getPayment"));
   assert(source.includes("paymentRefForRead"));
   assert(source.includes("applyPaymentTransition"));
   assert(source.includes("releasePaidIfClosed"));
+  assert(source.includes("pollPendingPagBankCharges"));
+  assertEquals(webhook.includes("PAYMENT_RECEIVED"), false);
+  assertEquals(webhook.includes("billingType"), false);
+  assertEquals(webhook.includes("note_split_divergence"), false);
   assertEquals(source.includes("PAYMENT_RECEIVED"), false);
   assertEquals(source.includes("billingType"), false);
   assertEquals(source.includes("note_split_divergence"), false);

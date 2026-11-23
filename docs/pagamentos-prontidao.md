@@ -19,7 +19,7 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 | `pagbank_api_key` | env `PAGBANK_TOKEN` não vazia |
 | `pagbank_base_url_production` | `PAGBANK_ENV` ausente ou `production` (base `https://api.pagseguro.com`). `sandbox` conta como não |
 | `pagbank_webhook_token` | env `PAGBANK_WEBHOOK_SECRET` não vazia |
-| `pagbank_webhook_email` | env `PAGBANK_WEBHOOK_EMAIL` não vazia |
+| `pagbank_webhook_email` | não é exigido. `PAGBANK_WEBHOOK_EMAIL` não entra no webhook de Pedidos |
 | `venue_withdrawals_secret` | env `VENUE_WITHDRAWALS_SECRET` não vazia, ou Vault `venue_withdrawals_secret` não vazio |
 | `ledger_reconcile_secret` | env `LEDGER_RECONCILE_SECRET` não vazia, ou Vault `ledger_reconcile_secret` não vazio |
 | `vault_venue_withdrawals_url` | Vault `venue_withdrawals_url` não vazio |
@@ -43,8 +43,7 @@ Trocar os placeholders. Não gravar os valores no git. A base de produção é `
 supabase secrets set --project-ref <project-ref> \
   PAGBANK_TOKEN='<chave da conta PagBank de produção>' \
   PAGBANK_ENV='production' \
-  PAGBANK_WEBHOOK_SECRET='<token de 32 a 255 caracteres, sem espaço>' \
-  PAGBANK_WEBHOOK_EMAIL='<email que o PagBank usa no webhook>' \
+  PAGBANK_WEBHOOK_SECRET='<opcional; se vazio, a assinatura usa PAGBANK_TOKEN>' \
   VENUE_WITHDRAWALS_SECRET='<segredo longo, o mesmo do Vault>'
 ```
 

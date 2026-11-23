@@ -249,11 +249,13 @@ export function webhookEmail(env: EnvLike): string {
   return email;
 }
 
-/// authToken do PagBank: 32 a 255, sem espaço, e não pode ser a apiKey.
+/// Segredo da assinatura. O padrão é o token da conta. O secret só substitui.
 export function webhookAuthToken(env: EnvLike, apiKey = ""): string {
-  const token = env.get("PAGBANK_WEBHOOK_SECRET") ?? "";
+  const override = env.get("PAGBANK_WEBHOOK_SECRET") ?? "";
+  const token = override.length > 0
+    ? override
+    : (env.get("PAGBANK_TOKEN") ?? apiKey);
   if (token.length < 32 || token.length > 255 || /\s/.test(token)) return "";
-  if (apiKey.length > 0 && token === apiKey) return "";
   return token;
 }
 

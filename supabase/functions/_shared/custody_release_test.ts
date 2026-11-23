@@ -1,6 +1,8 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   finishCapturedCard,
+  maxCustodyReleaseAttempts,
+  releaseHeldSplit,
   releasePaidIfClosed,
   retryPendingCustodyReleases,
 } from "./custody_release.ts";
@@ -34,6 +36,12 @@ function adminFor(rows: Record<string, unknown>[]) {
           return self;
         },
         limit() {
+          return self;
+        },
+        order() {
+          return self;
+        },
+        or() {
           return self;
         },
         maybeSingle() {
@@ -160,12 +168,36 @@ Deno.test("o cron repete a custódia que falhou", async () => {
   assertEquals(releases, ["SPLI_RETRY"]);
 });
 
+Deno.test("a custódia para depois do limite e alerta", async () => {
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (line?: unknown) => {
+    lines.push(String(line ?? ""));
+  };
+  try {
+    const admin = adminFor([]);
+    const ok = await releaseHeldSplit(admin, {
+      releaseCustody: () => Promise.reject(new Error("PagBank 500: indisponivel")),
+    }, {
+      id: chargeId,
+      provider_split_id: "SPLI_CARD",
+      custody_release_attempts: maxCustodyReleaseAttempts - 1,
+    });
+    assertEquals(ok, false);
+    const last = admin.updates.at(-1);
+    assertEquals(last?.custody_release_attempts, maxCustodyReleaseAttempts);
+    assert(lines.some((line) => line.includes("custody_release_exhausted")));
+  } finally {
+    console.error = original;
+  }
+});
+
 Deno.test("create-charge e o webhook usam a liberação da custódia", async () => {
   const charge = await Deno.readTextFile(
     new URL("../create-charge/index.ts", import.meta.url),
   );
   const webhook = await Deno.readTextFile(
-    new URL("../pagbank-webhook/index.ts", import.meta.url),
+    new URL("./charge_notice.ts", import.meta.url),
   );
   const settle = await Deno.readTextFile(
     new URL("../settle-charges/index.ts", import.meta.url),

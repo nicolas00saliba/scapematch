@@ -4,7 +4,7 @@ O EscapeMatch cobra só pela PagBank, em produção (`https://api.pagseguro.com`
 
 ## O que o dinheiro faz
 
-O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. A custódia (`custody.apply`, status HELD) segura a casa e a EscapeMatch. A confirmação chama `POST /splits/{id}/release-custody`. O cartão grava o `splitId` da autorização e solta a custódia também na captura imediata, quando o grupo já confirmou. Se a liberação falha, a cobrança guarda `custody_release_failed_at` e `settle-charges` e `reconcile-payments` tentam de novo. Pix pago depois da confirmação solta a custódia no webhook. O Pix estornado pode sair do saldo HELD. O cartão nasce com `capture: false` e só é capturado na confirmação (até 29 dias).
+O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. A custódia (`custody.apply`, status HELD) segura a casa e a EscapeMatch. A confirmação chama `POST /splits/{id}/release-custody`. O cartão grava o `splitId` da autorização e solta a custódia também na captura imediata, quando o grupo já confirmou. Se a liberação falha, a cobrança guarda `custody_release_failed_at` e soma `custody_release_attempts`. `settle-charges` e `reconcile-payments` tentam de novo, do mais antigo, só com o grupo já confirmado, e param depois de 8 falhas com o alerta `custody_release_exhausted`. Pix pago depois da confirmação solta a custódia no webhook. Cada pedido manda `notification_urls` com a URL do `pagbank-webhook`. A consulta periódica relê o Pix pendente na PagBank e aplica o mesmo caminho. O Pix estornado pode sair do saldo HELD. O cartão nasce com `capture: false` e só é capturado na confirmação (até 29 dias).
 
 A casa recebe a parte dela sobre o valor bruto, em centavos fixos. A taxa da PagBank sai só da comissão da conta primária (EscapeMatch). A comissão continua o campo por casa no Admin. Não há percentual fixo no código. Se a comissão for menor que a taxa, o saldo da conta primária cobre a diferença. A casa não é reduzida.
 
@@ -16,16 +16,27 @@ A PagBank não emite NFS-e. As linhas fiscais continuam `scheduled`. Nada chama 
 
 Só por ambiente. Não commitar e não logar.
 
-- `PAGBANK_TOKEN`: token da conta primária.
-- `PAGBANK_ENV=production`. A base da API sai daqui: produção é `https://api.pagseguro.com`. Sandbox só com `PAGBANK_ENV=sandbox`. `PAGBANK_BASE_URL` não é usada.
+Obrigatórios:
+
+- `PAGBANK_TOKEN`: token da conta primária. A assinatura do webhook é SHA-256 hex de `{token}-{corpo cru}`.
+- `PAGBANK_ENV=production`. A base da API sai daqui: produção é `https://api.pagseguro.com`. Sandbox só com `PAGBANK_ENV=sandbox`.
 - `PAGBANK_ACCOUNT_ID`: `ACCO_` da EscapeMatch. É quem paga as taxas.
-- `PAGBANK_WEBHOOK_SECRET`: se vazio, a assinatura usa `PAGBANK_TOKEN`. Header `x-authenticity-token` = SHA-256 hex de `{segredo}-{corpo cru}`.
 - `PAGBANK_CONNECT_CLIENT_ID`, `PAGBANK_CONNECT_CLIENT_SECRET`.
 - `PAGBANK_CONNECT_REDIRECT_URI`: `https://parceiro.escapematch.com.br/pagbank/retorno`. O host tem de servir o `index.html` do Parceiro nesse caminho.
+
+Opcionais:
+
+- `PAGBANK_WEBHOOK_SECRET`: só se a assinatura tiver de usar outro segredo no lugar do `PAGBANK_TOKEN`. Pode ser igual ao token.
 - `PAGBANK_CONNECT_ADMIN_REDIRECT_URI`: `https://admin.escapematch.com.br/pagbank/retorno`, se o Admin também abre o Connect. Sem ela, o Admin usa a URI do Parceiro.
 - `PAGBANK_POINTS_RESERVE_ACCOUNT_ID` e `PAGBANK_POINTS_RESERVE_TOKEN`, se a reserva de pontos tiver conta própria.
+- `PAGBANK_ROOT_WALLET_ID`: conta que recebe a sobra da reserva de pontos. Sem ela, essa perna não sai.
 
-Transferência Pix em produção pode exigir mTLS. O certificado não entra no repositório.
+Não gravar:
+
+- `PAGBANK_BASE_URL`: não escolhe o host.
+- `PAGBANK_WEBHOOK_EMAIL`: a PagBank não pede e-mail no webhook de Pedidos. O saque está desligado e não cadastra webhook.
+
+O saque da casa fica desligado no código (`venue_payouts_enabled` não liga transferência) até um PR próprio. A doc de transferência pede liberação comercial, mTLS e `notification_urls` no próprio POST. O cadastro antigo, com `authToken`, e-mail e `TRANSFER_*`, não é usado.
 
 ## Ordem para publicar
 
@@ -33,8 +44,8 @@ Não aplicar isto daqui. O dono aprova.
 
 1. Migration `20261123190000_pagbank.sql` no projeto `eujlhicairvksvmssruz`. Ela só adiciona colunas, gatilhos e funções. Não apaga coluna nem tabela.
 2. Segredos acima.
-3. Funções, nesta ordem: `pagbank-webhook`, `pagbank-connect`, `create-charge`, `settle-charges`, `tokenize-card`, `provision-venue-wallet`, `venue-payouts`, `payments-readiness`, `reconcile-payments`, `ledger-reconcile`.
-4. Cadastrar a URL do `pagbank-webhook` no painel. Só então despublicar `asaas-webhook` e `asaas-transfer-webhook`.
+3. Funções do mesmo commit: `pagbank-webhook`, `pagbank-transfer-webhook`, `pagbank-connect`, `create-charge`, `settle-charges`, `tokenize-card`, `provision-venue-wallet`, `venue-payouts`, `payments-readiness`, `reconcile-payments`, `ledger-reconcile`, `cancel-house-group`, `configure-venue-fiscal`, `schedule-venue-withdrawals`, `venue-documents`. `invoice-document` e `venue-claim` não importam o `_shared` alterado.
+4. Não depende do painel. Cada pedido já manda `notification_urls` para `pagbank-webhook`, e `reconcile-payments` relê o Pix pendente. Só então despublicar `asaas-webhook` e `asaas-transfer-webhook`.
 
 ## Connect da casa
 

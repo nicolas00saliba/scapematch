@@ -13,7 +13,14 @@ alter table public.payment_charges
   add column if not exists provider_fee_cents integer,
   add column if not exists provider_split_id text,
   add column if not exists custody_released_at timestamptz,
-  add column if not exists custody_release_failed_at timestamptz;
+  add column if not exists custody_release_failed_at timestamptz,
+  add column if not exists custody_release_attempts integer not null default 0;
+
+alter table public.payment_charges
+  drop constraint if exists payment_charges_custody_attempts_nonnegative;
+alter table public.payment_charges
+  add constraint payment_charges_custody_attempts_nonnegative
+  check (custody_release_attempts >= 0);
 
 alter table public.payment_charges
   drop constraint if exists payment_charges_provider_fee_nonnegative;

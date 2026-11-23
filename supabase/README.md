@@ -106,7 +106,7 @@ Segredos, no painel da função (nunca no repositório):
 | --- | --- |
 | `PAGBANK_TOKEN` | token da conta primária |
 | `PAGBANK_ENV` | `production`. A base fica `https://api.pagseguro.com`. `sandbox` usa `https://sandbox.api.pagseguro.com`. `PAGBANK_BASE_URL` não escolhe o host. |
-| `PAGBANK_WEBHOOK_SECRET` | string sua, de 32 a 255 caracteres, sem espaço. Não use a API key. |
+| `PAGBANK_WEBHOOK_SECRET` | opcional. Se vazio, a assinatura usa `PAGBANK_TOKEN`. Pode ser o mesmo valor. |
 | `PAGBANK_CONNECT_EMAIL_DOMAIN` | opcional. Domínio do alias da subconta (`parceiros+<venue_id>@domínio`). Sem a variável, usa `escapematch.com.br` e registra um aviso no log. Um valor que não é domínio também cai nesse fallback, com aviso. |
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` a plataforma já injeta na função.
@@ -125,10 +125,10 @@ supabase functions deploy cancel-house-group
 supabase functions deploy pagbank-webhook --no-verify-jwt
 supabase functions deploy configure-venue-fiscal
 supabase functions deploy invoice-document
-supabase secrets set PAGBANK_TOKEN=… PAGBANK_ENV=production PAGBANK_WEBHOOK_SECRET=…
+supabase secrets set PAGBANK_TOKEN=… PAGBANK_ENV=production
 ```
 
-No painel da PagBank, o webhook aponta para `https://eujlhicairvksvmssruz.supabase.co/functions/v1/pagbank-webhook` com o mesmo token. A notificação traz o status da cobrança (`PAID`, `AUTHORIZED`, `CANCELED`, `DECLINED`, `REFUNDED`).
+Cada pedido manda `notification_urls` para `https://eujlhicairvksvmssruz.supabase.co/functions/v1/pagbank-webhook`. Não precisa cadastrar a URL no painel. A assinatura é SHA-256 de `{PAGBANK_TOKEN}-{corpo cru}`. A notificação traz o status da cobrança (`PAID`, `AUTHORIZED`, `CANCELED`, `DECLINED`, `REFUNDED`). `reconcile-payments` relê o que ficar pendente.
 
 A EscapeMatch Demo não recebe `walletId` no SQL. Com a chave já gravada, entre como admin e chame `provision-venue-wallet` sem `venue_id` (ou com o id da demo). Ela cria a subconta sandbox. O sandbox limita 20 subcontas por dia. Estornar um Pix logo depois de pago pode falhar se a taxa do PagBank deixar o saldo insuficiente: deixe saldo na conta raiz do sandbox.
 

@@ -2,34 +2,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure, logCaught } from "../_shared/pagbank_client_error.ts";
 import {
   PagBankProvider,
-  isPagBankSandbox,
-  pagbankApiBaseUrl,
   pagbankSignatureMatches,
 } from "../_shared/pagbank_provider.ts";
-import { releasePaidIfClosed } from "../_shared/custody_release.ts";
-import { bandConfirmed } from "../_shared/group_band.ts";
+import { applyPagBankNotice } from "../_shared/charge_notice.ts";
 import { bindJson } from "../_shared/http.ts";
-import {
-  cancelInvoicesForCharge,
-  issuePaidInvoices,
-} from "../_shared/issue_invoices.ts";
-import {
-  confirmedChargeStatus,
-  movesMoney,
-  paymentRefForRead,
-  requestedChargeStatus,
-} from "../_shared/charge_patch.ts";
-import { applyPaymentTransition } from "../_shared/ledger.ts";
-import { syncPayerDocument } from "../_shared/payer_document.ts";
-import { settlePaidChargeReserve } from "../_shared/points_reserve.ts";
 
 Deno.serve(async (req) => {
   // Servidor a servidor: a resposta segue mesmo sem o header de navegador.
   const json = bindJson(req);
   if (req.method !== "POST") return json({ error: "method" }, 405);
   const raw = await req.text();
-  const expected = Deno.env.get("PAGBANK_WEBHOOK_SECRET") ||
-    Deno.env.get("PAGBANK_TOKEN");
+  const override = (Deno.env.get("PAGBANK_WEBHOOK_SECRET") ?? "").trim();
+  const expected = override || (Deno.env.get("PAGBANK_TOKEN") ?? "").trim();
   const header = req.headers.get("x-authenticity-token");
   if (!await pagbankSignatureMatches(header, expected, raw)) {
     return json({ error: "unauthorized" }, 401);
@@ -60,67 +44,14 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!charge) return json({ ok: true });
 
-    const requested = requestedChargeStatus("", paymentStatus);
-    if (!requested) return json({ ok: true });
-
-    let next = requested;
-    const confirmRemote = movesMoney(requested) || requested === "cancelled" ||
-      requested === "failed";
-    if (confirmRemote) {
-      const providerRef = paymentRefForRead(charge.provider_ref, paymentId);
-      if (!providerRef) throw new Error("ledger_write_failed");
-      const pagbank = PagBankProvider.fromEnv(Deno.env);
-      const remote = await pagbank.getPayment(providerRef);
-      const confirmed = confirmedChargeStatus(remote.status);
-      if (!confirmed) throw new Error("ledger_write_failed");
-      next = confirmed;
-    }
-
-    const credit = next === "paid" &&
-      await groupIsClosed(admin, charge.group_id);
-    if (next === "paid") {
-      await syncPayerDocument(admin, safePagBank(), {
-        id: charge.id,
-        user_id: charge.user_id,
-        billing_type: charge.billing_type,
-        provider_ref: charge.provider_ref,
-      });
-    }
-    const result = await applyPaymentTransition(admin, charge.id, next, credit);
-    const status = result.status;
-
-    const sandbox = isPagBankSandbox(pagbankApiBaseUrl(Deno.env));
-    const pagbank = sandbox ? undefined : safePagBank();
-    if (status === "paid") {
-      const live = pagbank ?? safePagBank();
-      if (live) {
-        await releasePaidIfClosed({
-          admin,
-          pagbank: live,
-          charge,
-          groupClosed: credit,
-        }).catch((error) => {
-          logCaught("custody_release_failed", error);
-        });
-      }
-      await settlePaidChargeReserve(admin, Deno.env, charge.id).catch(
-        (error) => {
-          logCaught("pagbank-webhook", error);
-        },
-      );
-      await issuePaidInvoices(admin, charge, { sandbox, pagbank }).catch(
-        (error) => {
-          logCaught("pagbank-webhook", error);
-        },
-      );
-    }
-    if (status === "refunded") {
-      await cancelInvoicesForCharge(admin, charge.id, { sandbox, pagbank }).catch(
-        (error) => {
-          logCaught("pagbank-webhook", error);
-        },
-      );
-    }
+    const pagbank = PagBankProvider.fromEnv(Deno.env);
+    await applyPagBankNotice({
+      admin,
+      env: Deno.env,
+      pagbank,
+      charge,
+      paymentStatus,
+    });
     return json({ ok: true });
   } catch (error) {
     const failure = clientFailure(error, "pagbank-webhook");
@@ -147,33 +78,4 @@ async function noteWebhookError(
   } catch (error) {
     logCaught("pagbank-webhook", error);
   }
-}
-
-function safePagBank(): PagBankProvider | undefined {
-  try {
-    return PagBankProvider.fromEnv(Deno.env);
-  } catch (error) {
-    logCaught("pagbank-webhook", error);
-    return undefined;
-  }
-}
-
-async function groupIsClosed(
-  admin: ReturnType<typeof createClient>,
-  groupId: string,
-): Promise<boolean> {
-  const { data: group } = await admin
-    .from("groups")
-    .select(
-      "cancelled_at, confirmed_at, closed_at, closes_at, total_spots, minimum_spots",
-    )
-    .eq("id", groupId)
-    .maybeSingle();
-  if (!group) return false;
-  const { count } = await admin
-    .from("group_members")
-    .select("id", { count: "exact", head: true })
-    .eq("group_id", groupId)
-    .neq("attendance", "cancelled");
-  return bandConfirmed(group, count ?? 0);
 }

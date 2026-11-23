@@ -15,7 +15,12 @@ export type CustodyCharge = {
   id: string;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
+  custody_release_attempts?: number | null;
+  created_at?: string | null;
 };
+
+/// Depois disto o cron para e o log custody_release_exhausted alerta.
+export const maxCustodyReleaseAttempts = 8;
 
 export async function rememberSplitId(
   admin: Admin,
@@ -75,13 +80,24 @@ export async function releaseHeldSplit(
     if (error) logCaught("custody-release", error);
     return true;
   } catch (error) {
+    const attempts = nextCustodyAttempt(charge.custody_release_attempts);
     const failed = await admin.from("payment_charges").update({
       custody_release_failed_at: new Date().toISOString(),
+      custody_release_attempts: attempts,
     }).eq("id", charge.id);
     if (failed.error) logCaught("custody-release", failed.error);
     logCaught("custody_release_failed", error);
+    if (attempts >= maxCustodyReleaseAttempts) {
+      logCaught("custody_release_exhausted", error);
+    }
     return false;
   }
+}
+
+function nextCustodyAttempt(current: number | null | undefined): number {
+  const value = Number(current ?? 0);
+  if (!Number.isInteger(value) || value < 0) return 1;
+  return value + 1;
 }
 
 /// Cobrança paga, com split, ainda sem custódia solta. O cron chama isto.
@@ -92,16 +108,28 @@ export async function retryPendingCustodyReleases(
   if (typeof admin?.from !== "function") return 0;
   const { data, error } = await admin
     .from("payment_charges")
-    .select("id, group_id, provider_split_id, status, custody_released_at")
+    .select(
+      "id, group_id, provider_split_id, status, custody_released_at, custody_release_attempts, created_at, groups!inner(confirmed_at, closed_at, cancelled_at)",
+    )
     .eq("status", "paid")
     .is("custody_released_at", null)
     .not("provider_split_id", "is", null)
+    .or(
+      `custody_release_attempts.is.null,custody_release_attempts.lt.${maxCustodyReleaseAttempts}`,
+    )
+    .or("confirmed_at.not.is.null,closed_at.not.is.null", {
+      referencedTable: "groups",
+    })
+    .order("created_at", { ascending: true })
     .limit(40);
   if (error || !Array.isArray(data)) return 0;
   let released = 0;
   for (const row of data) {
     const charge = row as CustodyCharge & { group_id?: string };
     if (!charge.group_id) continue;
+    if ((charge.custody_release_attempts ?? 0) >= maxCustodyReleaseAttempts) {
+      continue;
+    }
     if (!await groupIsClosed(admin, charge.group_id)) continue;
     if (await releaseHeldSplit(admin, pagbank, charge)) released += 1;
   }

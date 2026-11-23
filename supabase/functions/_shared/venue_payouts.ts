@@ -27,6 +27,12 @@ import { bindJson, corsHeadersFor, todayInSaoPaulo } from "./http.ts";
 
 const reauthWindowSec = 300;
 
+/// A transferência Pix da PagBank pede liberação comercial e mTLS.
+/// O aviso vai em notification_urls no próprio POST /transfers.
+/// O cadastro com authToken, e-mail e TRANSFER_* não é dessa API.
+/// Saque fica desligado até um PR próprio.
+export const venuePayoutsForcedOff = true;
+
 const knownErrors = [
   "titularidade",
   "saldo",
@@ -272,6 +278,9 @@ export async function handleVenuePayouts(
       return json(await loadSnapshot(deps, actor, claims, venueId));
     }
     if (action === "withdraw") {
+      if (venuePayoutsForcedOff) {
+        return json({ error: "saques_desligados" }, 403);
+      }
       const amount = integerOrNull(body?.amount_cents);
       if (amount == null || amount <= 0) return json({ error: "valor" }, 400);
       const result = await sendWithdrawal(deps, {
@@ -301,13 +310,11 @@ export async function handleTransferWebhook(
   const json = bindJson(req, deps.env);
   if (req.method !== "POST") return json({ error: "method" }, 405);
   const raw = await req.text();
-  const secret = deps.env.get("PAGBANK_WEBHOOK_SECRET") ||
-    deps.env.get("PAGBANK_TOKEN");
-  const authentic = await pagbankSignatureMatches(
-    req.headers.get("x-authenticity-token"),
-    secret,
-    raw,
-  );
+  const header = req.headers.get("x-authenticity-token");
+  const override = (deps.env.get("PAGBANK_WEBHOOK_SECRET") ?? "").trim();
+  const platform = override || (deps.env.get("PAGBANK_TOKEN") ?? "").trim();
+  const authentic = await pagbankSignatureMatches(header, platform, raw) ||
+    await venueSignatureMatches(deps, header, raw);
   if (!authentic) return json({ error: "unauthorized" }, 401);
   let transferId = "";
   try {
@@ -377,6 +384,10 @@ export async function handleScheduledWithdrawals(
     return json({ error: "not authenticated" }, 401);
   }
   try {
+    if (venuePayoutsForcedOff) {
+      const reconciled = await reconcileStaleWithdrawals(deps);
+      return json({ ok: true, created: 0, webhooks: 0, reconciled });
+    }
     const webhooks = await syncTransferWebhooks(deps);
     const reconciled = await reconcileStaleWithdrawals(deps);
     const enabled = await deps.store.rpc("venue_payouts_enabled", {});
@@ -416,6 +427,34 @@ export async function handleScheduledWithdrawals(
   } catch (error) {
     const failure = clientFailure(error, "schedule-venue-withdrawals");
     return json(failure.body, failure.status);
+  }
+}
+
+async function venueSignatureMatches(
+  deps: PayoutDeps,
+  header: string | null,
+  raw: string,
+): Promise<boolean> {
+  try {
+    const payload = JSON.parse(raw) as Record<string, unknown>;
+    const reference = text(payload.reference_id);
+    if (!reference) return false;
+    const venueId = text(await deps.store.rpc("transfer_ref_venue", {
+      p_reference: reference,
+    }));
+    if (!venueId) return false;
+    const session = record(await deps.store.rpc("read_venue_pagbank_tokens", {
+      p_venue_id: venueId,
+    }));
+    let access = text(session?.access_token);
+    if (!access) {
+      access = text(await deps.store.rpc("read_venue_provider_key", {
+        p_venue_id: venueId,
+      }));
+    }
+    return await pagbankSignatureMatches(header, access, raw);
+  } catch {
+    return false;
   }
 }
 

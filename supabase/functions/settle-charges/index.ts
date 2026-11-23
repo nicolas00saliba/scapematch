@@ -3,6 +3,7 @@ import { clientFailure } from "../_shared/pagbank_client_error.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { retryPendingCustodyReleases } from "../_shared/custody_release.ts";
+import { pollPendingPagBankCharges } from "../_shared/charge_notice.ts";
 import {
   expireUnconfirmedGroups,
   maySettle,
@@ -70,6 +71,7 @@ Deno.serve(async (req) => {
       await settleGroup(admin, pagbank, groupId);
       settled.push(groupId);
     }
+    await pollPendingPagBankCharges(admin, pagbank, Deno.env);
     await retryPendingCustodyReleases(admin, pagbank);
     return json({ settled });
   } catch (error) {

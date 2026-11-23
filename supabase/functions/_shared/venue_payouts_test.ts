@@ -7,6 +7,7 @@ import {
   requestFromBank,
   transferPayload,
   transferWebhookEvents,
+  webhookAuthToken,
 } from "./pagbank_transfers.ts";
 import {
   ensureTransferWebhook,
@@ -376,21 +377,11 @@ Deno.test("saque manual manda a chave da subconta e a referencia unica", async (
     gate.deps,
   );
   const body = await response.json();
-  assertEquals(response.status, 200);
-  assertEquals(body.status, "pending");
-  assertEquals(gate.keys, [subKey]);
-  assertEquals(gate.created.length, 1);
-  const payload = gate.created[0];
-  assertEquals(
-    (payload.instrument as { pix: { key: string } }).pix.key,
-    "11222333000181",
-  );
-  assertEquals(payload.reference_id, withdrawal);
-  assert(!JSON.stringify(body).includes("11222333000181"));
+  assertEquals(response.status, 403);
+  assertEquals(body.error, "saques_desligados");
+  assertEquals(gate.created, []);
+  assertEquals(gate.keys, []);
   assert(!JSON.stringify(body).includes(subKey));
-  const claim = gate.calls.find((call) => call.fn === "claim_venue_withdrawal");
-  assertEquals(claim?.args.p_actor, actor);
-  assertEquals(claim?.args.p_source, "manual");
 });
 
 Deno.test("a reserva de pontos nao abre transferencia", async () => {
@@ -399,7 +390,7 @@ Deno.test("a reserva de pontos nao abre transferencia", async () => {
     post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
     gate.deps,
   );
-  assertEquals((await response.json()).error, "reserva");
+  assertEquals((await response.json()).error, "saques_desligados");
   assertEquals(gate.created, []);
   assertEquals(gate.keys, []);
   assert(
@@ -417,8 +408,9 @@ Deno.test("o cron nao repete o periodo e ignora a reserva", async () => {
     new Request("https://example.test/cron", { method: "POST", headers: secret }),
     first.deps,
   );
-  assertEquals((await created.json()).created, 1);
-  assertEquals(first.created.length, 1);
+  assertEquals((await created.json()).created, 0);
+  assertEquals(first.created.length, 0);
+  assert(!first.calls.some((call) => call.fn === "list_due_venue_payouts"));
 
   const again = fake({ begin: false });
   const repeat = await handleScheduledWithdrawals(
@@ -454,6 +446,23 @@ async function authenticity(raw: string): Promise<string> {
     byte.toString(16).padStart(2, "0")
   ).join("");
 }
+
+Deno.test("o token da conta assina mesmo quando é a apiKey", () => {
+  const token = "a".repeat(40);
+  const env = {
+    get: (name: string) => name === "PAGBANK_TOKEN" ? token : undefined,
+  };
+  assertEquals(webhookAuthToken(env, token), token);
+  const override = "b".repeat(40);
+  const replaced = {
+    get: (name: string) => {
+      if (name === "PAGBANK_WEBHOOK_SECRET") return override;
+      if (name === "PAGBANK_TOKEN") return token;
+      return undefined;
+    },
+  };
+  assertEquals(webhookAuthToken(replaced, token), override);
+});
 
 Deno.test("webhook de transferencia exige o token e conclui o saque", async () => {
   const gate = fake({
@@ -526,6 +535,31 @@ Deno.test("webhook de transferencia exige o token e conclui o saque", async () =
   );
   assertEquals(payment.status, 200);
   assertEquals(ignored.calls, []);
+
+  const venueSigned = fake();
+  const signed = JSON.stringify({
+    id: "TR_teste",
+    reference_id: withdrawal,
+    status: "DONE",
+  });
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${subKey}-${signed}`),
+  );
+  const venueToken = [...new Uint8Array(digest)].map((byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+  const accepted = await handleTransferWebhook(
+    new Request("https://example.test/hook", {
+      method: "POST",
+      headers: { "x-authenticity-token": venueToken },
+      body: signed,
+    }),
+    venueSigned.deps,
+  );
+  assertEquals(accepted.status, 200);
+  assert(venueSigned.calls.some((call) => call.fn === "read_venue_provider_key"));
+  assert(!JSON.stringify(await accepted.clone().json()).includes(subKey));
 });
 
 Deno.test("toda transferencia sai como pix e nunca como ted", () => {
@@ -592,25 +626,10 @@ Deno.test("banco sem pix falha com mensagem clara e nao vira ted", async () => {
     post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
     saved.deps,
   );
-  assertEquals((await response.json()).error, "sem pix");
+  assertEquals((await response.json()).error, "saques_desligados");
   assertEquals(saved.created, []);
-  const failed = saved.calls.find((call) => call.fn === "fail_venue_withdrawal");
-  assertEquals(failed?.args.p_reason, "sem pix");
-
-  const rejected = fake({
-    failTransfer: new Error(
-      'PagBank 400: {"errors":[{"description":"A instituição de destino não participa do arranjo Pix."}]}',
-    ),
-  });
-  const again = await handleVenuePayouts(
-    post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
-    rejected.deps,
-  );
-  const body = await again.json();
-  assertEquals(body.error, "sem pix");
-  assertEquals(rejected.created, []);
-  assert(!JSON.stringify(body).includes("instituição"));
-  assert(!JSON.stringify(body).includes("TED"));
+  assert(!saved.calls.some((call) => call.fn === "fail_venue_withdrawal"));
+  assert(!saved.calls.some((call) => call.fn === "claim_venue_withdrawal"));
 });
 
 Deno.test("a transferencia usa a chave da subconta e nao a devolve no erro", async () => {
@@ -658,13 +677,12 @@ Deno.test("o automatico usa o saldo inteiro porque o PagBank ja descontou o pend
     new Request("https://example.test/cron", { method: "POST", headers: secret }),
     gate.deps,
   );
-  assertEquals((await response.json()).created, 1);
-  const claim = gate.calls.find((call) => call.fn === "claim_venue_withdrawal");
-  assertEquals(claim?.args.p_amount_cents, 10_000);
-  assertEquals(claim?.args.p_available_cents, 10_000);
-  assertEquals(claim?.args.p_period_key, "auto:2026-W46-r1");
-  assertEquals((gate.created[0].amount as { value: number }).value, 10_000);
-  assertEquals(gate.created.length, 1);
+  const body = await response.json();
+  assertEquals(body.created, 0);
+  assertEquals(body.webhooks, 0);
+  assertEquals(gate.created, []);
+  assert(!gate.calls.some((call) => call.fn === "claim_venue_withdrawal"));
+  assert(!gate.calls.some((call) => call.fn === "list_due_venue_payouts"));
 });
 
 Deno.test("o webhook de transferencia fica na subconta e nao duplica", async () => {
@@ -766,12 +784,11 @@ Deno.test("subcontas existentes ganham o webhook e a reserva fica de fora", asyn
     gate.deps,
   );
   const body = await response.json();
-  assertEquals(body.webhooks, 1);
-  assertEquals(saved.length, 1);
-  assert(
-    (saved[0].body.events as string[]).includes("TRANSFER_FAILED"),
-  );
+  assertEquals(body.created, 0);
+  assertEquals(body.webhooks, 0);
+  assertEquals(saved, []);
   assert(!JSON.stringify(body).includes(webhookToken));
+  assert(!JSON.stringify(saved).includes("TRANSFER_"));
 
   const reserveSaved: { body: Record<string, unknown>; id?: string }[] = [];
   const reserve = fake({

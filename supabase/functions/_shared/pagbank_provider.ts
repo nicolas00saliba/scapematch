@@ -200,6 +200,15 @@ export function pagbankBaseUrlIsProduction(baseUrl: string): boolean {
 
 /// Produção é o padrão. Sandbox só com PAGBANK_ENV=sandbox.
 /// PAGBANK_BASE_URL não escolhe o host.
+/// A doc de Pedidos (POST /orders) manda `notification_urls` como array de URL.
+export function pagbankOrderNotificationUrl(
+  env: { get(name: string): string | undefined },
+): string {
+  const base = (env.get("SUPABASE_URL") ?? "").trim().replace(/\/$/, "");
+  if (!base.startsWith("https://")) return "";
+  return `${base}/functions/v1/pagbank-webhook`;
+}
+
 export function pagbankApiBaseUrl(
   env: { get(name: string): string | undefined },
 ): string {
@@ -294,6 +303,7 @@ export class PagBankProvider {
     private readonly fetchFn: PagBankFetch = fetch,
     private readonly sleep: (ms: number) => Promise<void> = defaultSleep,
     private readonly primaryAccountId = "",
+    private readonly notificationUrl = "",
   ) {
     if (!apiKey) throw new Error("PAGBANK_TOKEN ausente");
     if (!baseUrl.startsWith("https://")) {
@@ -316,7 +326,14 @@ export class PagBankProvider {
       ? (input, init) =>
         baseFetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) })
       : baseFetch;
-    return new PagBankProvider(apiKey, baseUrl, fetchFn, defaultSleep, account);
+    return new PagBankProvider(
+      apiKey,
+      baseUrl,
+      fetchFn,
+      defaultSleep,
+      account,
+      pagbankOrderNotificationUrl(env),
+    );
   }
 
   /// Na resposta 401, troca o access token uma vez e repete a chamada.
@@ -331,6 +348,7 @@ export class PagBankProvider {
       this.fetchFn,
       this.sleep,
       this.primaryAccountId,
+      this.notificationUrl,
     );
   }
 
@@ -887,7 +905,7 @@ export class PagBankProvider {
         soft_descriptor: "EscapeMatch",
         card: cardBody(input.creditCardToken ?? ""),
       };
-    return this.#send("/orders", {
+    const order: Record<string, unknown> = {
       reference_id: input.externalReference,
       customer,
       items: [{
@@ -903,7 +921,9 @@ export class PagBankProvider {
         payment_method: paymentMethod,
         splits: pagbankSplitBody(split),
       }],
-    });
+    };
+    if (this.notificationUrl) order.notification_urls = [this.notificationUrl];
+    return this.#send("/orders", order);
   }
 
   #primary(): string {

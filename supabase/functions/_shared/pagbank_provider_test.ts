@@ -5,6 +5,7 @@ import {
 } from "jsr:@std/assert@1";
 import {
   PagBankProvider,
+  pagbankOrderNotificationUrl,
   pagbankProductionBaseUrl,
   pagbankSandboxBaseUrl,
   pagbankSignatureMatches,
@@ -110,6 +111,68 @@ Deno.test("Pix FIXED: a casa leva o bruto, a taxa fica na primária e a custódi
   assertEquals(JSON.stringify(body).includes("pb-token-secret"), false);
   const headers = post.init.headers as Record<string, string>;
   assertEquals(headers.Authorization, "Bearer pb-token-secret");
+});
+
+Deno.test("todo pedido manda a URL de notificação do webhook", async () => {
+  const notice = "https://example.supabase.co/functions/v1/pagbank-webhook";
+  const posted: Record<string, unknown>[] = [];
+  const order = {
+    charges: [{
+      id: "CHAR_PIX",
+      status: "WAITING",
+      splits: { id: "SPLI_1" },
+      payment_method: {
+        type: "PIX",
+        pix: { qr_code: { text: "000201PIX", image: "aW1n" } },
+      },
+    }],
+  };
+  const fetchFn = (_url: string, init?: RequestInit) => {
+    if ((init?.method ?? "GET") === "POST") {
+      posted.push(JSON.parse(String(init?.body)));
+      return Promise.resolve(
+        new Response(JSON.stringify(order), { status: 200 }),
+      );
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ orders: [] }), { status: 200 }),
+    );
+  };
+  const client = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    fetchFn,
+    () => Promise.resolve(),
+    primary,
+    notice,
+  );
+  await client.createPix({
+    customer: "PB_CUS_1",
+    value: 50,
+    dueDate: "2026-11-07",
+    description: "EscapeMatch",
+    externalReference: "pix-notice",
+    split: { walletId: venue, fixedValue: 40 },
+  });
+  await client.authorizeCard({
+    customer: "PB_CUS_1",
+    value: 50,
+    dueDate: "2026-11-07",
+    description: "EscapeMatch",
+    externalReference: "card-notice",
+    split: { walletId: venue, fixedValue: 40 },
+    creditCardToken: "CARD_1",
+  });
+  assertEquals(posted.length, 2);
+  assertEquals(posted[0].notification_urls, [notice]);
+  assertEquals(posted[1].notification_urls, [notice]);
+  assertEquals(
+    pagbankOrderNotificationUrl({
+      get: (name) =>
+        name === "SUPABASE_URL" ? "https://example.supabase.co/" : undefined,
+    }),
+    notice,
+  );
 });
 
 Deno.test("cartão até 3x não manda juro e nasce sem captura", async () => {
