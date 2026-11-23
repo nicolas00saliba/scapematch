@@ -75,14 +75,14 @@ insert into public.groups (
 
 insert into public.payment_charges (
   id, group_id, user_id, venue_id, amount_cents, billing_type, status,
-  provider, provider_ref, qr_code, idempotency_key, commission_bps, paid_at
+  provider_ref, qr_code, idempotency_key, commission_bps, paid_at
 ) values (
   'e8500000-0000-4000-8000-000000000001',
   'e8400000-0000-4000-8000-000000000001',
   'e8222222-2222-4222-8222-222222222222',
   'e8200000-0000-4000-8000-000000000001',
   8000, 'PIX', 'paid',
-  'asaas', 'pay_conciliacao', 'segredo-qr-nao-sair', 'idem-conciliacao', 2500,
+  'pay_conciliacao', 'segredo-qr-nao-sair', 'idem-conciliacao', 2500,
   timestamptz '2026-11-12 18:05:00+00'
 );
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 
-/// Tipo de empresa da casa. Pessoa física não vê a pergunta:
+/// Tipo de empresa da subconta Asaas. Pessoa física não vê a pergunta:
 /// a provisão não envia `companyType` no CPF.
 class CompanyTypeField extends StatelessWidget {
   const CompanyTypeField({
@@ -30,7 +30,7 @@ class CompanyTypeField extends StatelessWidget {
         initialValue: selected,
         decoration: const InputDecoration(
           labelText: 'Tipo de empresa',
-          helperText: 'Este tipo identifica a empresa da casa.',
+          helperText: 'O Asaas usa este tipo na conta da casa.',
           border: OutlineInputBorder(),
         ),
         items: [

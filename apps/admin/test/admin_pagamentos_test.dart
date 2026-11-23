@@ -20,8 +20,6 @@ void main() {
         asaasBaseUrlProduction: true,
         asaasWebhookToken: false,
         asaasWebhookEmail: null,
-        wooviAppId: true,
-        mpAccessToken: false,
         venueWithdrawalsSecret: true,
         vaultUrl: true,
         vaultSecret: false,
@@ -48,7 +46,7 @@ void main() {
         webhookErrors: [
           WebhookErrorLine(
             id: 'erro-1',
-            source: 'woovi-webhook',
+            source: 'asaas-webhook',
             code: 'internal_error',
             providerRef: 'pay_painel',
             when: DateTime.utc(2026, 11, 13, 12),
@@ -70,9 +68,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.byKey(const Key('admin-pagamentos')), findsOneWidget);
-    expect(find.text('App da Woovi: sim'), findsOneWidget);
-    expect(find.text('Token do Mercado Pago: não'), findsOneWidget);
-    expect(find.text('Chave da API do Asaas: sim'), findsNothing);
+    expect(find.text('Chave da API do Asaas: sim'), findsOneWidget);
+    expect(find.text('Token do webhook: não'), findsOneWidget);
+    expect(find.text('E-mail do webhook: sem leitura'), findsOneWidget);
     expect(find.text('Vault do segredo de saques: não'), findsOneWidget);
     expect(
       find.text('Última execução do cron: falhou · config_ausente'),
@@ -80,7 +78,7 @@ void main() {
     );
     expect(find.text('Casa do Painel · PIX'), findsOneWidget);
     expect(find.text('Nenhum estorno recente.'), findsOneWidget);
-    expect(find.text('woovi-webhook · internal_error'), findsOneWidget);
+    expect(find.text('asaas-webhook · internal_error'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('admin-payouts-switch')));
     await tester.pump();

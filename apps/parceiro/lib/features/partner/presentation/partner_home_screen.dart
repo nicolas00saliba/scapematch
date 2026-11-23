@@ -17,7 +17,6 @@ import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
-import 'package:scapematch_parceiro/features/partner/presentation/woovi_house_card.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
@@ -327,7 +326,6 @@ class _BalanceSection extends StatelessWidget {
       children: [
         const ExampleDataBanner(),
         const SizedBox(height: 16),
-        WooviHouseCard(venueId: snapshot.house.id),
         Text(
           PartnerMessages.balanceTitle,
           style: Theme.of(context).textTheme.headlineSmall
@@ -399,10 +397,7 @@ class _WithdrawalsSection extends StatelessWidget {
     final wide = isScapeDesktop(context);
     return ListView(
       padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 20, wide ? 32 : 16, 32),
-      children: [
-        WooviHouseCard(venueId: snapshot.house.id),
-        VenueWithdrawalsPanel(venueId: snapshot.house.id),
-      ],
+      children: [VenueWithdrawalsPanel(venueId: snapshot.house.id)],
     );
   }
 }

@@ -67,14 +67,25 @@ Deno.test("RECEIVED e CONFIRMED viram pago; pendente continua pendente", () => {
   assertEquals(localChargeStatus("OVERDUE"), "pending");
 });
 
-Deno.test("create-charge manda o Pix para a Woovi", async () => {
+Deno.test("create-charge reserva o Pix e não troca provider_ref", async () => {
   const source = await Deno.readTextFile(
     new URL("../create-charge/index.ts", import.meta.url),
   );
-  assert(source.includes("createAlternateCharge"));
-  assert(source.includes("isHistoricalAsaas"));
-  assertEquals(source.includes("cancelPaymentConfirmed"), false);
-  assertEquals(source.includes("findByExternalReference"), false);
+  assert(source.includes("pixExternalReference"));
+  assert(source.includes("onCreated"));
+  assert(source.includes("reserve_pix_charge"));
+  assert(source.includes("attach_pix_provider"));
+  assert(source.includes("pixReservationAction"));
+  assert(source.includes("pixMatchesCharge"));
+  assert(source.includes("claim_expired_pix_reservation"));
+  assert(source.includes("release_pix_reservation"));
+  assert(source.includes("cancelPaymentConfirmed"));
+  assert(source.includes("clear_pix_provider_ref"));
+  assert(source.includes("record_orphan_payment"));
+  assert(source.includes("findByExternalReference"));
+  assert(source.includes("p_attempt_id"));
+  assertEquals(source.includes(".update(row)"), false);
+  assertEquals(source.includes("persistPixCharge"), false);
   assertEquals(source.includes("error.message"), false);
   assertEquals(source.includes("console."), false);
 });

@@ -7,9 +7,9 @@ export const chargeTransitions: Record<string, readonly string[]> = {
     "cancelled",
     "failed",
   ],
-  pending: ["authorized", "paid", "refunded", "cancelled", "failed", "charged_back"],
-  authorized: ["paid", "refunded", "cancelled", "failed", "charged_back"],
-  paid: ["refunded", "charged_back"],
+  pending: ["authorized", "paid", "refunded", "cancelled", "failed"],
+  authorized: ["paid", "refunded", "cancelled", "failed"],
+  paid: ["refunded"],
 };
 
 const terminal = new Set(["refunded", "cancelled", "failed"]);
@@ -123,9 +123,6 @@ export function memberPaymentForStatus(status: string): MemberPaymentSync {
   }
   if (status === "authorized") {
     return { payment_status: "reserved", refund_status: "none" };
-  }
-  if (status === "charged_back") {
-    return { payment_status: "released", refund_status: "none" };
   }
   if (status === "refunded") {
     return { payment_status: "released", refund_status: "refunded" };

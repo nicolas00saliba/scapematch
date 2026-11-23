@@ -13,6 +13,9 @@ verify_jwt = true
 [functions.settle-charges]
 verify_jwt = true
 
+[functions.asaas-webhook]
+verify_jwt = false
+
 [functions.configure-venue-fiscal]
 verify_jwt = true
 
@@ -42,20 +45,7 @@ verify_jwt = false
 verify_jwt = true
 
 # O Asaas manda asaas-access-token, o mesmo segredo do webhook de cobrança.
-# A Woovi assina o corpo. Sem JWT de usuário.
-[functions.woovi-webhook]
-verify_jwt = false
-
-# O Mercado Pago assina com x-signature. Sem JWT de usuário.
-[functions.mp-webhook]
-verify_jwt = false
-
-# A casa conecta o Mercado Pago com o JWT do Parceiro.
-[functions.mp-oauth]
-verify_jwt = true
-
-# A Public Key não é segredo. O app lê antes de tokenizar no Mercado Pago.
-[functions.mp-public-key]
+[functions.asaas-transfer-webhook]
 verify_jwt = false
 
 # E-mails do Auth, em pt-BR. O CLI local lê subject e content_path.

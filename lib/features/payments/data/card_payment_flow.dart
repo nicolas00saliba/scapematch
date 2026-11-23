@@ -1,6 +1,6 @@
 import 'package:dominio/dominio.dart';
 
-/// Dados digitados no aparelho. O número não segue para o servidor.
+/// Cartão ainda não tokenizado. Só a função `tokenize-card` recebe estes campos.
 class CardDraft {
   const CardDraft({
     required this.holderName,
@@ -57,12 +57,21 @@ typedef FunctionInvoker = Future<Map<String, dynamic>> Function(
   Map<String, dynamic> body,
 );
 
-/// O número, o CVV e a validade não entram em pedido nenhum.
+/// Body da tokenização. É o único pedido do app com número, CVV e validade.
 Map<String, dynamic> tokenizeCardBody(CardDraft card) {
-  if (card.number.isNotEmpty || card.number.isEmpty) {
-    throw StateError('O token do cartão nasce no aparelho, no Mercado Pago.');
-  }
-  return const {};
+  return {
+    'holder_name': card.holderName,
+    'number': card.number,
+    'expiry_month': card.expiryMonth,
+    'expiry_year': card.expiryYear,
+    'ccv': card.ccv,
+    if (card.holderCpfCnpj.isNotEmpty) 'holder_cpf_cnpj': card.holderCpfCnpj,
+    if (card.holderPostalCode.isNotEmpty)
+      'holder_postal_code': card.holderPostalCode,
+    if (card.holderAddressNumber.isNotEmpty)
+      'holder_address_number': card.holderAddressNumber,
+    if (card.holderPhone.isNotEmpty) 'holder_phone': card.holderPhone,
+  };
 }
 
 /// Body da cobrança. Não tem número, CVV nem validade.
@@ -71,19 +80,13 @@ Map<String, dynamic> createChargeBody({
   required String idempotencyKey,
   required PaymentMethodKind kind,
   String? savedCardId,
-  String? cardToken,
-  String? paymentMethodId,
   int points = 0,
 }) {
   return {
     'group_id': groupId,
     'idempotency_key': idempotencyKey,
     'billing_type': kind == PaymentMethodKind.card ? 'CREDIT_CARD' : 'PIX',
-    if (kind == PaymentMethodKind.card && savedCardId != null)
-      'saved_card_id': savedCardId,
-    if (cardToken != null && cardToken.isNotEmpty) 'card_token': cardToken,
-    if (paymentMethodId != null && paymentMethodId.isNotEmpty)
-      'payment_method_id': paymentMethodId,
+    if (kind == PaymentMethodKind.card) 'saved_card_id': savedCardId,
     if (points > 0) 'points': points,
   };
 }
@@ -106,17 +109,13 @@ bool chargeBodyHasRawCard(Map<String, dynamic> body) {
 
 /// Tokeniza e só então cobra com o id interno devolvido.
 class CardPaymentFlow {
-  const CardPaymentFlow(this.invoke, {this.tokenizeCard});
+  const CardPaymentFlow(this.invoke);
 
   final FunctionInvoker invoke;
 
-  /// Tokeniza no Mercado Pago, no aparelho. Sem isto, o fluxo não cobra.
-  final Future<({String id, String paymentMethodId})> Function(CardDraft card)?
-  tokenizeCard;
-
   Future<SavedCardRef> tokenize(CardDraft card) async {
-    tokenizeCardBody(card);
-    throw StateError('O token do cartão nasce no aparelho, no Mercado Pago.');
+    final body = await invoke('tokenize-card', tokenizeCardBody(card));
+    return SavedCardRef.fromResponse(body);
   }
 
   Future<Map<String, dynamic>> charge({
@@ -144,37 +143,12 @@ class CardPaymentFlow {
     required String groupId,
     required String idempotencyKey,
   }) async {
-    final mint = tokenizeCard;
-    if (mint == null) {
-      throw StateError('O token do cartão nasce no aparelho, no Mercado Pago.');
-    }
-    final device = await mint(card);
-    return chargeToken(
-      groupId: groupId,
-      idempotencyKey: idempotencyKey,
-      cardToken: device.id,
-      paymentMethodId: device.paymentMethodId,
-    );
-  }
-
-  Future<Map<String, dynamic>> chargeToken({
-    required String groupId,
-    required String idempotencyKey,
-    required String cardToken,
-    String? paymentMethodId,
-    int points = 0,
-  }) {
-    final body = createChargeBody(
+    final saved = await tokenize(card);
+    return charge(
       groupId: groupId,
       idempotencyKey: idempotencyKey,
       kind: PaymentMethodKind.card,
-      cardToken: cardToken,
-      paymentMethodId: paymentMethodId,
-      points: points,
+      savedCardId: saved.savedCardId,
     );
-    if (chargeBodyHasRawCard(body)) {
-      throw StateError('create-charge não recebe dados do cartão');
-    }
-    return invoke('create-charge', body);
   }
 }

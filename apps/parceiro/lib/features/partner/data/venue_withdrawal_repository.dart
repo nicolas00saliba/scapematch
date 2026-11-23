@@ -208,7 +208,7 @@ class VenuePayoutSnapshot {
           amountCents: 4000,
           status: 'failed',
           source: 'manual',
-          failureReason: 'provider_unavailable',
+          failureReason: 'asaas_unavailable',
           createdAt: DateTime.utc(2026, 11, 8),
         ),
       ],

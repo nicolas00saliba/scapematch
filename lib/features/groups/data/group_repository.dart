@@ -52,7 +52,7 @@ abstract class GroupRepository {
     int points = 0,
   });
 
-  /// Tokeniza no Mercado Pago e cobra em `create-charge` com o token.
+  /// Tokeniza em `tokenize-card` e cobra em `create-charge` com o id devolvido.
   /// A demonstração não cobra.
   Future<PayShareResult> payWithNewCard(
     String groupId, {

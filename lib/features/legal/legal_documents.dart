@@ -54,7 +54,7 @@ Você só é cobrado se o grupo confirmar.
 
 Pix. Se o grupo não atingir o mínimo até o prazo, ou se for cancelado antes de confirmar, o Pix que já tiver sido pago é estornado. A tela avisa que o valor foi liberado.
 
-Cartão. A autorização não é capturada enquanto o grupo não confirma. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. Se o grupo confirmar, a captura acontece e a parte entra no extrato da casa, já com a comissão da intermediação separada.
+Cartão. A autorização não é capturada enquanto o grupo não confirma. Se o grupo não confirmar, a autorização é cancelada e nada é cobrado no cartão. Se o grupo confirmar, a captura acontece e a parte entra no extrato da casa, já com a comissão da intermediação separada.
 
 Cancelamento pelo jogador. Cada casa define a antecedência mínima. Sair dentro dessa janela, antes do início, devolve o que já tiver sido capturado. Sair depois da janela não devolve. O organizador pode excluir o grupo até 2 horas antes do início. No instante exato das 2 horas ainda pode. A exclusão libera a reserva ou reembolsa o que já foi capturado.
 

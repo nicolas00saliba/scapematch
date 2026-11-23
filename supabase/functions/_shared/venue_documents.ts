@@ -7,12 +7,13 @@
 // liberam o saque na tela. A consulta logo após criar a conta pode mentir
 // por cerca de 15 segundos; a tela pede para atualizar.
 
+import {
+  asaasProductionBaseUrl,
+  asaasSandboxBaseUrl,
+  type AsaasFetch,
+} from "./asaas_provider.ts";
+import { isPointsReserve } from "./asaas_transfers.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
-
-type AsaasFetch = (
-  input: string,
-  init?: RequestInit,
-) => Promise<Response>;
 import { readJwtClaims } from "./venue_payouts.ts";
 
 const maxBase64Chars = 2_800_000;
@@ -93,7 +94,11 @@ export async function roleOf(
   return "none";
 }
 
-export function officialAsaasBase(_baseUrl: string): string | null {
+export function officialAsaasBase(baseUrl: string): string | null {
+  const base = baseUrl.trim().replace(/\/$/, "");
+  if (base === asaasSandboxBaseUrl || base === asaasProductionBaseUrl) {
+    return base;
+  }
   return null;
 }
 
@@ -109,7 +114,13 @@ export function safeOnboardingUrl(value: unknown): string | null {
     return null;
   }
   if (url.protocol !== "https:" || url.username || url.password) return null;
-  return null;
+  const host = url.hostname.toLowerCase();
+  const ok = host === "cadastro.io" ||
+    host.endsWith(".cadastro.io") ||
+    host === "asaas.com" ||
+    host.endsWith(".asaas.com");
+  if (!ok) return null;
+  return url.toString();
 }
 
 export function presentDocuments(
@@ -184,19 +195,30 @@ export async function handleVenueDocuments(
       const allowed = await deps.strongAuth(jwt);
       if (!allowed) return json({ error: "reauth" }, 401);
     }
-    return json({
-      documentation: "UNKNOWN",
-      general: "UNKNOWN",
-      commercial_info: "UNKNOWN",
-      bank_account_info: "UNKNOWN",
-      approved: false,
-      known: false,
-      onboarding_url: null,
-      documents: [],
-      notice: "A casa não envia documento para a Woovi.",
-    });
-  } catch (_error) {
-    return json({ error: "erro" }, 400);
+    const account = await deps.subaccount(venueId);
+    const apiKey = account.apiKey.trim();
+    if (!apiKey) return json({ error: "sem subconta" }, 409);
+    if (isPointsReserve(deps.env, account.walletId, apiKey)) {
+      return json({ error: "reserva" }, 403);
+    }
+    const base = officialAsaasBase(
+      deps.env.get("ASAAS_BASE_URL") ?? asaasSandboxBaseUrl,
+    );
+    if (!base) return json({ error: "asaas_unavailable" }, 503);
+    if (action === "upload") {
+      const uploaded = await uploadDocument(deps, base, apiKey, body, json);
+      if (uploaded instanceof Response) return uploaded;
+      return json(uploaded);
+    }
+    return json(await loadFromAsaas(deps.fetchFn, base, apiKey));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "onboarding") {
+      return json({ error: "onboarding" }, 409);
+    }
+    if (message === "arquivo") return json({ error: "arquivo" }, 400);
+    if (message === "status") return json({ error: "status" }, 409);
+    return json({ error: "asaas_unavailable" }, 502);
   }
 }
 

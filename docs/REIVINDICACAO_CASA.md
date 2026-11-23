@@ -1,7 +1,5 @@
 # Reivindicar uma casa que já tem perfil
 
-Desde 20/11/2026 `provision-venue-wallet` abre subconta Woovi com a chave Pix. A casa não abre a Woovi e não envia documento para lá.
-
 O cadastro do Parceiro, ao receber o CNPJ, procura uma casa existente. Se achar um perfil ainda não reivindicado, a tela oferece **Esta é a sua casa? Reivindicar**. O cadastro não abre outra casa. Fotos, salas e avaliações ficam no mesmo perfil.
 
 O caso da Ninja Escape Room é esse: o perfil com fotos já existe. Enquanto o contato oficial estiver vazio, o pedido cai na fila manual do Admin.

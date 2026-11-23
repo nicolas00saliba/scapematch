@@ -73,7 +73,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'Quais formas de pagamento existem?',
         resposta:
-          'Pix pela Woovi e cartão pelo Mercado Pago. O número do cartão não passa pelo servidor.',
+          'Pix e cartão, processados pela Asaas. O app não guarda o número do cartão.',
       },
       {
         pergunta: 'Quando a cobrança acontece?',

@@ -2,13 +2,57 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 
 void main() {
-  test('o número do cartão não sai do aparelho', () async {
+  test('tokenize-card vem antes e create-charge só leva o id', () async {
     final calls = <String>[];
     final flow = CardPaymentFlow((name, body) async {
       calls.add(name);
-      return body;
+      if (name == 'tokenize-card') {
+        expect(body['number'], '4111111111111111');
+        expect(body['ccv'], '123');
+        expect(body.containsKey('remote_ip'), isFalse);
+        return {
+          'saved_card_id': 'card-1',
+          'last4': '1111',
+          'brand': 'VISA',
+        };
+      }
+      expect(name, 'create-charge');
+      expect(chargeBodyHasRawCard(body), isFalse);
+      expect(body['saved_card_id'], 'card-1');
+      expect(body['billing_type'], 'CREDIT_CARD');
+      expect(body.containsKey('number'), isFalse);
+      expect(body.containsKey('ccv'), isFalse);
+      expect(body.containsKey('expiry_month'), isFalse);
+      expect(body.containsKey('expiry_year'), isFalse);
+      expect(body.containsKey('remote_ip'), isFalse);
+      return {'charge_id': 'ch-1', 'status': 'authorized'};
     });
 
+    final charged = await flow.payWithNewCard(
+      card: const CardDraft(
+        holderName: 'Ana',
+        number: '4111111111111111',
+        expiryMonth: '12',
+        expiryYear: '2028',
+        ccv: '123',
+      ),
+      groupId: 'group-1',
+      idempotencyKey: 'idem-12345678',
+    );
+
+    expect(calls, ['tokenize-card', 'create-charge']);
+    expect(charged['charge_id'], 'ch-1');
+  });
+
+  test('resposta com token não segue para a cobrança', () async {
+    final flow = CardPaymentFlow((name, body) async {
+      return {
+        'saved_card_id': 'card-1',
+        'last4': '1111',
+        'brand': 'VISA',
+        'credit_card_token': 'tok_vazado',
+      };
+    });
     expect(
       () => flow.payWithNewCard(
         card: const CardDraft(
@@ -23,51 +67,5 @@ void main() {
       ),
       throwsStateError,
     );
-    expect(calls, isEmpty);
-
-    final charged = await flow.chargeToken(
-      groupId: 'group-1',
-      idempotencyKey: 'idem-12345678',
-      cardToken: 'tok_mp_1',
-    );
-    expect(calls, ['create-charge']);
-    expect(charged['card_token'], 'tok_mp_1');
-    expect(charged.containsKey('number'), isFalse);
-    expect(charged.containsKey('ccv'), isFalse);
-  });
-
-  test('a cobrança recebe o token e não o número', () async {
-    final calls = <Map<String, dynamic>>[];
-    final flow = CardPaymentFlow(
-      (name, body) async {
-        expect(name, 'create-charge');
-        calls.add(body);
-        return body;
-      },
-      tokenizeCard: (card) async {
-        expect(card.number, '4111111111111111');
-        return (id: 'tok_aparelho', paymentMethodId: 'visa');
-      },
-    );
-
-    final charged = await flow.payWithNewCard(
-      card: const CardDraft(
-        holderName: 'Ana',
-        number: '4111111111111111',
-        expiryMonth: '12',
-        expiryYear: '2028',
-        ccv: '123',
-      ),
-      groupId: 'group-1',
-      idempotencyKey: 'idem-12345678',
-    );
-    expect(calls, hasLength(1));
-    expect(charged['card_token'], 'tok_aparelho');
-    expect(charged['payment_method_id'], 'visa');
-    expect(charged.containsKey('number'), isFalse);
-    expect(charged.containsKey('ccv'), isFalse);
-    expect(jsonOf(charged).contains('4111111111111111'), isFalse);
   });
 }
-
-String jsonOf(Map<String, dynamic> body) => body.toString();

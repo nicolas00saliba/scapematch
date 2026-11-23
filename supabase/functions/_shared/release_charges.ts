@@ -1,26 +1,31 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { isAlternateProvider, isHistoricalAsaas } from "./payment_provider.ts";
+import { AsaasProvider } from "./asaas_provider.ts";
+import { cancelInvoicesForCharge } from "./issue_invoices.ts";
 import {
-  releaseAlternateCharge,
-  type AlternateCharge,
-  type AlternateGate,
-} from "./provider_dispatch.ts";
+  applyPaymentTransition,
+  type ChargeRow,
+  reverseLedger,
+} from "./ledger.ts";
 
 type Admin = ReturnType<typeof createClient>;
 
-type Charge = AlternateCharge;
+type Charge = ChargeRow & {
+  status: string;
+  provider_ref: string | null;
+  billing_type: string;
+};
 
 /// Estorna o que já foi pago. Pix pendente sai com DELETE. A pré-autorização
 /// do cartão sai com refund. O status local só muda depois da API.
 export async function releaseCancelledCharges(
   admin: Admin,
+  asaas: AsaasProvider,
   groupId: string,
-  gate?: AlternateGate,
 ): Promise<string[]> {
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider, provider_ref, billing_type, provider_end_to_end_id, house_pix_key, house_fixed_cents",
+      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type",
     )
     .eq("group_id", groupId);
 
@@ -35,9 +40,30 @@ export async function releaseCancelledCharges(
       continue;
     }
     try {
-      if (isHistoricalAsaas(row.provider)) continue;
-      if (isAlternateProvider(row.provider)) {
-        await releaseAlternateCharge(admin, row, gate);
+      if (row.status === "paid") {
+        await asaas.refund(row.provider_ref);
+        await reverseLedger(admin, row);
+        await cancelInvoicesForCharge(admin, row.id, {
+          sandbox: asaas.sandbox,
+          asaas,
+        });
+        continue;
+      }
+      if (row.billing_type === "PIX") {
+        const gone = await asaas.cancelPaymentConfirmed(row.provider_ref);
+        if (!gone) throw new Error("erro");
+      } else {
+        await asaas.cancelAuthorization(row.provider_ref);
+      }
+      const cancelled = await applyPaymentTransition(
+        admin,
+        row.id,
+        "cancelled",
+        false,
+      );
+      if (cancelled.status !== "cancelled") {
+        stillPending.push(row.id);
+        continue;
       }
     } catch (_error) {
       stillPending.push(row.id);
