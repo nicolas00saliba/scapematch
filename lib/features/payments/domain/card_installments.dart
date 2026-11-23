@@ -26,6 +26,13 @@ class CardInstallmentOption {
   bool get showsTotal => enabled && !interestFree && count > 1;
 }
 
+/// Texto curto da opção atual. À vista, ou "3x sem juros".
+String installmentChoiceLabel(CardInstallmentOption option) {
+  if (option.count <= 1) return 'À vista';
+  final badge = option.interestFree ? 'sem juros' : 'com juros';
+  return '${option.count}x $badge';
+}
+
 /// Parcela arredondada para cima, em centavos. O total cobrado é [totalCents].
 int cardInstallmentCents(int totalCents, int count) {
   if (count <= 1) return totalCents;

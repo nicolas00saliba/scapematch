@@ -10,7 +10,7 @@ import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 import 'package:scapematch/features/payments/domain/card_installments.dart';
-import 'package:scapematch/features/payments/presentation/installment_grid.dart';
+import 'package:scapematch/features/payments/presentation/installment_summary.dart';
 import 'package:scapematch/features/payments/domain/live_charge.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
@@ -97,6 +97,9 @@ Future<PaySheetOutcome> showPayShareSheet({
   quoteInstallments,
   PointSpendChoice? points,
   int discountCents = 0,
+  String coverAsset = '',
+  String houseName = '',
+  String roomName = '',
 }) async {
   final outcome = await showModalBottomSheet<PaySheetOutcome>(
     context: context,
@@ -115,6 +118,9 @@ Future<PaySheetOutcome> showPayShareSheet({
         discountCents: discountCents > 0
             ? discountCents
             : points?.discountCents ?? 0,
+        coverAsset: coverAsset,
+        houseName: houseName,
+        roomName: roomName,
       );
     },
   );
@@ -131,10 +137,16 @@ class PayShareSheet extends ConsumerStatefulWidget {
     this.quoteInstallments,
     this.points,
     this.discountCents = 0,
+    this.coverAsset = '',
+    this.houseName = '',
+    this.roomName = '',
   });
 
   final int amountCents;
   final String reference;
+  final String coverAsset;
+  final String houseName;
+  final String roomName;
   final PointSpendChoice? points;
   final int discountCents;
   final Future<ShareChargeView> Function(
@@ -189,6 +201,19 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     return cardInstallmentOptions(principalCents: _chargedCents);
   }
 
+  Future<void> _openInstallments() async {
+    final picked = await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        builder: (context) => InstallmentPickerPage(
+          options: _plans,
+          selected: _chosenPlan().count,
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _installments = picked);
+  }
+
   CardInstallmentOption _chosenPlan() {
     final plans = _plans;
     for (final plan in plans) {
@@ -211,7 +236,9 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
       if (!mounted || token != _quoteToken) return;
       setState(() {
         _remotePlans = plans;
-        if (!_plans.any((plan) => plan.count == _installments && plan.enabled)) {
+        if (!_plans.any(
+          (plan) => plan.count == _installments && plan.enabled,
+        )) {
           _installments = 1;
         }
       });
@@ -537,18 +564,17 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                               key: const Key('pay-card-panel'),
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text(
-                                  'Parcelas',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
+                                ReservationPaySummary(
+                                  coverAsset: widget.coverAsset,
+                                  houseName: widget.houseName,
+                                  roomName: widget.roomName,
+                                  totalLabel: formatPrice(_chargedCents),
+                                  installmentLabel: installmentChoiceLabel(
+                                    _chosenPlan(),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                InstallmentGrid(
-                                  options: _plans,
-                                  selected: _chosenPlan().count,
-                                  onSelect: (count) =>
-                                      setState(() => _installments = count),
+                                  onOpenInstallments: _busy
+                                      ? null
+                                      : _openInstallments,
                                 ),
                                 const SizedBox(height: 16),
                                 _CardPanel(

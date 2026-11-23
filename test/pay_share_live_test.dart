@@ -9,6 +9,8 @@ import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
 import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
+import 'package:scapematch/features/payments/presentation/installment_grid.dart';
+import 'package:scapematch/features/payments/presentation/installment_summary.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
@@ -49,10 +51,14 @@ void main() {
     await _open(
       tester,
       live: true,
-      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
-        calls.add((kind, savedCardId));
-        return const ShareChargeView(pixCode: _realPix, pixImageBase64: _png);
-      },
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            calls.add((kind, savedCardId));
+            return const ShareChargeView(
+              pixCode: _realPix,
+              pixImageBase64: _png,
+            );
+          },
     );
 
     expect(find.text(GroupMessages.simulatedNotice), findsNothing);
@@ -82,11 +88,12 @@ void main() {
     await _open(
       tester,
       live: true,
-      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
-        return const ShareChargeView(
-          message: 'A casa ainda não tem subconta PagBank.',
-        );
-      },
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            return const ShareChargeView(
+              message: 'A casa ainda não tem subconta PagBank.',
+            );
+          },
     );
 
     await tester.tap(find.byKey(AppKeys.payCharge));
@@ -113,11 +120,12 @@ void main() {
           nickname: 'Pessoal',
         ),
       ],
-      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
-        chargedId = savedCardId;
-        expect(kind, PaymentMethodKind.card);
-        return const ShareChargeView(outcome: PaySheetOutcome.reserved);
-      },
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            chargedId = savedCardId;
+            expect(kind, PaymentMethodKind.card);
+            return const ShareChargeView(outcome: PaySheetOutcome.reserved);
+          },
     );
 
     await tester.tap(find.byKey(AppKeys.payMethodCard));
@@ -155,20 +163,27 @@ void main() {
         principalCents: cents,
         interestCentsByCount: {4: 640},
       ),
-      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
-        sent = installments;
-        expected = expectedAmountCents;
-        expect(kind, PaymentMethodKind.card);
-        return const ShareChargeView(outcome: PaySheetOutcome.reserved);
-      },
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            sent = installments;
+            expected = expectedAmountCents;
+            expect(kind, PaymentMethodKind.card);
+            return const ShareChargeView(outcome: PaySheetOutcome.reserved);
+          },
     );
 
     await tester.tap(find.byKey(AppKeys.payMethodCard));
     await tester.pumpAndSettle();
+    expect(find.text('À vista'), findsOneWidget);
+    expect(find.byType(InstallmentGrid), findsNothing);
+    await tester.tap(find.byKey(AppKeys.payInstallments));
+    await tester.pumpAndSettle();
+    expect(find.text(InstallmentPickerPage.title), findsOneWidget);
     expect(find.text('sem juros'), findsNWidgets(3));
     expect(find.text('com juros'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('parcela-4')));
     await tester.pumpAndSettle();
+    expect(find.text('4x com juros'), findsOneWidget);
     await tester.tap(find.byKey(AppKeys.payCharge));
     await tester.pumpAndSettle();
 

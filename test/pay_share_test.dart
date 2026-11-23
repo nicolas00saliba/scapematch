@@ -76,11 +76,13 @@ void main() {
         matching: find.byType(Scrollable),
       ),
     );
-    final sheet = sheetScrolls.firstWhere(
+    final overflow = sheetScrolls.where(
       (state) => state.position.maxScrollExtent > 0,
     );
-    sheet.position.jumpTo(sheet.position.maxScrollExtent);
-    await tester.pumpAndSettle();
+    if (overflow.isNotEmpty) {
+      overflow.first.position.jumpTo(overflow.first.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+    }
     await tester.tap(find.byKey(AppKeys.paySimulate));
     await tester.pumpAndSettle();
     expect(find.text('Valor reservado'), findsOneWidget);

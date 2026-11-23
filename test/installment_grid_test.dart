@@ -6,8 +6,10 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/theme.dart';
+import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/payments/presentation/installment_grid.dart';
+import 'package:scapematch/features/payments/presentation/installment_summary.dart';
 
 void main() {
   test('abaixo de R\$ 150 só à vista fica habilitada', () {
@@ -15,10 +17,7 @@ void main() {
     expect(options.where((item) => item.enabled).map((item) => item.count), [
       1,
     ]);
-    expect(
-      options[3].disabledReason,
-      'parcelamento a partir de R\$150',
-    );
+    expect(options[3].disabledReason, 'parcelamento a partir de R\$150');
   });
 
   testWidgets('a grade marca sem juros até 3x e o total a partir de 4x', (
@@ -58,7 +57,9 @@ void main() {
     );
     expect(selected, 4);
 
-    final semantics = tester.getSemantics(find.byKey(const ValueKey('parcela-1')));
+    final semantics = tester.getSemantics(
+      find.byKey(const ValueKey('parcela-1')),
+    );
     expect(semantics.flagsCollection.isButton, isTrue);
 
     final box = tester.getSize(find.byKey(const ValueKey('parcela-2')));
@@ -82,46 +83,84 @@ void main() {
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
   });
 
-  testWidgets('salva a grade a 390px', (tester) async {
+  testWidgets('salva o resumo e a grade a 390px', (tester) async {
     if (Platform.environment['SCAPEMATCH_INSTALLMENT_SHOT'] != '1') return;
     await tester.runAsync(_loadFonts);
-    const size = Size(390, 860);
-    tester.view.physicalSize = size;
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      _host(
-        selected: 4,
-        options: cardInstallmentOptions(
-          principalCents: 20000,
-          interestCentsByCount: {
-            for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
-          },
+    final options = cardInstallmentOptions(
+      principalCents: 20000,
+      interestCentsByCount: {
+        for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
+      },
+    );
+    await _shot(
+      tester,
+      const Size(390, 280),
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(Brightness.light),
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+            child: ReservationPaySummary(
+              coverAsset: 'assets/images/news/biblioteca.jpg',
+              houseName: 'Biblioteca de São Paulo',
+              roomName: 'Sala Mistério',
+              totalLabel: formatPrice(20000),
+              installmentLabel: '3x sem juros',
+              onOpenInstallments: () {},
+            ),
+          ),
         ),
-        onSelect: (_) {},
       ),
+      '/opt/cursor/artifacts/resumo-parcelas-390.png',
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    final view = tester.binding.renderViews.first;
-    // ignore: invalid_use_of_protected_member
-    final layer = view.layer;
-    final image = await tester.runAsync(
-      () => (layer! as OffsetLayer).toImage(
-        Offset.zero & view.size,
-        pixelRatio: 1,
+    await _shot(
+      tester,
+      const Size(390, 980),
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(Brightness.light),
+        home: InstallmentPickerPage(options: options, selected: 3),
       ),
+      '/opt/cursor/artifacts/parcelas-390.png',
     );
-    final bytes = await tester.runAsync(
-      () => image!.toByteData(format: ui.ImageByteFormat.png),
-    );
-    const path = '/opt/cursor/artifacts/parcelas-390.png';
-    Directory('/opt/cursor/artifacts').createSync(recursive: true);
-    File(path).writeAsBytesSync(bytes!.buffer.asUint8List());
-    expect(image!.width, 390);
-    image.dispose();
   });
+}
+
+Future<void> _shot(
+  WidgetTester tester,
+  Size size,
+  Widget app,
+  String path,
+) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(app);
+  final context = tester.element(find.byType(Scaffold).first);
+  await tester.runAsync(() async {
+    await precacheImage(
+      const AssetImage('assets/images/news/biblioteca.jpg'),
+      context,
+    );
+  });
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
+  final view = tester.binding.renderViews.first;
+  // ignore: invalid_use_of_protected_member
+  final layer = view.layer;
+  final image = await tester.runAsync(
+    () =>
+        (layer! as OffsetLayer).toImage(Offset.zero & view.size, pixelRatio: 1),
+  );
+  final bytes = await tester.runAsync(
+    () => image!.toByteData(format: ui.ImageByteFormat.png),
+  );
+  Directory('/opt/cursor/artifacts').createSync(recursive: true);
+  File(path).writeAsBytesSync(bytes!.buffer.asUint8List());
+  expect(image!.width, 390);
+  image.dispose();
 }
 
 Widget _host({
