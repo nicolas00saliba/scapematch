@@ -11,7 +11,9 @@ alter table public.profiles
 
 alter table public.payment_charges
   add column if not exists provider_fee_cents integer,
-  add column if not exists provider_split_id text;
+  add column if not exists provider_split_id text,
+  add column if not exists custody_released_at timestamptz,
+  add column if not exists custody_release_failed_at timestamptz;
 
 alter table public.payment_charges
   drop constraint if exists payment_charges_provider_fee_nonnegative;
@@ -170,37 +172,6 @@ create trigger sync_pagbank_withdrawal
 update public.payment_charges
 set provider_fee_cents = asaas_fee_cents
 where provider_fee_cents is null and asaas_fee_cents is not null;
-
-create or replace view public.venue_provider_keys as
-select venue_id, api_key from public.venue_asaas_keys;
-revoke all on table public.venue_provider_keys from public, anon, authenticated;
-
-create or replace function public.read_venue_provider_key(p_venue_id uuid)
-returns text
-language sql
-security definer
-set search_path = ''
-as $$
-  select public.read_venue_asaas_key(p_venue_id);
-$$;
-
-create or replace function public.store_venue_provider_key(
-  p_venue_id uuid,
-  p_api_key text
-)
-returns void
-language sql
-security definer
-set search_path = ''
-as $$
-  select public.store_venue_asaas_key(p_venue_id, p_api_key);
-$$;
-
-revoke all on function public.read_venue_provider_key(uuid) from public, anon, authenticated;
-revoke all on function public.store_venue_provider_key(uuid, text) from public, anon, authenticated;
-grant execute on function public.read_venue_provider_key(uuid) to service_role;
-grant execute on function public.store_venue_provider_key(uuid, text) to service_role;
-
 
 create or replace function private.sync_house_fixed(p_charge_id uuid)
 returns integer
@@ -908,6 +879,8 @@ create table public.venue_pagbank_tokens (
 revoke all on table public.venue_pagbank_tokens
   from public, anon, authenticated;
 
+alter table public.venue_pagbank_tokens enable row level security;
+
 create or replace function public.store_venue_pagbank_tokens(
   p_venue_id uuid,
   p_access_token text,
@@ -1035,6 +1008,8 @@ create table public.pagbank_connect_states (
 
 revoke all on table public.pagbank_connect_states
   from public, anon, authenticated;
+
+alter table public.pagbank_connect_states enable row level security;
 
 create or replace function public.begin_pagbank_connect(
   p_venue_id uuid,

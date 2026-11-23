@@ -302,7 +302,7 @@ class FakeGroupRepository implements GroupRepository {
           kind: NoticeKind.partySeat,
           title: 'Vaga reservada',
           body:
-              '$leaderName reservou sua vaga em ${current.roomName}. Pague a sua parte para confirmar. Nada é cobrado se o grupo não confirmar.',
+              '$leaderName reservou sua vaga em ${current.roomName}. Pague a sua parte para confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.',
           at: clock.now(),
           groupId: current.id,
           scope: 'party-${current.id}-${person.id}',

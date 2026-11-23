@@ -48,7 +48,8 @@ Deno.test("a prontidão descarta texto e só guarda sim ou não", () => {
     {
       get: (name) => {
         if (name === "PAGBANK_TOKEN") return secret;
-        if (name === "PAGBANK_BASE_URL") return pagbankSandboxBaseUrl;
+        if (name === "PAGBANK_ENV") return "sandbox";
+        if (name === "PAGBANK_BASE_URL") return "https://evil.example/v3";
         if (name === "PAGBANK_WEBHOOK_SECRET") return "tok";
         if (name === "PAGBANK_WEBHOOK_EMAIL") return "ops@example.com";
         return "   ";
@@ -95,8 +96,7 @@ Deno.test("segredo só no vault conta como presente", () => {
 Deno.test("produção ligada aparece sem devolver a URL", () => {
   const report = buildReadiness(
     {
-      get: (name) =>
-        name === "PAGBANK_BASE_URL" ? `${pagbankProductionBaseUrl}/` : "x",
+      get: (name) => name === "PAGBANK_ENV" ? "production" : "x",
     },
     {
       vault_venue_withdrawals_url: false,
@@ -152,7 +152,7 @@ Deno.test("admin aal2 recebe só o mapa de sim ou não", async () => {
     {
       env: {
         get: (name) =>
-          name === "PAGBANK_BASE_URL" ? pagbankProductionBaseUrl : "valor-que-nao-sai",
+          name === "PAGBANK_ENV" ? "production" : "valor-que-nao-sai",
       },
       loadVault: () =>
         Promise.resolve({

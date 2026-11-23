@@ -450,7 +450,7 @@ Deno.test("cashback entra na subconta pela conta raiz na API oficial", async () 
     { rpc },
     {
       get: (name) => {
-        if (name === "PAGBANK_BASE_URL") return pagbankSandboxBaseUrl;
+        if (name === "PAGBANK_ENV") return "sandbox";
         if (name === "PAGBANK_TOKEN") return "chave-raiz";
         if (name === "PAGBANK_POINTS_RESERVE_ACCOUNT_ID") return "wal_reserva";
         if (name === "PAGBANK_ROOT_WALLET_ID") return "wal_raiz";

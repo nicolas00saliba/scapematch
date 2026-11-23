@@ -18,6 +18,7 @@ type Charge = {
   status: string;
   provider_ref: string | null;
   billing_type: string;
+  provider_split_id?: string | null;
 };
 
 function adminFor(options: {
@@ -172,6 +173,9 @@ function provider(
           { status: 200 },
         ),
       );
+    }
+    if (method === "POST" && url.includes("/release-custody")) {
+      return Promise.resolve(new Response("{}", { status: 200 }));
     }
     if (method === "POST" && url.includes("/capture")) {
       captures.push(url);
@@ -341,6 +345,35 @@ Deno.test("prazo vencido sem confirmação cancela e não captura", async () => 
       call.cancel_reason === "O grupo não confirmou a tempo"
     ),
   );
+});
+
+Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
+  const charges = [{
+    ...card(),
+    status: "paid",
+    billing_type: "PIX",
+    provider_ref: "pay_pix",
+    provider_split_id: "SPLI_PIX",
+  }];
+  const admin = adminFor({ closed: true, charges });
+  const releases: string[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    if ((init?.method ?? "GET") === "POST" && url.includes("/release-custody")) {
+      releases.push(url);
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  };
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
+    fetchFn,
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
+  );
+  await settleGroup(admin, pagbank, groupId);
+  assertEquals(releases.length, 1);
+  assert(releases[0].includes("/splits/SPLI_PIX/release-custody"));
 });
 
 Deno.test("grupo confirmado captura mesmo sem lotar", async () => {

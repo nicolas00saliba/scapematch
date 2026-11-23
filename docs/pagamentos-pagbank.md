@@ -4,7 +4,7 @@ O EscapeMatch cobra só pela PagBank, em produção (`https://api.pagseguro.com`
 
 ## O que o dinheiro faz
 
-O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. A custódia (`custody.apply`, status HELD) segura a casa e a EscapeMatch. A confirmação chama `POST /splits/{id}/release-custody`. O Pix estornado pode sair do saldo HELD. O cartão nasce com `capture: false` e só é capturado na confirmação (até 29 dias).
+O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. A custódia (`custody.apply`, status HELD) segura a casa e a EscapeMatch. A confirmação chama `POST /splits/{id}/release-custody`. O cartão grava o `splitId` da autorização e solta a custódia também na captura imediata, quando o grupo já confirmou. Se a liberação falha, a cobrança guarda `custody_release_failed_at` e `settle-charges` e `reconcile-payments` tentam de novo. Pix pago depois da confirmação solta a custódia no webhook. O Pix estornado pode sair do saldo HELD. O cartão nasce com `capture: false` e só é capturado na confirmação (até 29 dias).
 
 A casa recebe a parte dela sobre o valor bruto, em centavos fixos. A taxa da PagBank sai só da comissão da conta primária (EscapeMatch). A comissão continua o campo por casa no Admin. Não há percentual fixo no código. Se a comissão for menor que a taxa, o saldo da conta primária cobre a diferença. A casa não é reduzida.
 
@@ -17,7 +17,7 @@ A PagBank não emite NFS-e. As linhas fiscais continuam `scheduled`. Nada chama 
 Só por ambiente. Não commitar e não logar.
 
 - `PAGBANK_TOKEN`: token da conta primária.
-- `PAGBANK_ENV=production`.
+- `PAGBANK_ENV=production`. A base da API sai daqui: produção é `https://api.pagseguro.com`. Sandbox só com `PAGBANK_ENV=sandbox`. `PAGBANK_BASE_URL` não é usada.
 - `PAGBANK_ACCOUNT_ID`: `ACCO_` da EscapeMatch. É quem paga as taxas.
 - `PAGBANK_WEBHOOK_SECRET`: se vazio, a assinatura usa `PAGBANK_TOKEN`. Header `x-authenticity-token` = SHA-256 hex de `{segredo}-{corpo cru}`.
 - `PAGBANK_CONNECT_CLIENT_ID`, `PAGBANK_CONNECT_CLIENT_SECRET`.

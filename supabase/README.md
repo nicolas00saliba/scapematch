@@ -104,8 +104,8 @@ Segredos, no painel da função (nunca no repositório):
 
 | Nome | Valor na demo |
 | --- | --- |
-| `PAGBANK_TOKEN` | chave da conta raiz do sandbox |
-| `PAGBANK_BASE_URL` | `https://sandbox.api.pagseguro.com` |
+| `PAGBANK_TOKEN` | token da conta primária |
+| `PAGBANK_ENV` | `production`. A base fica `https://api.pagseguro.com`. `sandbox` usa `https://sandbox.api.pagseguro.com`. `PAGBANK_BASE_URL` não escolhe o host. |
 | `PAGBANK_WEBHOOK_SECRET` | string sua, de 32 a 255 caracteres, sem espaço. Não use a API key. |
 | `PAGBANK_CONNECT_EMAIL_DOMAIN` | opcional. Domínio do alias da subconta (`parceiros+<venue_id>@domínio`). Sem a variável, usa `escapematch.com.br` e registra um aviso no log. Um valor que não é domínio também cai nesse fallback, com aviso. |
 
@@ -125,10 +125,10 @@ supabase functions deploy cancel-house-group
 supabase functions deploy pagbank-webhook --no-verify-jwt
 supabase functions deploy configure-venue-fiscal
 supabase functions deploy invoice-document
-supabase secrets set PAGBANK_TOKEN=… PAGBANK_BASE_URL=https://sandbox.api.pagseguro.com PAGBANK_WEBHOOK_SECRET=…
+supabase secrets set PAGBANK_TOKEN=… PAGBANK_ENV=production PAGBANK_WEBHOOK_SECRET=…
 ```
 
-No painel do PagBank sandbox, o webhook aponta para `https://eujlhicairvksvmssruz.supabase.co/functions/v1/pagbank-webhook` com o mesmo token. Eventos: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_REFUNDED` e `PAYMENT_AUTHORIZED`.
+No painel da PagBank, o webhook aponta para `https://eujlhicairvksvmssruz.supabase.co/functions/v1/pagbank-webhook` com o mesmo token. A notificação traz o status da cobrança (`PAID`, `AUTHORIZED`, `CANCELED`, `DECLINED`, `REFUNDED`).
 
 A EscapeMatch Demo não recebe `walletId` no SQL. Com a chave já gravada, entre como admin e chame `provision-venue-wallet` sem `venue_id` (ou com o id da demo). Ela cria a subconta sandbox. O sandbox limita 20 subcontas por dia. Estornar um Pix logo depois de pago pode falhar se a taxa do PagBank deixar o saldo insuficiente: deixe saldo na conta raiz do sandbox.
 
@@ -138,7 +138,7 @@ O PagBank não oferece SDK de navegador para tokenizar o cartão. Quem recebe n�
 
 Por reserva paga e com o grupo confirmado, nascem duas linhas em `fiscal_invoices`. A subconta da casa emite a NFS-e do serviço para o jogador (`POST /v3/invoices` e em seguida `/authorize`). A conta raiz emite só a NFS-e da comissão, contra a casa. Casa com CPF recebe o split e a nota de serviço fica `sem_emissao`. CNPJ ou MEI sem inscrição municipal, código de serviço ou alíquota de ISS também fica sem emissão.
 
-No sandbox (`PAGBANK_BASE_URL` com `sandbox.api.pagseguro.com`) a função não chama `/v3/invoices`. Ela grava status `simulated`, um número `TESTE-…` e links de PDF e XML. Em produção, troque `PAGBANK_TOKEN` e `PAGBANK_BASE_URL` para `https://api.pagseguro.com`. A emissão fica desligada até `FISCAL_INVOICE_EMISSION=on`. Sem isso, a nota que seria enviada fica `scheduled`, sem chamar o PagBank, e a cobrança segue. Com a chave ligada, uma trava `processing` impede emissão dupla. Falha por certificado ou PagBank indisponível fica `error` e pode ser tentada de novo até 5 vezes. Uma linha `processing` parada há 15 minutos procura a nota existente antes de criar outra. A configuração fiscal da plataforma, se quiser outra que não o padrão, entra em `FISCAL_SERVICE_CODE`, `FISCAL_SERVICE_NAME` e `FISCAL_ISS`.
+No sandbox (`PAGBANK_ENV=sandbox`) a função não chama `/v3/invoices`. Ela grava status `simulated`, um número `TESTE-…` e links de PDF e XML. Em produção, `PAGBANK_ENV=production` (ou ausente) usa `https://api.pagseguro.com`. A emissão fica desligada até `FISCAL_INVOICE_EMISSION=on`. Sem isso, a nota que seria enviada fica `scheduled`, sem chamar o PagBank, e a cobrança segue. Com a chave ligada, uma trava `processing` impede emissão dupla. Falha por certificado ou PagBank indisponível fica `error` e pode ser tentada de novo até 5 vezes. Uma linha `processing` parada há 15 minutos procura a nota existente antes de criar outra. A configuração fiscal da plataforma, se quiser outra que não o padrão, entra em `FISCAL_SERVICE_CODE`, `FISCAL_SERVICE_NAME` e `FISCAL_ISS`.
 
 A `apiKey` da subconta volta só na criação da conta PagBank. `provision-venue-wallet` grava em `venue_provider_keys`. Essa tabela não tem política de leitura para o app. A resposta da função continua só com `wallet_id`.
 

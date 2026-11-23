@@ -7,23 +7,20 @@ import {
   paymentRefForRead,
   paymentTransition,
   requestedChargeStatus,
-  splitDivergenceEvent,
 } from "./charge_patch.ts";
 
 const now = "2026-11-05T18:00:00.000Z";
 const earlier = "2026-11-05T12:00:00.000Z";
 
-Deno.test("divergência de split não muda o status", () => {
-  assertEquals(
-    splitDivergenceEvent("PAYMENT_SPLIT_DIVERGENCE_BLOCK"),
-    "PAYMENT_SPLIT_DIVERGENCE_BLOCK",
-  );
-  assertEquals(
-    splitDivergenceEvent("PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED"),
-    "PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED",
-  );
-  assertEquals(splitDivergenceEvent("PAYMENT_RECEIVED"), null);
+Deno.test("status da PagBank move a cobrança e nome de evento antigo não", () => {
+  assertEquals(requestedChargeStatus("PAYMENT_RECEIVED", ""), null);
   assertEquals(requestedChargeStatus("PAYMENT_SPLIT_DIVERGENCE_BLOCK", ""), null);
+  assertEquals(requestedChargeStatus("", "PAID"), "paid");
+  assertEquals(requestedChargeStatus("", "CANCELED"), "cancelled");
+  assertEquals(requestedChargeStatus("", "DECLINED"), "failed");
+  assertEquals(requestedChargeStatus("", "PENDING"), null);
+  assertEquals(confirmedChargeStatus("CANCELED"), "cancelled");
+  assertEquals(confirmedChargeStatus("DECLINED"), "failed");
 });
 
 Deno.test("RECEIVED depois de REFUNDED não volta para paid", () => {
@@ -80,7 +77,7 @@ Deno.test("pending pode ir para paid e cancelled não sai", () => {
   assertEquals(paymentTransition("paid", "pending"), "paid");
   assertEquals(confirmedChargeStatus("RECEIVED"), "paid");
   assertEquals(confirmedChargeStatus("REFUNDED"), "refunded");
-  assertEquals(requestedChargeStatus("PAYMENT_RECEIVED", "RECEIVED"), "paid");
+  assertEquals(requestedChargeStatus("", "RECEIVED"), "paid");
 });
 
 Deno.test("estorno deixa o membro released e o GET usa o id do banco", () => {
@@ -141,8 +138,10 @@ Deno.test("o webhook confirma no PagBank e usa a transição", async () => {
   assert(source.includes("getPayment"));
   assert(source.includes("paymentRefForRead"));
   assert(source.includes("applyPaymentTransition"));
-  assert(source.includes("note_split_divergence"));
-  assert(source.includes("split_divergence"));
+  assert(source.includes("releasePaidIfClosed"));
+  assertEquals(source.includes("PAYMENT_RECEIVED"), false);
+  assertEquals(source.includes("billingType"), false);
+  assertEquals(source.includes("note_split_divergence"), false);
   assert(source.includes("confirmedChargeStatus"));
   assertEquals(source.includes("paymentChargePatch"), false);
   assertEquals(source.includes("payment_status"), false);

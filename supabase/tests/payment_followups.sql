@@ -511,3 +511,29 @@ begin
     raise exception 'service_role perdeu a wallet: %', v_wallet;
   end if;
 end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'venue_pagbank_tokens'
+      and c.relrowsecurity
+  ) or not exists (
+    select 1
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'pagbank_connect_states'
+      and c.relrowsecurity
+  ) or exists (
+    select 1
+    from pg_catalog.pg_policies
+    where schemaname = 'public'
+      and tablename in ('venue_pagbank_tokens', 'pagbank_connect_states')
+  ) then
+    raise exception 'RLS dos tokens do Connect saiu do combinado';
+  end if;
+end $$;

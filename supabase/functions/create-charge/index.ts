@@ -20,6 +20,10 @@ import {
   PixReuseRejected,
 } from "../_shared/pagbank_provider.ts";
 import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
+import {
+  finishCapturedCard,
+  releasePaidIfClosed,
+} from "../_shared/custody_release.ts";
 import { bandConfirmed } from "../_shared/group_band.ts";
 import { detachGonePix } from "../_shared/detach_gone_pix.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
@@ -651,6 +655,17 @@ export async function createCharge(
             provider_split_id: pix.splitId || null,
           }).eq("id", savedId);
           if (qrSaved.error) return json({ error: publicError("erro") }, 400);
+          if (mayCredit && status === "paid") {
+            await releasePaidIfClosed({
+              admin,
+              pagbank,
+              charge: {
+                id: savedId,
+                provider_split_id: pix.splitId,
+              },
+              groupClosed: true,
+            });
+          }
         } catch (error) {
           if (releaseReservationOnError(error)) {
             await releasePixReservation(admin, reserved.id, attemptId);
@@ -723,7 +738,7 @@ export async function createCharge(
         storedFixed ??
           Math.max(previewGross - commissionCents(previewGross, commissionBps), 0),
       );
-      let authorized: { id: string; status: string };
+      let authorized: { id: string; status: string; splitId: string };
       try {
         authorized = await pagbank.authorizeCard({
           customer: customerId,
@@ -1020,6 +1035,13 @@ export async function createCharge(
         mayCredit && status === "paid",
       );
       status = transition.status;
+      await finishCapturedCard({
+        admin,
+        pagbank,
+        chargeId: cardChargeId,
+        splitId: authorized.splitId,
+        paid: mayCredit && status === "paid",
+      });
       providerRef = stored;
       savedId = cardChargeId;
       } catch (error) {

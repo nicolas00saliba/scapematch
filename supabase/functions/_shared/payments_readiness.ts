@@ -1,7 +1,10 @@
 // Prontidão dos pagamentos. Cada campo é sim ou não.
 // Nenhum valor de segredo, URL ou e-mail sai daqui.
 
-import { pagbankProductionBaseUrl } from "./pagbank_provider.ts";
+import {
+  pagbankApiBaseUrl,
+  pagbankProductionBaseUrl,
+} from "./pagbank_provider.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { logCaught } from "./pagbank_client_error.ts";
 
@@ -48,7 +51,7 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
   return {
     pagbank_api_key: secretPresent(env.get("PAGBANK_TOKEN")),
     pagbank_base_url_production: pagbankBaseUrlIsProduction(
-      env.get("PAGBANK_BASE_URL"),
+      pagbankApiBaseUrl(env),
     ),
     pagbank_webhook_token: secretPresent(env.get("PAGBANK_WEBHOOK_SECRET")),
     pagbank_webhook_email: secretPresent(env.get("PAGBANK_WEBHOOK_EMAIL")),

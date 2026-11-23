@@ -41,6 +41,14 @@ Deno.test("produção é o padrão e sandbox só com a env", () => {
     },
   });
   assertEquals(forced.sandbox, true);
+  const ignored = PagBankProvider.fromEnv({
+    get: (name) => {
+      if (name === "PAGBANK_TOKEN") return "tok";
+      if (name === "PAGBANK_BASE_URL") return pagbankSandboxBaseUrl;
+      return undefined;
+    },
+  });
+  assertEquals(ignored.sandbox, false);
   assertEquals(pagbankSandboxBaseUrl.includes("sandbox"), true);
   assertEquals(pagbankProductionBaseUrl, "https://api.pagseguro.com");
 });
@@ -367,4 +375,52 @@ Deno.test("erro da tokenização não ecoa o cartão", async () => {
   const message = error instanceof Error ? error.message : "";
   assertEquals(message.includes("4111111111111111"), false);
   assertEquals(message.includes("123"), false);
+});
+
+Deno.test("Connect troca o code e renova o refresh token", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const headers: Record<string, string>[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    assertEquals(url, `${pagbankProductionBaseUrl}/oauth2/token`);
+    bodies.push(JSON.parse(String(init?.body ?? "{}")));
+    headers.push({
+      id: new Headers(init?.headers).get("X_CLIENT_ID") ?? "",
+      secret: new Headers(init?.headers).get("X_CLIENT_SECRET") ?? "",
+    });
+    const grant = bodies.at(-1)?.grant_type;
+    return Promise.resolve(Response.json({
+      access_token: grant === "refresh_token" ? "access-novo" : "access-1",
+      refresh_token: grant === "refresh_token" ? "refresh-novo" : "refresh-1",
+      expires_in: 3600,
+      account_id: "ACCO_CASA",
+    }));
+  };
+  const client = provider(fetchFn);
+  const exchanged = await client.exchangeConnectCode({
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    code: "code-1",
+    redirectUri: "https://parceiro.escapematch.com.br/pagbank/retorno",
+  });
+  assertEquals(exchanged.accessToken, "access-1");
+  assertEquals(exchanged.refreshToken, "refresh-1");
+  assertEquals(exchanged.expiresIn, 3600);
+  assertEquals(exchanged.accountId, "ACCO_CASA");
+  assertEquals(bodies[0].grant_type, "authorization_code");
+  assertEquals(bodies[0].code, "code-1");
+  assertEquals(
+    bodies[0].redirect_uri,
+    "https://parceiro.escapematch.com.br/pagbank/retorno",
+  );
+  const refreshed = await client.refreshConnectToken({
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    refreshToken: "refresh-1",
+  });
+  assertEquals(refreshed.accessToken, "access-novo");
+  assertEquals(refreshed.refreshToken, "refresh-novo");
+  assertEquals(bodies[1].grant_type, "refresh_token");
+  assertEquals(bodies[1].refresh_token, "refresh-1");
+  assertEquals(headers[0].id, "client-id");
+  assertEquals(headers[1].secret, "client-secret");
 });

@@ -1,5 +1,6 @@
 // Conciliação diária. Só GET no PagBank. Não cria cobrança, estorno nem transferência.
 
+import { pagbankApiBaseUrl } from "./pagbank_provider.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
 
@@ -418,7 +419,7 @@ export async function handleLedgerReconcile(
   if (!(await secretMatches(header, secret))) {
     return json({ error: "not authenticated" }, 401);
   }
-  const base = (deps.env.get("PAGBANK_BASE_URL") ?? "").trim().replace(/\/+$/, "");
+  const base = pagbankApiBaseUrl(deps.env);
   const apiKey = (deps.env.get("PAGBANK_TOKEN") ?? "").trim();
   if (!base.startsWith("https://") || apiKey === "") {
     return json({ error: "config_ausente" }, 503);

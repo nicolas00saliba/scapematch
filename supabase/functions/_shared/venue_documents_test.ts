@@ -278,20 +278,24 @@ Deno.test("sem sessão, sem papel ou sem reautenticação não consulta o PagBan
   assertEquals(called, false);
 });
 
-Deno.test("URL que não é a API oficial não é chamada", async () => {
-  let called = false;
+Deno.test("PAGBANK_BASE_URL estranha não tira a chamada da API oficial", async () => {
+  let called = "";
   const response = await handleVenueDocuments(
     request({ action: "list", venue_id: venueId }),
     deps({
       base: "https://api.pagseguro.com.evil.com/v3",
-      fetchFn: () => {
-        called = true;
-        return Promise.resolve(new Response(""));
+      fetchFn: (url) => {
+        called = String(url);
+        if (String(url).endsWith("/myAccount/status")) {
+          return jsonResponse({ documentation: "PENDING", general: "PENDING" });
+        }
+        return jsonResponse({ data: [] });
       },
     }),
   );
-  assertEquals(response.status, 503);
-  assertEquals(called, false);
+  assertEquals(response.status, 200);
+  assertEquals(called.startsWith(pagbankSandboxBaseUrl), true);
+  assertEquals(called.includes("evil"), false);
 });
 
 Deno.test("admin sem MFA não lista nem executa outra ação", async () => {
@@ -456,7 +460,10 @@ function deps(input: {
   return {
     env: {
       get: (name) => {
-        if (name === "PAGBANK_BASE_URL") return input.base ?? pagbankSandboxBaseUrl;
+        if (name === "PAGBANK_ENV") {
+          return input.base === pagbankProductionBaseUrl ? "production" : "sandbox";
+        }
+        if (name === "PAGBANK_BASE_URL") return input.base ?? "";
         if (name === "PAGBANK_POINTS_RESERVE_TOKEN") return "chave-reserva";
         return "";
       },

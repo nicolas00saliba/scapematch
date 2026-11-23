@@ -3,8 +3,10 @@ import { clientFailure, logCaught } from "../_shared/pagbank_client_error.ts";
 import {
   PagBankProvider,
   isPagBankSandbox,
+  pagbankApiBaseUrl,
   pagbankSignatureMatches,
 } from "../_shared/pagbank_provider.ts";
+import { releasePaidIfClosed } from "../_shared/custody_release.ts";
 import { bandConfirmed } from "../_shared/group_band.ts";
 import { bindJson } from "../_shared/http.ts";
 import {
@@ -16,7 +18,6 @@ import {
   movesMoney,
   paymentRefForRead,
   requestedChargeStatus,
-  splitDivergenceEvent,
 } from "../_shared/charge_patch.ts";
 import { applyPaymentTransition } from "../_shared/ledger.ts";
 import { syncPayerDocument } from "../_shared/payer_document.ts";
@@ -39,46 +40,33 @@ Deno.serve(async (req) => {
     const payload = JSON.parse(raw) as {
       id?: string;
       status?: string;
-      event?: string;
       charges?: { id?: string; status?: string }[];
-      payment?: { id?: string; status?: string; billingType?: string };
     };
-    const charge = payload.charges?.find((item) => item?.id);
-    paymentId = charge?.id ?? payload.payment?.id ?? payload.id ?? "";
-    const paymentStatus = charge?.status ?? payload.payment?.status ??
-      payload.status ?? "";
+    const notice = payload.charges?.find((item) => item?.id);
+    paymentId = notice?.id ?? payload.id ?? "";
+    const paymentStatus = notice?.status ?? payload.status ?? "";
     if (!paymentId) return json({ ok: true });
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
-    const divergence = splitDivergenceEvent(payload?.event ?? "");
-    if (divergence) {
-      console.error(`split_divergence ${divergence} ${paymentId}`);
-      await admin.rpc("note_split_divergence", {
-        p_provider_ref: paymentId,
-        p_event: divergence,
-      });
-    }
-
     const { data: charge } = await admin
       .from("payment_charges")
       .select(
-        "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref",
+        "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at",
       )
       .eq("provider_ref", paymentId)
       .maybeSingle();
     if (!charge) return json({ ok: true });
 
-    const requested = requestedChargeStatus(
-      payload.event ?? "",
-      paymentStatus,
-    );
+    const requested = requestedChargeStatus("", paymentStatus);
     if (!requested) return json({ ok: true });
 
     let next = requested;
-    if (movesMoney(requested)) {
+    const confirmRemote = movesMoney(requested) || requested === "cancelled" ||
+      requested === "failed";
+    if (confirmRemote) {
       const providerRef = paymentRefForRead(charge.provider_ref, paymentId);
       if (!providerRef) throw new Error("ledger_write_failed");
       const pagbank = PagBankProvider.fromEnv(Deno.env);
@@ -101,11 +89,20 @@ Deno.serve(async (req) => {
     const result = await applyPaymentTransition(admin, charge.id, next, credit);
     const status = result.status;
 
-    const sandbox = isPagBankSandbox(
-      Deno.env.get("PAGBANK_BASE_URL") ?? "https://sandbox.api.pagseguro.com",
-    );
+    const sandbox = isPagBankSandbox(pagbankApiBaseUrl(Deno.env));
     const pagbank = sandbox ? undefined : safePagBank();
     if (status === "paid") {
+      const live = pagbank ?? safePagBank();
+      if (live) {
+        await releasePaidIfClosed({
+          admin,
+          pagbank: live,
+          charge,
+          groupClosed: credit,
+        }).catch((error) => {
+          logCaught("custody_release_failed", error);
+        });
+      }
       await settlePaidChargeReserve(admin, Deno.env, charge.id).catch(
         (error) => {
           logCaught("pagbank-webhook", error);

@@ -6,6 +6,7 @@ import {
   reconcilePagBankTimeoutMs,
   reconcilePayments,
 } from "../_shared/reconcile_payments.ts";
+import { retryPendingCustodyReleases } from "../_shared/custody_release.ts";
 import {
   expireUnconfirmedGroups,
   settleAuthorizedCards,
@@ -58,6 +59,7 @@ export async function handleReconcile(
       }
     }
     await settleAuthorizedCards(admin, pagbank);
+    await retryPendingCustodyReleases(admin, pagbank);
     const released = await admin.rpc("release_due_scape_points");
     if (released.error) throw new Error("points");
     return json(reconciled);

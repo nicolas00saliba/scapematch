@@ -17,7 +17,7 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 | Campo | Onde olha |
 | --- | --- |
 | `pagbank_api_key` | env `PAGBANK_TOKEN` não vazia |
-| `pagbank_base_url_production` | env `PAGBANK_BASE_URL` é exatamente `https://api.pagseguro.com` |
+| `pagbank_base_url_production` | `PAGBANK_ENV` ausente ou `production` (base `https://api.pagseguro.com`). `sandbox` conta como não |
 | `pagbank_webhook_token` | env `PAGBANK_WEBHOOK_SECRET` não vazia |
 | `pagbank_webhook_email` | env `PAGBANK_WEBHOOK_EMAIL` não vazia |
 | `venue_withdrawals_secret` | env `VENUE_WITHDRAWALS_SECRET` não vazia, ou Vault `venue_withdrawals_secret` não vazio |
@@ -27,7 +27,7 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 | `vault_ledger_reconcile_secret` | Vault `ledger_reconcile_secret` não vazio |
 | `venue_payouts_enabled` | `venue_payouts_settings.enabled` |
 
-Sandbox (`https://sandbox.api.pagseguro.com`), URL vazia e qualquer outro host contam como não.
+`PAGBANK_ENV=sandbox` conta como não. `PAGBANK_BASE_URL` não entra nessa conta.
 
 ## Migration
 
@@ -37,12 +37,12 @@ Aplicar no projeto antes de publicar a função `payments-readiness` e antes de 
 
 ## Envs da Edge Function
 
-Trocar os placeholders. Não gravar os valores no git. `PAGBANK_BASE_URL` de produção é a URL pública abaixo, não um segredo.
+Trocar os placeholders. Não gravar os valores no git. A base de produção é `https://api.pagseguro.com` quando `PAGBANK_ENV` está ausente ou vale `production`.
 
 ```bash
 supabase secrets set --project-ref <project-ref> \
   PAGBANK_TOKEN='<chave da conta PagBank de produção>' \
-  PAGBANK_BASE_URL='https://api.pagseguro.com' \
+  PAGBANK_ENV='production' \
   PAGBANK_WEBHOOK_SECRET='<token de 32 a 255 caracteres, sem espaço>' \
   PAGBANK_WEBHOOK_EMAIL='<email que o PagBank usa no webhook>' \
   VENUE_WITHDRAWALS_SECRET='<segredo longo, o mesmo do Vault>'

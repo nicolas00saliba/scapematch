@@ -375,7 +375,7 @@ class CommunityBoard {
           kind: NoticeKind.paymentDeadline,
           title: 'Prazo do grupo perto',
           body:
-              'O prazo para confirmar ${group.roomName} está perto. Nada é cobrado nesta versão.',
+              'O prazo para confirmar ${group.roomName} está perto. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.',
           at: now,
           groupId: group.id,
         );

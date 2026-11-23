@@ -1,4 +1,5 @@
 import { logCaught } from "./pagbank_client_error.ts";
+import { releaseHeldSplit } from "./custody_release.ts";
 import { providerPaymentGone, PagBankProvider } from "./pagbank_provider.ts";
 import { issuePaidInvoices } from "./issue_invoices.ts";
 import {
@@ -32,6 +33,7 @@ type ChargeView = ChargeRow & {
   provider_ref: string | null;
   billing_type: string;
   provider_split_id?: string | null;
+  custody_released_at?: string | null;
 };
 
 /// Admin, criador e dono da casa liquidam ou liberam.
@@ -107,7 +109,7 @@ export async function settleGroup(
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type, provider_split_id",
+      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type, provider_split_id, custody_released_at",
     )
     .eq("group_id", groupId);
 
@@ -130,7 +132,7 @@ export async function settleGroup(
         sandbox: pagbank.sandbox,
         pagbank: pagbank.sandbox ? undefined : pagbank,
       });
-      await releaseHeldSplit(pagbank, item.provider_split_id);
+      await releaseHeldSplit(admin, pagbank, item);
     }
   }
 }
@@ -221,7 +223,7 @@ async function captureAuthorizedCard(
       sandbox: pagbank.sandbox,
       pagbank: pagbank.sandbox ? undefined : pagbank,
     });
-    await releaseHeldSplit(pagbank, row.provider_split_id);
+    await releaseHeldSplit(admin, pagbank, row);
   } catch (error) {
     await releaseCardCaptureClaim(admin, row.id);
     throw error;
@@ -234,20 +236,6 @@ export function goneProviderLocalStatus(
   status: string,
 ): "refunded" | "cancelled" {
   return status.trim().toUpperCase() === "REFUNDED" ? "refunded" : "cancelled";
-}
-
-/// A custódia só sai depois da captura ou do Pix pago. Falha aqui não desfaz o pago.
-async function releaseHeldSplit(
-  pagbank: PagBankProvider,
-  splitId: string | null | undefined,
-): Promise<void> {
-  const id = (splitId ?? "").trim();
-  if (!id) return;
-  try {
-    await pagbank.releaseCustody(id, []);
-  } catch (error) {
-    logCaught("settle-charges", error);
-  }
 }
 
 /// Sem a função no banco, segue em frente: a leitura do status no PagBank

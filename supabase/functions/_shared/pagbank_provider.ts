@@ -198,6 +198,15 @@ export function pagbankBaseUrlIsProduction(baseUrl: string): boolean {
   return baseUrl.trim().replace(/\/$/, "") === pagbankProductionBaseUrl;
 }
 
+/// Produção é o padrão. Sandbox só com PAGBANK_ENV=sandbox.
+/// PAGBANK_BASE_URL não escolhe o host.
+export function pagbankApiBaseUrl(
+  env: { get(name: string): string | undefined },
+): string {
+  const mode = (env.get("PAGBANK_ENV") ?? "production").trim().toLowerCase();
+  return mode === "sandbox" ? pagbankSandboxBaseUrl : pagbankProductionBaseUrl;
+}
+
 /// SHA-256 hex de `{segredo}-{corpo cru}`. O corpo não pode ser reformatado.
 export async function pagbankAuthenticityToken(
   secret: string,
@@ -300,10 +309,7 @@ export class PagBankProvider {
     fetchImpl?: PagBankFetch,
   ): PagBankProvider {
     const apiKey = env.get("PAGBANK_TOKEN") ?? "";
-    const mode = (env.get("PAGBANK_ENV") ?? "production").trim().toLowerCase();
-    const baseUrl = mode === "sandbox"
-      ? pagbankSandboxBaseUrl
-      : pagbankProductionBaseUrl;
+    const baseUrl = pagbankApiBaseUrl(env);
     const account = env.get("PAGBANK_ACCOUNT_ID") ?? "";
     const baseFetch = fetchImpl ?? fetch;
     const fetchFn: PagBankFetch = timeoutMs > 0

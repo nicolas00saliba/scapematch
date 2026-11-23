@@ -8,6 +8,7 @@
 // por cerca de 15 segundos; a tela pede para atualizar.
 
 import {
+  pagbankApiBaseUrl,
   pagbankProductionBaseUrl,
   pagbankSandboxBaseUrl,
   type PagBankFetch,
@@ -201,9 +202,7 @@ export async function handleVenueDocuments(
     if (isPointsReserve(deps.env, account.walletId, apiKey)) {
       return json({ error: "reserva" }, 403);
     }
-    const base = officialPagBankBase(
-      deps.env.get("PAGBANK_BASE_URL") ?? pagbankSandboxBaseUrl,
-    );
+    const base = officialPagBankBase(pagbankApiBaseUrl(deps.env));
     if (!base) return json({ error: "pagbank_unavailable" }, 503);
     if (action === "upload") {
       const uploaded = await uploadDocument(deps, base, apiKey, body, json);

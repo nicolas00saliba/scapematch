@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { clientFailure } from "../_shared/pagbank_client_error.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
+import { retryPendingCustodyReleases } from "../_shared/custody_release.ts";
 import {
   expireUnconfirmedGroups,
   maySettle,
@@ -69,6 +70,7 @@ Deno.serve(async (req) => {
       await settleGroup(admin, pagbank, groupId);
       settled.push(groupId);
     }
+    await retryPendingCustodyReleases(admin, pagbank);
     return json({ settled });
   } catch (error) {
     const failure = clientFailure(error, "settle-charges");

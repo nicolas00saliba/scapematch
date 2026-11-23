@@ -119,7 +119,7 @@ class AccountDestinationScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         const _InfoCard(
           title: 'Os dados são de exemplo',
-          subtitle: 'Casas, salas, notícias e a carteira foram inventados. Nada é cobrado.',
+          subtitle: 'Casas, salas, notícias e a carteira foram inventados.',
         ),
       ],
       AccountDestination.policies => [

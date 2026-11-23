@@ -12,7 +12,7 @@
 // Autorização de evento crítico não liquida a reserva.
 
 import {
-  pagbankSandboxBaseUrl,
+  pagbankApiBaseUrl,
   fixedReaisFromCents,
   isOfficialPagBankBase,
   type PagBankFetch,
@@ -462,8 +462,7 @@ export async function fundCashbackReserve(
   chargeId: string,
   fetchFn: PagBankFetch = fetch,
 ): Promise<void> {
-  const baseUrl = (readEnv(env, "PAGBANK_BASE_URL") || pagbankSandboxBaseUrl)
-    .replace(/\/$/, "");
+  const baseUrl = pagbankApiBaseUrl(env);
   const rootKey = readEnv(env, "PAGBANK_TOKEN");
   const reserveKey = readEnv(env, "PAGBANK_POINTS_RESERVE_TOKEN");
   const reserveWallet = readEnv(env, "PAGBANK_POINTS_RESERVE_ACCOUNT_ID").trim();
@@ -532,8 +531,7 @@ export async function settlePaidChargeReserve(
   fetchFn: PagBankFetch = fetch,
 ): Promise<void> {
   const client = admin as { rpc: ReserveRpc; from: (table: string) => unknown };
-  const baseUrl = (readEnv(env, "PAGBANK_BASE_URL") || pagbankSandboxBaseUrl)
-    .replace(/\/$/, "");
+  const baseUrl = pagbankApiBaseUrl(env);
   const apiKey = readEnv(env, "PAGBANK_POINTS_RESERVE_TOKEN");
   if (!reserveTransferAllowed(baseUrl, apiKey)) return;
   const topup = await readRow(
