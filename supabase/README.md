@@ -67,9 +67,9 @@ tool/apply_auth_email_templates.sh
 - O split manda `(100% − comissão)` para `venues.asaas_wallet_id`. A comissão é `platform_settings.commission_bps` (padrão 2500, 25%, se o Admin não tiver gravado outra) e fica na conta Asaas que cria a cobrança. Uma casa com linha em `venue_commissions` fica na taxa dela.
 - Scape Points (`20261108140000_scape_points.sql`, `20261108150000_payer_cpf_gate.sql`, `20261108160000_referral_payer_antifraud.sql` e `20261108170000_modelo2_complete.sql`) lançam a indicação quando a cobrança fica paga. Pagamento por terceiro libera. O pagador que é o próprio indicador não gera a indicação dele. O mesmo pagador premia no máximo 3 contas. Contas do mesmo indicador no mesmo aparelho ficam `em_revisao`. O desconto de 20% da primeira reserva qualificada sai da comissão e abaixa só a parte do jogador. O crédito B2C/B2B libera em 30 dias e entra no split da próxima cobrança da casa. O cashback de 1% (`cashback_bps`) entra em toda reserva paga, sem as travas do pagador, e também sai da comissão. A casa não perde líquido. O cron de reconcile libera o que completou 30 dias e não está em revisão. O app não escreve no ledger.
 
-## Asaas (sandbox na demo)
+## Provedor anterior (histórico, não usar)
 
-A implementação é `AsaasProvider` em `supabase/functions/_shared/asaas_provider.ts`. O app não chama `api-sandbox.asaas.com`. Quem chama é a Edge Function.
+Em 20/11/2026 esse provedor saiu do código. Pix é Woovi e cartão é Mercado Pago. A tabela abaixo descreve o comportamento antigo. Segredos e funções para apagar depois do merge estão em `docs/pagamentos-woovi-mercadopago.md`.
 
 | Função | JWT | O que faz |
 | --- | --- | --- |

@@ -107,8 +107,8 @@ void main() {
 
   test('erros de create-charge viram texto e segredo não volta', () {
     expect(
-      liveChargeErrorMessage({'error': 'A casa ainda não tem subconta Asaas.'}),
-      'A casa ainda não tem subconta Asaas.',
+      liveChargeErrorMessage({'error': 'A casa ainda não tem subconta.'}),
+      'A casa ainda não tem subconta.',
     );
     expect(
       liveChargeErrorMessage('{"error":"card_declined"}'),
@@ -120,7 +120,7 @@ void main() {
     );
     expect(
       liveChargeErrorMessage({'error': 'asaas_unavailable'}),
-      contains('Asaas'),
+      contains('provedor'),
     );
     expect(
       liveChargeErrorMessage({'error': 'aact_nao_mostrar'}),

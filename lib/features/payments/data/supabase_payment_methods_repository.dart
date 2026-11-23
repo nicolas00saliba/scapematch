@@ -28,7 +28,7 @@ class SupabasePaymentMethodsRepository implements PaymentMethodsRepository {
       methods.add(
         PaymentMethod(
           id: id,
-          brand: cardBrandFromAsaas(row['brand']?.toString() ?? ''),
+          brand: cardBrandFromCode(row['brand']?.toString() ?? ''),
           last4: last4,
           nickname: 'Cartão',
         ),
@@ -53,7 +53,7 @@ class SupabasePaymentMethodsRepository implements PaymentMethodsRepository {
     final saved = await flow.tokenize(card);
     return PaymentMethod(
       id: saved.savedCardId,
-      brand: cardBrandFromAsaas(saved.brand),
+      brand: cardBrandFromCode(saved.brand),
       last4: saved.last4,
       nickname: card.holderName,
     );
@@ -69,7 +69,7 @@ class SupabasePaymentMethodsRepository implements PaymentMethodsRepository {
   }
 }
 
-CardBrand cardBrandFromAsaas(String value) {
+CardBrand cardBrandFromCode(String value) {
   final text = value.toLowerCase();
   if (text.contains('visa')) {
     return CardBrand.visa;

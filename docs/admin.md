@@ -1,5 +1,7 @@
 # EscapeMatch Admin
 
+Desde 20/11/2026 a subconta nova é Woovi, pela chave Pix. A taxa histórica do painel lê `payment_charges.asaas_fee_cents` e não estima valor novo.
+
 Painel exclusivo do Nícolas. Não há link a partir do app do jogador, do Parceiro, das demos nem da landing.
 
 ## Onde fica

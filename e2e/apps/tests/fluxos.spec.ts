@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // Ambiente de teste ou demonstração. Nunca a produção com pagamento real.
-// O sandbox do Asaas fica nas Edge Functions. Este teste para na tela de
+// Woovi e Mercado Pago ficam nas Edge Functions. Este teste para na tela de
 // pagamento e não confirma a cobrança.
 //
 // Secrets, todos opcionais. Sem eles o teste fica pendente:

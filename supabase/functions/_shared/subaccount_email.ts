@@ -1,9 +1,4 @@
-import {
-  asaasStatus,
-  isDuplicateSubaccountEmail,
-} from "./asaas_client_error.ts";
-
-/// Domínio do alias quando `ASAAS_SUBACCOUNT_EMAIL_DOMAIN` não está definida
+/// Domínio do alias quando `SUBACCOUNT_EMAIL_DOMAIN` não está definida
 /// ou não é um domínio. É um domínio nosso. O fallback avisa no log.
 export const fallbackSubaccountDomain = "escapematch.com.br";
 
@@ -36,7 +31,7 @@ function warnEmailDomainFallback(
 export function subaccountEmailDomain(
   env: { get(name: string): string | undefined },
 ): string {
-  const raw = (env.get("ASAAS_SUBACCOUNT_EMAIL_DOMAIN") ?? "").trim()
+  const raw = (env.get("SUBACCOUNT_EMAIL_DOMAIN") ?? "").trim()
     .toLowerCase();
   if (!raw) {
     warnEmailDomainFallback("missing_email_domain");
@@ -86,14 +81,11 @@ export function subaccountEmailPlan(
   return { primary: own ?? alias, alias };
 }
 
-/// Segunda tentativa só quando o Asaas recusa o e-mail por já existir.
+/// Não há segunda tentativa em outro provedor.
 export function nextSubaccountEmail(
-  current: string,
-  alias: string,
-  error: unknown,
+  _current: string,
+  _alias: string,
+  _error: unknown,
 ): string | null {
-  if (current === alias) return null;
-  if (asaasStatus(error) !== 400) return null;
-  if (!isDuplicateSubaccountEmail(error)) return null;
-  return alias;
+  return null;
 }

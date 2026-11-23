@@ -23,7 +23,7 @@ type Admin = {
   ): PromiseLike<{ data: unknown; error: LedgerRpcError }>;
 };
 
-import { fundCashbackReserve } from "./points_reserve_asaas.ts";
+import { fundCashbackReserve } from "./points_reserve.ts";
 import {
   DbRpcError,
   isSerializationConflict,

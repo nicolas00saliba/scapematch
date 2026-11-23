@@ -41,12 +41,12 @@ abstract final class GroupMessages {
 
   static const simulatedPixNotice = 'Pix simulado. O código abaixo não cobra.';
 
-  static const livePixHint = 'O código Pix vem do Asaas quando você confirma.';
+  static const livePixHint = 'O código Pix vem da Woovi quando você confirma.';
 
   static const livePixNotice =
       'O Pix é pago agora. Se o grupo não confirmar, o valor volta.';
 
-  static const livePixReady = 'Pix do Asaas. Escaneie o QR ou copie o código.';
+  static const livePixReady = 'Pix da Woovi. Escaneie o QR ou copie o código.';
 
   static const simulatePayment = 'Simular pagamento';
 
