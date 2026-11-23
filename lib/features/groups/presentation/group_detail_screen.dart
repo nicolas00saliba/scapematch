@@ -472,20 +472,29 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       reference: group.id,
       points: spend,
       discountCents: spend?.discountCents ?? 0,
-      onPay: (kind, {savedCardId}) async {
+      quoteInstallments: (cents) {
+        return ref.read(groupRepositoryProvider).quoteCardInstallments(cents);
+      },
+      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
         final result = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)
             .payShare(
               kind,
               savedCardId: savedCardId,
               points: spend?.selected ?? 0,
+              installments: installments,
+              expectedAmountCents: expectedAmountCents,
             );
         return ShareChargeView.fromResult(result);
       },
-      onPayNewCard: (card) async {
+      onPayNewCard: (card, {installments = 1, expectedAmountCents}) async {
         final result = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)
-            .payWithNewCard(card);
+            .payWithNewCard(
+              card,
+              installments: installments,
+              expectedAmountCents: expectedAmountCents,
+            );
         return ShareChargeView.fromResult(result);
       },
     );

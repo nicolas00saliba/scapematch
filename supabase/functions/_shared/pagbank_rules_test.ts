@@ -7,6 +7,7 @@ import {
   groupPaymentAction,
   holdUntilGroupConfirms,
   installmentCharge,
+  installmentMenu,
   pagbankSplitBody,
   venueShareCents,
 } from "./pagbank_rules.ts";
@@ -82,6 +83,27 @@ Deno.test("3x não manda juro do comprador; 4x soma o juro cotado", () => {
       .buyer.interest,
     { total: 640, installments: 1 },
   );
+});
+
+Deno.test("a grade habilita 1x a 3x sem juro e 4x só com a cotação", () => {
+  const below = installmentMenu({ principalCents: 14_999 });
+  assertEquals(below.length, 12);
+  assertEquals(below[0].enabled, true);
+  assertEquals(below[0].amountCents, 14_999);
+  assertEquals(below.filter((item) => item.enabled).length, 1);
+
+  const open = installmentMenu({
+    principalCents: 20_000,
+    interestByCount: { 4: 640 },
+  });
+  assertEquals(open[2].installments, 3);
+  assertEquals(open[2].merchantAbsorbsInterest, true);
+  assertEquals(open[2].amountCents, 20_000);
+  assertEquals(open[2].enabled, true);
+  assertEquals(open[3].installments, 4);
+  assertEquals(open[3].amountCents, 20_640);
+  assertEquals(open[3].enabled, true);
+  assertEquals(open[4].enabled, false);
 });
 
 Deno.test("abaixo de R$ 150 só cabe 1x", () => {

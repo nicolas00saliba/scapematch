@@ -83,6 +83,9 @@ String liveChargeErrorMessage(Object? details) {
     'pix_reuse_mismatch' => 'Não foi possível reutilizar o Pix desta parte.',
     'saved_card_id é obrigatório' => liveChooseCard,
     'cartão não encontrado' => 'Não encontramos esse cartão.',
+    'parcelas' => 'Essa parcela não está disponível para este valor.',
+    'valor_parcelas' =>
+      'O valor das parcelas mudou. Escolha de novo antes de pagar.',
     'group not found' => 'Não encontramos esse grupo.',
     'session started' => 'Esta sessão já começou.',
     'not member' => 'Você não está neste grupo.',

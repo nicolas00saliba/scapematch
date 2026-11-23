@@ -9,6 +9,8 @@ import 'package:scapematch/core/ui/motion.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
+import 'package:scapematch/features/payments/presentation/installment_grid.dart';
 import 'package:scapematch/features/payments/domain/live_charge.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/card_entry_fields.dart';
@@ -81,9 +83,18 @@ Future<PaySheetOutcome> showPayShareSheet({
   required Future<ShareChargeView> Function(
     PaymentMethodKind kind, {
     String? savedCardId,
+    int installments,
+    int? expectedAmountCents,
   })
   onPay,
-  Future<ShareChargeView> Function(CardDraft card)? onPayNewCard,
+  Future<ShareChargeView> Function(
+    CardDraft card, {
+    int installments,
+    int? expectedAmountCents,
+  })?
+  onPayNewCard,
+  Future<List<CardInstallmentOption>> Function(int principalCents)?
+  quoteInstallments,
   PointSpendChoice? points,
   int discountCents = 0,
 }) async {
@@ -99,6 +110,7 @@ Future<PaySheetOutcome> showPayShareSheet({
         reference: reference,
         onPay: onPay,
         onPayNewCard: onPayNewCard,
+        quoteInstallments: quoteInstallments,
         points: points,
         discountCents: discountCents > 0
             ? discountCents
@@ -116,6 +128,7 @@ class PayShareSheet extends ConsumerStatefulWidget {
     required this.reference,
     required this.onPay,
     this.onPayNewCard,
+    this.quoteInstallments,
     this.points,
     this.discountCents = 0,
   });
@@ -127,9 +140,18 @@ class PayShareSheet extends ConsumerStatefulWidget {
   final Future<ShareChargeView> Function(
     PaymentMethodKind kind, {
     String? savedCardId,
+    int installments,
+    int? expectedAmountCents,
   })
   onPay;
-  final Future<ShareChargeView> Function(CardDraft card)? onPayNewCard;
+  final Future<ShareChargeView> Function(
+    CardDraft card, {
+    int installments,
+    int? expectedAmountCents,
+  })?
+  onPayNewCard;
+  final Future<List<CardInstallmentOption>> Function(int principalCents)?
+  quoteInstallments;
 
   @override
   ConsumerState<PayShareSheet> createState() => _PayShareSheetState();
@@ -145,6 +167,9 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   Uint8List? _issuedPixImage;
   String? _cardId = payTestCard.id;
   var _usePoints = false;
+  var _installments = 1;
+  var _quoteToken = 0;
+  List<CardInstallmentOption>? _remotePlans;
   final _entry = CardEntryControllers();
 
   bool get _done => _seat != null;
@@ -156,6 +181,44 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
       return points.chargedCents - discount;
     }
     return widget.amountCents - discount;
+  }
+
+  List<CardInstallmentOption> get _plans {
+    final remote = _remotePlans;
+    if (remote != null && remote.isNotEmpty) return remote;
+    return cardInstallmentOptions(principalCents: _chargedCents);
+  }
+
+  CardInstallmentOption _chosenPlan() {
+    final plans = _plans;
+    for (final plan in plans) {
+      if (plan.count == _installments && plan.enabled) return plan;
+    }
+    return plans.first;
+  }
+
+  Future<void> _loadQuote() async {
+    final cents = _chargedCents;
+    final quote = widget.quoteInstallments;
+    if (quote == null || cents < minCardInstallmentCents) {
+      if (!mounted) return;
+      setState(() => _remotePlans = null);
+      return;
+    }
+    final token = ++_quoteToken;
+    try {
+      final plans = await quote(cents);
+      if (!mounted || token != _quoteToken) return;
+      setState(() {
+        _remotePlans = plans;
+        if (!_plans.any((plan) => plan.count == _installments && plan.enabled)) {
+          _installments = 1;
+        }
+      });
+    } catch (_) {
+      if (!mounted || token != _quoteToken) return;
+      setState(() => _remotePlans = null);
+    }
   }
 
   @override
@@ -239,12 +302,17 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
       return;
     }
 
+    final chosen = _chosenPlan();
     final ShareChargeView view;
     if (draft != null) {
       final payNew = widget.onPayNewCard;
       view = payNew == null
           ? const ShareChargeView(message: liveChargeFailed)
-          : await payNew(draft);
+          : await payNew(
+              draft,
+              installments: chosen.count,
+              expectedAmountCents: chosen.totalCents,
+            );
     } else if (live &&
         _method == PaymentMethodKind.card &&
         _savedCardId(_savedCards()) == null) {
@@ -259,6 +327,10 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
         _method,
         savedCardId: _method == PaymentMethodKind.card
             ? _savedCardId(_savedCards())
+            : null,
+        installments: _method == PaymentMethodKind.card ? chosen.count : 1,
+        expectedAmountCents: _method == PaymentMethodKind.card
+            ? chosen.totalCents
             : null,
       );
     }
@@ -397,7 +469,12 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                                 setState(() {
                                   _usePoints = value;
                                   widget.points!.use = value;
+                                  _installments = 1;
+                                  _remotePlans = null;
                                 });
+                                if (_method == PaymentMethodKind.card) {
+                                  _loadQuote();
+                                }
                               },
                       ),
                     ],
@@ -433,9 +510,10 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                             icon: Icons.credit_card,
                             label: 'Cartão',
                             selected: _method == PaymentMethodKind.card,
-                            onTap: () => setState(() {
-                              _method = PaymentMethodKind.card;
-                            }),
+                            onTap: () {
+                              setState(() => _method = PaymentMethodKind.card);
+                              _loadQuote();
+                            },
                           ),
                         ),
                       ],
@@ -455,13 +533,36 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                                     copied: _copied,
                                     onCopy: () => _copy(_samplePixCode),
                                   )
-                          : _CardPanel(
+                          : Column(
                               key: const Key('pay-card-panel'),
-                              cards: cards,
-                              selectedId: _displayedCardId(cards, live: live),
-                              entry: _entry,
-                              onOwnCard: live ? _toggleOwn : null,
-                              onSelect: (id) => setState(() => _cardId = id),
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'Parcelas',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                InstallmentGrid(
+                                  options: _plans,
+                                  selected: _chosenPlan().count,
+                                  onSelect: (count) =>
+                                      setState(() => _installments = count),
+                                ),
+                                const SizedBox(height: 16),
+                                _CardPanel(
+                                  cards: cards,
+                                  selectedId: _displayedCardId(
+                                    cards,
+                                    live: live,
+                                  ),
+                                  entry: _entry,
+                                  onOwnCard: live ? _toggleOwn : null,
+                                  onSelect: (id) =>
+                                      setState(() => _cardId = id),
+                                ),
+                              ],
                             ),
                     ),
                     if (_error != null) ...[
@@ -773,7 +874,6 @@ class _PixCodeView extends StatelessWidget {
 
 class _CardPanel extends StatelessWidget {
   const _CardPanel({
-    super.key,
     required this.cards,
     required this.selectedId,
     required this.entry,

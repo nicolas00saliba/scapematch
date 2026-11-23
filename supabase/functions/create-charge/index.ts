@@ -10,7 +10,7 @@ import {
   isCardDeclined,
   logProviderFailure,
 } from "../_shared/pagbank_client_error.ts";
-import { installmentCharge } from "../_shared/pagbank_rules.ts";
+import { type InstallmentCharge } from "../_shared/pagbank_rules.ts";
 import {
   providerPaymentGone,
   PagBankProvider,
@@ -76,24 +76,53 @@ import {
 } from "../_shared/saved_card.ts";
 
 type ChargeBody = {
+  action?: string;
   group_id?: string;
   billing_type?: string;
   idempotency_key?: string;
   saved_card_id?: string;
   points?: number;
   installments?: number;
+  amount_cents?: number;
+  expected_amount_cents?: number;
 };
 
 type ChargeUser = { id: string; email?: string | null };
 
-function requestedInstallments(body: ChargeBody, amountCents: number): number {
-  const raw = body.installments ?? 1;
-  const count = typeof raw === "number" && Number.isFinite(raw) ? Math.trunc(raw) : 1;
-  return installmentCharge({
-    principalCents: amountCents,
-    installments: count,
-    buyerInterestCents: 0,
-  }).installments;
+function thrownText(error: unknown): string {
+  if (!(error instanceof Error)) return "";
+  const { message } = error;
+  return message;
+}
+
+async function resolveCardPlan(
+  pagbank: PagBankProvider,
+  principalCents: number,
+  requested: number | undefined,
+  expected: number | undefined,
+  checkExpected: boolean,
+): Promise<InstallmentCharge> {
+  const count = typeof requested === "number" && Number.isFinite(requested)
+    ? Math.trunc(requested)
+    : 1;
+  let plan: InstallmentCharge;
+  try {
+    plan = await pagbank.cardPlan(principalCents, count);
+  } catch (error) {
+    const message = thrownText(error);
+    if (message === "parcelas" || message === "juros" || message === "valor") {
+      throw new Error("parcelas");
+    }
+    throw error;
+  }
+  if (
+    checkExpected &&
+    typeof expected === "number" &&
+    expected !== plan.amountCents
+  ) {
+    throw new Error("valor_parcelas");
+  }
+  return plan;
 }
 
 export type ChargeRuntime = {
@@ -137,6 +166,28 @@ export async function createCharge(
     }
 
     const body = await req.json() as ChargeBody;
+    if (body.action === "quote_installments") {
+      const cents = body.amount_cents;
+      if (typeof cents !== "number" || !Number.isInteger(cents) || cents <= 0) {
+        return json({ error: "valor" }, 400);
+      }
+      const quoted = deps?.pagbank ?? PagBankProvider.fromEnv(Deno.env);
+      const plans = await quoted.quoteCardPlans(cents);
+      return json({
+        plans: plans.map((plan) => ({
+          installments: plan.installments,
+          amount_cents: plan.amountCents,
+          buyer_interest_cents: plan.buyerInterestCents,
+          interest_free: plan.merchantAbsorbsInterest,
+          enabled: plan.enabled,
+          disabled_reason: plan.enabled
+            ? null
+            : cents < 15_000
+            ? "parcelamento a partir de R$150"
+            : "Cotação indisponível",
+        })),
+      });
+    }
     if (hasRawCardData(body)) {
       return json({ error: "A cobrança não recebe dados do cartão." }, 400);
     }
@@ -739,6 +790,23 @@ export async function createCharge(
           Math.max(previewGross - commissionCents(previewGross, commissionBps), 0),
       );
       let authorized: { id: string; status: string; splitId: string };
+      let plan: InstallmentCharge;
+      try {
+        plan = await resolveCardPlan(
+          pagbank,
+          amountCents,
+          body.installments,
+          body.expected_amount_cents,
+          true,
+        );
+      } catch (error) {
+        const message = thrownText(error);
+        if (message === "parcelas") return json({ error: "parcelas" }, 400);
+        if (message === "valor_parcelas") {
+          return json({ error: "valor_parcelas" }, 409);
+        }
+        throw error;
+      }
       try {
         authorized = await pagbank.authorizeCard({
           customer: customerId,
@@ -753,7 +821,8 @@ export async function createCharge(
           ),
           remoteIp,
           creditCardToken: owned.creditCardToken,
-          installments: requestedInstallments(body, amountCents),
+          installments: plan.installments,
+          buyerInterestCents: plan.buyerInterestCents,
         });
       } catch (error) {
         if (isCardDeclined(error)) {
@@ -782,6 +851,14 @@ export async function createCharge(
         await loseCard(chargeId, attempt);
         split.fixedValue = nextFixed;
         amountCents = nextAmount;
+        const nextPlan = await resolveCardPlan(
+          pagbank,
+          amountCents,
+          plan.installments,
+          undefined,
+          false,
+        );
+        plan = nextPlan;
         authorized = await pagbank.authorizeCard({
           customer: customerId,
           value: amountCents / 100,
@@ -792,7 +869,8 @@ export async function createCharge(
           extraSplits: await reserveSplitsFor(fixedCents, chargeId),
           remoteIp,
           creditCardToken: owned.creditCardToken,
-          installments: requestedInstallments(body, amountCents),
+          installments: plan.installments,
+          buyerInterestCents: plan.buyerInterestCents,
         });
       };
       try {

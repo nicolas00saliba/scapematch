@@ -16,6 +16,7 @@ import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/payments/domain/live_charge.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -185,12 +186,21 @@ class SupabaseGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<List<CardInstallmentOption>> quoteCardInstallments(
+    int principalCents,
+  ) {
+    return CardPaymentFlow(_invoke).quoteInstallments(principalCents);
+  }
+
+  @override
   Future<PayShareResult> payShare(
     String groupId, {
     required String userId,
     required PaymentMethodKind kind,
     String? savedCardId,
     int points = 0,
+    int installments = 1,
+    int? expectedAmountCents,
   }) {
     if (kind == PaymentMethodKind.card &&
         (savedCardId == null || savedCardId.isEmpty)) {
@@ -208,6 +218,8 @@ class SupabaseGroupRepository implements GroupRepository {
         kind: kind,
         savedCardId: savedCardId,
         points: points,
+        installments: installments,
+        expectedAmountCents: expectedAmountCents,
       );
     });
   }
@@ -217,12 +229,16 @@ class SupabaseGroupRepository implements GroupRepository {
     String groupId, {
     required String userId,
     required CardDraft card,
+    int installments = 1,
+    int? expectedAmountCents,
   }) {
     return _charge(groupId, userId, () {
       return CardPaymentFlow(_invoke).payWithNewCard(
         card: card,
         groupId: groupId,
         idempotencyKey: _chargeKey(groupId, userId),
+        installments: installments,
+        expectedAmountCents: expectedAmountCents,
       );
     });
   }

@@ -600,3 +600,44 @@ Deno.test("criação do Pix devolve o pedido e o copia-e-cola do charge", async 
   assertEquals(pix.splitId, "SPLI_CRIADO");
   assertEquals(pix.status, "PENDING");
 });
+
+Deno.test("a cotação de parcelas sai de uma consulta só", async () => {
+  let quotes = 0;
+  const fetchFn = (url: string) => {
+    if (url.includes("/charges/fees/calculate")) {
+      quotes += 1;
+      return Promise.resolve(new Response(JSON.stringify({
+        payment_methods: {
+          credit_card: {
+            visa: {
+              installment_plans: [{
+                installments: 4,
+                interest_free: false,
+                amount: {
+                  value: 20640,
+                  fees: { buyer: { interest: { total: 640 } } },
+                },
+              }],
+            },
+          },
+        },
+      }), { status: 200 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const client = provider(fetchFn);
+  const plans = await client.quoteCardPlans(20_000);
+  assertEquals(quotes, 1);
+  assertEquals(plans[0].enabled, true);
+  assertEquals(plans[2].amountCents, 20_000);
+  assertEquals(plans[2].merchantAbsorbsInterest, true);
+  assertEquals(plans[3].amountCents, 20_640);
+  assertEquals(plans[3].enabled, true);
+  assertEquals(plans[4].enabled, false);
+  const small = await client.quoteCardPlans(10_000);
+  assertEquals(quotes, 1);
+  assertEquals(small.filter((item) => item.enabled).length, 1);
+  const checked = await client.cardPlan(20_000, 4);
+  assertEquals(checked.amountCents, 20_640);
+  assertEquals(quotes, 2);
+});

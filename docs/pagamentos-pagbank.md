@@ -10,7 +10,7 @@ O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix
 
 A casa recebe a parte dela sobre o valor bruto, em centavos fixos. A taxa da PagBank sai só da comissão da conta primária (EscapeMatch). A comissão continua o campo por casa no Admin. Não há percentual fixo no código. Se a comissão for menor que a taxa, o saldo da conta primária cobre a diferença. A casa não é reduzida.
 
-Cartão até 3x sem juros (a EscapeMatch absorve). De 4x a 12x o juros vai para o jogador, cotado em `GET /charges/fees/calculate`. Abaixo de R$ 150 (`minInstallmentAmountCents = 15000`) só cabe 1x. Pontos, indicação e cashback não mudam com o meio nem com as parcelas.
+Cartão até 3x sem juros (a EscapeMatch absorve). De 4x a 12x o juros vai para o jogador, cotado em `GET /charges/fees/calculate`. Abaixo de R$ 150 (`minInstallmentAmountCents = 15000`) só cabe 1x. O app do jogador mostra a grade (à vista até 12x) e manda `installments` e `expected_amount_cents`. `create-charge` com `action: quote_installments` devolve o cardápio sem cobrar. Na cobrança o servidor cota de novo e recusa parcela inválida (`parcelas`) ou total diferente (`valor_parcelas`). Pontos, indicação e cashback não mudam com o meio nem com as parcelas.
 
 A PagBank não emite NFS-e. As linhas fiscais continuam `scheduled`. Nada chama a rede para nota.
 

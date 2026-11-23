@@ -1,6 +1,7 @@
 import 'package:dominio/dominio.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
@@ -50,7 +51,18 @@ abstract class GroupRepository {
     required PaymentMethodKind kind,
     String? savedCardId,
     int points = 0,
+    int installments = 1,
+    int? expectedAmountCents,
   });
+
+  /// Cotação de 1x a 12x. A demonstração devolve a grade local, sem juro inventado.
+  Future<List<CardInstallmentOption>> quoteCardInstallments(
+    int principalCents,
+  ) {
+    return Future.value(
+      cardInstallmentOptions(principalCents: principalCents),
+    );
+  }
 
   /// Tokeniza em `tokenize-card` e cobra em `create-charge` com o id devolvido.
   /// A demonstração não cobra.
@@ -58,6 +70,8 @@ abstract class GroupRepository {
     String groupId, {
     required String userId,
     required CardDraft card,
+    int installments = 1,
+    int? expectedAmountCents,
   }) {
     return Future.value(
       const PayShareFailure(PayShareFailureReason.unavailable),

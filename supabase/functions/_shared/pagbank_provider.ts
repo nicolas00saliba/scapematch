@@ -9,8 +9,14 @@ import {
   chargeAmountBody,
   fixedSplit,
   installmentCharge,
+  installmentMenu,
+  interestFreeInstallments,
+  maxInstallments,
+  minInstallmentAmountCents,
   pagbankSplitBody,
   type FixedSplit,
+  type InstallmentCharge,
+  type InstallmentOption,
 } from "./pagbank_rules.ts";
 import { localChargeStatus, pixMatchesCharge } from "./pix_charge.ts";
 import { redactSensitive } from "./redact.ts";
@@ -681,6 +687,57 @@ export class PagBankProvider {
     const interest = buyerInterestFromQuote(body, installments);
     if (interest == null) throw new Error("PagBank 502: juros_indisponiveis");
     return interest;
+  }
+
+  /// Uma consulta de taxas vira a grade de 1x a 12x.
+  async quoteCardPlans(principalCents: number): Promise<InstallmentOption[]> {
+    if (!Number.isInteger(principalCents) || principalCents <= 0) {
+      throw new Error("valor");
+    }
+    if (principalCents < minInstallmentAmountCents) {
+      return installmentMenu({ principalCents });
+    }
+    const query = new URLSearchParams({
+      payment_methods: "CREDIT_CARD",
+      value: String(principalCents),
+      max_installments: String(maxInstallments),
+      max_installments_no_interest: String(interestFreeInstallments),
+    });
+    const body = await this.#send(
+      `/charges/fees/calculate?${query}`,
+      undefined,
+      "GET",
+    );
+    const interestByCount: Record<number, number> = {};
+    for (
+      let count = interestFreeInstallments + 1;
+      count <= maxInstallments;
+      count++
+    ) {
+      const interest = buyerInterestFromQuote(body, count);
+      if (interest != null) interestByCount[count] = interest;
+    }
+    return installmentMenu({ principalCents, interestByCount });
+  }
+
+  /// Recalcula a parcela no servidor. Até 3x o juro do comprador é zero.
+  cardPlan(
+    principalCents: number,
+    installments = 1,
+  ): Promise<InstallmentCharge> {
+    const count = Number.isInteger(installments) ? installments : 1;
+    if (count <= interestFreeInstallments) {
+      return Promise.resolve(
+        installmentCharge({ principalCents, installments: count }),
+      );
+    }
+    return this.quoteBuyerInterest(principalCents, count).then((interest) =>
+      installmentCharge({
+        principalCents,
+        installments: count,
+        buyerInterestCents: interest,
+      })
+    );
   }
 
   /// CHAR_ vai em /charges. ORDE_ vai em /orders, como a doc de consulta do pedido.

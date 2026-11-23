@@ -147,6 +147,62 @@ export type InstallmentCharge = {
   merchantAbsorbsInterest: boolean;
 };
 
+export type InstallmentOption = InstallmentCharge & { enabled: boolean };
+
+/// Grade de 1x a 12x. Abaixo de R$ 150 só 1x fica habilitado.
+/// De 4x a 12x só habilita quando a cotação trouxe o juro do comprador.
+export function installmentMenu(input: {
+  principalCents: number;
+  interestByCount?: Readonly<Record<number, number>>;
+}): InstallmentOption[] {
+  const principal = input.principalCents;
+  if (!Number.isInteger(principal) || principal <= 0) {
+    throw new Error("valor");
+  }
+  const quoted = input.interestByCount ?? {};
+  const below = principal < minInstallmentAmountCents;
+  const options: InstallmentOption[] = [];
+  for (let count = 1; count <= maxInstallments; count++) {
+    if (below && count > 1) {
+      options.push({
+        installments: count,
+        amountCents: principal,
+        buyerInterestCents: 0,
+        merchantAbsorbsInterest: count <= interestFreeInstallments,
+        enabled: false,
+      });
+      continue;
+    }
+    if (count <= interestFreeInstallments) {
+      options.push({
+        ...installmentCharge({ principalCents: principal, installments: count }),
+        enabled: true,
+      });
+      continue;
+    }
+    const interest = quoted[count];
+    if (interest == null || !Number.isInteger(interest) || interest < 0) {
+      options.push({
+        installments: count,
+        amountCents: principal,
+        buyerInterestCents: 0,
+        merchantAbsorbsInterest: false,
+        enabled: false,
+      });
+      continue;
+    }
+    options.push({
+      ...installmentCharge({
+        principalCents: principal,
+        installments: count,
+        buyerInterestCents: interest,
+      }),
+      enabled: true,
+    });
+  }
+  return options;
+}
+
 /// 1 a 3x: o valor cobrado é o principal e o objeto de juro do comprador
 /// não vai no pedido. 4 a 12x: o juro cotado na API entra no valor e em
 /// `fees.buyer.interest`. Abaixo de R$ 150 só 1x.

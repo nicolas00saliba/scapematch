@@ -7,6 +7,7 @@ import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
@@ -48,7 +49,7 @@ void main() {
     await _open(
       tester,
       live: true,
-      onPay: (kind, {savedCardId}) async {
+      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
         calls.add((kind, savedCardId));
         return const ShareChargeView(pixCode: _realPix, pixImageBase64: _png);
       },
@@ -81,7 +82,7 @@ void main() {
     await _open(
       tester,
       live: true,
-      onPay: (kind, {savedCardId}) async {
+      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
         return const ShareChargeView(
           message: 'A casa ainda não tem subconta PagBank.',
         );
@@ -112,7 +113,7 @@ void main() {
           nickname: 'Pessoal',
         ),
       ],
-      onPay: (kind, {savedCardId}) async {
+      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
         chargedId = savedCardId;
         expect(kind, PaymentMethodKind.card);
         return const ShareChargeView(outcome: PaySheetOutcome.reserved);
@@ -134,11 +135,53 @@ void main() {
     expect(find.text(GroupMessages.simulatedNotice), findsNothing);
     expect(find.byKey(AppKeys.payConfirmed), findsOneWidget);
   });
+
+  testWidgets('a parcela escolhida vai para a cobrança', (tester) async {
+    int? sent;
+    int? expected;
+    await _open(
+      tester,
+      live: true,
+      amountCents: 20000,
+      cards: [
+        PaymentMethod(
+          id: 'card-real',
+          brand: CardBrand.visa,
+          last4: '1111',
+          nickname: 'Pessoal',
+        ),
+      ],
+      quoteInstallments: (cents) async => cardInstallmentOptions(
+        principalCents: cents,
+        interestCentsByCount: {4: 640},
+      ),
+      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+        sent = installments;
+        expected = expectedAmountCents;
+        expect(kind, PaymentMethodKind.card);
+        return const ShareChargeView(outcome: PaySheetOutcome.reserved);
+      },
+    );
+
+    await tester.tap(find.byKey(AppKeys.payMethodCard));
+    await tester.pumpAndSettle();
+    expect(find.text('sem juros'), findsNWidgets(3));
+    expect(find.text('com juros'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('parcela-4')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.payCharge));
+    await tester.pumpAndSettle();
+
+    expect(sent, 4);
+    expect(expected, 20640);
+  });
 }
 
 Future<ShareChargeView> _unusedPay(
   PaymentMethodKind kind, {
   String? savedCardId,
+  int installments = 1,
+  int? expectedAmountCents,
 }) async {
   return const ShareChargeView(outcome: PaySheetOutcome.reserved);
 }
@@ -149,10 +192,15 @@ Future<void> _open(
   required Future<ShareChargeView> Function(
     PaymentMethodKind kind, {
     String? savedCardId,
+    int installments,
+    int? expectedAmountCents,
   })
   onPay,
   List<PaymentMethod> cards = const [],
   int discountCents = 0,
+  int amountCents = 9000,
+  Future<List<CardInstallmentOption>> Function(int principalCents)?
+  quoteInstallments,
 }) async {
   tester.view.physicalSize = const Size(400, 2200);
   tester.view.devicePixelRatio = 1;
@@ -176,9 +224,10 @@ Future<void> _open(
                 onPressed: () {
                   showPayShareSheet(
                     context: context,
-                    amountCents: 9000,
+                    amountCents: amountCents,
                     reference: 'group-1',
                     discountCents: discountCents,
+                    quoteInstallments: quoteInstallments,
                     onPay: onPay,
                   );
                 },

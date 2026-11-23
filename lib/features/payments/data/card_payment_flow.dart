@@ -1,4 +1,5 @@
 import 'package:dominio/dominio.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
 
 /// Cartão ainda não tokenizado. Só a função `tokenize-card` recebe estes campos.
 class CardDraft {
@@ -81,12 +82,17 @@ Map<String, dynamic> createChargeBody({
   required PaymentMethodKind kind,
   String? savedCardId,
   int points = 0,
+  int installments = 1,
+  int? expectedAmountCents,
 }) {
   return {
     'group_id': groupId,
     'idempotency_key': idempotencyKey,
     'billing_type': kind == PaymentMethodKind.card ? 'CREDIT_CARD' : 'PIX',
     if (kind == PaymentMethodKind.card) 'saved_card_id': savedCardId,
+    if (kind == PaymentMethodKind.card) 'installments': installments,
+    if (kind == PaymentMethodKind.card && expectedAmountCents != null)
+      'expected_amount_cents': expectedAmountCents,
     if (points > 0) 'points': points,
   };
 }
@@ -124,6 +130,8 @@ class CardPaymentFlow {
     required PaymentMethodKind kind,
     String? savedCardId,
     int points = 0,
+    int installments = 1,
+    int? expectedAmountCents,
   }) {
     final body = createChargeBody(
       groupId: groupId,
@@ -131,6 +139,8 @@ class CardPaymentFlow {
       kind: kind,
       savedCardId: savedCardId,
       points: points,
+      installments: installments,
+      expectedAmountCents: expectedAmountCents,
     );
     if (chargeBodyHasRawCard(body)) {
       throw StateError('create-charge não recebe dados do cartão');
@@ -142,6 +152,8 @@ class CardPaymentFlow {
     required CardDraft card,
     required String groupId,
     required String idempotencyKey,
+    int installments = 1,
+    int? expectedAmountCents,
   }) async {
     final saved = await tokenize(card);
     return charge(
@@ -149,6 +161,16 @@ class CardPaymentFlow {
       idempotencyKey: idempotencyKey,
       kind: PaymentMethodKind.card,
       savedCardId: saved.savedCardId,
+      installments: installments,
+      expectedAmountCents: expectedAmountCents,
     );
+  }
+
+  Future<List<CardInstallmentOption>> quoteInstallments(int principalCents) async {
+    final body = await invoke('create-charge', {
+      'action': 'quote_installments',
+      'amount_cents': principalCents,
+    });
+    return cardInstallmentsFromQuote(body);
   }
 }

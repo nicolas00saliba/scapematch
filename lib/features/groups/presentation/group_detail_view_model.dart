@@ -33,6 +33,8 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
     PaymentMethodKind kind, {
     String? savedCardId,
     int points = 0,
+    int installments = 1,
+    int? expectedAmountCents,
   }) async {
     final user = ref.read(currentUserProvider);
     final result = await ref
@@ -43,6 +45,8 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
           kind: kind,
           savedCardId: savedCardId,
           points: points,
+          installments: installments,
+          expectedAmountCents: expectedAmountCents,
         );
     if (ref.mounted && result is PayShareSuccess) {
       _publish(result.group);
@@ -51,11 +55,19 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
   }
 
   /// Tokeniza o cartão e cobra a parte com o id devolvido.
-  Future<PayShareResult> payWithNewCard(CardDraft card) async {
+  Future<PayShareResult> payWithNewCard(
+    CardDraft card, {
+    int installments = 1,
+    int? expectedAmountCents,
+  }) async {
     final user = ref.read(currentUserProvider);
-    final result = await ref
-        .read(groupRepositoryProvider)
-        .payWithNewCard(groupId, userId: user.id, card: card);
+    final result = await ref.read(groupRepositoryProvider).payWithNewCard(
+      groupId,
+      userId: user.id,
+      card: card,
+      installments: installments,
+      expectedAmountCents: expectedAmountCents,
+    );
     if (ref.mounted && result is PayShareSuccess) {
       _publish(result.group);
     }
