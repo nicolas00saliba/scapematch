@@ -45,7 +45,7 @@ class _ConciliacaoPageState extends ConsumerState<ConciliacaoPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Comparação histórica com o livro. Cobranças novas não passam por aqui. Só leitura.',
+            'Comparação diária das cobranças e transferências do Asaas com o livro. Só leitura.',
           ),
           const SizedBox(height: 12),
           if (_error != null) Text(_error!),
@@ -58,7 +58,7 @@ class _ConciliacaoPageState extends ConsumerState<ConciliacaoPage> {
               '${whenLabel(board.startedAt)} · ${board.paymentCount} cobranças · ${board.transferCount} transferências · ${board.divergenceCount} divergências',
             ),
             if (board.truncated)
-              const Text('A lista histórica veio incompleta. Ausências não foram marcadas.'),
+              const Text('A lista do Asaas veio incompleta. Ausências não foram marcadas.'),
             const SizedBox(height: 12),
             if (board.rows.isEmpty)
               const Text('Nenhuma divergência nesta execução.')
@@ -78,19 +78,19 @@ class _ConciliacaoPageState extends ConsumerState<ConciliacaoPage> {
 
 String _kindLabel(String kind) {
   return switch (kind) {
-    'charge_missing_local' => 'Cobrança histórica sem livro',
-    'charge_missing_asaas' => 'Cobrança no livro sem registro histórico',
+    'charge_missing_local' => 'Cobrança no Asaas sem livro',
+    'charge_missing_asaas' => 'Cobrança no livro sem Asaas',
     'charge_status' => 'Status da cobrança diferente',
     'charge_status_unknown' => 'Status desconhecido',
     'charge_amount' => 'Valor da cobrança diferente',
     'ledger_missing' => 'Cobrança paga sem lançamento',
     'ledger_refund_missing' => 'Estorno sem lançamento',
-    'transfer_missing_local' => 'Transferência histórica sem saque',
-    'transfer_missing_asaas' => 'Saque sem transferência histórica',
+    'transfer_missing_local' => 'Transferência no Asaas sem saque',
+    'transfer_missing_asaas' => 'Saque sem transferência no Asaas',
     'transfer_status' => 'Status do saque diferente',
     'transfer_status_unknown' => 'Status desconhecido',
     'transfer_amount' => 'Valor do saque diferente',
-    'asaas_truncated' => 'A lista histórica veio incompleta',
+    'asaas_truncated' => 'A lista do Asaas veio incompleta',
     _ => kind,
   };
 }

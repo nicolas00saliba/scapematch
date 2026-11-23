@@ -6,39 +6,14 @@ import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/pwa/pwa_frame.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
-import 'package:scapematch_parceiro/features/partner/data/mp_oauth_return.dart';
-import 'package:scapematch_parceiro/features/partner/presentation/mp_return_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_screen.dart';
-import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
 
-class ParceiroApp extends ConsumerStatefulWidget {
-  const ParceiroApp({super.key, this.initialUri});
-
-  final Uri? initialUri;
+class ParceiroApp extends ConsumerWidget {
+  const ParceiroApp({super.key});
 
   @override
-  ConsumerState<ParceiroApp> createState() => _ParceiroAppState();
-}
-
-class _ParceiroAppState extends ConsumerState<ParceiroApp> {
-  late final Uri _uri;
-  var _mpReturn = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _uri = widget.initialUri ?? Uri.base;
-    _mpReturn = isMpOauthReturnPath(_uri);
-  }
-
-  void _leaveReturn() {
-    ref.read(partnerSectionProvider.notifier).select(PartnerSection.balance);
-    setState(() => _mpReturn = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final themeChoice = ref.watch(themeChoiceProvider);
     return MaterialApp(
       title: 'EscapeMatch Parceiro',
@@ -73,9 +48,7 @@ class _ParceiroAppState extends ConsumerState<ParceiroApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: _mpReturn
-          ? MpReturnScreen(uri: _uri, onFinished: _leaveReturn)
-          : const PartnerScreen(),
+      home: const PartnerScreen(),
     );
   }
 }

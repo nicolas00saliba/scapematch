@@ -4,8 +4,9 @@
 -- Não é dado de exemplo do app. Rode depois das migrations e depois de
 -- inserir o seu usuário em public.admins.
 --
--- A chave Pix da subconta não entra neste arquivo. provision-venue-wallet
--- cria a subconta Woovi da casa a partir da chave Pix. A casa não abre a Woovi.
+-- O walletId da subconta sandbox NÃO entra neste arquivo. Depois de gravar
+-- ASAAS_API_KEY na função, chame provision-venue-wallet. Ela cria a subconta
+-- da EscapeMatch Demo e salva venues.asaas_wallet_id.
 
 do $$
 declare

@@ -1,7 +1,5 @@
 # Decisões provisórias
 
-Em 20/11/2026 o provedor anterior saiu do código. Pix novo é Woovi e cartão novo é Mercado Pago. Os itens abaixo que citam o provedor antigo são histórico. A NFS-e continua pendente e não chama provedor de pagamento.
-
 ## A nota fiscal nasce desligada em produção
 
 - **Data:** 2026-11-13

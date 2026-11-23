@@ -367,8 +367,6 @@ class PaymentsBoard {
     required this.asaasBaseUrlProduction,
     required this.asaasWebhookToken,
     required this.asaasWebhookEmail,
-    this.wooviAppId,
-    this.mpAccessToken,
     required this.venueWithdrawalsSecret,
     required this.vaultUrl,
     required this.vaultSecret,
@@ -385,8 +383,6 @@ class PaymentsBoard {
   final bool? asaasBaseUrlProduction;
   final bool? asaasWebhookToken;
   final bool? asaasWebhookEmail;
-  final bool? wooviAppId;
-  final bool? mpAccessToken;
   final bool? venueWithdrawalsSecret;
   final bool vaultUrl;
   final bool vaultSecret;
@@ -873,8 +869,6 @@ class SupabaseAdminApi implements AdminApi {
     var asaasBase = _optionalBool(null);
     var asaasToken = _optionalBool(null);
     var asaasEmail = _optionalBool(null);
-    var wooviApp = _optionalBool(null);
-    var mpToken = _optionalBool(null);
     var withdrawalsSecret = _optionalBool(null);
     try {
       final response = await _client.functions.invoke('payments-readiness');
@@ -884,8 +878,6 @@ class SupabaseAdminApi implements AdminApi {
         asaasBase = _optionalBool(data['asaas_base_url_production']);
         asaasToken = _optionalBool(data['asaas_webhook_token']);
         asaasEmail = _optionalBool(data['asaas_webhook_email']);
-        wooviApp = _optionalBool(data['woovi_app_id']);
-        mpToken = _optionalBool(data['mp_access_token']);
         withdrawalsSecret = _optionalBool(data['venue_withdrawals_secret']);
       }
     } on Object {
@@ -899,8 +891,6 @@ class SupabaseAdminApi implements AdminApi {
       asaasBaseUrlProduction: asaasBase,
       asaasWebhookToken: asaasToken,
       asaasWebhookEmail: asaasEmail,
-      wooviAppId: wooviApp,
-      mpAccessToken: mpToken,
       venueWithdrawalsSecret: withdrawalsSecret,
       vaultUrl: ready['vault_venue_withdrawals_url'] == true,
       vaultSecret: ready['vault_venue_withdrawals_secret'] == true,
@@ -989,7 +979,7 @@ class SupabaseAdminApi implements AdminApi {
     );
     final data = response.data;
     if (data is Map && data['error'] != null) {
-      return 'A casa foi aprovada. A subconta Woovi não saiu nesta tentativa.';
+      return 'A casa foi aprovada. A subconta Asaas não saiu nesta tentativa.';
     }
     return null;
   }
@@ -1507,8 +1497,6 @@ class MemoryAdminApi implements AdminApi {
         asaasBaseUrlProduction: fixture.asaasBaseUrlProduction,
         asaasWebhookToken: fixture.asaasWebhookToken,
         asaasWebhookEmail: fixture.asaasWebhookEmail,
-        wooviAppId: fixture.wooviAppId,
-        mpAccessToken: fixture.mpAccessToken,
         venueWithdrawalsSecret: fixture.venueWithdrawalsSecret,
         vaultUrl: fixture.vaultUrl,
         vaultSecret: fixture.vaultSecret,

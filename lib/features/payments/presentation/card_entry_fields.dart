@@ -4,7 +4,7 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/account/domain/player_cpf.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
 
-/// Campos do cartão novo. O número só segue para o Mercado Pago.
+/// Campos do cartão novo. O número só segue para `tokenize-card`.
 class CardEntryControllers {
   CardEntryControllers()
     : holder = TextEditingController(),

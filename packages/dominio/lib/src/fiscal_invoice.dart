@@ -397,10 +397,10 @@ String _testNumber(String suffix, String groupId, String playerId) {
 }
 
 String _testPdf(String number) =>
-    'https://notas.escapematch.invalid/teste/$number.pdf';
+    'https://api-sandbox.asaas.com/notas/teste/$number.pdf';
 
 String _testXml(String number) =>
-    'https://notas.escapematch.invalid/teste/$number.xml';
+    'https://api-sandbox.asaas.com/notas/teste/$number.xml';
 
 String _xmlEscape(String value) {
   return value

@@ -50,6 +50,6 @@ void main() {
     expect(invoice.status, FiscalInvoiceStatus.simulated);
     expect(invoice.playerName, 'Nícolas');
     expect(invoice.canDownload, isTrue);
-    expect(invoice.pdfUrl, contains('notas.escapematch.invalid'));
+    expect(invoice.pdfUrl, contains('api-sandbox.asaas.com'));
   });
 }

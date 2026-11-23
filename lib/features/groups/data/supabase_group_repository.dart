@@ -16,7 +16,6 @@ import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
-import 'package:scapematch/features/payments/data/mp_card_token.dart';
 import 'package:scapematch/features/payments/domain/live_charge.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -220,15 +219,7 @@ class SupabaseGroupRepository implements GroupRepository {
     required CardDraft card,
   }) {
     return _charge(groupId, userId, () {
-      return CardPaymentFlow(
-        _invoke,
-        tokenizeCard: (draft) async {
-          final device = await MpCardTokenizer(
-            fetchPublicKey: () => mpPublicKeyFromInvoke(_invoke),
-          ).tokenize(draft);
-          return (id: device.id, paymentMethodId: device.paymentMethodId);
-        },
-      ).payWithNewCard(
+      return CardPaymentFlow(_invoke).payWithNewCard(
         card: card,
         groupId: groupId,
         idempotencyKey: _chargeKey(groupId, userId),

@@ -62,10 +62,10 @@ Deno.test("pedido sem Origin ainda devolve JSON e não depende de CORS", async (
   assertEquals(response.headers.get("Access-Control-Allow-Origin"), null);
   assertEquals(await response.json(), { ok: true });
   const webhook = await Deno.readTextFile(
-    new URL("../woovi-webhook/index.ts", import.meta.url),
+    new URL("../asaas-webhook/index.ts", import.meta.url),
   );
   assertEquals(/origin/i.test(webhook), false);
-  assert(webhook.includes("handleWooviWebhook"));
+  assert(webhook.includes("tokensMatch"));
 });
 
 Deno.test("ALLOWED_ORIGINS troca a lista e o curinga não passa", () => {

@@ -26,7 +26,7 @@ void main() {
     expect(service.valueCents, 12000);
     expect(service.playerId, 'user-local');
     expect(service.number, isNotNull);
-    expect(service.pdfUrl, contains('notas.escapematch.invalid'));
+    expect(service.pdfUrl, contains('api-sandbox.asaas.com'));
     expect(service.xmlUrl, endsWith('.xml'));
     expect(commission.kind, FiscalInvoiceKind.commission);
     expect(commission.issuer, FiscalIssuer.platform);

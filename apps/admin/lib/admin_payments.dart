@@ -96,8 +96,13 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
             const SizedBox(height: 8),
             const Text('Prontidão'),
             const SizedBox(height: 8),
-            _HealthRow('App da Woovi', _yn(board.wooviAppId)),
-            _HealthRow('Token do Mercado Pago', _yn(board.mpAccessToken)),
+            _HealthRow('Chave da API do Asaas', _yn(board.asaasApiKey)),
+            _HealthRow(
+              'URL do Asaas em produção',
+              _yn(board.asaasBaseUrlProduction),
+            ),
+            _HealthRow('Token do webhook', _yn(board.asaasWebhookToken)),
+            _HealthRow('E-mail do webhook', _yn(board.asaasWebhookEmail)),
             _HealthRow(
               'Segredo do cron de saques',
               _yn(board.venueWithdrawalsSecret),

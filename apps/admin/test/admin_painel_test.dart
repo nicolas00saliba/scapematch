@@ -138,7 +138,7 @@ void main() {
       find.textContaining('Crédito de casa ainda pendente'),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('admin-taxa-historica')), findsOneWidget);
+    expect(find.byKey(const Key('admin-taxa-asaas')), findsOneWidget);
     expect(find.textContaining('dívida tudo ou nada'), findsOneWidget);
     await _shot(tester, 'admin-ganhos');
 

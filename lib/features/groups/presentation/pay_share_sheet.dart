@@ -28,7 +28,7 @@ final payTestCard = PaymentMethod(
 /// O que a folha faz com a resposta de `create-charge` ou da demonstração.
 enum PaySheetOutcome { dismissed, reserved, paid }
 
-/// Resultado que a folha desenha. O Pix real traz o copia-e-cola da Woovi.
+/// Resultado que a folha desenha. O Pix real traz o copia-e-cola do Asaas.
 class ShareChargeView {
   const ShareChargeView({
     this.outcome = PaySheetOutcome.dismissed,
@@ -72,7 +72,7 @@ PaySheetOutcome _outcomeOf(LiveCharge? charge) {
   return PaySheetOutcome.dismissed;
 }
 
-/// Abre o pagamento da parte. No modo real, Pix é Woovi e cartão é Mercado Pago.
+/// Abre o pagamento da parte. No modo real a cobrança é a do Asaas.
 /// Na demonstração o Pix e o botão continuam simulados.
 Future<PaySheetOutcome> showPayShareSheet({
   required BuildContext context,

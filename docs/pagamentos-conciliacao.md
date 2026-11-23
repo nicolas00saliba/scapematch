@@ -1,8 +1,4 @@
-# Conciliação diária
-
-Desde 20/11/2026 a função `ledger-reconcile` autenticada responde `{ ok: true, skipped: true }` e não consulta provedor. O cron pode continuar disparando até ser desligado depois do merge. O texto abaixo descreve o comportamento antigo e não deve ser seguido.
-
-# Conciliação histórica (não usar)
+# Conciliação diária Asaas × livro
 
 O cron `ledger-reconcile` dispara todo dia às 08:30 em Brasília (`30 11 * * *` em UTC). Ele chama `private.invoke_ledger_reconcile()`, que lê dois itens do Vault e faz `POST` na Edge Function `ledger-reconcile` com o header `x-ledger-reconcile-secret`.
 

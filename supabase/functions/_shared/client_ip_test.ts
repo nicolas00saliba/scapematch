@@ -1,6 +1,24 @@
 import { assertEquals } from "jsr:@std/assert@1";
+import { AsaasProvider } from "./asaas_provider.ts";
 import { clientIp } from "./client_ip.ts";
 import { readCard } from "./tokenize_input.ts";
+
+const card = {
+  holderName: "ANA",
+  number: "4111111111111111",
+  expiryMonth: "12",
+  expiryYear: "2028",
+  ccv: "123",
+};
+
+const holder = {
+  name: "ANA",
+  email: "ana@example.com",
+  cpfCnpj: "39053344705",
+  postalCode: "80020310",
+  addressNumber: "100",
+  phone: "41999990000",
+};
 
 Deno.test("x-real-ip ganha de um X-Forwarded-For forjado", () => {
   const request = new Request("https://example.test/tokenize-card", {
@@ -36,6 +54,45 @@ Deno.test("sem header válido o pedido não leva remoteIp", async () => {
     },
   });
   assertEquals(clientIp(emptyReal), "2001:db8::1");
+
+  const bodies: string[] = [];
+  const provider = new AsaasProvider(
+    "asaas-secret-key",
+    "https://api-sandbox.asaas.com/v3",
+    (_url, init) => {
+      bodies.push(String(init?.body ?? ""));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            creditCardToken: "tok_card_1",
+            creditCardNumber: "1111",
+            creditCardBrand: "VISA",
+            id: "pay_card",
+            status: "AUTHORIZED",
+          }),
+          { status: 200 },
+        ),
+      );
+    },
+  );
+  await provider.tokenizeCard({
+    customer: "cus_1",
+    creditCard: card,
+    creditCardHolderInfo: holder,
+  });
+  await provider.authorizeCard({
+    customer: "cus_1",
+    value: 80,
+    dueDate: "2026-11-07",
+    description: "reserva",
+    externalReference: "charge-2",
+    split: { walletId: "wal_house", fixedValue: 90 },
+    creditCardToken: "tok_card_1",
+  });
+  for (const body of bodies) {
+    assertEquals(body.includes("remoteIp"), false);
+    assertEquals(JSON.parse(body).remoteIp, undefined);
+  }
 });
 
 Deno.test("o remote_ip do body não entra no cartão", () => {

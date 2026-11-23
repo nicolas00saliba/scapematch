@@ -5,7 +5,7 @@ import {
   planInvoices,
   testInvoiceNumber,
 } from "./fiscal_plan.ts";
-import { commissionCents } from "./scape_points.ts";
+import { commissionCents } from "./asaas_provider.ts";
 
 const venue = {
   documentKind: "cnpj" as const,
