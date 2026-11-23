@@ -53,7 +53,9 @@ O access token é renovado quando falta menos de dois minutos para vencer, e de 
 
 ## Colunas antigas
 
-A migration nova ainda cita os nomes antigos porque o gatilho copia os dois lados e as funções históricas leem a coluna antiga. Um drop fica para uma migration seguinte, depois que produção estiver estável na PagBank. Não entra neste PR.
+A migration nova ainda cita os nomes antigos. Depois do Connect, o gatilho espelha a conta PagBank na coluna antiga, para o SQL que ainda a lê. Ela não copia id nem chave do Asaas para a PagBank. Casa que já existia fica desligada até passar pelo Connect. Um drop fica para uma migration seguinte, depois que produção estiver estável na PagBank. Não entra neste PR.
+
+O harness local e o teste do allowlist do Vault continuam plantando o segredo `asaas_subaccount_key`. A migration `20261105220000` lê esse nome. Renomeá-lo no teste faria a cadeia histórica falhar.
 
 Migrations históricas que continuam com o nome antigo, porque reescrevê-las quebra a cadeia:
 
