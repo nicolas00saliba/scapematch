@@ -980,10 +980,10 @@ export class PagBankProvider {
         soft_descriptor: "EscapeMatch",
         card: cardBody(input.creditCardToken ?? ""),
       };
-    // Pix interbancário (copia-e-cola) nasce no charge, com type PIX.
-    // qr_codes no pedido é o QR da carteira PagBank (arrangements PAGBANK),
-    // não o Pix de qualquer banco. Doc: criar pedido com QR Code PIX e
-    // pedido com divisão de pagamento com PIX.
+    // Doc "Criar pedido com QR Code PIX" e "Pedido com divisão com PIX":
+    // o Pix interbancário nasce em charges[].payment_method.type = PIX.
+    // qr_codes no pedido, com arrangements PAGBANK, é o QR da carteira
+    // PagBank e só paga no app PagBank. Não entra neste pedido.
     const order: Record<string, unknown> = {
       reference_id: input.externalReference,
       customer,

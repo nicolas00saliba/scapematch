@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/payments/domain/card_installments.dart';
 
@@ -60,9 +59,7 @@ class _InstallmentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final status = theme.extension<ScapeStatusColors>();
-    const freeFill = Color(0xFFD7F3E3);
-    const freeInk = Color(0xFF1E7046);
+    const freeFill = Color(0xFF1E7046);
     final enabled = option.enabled;
     final title = option.count == 1 ? 'À vista' : '${option.count}x';
     final parcel = formatPrice(option.installmentCents);
@@ -148,10 +145,10 @@ class _InstallmentCard extends StatelessWidget {
                       _Badge(
                         text: option.interestFree ? 'sem juros' : 'com juros',
                         background: option.interestFree
-                            ? (status?.successContainer ?? freeFill)
+                            ? freeFill
                             : scheme.surfaceContainerHighest,
                         foreground: option.interestFree
-                            ? (status?.onSuccessContainer ?? freeInk)
+                            ? Colors.white
                             : scheme.onSurfaceVariant,
                         strong: option.interestFree,
                       )
@@ -195,13 +192,16 @@ class _Badge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: EdgeInsets.symmetric(
+          horizontal: strong ? 10 : 8,
+          vertical: strong ? 6 : 3,
+        ),
         child: Text(
           text,
           style: TextStyle(
             color: foreground,
             fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
-            fontSize: 12,
+            fontSize: strong ? 14 : 12,
             height: 1.2,
           ),
         ),

@@ -39,6 +39,11 @@ void main() {
 
     expect(find.text('sem juros'), findsNWidgets(3));
     expect(find.text('com juros'), findsNWidgets(2));
+    final free = tester.widget<Text>(find.text('sem juros').first);
+    final paid = tester.widget<Text>(find.text('com juros').first);
+    expect(free.style?.color, const Color(0xFFFFFFFF));
+    expect(free.style?.fontWeight, FontWeight.w800);
+    expect(free.style?.fontSize, greaterThan(paid.style?.fontSize ?? 0));
     expect(find.textContaining('206,40'), findsOneWidget);
     expect(find.textContaining('51,60'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
