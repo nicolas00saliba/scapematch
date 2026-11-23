@@ -294,6 +294,8 @@ Deno.test("o saldo nao devolve chave e a equipe nao chama o PagBank", async () =
   );
   const body = await response.json();
   assertEquals(response.status, 200);
+  assertEquals(body.enabled, false);
+  assertEquals(body.payouts_paused, true);
   assertEquals(body.available_cents, 10_000);
   assertEquals(body.receivables[0].creditDate, "2026-11-18");
   assertEquals(owner.keys, [subKey]);

@@ -80,8 +80,14 @@ function providerFor(
       if (!payment) {
         return Promise.resolve(new Response("não", { status: 404 }));
       }
+      const cents = typeof payment.value === "number"
+        ? Math.round(payment.value * 100)
+        : 10000;
       return Promise.resolve(
-        new Response(JSON.stringify(payment), { status: 200 }),
+        new Response(JSON.stringify({
+          ...payment,
+          amount: payment.amount ?? { value: cents, currency: "BRL" },
+        }), { status: 200 }),
       );
     }
     if (match && method === "DELETE") {

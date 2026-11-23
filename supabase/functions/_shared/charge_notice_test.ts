@@ -1,6 +1,9 @@
-import { assertEquals } from "jsr:@std/assert@1";
+import { assert, assertEquals } from "jsr:@std/assert@1";
 import { PagBankProvider, pagbankProductionBaseUrl } from "./pagbank_provider.ts";
-import { pollPendingPagBankCharges } from "./charge_notice.ts";
+import {
+  pagbankNoticeRefs,
+  pollPendingPagBankCharges,
+} from "./charge_notice.ts";
 
 const chargeId = "44444444-4444-4444-8444-444444444444";
 const groupId = "11111111-1111-4111-8111-111111111111";
@@ -67,7 +70,10 @@ function adminFor(rows: Record<string, unknown>[]) {
     rpc(fn: string, args: Record<string, unknown>) {
       calls.push({ fn, args });
       if (fn === "apply_payment_transition") {
-        return Promise.resolve({ data: { status: "paid" }, error: null });
+        return Promise.resolve({
+          data: { status: args.p_next_status ?? "paid" },
+          error: null,
+        });
       }
       return Promise.resolve({ data: [], error: null });
     },
@@ -123,6 +129,107 @@ Deno.test("Pix ainda aguardando não move a cobrança", async () => {
   const applied = await pollPendingPagBankCharges(
     admin,
     provider("WAITING"),
+    { get: () => undefined },
+  );
+  assertEquals(applied, 0);
+  assertEquals(admin.calls, []);
+});
+
+Deno.test("webhook casa o pedido e o split sai do charge pago", async () => {
+  assertEquals(
+    pagbankNoticeRefs({
+      id: "ORDE_PIX",
+      charges: [{ id: "CHAR_PIX", status: "PAID" }],
+    }),
+    ["ORDE_PIX", "CHAR_PIX"],
+  );
+  const urls: string[] = [];
+  const paid = {
+    id: "ORDE_PIX",
+    charges: [{
+      id: "CHAR_PIX",
+      status: "PAID",
+      amount: { value: 500 },
+      payment_method: { type: "PIX" },
+      splits: { id: "SPLI_PAGO" },
+    }],
+  };
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    (url: string, init?: RequestInit) => {
+      urls.push(`${init?.method ?? "GET"} ${url}`);
+      return Promise.resolve(
+        new Response(JSON.stringify(paid), { status: 200 }),
+      );
+    },
+  );
+  const row = { ...pending, provider_ref: "ORDE_PIX", provider_split_id: null };
+  const admin = adminFor([row]);
+  const applied = await pollPendingPagBankCharges(
+    admin,
+    pagbank,
+    { get: () => undefined },
+  );
+  assertEquals(applied, 1);
+  assert(urls.some((url) => url.includes("/orders/ORDE_PIX")));
+  assert(urls.some((url) => url.includes("/splits/SPLI_PAGO/release-custody")));
+});
+
+Deno.test("Pix vencido sai da fila como cancelado", async () => {
+  const expired = {
+    id: "ORDE_VELHO",
+    charges: [{
+      id: "CHAR_VELHO",
+      status: "WAITING",
+      payment_method: {
+        type: "PIX",
+        pix: { expiration_date: "2020-01-01T00:00:00-03:00" },
+      },
+    }],
+  };
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    () =>
+      Promise.resolve(new Response(JSON.stringify(expired), { status: 200 })),
+  );
+  const row = { ...pending, provider_ref: "ORDE_VELHO" };
+  const admin = adminFor([row]);
+  const applied = await pollPendingPagBankCharges(
+    admin,
+    pagbank,
+    { get: () => undefined },
+  );
+  assertEquals(applied, 1);
+  const transition = admin.calls.find((call) =>
+    call.fn === "apply_payment_transition"
+  );
+  assertEquals(transition?.args.p_next_status, "cancelled");
+  assertEquals(transition?.args.p_credit, false);
+});
+
+Deno.test("Pix com validade futura continua pendente", async () => {
+  const open = {
+    id: "ORDE_NOVO",
+    charges: [{
+      id: "CHAR_NOVO",
+      status: "WAITING",
+      payment_method: {
+        type: "PIX",
+        pix: { expiration_date: "2099-01-01T00:00:00-03:00" },
+      },
+    }],
+  };
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    () => Promise.resolve(new Response(JSON.stringify(open), { status: 200 })),
+  );
+  const admin = adminFor([{ ...pending, provider_ref: "ORDE_NOVO" }]);
+  const applied = await pollPendingPagBankCharges(
+    admin,
+    pagbank,
     { get: () => undefined },
   );
   assertEquals(applied, 0);

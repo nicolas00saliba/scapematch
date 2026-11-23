@@ -205,7 +205,10 @@ async function captureAuthorizedCard(
       remote.status === "RECEIVED";
     let paid = already;
     if (!already) {
-      const captured = await pagbank.capture(row.provider_ref);
+      const captured = await pagbank.capture(
+        row.provider_ref,
+        row.amount_cents,
+      );
       paid = captured.status === "CONFIRMED" || captured.status === "RECEIVED";
     }
     if (!paid) {

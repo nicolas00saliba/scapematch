@@ -947,7 +947,7 @@ Deno.test("troca para cartão trata Pix 404 como já cancelado", async () => {
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].billing_type, "CREDIT_CARD");
   assertEquals(store.charges[0].provider_ref, body.provider_ref);
-  assert(store.calls.some((call) => call.includes("/cancel")));
+  assert(store.calls.some((call) => call.includes("/charges/pay_sumiu")));
 });
 
 Deno.test("Pix pendente 404 abre outra cobrança sem órfão", async () => {

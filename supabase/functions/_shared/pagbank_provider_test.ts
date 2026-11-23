@@ -92,6 +92,7 @@ Deno.test("Pix FIXED: a casa leva o bruto, a taxa fica na primária e a custódi
       taxId: "52998224725",
     },
   });
+  assertEquals(pix.id, "ORDE_1");
   assertEquals(pix.payload, "000201PIX");
   assertEquals(pix.splitId, "SPLI_1");
   assertEquals(pix.status, "PENDING");
@@ -101,7 +102,12 @@ Deno.test("Pix FIXED: a casa leva o bruto, a taxa fica na primária e a custódi
   const body = JSON.parse(String(post.init.body));
   const charge = body.charges[0];
   assertEquals(charge.payment_method.type, "PIX");
+  assertEquals(
+    charge.payment_method.pix.expiration_date,
+    "2026-11-07T23:59:00-03:00",
+  );
   assertEquals(charge.payment_method.capture, undefined);
+  assertEquals(body.qr_codes, undefined);
   assertEquals(charge.splits.method, "FIXED");
   assertEquals(charge.splits.receivers[0].amount.value, 7500);
   assertEquals(charge.splits.receivers[0].account.id, venue);
@@ -262,6 +268,17 @@ Deno.test("captura, estorno e custódia usam os caminhos da PagBank", async () =
   const calls: string[] = [];
   const fetchFn = (url: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
+    if ((init?.method ?? "GET") === "GET") {
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "CHAR_1",
+        status: "AUTHORIZED",
+        amount: { value: 10000, currency: "BRL" },
+      }), { status: 200 }));
+    }
+    if (url.endsWith("/capture") || url.endsWith("/cancel")) {
+      const posted = JSON.parse(String(init?.body));
+      assertEquals(posted.amount.value, 10000);
+    }
     if (url.endsWith("/capture")) {
       return Promise.resolve(
         new Response(JSON.stringify({ id: "CHAR_1", status: "PAID" }), {
@@ -372,6 +389,18 @@ Deno.test("confirmação solta a custódia; sem confirmação estorna o Pix e ca
     calls.push(`${init?.method ?? "GET"} ${url}`);
     if (url.endsWith("/release-custody")) {
       return Promise.resolve(new Response("", { status: 200 }));
+    }
+    if ((init?.method ?? "GET") === "GET") {
+      const id = url.split("/").filter(Boolean).pop() ?? "CHAR_1";
+      return Promise.resolve(new Response(JSON.stringify({
+        id,
+        status: "PAID",
+        amount: { value: 1500, currency: "BRL" },
+      }), { status: 200 }));
+    }
+    if (url.includes("/cancel")) {
+      const posted = JSON.parse(String(init?.body ?? "{}"));
+      assertEquals(posted.amount.value, 1500);
     }
     return Promise.resolve(new Response(JSON.stringify({
       id: "CHAR_1",
@@ -486,4 +515,88 @@ Deno.test("Connect troca o code e renova o refresh token", async () => {
   assertEquals(bodies[1].refresh_token, "refresh-1");
   assertEquals(headers[0].id, "client-id");
   assertEquals(headers[1].secret, "client-secret");
+});
+
+const pixCopy =
+  "00020101021226880014br.gov.bcb.pix2566pix.example/qr/v2/escapematch";
+
+function pixOrder(status: string) {
+  return {
+    id: "ORDE_PIX",
+    reference_id: "charge-1",
+    customer: { name: "Jogador", tax_id: "52998224725" },
+    charges: [{
+      id: "CHAR_PIX",
+      reference_id: "charge-1",
+      status,
+      amount: { value: 10000, currency: "BRL" },
+      payment_method: {
+        type: "PIX",
+        pix: { expiration_date: "2026-11-07T23:59:00-03:00" },
+      },
+      qr_code: { id: "QRCO_1", text: pixCopy },
+      splits: {
+        id: status === "PAID" ? "SPLI_PAGO" : "SPLI_CRIADO",
+        method: "FIXED",
+        receivers: [
+          {
+            account: { id: venue },
+            amount: { value: 7500 },
+            configurations: { custody: { apply: true } },
+          },
+        ],
+      },
+    }],
+  };
+}
+
+Deno.test("consulta do Pix usa o pedido, antes e depois do pagamento", async () => {
+  let paid = false;
+  const fetchFn = (url: string, init?: RequestInit) => {
+    assertEquals(init?.method ?? "GET", "GET");
+    assert(url.endsWith("/orders/ORDE_PIX"));
+    return Promise.resolve(
+      new Response(JSON.stringify(pixOrder(paid ? "PAID" : "WAITING")), {
+        status: 200,
+      }),
+    );
+  };
+  const client = provider(fetchFn);
+  const waiting = await client.getPayment("ORDE_PIX");
+  assertEquals(waiting.id, "ORDE_PIX");
+  assertEquals(waiting.status, "PENDING");
+  assertEquals(waiting.billingType, "PIX");
+  assertEquals(waiting.expiresAt, "2026-11-07T23:59:00-03:00");
+  assertEquals(waiting.splitId, "SPLI_CRIADO");
+  paid = true;
+  const done = await client.getPayment("ORDE_PIX");
+  assertEquals(done.id, "ORDE_PIX");
+  assertEquals(done.status, "CONFIRMED");
+  assertEquals(done.splitId, "SPLI_PAGO");
+});
+
+Deno.test("criação do Pix devolve o pedido e o copia-e-cola do charge", async () => {
+  const fetchFn = (url: string, init?: RequestInit) => {
+    if ((init?.method ?? "GET") === "GET") {
+      return Promise.resolve(
+        new Response(JSON.stringify({ orders: [] }), { status: 200 }),
+      );
+    }
+    assert(url.endsWith("/orders"));
+    return Promise.resolve(
+      new Response(JSON.stringify(pixOrder("WAITING")), { status: 200 }),
+    );
+  };
+  const pix = await provider(fetchFn).createPix({
+    customer: "PB_CUS_1",
+    value: 100,
+    dueDate: "2026-11-07",
+    description: "EscapeMatch",
+    externalReference: "charge-1",
+    split: { walletId: venue, fixedValue: 75 },
+  });
+  assertEquals(pix.id, "ORDE_PIX");
+  assertEquals(pix.payload, pixCopy);
+  assertEquals(pix.splitId, "SPLI_CRIADO");
+  assertEquals(pix.status, "PENDING");
 });

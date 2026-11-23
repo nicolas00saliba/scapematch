@@ -157,6 +157,8 @@ export type PaymentView = {
   billingType: string;
   deleted: boolean;
   splitId: string;
+  /// ISO da doc (`payment_method.pix.expiration_date`). Vazio se não houver.
+  expiresAt: string;
 };
 
 export type CustomerInput = {
@@ -281,8 +283,9 @@ export function pickReusablePix(rows: unknown[]): PixPaymentRef | null {
   const chosen = settled ?? pending ??
     pix.find((row) => reusableStatus.has(String(row.status)));
   if (!chosen || typeof chosen.id !== "string") return null;
+  const orderId = typeof chosen.orderId === "string" ? chosen.orderId : "";
   return {
-    id: chosen.id,
+    id: orderId.startsWith("ORDE_") ? orderId : chosen.id,
     status: typeof chosen.status === "string" ? chosen.status : "",
     splitId: typeof chosen.splitId === "string" ? chosen.splitId : "",
   };
@@ -540,12 +543,14 @@ export class PagBankProvider {
     const live = rows.filter((row) => !providerPaymentGone(row));
     const chosen = live[0];
     if (!chosen) return null;
+    const orderId = typeof chosen.orderId === "string" ? chosen.orderId : "";
     return {
-      id: String(chosen.id),
+      id: orderId.startsWith("ORDE_") ? orderId : String(chosen.id),
       status: String(chosen.status ?? ""),
       billingType: String(chosen.billingType ?? ""),
       deleted: false,
       splitId: String(chosen.splitId ?? ""),
+      expiresAt: "",
     };
   }
 
@@ -605,16 +610,26 @@ export class PagBankProvider {
     };
   }
 
-  capture(paymentId: string): Promise<{ id: string; status: string }> {
-    return this.#send(`/charges/${encodeURIComponent(paymentId)}/capture`, {})
-      .then((body) => ({
-        id: optionalString(body, "id") || paymentId,
+  capture(
+    paymentId: string,
+    amountCents = 0,
+  ): Promise<{ id: string; status: string }> {
+    return this.#chargeMoney(paymentId, amountCents).then((target) =>
+      this.#send(
+        `/charges/${encodeURIComponent(target.chargeId)}/capture`,
+        { amount: { value: target.value } },
+      ).then((body) => ({
+        id: optionalString(body, "id") || target.chargeId,
         status: mapStatus(optionalString(body, "status") || "PAID", body),
-      }));
+      }))
+    );
   }
 
-  refund(paymentId: string): Promise<{ id: string; status: string }> {
-    return this.#cancelCharge(paymentId).then((body) => ({
+  refund(
+    paymentId: string,
+    amountCents = 0,
+  ): Promise<{ id: string; status: string }> {
+    return this.#cancelCharge(paymentId, amountCents).then((body) => ({
       id: optionalString(body, "id") || paymentId,
       status: "REFUNDED",
     }));
@@ -622,8 +637,9 @@ export class PagBankProvider {
 
   cancelAuthorization(
     paymentId: string,
+    amountCents = 0,
   ): Promise<{ id: string; status: string }> {
-    return this.#cancelCharge(paymentId).then((body) => ({
+    return this.#cancelCharge(paymentId, amountCents).then((body) => ({
       id: optionalString(body, "id") || paymentId,
       status: "CANCELED",
     }));
@@ -667,23 +683,24 @@ export class PagBankProvider {
     return interest;
   }
 
+  /// CHAR_ vai em /charges. ORDE_ vai em /orders, como a doc de consulta do pedido.
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
-    return this.#send(
-      `/charges/${encodeURIComponent(paymentId)}`,
-      undefined,
-      "GET",
-    );
+    const path = paymentId.startsWith("ORDE_")
+      ? `/orders/${encodeURIComponent(paymentId)}`
+      : `/charges/${encodeURIComponent(paymentId)}`;
+    return this.#send(path, undefined, "GET");
   }
 
   getPayment(paymentId: string): Promise<PaymentView> {
     return this.readPayment(paymentId).then((body) => {
       const normalized = normalizeCharge(body);
       return {
-        id: stringField(normalized, "id"),
+        id: persistedPaymentId(body, normalized),
         status: stringField(normalized, "status"),
         billingType: stringField(normalized, "billingType"),
         deleted: normalized.deleted === true,
         splitId: optionalString(normalized, "splitId"),
+        expiresAt: pixExpiresAt(body),
       };
     });
   }
@@ -790,7 +807,8 @@ export class PagBankProvider {
     if (!reference) throw new Error("externalReference ausente");
     const existing = await this.#findReusablePix(reference);
     if (existing) {
-      const full = normalizeCharge(await this.readPayment(existing.id));
+      const raw = await this.readPayment(existing.id);
+      const full = normalizeCharge(raw);
       if (String(full.externalReference ?? "") !== reference) {
         throw new PixReuseRejected();
       }
@@ -806,7 +824,7 @@ export class PagBankProvider {
         throw new PixReuseRejected();
       }
       return {
-        id: stringField(full, "id"),
+        id: persistedPaymentId(raw, full),
         status: stringField(full, "status"),
         splitId: optionalString(full, "splitId"),
         created: false,
@@ -816,7 +834,7 @@ export class PagBankProvider {
     const charge = firstCharge(order);
     const qr = readQr(charge) ?? readQr(order);
     return {
-      id: stringField(charge, "id"),
+      id: persistedPaymentId(order, normalizeCharge(order)),
       status: mapStatus(stringField(charge, "status"), charge),
       splitId: splitIdOf(charge),
       created: true,
@@ -905,6 +923,10 @@ export class PagBankProvider {
         soft_descriptor: "EscapeMatch",
         card: cardBody(input.creditCardToken ?? ""),
       };
+    // Pix interbancário (copia-e-cola) nasce no charge, com type PIX.
+    // qr_codes no pedido é o QR da carteira PagBank (arrangements PAGBANK),
+    // não o Pix de qualquer banco. Doc: criar pedido com QR Code PIX e
+    // pedido com divisão de pagamento com PIX.
     const order: Record<string, unknown> = {
       reference_id: input.externalReference,
       customer,
@@ -932,11 +954,37 @@ export class PagBankProvider {
     return id;
   }
 
-  #cancelCharge(paymentId: string): Promise<Record<string, unknown>> {
-    return this.#send(
-      `/charges/${encodeURIComponent(paymentId)}/cancel`,
-      {},
+  #cancelCharge(
+    paymentId: string,
+    amountCents = 0,
+  ): Promise<Record<string, unknown>> {
+    return this.#chargeMoney(paymentId, amountCents).then((target) =>
+      this.#send(
+        `/charges/${encodeURIComponent(target.chargeId)}/cancel`,
+        { amount: { value: target.value } },
+      )
     );
+  }
+
+  /// A doc de captura e de cancelamento manda amount.value em centavos.
+  /// Pedido ORDE_ resolve o CHAR_ gerado no pagamento.
+  #chargeMoney(
+    paymentId: string,
+    amountCents = 0,
+  ): Promise<{ chargeId: string; value: number }> {
+    const known = Math.round(amountCents);
+    if (known > 0 && !paymentId.startsWith("ORDE_")) {
+      return Promise.resolve({ chargeId: paymentId, value: known });
+    }
+    return this.readPayment(paymentId).then((body) => {
+      const charge = chargeRecord(body);
+      const chargeId = stringField(charge, "id") || paymentId;
+      const value = known > 0 ? known : chargeAmountCents(charge);
+      if (!chargeId || value <= 0) {
+        throw new Error("PagBank 400: amount ausente");
+      }
+      return { chargeId, value };
+    });
   }
 
   async #pixQrWithRetry(
@@ -1117,6 +1165,7 @@ function normalizeCharge(body: Record<string, unknown>): Record<string, unknown>
     : String(charge.customer ?? "");
   return {
     id: charge.id,
+    orderId: orderIdOf(body) || orderIdOf(charge),
     status: mapStatus(String(charge.status ?? ""), charge),
     billingType,
     customer: customerId,
@@ -1126,6 +1175,59 @@ function normalizeCharge(body: Record<string, unknown>): Record<string, unknown>
     split: normalizedReceivers(charge),
     externalReference: charge.reference_id ?? charge.externalReference,
   };
+}
+
+function orderIdOf(body: Record<string, unknown>): string {
+  if (typeof body.id === "string" && body.id.startsWith("ORDE_")) return body.id;
+  if (typeof body.order_id === "string" && body.order_id.startsWith("ORDE_")) {
+    return body.order_id;
+  }
+  if (typeof body.orderId === "string" && body.orderId.startsWith("ORDE_")) {
+    return body.orderId;
+  }
+  return "";
+}
+
+function persistedPaymentId(
+  body: Record<string, unknown>,
+  normalized: Record<string, unknown>,
+): string {
+  return orderIdOf(body) || orderIdOf(normalized) || stringField(normalized, "id");
+}
+
+function chargeRecord(body: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(body.charges) && body.charges[0] &&
+    typeof body.charges[0] === "object") {
+    return body.charges[0] as Record<string, unknown>;
+  }
+  return body;
+}
+
+function chargeAmountCents(charge: Record<string, unknown>): number {
+  const amount = charge.amount;
+  if (amount && typeof amount === "object") {
+    const value = (amount as { value?: unknown }).value;
+    if (typeof value === "number" && value > 0) return Math.round(value);
+  }
+  if (typeof charge.value === "number" && charge.value > 0) {
+    return Math.round(charge.value * 100);
+  }
+  return 0;
+}
+
+function pixExpiresAt(body: Record<string, unknown>): string {
+  const charge = chargeRecord(body);
+  const method = charge.payment_method;
+  if (method && typeof method === "object") {
+    const pix = (method as { pix?: { expiration_date?: unknown } }).pix;
+    if (typeof pix?.expiration_date === "string") return pix.expiration_date;
+  }
+  const codes = Array.isArray(body.qr_codes) ? body.qr_codes : charge.qr_codes;
+  if (Array.isArray(codes) && codes[0] && typeof codes[0] === "object") {
+    const date = (codes[0] as { expiration_date?: unknown }).expiration_date;
+    if (typeof date === "string") return date;
+  }
+  return "";
 }
 
 function normalizedReceivers(
@@ -1168,6 +1270,7 @@ function chargesFromList(body: Record<string, unknown>): Record<string, unknown>
           out.push({
             ...(charge as Record<string, unknown>),
             customer: record.customer,
+            order_id: record.id,
           });
         }
       }

@@ -15,6 +15,7 @@ import {
   requestedChargeStatus,
 } from "./charge_patch.ts";
 import { applyPaymentTransition } from "./ledger.ts";
+import { rememberSplitId } from "./custody_release.ts";
 import { syncPayerDocument } from "./payer_document.ts";
 import { settlePaidChargeReserve } from "./points_reserve.ts";
 
@@ -49,12 +50,14 @@ export async function applyPagBankNotice(input: {
   if (!requested) return null;
 
   let next = requested;
+  let remoteSplit = "";
   const confirmRemote = movesMoney(requested) || requested === "cancelled" ||
     requested === "failed";
   if (confirmRemote) {
     const providerRef = paymentRefForRead(input.charge.provider_ref, "");
     if (!providerRef) throw new Error("ledger_write_failed");
     const remote = await input.pagbank.getPayment(providerRef);
+    remoteSplit = remote.splitId;
     const confirmed = confirmedChargeStatus(remote.status);
     if (!confirmed) throw new Error("ledger_write_failed");
     next = confirmed;
@@ -81,6 +84,10 @@ export async function applyPagBankNotice(input: {
   const pagbank = sandbox ? undefined : input.pagbank;
   if (status === "paid") {
     const live = pagbank ?? input.pagbank;
+    if (remoteSplit && remoteSplit !== (input.charge.provider_split_id ?? "")) {
+      input.charge.provider_split_id = remoteSplit;
+      await rememberSplitId(input.admin, input.charge.id, remoteSplit);
+    }
     await releasePaidIfClosed({
       admin: input.admin,
       pagbank: live,
@@ -109,6 +116,36 @@ export async function applyPagBankNotice(input: {
   return status;
 }
 
+/// Ordem de busca: id do pedido (ORDE_), depois o id de cada charge.
+export function pagbankNoticeRefs(payload: {
+  id?: string;
+  charges?: { id?: string; status?: string }[];
+}): string[] {
+  const ids: string[] = [];
+  const push = (value: string | undefined) => {
+    const id = (value ?? "").trim();
+    if (id && !ids.includes(id)) ids.push(id);
+  };
+  if ((payload.id ?? "").startsWith("ORDE_")) push(payload.id);
+  for (const charge of payload.charges ?? []) push(charge?.id);
+  push(payload.id);
+  return ids;
+}
+
+function pixPastExpiration(
+  charge: NoticeCharge,
+  remote: { status: string; expiresAt?: string },
+  now: number,
+): boolean {
+  if ((charge.billing_type ?? "").toUpperCase() !== "PIX") return false;
+  const status = remote.status.toUpperCase();
+  if (status !== "PENDING" && status !== "WAITING") return false;
+  const raw = (remote.expiresAt ?? "").trim();
+  if (!raw) return false;
+  const at = Date.parse(raw);
+  return Number.isFinite(at) && at <= now;
+}
+
 /// Pix e pedidos ainda pendentes. O webhook é o caminho normal.
 /// Isto cobre o aviso que não chegou.
 export async function pollPendingPagBankCharges(
@@ -134,6 +171,16 @@ export async function pollPendingPagBankCharges(
     if (!ref) continue;
     try {
       const remote = await pagbank.getPayment(ref);
+      if (pixPastExpiration(charge, remote, Date.now())) {
+        const expired = await applyPaymentTransition(
+          admin,
+          charge.id,
+          "cancelled",
+          false,
+        );
+        if (expired.status !== charge.status) applied += 1;
+        continue;
+      }
       const before = charge.status;
       const status = await applyPagBankNotice({
         admin,

@@ -591,19 +591,25 @@ async function loadSnapshot(
     p_actor: actor.id,
     p_as_admin: asAdmin,
   })) ?? { enabled: false, can_withdraw: false };
-  if (snap.enabled !== true) return snap;
+  const paused = (body: Record<string, unknown>) =>
+    venuePayoutsForcedOff
+      ? { ...body, enabled: false, payouts_paused: true }
+      : body;
+  if (snap.enabled !== true) return paused(snap);
   const role = text(snap.role);
-  if (role !== "owner" && role !== "partner" && role !== "admin") return snap;
+  if (role !== "owner" && role !== "partner" && role !== "admin") {
+    return paused(snap);
+  }
   const keys = await subaccount(deps, venueId);
   if (keys.kind !== "ok") {
-    return { ...snap, available_cents: 0, receivables: [] };
+    return paused({ ...snap, available_cents: 0, receivables: [] });
   }
   const today = deps.today ?? todayInSaoPaulo();
   const [available, receivables] = await Promise.all([
     keys.client.balanceCents(),
     keys.client.receivables(today),
   ]);
-  return { ...snap, available_cents: available, receivables };
+  return paused({ ...snap, available_cents: available, receivables });
 }
 
 async function subaccount(

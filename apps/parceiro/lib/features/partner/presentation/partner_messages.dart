@@ -265,6 +265,8 @@ abstract final class PartnerMessages {
   static const withdrawalHowDocs =
       'Os documentos da subconta precisam estar aprovados para o saque ligar.';
   static const withdrawalsUnavailable = 'Os saques ainda não estão liberados.';
+  static const payoutsPaused =
+      'Os saques pelo EscapeMatch estão desligados. O dinheiro cai na conta PagBank da casa e pode ser sacado pelo aplicativo do PagBank.';
   static const withdrawalsLoading = 'Carregando saques';
   static const withdrawalsLoadError = 'Não foi possível carregar os saques.';
   static const availableLabel = 'Disponível para saque';

@@ -130,6 +130,7 @@ class VenuePayoutSnapshot {
     required this.withdrawals,
     this.blockedUntil,
     this.bank,
+    this.payoutsPaused = false,
   });
 
   final bool enabled;
@@ -142,6 +143,7 @@ class VenuePayoutSnapshot {
   final List<VenueWithdrawal> withdrawals;
   final DateTime? blockedUntil;
   final VenueBankSummary? bank;
+  final bool payoutsPaused;
 
   static const hidden = VenuePayoutSnapshot(
     enabled: false,
@@ -582,6 +584,7 @@ class SupabaseVenueWithdrawalRepository implements VenueWithdrawalRepository {
     final scheduleMap = schedule is Map ? schedule : const {};
     return VenuePayoutSnapshot(
       enabled: json['enabled'] == true,
+      payoutsPaused: json['payouts_paused'] == true,
       canWithdraw: json['can_withdraw'] == true,
       role: json['role']?.toString() ?? 'none',
       availableCents: _int(json['available_cents']),

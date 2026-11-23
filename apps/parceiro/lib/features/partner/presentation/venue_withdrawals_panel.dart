@@ -281,7 +281,11 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
     if (_loading) return const _WithdrawalsLoading();
     if (_loadFailed) return _WithdrawalsLoadError(onRetry: _load);
     if (snapshot == null || !snapshot.enabled) {
-      return const _WithdrawalsUnavailable();
+      return _WithdrawalsUnavailable(
+        message: snapshot?.payoutsPaused == true
+            ? PartnerMessages.payoutsPaused
+            : PartnerMessages.withdrawalsUnavailable,
+      );
     }
     final theme = Theme.of(context);
     final staff = snapshot.role == 'staff' || !snapshot.canWithdraw;
@@ -486,7 +490,9 @@ class _WithdrawalsLoadError extends StatelessWidget {
 }
 
 class _WithdrawalsUnavailable extends StatelessWidget {
-  const _WithdrawalsUnavailable();
+  const _WithdrawalsUnavailable({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -500,7 +506,7 @@ class _WithdrawalsUnavailable extends StatelessWidget {
               ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
-        const Text(PartnerMessages.withdrawalsUnavailable),
+        Text(message),
       ],
     );
   }

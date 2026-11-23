@@ -992,7 +992,7 @@ export async function createCharge(
           return json({ error: "pagamento em andamento" }, 409);
         }
         try {
-          const captured = await pagbank.capture(stored);
+          const captured = await pagbank.capture(stored, amountCents);
           status = captured.status === "CONFIRMED" ||
               captured.status === "RECEIVED"
             ? "paid"
@@ -1000,7 +1000,7 @@ export async function createCharge(
         } catch (_captureError) {
           let refunded = false;
           try {
-            await pagbank.refund(stored);
+            await pagbank.refund(stored, amountCents);
             refunded = true;
           } catch (_refundError) {
             await recordOrphanPayment(admin, {
