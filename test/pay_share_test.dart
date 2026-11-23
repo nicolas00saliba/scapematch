@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
@@ -68,6 +69,17 @@ void main() {
     await tester.tap(find.byKey(AppKeys.payMethodCard));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.payTestCard));
+    await tester.pumpAndSettle();
+    final sheetScrolls = tester.stateList<ScrollableState>(
+      find.descendant(
+        of: find.byKey(AppKeys.paySheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final sheet = sheetScrolls.firstWhere(
+      (state) => state.position.maxScrollExtent > 0,
+    );
+    sheet.position.jumpTo(sheet.position.maxScrollExtent);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.paySimulate));
     await tester.pumpAndSettle();
