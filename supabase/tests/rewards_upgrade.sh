@@ -4,7 +4,7 @@
 # A main não serve de base: depois do #85, private.post_player_cashback já
 # existe e o teste histórico do #84 falha. Arquivo da base não roda de novo.
 # 70bbdd1 nunca foi aplicado fora de teste e não é caminho suportado.
-# Não fala com o Asaas e não publica função.
+# Não fala com o PagBank e não publica função.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"

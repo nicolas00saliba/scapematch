@@ -15,7 +15,7 @@ Deno.test("mascara PAN e campos nomeados e preserva números curtos", () => {
     note: "pedido 12 ref 999 vence 2026-11-12",
   });
   const leaked = [
-    `Asaas 400: cartão ${pan} e ${spaced}`,
+    `PagBank 400: cartão ${pan} e ${spaced}`,
     body,
   ].join("\n");
   const redacted = redactSensitive(leaked);
@@ -28,7 +28,7 @@ Deno.test("mascara PAN e campos nomeados e preserva números curtos", () => {
   assertEquals(redacted.includes("pedido 12"), true);
   assertEquals(redacted.includes("ref 999"), true);
   assertEquals(redacted.includes("2026-11-12"), true);
-  assertEquals(redacted.includes("Asaas 400"), true);
+  assertEquals(redacted.includes("PagBank 400"), true);
 });
 
 Deno.test("mascara creditCardToken aninhado e na mensagem de erro", () => {
@@ -47,7 +47,7 @@ Deno.test("mascara creditCardToken aninhado e na mensagem de erro", () => {
     }],
   });
   const message = [
-    `Asaas 400: ${JSON.stringify({
+    `PagBank 400: ${JSON.stringify({
       errors: [{
         code: "invalid_object",
         description: `creditCardToken=${echoed} rejeitado`,
@@ -66,7 +66,7 @@ Deno.test("mascara creditCardToken aninhado e na mensagem de erro", () => {
   assertEquals(redacted.includes('"credit_card_token":"[redacted]"'), true);
   assertEquals(redacted.includes('"CREDIT_CARD_TOKEN":"[redacted]"'), true);
   assertEquals(redacted.includes("creditCardToken=[redacted]"), true);
-  assertEquals(redacted.includes("Asaas 400"), true);
+  assertEquals(redacted.includes("PagBank 400"), true);
   assertEquals(redacted.includes("o campo creditCardToken é obrigatório"), true);
   assertEquals(redacted.includes("pedido 12"), true);
   assertEquals(redacted.includes("ref 999"), true);
@@ -86,7 +86,7 @@ Deno.test("mascara os campos do titular e preserva a palavra solta", () => {
     address_number: "42",
   };
   const body = JSON.stringify({ creditCardHolderInfo: holder });
-  const labeled = "Asaas 400: email=ana.titular@example.com rejeitado";
+  const labeled = "PagBank 400: email=ana.titular@example.com rejeitado";
   const redacted = redactSensitive(
     `${body}\n${labeled}\no campo name é obrigatório\npedido 12 ref 999`,
   );
@@ -106,5 +106,5 @@ Deno.test("mascara os campos do titular e preserva a palavra solta", () => {
   assertEquals(redacted.includes("o campo name é obrigatório"), true);
   assertEquals(redacted.includes("pedido 12"), true);
   assertEquals(redacted.includes("ref 999"), true);
-  assertEquals(redacted.includes("Asaas 400"), true);
+  assertEquals(redacted.includes("PagBank 400"), true);
 });

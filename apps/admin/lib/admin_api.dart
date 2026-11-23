@@ -270,8 +270,8 @@ class EarningsReport {
     required this.openPoints,
     required this.openPointsCents,
     required this.pendingPoints,
-    required this.asaasFeeCents,
-    required this.asaasFeeRows,
+    required this.pagbankFeeCents,
+    required this.pagbankFeeRows,
     required this.byVenue,
     required this.openComponents,
   });
@@ -282,8 +282,8 @@ class EarningsReport {
   final int openPoints;
   final int openPointsCents;
   final int pendingPoints;
-  final int? asaasFeeCents;
-  final int asaasFeeRows;
+  final int? pagbankFeeCents;
+  final int pagbankFeeRows;
   final List<VenueEarnings> byVenue;
   final List<OpenComponent> openComponents;
 }
@@ -363,10 +363,10 @@ class WebhookErrorLine {
 
 class PaymentsBoard {
   const PaymentsBoard({
-    required this.asaasApiKey,
-    required this.asaasBaseUrlProduction,
-    required this.asaasWebhookToken,
-    required this.asaasWebhookEmail,
+    required this.pagbankToken,
+    required this.pagbankBaseUrlProduction,
+    required this.pagbankWebhookSecret,
+    required this.pagbankWebhookEmail,
     required this.venueWithdrawalsSecret,
     required this.vaultUrl,
     required this.vaultSecret,
@@ -379,10 +379,10 @@ class PaymentsBoard {
     required this.webhookErrors,
   });
 
-  final bool? asaasApiKey;
-  final bool? asaasBaseUrlProduction;
-  final bool? asaasWebhookToken;
-  final bool? asaasWebhookEmail;
+  final bool? pagbankToken;
+  final bool? pagbankBaseUrlProduction;
+  final bool? pagbankWebhookSecret;
+  final bool? pagbankWebhookEmail;
   final bool? venueWithdrawalsSecret;
   final bool vaultUrl;
   final bool vaultSecret;
@@ -754,8 +754,8 @@ class SupabaseAdminApi implements AdminApi {
       openPoints: _int(row['open_points']),
       openPointsCents: _int(row['open_points_cents']),
       pendingPoints: _int(row['pending_points']),
-      asaasFeeCents: _intOrNull(row['asaas_fee_cents']),
-      asaasFeeRows: _int(row['asaas_fee_rows']),
+      pagbankFeeCents: _intOrNull(row['provider_fee_cents']),
+      pagbankFeeRows: _int(row['pagbank_fee_rows']),
       byVenue: [
         for (final item in _list(row['by_venue']))
           VenueEarnings(
@@ -865,19 +865,19 @@ class SupabaseAdminApi implements AdminApi {
   Future<PaymentsBoard> payments() async {
     final row = _map(await _rpc('admin_payments_board'));
     final ready = _map(row['readiness']);
-    var asaasApiKey = _optionalBool(null);
-    var asaasBase = _optionalBool(null);
-    var asaasToken = _optionalBool(null);
-    var asaasEmail = _optionalBool(null);
+    var pagbankToken = _optionalBool(null);
+    var pagbankBase = _optionalBool(null);
+    var pagbankToken = _optionalBool(null);
+    var pagbankEmail = _optionalBool(null);
     var withdrawalsSecret = _optionalBool(null);
     try {
       final response = await _client.functions.invoke('payments-readiness');
       final data = response.data;
       if (data is Map) {
-        asaasApiKey = _optionalBool(data['asaas_api_key']);
-        asaasBase = _optionalBool(data['asaas_base_url_production']);
-        asaasToken = _optionalBool(data['asaas_webhook_token']);
-        asaasEmail = _optionalBool(data['asaas_webhook_email']);
+        pagbankToken = _optionalBool(data['pagbank_api_key']);
+        pagbankBase = _optionalBool(data['pagbank_base_url_production']);
+        pagbankToken = _optionalBool(data['pagbank_webhook_token']);
+        pagbankEmail = _optionalBool(data['pagbank_webhook_email']);
         withdrawalsSecret = _optionalBool(data['venue_withdrawals_secret']);
       }
     } on Object {
@@ -887,10 +887,10 @@ class SupabaseAdminApi implements AdminApi {
       withdrawalsSecret = true;
     }
     return PaymentsBoard(
-      asaasApiKey: asaasApiKey,
-      asaasBaseUrlProduction: asaasBase,
-      asaasWebhookToken: asaasToken,
-      asaasWebhookEmail: asaasEmail,
+      pagbankToken: pagbankToken,
+      pagbankBaseUrlProduction: pagbankBase,
+      pagbankWebhookSecret: pagbankToken,
+      pagbankWebhookEmail: pagbankEmail,
       venueWithdrawalsSecret: withdrawalsSecret,
       vaultUrl: ready['vault_venue_withdrawals_url'] == true,
       vaultSecret: ready['vault_venue_withdrawals_secret'] == true,
@@ -979,7 +979,7 @@ class SupabaseAdminApi implements AdminApi {
     );
     final data = response.data;
     if (data is Map && data['error'] != null) {
-      return 'A casa foi aprovada. A subconta Asaas não saiu nesta tentativa.';
+      return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
     }
     return null;
   }
@@ -1382,8 +1382,8 @@ class MemoryAdminApi implements AdminApi {
       openPoints: 1800,
       openPointsCents: 1800,
       pendingPoints: 200,
-      asaasFeeCents: feeCents,
-      asaasFeeRows: feeCents == null ? 0 : 4,
+      pagbankFeeCents: feeCents,
+      pagbankFeeRows: feeCents == null ? 0 : 4,
       byVenue: [
         for (final house in houses)
           if (house.status == 'approved' &&
@@ -1493,10 +1493,10 @@ class MemoryAdminApi implements AdminApi {
     final fixture = paymentsFixture;
     if (fixture != null) {
       return PaymentsBoard(
-        asaasApiKey: fixture.asaasApiKey,
-        asaasBaseUrlProduction: fixture.asaasBaseUrlProduction,
-        asaasWebhookToken: fixture.asaasWebhookToken,
-        asaasWebhookEmail: fixture.asaasWebhookEmail,
+        pagbankToken: fixture.pagbankToken,
+        pagbankBaseUrlProduction: fixture.pagbankBaseUrlProduction,
+        pagbankWebhookSecret: fixture.pagbankWebhookSecret,
+        pagbankWebhookEmail: fixture.pagbankWebhookEmail,
         venueWithdrawalsSecret: fixture.venueWithdrawalsSecret,
         vaultUrl: fixture.vaultUrl,
         vaultSecret: fixture.vaultSecret,
@@ -1510,10 +1510,10 @@ class MemoryAdminApi implements AdminApi {
       );
     }
     return PaymentsBoard(
-      asaasApiKey: null,
-      asaasBaseUrlProduction: null,
-      asaasWebhookToken: null,
-      asaasWebhookEmail: null,
+      pagbankToken: null,
+      pagbankBaseUrlProduction: null,
+      pagbankWebhookSecret: null,
+      pagbankWebhookEmail: null,
       venueWithdrawalsSecret: null,
       vaultUrl: false,
       vaultSecret: false,

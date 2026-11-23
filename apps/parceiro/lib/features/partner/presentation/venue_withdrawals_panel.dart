@@ -1241,14 +1241,14 @@ class _ReaisMaskFormatter extends TextInputFormatter {
   }
 }
 
-/// Frase curta do motivo. Código interno vira texto; frase do Asaas passa.
+/// Frase curta do motivo. Código interno vira texto; frase do PagBank passa.
 String withdrawalFailureMessage(String? reason) {
   final text = reason?.trim() ?? '';
   if (text.isEmpty || text == 'falhou' || text == 'erro') {
-    return 'O Asaas não concluiu este saque.';
+    return 'O PagBank não concluiu este saque.';
   }
-  if (text == 'asaas_unavailable') {
-    return 'O Asaas não respondeu. Tente de novo em instantes.';
+  if (text == 'pagbank_unavailable') {
+    return 'O PagBank não respondeu. Tente de novo em instantes.';
   }
   if (text == 'sem pix') {
     return 'Este banco ou esta chave não aceita Pix. Cadastre uma chave Pix ou uma conta que receba Pix.';
@@ -1263,12 +1263,12 @@ String withdrawalFailureMessage(String? reason) {
   if (lower.contains('not authorized') || lower.contains('não autoriz')) {
     return 'A transferência não foi autorizada.';
   }
-  final safe = _safeAsaasPhrase(text);
+  final safe = _safePagBankPhrase(text);
   if (safe != null) return safe;
-  return 'O Asaas não concluiu este saque.';
+  return 'O PagBank não concluiu este saque.';
 }
 
-String? _safeAsaasPhrase(String text) {
+String? _safePagBankPhrase(String text) {
   if (text.length < 8 || text.length > 80 || !text.contains(' ')) return null;
   final lower = text.toLowerCase();
   const blocked = ['aact_', 'bearer', 'api_key', 'secret', 'token', 'eyj'];

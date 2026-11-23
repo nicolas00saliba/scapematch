@@ -1,6 +1,6 @@
 #!/bin/bash
 # Revisão periódica dos dois pacotes de recompensa.
-# Só Postgres local. Não cobra no Asaas e desfaz os dados no final.
+# Só Postgres local. Não cobra no PagBank e desfaz os dados no final.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

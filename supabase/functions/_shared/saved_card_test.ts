@@ -12,7 +12,7 @@ import {
 const cardA: SavedCard = {
   id: "11111111-1111-1111-1111-111111111111",
   userId: "user-a",
-  asaasCustomerId: "cus_a",
+  pagbankCustomerId: "cus_a",
   creditCardToken: "tok_user_a_secret",
   last4: "1111",
   brand: "VISA",
@@ -21,7 +21,7 @@ const cardA: SavedCard = {
 const cardB: SavedCard = {
   id: "22222222-2222-2222-2222-222222222222",
   userId: "user-b",
-  asaasCustomerId: "cus_b",
+  pagbankCustomerId: "cus_b",
   creditCardToken: "tok_user_b_secret",
   last4: "2222",
   brand: "MASTERCARD",
@@ -33,7 +33,7 @@ function storeOf(cards: readonly SavedCard[]): CardStore {
       const found = cards.find((card) =>
         card.id === cardId &&
         card.userId === userId &&
-        card.asaasCustomerId === customerId
+        card.pagbankCustomerId === customerId
       );
       return Promise.resolve(found ?? null);
     },

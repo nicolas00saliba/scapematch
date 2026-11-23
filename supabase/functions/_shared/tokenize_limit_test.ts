@@ -1,7 +1,7 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import { gateTokenize } from "./tokenize_limit.ts";
 
-Deno.test("o 6º cartão não segue para o Asaas", async () => {
+Deno.test("o 6º cartão não segue para o PagBank", async () => {
   const activeCards = 5;
   let tokenized = 0;
   const decision = await gateTokenize(
@@ -15,7 +15,7 @@ Deno.test("o 6º cartão não segue para o Asaas", async () => {
   assertEquals(tokenized, 0);
 });
 
-Deno.test("a 6ª tentativa na hora não segue para o Asaas", async () => {
+Deno.test("a 6ª tentativa na hora não segue para o PagBank", async () => {
   let attempts = 0;
   let tokenized = 0;
   const claim = () => {

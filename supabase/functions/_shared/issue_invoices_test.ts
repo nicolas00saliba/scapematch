@@ -63,13 +63,13 @@ Deno.test("a emissão só liga com o valor on", () => {
   );
 });
 
-Deno.test("produção desligada grava a nota e não chama o Asaas", async () => {
+Deno.test("produção desligada grava a nota e não chama o PagBank", async () => {
   const state = { invoices: [] as Record<string, unknown>[] };
   const calls: string[] = [];
   await issuePaidInvoices(adminFor(state), charge, {
     sandbox: false,
     emissionEnabled: false,
-    asaas: asaasSpy(calls),
+    pagbank: providerSpy(calls),
   });
   assertEquals(calls, []);
   assertEquals(state.invoices.map((row) => row.kind), ["service", "commission"]);
@@ -101,7 +101,7 @@ Deno.test("nota já gravada continua pendente enquanto a chave está off", async
   await issuePaidInvoices(adminFor(state), charge, {
     sandbox: false,
     emissionEnabled: false,
-    asaas: asaasSpy(calls),
+    pagbank: providerSpy(calls),
   });
   assertEquals(calls, []);
   assertEquals(state.invoices.length, 2);
@@ -113,7 +113,7 @@ Deno.test("com a chave on a falha da nota não rejeita a cobrança", async () =>
   await issuePaidInvoices(adminFor(state), charge, {
     sandbox: false,
     emissionEnabled: true,
-    asaas: asaasSpy([]),
+    pagbank: providerSpy([]),
   });
   assertEquals(state.invoices.map((row) => row.status), ["error", "error"]);
   assertEquals(
@@ -141,7 +141,7 @@ Deno.test("chave on emite a nota que estava scheduled", async () => {
   await issuePaidInvoices(adminFor(state), charge, {
     sandbox: false,
     emissionEnabled: true,
-    asaas: asaasSpy([]),
+    pagbank: providerSpy([]),
   });
   const commission = state.invoices.find((row) => row.kind === "commission");
   const service = state.invoices.find((row) => row.kind === "service");
@@ -156,7 +156,7 @@ Deno.test("sandbox continua simulado mesmo com a chave ligada", async () => {
   await issuePaidInvoices(adminFor(state), charge, {
     sandbox: true,
     emissionEnabled: true,
-    asaas: asaasSpy(calls),
+    pagbank: providerSpy(calls),
   });
   assertEquals(calls, []);
   assertEquals(state.invoices.every((row) => row.status === "simulated"), true);
@@ -165,7 +165,7 @@ Deno.test("sandbox continua simulado mesmo com a chave ligada", async () => {
 Deno.test("webhook e settle ao mesmo tempo emitem cada nota uma vez", async () => {
   const state = { invoices: [] as Record<string, unknown>[] };
   let schedules = 0;
-  const asaas = liveAsaas(() => {
+  const pagbank = liveProvider(() => {
     schedules += 1;
   });
   const admin = adminFor(state);
@@ -173,12 +173,12 @@ Deno.test("webhook e settle ao mesmo tempo emitem cada nota uma vez", async () =
     issuePaidInvoices(admin, charge, {
       sandbox: false,
       emissionEnabled: true,
-      asaas,
+      pagbank,
     }),
     issuePaidInvoices(admin, charge, {
       sandbox: false,
       emissionEnabled: true,
-      asaas,
+      pagbank,
     }),
   ]);
   assertEquals(schedules, 2);
@@ -220,7 +220,7 @@ Deno.test("processing velho reaproveita a nota e o recente não emite", async ()
   await issuePaidInvoices(adminFor(state), charge, {
     sandbox: false,
     emissionEnabled: true,
-    asaas: liveAsaas(() => {
+    pagbank: liveProvider(() => {
       schedules += 1;
     }, {
       "commission:charge-1": { id: "inv_antiga", status: "AUTHORIZED" },
@@ -237,7 +237,7 @@ Deno.test("processing velho reaproveita a nota e o recente não emite", async ()
 
 Deno.test("erro sem certificado volta a emitir até o limite", async () => {
   const reason = invoiceFailureReason(new Error(
-    'Asaas 400 {"errors":[{"code":"invalid_object","description":"Certificado digital ausente"}]}',
+    'PagBank 400 {"errors":[{"code":"invalid_object","description":"Certificado digital ausente"}]}',
   ));
   assertEquals(reason, "sem_certificado");
   assertEquals(invoiceErrorRetryable(reason), true);
@@ -247,8 +247,8 @@ Deno.test("erro sem certificado volta a emitir até o limite", async () => {
   await issuePaidInvoices(adminFor(failing), charge, {
     sandbox: false,
     emissionEnabled: true,
-    asaas: failingAsaas(new Error(
-      'Asaas 400 {"errors":[{"code":"invalid_object","description":"Certificado digital ausente"}]}',
+    pagbank: failingPagBank(new Error(
+      'PagBank 400 {"errors":[{"code":"invalid_object","description":"Certificado digital ausente"}]}',
     )),
   });
   assertEquals(failing.invoices.every((row) => row.status === "error"), true);
@@ -283,7 +283,7 @@ Deno.test("erro sem certificado volta a emitir até o limite", async () => {
   const retried = await retryFailedInvoices(adminFor(state), {
     sandbox: false,
     emissionEnabled: true,
-    asaas: liveAsaas(() => {
+    pagbank: liveProvider(() => {
       schedules += 1;
     }),
   });
@@ -301,7 +301,7 @@ Deno.test("erro sem certificado volta a emitir até o limite", async () => {
       status: "error",
       provider_invoice_id: null,
       attempt_count: invoiceAttemptLimit,
-      error_message: "asaas_unavailable",
+      error_message: "pagbank_unavailable",
     }],
     charges: { "charge-1": { ...charge } },
   };
@@ -309,7 +309,7 @@ Deno.test("erro sem certificado volta a emitir até o limite", async () => {
   const again = await retryFailedInvoices(adminFor(exhausted), {
     sandbox: false,
     emissionEnabled: true,
-    asaas: liveAsaas(() => {
+    pagbank: liveProvider(() => {
       extra += 1;
     }),
   });
@@ -320,19 +320,19 @@ Deno.test("erro sem certificado volta a emitir até o limite", async () => {
   const off = await retryFailedInvoices(adminFor(state), {
     sandbox: false,
     emissionEnabled: false,
-    asaas: liveAsaas(() => {
+    pagbank: liveProvider(() => {
       extra += 1;
     }),
   });
   assertEquals(off, 0);
 });
 
-function liveAsaas(
+function liveProvider(
   onSchedule: () => void,
   existing: Record<string, { id: string; status: string }> = {},
 ) {
   let created = 0;
-  const asaas = {
+  const pagbank = {
     findInvoiceByReference(reference: string) {
       return Promise.resolve(existing[reference] ?? null);
     },
@@ -349,22 +349,22 @@ function liveAsaas(
         id,
         status: "AUTHORIZED",
         number: "15",
-        pdfUrl: "https://asaas.com/nota.pdf",
-        xmlUrl: "https://asaas.com/nota.xml",
+        pdfUrl: "https://pagbank.com/nota.pdf",
+        xmlUrl: "https://pagbank.com/nota.xml",
       });
     },
     createCustomer() {
       return Promise.resolve({ id: "cus_1" });
     },
     withKey() {
-      return asaas;
+      return pagbank;
     },
   };
-  return asaas as never;
+  return pagbank as never;
 }
 
-function failingAsaas(error: Error) {
-  const asaas = {
+function failingPagBank(error: Error) {
+  const pagbank = {
     findInvoiceByReference() {
       return Promise.resolve(null);
     },
@@ -381,17 +381,17 @@ function failingAsaas(error: Error) {
       return Promise.resolve({ id: "cus_1" });
     },
     withKey() {
-      return asaas;
+      return pagbank;
     },
   };
-  return asaas as never;
+  return pagbank as never;
 }
 
-function asaasSpy(calls: string[]): never {
+function providerSpy(calls: string[]): never {
   return new Proxy({}, {
     get(_target, prop) {
       calls.push(String(prop));
-      throw new Error("asaas chamado");
+      throw new Error("pagbank chamado");
     },
   }) as never;
 }

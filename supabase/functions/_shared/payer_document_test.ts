@@ -51,8 +51,8 @@ Deno.test("CPF do pagador diferente barra e a reserva não depende disso", async
 Deno.test("consulta que falha não impede o pagamento e fica não verificada", async () => {
   const writes: string[] = [];
   const status = await syncPayerDocument(admin(writes, "52998224725"), {
-    readPayment: () => Promise.reject(new Error("Asaas 503")),
-    getPixTransaction: () => Promise.reject(new Error("Asaas 503")),
+    readPayment: () => Promise.reject(new Error("PagBank 503")),
+    getPixTransaction: () => Promise.reject(new Error("PagBank 503")),
   }, charge(), null);
   assertEquals(status, "unverified");
 });

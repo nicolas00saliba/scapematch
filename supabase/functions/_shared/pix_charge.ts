@@ -10,8 +10,8 @@ export function pixExternalReference(groupId: string, userId: string): string {
 }
 
 /// RECEIVED e CONFIRMED já foram pagos. O resto do Pix nasce pendente.
-export function localChargeStatus(asaasStatus: string): "pending" | "paid" {
-  const status = asaasStatus.trim().toUpperCase();
+export function localChargeStatus(providerStatus: string): "pending" | "paid" {
+  const status = providerStatus.trim().toUpperCase();
   if (status === "RECEIVED" || status === "CONFIRMED") return "paid";
   return "pending";
 }
@@ -37,7 +37,7 @@ export function pixLeaseExpired(
 }
 
 /// Quem inseriu cria o Pix. provider_ref existente não é trocado.
-/// Reserva vencida pede busca no Asaas; reserva fresca fica busy.
+/// Reserva vencida pede busca no PagBank; reserva fresca fica busy.
 export function pixReservationAction(input: {
   inserted: boolean;
   providerRef: string | null;
@@ -124,10 +124,10 @@ export function lostAttemptCompensation(
   return "cancel";
 }
 
-/// 4xx do Asaas: a cobrança não foi criada. Timeout e 5xx ficam no lease.
+/// 4xx do PagBank: a cobrança não foi criada. Timeout e 5xx ficam no lease.
 export function releaseReservationOnError(error: unknown): boolean {
   const raw = error instanceof Error ? error.message : "";
-  const match = /^Asaas (\d+)/.exec(raw);
+  const match = /^PagBank (\d+)/.exec(raw);
   if (!match) return false;
   const status = Number(match[1]);
   return status >= 400 && status < 500;

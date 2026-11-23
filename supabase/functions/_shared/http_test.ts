@@ -20,7 +20,7 @@ const local = envOf({ SUPABASE_URL: "http://127.0.0.1:54321" });
 function request(origin?: string): Request {
   const headers = new Headers();
   if (origin) headers.set("Origin", origin);
-  return new Request("https://example.supabase.co/functions/v1/asaas-webhook", {
+  return new Request("https://example.supabase.co/functions/v1/pagbank-webhook", {
     method: "POST",
     headers,
   });
@@ -62,10 +62,10 @@ Deno.test("pedido sem Origin ainda devolve JSON e não depende de CORS", async (
   assertEquals(response.headers.get("Access-Control-Allow-Origin"), null);
   assertEquals(await response.json(), { ok: true });
   const webhook = await Deno.readTextFile(
-    new URL("../asaas-webhook/index.ts", import.meta.url),
+    new URL("../pagbank-webhook/index.ts", import.meta.url),
   );
   assertEquals(/origin/i.test(webhook), false);
-  assert(webhook.includes("tokensMatch"));
+  assert(webhook.includes("pagbankSignatureMatches"));
 });
 
 Deno.test("ALLOWED_ORIGINS troca a lista e o curinga não passa", () => {

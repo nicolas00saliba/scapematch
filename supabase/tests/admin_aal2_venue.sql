@@ -30,7 +30,7 @@ values ('c0222222-2222-4222-8222-222222222222');
 insert into public.venues (
   id, owner_id, city_id, name, neighborhood, street_address, address_number,
   postal_code, latitude, longitude, income_value, document_kind,
-  document_number, phone, status, asaas_wallet_id
+  document_number, phone, status, pagbank_account_id
 ) values (
   'c0411111-1111-4111-8111-111111111111',
   'c0111111-1111-4111-8111-111111111111',

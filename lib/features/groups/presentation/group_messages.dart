@@ -37,16 +37,17 @@ abstract final class GroupMessages {
 
   static const paymentLabel = 'Pago (simulado)';
 
-  static const simulatedNotice = 'Pagamento simulado, nada é cobrado';
+  static const simulatedNotice =
+      'Pagamento simulado. O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
 
   static const simulatedPixNotice = 'Pix simulado. O código abaixo não cobra.';
 
-  static const livePixHint = 'O código Pix vem do Asaas quando você confirma.';
+  static const livePixHint = 'O código Pix vem do PagBank quando você confirma.';
 
   static const livePixNotice =
       'O Pix é pago agora. Se o grupo não confirmar, o valor volta.';
 
-  static const livePixReady = 'Pix do Asaas. Escaneie o QR ou copie o código.';
+  static const livePixReady = 'Pix do PagBank. Escaneie o QR ou copie o código.';
 
   static const simulatePayment = 'Simular pagamento';
 
@@ -54,9 +55,11 @@ abstract final class GroupMessages {
 
   static const payWithCard = 'Pagar com cartão';
 
-  static const chargeOnlyIfCloses = 'Você só é cobrado se o grupo confirmar.';
+  static const chargeOnlyIfCloses =
+      'O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
 
-  static const holdReleased = 'Valor liberado, nada foi cobrado';
+  static const holdReleased =
+      'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
 
   static String paymentStatus(PaymentStatus status) {
     return switch (status) {
@@ -111,9 +114,10 @@ abstract final class GroupMessages {
 
   static const yourSharePending = 'Sua parte está pendente';
   static const yourShareReserved =
-      'Valor reservado. Você só é cobrado se o grupo confirmar.';
+      'Valor reservado. O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
   static const yourSharePaid = 'Sua parte está paga';
-  static const yourShareReleased = 'Valor liberado, nada foi cobrado';
+  static const yourShareReleased =
+      'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
 
   static String yourShare(PaymentStatus status) {
     return switch (status) {

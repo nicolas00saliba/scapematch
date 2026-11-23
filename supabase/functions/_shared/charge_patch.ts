@@ -70,7 +70,8 @@ export function requestedChargeStatus(
   }
   if (
     event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED" ||
-    paymentStatus === "RECEIVED" || paymentStatus === "CONFIRMED"
+    paymentStatus === "RECEIVED" || paymentStatus === "CONFIRMED" ||
+    paymentStatus === "PAID"
   ) {
     return "paid";
   }
@@ -81,8 +82,8 @@ export function requestedChargeStatus(
 }
 
 /// Status confirmado no GET /payments/{id}. null = não aplicar.
-export function confirmedChargeStatus(asaasStatus: string): string | null {
-  switch (asaasStatus.trim().toUpperCase()) {
+export function confirmedChargeStatus(providerStatus: string): string | null {
+  switch (providerStatus.trim().toUpperCase()) {
     case "REFUNDED":
       return "refunded";
     case "RECEIVED":
@@ -90,8 +91,12 @@ export function confirmedChargeStatus(asaasStatus: string): string | null {
       return "paid";
     case "AUTHORIZED":
       return "authorized";
+    case "PAID":
+      return "paid";
     case "PENDING":
     case "OVERDUE":
+    case "WAITING":
+    case "IN_ANALYSIS":
       return "pending";
     default:
       return null;

@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { clientFailure } from "../_shared/pagbank_client_error.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import {
   playerCpfDigits,
   resolveCustomerWithCpf,
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const admin = createClient(url, service);
     const { data: profile } = await admin
       .from("profiles")
-      .select("display_name, asaas_customer_id, cpf")
+      .select("display_name, pagbank_customer_id, cpf")
       .eq("id", user.id)
       .maybeSingle();
     const cpf = playerCpfDigits(profile?.cpf);
@@ -64,9 +64,9 @@ Deno.serve(async (req) => {
         return claim.data === true;
       },
       async () => {
-        const asaas = AsaasProvider.fromEnv(Deno.env);
-        const previousCustomer = profile?.asaas_customer_id as string | null;
-        const resolvedCustomer = await resolveCustomerWithCpf(asaas, {
+        const pagbank = PagBankProvider.fromEnv(Deno.env);
+        const previousCustomer = profile?.pagbank_customer_id as string | null;
+        const resolvedCustomer = await resolveCustomerWithCpf(pagbank, {
           customerId: previousCustomer,
           name: profile?.display_name ?? "Jogador",
           email: user.email ?? "",
@@ -78,11 +78,11 @@ Deno.serve(async (req) => {
           user.id,
           previousCustomer,
           resolvedCustomer.id,
-          asaas,
+          pagbank,
         );
         const customerId = storedCustomer.id;
 
-        const tokenized = await asaas.tokenizeCard({
+        const tokenized = await pagbank.tokenizeCard({
           customer: customerId,
           remoteIp: clientIp(req) ?? undefined,
           creditCard: {

@@ -1,5 +1,5 @@
 -- Cálculo, idempotência, janela de um ano, estorno, antifraude e RLS.
--- Não fala com o Asaas.
+-- Não fala com o PagBank.
 
 \set ON_ERROR_STOP on
 

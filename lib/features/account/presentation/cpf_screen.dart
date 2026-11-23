@@ -67,7 +67,7 @@ class _CpfScreenState extends ConsumerState<CpfScreen> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
             Text(
-              'Para pagar com Pix ou cartão, o Asaas precisa do seu CPF.',
+              'Para pagar com Pix ou cartão, o PagBank precisa do seu CPF.',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),

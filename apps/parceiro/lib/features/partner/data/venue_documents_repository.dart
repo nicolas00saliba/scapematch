@@ -297,7 +297,7 @@ final venueDocumentPickerProvider = Provider<VenueDocumentPicker>((ref) {
 
 String venueDocumentFailureMessage(String code) {
   return switch (code) {
-    'onboarding' => 'Esse documento se envia no site do Asaas.',
+    'onboarding' => 'Esse documento se envia no site do PagBank.',
     'arquivo' => 'Escolha um PDF, JPG ou PNG de até 2 MB.',
     'reauth' || 'mfa' => 'Confirme que é você para enviar o arquivo.',
     'sem subconta' => 'A casa ainda não tem subconta.',

@@ -45,11 +45,11 @@ void main() {
     );
     expect(
       venueDocumentFailureMessage('onboarding'),
-      contains('site do Asaas'),
+      contains('site do PagBank'),
     );
   });
 
-  testWidgets('link do Asaas aparece e o saque fica desligado', (tester) async {
+  testWidgets('link do PagBank aparece e o saque fica desligado', (tester) async {
     final docs = MemoryVenueDocumentsRepository(
       VenueDocumentsView.fromJson({
         'known': true,

@@ -1,4 +1,4 @@
--- Conciliação diária. Não fala com o Asaas.
+-- Conciliação diária. Não fala com o PagBank.
 
 \set ON_ERROR_STOP on
 
@@ -99,7 +99,7 @@ insert into public.ledger_entries (
 
 insert into public.venue_withdrawals (
   id, venue_id, amount_cents, status, source, period_key, external_reference,
-  asaas_transfer_id
+  pagbank_transfer_id
 ) values (
   'e8600000-0000-4000-8000-000000000001',
   'e8200000-0000-4000-8000-000000000001',
@@ -146,7 +146,7 @@ begin
       and (item ->> 'amount_cents')::integer = 8000
   ) or not exists (
     select 1 from pg_catalog.jsonb_array_elements(v_snap -> 'withdrawals') item
-    where item ->> 'asaas_transfer_id' = 'tra_conciliacao'
+    where item ->> 'pagbank_transfer_id' = 'tra_conciliacao'
   ) or v_snap::text like '%segredo-qr-nao-sair%'
     or v_snap::text like '%80706050000120%'
   then

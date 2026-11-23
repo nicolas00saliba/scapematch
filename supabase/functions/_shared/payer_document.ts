@@ -17,7 +17,7 @@ type PixReader = {
 /// seguinte ainda pode confirmar.
 export async function syncPayerDocument(
   admin: Admin,
-  asaas: PixReader | undefined,
+  pagbank: PixReader | undefined,
   charge: { id: string; user_id: string; billing_type: string; provider_ref: string | null },
   remote?: Record<string, unknown> | null,
 ): Promise<Status> {
@@ -30,12 +30,12 @@ export async function syncPayerDocument(
   let payer: string | null = null;
   try {
     const payment = remote ??
-      (asaas && charge.provider_ref
-        ? await asaas.readPayment(charge.provider_ref)
+      (pagbank && charge.provider_ref
+        ? await pagbank.readPayment(charge.provider_ref)
         : null);
     const pixId = pixTransactionId(payment);
-    if (asaas && pixId) {
-      payer = pixPayerDocument(await asaas.getPixTransaction(pixId));
+    if (pagbank && pixId) {
+      payer = pixPayerDocument(await pagbank.getPixTransaction(pixId));
     }
   } catch (_error) {
     payer = null;

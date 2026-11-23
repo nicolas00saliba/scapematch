@@ -1,4 +1,4 @@
--- Painel de pagamentos. Não fala com o Asaas.
+-- Painel de pagamentos. Não fala com o PagBank.
 
 \set ON_ERROR_STOP on
 
@@ -123,7 +123,7 @@ insert into public.payment_charges (
 
 insert into public.venue_withdrawals (
   venue_id, amount_cents, status, source, period_key, external_reference,
-  asaas_transfer_id, receipt_url
+  pagbank_transfer_id, receipt_url
 ) values (
   'd7200000-0000-4000-8000-000000000001',
   6000, 'done', 'automatic', 'auto:2026-W46',
@@ -170,7 +170,7 @@ end $$;
 do $$
 begin
   set local role authenticated;
-  perform public.note_webhook_error('asaas-webhook', 'internal_error', 'pay_x');
+  perform public.note_webhook_error('pagbank-webhook', 'internal_error', 'pay_x');
   raise exception 'authenticated anotou erro de webhook';
 exception
   when insufficient_privilege then
@@ -181,12 +181,12 @@ do $$
 begin
   set local role service_role;
   perform public.note_webhook_error(
-    'asaas-webhook',
+    'pagbank-webhook',
     'cartão não encontrado',
     'pay_painel segredo'
   );
   perform public.note_webhook_error(
-    'asaas-transfer-webhook',
+    'pagbank-transfer-webhook',
     'internal_error',
     'tra_painel'
   );
@@ -217,7 +217,7 @@ begin
     )
     or not exists (
       select 1 from pg_catalog.jsonb_array_elements(v_board -> 'withdrawals') item
-      where item ->> 'asaas_transfer_id' = 'tra_painel'
+      where item ->> 'pagbank_transfer_id' = 'tra_painel'
         and item ->> 'venue_name' = 'Casa do Painel'
     )
     or not exists (

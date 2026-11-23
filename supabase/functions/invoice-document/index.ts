@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
+import { clientFailure } from "../_shared/pagbank_client_error.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
-import { isRemoteAsaasFile } from "./remote_asaas_file.ts";
+import { isRemoteInvoiceFile } from "./remote_invoice_file.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
   if (!data) return json({ error: "not found" }, 404);
 
   const stored = format === "xml" ? data.xml_url as string | null : data.pdf_url as string | null;
-  if (stored && isRemoteAsaasFile(stored)) {
+  if (stored && isRemoteInvoiceFile(stored)) {
     return Response.redirect(stored, 302);
   }
 

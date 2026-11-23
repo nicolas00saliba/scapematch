@@ -22,7 +22,7 @@ const withdrawal: LocalWithdrawal = {
   id: "saque-1",
   venueId: "11111111-1111-4111-8111-111111111111",
   externalReference: "saque-1",
-  asaasTransferId: "tra_1",
+  pagbankTransferId: "tra_1",
   status: "done",
   amountCents: 6000,
 };
@@ -71,7 +71,7 @@ Deno.test("compara status, valor, livro e transferência", () => {
         id: "saque-2",
         venueId: "11111111-1111-4111-8111-111111111111",
         externalReference: "saque-2",
-        asaasTransferId: "tra_sumiu",
+        pagbankTransferId: "tra_sumiu",
         status: "done",
         amountCents: 100,
       },
@@ -81,17 +81,17 @@ Deno.test("compara status, valor, livro e transferência", () => {
   const kinds = rows.map((row) => row.kind).sort();
   assertEquals(kinds, [
     "charge_amount",
-    "charge_missing_asaas",
     "charge_missing_local",
+    "charge_missing_pagbank",
     "charge_status",
     "ledger_refund_missing",
-    "transfer_missing_asaas",
     "transfer_missing_local",
+    "transfer_missing_pagbank",
     "transfer_status",
   ]);
 });
 
-Deno.test("status do Asaas vira o vocabulário do livro", () => {
+Deno.test("status do PagBank vira o vocabulário do livro", () => {
   assertEquals(mapPaymentStatus("AUTHORIZED"), "authorized");
   assertEquals(mapPaymentStatus("CONFIRMED"), "paid");
   assertEquals(mapPaymentStatus("RECEIVED_IN_CASH"), "paid");
@@ -263,21 +263,21 @@ Deno.test("lista incompleta não acusa ausência e marca o corte", () => {
     withdrawals: [withdrawal],
     truncated: true,
   });
-  assertEquals(rows.map((row) => row.kind), ["asaas_truncated"]);
+  assertEquals(rows.map((row) => row.kind), ["pagbank_truncated"]);
 });
 
 function envFor(secret: string): { get(name: string): string | undefined } {
   return {
     get(name) {
       if (name === "LEDGER_RECONCILE_SECRET") return secret;
-      if (name === "ASAAS_BASE_URL") return "https://asaas.test/v3";
-      if (name === "ASAAS_API_KEY") return "chave-de-teste";
+      if (name === "PAGBANK_BASE_URL") return "https://pagbank.test/v3";
+      if (name === "PAGBANK_TOKEN") return "chave-de-teste";
       return "";
     },
   };
 }
 
-Deno.test("sem segredo responde 503 e não chama o Asaas", async () => {
+Deno.test("sem segredo responde 503 e não chama o PagBank", async () => {
   const seen: string[] = [];
   const response = await handleLedgerReconcile(
     new Request("https://example.test/ledger", { method: "POST" }),
@@ -293,7 +293,7 @@ Deno.test("sem segredo responde 503 e não chama o Asaas", async () => {
   assertEquals(seen, []);
 });
 
-Deno.test("segredo errado responde 401 e não chama o Asaas", async () => {
+Deno.test("segredo errado responde 401 e não chama o PagBank", async () => {
   const seen: string[] = [];
   const response = await handleLedgerReconcile(
     new Request("https://example.test/ledger", {
@@ -393,8 +393,8 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
       now,
       fetchFn: (input, init) => {
         const url = String(input);
-        const headers = init?.headers as { access_token?: string };
-        seen.push({ url, key: headers.access_token ?? "" });
+        const headers = new Headers(init?.headers);
+        seen.push({ url, key: headers.get("Authorization") ?? "" });
         assert((init?.method ?? "GET") === "GET");
         assert(!url.includes("chave-de-teste"));
         assert(!url.includes("chave-da-casa"));
@@ -406,14 +406,14 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
             externalReference: "saque-1",
           }), { status: 200 }));
         }
-        if (url.includes("/payments/pay_antiga")) {
+        if (url.includes("/charges/pay_antiga")) {
           return Promise.resolve(new Response(JSON.stringify({
             id: "pay_antiga",
             status: "CONFIRMED",
             value: 10,
           }), { status: 200 }));
         }
-        const data = url.includes("/payments") && url.includes("dateCreated")
+        const data = url.includes("/charges") && url.includes("dateCreated")
           ? [{ id: "pay_1", status: "RECEIVED", value: 80 }]
           : [];
         return Promise.resolve(
@@ -450,7 +450,7 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
                   id: "saque-1",
                   venue_id: "11111111-1111-4111-8111-111111111111",
                   external_reference: "saque-1",
-                  asaas_transfer_id: "tra_1",
+                  pagbank_transfer_id: "tra_1",
                   status: "done",
                   amount_cents: 6000,
                 }],
@@ -458,13 +458,13 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
               error: null,
             });
           }
-          if (name === "read_venue_asaas_key") {
+          if (name === "read_venue_provider_key") {
             return Promise.resolve({ data: "chave-da-casa", error: null });
           }
           if (name === "record_payment_divergences") {
             const rows = args.p_rows as Array<{ kind: string }>;
             assert(rows.some((row) => row.kind === "charge_status"));
-            assert(!rows.some((row) => row.kind === "transfer_missing_asaas"));
+            assert(!rows.some((row) => row.kind === "transfer_missing_pagbank"));
             assert(!JSON.stringify(rows).includes("chave-da-casa"));
             assert(!JSON.stringify(rows).includes("chave-de-teste"));
             return Promise.resolve({ data: "run-1", error: null });
@@ -478,17 +478,17 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
   const body = await response.json();
   assertEquals(body.ok, true);
   assert(body.divergences >= 1);
-  const paymentUrls = seen.filter((item) => item.url.includes("/payments"));
+  const paymentUrls = seen.filter((item) => item.url.includes("/charges"));
   const transferUrls = seen.filter((item) => item.url.includes("/transfers"));
   assert(paymentUrls.some((item) => item.url.includes("dateCreated%5Bge%5D=2026-11-12")));
   assert(paymentUrls.some((item) => item.url.includes("paymentDate%5Bge%5D=2026-11-12")));
-  assert(paymentUrls.some((item) => item.url.endsWith("/payments/pay_antiga")));
-  assert(paymentUrls.every((item) => item.key === "chave-de-teste"));
+  assert(paymentUrls.some((item) => item.url.endsWith("/charges/pay_antiga")));
+  assert(paymentUrls.every((item) => item.key === "Bearer chave-de-teste"));
   assert(transferUrls.some((item) => item.url.endsWith("/transfers/tra_1")));
-  assert(transferUrls.every((item) => item.key === "chave-da-casa"));
+  assert(transferUrls.every((item) => item.key === "Bearer chave-da-casa"));
   assertEquals(calls, [
     "ledger_reconcile_snapshot",
-    "read_venue_asaas_key",
+    "read_venue_provider_key",
     "record_payment_divergences",
   ]);
 });
@@ -520,7 +520,7 @@ Deno.test("sem chave da subconta não consulta transferência", async () => {
                   id: "saque-1",
                   venue_id: "11111111-1111-4111-8111-111111111111",
                   external_reference: "saque-1",
-                  asaas_transfer_id: "tra_1",
+                  pagbank_transfer_id: "tra_1",
                   status: "done",
                   amount_cents: 6000,
                 }],
@@ -528,12 +528,12 @@ Deno.test("sem chave da subconta não consulta transferência", async () => {
               error: null,
             });
           }
-          if (name === "read_venue_asaas_key") {
+          if (name === "read_venue_provider_key") {
             return Promise.resolve({ data: "", error: null });
           }
           if (name === "record_payment_divergences") {
             const rows = args.p_rows as Array<{ kind: string }>;
-            assert(!rows.some((row) => row.kind === "transfer_missing_asaas"));
+            assert(!rows.some((row) => row.kind === "transfer_missing_pagbank"));
             return Promise.resolve({ data: "run-1", error: null });
           }
           return Promise.resolve({ data: null, error: { message: "inesperado" } });

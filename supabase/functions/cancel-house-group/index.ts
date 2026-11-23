@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientDbError, clientFailure } from "../_shared/asaas_client_error.ts";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { clientDbError, clientFailure } from "../_shared/pagbank_client_error.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { releaseCancelledCharges } from "../_shared/release_charges.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
@@ -58,8 +58,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const asaas = AsaasProvider.fromEnv(Deno.env);
-    const pending = await releaseCancelledCharges(admin, asaas, groupId);
+    const pagbank = PagBankProvider.fromEnv(Deno.env);
+    const pending = await releaseCancelledCharges(admin, pagbank, groupId);
     return json({ cancelled: true, pending });
   } catch (error) {
     const failure = clientFailure(error, "cancel-house-group");

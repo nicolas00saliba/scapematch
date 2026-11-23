@@ -1,7 +1,7 @@
 /// Forma que o jogador escolhe.
 enum PaymentMethodKind { pix, card }
 
-/// Repasse para a subconta da casa. No Asaas o split usa o walletId;
+/// Repasse para a subconta da casa. No PagBank o split usa o walletId;
 /// a comissão da EscapeMatch fica na conta que cria a cobrança.
 class MarketplaceSplit {
   const MarketplaceSplit({
@@ -41,7 +41,7 @@ class PixCharge {
   bool get isPending => status == 'pending';
 }
 
-/// Transporte até a Edge Function. A chave do Asaas não passa por aqui.
+/// Transporte até a Edge Function. A chave do PagBank não passa por aqui.
 abstract class PixTransport {
   Future<Map<String, dynamic>> postPix(Map<String, dynamic> body);
 }

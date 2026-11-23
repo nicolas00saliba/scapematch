@@ -1,6 +1,6 @@
 // Mesma conta de packages/dominio/lib/src/scape_points.dart.
 // O banco é quem lança. Este módulo cobre o cálculo testável na função
-// e confere o percentual que o SQL devolve antes de chamar o Asaas.
+// e confere o percentual que o SQL devolve antes de chamar o PagBank.
 
 export const officialPointValueCents = 1;
 export const officialC2cBps = 250;
@@ -606,7 +606,7 @@ function digits(value: string | null | undefined): string | null {
   return only.length > 0 ? only : null;
 }
 
-/// 11 ou 14 dígitos. Asterisco é a máscara do Asaas e não compara.
+/// 11 ou 14 dígitos. Asterisco é a máscara do PagBank e não compara.
 export function fullPayerDocument(value: string | null | undefined): string | null {
   if (!value || value.includes("*")) return null;
   const only = digits(value);

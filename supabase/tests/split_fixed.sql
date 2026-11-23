@@ -76,10 +76,10 @@ insert into public.payment_charges (
   id, group_id, user_id, venue_id, amount_cents, billing_type, status,
   idempotency_key, wallet_id, commission_bps, provider, provider_ref
 ) values
-  ('ff500000-0000-4000-8000-000000000001', 'ff400000-0000-4000-8000-000000000001', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 10000, 'PIX', 'creating', 'idem-fixo-credito', 'wal', 2500, 'asaas', null),
-  ('ff500000-0000-4000-8000-000000000002', 'ff400000-0000-4000-8000-000000000002', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 10000, 'PIX', 'creating', 'idem-fixo-grande', 'wal', 2500, 'asaas', null),
-  ('ff500000-0000-4000-8000-000000000003', 'ff400000-0000-4000-8000-000000000003', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 1500, 'PIX', 'creating', 'idem-fixo-apertado', 'wal', 1000, 'asaas', null),
-  ('ff500000-0000-4000-8000-000000000004', 'ff400000-0000-4000-8000-000000000004', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 10000, 'PIX', 'pending', 'idem-fixo-alerta', 'wal', 2500, 'asaas', 'pay_divergence');
+  ('ff500000-0000-4000-8000-000000000001', 'ff400000-0000-4000-8000-000000000001', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 10000, 'PIX', 'creating', 'idem-fixo-credito', 'wal', 2500, 'pagbank', null),
+  ('ff500000-0000-4000-8000-000000000002', 'ff400000-0000-4000-8000-000000000002', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 10000, 'PIX', 'creating', 'idem-fixo-grande', 'wal', 2500, 'pagbank', null),
+  ('ff500000-0000-4000-8000-000000000003', 'ff400000-0000-4000-8000-000000000003', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 1500, 'PIX', 'creating', 'idem-fixo-apertado', 'wal', 1000, 'pagbank', null),
+  ('ff500000-0000-4000-8000-000000000004', 'ff400000-0000-4000-8000-000000000004', 'ff100000-0000-4000-8000-000000000001', 'ff200000-0000-4000-8000-000000000001', 10000, 'PIX', 'pending', 'idem-fixo-alerta', 'wal', 2500, 'pagbank', 'pay_divergence');
 
 insert into public.venue_referral_entries (
   venue_id, kind, amount_cents, program, settlement, source_charge_id,
@@ -126,15 +126,10 @@ begin
     raise exception 'credito maior que a sala depois da taxa entrou %', v_fixed;
   end if;
 
-  begin
-    perform private.sync_house_fixed('ff500000-0000-4000-8000-000000000003');
-    raise exception 'comissao menor que a taxa foi aceita';
-  exception
-    when sqlstate '23514' then
-      if sqlerrm not like '%split_excede_liquido%' then
-        raise;
-      end if;
-  end;
+  v_fixed := private.sync_house_fixed('ff500000-0000-4000-8000-000000000003');
+  if v_fixed <> 1350 then
+    raise exception 'comissao menor que a taxa encolheu a casa %', v_fixed;
+  end if;
 
   if not private.note_split_divergence(
     'pay_divergence', 'PAYMENT_SPLIT_DIVERGENCE_BLOCK'
@@ -179,7 +174,7 @@ begin
     'ff400000-0000-4000-8000-000000000005',
     'ff100000-0000-4000-8000-000000000001',
     'ff200000-0000-4000-8000-000000000001',
-    10000, 'PIX', 'creating', 'idem-fixo-debito', 'wal', 2500, 'asaas'
+    10000, 'PIX', 'creating', 'idem-fixo-debito', 'wal', 2500, 'pagbank'
   );
   insert into public.venue_cashback_debits (
     venue_id, source_charge_id, amount_cents

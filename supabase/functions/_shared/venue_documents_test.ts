@@ -1,9 +1,9 @@
 import { assertEquals } from "jsr:@std/assert";
-import { asaasProductionBaseUrl, asaasSandboxBaseUrl } from "./asaas_provider.ts";
+import { pagbankProductionBaseUrl, pagbankSandboxBaseUrl } from "./pagbank_provider.ts";
 import {
   decodeDocumentPayload,
   handleVenueDocuments,
-  officialAsaasBase,
+  officialPagBankBase,
   presentDocuments,
   roleOf,
   safeOnboardingUrl,
@@ -15,24 +15,24 @@ import {
 const venueId = "11111111-1111-4111-8111-111111111111";
 const secret = "super-secret-key";
 
-Deno.test("o link de onboarding só abre host do Asaas em https", () => {
+Deno.test("o link de onboarding só abre host do PagBank em https", () => {
   assertEquals(
     safeOnboardingUrl("https://cadastro.io/8ad196"),
     "https://cadastro.io/8ad196",
   );
   assertEquals(
-    safeOnboardingUrl("https://www.asaas.com/onboarding/abc"),
-    "https://www.asaas.com/onboarding/abc",
+    safeOnboardingUrl("https://www.pagbank.com/onboarding/abc"),
+    "https://www.pagbank.com/onboarding/abc",
   );
   assertEquals(safeOnboardingUrl("http://cadastro.io/abc"), null);
   assertEquals(safeOnboardingUrl("https://cadastro.io.evil.com/abc"), null);
   assertEquals(safeOnboardingUrl("https://evil.com/?x=cadastro.io"), null);
   assertEquals(safeOnboardingUrl("javascript:alert(1)"), null);
   assertEquals(
-    officialAsaasBase(`${asaasProductionBaseUrl}/`),
-    asaasProductionBaseUrl,
+    officialPagBankBase(`${pagbankProductionBaseUrl}/`),
+    pagbankProductionBaseUrl,
   );
-  assertEquals(officialAsaasBase("https://api.asaas.com.evil.com/v3"), null);
+  assertEquals(officialPagBankBase("https://api.pagseguro.com.evil.com/v3"), null);
 });
 
 Deno.test("com onboardingUrl o grupo não aceita upload pela API", () => {
@@ -103,7 +103,7 @@ Deno.test("a lista usa a chave da subconta e não a devolve", async () => {
     deps({
       fetchFn: (url, init) => {
         seen.url = String(url);
-        seen.key = new Headers(init?.headers).get("access_token") ?? "";
+        seen.key = new Headers(init?.headers).get("Authorization") ?? "";
         const path = String(url);
         if (path.endsWith("/myAccount/status")) {
           return jsonResponse({
@@ -125,8 +125,8 @@ Deno.test("a lista usa a chave da subconta e não a devolve", async () => {
   const body = await response.json();
   assertEquals(response.status, 200);
   assertEquals(body.approved, true);
-  assertEquals(seen.key, secret);
-  assertEquals(seen.url, `${asaasSandboxBaseUrl}/myAccount/documents`);
+  assertEquals(seen.key, `Bearer ${secret}`);
+  assertEquals(seen.url, `${pagbankSandboxBaseUrl}/myAccount/documents`);
   assertEquals(JSON.stringify(body).includes(secret), false);
 });
 
@@ -177,7 +177,7 @@ Deno.test("sem link o arquivo segue em multipart e o erro não vaza a chave", as
     }),
     deps({
       strong: true,
-      base: asaasProductionBaseUrl,
+      base: pagbankProductionBaseUrl,
       fetchFn: async (url, init) => {
         const method = init?.method ?? "GET";
         const path = String(url);
@@ -188,11 +188,11 @@ Deno.test("sem link o arquivo segue em multipart e o erro não vaza a chave", as
           posts.push({
             type: String(form.get("type")),
             file: file instanceof File ? file.name : "",
-            key: new Headers(init?.headers).get("access_token") ?? "",
+            key: new Headers(init?.headers).get("Authorization") ?? "",
           });
           assertEquals(
             path,
-            `${asaasProductionBaseUrl}/myAccount/documents/doc_sem_link_1`,
+            `${pagbankProductionBaseUrl}/myAccount/documents/doc_sem_link_1`,
           );
           return new Response(JSON.stringify({
             errors: [{ description: secret }],
@@ -217,11 +217,11 @@ Deno.test("sem link o arquivo segue em multipart e o erro não vaza a chave", as
   );
   const body = await response.json();
   assertEquals(response.status, 502);
-  assertEquals(body, { error: "asaas_unavailable" });
+  assertEquals(body, { error: "pagbank_unavailable" });
   assertEquals(posts, [{
     type: "IDENTIFICATION",
     file: "documento.png",
-    key: secret,
+    key: `Bearer ${secret}`,
   }]);
   assertEquals(JSON.stringify(body).includes(secret), false);
 });
@@ -249,7 +249,7 @@ Deno.test("arquivo que não é pdf nem imagem não sai da função", async () =>
   assertEquals(decodeDocumentPayload(""), null);
 });
 
-Deno.test("sem sessão, sem papel ou sem reautenticação não consulta o Asaas", async () => {
+Deno.test("sem sessão, sem papel ou sem reautenticação não consulta o PagBank", async () => {
   let called = false;
   const fetchFn = () => {
     called = true;
@@ -283,7 +283,7 @@ Deno.test("URL que não é a API oficial não é chamada", async () => {
   const response = await handleVenueDocuments(
     request({ action: "list", venue_id: venueId }),
     deps({
-      base: "https://api.asaas.com.evil.com/v3",
+      base: "https://api.pagseguro.com.evil.com/v3",
       fetchFn: () => {
         called = true;
         return Promise.resolve(new Response(""));
@@ -328,7 +328,7 @@ Deno.test("admin com aal2 lista os documentos", async () => {
   const response = await handleVenueDocuments(
     request({ action: "list", venue_id: venueId }, sessionJwt("aal2")),
     deps({
-      fetchFn: asaasDocuments(),
+      fetchFn: pagbankDocuments(),
       role: (id, userId, token) => roleOf(store, id, userId, token),
     }),
   );
@@ -344,7 +344,7 @@ Deno.test("o dono da casa lista sem MFA", async () => {
   const response = await handleVenueDocuments(
     request({ action: "list", venue_id: venueId }, sessionJwt("aal1")),
     deps({
-      fetchFn: asaasDocuments(),
+      fetchFn: pagbankDocuments(),
       role: (id, userId, token) => roleOf(store, id, userId, token),
     }),
   );
@@ -412,7 +412,7 @@ function roleStore(input: {
   return store;
 }
 
-function asaasDocuments(): VenueDocumentDeps["fetchFn"] {
+function pagbankDocuments(): VenueDocumentDeps["fetchFn"] {
   return (url) => {
     if (String(url).endsWith("/myAccount/status")) {
       return jsonResponse({
@@ -456,8 +456,8 @@ function deps(input: {
   return {
     env: {
       get: (name) => {
-        if (name === "ASAAS_BASE_URL") return input.base ?? asaasSandboxBaseUrl;
-        if (name === "ASAAS_POINTS_RESERVE_API_KEY") return "chave-reserva";
+        if (name === "PAGBANK_BASE_URL") return input.base ?? pagbankSandboxBaseUrl;
+        if (name === "PAGBANK_POINTS_RESERVE_TOKEN") return "chave-reserva";
         return "";
       },
     },

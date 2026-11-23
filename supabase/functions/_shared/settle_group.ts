@@ -1,5 +1,5 @@
-import { logCaught } from "./asaas_client_error.ts";
-import { asaasPaymentGone, AsaasProvider } from "./asaas_provider.ts";
+import { logCaught } from "./pagbank_client_error.ts";
+import { providerPaymentGone, PagBankProvider } from "./pagbank_provider.ts";
 import { issuePaidInvoices } from "./issue_invoices.ts";
 import {
   applyPaymentTransition,
@@ -31,6 +31,7 @@ type ChargeView = ChargeRow & {
   status: string;
   provider_ref: string | null;
   billing_type: string;
+  provider_split_id?: string | null;
 };
 
 /// Admin, criador e dono da casa liquidam ou liberam.
@@ -71,7 +72,7 @@ export async function maySettle(
 
 export async function settleGroup(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   groupId: string,
 ): Promise<void> {
   const { data: group } = await admin
@@ -97,7 +98,7 @@ export async function settleGroup(
         .is("cancelled_at", null)
         .is("confirmed_at", null);
     }
-    await releaseCancelledCharges(admin, asaas, groupId);
+    await releaseCancelledCharges(admin, pagbank, groupId);
     return;
   }
   if (decision === "wait") return;
@@ -106,7 +107,7 @@ export async function settleGroup(
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type",
+      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type, provider_split_id",
     )
     .eq("group_id", groupId);
 
@@ -114,11 +115,11 @@ export async function settleGroup(
     const item = charge as ChargeView;
     if (!item.provider_ref) continue;
     if (item.status === "authorized" && item.billing_type === "CREDIT_CARD") {
-      await captureAuthorizedCard(admin, asaas, item);
+      await captureAuthorizedCard(admin, pagbank, item);
       continue;
     }
     if (item.status === "paid") {
-      await syncPayerDocument(admin, asaas, {
+      await syncPayerDocument(admin, pagbank, {
         id: item.id,
         user_id: item.user_id,
         billing_type: item.billing_type,
@@ -126,9 +127,10 @@ export async function settleGroup(
       });
       await creditLedger(admin, item);
       await issuePaidInvoices(admin, item, {
-        sandbox: asaas.sandbox,
-        asaas: asaas.sandbox ? undefined : asaas,
+        sandbox: pagbank.sandbox,
+        pagbank: pagbank.sandbox ? undefined : pagbank,
       });
+      await releaseHeldSplit(pagbank, item.provider_split_id);
     }
   }
 }
@@ -152,7 +154,7 @@ export async function expireUnconfirmedGroups(admin: Admin): Promise<string[]> {
 /// Um grupo que falha não impede o próximo.
 export async function settleAuthorizedCards(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
 ): Promise<void> {
   if (typeof admin?.from !== "function") return;
   const { data, error } = await admin
@@ -169,7 +171,7 @@ export async function settleAuthorizedCards(
   }
   for (const id of ids) {
     try {
-      await settleGroup(admin, asaas, id);
+      await settleGroup(admin, pagbank, id);
     } catch (error) {
       logCaught("settle-charges", error);
     }
@@ -178,15 +180,15 @@ export async function settleAuthorizedCards(
 
 async function captureAuthorizedCard(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   row: ChargeView,
 ): Promise<void> {
   if (!row.provider_ref) return;
   const claimed = await claimCardCapture(admin, row.id);
   if (!claimed) return;
   try {
-    const remote = await asaas.getPayment(row.provider_ref);
-    if (asaasPaymentGone(remote)) {
+    const remote = await pagbank.getPayment(row.provider_ref);
+    if (providerPaymentGone(remote)) {
       await releaseCardCaptureClaim(admin, row.id);
       const transition = await applyPaymentTransition(
         admin,
@@ -201,7 +203,7 @@ async function captureAuthorizedCard(
       remote.status === "RECEIVED";
     let paid = already;
     if (!already) {
-      const captured = await asaas.capture(row.provider_ref);
+      const captured = await pagbank.capture(row.provider_ref);
       paid = captured.status === "CONFIRMED" || captured.status === "RECEIVED";
     }
     if (!paid) {
@@ -216,9 +218,10 @@ async function captureAuthorizedCard(
     );
     if (transition.status !== "paid") return;
     await issuePaidInvoices(admin, row, {
-      sandbox: asaas.sandbox,
-      asaas: asaas.sandbox ? undefined : asaas,
+      sandbox: pagbank.sandbox,
+      pagbank: pagbank.sandbox ? undefined : pagbank,
     });
+    await releaseHeldSplit(pagbank, row.provider_split_id);
   } catch (error) {
     await releaseCardCaptureClaim(admin, row.id);
     throw error;
@@ -233,7 +236,21 @@ export function goneProviderLocalStatus(
   return status.trim().toUpperCase() === "REFUNDED" ? "refunded" : "cancelled";
 }
 
-/// Sem a função no banco, segue em frente: a leitura do status no Asaas
+/// A custódia só sai depois da captura ou do Pix pago. Falha aqui não desfaz o pago.
+async function releaseHeldSplit(
+  pagbank: PagBankProvider,
+  splitId: string | null | undefined,
+): Promise<void> {
+  const id = (splitId ?? "").trim();
+  if (!id) return;
+  try {
+    await pagbank.releaseCustody(id, []);
+  } catch (error) {
+    logCaught("settle-charges", error);
+  }
+}
+
+/// Sem a função no banco, segue em frente: a leitura do status no PagBank
 /// evita uma segunda captura na tentativa seguinte.
 async function claimCardCapture(
   admin: Admin,

@@ -4,20 +4,21 @@ import {
   paymentBlock,
 } from "../_shared/venue_finance.ts";
 import {
-  asaasStatus,
+  providerStatus,
   cardDeclined,
   clientFailure,
   isCardDeclined,
-  logAsaasFailure,
-} from "../_shared/asaas_client_error.ts";
+  logProviderFailure,
+} from "../_shared/pagbank_client_error.ts";
+import { installmentCharge } from "../_shared/pagbank_rules.ts";
 import {
-  asaasPaymentGone,
-  AsaasProvider,
+  providerPaymentGone,
+  PagBankProvider,
   commissionCents,
   fixedReaisFromCents,
   PixReservationLost,
   PixReuseRejected,
-} from "../_shared/asaas_provider.ts";
+} from "../_shared/pagbank_provider.ts";
 import { confirmedChargeStatus } from "../_shared/charge_patch.ts";
 import { bandConfirmed } from "../_shared/group_band.ts";
 import { detachGonePix } from "../_shared/detach_gone_pix.ts";
@@ -46,7 +47,7 @@ import {
   pointsReserveSplitLine,
   readEnv,
   settlePaidChargeReserve,
-} from "../_shared/points_reserve_asaas.ts";
+} from "../_shared/points_reserve.ts";
 import {
   cardReregisterCode,
   chargeAsksNewCard,
@@ -76,14 +77,25 @@ type ChargeBody = {
   idempotency_key?: string;
   saved_card_id?: string;
   points?: number;
+  installments?: number;
 };
 
 type ChargeUser = { id: string; email?: string | null };
 
+function requestedInstallments(body: ChargeBody, amountCents: number): number {
+  const raw = body.installments ?? 1;
+  const count = typeof raw === "number" && Number.isFinite(raw) ? Math.trunc(raw) : 1;
+  return installmentCharge({
+    principalCents: amountCents,
+    installments: count,
+    buyerInterestCents: 0,
+  }).installments;
+}
+
 export type ChargeRuntime = {
   user: ChargeUser;
   admin: ChargeDb;
-  asaas: AsaasProvider;
+  pagbank: PagBankProvider;
 };
 
 export async function createCharge(
@@ -199,17 +211,17 @@ export async function createCharge(
 
     const { data: venue } = await admin
       .from("venues")
-      .select("id, name, asaas_wallet_id, status")
+      .select("id, name, pagbank_account_id, status")
       .eq("id", group.venue_id)
       .maybeSingle();
     const blocked = paymentBlock({
       status: (venue?.status as string | null) ?? null,
-      walletId: (venue?.asaas_wallet_id as string | null) ?? null,
+      walletId: (venue?.pagbank_account_id as string | null) ?? null,
       hasBankAccount: true,
     });
     if (!venue || blocked) {
       return json({
-        error: blocked ?? "A casa ainda não tem subconta Asaas.",
+        error: blocked ?? "A casa ainda não tem subconta PagBank.",
       }, 409);
     }
     // service_role não lê venue_bank_accounts. A função vê a conta.
@@ -221,7 +233,7 @@ export async function createCharge(
       return json({ error: financeBlockedMessage }, 409);
     }
 
-    const asaas = deps?.asaas ?? AsaasProvider.fromEnv(Deno.env);
+    const pagbank = deps?.pagbank ?? PagBankProvider.fromEnv(Deno.env);
     const commissionBps = await commissionBpsForVenue(
       admin,
       venue.id as string,
@@ -282,15 +294,15 @@ export async function createCharge(
       }
     }
     const split = {
-      walletId: venue.asaas_wallet_id as string,
+      walletId: venue.pagbank_account_id as string,
       fixedValue: 0,
     };
     const reserveSplitsFor = async (
       houseFixedCents: number,
       chargeId: string,
     ) => {
-      if (!asaas.official) return [];
-      const wallet = readEnv(Deno.env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
+      if (!pagbank.official) return [];
+      const wallet = readEnv(Deno.env, "PAGBANK_POINTS_RESERVE_ACCOUNT_ID").trim();
       if (!wallet) return [];
       const gross = grossForReserve ?? grossCents;
       const { data, error } = await admin.rpc("points_reserve_split_cents", {
@@ -306,8 +318,8 @@ export async function createCharge(
       }
       const line = pointsReserveSplitLine({
         reserveWalletId: wallet,
-        rootWalletId: readEnv(Deno.env, "ASAAS_ROOT_WALLET_ID"),
-        houseWalletId: venue.asaas_wallet_id as string,
+        rootWalletId: readEnv(Deno.env, "PAGBANK_ROOT_WALLET_ID"),
+        houseWalletId: venue.pagbank_account_id as string,
         referralCents: data,
       });
       if (!line || !chargeId) return line ? [line] : [];
@@ -330,7 +342,7 @@ export async function createCharge(
 
     const { data: profile } = await admin
       .from("profiles")
-      .select("display_name, asaas_customer_id, cpf")
+      .select("display_name, pagbank_customer_id, cpf")
       .eq("id", user.id)
       .maybeSingle();
     const cpf = playerCpfDigits(profile?.cpf);
@@ -341,7 +353,7 @@ export async function createCharge(
         p_user_id: user.id,
         p_venue_id: venue.id,
         p_idempotency_key: idempotencyKey,
-        p_wallet_id: venue.asaas_wallet_id,
+        p_wallet_id: venue.pagbank_account_id,
         p_commission_bps: commissionBps,
         p_billing_type: billingType,
       });
@@ -362,8 +374,8 @@ export async function createCharge(
         points_only: true,
       });
     }
-    const previousCustomer = profile?.asaas_customer_id as string | null;
-    const resolvedCustomer = await resolveCustomerWithCpf(asaas, {
+    const previousCustomer = profile?.pagbank_customer_id as string | null;
+    const resolvedCustomer = await resolveCustomerWithCpf(pagbank, {
       customerId: previousCustomer,
       name: profile?.display_name ?? "Jogador",
       email: user.email ?? "",
@@ -375,7 +387,7 @@ export async function createCharge(
       user.id,
       previousCustomer,
       resolvedCustomer.id,
-      asaas,
+      pagbank,
     );
     const customerId = storedCustomer.id;
     const replacedCustomer = storedCustomer.replacedId;
@@ -400,7 +412,7 @@ export async function createCharge(
         venueId: venue.id as string,
         amountCents,
         idempotencyKey,
-        walletId: venue.asaas_wallet_id as string,
+        walletId: venue.pagbank_account_id as string,
         commissionBps,
         grossCents: grossForReserve,
         subsidyCents,
@@ -445,12 +457,12 @@ export async function createCharge(
       let attemptId = reserved.attempt_id;
       let createPix = action === "create";
       if (action === "reclaim") {
-        const found = await asaas.findPix(
+        const found = await pagbank.findPix(
           pixExternalReference(groupId, user.id),
         );
         if (found) {
-          const full = await paymentOrGone(asaas, found.id);
-          if (asaasPaymentGone(full)) {
+          const full = await paymentOrGone(pagbank, found.id);
+          if (providerPaymentGone(full)) {
             const claimed = await claimExpiredPixReservation(
               admin,
               reserved.id,
@@ -472,14 +484,14 @@ export async function createCharge(
           if (!stored) return json({ error: "pagamento em andamento" }, 409);
           const remote = stored === found.id
             ? full
-            : await paymentOrGone(asaas, stored);
+            : await paymentOrGone(pagbank, stored);
           if (stored !== found.id && !pixMatchesCharge(remote, expected)) {
             return json({ error: "pix_reuse_mismatch" }, 409);
           }
           const confirmed = confirmedChargeStatus(String(remote.status ?? ""));
           if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
           if (confirmed === "paid") {
-            await syncPayerDocument(admin, asaas, {
+            await syncPayerDocument(admin, pagbank, {
               id: reserved.id,
               user_id: user.id,
               billing_type: "PIX",
@@ -495,7 +507,7 @@ export async function createCharge(
           status = transition.status;
           providerRef = stored;
           if (status === "pending" && !existing?.qr_code) {
-            const qr = await asaas.getPixQrCode(providerRef);
+            const qr = await pagbank.getPixQrCode(providerRef);
             qrCode = qr.payload;
             qrImage = qr.encodedImage;
             const qrSaved = await admin.from("payment_charges").update({
@@ -516,8 +528,8 @@ export async function createCharge(
         }
       }
       if (action === "reuse" && reserved.provider_ref) {
-        const full = await paymentOrGone(asaas, reserved.provider_ref);
-        if (asaasPaymentGone(full)) {
+        const full = await paymentOrGone(pagbank, reserved.provider_ref);
+        if (providerPaymentGone(full)) {
           const reopened = await detachGonePix(
             admin,
             reserved.id,
@@ -532,7 +544,7 @@ export async function createCharge(
           const confirmed = confirmedChargeStatus(String(full.status ?? ""));
           if (!confirmed) return json({ error: "pix_reuse_mismatch" }, 409);
           if (confirmed === "paid") {
-            await syncPayerDocument(admin, asaas, {
+            await syncPayerDocument(admin, pagbank, {
               id: reserved.id,
               user_id: user.id,
               billing_type: "PIX",
@@ -548,7 +560,7 @@ export async function createCharge(
           status = transition.status;
           providerRef = reserved.provider_ref;
           if (status === "pending" && !existing?.qr_code) {
-            const qr = await asaas.getPixQrCode(providerRef);
+            const qr = await pagbank.getPixQrCode(providerRef);
             qrCode = qr.payload;
             qrImage = qr.encodedImage;
             const qrSaved = await admin.from("payment_charges").update({
@@ -564,7 +576,7 @@ export async function createCharge(
       }
       if (createPix) {
         try {
-          const pix = await asaas.createPix({
+          const pix = await pagbank.createPix({
             customer: customerId,
             value: amountCents / 100,
             dueDate,
@@ -591,7 +603,7 @@ export async function createCharge(
               }
               const next = localChargeStatus(payment.status);
               if (mayCredit && next === "paid") {
-                await syncPayerDocument(admin, asaas, {
+                await syncPayerDocument(admin, pagbank, {
                   id: reserved.id,
                   user_id: user.id,
                   billing_type: "PIX",
@@ -616,7 +628,7 @@ export async function createCharge(
           });
           const next = localChargeStatus(pix.status);
           if (mayCredit && next === "paid") {
-            await syncPayerDocument(admin, asaas, {
+            await syncPayerDocument(admin, pagbank, {
               id: reserved.id,
               user_id: user.id,
               billing_type: "PIX",
@@ -636,6 +648,7 @@ export async function createCharge(
           const qrSaved = await admin.from("payment_charges").update({
             qr_code: qrCode,
             qr_code_base64: qrImage,
+            provider_split_id: pix.splitId || null,
           }).eq("id", savedId);
           if (qrSaved.error) return json({ error: publicError("erro") }, 400);
         } catch (error) {
@@ -712,7 +725,7 @@ export async function createCharge(
       );
       let authorized: { id: string; status: string };
       try {
-        authorized = await asaas.authorizeCard({
+        authorized = await pagbank.authorizeCard({
           customer: customerId,
           value: amountCents / 100,
           dueDate,
@@ -725,16 +738,17 @@ export async function createCharge(
           ),
           remoteIp,
           creditCardToken: owned.creditCardToken,
+          installments: requestedInstallments(body, amountCents),
         });
       } catch (error) {
         if (isCardDeclined(error)) {
-          logAsaasFailure("create-charge", error);
+          logProviderFailure("create-charge", error);
           return json({ error: cardDeclined }, 422);
         }
         throw error;
       }
       const loseCard = (chargeId: string, attempt: string | null) =>
-        compensateLostPayment(asaas, admin, {
+        compensateLostPayment(pagbank, admin, {
           providerRef: authorized.id,
           status: authorized.status,
           chargeId,
@@ -753,7 +767,7 @@ export async function createCharge(
         await loseCard(chargeId, attempt);
         split.fixedValue = nextFixed;
         amountCents = nextAmount;
-        authorized = await asaas.authorizeCard({
+        authorized = await pagbank.authorizeCard({
           customer: customerId,
           value: amountCents / 100,
           dueDate,
@@ -763,11 +777,12 @@ export async function createCharge(
           extraSplits: await reserveSplitsFor(fixedCents, chargeId),
           remoteIp,
           creditCardToken: owned.creditCardToken,
+          installments: requestedInstallments(body, amountCents),
         });
       };
       try {
       if (decision === "cancel_pix" && existing?.provider_ref) {
-        const gone = await asaas.cancelPaymentConfirmed(existing.provider_ref);
+        const gone = await pagbank.cancelPaymentConfirmed(existing.provider_ref);
         if (!gone) {
           await loseCard(existing.id, existing.attempt_id ?? null);
           await recordOrphanPayment(admin, {
@@ -792,7 +807,7 @@ export async function createCharge(
         cardChargeId = existing.id;
       }
       if (decision === "drop_lease" && existing) {
-        const dropped = await dropExpiredReservation(asaas, admin, {
+        const dropped = await dropExpiredReservation(pagbank, admin, {
           chargeId: existing.id,
           attemptId: existing.attempt_id ?? null,
           billingType: existing.billing_type,
@@ -815,7 +830,7 @@ export async function createCharge(
           venueId: venue.id as string,
           amountCents,
           idempotencyKey,
-          walletId: venue.asaas_wallet_id as string,
+          walletId: venue.pagbank_account_id as string,
           commissionBps,
           grossCents: grossForReserve,
           subsidyCents,
@@ -852,7 +867,7 @@ export async function createCharge(
           !reservedCard.provider_ref && reservedCard.lease_expired &&
           reservedCard.attempt_id
         ) {
-          const dropped = await dropExpiredReservation(asaas, admin, {
+          const dropped = await dropExpiredReservation(pagbank, admin, {
             chargeId: reservedCard.id,
             attemptId: reservedCard.attempt_id,
             billingType: reservedCard.billing_type,
@@ -882,7 +897,7 @@ export async function createCharge(
             venueId: venue.id as string,
             amountCents,
             idempotencyKey,
-            walletId: venue.asaas_wallet_id as string,
+            walletId: venue.pagbank_account_id as string,
             commissionBps,
             grossCents: grossForReserve,
             subsidyCents,
@@ -934,7 +949,7 @@ export async function createCharge(
         attemptId,
       );
       if (!stored || stored !== authorized.id) {
-        await compensateLostPayment(asaas, admin, {
+        await compensateLostPayment(pagbank, admin, {
           providerRef: authorized.id,
           status: authorized.status,
           chargeId: cardChargeId,
@@ -952,7 +967,7 @@ export async function createCharge(
           false,
         );
         if (held.status !== "authorized") {
-          await compensateLostPayment(asaas, admin, {
+          await compensateLostPayment(pagbank, admin, {
             providerRef: stored,
             status: "AUTHORIZED",
             chargeId: cardChargeId,
@@ -962,7 +977,7 @@ export async function createCharge(
           return json({ error: "pagamento em andamento" }, 409);
         }
         try {
-          const captured = await asaas.capture(stored);
+          const captured = await pagbank.capture(stored);
           status = captured.status === "CONFIRMED" ||
               captured.status === "RECEIVED"
             ? "paid"
@@ -970,7 +985,7 @@ export async function createCharge(
         } catch (_captureError) {
           let refunded = false;
           try {
-            await asaas.refund(stored);
+            await pagbank.refund(stored);
             refunded = true;
           } catch (_refundError) {
             await recordOrphanPayment(admin, {
@@ -1015,7 +1030,7 @@ export async function createCharge(
             attemptId || null,
           );
         } catch (_loseError) {
-          // O erro original segue. A autorização órfã fica no registro do Asaas.
+          // O erro original segue. A autorização órfã fica no registro do PagBank.
         }
         if (isSerializationConflict(error)) {
           return json({ error: "pagamento em andamento" }, 409);
@@ -1291,13 +1306,13 @@ async function recordOrphanPayment(
 }
 
 async function paymentOrGone(
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   paymentId: string,
 ): Promise<Record<string, unknown>> {
   try {
-    return await asaas.readPayment(paymentId);
+    return await pagbank.readPayment(paymentId);
   } catch (error) {
-    if (asaasStatus(error) === 404) {
+    if (providerStatus(error) === 404) {
       return { id: paymentId, deleted: true, status: "DELETED" };
     }
     throw error;
@@ -1305,7 +1320,7 @@ async function paymentOrGone(
 }
 
 async function dropExpiredReservation(
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   admin: ChargeDb,
   input: {
     chargeId: string;
@@ -1315,10 +1330,10 @@ async function dropExpiredReservation(
   },
 ): Promise<boolean> {
   if (input.reference) {
-    const remote = await asaas.findByExternalReference(input.reference);
+    const remote = await pagbank.findByExternalReference(input.reference);
     if (remote) {
       if (lostAttemptCompensation(remote.status) === "refund") return false;
-      const gone = await asaas.cancelPaymentConfirmed(remote.id);
+      const gone = await pagbank.cancelPaymentConfirmed(remote.id);
       if (!gone) {
         await recordOrphanPayment(admin, {
           providerRef: remote.id,
@@ -1339,7 +1354,7 @@ async function dropExpiredReservation(
 }
 
 async function compensateLostPayment(
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   admin: ChargeDb,
   input: {
     providerRef: string;
@@ -1352,10 +1367,10 @@ async function compensateLostPayment(
   const action = lostAttemptCompensation(input.status);
   if (action === "none") return;
   try {
-    if (action === "refund") await asaas.refund(input.providerRef);
-    else await asaas.cancelAuthorization(input.providerRef);
+    if (action === "refund") await pagbank.refund(input.providerRef);
+    else await pagbank.cancelAuthorization(input.providerRef);
   } catch (error) {
-    if (asaasStatus(error) === 404) return;
+    if (providerStatus(error) === 404) return;
     await recordOrphanPayment(admin, {
       providerRef: input.providerRef,
       chargeId: input.chargeId,

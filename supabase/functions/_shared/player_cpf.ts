@@ -1,4 +1,4 @@
-import { AsaasProvider, type CustomerInput } from "./asaas_provider.ts";
+import { PagBankProvider, type CustomerInput } from "./pagbank_provider.ts";
 
 /// 11 dígitos com os dois verificadores. CPF repetido não vale.
 export function playerCpfDigits(value: unknown): string | null {
@@ -24,7 +24,7 @@ export type PlayerCustomerInput = CustomerInput & {
   cpf: string;
 };
 
-/// Customer da conta Asaas atual. `replacedId` é o id que não existe mais
+/// Customer da conta PagBank atual. `replacedId` é o id que não existe mais
 /// (404 ou `deleted`) e cujos cartões precisam ser desativados antes de
 /// gravar o id novo.
 export type ResolvedCustomer = {
@@ -80,13 +80,13 @@ function cpfOrThrow(value: string): string {
 
 /// 404 é customer de outra conta (sandbox ou chave antiga). Outro status sobe.
 function customerMissing(error: unknown): boolean {
-  return error instanceof Error && /^Asaas 404\b/.test(error.message);
+  return error instanceof Error && /^PagBank 404\b/.test(error.message);
 }
 
 /// Cria o customer com o CPF, preenche o documento vazio, ou recria quando
-/// o id salvo não existe na conta Asaas atual.
+/// o id salvo não existe na conta PagBank atual.
 export async function resolveCustomerWithCpf(
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   input: PlayerCustomerInput,
 ): Promise<ResolvedCustomer> {
   const cpf = cpfOrThrow(input.cpf);
@@ -97,41 +97,41 @@ export async function resolveCustomerWithCpf(
     cpfCnpj: cpf,
   };
   if (!input.customerId) {
-    const created = await asaas.createCustomer(draft);
+    const created = await pagbank.createCustomer(draft);
     return { id: created.id, replacedId: null };
   }
   try {
-    const current = await asaas.getCustomer(input.customerId);
+    const current = await pagbank.getCustomer(input.customerId);
     if (!current.deleted) {
       if (current.cpfCnpj.length === 0) {
-        await asaas.updateCustomerCpf(input.customerId, cpf);
+        await pagbank.updateCustomerCpf(input.customerId, cpf);
       }
       return { id: input.customerId, replacedId: null };
     }
   } catch (error) {
     if (!customerMissing(error)) throw error;
   }
-  const created = await asaas.createCustomer(draft);
+  const created = await pagbank.createCustomer(draft);
   return { id: created.id, replacedId: input.customerId };
 }
 
 /// O mesmo id de [resolveCustomerWithCpf], para quem só precisa da string.
 export async function customerWithCpf(
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   input: PlayerCustomerInput,
 ): Promise<string> {
-  return (await resolveCustomerWithCpf(asaas, input)).id;
+  return (await resolveCustomerWithCpf(pagbank, input)).id;
 }
 
-/// Quem grava o id novo é o update com `asaas_customer_id = previousId`.
+/// Quem grava o id novo é o update com `pagbank_customer_id = previousId`.
 /// A outra chamada relê o perfil e usa o customer que ficou. O id que
-/// ela criou no Asaas é apagado; se o DELETE falhar, a cobrança segue.
+/// ela criou no PagBank é apagado; se o DELETE falhar, a cobrança segue.
 export async function storeReplacedCustomer(
   db: CustomerStore,
   userId: string,
   previousId: string | null,
   nextId: string,
-  asaas?: CustomerCleaner,
+  pagbank?: CustomerCleaner,
 ): Promise<{ id: string; replacedId: string | null }> {
   if (previousId && previousId !== nextId) {
     const deactivated = await db.rpc("deactivate_customer_saved_cards", {
@@ -141,9 +141,9 @@ export async function storeReplacedCustomer(
     if (deactivated.error) throw new Error("customer_cards");
   }
   const id = await claimCustomerId(db, userId, previousId, nextId);
-  if (asaas && id !== nextId) {
+  if (pagbank && id !== nextId) {
     try {
-      await asaas.deleteCustomer(nextId);
+      await pagbank.deleteCustomer(nextId);
     } catch (_error) {
       // O perdedor pode ficar na conta. A cobrança usa o id que venceu.
     }
@@ -162,21 +162,21 @@ async function claimCustomerId(
 ): Promise<string> {
   if (previousId === nextId) return nextId;
   let filter = db.from("profiles").update({
-    asaas_customer_id: nextId,
+    pagbank_customer_id: nextId,
   }).eq("id", userId);
   filter = previousId === null
-    ? filter.is("asaas_customer_id", null)
-    : filter.eq("asaas_customer_id", previousId);
-  const claimed = await filter.select("asaas_customer_id");
+    ? filter.is("pagbank_customer_id", null)
+    : filter.eq("pagbank_customer_id", previousId);
+  const claimed = await filter.select("pagbank_customer_id");
   if (claimed.error) throw new Error("customer_profile");
   const rows = Array.isArray(claimed.data) ? claimed.data : [];
   if (rows.length > 0) return nextId;
-  const current = await db.from("profiles").select("asaas_customer_id").eq(
+  const current = await db.from("profiles").select("pagbank_customer_id").eq(
     "id",
     userId,
   ).maybeSingle();
   if (current.error) throw new Error("customer_profile");
-  const id = current.data?.asaas_customer_id;
+  const id = current.data?.pagbank_customer_id;
   if (typeof id === "string" && id.length > 0) return id;
   throw new Error("customer_profile");
 }

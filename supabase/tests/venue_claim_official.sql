@@ -1,4 +1,4 @@
--- Reivindicação oficial. Não fala com Asaas nem com o projeto remoto.
+-- Reivindicação oficial. Não fala com PagBank nem com o projeto remoto.
 -- O job duplicates-sql sobe postgres sem pgTAP. O harness já usado no CI
 -- executa este arquivo.
 
@@ -479,7 +479,7 @@ begin
 end $$;
 
 update public.venues
-set asaas_wallet_id = 'wal_ninja_claim'
+set pagbank_account_id = 'wal_ninja_claim'
 where id = 'e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5';
 
 do $$

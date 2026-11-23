@@ -13,9 +13,9 @@ values
 on conflict (id) do nothing;
 
 update public.venues
-set asaas_wallet_id = 'wal_teste_faixa'
+set pagbank_account_id = 'wal_teste_faixa'
 where id = 'ca111111-1111-1111-1111-111111111111'
-  and (asaas_wallet_id is null or btrim(asaas_wallet_id) = '');
+  and (pagbank_account_id is null or btrim(pagbank_account_id) = '');
 
 insert into public.room_sessions (id, room_id, starts_at, availability)
 values

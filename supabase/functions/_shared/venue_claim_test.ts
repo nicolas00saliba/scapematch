@@ -154,12 +154,12 @@ Deno.test("a função exige JWT e não devolve o código", async () => {
   assert(source.includes("getUser"));
   assertEquals(source.includes("body.email"), false);
   assertEquals(source.includes("body.phone"), false);
-  assertEquals(source.includes("AsaasProvider"), false);
-  assertEquals(source.includes("ASAAS_"), false);
-  assertEquals(source.includes("asaas_provider"), false);
+  assertEquals(source.includes("PagBankProvider"), false);
+  assertEquals(source.includes("PAGBANK_"), false);
+  assertEquals(source.includes("pagbank_provider"), false);
   for (const match of source.matchAll(/https?:\/\/[^\s"'`<>)]+/g)) {
     const host = new URL(match[0]).hostname;
-    assertEquals(host === "api.asaas.com", false);
-    assertEquals(host === "api-sandbox.asaas.com", false);
+    assertEquals(host === "api.pagseguro.com", false);
+    assertEquals(host === "sandbox.api.pagseguro.com", false);
   }
 });

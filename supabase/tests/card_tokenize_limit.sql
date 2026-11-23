@@ -9,11 +9,11 @@ values
   ('d4444444-4444-4444-4444-444444444444', 'cartd@example.com', '{"display_name":"Dora"}');
 
 update public.profiles
-set asaas_customer_id = 'cus_carla'
+set pagbank_customer_id = 'cus_carla'
 where id = 'd3333333-3333-3333-3333-333333333333';
 
 update public.profiles
-set asaas_customer_id = 'cus_dora'
+set pagbank_customer_id = 'cus_dora'
 where id = 'd4444444-4444-4444-4444-444444444444';
 
 select private.insert_saved_card(

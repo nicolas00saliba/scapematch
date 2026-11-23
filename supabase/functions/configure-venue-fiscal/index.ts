@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { clientFailure } from "../_shared/pagbank_client_error.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
 
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
         venue_id: venueId,
         emission: "sem_emissao",
         reason: "cpf",
-        asaas: "nao_aplicavel",
+        pagbank: "nao_aplicavel",
       });
     }
 
@@ -111,20 +111,20 @@ Deno.serve(async (req) => {
     if (saveError) return json({ error: "erro" }, 400);
 
     const { data: apiKey, error: keyError } = await admin.rpc(
-      "read_venue_asaas_key",
+      "read_venue_provider_key",
       { p_venue_id: venueId },
     );
     if (keyError || typeof apiKey !== "string" || apiKey.length === 0) {
       return json({
         venue_id: venueId,
         emission: "habilitada",
-        asaas: "sem_chave",
+        pagbank: "sem_chave",
       });
     }
 
     try {
-      const asaas = AsaasProvider.fromEnv(Deno.env).withKey(apiKey);
-      await asaas.configureFiscalInfo({
+      const pagbank = PagBankProvider.fromEnv(Deno.env).withKey(apiKey);
+      await pagbank.configureFiscalInfo({
         email,
         municipalInscription: inscription,
         simplesNacional: simples,
@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
       return json({
         venue_id: venueId,
         emission: "habilitada",
-        asaas: "erro",
+        pagbank: "erro",
         ...failure.body,
       }, failure.status);
     }
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
     return json({
       venue_id: venueId,
       emission: "habilitada",
-      asaas: "configured",
+      pagbank: "configured",
     });
   } catch (error) {
     const failure = clientFailure(error, "configure-venue-fiscal");

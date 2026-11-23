@@ -1,9 +1,9 @@
 import {
-  asaasStatus,
+  providerStatus,
   isDuplicateSubaccountEmail,
-} from "./asaas_client_error.ts";
+} from "./pagbank_client_error.ts";
 
-/// Domínio do alias quando `ASAAS_SUBACCOUNT_EMAIL_DOMAIN` não está definida
+/// Domínio do alias quando `PAGBANK_CONNECT_EMAIL_DOMAIN` não está definida
 /// ou não é um domínio. É um domínio nosso. O fallback avisa no log.
 export const fallbackSubaccountDomain = "escapematch.com.br";
 
@@ -36,7 +36,7 @@ function warnEmailDomainFallback(
 export function subaccountEmailDomain(
   env: { get(name: string): string | undefined },
 ): string {
-  const raw = (env.get("ASAAS_SUBACCOUNT_EMAIL_DOMAIN") ?? "").trim()
+  const raw = (env.get("PAGBANK_CONNECT_EMAIL_DOMAIN") ?? "").trim()
     .toLowerCase();
   if (!raw) {
     warnEmailDomainFallback("missing_email_domain");
@@ -86,14 +86,14 @@ export function subaccountEmailPlan(
   return { primary: own ?? alias, alias };
 }
 
-/// Segunda tentativa só quando o Asaas recusa o e-mail por já existir.
+/// Segunda tentativa só quando o PagBank recusa o e-mail por já existir.
 export function nextSubaccountEmail(
   current: string,
   alias: string,
   error: unknown,
 ): string | null {
   if (current === alias) return null;
-  if (asaasStatus(error) !== 400) return null;
+  if (providerStatus(error) !== 400) return null;
   if (!isDuplicateSubaccountEmail(error)) return null;
   return alias;
 }

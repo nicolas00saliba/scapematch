@@ -12,7 +12,7 @@ import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 const _realPix =
-    '00020126580014BR.GOV.BCB.PIX0136asaas.real.payload520400005303986540590.00';
+    '00020126580014BR.GOV.BCB.PIX0136pagbank.real.payload520400005303986540590.00';
 const _png =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
@@ -83,7 +83,7 @@ void main() {
       live: true,
       onPay: (kind, {savedCardId}) async {
         return const ShareChargeView(
-          message: 'A casa ainda não tem subconta Asaas.',
+          message: 'A casa ainda não tem subconta PagBank.',
         );
       },
     );
@@ -91,7 +91,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.payCharge));
     await tester.pumpAndSettle();
 
-    expect(find.text('A casa ainda não tem subconta Asaas.'), findsOneWidget);
+    expect(find.text('A casa ainda não tem subconta PagBank.'), findsOneWidget);
     expect(find.byKey(AppKeys.payConfirmed), findsNothing);
     expect(find.text(GroupMessages.simulatedNotice), findsNothing);
     expect(find.textContaining('scapematch.'), findsNothing);

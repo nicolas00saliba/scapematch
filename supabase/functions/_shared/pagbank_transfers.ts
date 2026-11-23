@@ -1,5 +1,5 @@
-// Transferência Pix da subconta Asaas. A chave da subconta só entra
-// no header access_token, pelo AsaasProvider. Sem operationType, o Asaas
+// Transferência Pix da subconta PagBank. A chave da subconta só entra
+// no header access_token, pelo PagBankProvider. Sem operationType, o PagBank
 // pode cair em TED quando o banco não participa do Pix.
 
 export type Receivable = {
@@ -55,7 +55,7 @@ export function centsToReais(cents: number): number {
 export function balanceCents(body: Record<string, unknown>): number {
   const value = body.balance;
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("Resposta do Asaas sem balance");
+    throw new Error("Resposta do PagBank sem balance");
   }
   return reaisToCents(value);
 }
@@ -65,18 +65,20 @@ export function isPointsReserve(
   walletId: string,
   apiKey: string,
 ): boolean {
-  const wallet = (env.get("ASAAS_POINTS_RESERVE_WALLET_ID") ?? "").trim();
-  const key = (env.get("ASAAS_POINTS_RESERVE_API_KEY") ?? "").trim();
+  const wallet = (env.get("PAGBANK_POINTS_RESERVE_ACCOUNT_ID") ?? "").trim();
+  const key = (env.get("PAGBANK_POINTS_RESERVE_TOKEN") ?? "").trim();
   if (wallet.length > 0 && walletId === wallet) return true;
   if (key.length > 0 && apiKey === key) return true;
   return false;
 }
 
-export function mapAsaasTransferStatus(
+export function mapTransferStatus(
   status: string,
 ): TransferResult["status"] {
   switch (status) {
     case "DONE":
+    case "PAID":
+    case "AVAILABLE":
       return "done";
     case "FAILED":
       return "failed";
@@ -107,7 +109,7 @@ export function mapTransferEvent(
   }
 }
 
-/// O Asaas devolveu que o destino não aceita Pix. Não tentar TED.
+/// O PagBank devolveu que o destino não aceita Pix. Não tentar TED.
 export function isPixRejected(error: unknown): boolean {
   const raw = error instanceof Error ? error.message : "";
   if (raw === "sem pix") return true;
@@ -121,17 +123,16 @@ export function transferPayload(
   input: TransferRequest,
 ): Record<string, unknown> {
   const base: Record<string, unknown> = {
-    value: centsToReais(input.valueCents),
-    externalReference: input.externalReference,
+    reference_id: input.externalReference,
     description: input.description,
-    operationType: "PIX",
+    amount: { value: input.valueCents, currency: "BRL" },
+    instrument: { type: "PIX" },
   };
   if (input.destination === "pix") {
     if (!input.pixKey || !input.pixKeyType) throw new Error("sem pix");
     return {
       ...base,
-      pixAddressKey: input.pixKey,
-      pixAddressKeyType: input.pixKeyType,
+      instrument: { type: "PIX", pix: { key: input.pixKey, key_type: input.pixKeyType } },
     };
   }
   if (
@@ -181,12 +182,12 @@ export function requestFromBank(
 
 export function parseTransfer(body: Record<string, unknown>): TransferResult {
   const id = text(body.id);
-  if (!id) throw new Error("Resposta do Asaas sem id");
+  if (!id) throw new Error("Resposta do PagBank sem id");
   return {
     id,
-    status: mapAsaasTransferStatus(text(body.status)),
-    receiptUrl: httpsUrl(body.transactionReceiptUrl),
-    externalReference: text(body.externalReference),
+    status: mapTransferStatus(text(body.status)),
+    receiptUrl: httpsUrl(body.transactionReceiptUrl ?? body.receipt_url),
+    externalReference: text(body.externalReference) || text(body.reference_id),
     failReason: text(body.failReason).slice(0, 80),
   };
 }
@@ -227,28 +228,28 @@ export type WebhookView = {
 };
 
 export function transferWebhookUrl(env: EnvLike): string {
-  const explicit = (env.get("ASAAS_TRANSFER_WEBHOOK_URL") ?? "").trim();
+  const explicit = (env.get("PAGBANK_TRANSFER_WEBHOOK_URL") ?? "").trim();
   if (
     explicit.startsWith("https://") &&
-    explicit.includes("/asaas-transfer-webhook")
+    explicit.includes("/pagbank-transfer-webhook")
   ) {
     return explicit;
   }
   const base = (env.get("SUPABASE_URL") ?? "").trim().replace(/\/$/, "");
   if (!base.startsWith("https://")) return "";
-  return `${base}/functions/v1/asaas-transfer-webhook`;
+  return `${base}/functions/v1/pagbank-transfer-webhook`;
 }
 
 export function webhookEmail(env: EnvLike): string {
-  const email = (env.get("ASAAS_WEBHOOK_EMAIL") ?? "").trim();
+  const email = (env.get("PAGBANK_WEBHOOK_EMAIL") ?? "").trim();
   if (email.length < 6 || email.length > 200 || /\s/.test(email)) return "";
   if (!email.includes("@")) return "";
   return email;
 }
 
-/// authToken do Asaas: 32 a 255, sem espaço, e não pode ser a apiKey.
+/// authToken do PagBank: 32 a 255, sem espaço, e não pode ser a apiKey.
 export function webhookAuthToken(env: EnvLike, apiKey = ""): string {
-  const token = env.get("ASAAS_WEBHOOK_TOKEN") ?? "";
+  const token = env.get("PAGBANK_WEBHOOK_SECRET") ?? "";
   if (token.length < 32 || token.length > 255 || /\s/.test(token)) return "";
   if (apiKey.length > 0 && token === apiKey) return "";
   return token;
@@ -357,7 +358,7 @@ export function parseFinancialTransactions(
 }
 
 /// Cobranças confirmadas e lançamentos com data futura. O extrato do
-/// Asaas só traz o que já entrou; a data futura vem do lançamento agendado.
+/// PagBank só traz o que já entrou; a data futura vem do lançamento agendado.
 export function mergeReceivables(
   payments: Receivable[],
   movements: FinancialMovement[],

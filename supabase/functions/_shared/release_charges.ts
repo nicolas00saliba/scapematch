@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { AsaasProvider } from "./asaas_provider.ts";
+import { PagBankProvider } from "./pagbank_provider.ts";
 import { cancelInvoicesForCharge } from "./issue_invoices.ts";
 import {
   applyPaymentTransition,
@@ -19,7 +19,7 @@ type Charge = ChargeRow & {
 /// do cartão sai com refund. O status local só muda depois da API.
 export async function releaseCancelledCharges(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   groupId: string,
 ): Promise<string[]> {
   const { data: charges } = await admin
@@ -41,19 +41,19 @@ export async function releaseCancelledCharges(
     }
     try {
       if (row.status === "paid") {
-        await asaas.refund(row.provider_ref);
+        await pagbank.refund(row.provider_ref);
         await reverseLedger(admin, row);
         await cancelInvoicesForCharge(admin, row.id, {
-          sandbox: asaas.sandbox,
-          asaas,
+          sandbox: pagbank.sandbox,
+          pagbank,
         });
         continue;
       }
       if (row.billing_type === "PIX") {
-        const gone = await asaas.cancelPaymentConfirmed(row.provider_ref);
+        const gone = await pagbank.cancelPaymentConfirmed(row.provider_ref);
         if (!gone) throw new Error("erro");
       } else {
-        await asaas.cancelAuthorization(row.provider_ref);
+        await pagbank.cancelAuthorization(row.provider_ref);
       }
       const cancelled = await applyPaymentTransition(
         admin,

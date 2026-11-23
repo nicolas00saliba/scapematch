@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { AsaasProvider } from "./asaas_provider.ts";
+import { PagBankProvider } from "./pagbank_provider.ts";
 import { memberPaymentForStatus } from "./charge_patch.ts";
 import { maySettle, settleGroup } from "./settle_group.ts";
 
@@ -160,7 +160,7 @@ function provider(
 ) {
   const fetchFn = (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
-    if (method === "GET" && url.includes("/payments/pay_card")) {
+    if (method === "GET" && url.includes("/charges/pay_card")) {
       return Promise.resolve(
         new Response(
           JSON.stringify({
@@ -173,7 +173,7 @@ function provider(
         ),
       );
     }
-    if (method === "POST" && url.includes("captureAuthorizedPayment")) {
+    if (method === "POST" && url.includes("/capture")) {
       captures.push(url);
       return Promise.resolve(
         new Response(
@@ -184,11 +184,12 @@ function provider(
     }
     return Promise.resolve(new Response("não", { status: 500 }));
   };
-  return new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  return new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     fetchFn,
     () => Promise.resolve(),
+    "ACCO_PRIMARY",
   );
 }
 
@@ -218,15 +219,15 @@ Deno.test("grupo fechado captura o cartão autorizado uma vez", async () => {
     },
   });
   const captures: string[] = [];
-  const asaas = provider("AUTHORIZED", captures);
-  await settleGroup(admin, asaas, groupId);
-  await settleGroup(admin, asaas, groupId);
+  const pagbank = provider("AUTHORIZED", captures);
+  await settleGroup(admin, pagbank, groupId);
+  await settleGroup(admin, pagbank, groupId);
   assertEquals(captures.length, 1);
   assertEquals(charges[0].status, "paid");
   assert(admin.calls.includes("apply_payment_transition"));
 });
 
-Deno.test("cartão já confirmado no Asaas não captura de novo", async () => {
+Deno.test("cartão já confirmado no PagBank não captura de novo", async () => {
   const charges = [card()];
   const admin = adminFor({ closed: true, charges });
   const captures: string[] = [];

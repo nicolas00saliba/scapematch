@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
-import { asaasProductionBaseUrl, asaasSandboxBaseUrl } from "./asaas_provider.ts";
+import { pagbankProductionBaseUrl, pagbankSandboxBaseUrl } from "./pagbank_provider.ts";
 import {
-  asaasBaseUrlIsProduction,
+  pagbankBaseUrlIsProduction,
   buildReadiness,
   handlePaymentsReadiness,
 } from "./payments_readiness.ts";
@@ -10,36 +10,36 @@ import {
   type PayoutDeps,
 } from "./venue_payouts.ts";
 
-const officialAsaasHosts = new Set([
-  "api.asaas.com",
-  "api-sandbox.asaas.com",
-  "asaas.com",
+const officialPagBankHosts = new Set([
+  "api.pagseguro.com",
+  "sandbox.api.pagseguro.com",
+  "pagbank.com",
 ]);
 
-function leaksOfficialAsaasHost(value: unknown): boolean {
+function leaksOfficialPagBankHost(value: unknown): boolean {
   if (typeof value === "string") {
-    if (officialAsaasHosts.has(value)) return true;
+    if (officialPagBankHosts.has(value)) return true;
     try {
-      return officialAsaasHosts.has(new URL(value).hostname);
+      return officialPagBankHosts.has(new URL(value).hostname);
     } catch {
       return false;
     }
   }
-  if (Array.isArray(value)) return value.some(leaksOfficialAsaasHost);
+  if (Array.isArray(value)) return value.some(leaksOfficialPagBankHost);
   if (value !== null && typeof value === "object") {
-    return Object.values(value).some(leaksOfficialAsaasHost);
+    return Object.values(value).some(leaksOfficialPagBankHost);
   }
   return false;
 }
 
 Deno.test("a base de produção é só a URL oficial, sem barra", () => {
-  assert(asaasBaseUrlIsProduction(asaasProductionBaseUrl));
-  assert(asaasBaseUrlIsProduction(`${asaasProductionBaseUrl}/`));
-  assert(!asaasBaseUrlIsProduction(asaasSandboxBaseUrl));
-  assert(!asaasBaseUrlIsProduction(""));
-  assert(!asaasBaseUrlIsProduction(undefined));
-  assert(!asaasBaseUrlIsProduction("https://api.asaas.com.evil/v3"));
-  assert(!asaasBaseUrlIsProduction("http://api.asaas.com/v3"));
+  assert(pagbankBaseUrlIsProduction(pagbankProductionBaseUrl));
+  assert(pagbankBaseUrlIsProduction(`${pagbankProductionBaseUrl}/`));
+  assert(!pagbankBaseUrlIsProduction(pagbankSandboxBaseUrl));
+  assert(!pagbankBaseUrlIsProduction(""));
+  assert(!pagbankBaseUrlIsProduction(undefined));
+  assert(!pagbankBaseUrlIsProduction("https://api.pagseguro.com.evil/v3"));
+  assert(!pagbankBaseUrlIsProduction("http://api.pagseguro.com/v3"));
 });
 
 Deno.test("a prontidão descarta texto e só guarda sim ou não", () => {
@@ -47,10 +47,10 @@ Deno.test("a prontidão descarta texto e só guarda sim ou não", () => {
   const report = buildReadiness(
     {
       get: (name) => {
-        if (name === "ASAAS_API_KEY") return secret;
-        if (name === "ASAAS_BASE_URL") return asaasSandboxBaseUrl;
-        if (name === "ASAAS_WEBHOOK_TOKEN") return "tok";
-        if (name === "ASAAS_WEBHOOK_EMAIL") return "ops@example.com";
+        if (name === "PAGBANK_TOKEN") return secret;
+        if (name === "PAGBANK_BASE_URL") return pagbankSandboxBaseUrl;
+        if (name === "PAGBANK_WEBHOOK_SECRET") return "tok";
+        if (name === "PAGBANK_WEBHOOK_EMAIL") return "ops@example.com";
         return "   ";
       },
     },
@@ -63,10 +63,10 @@ Deno.test("a prontidão descarta texto e só guarda sim ou não", () => {
       leaked: secret,
     },
   );
-  assertEquals(report.asaas_api_key, true);
-  assertEquals(report.asaas_base_url_production, false);
-  assertEquals(report.asaas_webhook_token, true);
-  assertEquals(report.asaas_webhook_email, true);
+  assertEquals(report.pagbank_api_key, true);
+  assertEquals(report.pagbank_base_url_production, false);
+  assertEquals(report.pagbank_webhook_token, true);
+  assertEquals(report.pagbank_webhook_email, true);
   assertEquals(report.venue_withdrawals_secret, false);
   assertEquals(report.ledger_reconcile_secret, false);
   assertEquals(report.vault_venue_withdrawals_url, true);
@@ -96,7 +96,7 @@ Deno.test("produção ligada aparece sem devolver a URL", () => {
   const report = buildReadiness(
     {
       get: (name) =>
-        name === "ASAAS_BASE_URL" ? `${asaasProductionBaseUrl}/` : "x",
+        name === "PAGBANK_BASE_URL" ? `${pagbankProductionBaseUrl}/` : "x",
     },
     {
       vault_venue_withdrawals_url: false,
@@ -106,15 +106,15 @@ Deno.test("produção ligada aparece sem devolver a URL", () => {
       cron_failure_code: null,
     },
   );
-  assertEquals(report.asaas_base_url_production, true);
+  assertEquals(report.pagbank_base_url_production, true);
   assertEquals(report.venue_payouts_enabled, true);
   assertEquals(report.cron_last_failed, false);
   assertEquals(report.cron_failure_code, null);
-  assertEquals(leaksOfficialAsaasHost(report), false);
+  assertEquals(leaksOfficialPagBankHost(report), false);
 });
 
 Deno.test("sem JWT a prontidão não revela o que está configurado", async () => {
-  const secret = "chave-asaas-nao-sai";
+  const secret = "chave-pagbank-nao-sai";
   const response = await handlePaymentsReadiness(
     new Request("https://example.test/ready", { method: "POST" }),
     {
@@ -128,7 +128,7 @@ Deno.test("sem JWT a prontidão não revela o que está configurado", async () =
 });
 
 Deno.test("quem não é admin recebe forbidden sem o mapa", async () => {
-  const secret = "chave-asaas-nao-sai";
+  const secret = "chave-pagbank-nao-sai";
   const response = await handlePaymentsReadiness(
     new Request("https://example.test/ready", {
       method: "POST",
@@ -152,7 +152,7 @@ Deno.test("admin aal2 recebe só o mapa de sim ou não", async () => {
     {
       env: {
         get: (name) =>
-          name === "ASAAS_BASE_URL" ? asaasProductionBaseUrl : "valor-que-nao-sai",
+          name === "PAGBANK_BASE_URL" ? pagbankProductionBaseUrl : "valor-que-nao-sai",
       },
       loadVault: () =>
         Promise.resolve({
@@ -166,7 +166,7 @@ Deno.test("admin aal2 recebe só o mapa de sim ou não", async () => {
   );
   assertEquals(response.status, 200);
   const body = await response.json();
-  assertEquals(body.asaas_base_url_production, true);
+  assertEquals(body.pagbank_base_url_production, true);
   assertEquals(body.vault_venue_withdrawals_url, true);
   assertEquals(body.vault_venue_withdrawals_secret, false);
   assertEquals(body.cron_failure_code, "config_ausente");

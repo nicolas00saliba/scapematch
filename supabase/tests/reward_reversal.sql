@@ -1,4 +1,4 @@
--- Estorno de crédito da casa e livro. Sem Asaas. Desfaz no final.
+-- Estorno de crédito da casa e livro. Sem PagBank. Desfaz no final.
 \set ON_ERROR_STOP on
 begin;
 

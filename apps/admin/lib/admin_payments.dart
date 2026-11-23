@@ -96,13 +96,13 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
             const SizedBox(height: 8),
             const Text('Prontidão'),
             const SizedBox(height: 8),
-            _HealthRow('Chave da API do Asaas', _yn(board.asaasApiKey)),
+            _HealthRow('Chave da API do PagBank', _yn(board.pagbankToken)),
             _HealthRow(
-              'URL do Asaas em produção',
-              _yn(board.asaasBaseUrlProduction),
+              'URL do PagBank em produção',
+              _yn(board.pagbankBaseUrlProduction),
             ),
-            _HealthRow('Token do webhook', _yn(board.asaasWebhookToken)),
-            _HealthRow('E-mail do webhook', _yn(board.asaasWebhookEmail)),
+            _HealthRow('Token do webhook', _yn(board.pagbankWebhookSecret)),
+            _HealthRow('E-mail do webhook', _yn(board.pagbankWebhookEmail)),
             _HealthRow(
               'Segredo do cron de saques',
               _yn(board.venueWithdrawalsSecret),

@@ -14,7 +14,7 @@ if (import.meta.main) {
       actor: (jwt) => store.actor(jwt),
       role: (venueId, userId, jwt) => roleOf(store, venueId, userId, jwt),
       subaccount: async (venueId) => {
-        const apiKey = await store.rpc("read_venue_asaas_key", {
+        const apiKey = await store.rpc("read_venue_provider_key", {
           p_venue_id: venueId,
         });
         const walletId = await store.rpc("venue_payout_wallet", {

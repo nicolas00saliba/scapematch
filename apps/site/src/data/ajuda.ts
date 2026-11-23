@@ -73,7 +73,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'Quais formas de pagamento existem?',
         resposta:
-          'Pix e cartão, processados pela Asaas. O app não guarda o número do cartão.',
+          'Pix e cartão, processados pela PagBank. O app não guarda o número do cartão.',
       },
       {
         pergunta: 'Quando a cobrança acontece?',

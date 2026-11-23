@@ -1,5 +1,5 @@
 -- Sorteio do cashback: bytes do pgcrypto, uma vez por cobrança, média até 100 bps.
--- Não fala com o Asaas. O bloco desfaz no final.
+-- Não fala com o PagBank. O bloco desfaz no final.
 
 \set ON_ERROR_STOP on
 

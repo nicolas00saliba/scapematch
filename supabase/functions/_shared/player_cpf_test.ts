@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { AsaasProvider } from "./asaas_provider.ts";
+import { PagBankProvider } from "./pagbank_provider.ts";
 import {
   cardReregisterCode,
   chargeAsksNewCard,
@@ -47,58 +47,53 @@ Deno.test("customer novo nasce com cpf e o antigo sem cpf é atualizado", async 
     }
     return Promise.resolve(new Response("no", { status: 500 }));
   };
-  const asaas = new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     fetchFn,
   );
   try {
-    const created = await customerWithCpf(asaas, {
+    const created = await customerWithCpf(pagbank, {
       customerId: null,
       name: "Ana",
       email: "ana@example.com",
       externalReference: "user-1",
       cpf: "529.982.247-25",
     });
-    assertEquals(created, "cus_new");
-    const posted = JSON.parse(calls[0].body);
-    assertEquals(posted.cpfCnpj, cpf);
-    assertEquals(calls[0].method, "POST");
+    assertEquals(created, "PB_CUS_user-1");
+    assertEquals(calls.length, 0);
 
-    calls.length = 0;
-    const updated = await customerWithCpf(asaas, {
+    const updated = await customerWithCpf(pagbank, {
       customerId: "cus_empty",
       name: "Ana",
       email: "ana@example.com",
       externalReference: "user-1",
       cpf,
     });
-    assertEquals(updated, "cus_empty");
-    assertEquals(calls.map((call) => call.method), ["GET", "PUT"]);
-    assertEquals(JSON.parse(calls[1].body), { cpfCnpj: cpf });
+    assertEquals(updated, "PB_CUS_user-1");
+    assertEquals(calls.length, 0);
 
-    calls.length = 0;
-    const kept = await customerWithCpf(asaas, {
-      customerId: "cus_ok",
+    const kept = await customerWithCpf(pagbank, {
+      customerId: "PB_CUS_user-1",
       name: "Ana",
       email: "ana@example.com",
       externalReference: "user-1",
       cpf,
     });
-    assertEquals(kept, "cus_ok");
-    assertEquals(calls.map((call) => call.method), ["GET"]);
+    assertEquals(kept, "PB_CUS_user-1");
+    assertEquals(calls.length, 0);
   } finally {
     console.error = original;
   }
   const joined = logs.join("\n") + calls.map((call) => call.body).join("\n");
-  assertEquals(joined.includes("asaas-secret-key"), false);
+  assertEquals(joined.includes("pagbank-secret-key"), false);
   assert(logs.length === 0);
 });
 
-Deno.test("resposta do Asaas não deixa o cpf no erro", async () => {
-  const asaas = new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+Deno.test("resposta do PagBank não deixa o cpf no erro", async () => {
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     () =>
       Promise.resolve(
         new Response(
@@ -110,15 +105,27 @@ Deno.test("resposta do Asaas não deixa o cpf no erro", async () => {
         ),
       ),
   );
-  const error = await asaas.createCustomer({
-    name: "Ana",
-    email: "ana@example.com",
-    externalReference: "user-1",
-    cpfCnpj: cpf,
+  const error = await pagbank.tokenizeCard({
+    customer: "PB_CUS_user-1",
+    creditCard: {
+      holderName: "ANA",
+      number: "4111111111111111",
+      expiryMonth: "12",
+      expiryYear: "2030",
+      ccv: "123",
+    },
+    creditCardHolderInfo: {
+      name: "Ana",
+      email: "ana@example.com",
+      cpfCnpj: cpf,
+      postalCode: "80000000",
+      addressNumber: "1",
+      phone: "41999999999",
+    },
   }).catch((caught: unknown) => caught);
   const message = error instanceof Error ? error.message : String(error);
   assertEquals(message.includes(cpf), false);
-  assert(message.startsWith("Asaas 400"));
+  assert(message.startsWith("PagBank 400"));
 });
 
 Deno.test("customer 404 ou deleted é recriado e o cartão antigo pede recadastro", async () => {
@@ -145,9 +152,9 @@ Deno.test("customer 404 ou deleted é recriado e o cartão antigo pede recadastr
     }
     return Promise.resolve(new Response("no", { status: 500 }));
   };
-  const asaas = new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     fetchFn,
   );
   const input = {
@@ -156,25 +163,20 @@ Deno.test("customer 404 ou deleted é recriado e o cartão antigo pede recadastr
     externalReference: "user-1",
     cpf,
   };
-  const missing = await resolveCustomerWithCpf(asaas, {
+  const missing = await resolveCustomerWithCpf(pagbank, {
     ...input,
     customerId: "cus_404",
   });
-  assertEquals(missing, { id: "cus_404_novo", replacedId: "cus_404" });
-  assertEquals(
-    calls.filter((call) => call.url.endsWith("/customers/cus_404")).map((c) =>
-      c.method
-    ),
-    ["GET"],
-  );
+  assertEquals(missing, { id: "PB_CUS_user-1", replacedId: "cus_404" });
+  assertEquals(calls.length, 0);
 
   calls.length = 0;
-  const deleted = await resolveCustomerWithCpf(asaas, {
+  const deleted = await resolveCustomerWithCpf(pagbank, {
     ...input,
     customerId: "cus_gone",
   });
-  assertEquals(deleted, { id: "cus_gone_novo", replacedId: "cus_gone" });
-  assertEquals(calls.map((call) => call.method), ["GET", "POST"]);
+  assertEquals(deleted, { id: "PB_CUS_user-1", replacedId: "cus_gone" });
+  assertEquals(calls.length, 0);
   assertEquals(
     calls.some((call) => call.method === "PUT"),
     false,
@@ -200,7 +202,7 @@ Deno.test("customer 404 ou deleted é recriado e o cartão antigo pede recadastr
               select() {
                 order.push("profile");
                 return Promise.resolve({
-                  data: [{ asaas_customer_id: "cus_404_novo" }],
+                  data: [{ pagbank_customer_id: "cus_404_novo" }],
                   error: null,
                 });
               },
@@ -255,7 +257,7 @@ Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", 
     from() {
       return {
         update(values: Record<string, unknown>) {
-          const next = String(values.asaas_customer_id);
+          const next = String(values.pagbank_customer_id);
           const filters: Record<string, string> = {};
           const chain = {
             eq(column: string, value: string) {
@@ -266,11 +268,11 @@ Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", 
               return chain;
             },
             select() {
-              const previous = filters.asaas_customer_id;
+              const previous = filters.pagbank_customer_id;
               if (profile === previous) {
                 profile = next;
                 return Promise.resolve({
-                  data: [{ asaas_customer_id: next }],
+                  data: [{ pagbank_customer_id: next }],
                   error: null,
                 });
               }
@@ -288,7 +290,7 @@ Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", 
               return {
                 maybeSingle() {
                   return Promise.resolve({
-                    data: { asaas_customer_id: profile },
+                    data: { pagbank_customer_id: profile },
                     error: null,
                   });
                 },
@@ -302,7 +304,7 @@ Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", 
             },
             maybeSingle() {
               return Promise.resolve({
-                data: { asaas_customer_id: profile },
+                data: { pagbank_customer_id: profile },
                 error: null,
               });
             },
@@ -311,15 +313,15 @@ Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", 
       };
     },
   };
-  const asaas = {
+  const pagbank = {
     deleteCustomer(id: string) {
       deleted.push(id);
-      return Promise.reject(new Error("Asaas 400: sem apagar"));
+      return Promise.reject(new Error("PagBank 400: sem apagar"));
     },
   };
   const [first, second] = await Promise.all([
-    storeReplacedCustomer(db, "user-1", "cus_old", "cus_a", asaas),
-    storeReplacedCustomer(db, "user-1", "cus_old", "cus_b", asaas),
+    storeReplacedCustomer(db, "user-1", "cus_old", "cus_a", pagbank),
+    storeReplacedCustomer(db, "user-1", "cus_old", "cus_b", pagbank),
   ]);
   assertEquals(first.id, second.id);
   assertEquals(first.replacedId, "cus_old");
@@ -358,25 +360,24 @@ Deno.test("duas trocas simultâneas ficam com um customer e apagam o perdedor", 
 
 Deno.test("customer 500 não recria e não troca o id", async () => {
   let posts = 0;
-  const asaas = new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     (url, init) => {
       if (init?.method === "POST") posts += 1;
       return Promise.resolve(new Response("no", { status: 500 }));
     },
   );
-  const error = await resolveCustomerWithCpf(asaas, {
-    customerId: "cus_off",
+  const kept = await resolveCustomerWithCpf(pagbank, {
+    customerId: "PB_CUS_user-1",
     name: "Ana",
     email: "ana@example.com",
     externalReference: "user-1",
     cpf,
-  }).catch((caught: unknown) => caught);
-  assert(error instanceof Error);
-  assert(error.message.startsWith("Asaas 500"));
+  });
+  assertEquals(kept.id, "PB_CUS_user-1");
+  assertEquals(kept.replacedId, null);
   assertEquals(posts, 0);
-  assertEquals(error.message.includes(cpf), false);
 });
 
 function json(body: unknown): Response {

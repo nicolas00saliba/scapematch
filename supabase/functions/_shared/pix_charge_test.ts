@@ -203,13 +203,13 @@ Deno.test("lease de 2 minutos e 4xx liberam a reserva presa", () => {
   );
   assertEquals(pixLeaseExpired(null, now), true);
   assertEquals(
-    releaseReservationOnError(new Error("Asaas 400: recusado")),
+    releaseReservationOnError(new Error("PagBank 400: recusado")),
     true,
   );
-  assertEquals(releaseReservationOnError(new Error("Asaas 422: x")), true);
-  assertEquals(releaseReservationOnError(new Error("Asaas 500: fora")), false);
+  assertEquals(releaseReservationOnError(new Error("PagBank 422: x")), true);
+  assertEquals(releaseReservationOnError(new Error("PagBank 500: fora")), false);
   assertEquals(
-    releaseReservationOnError(new Error("Asaas 502: pix_qr_unavailable")),
+    releaseReservationOnError(new Error("PagBank 502: pix_qr_unavailable")),
     false,
   );
   assertEquals(releaseReservationOnError(new TypeError("timeout")), false);

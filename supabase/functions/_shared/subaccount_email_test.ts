@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { logAsaasFailure } from "./asaas_client_error.ts";
+import { logProviderFailure } from "./pagbank_client_error.ts";
 import {
   fallbackSubaccountDomain,
   nextSubaccountEmail,
@@ -46,7 +46,7 @@ Deno.test("domínio do alias vem do env e o inválido cai no fallback", () => {
   try {
     const custom = subaccountEmailPlan({ id: venueId }, {
       get: (name) =>
-        name === "ASAAS_SUBACCOUNT_EMAIL_DOMAIN"
+        name === "PAGBANK_CONNECT_EMAIL_DOMAIN"
           ? "mail.escapematch.com.br"
           : undefined,
     });
@@ -71,7 +71,7 @@ Deno.test("domínio do alias vem do env e o inválido cai no fallback", () => {
   }
 });
 
-Deno.test("sem ASAAS_SUBACCOUNT_EMAIL_DOMAIN avisa e usa escapematch.com.br", () => {
+Deno.test("sem PAGBANK_CONNECT_EMAIL_DOMAIN avisa e usa escapematch.com.br", () => {
   const logs: string[] = [];
   const original = console.warn;
   console.warn = (...args: unknown[]) => {
@@ -103,10 +103,10 @@ Deno.test("sem ASAAS_SUBACCOUNT_EMAIL_DOMAIN avisa e usa escapematch.com.br", ()
   }
 });
 
-Deno.test("e-mail duplicado no Asaas pede o alias; outro 400 não", () => {
+Deno.test("e-mail duplicado no PagBank pede o alias; outro 400 não", () => {
   const alias = venueAliasEmail(venueId, fallbackSubaccountDomain);
   const duplicate = new Error(
-    `Asaas 400: ${
+    `PagBank 400: ${
       JSON.stringify({
         errors: [{
           code: "invalid_object",
@@ -121,7 +121,7 @@ Deno.test("e-mail duplicado no Asaas pede o alias; outro 400 não", () => {
   );
   assertEquals(nextSubaccountEmail(alias, alias, duplicate), null);
   const other = new Error(
-    `Asaas 400: ${
+    `PagBank 400: ${
       JSON.stringify({
         errors: [{ code: "invalid_object", description: "CEP inválido" }],
       })
@@ -134,7 +134,7 @@ Deno.test("e-mail duplicado no Asaas pede o alias; outro 400 não", () => {
     logs.push(args.map(String).join(" "));
   };
   try {
-    logAsaasFailure("provision-venue-wallet", duplicate);
+    logProviderFailure("provision-venue-wallet", duplicate);
   } finally {
     console.error = original;
   }
@@ -148,8 +148,8 @@ Deno.test("provision-venue-wallet não usa o e-mail de login", async () => {
   const source = await Deno.readTextFile(
     new URL("../provision-venue-wallet/index.ts", import.meta.url),
   );
-  assert(source.includes("subaccountEmailPlan"));
-  assert(source.includes("nextSubaccountEmail"));
+  assert(source.includes("connectAuthorizeUrl"));
+  assert(source.includes("PAGBANK_CONNECT_REDIRECT_URI"));
   assertEquals(source.includes("owner.data.user?.email"), false);
   assertEquals(source.includes("error.message"), false);
   assertEquals(source.includes("console."), false);

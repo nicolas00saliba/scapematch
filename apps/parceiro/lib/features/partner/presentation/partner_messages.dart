@@ -96,7 +96,7 @@ abstract final class PartnerMessages {
   static const commissionLabel = 'Comissão';
   static const reservedLabel = 'Reservado';
   static const reservedBody =
-      'Ainda não entrou no saldo. Se o grupo não confirmar, o valor é liberado e nada é cobrado.';
+      'Ainda não entrou no saldo. O pagamento fica retido até o grupo confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.';
   static const statement = 'Extrato';
   static const statementEmpty =
       'Nenhuma captura ainda. Quando um grupo confirma, o valor aparece aqui.';
@@ -191,8 +191,8 @@ abstract final class PartnerMessages {
   static const claimLinked =
       'A casa é sua. Fotos, salas e avaliações continuam no mesmo perfil.';
   static const claimFinanceBody =
-      'Complete nesta ordem: subconta Asaas, documentos da subconta e chave Pix. Enquanto a subconta e a chave não estiverem prontas, pagamento e saque ficam desligados.';
-  static const claimStepSubaccount = '1. Subconta Asaas';
+      'Complete nesta ordem: subconta PagBank, documentos da subconta e chave Pix. Enquanto a subconta e a chave não estiverem prontas, pagamento e saque ficam desligados.';
+  static const claimStepSubaccount = '1. Subconta PagBank';
   static const claimStepDocuments = '2. Documentos da subconta';
   static const claimStepPix = '3. Chave Pix';
   static const claimStepPending = 'Pendente';
@@ -201,7 +201,7 @@ abstract final class PartnerMessages {
   static const claimStepPixReady = 'Cadastrada';
   static const claimStepWait = 'Aguardando a subconta';
   static const claimStepUnknown = 'Não foi possível consultar';
-  static const claimProvision = 'Criar subconta Asaas';
+  static const claimProvision = 'Criar subconta PagBank';
   static const claimProvisionDone = 'Pedido de subconta enviado.';
   static const claimBankHint =
       'A chave Pix se cadastra na aba Saques, em conta de saque.';
@@ -256,10 +256,10 @@ abstract final class PartnerMessages {
       'O saldo disponível já está na subconta da casa. O saque vai para uma conta com o mesmo CPF ou CNPJ.';
   static const withdrawalBalanceSection = 'Saldo da subconta';
   static const withdrawalPixNotice =
-      'Os saques saem por Pix. Em conta CNPJ, o Asaas dá 30 Pix grátis por mês.';
+      'Os saques saem por Pix. Em conta CNPJ, o PagBank dá 30 Pix grátis por mês.';
   static const withdrawalHowTitle = 'Como funciona';
   static const withdrawalHowCard =
-      'Pagamento por Pix entra na subconta assim que compensa e pode ser sacado. Pagamento no cartão fica em A receber e costuma entrar em cerca de 30 dias, na data que o Asaas informa.';
+      'Pagamento por Pix entra na subconta assim que compensa e pode ser sacado. Pagamento no cartão fica em A receber e costuma entrar em cerca de 30 dias, na data que o PagBank informa.';
   static const withdrawalHowDocs =
       'Os documentos da subconta precisam estar aprovados para o saque ligar.';
   static const withdrawalsUnavailable = 'Os saques ainda não estão liberados.';
@@ -308,24 +308,24 @@ abstract final class PartnerMessages {
   static const withdrawalAutomatic = 'Automático';
   static const documentsTitle = 'Documentos da subconta';
   static const documentsBody =
-      'O Asaas só libera o saque com os documentos aprovados.';
+      'O PagBank só libera o saque com os documentos aprovados.';
   static const documentsApproved = 'Documentos e conta aprovados';
-  static const documentsPending = 'Aguardando aprovação do Asaas';
+  static const documentsPending = 'Aguardando aprovação do PagBank';
   static const documentsHosted =
-      'O envio é no site do Asaas. O EscapeMatch não guarda o arquivo.';
-  static const documentsOpen = 'Enviar no site do Asaas';
+      'O envio é no site do PagBank. O EscapeMatch não guarda o arquivo.';
+  static const documentsOpen = 'Enviar no site do PagBank';
   static const documentsUnsafe =
-      'O Asaas pediu um link que não reconhecemos. Atualize a tela.';
+      'O PagBank pediu um link que não reconhecemos. Atualize a tela.';
   static const documentsUpload =
-      'Este documento não tem link do Asaas. O arquivo segue direto e não fica aqui.';
+      'Este documento não tem link do PagBank. O arquivo segue direto e não fica aqui.';
   static const documentsSend = 'Enviar arquivo';
   static const documentsRefresh = 'Atualizar status';
   static const documentsUnavailable =
       'Não foi possível consultar os documentos.';
   static const documentsWait =
-      'Conta nova: espere uns 15 segundos e atualize. O Asaas ainda está definindo o que é obrigatório.';
+      'Conta nova: espere uns 15 segundos e atualize. O PagBank ainda está definindo o que é obrigatório.';
   static const documentsBlockWithdraw =
-      'O saque libera quando o Asaas aprovar os documentos e a conta.';
+      'O saque libera quando o PagBank aprovar os documentos e a conta.';
   static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
 
   static String documentStatus(String status) {

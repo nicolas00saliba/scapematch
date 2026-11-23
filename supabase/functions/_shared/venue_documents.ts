@@ -1,18 +1,18 @@
-// Documentos da subconta Asaas. A apiKey não sai da função.
+// Documentos da subconta PagBank. A apiKey não sai da função.
 //
 // GET /v3/myAccount/documents devolve o onboardingUrl quando o envio é no
-// site do Asaas (cadastro.io). Com esse link, POST /v3/myAccount/documents/{id}
+// site do PagBank (cadastro.io). Com esse link, POST /v3/myAccount/documents/{id}
 // é recusado. O upload daqui só vale para grupo sem onboardingUrl.
 // GET /v3/myAccount/status traz documentation e general. Os dois APPROVED
 // liberam o saque na tela. A consulta logo após criar a conta pode mentir
 // por cerca de 15 segundos; a tela pede para atualizar.
 
 import {
-  asaasProductionBaseUrl,
-  asaasSandboxBaseUrl,
-  type AsaasFetch,
-} from "./asaas_provider.ts";
-import { isPointsReserve } from "./asaas_transfers.ts";
+  pagbankProductionBaseUrl,
+  pagbankSandboxBaseUrl,
+  type PagBankFetch,
+} from "./pagbank_provider.ts";
+import { isPointsReserve } from "./pagbank_transfers.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { readJwtClaims } from "./venue_payouts.ts";
 
@@ -59,7 +59,7 @@ export type PublicDocuments = {
 
 export type VenueDocumentDeps = {
   env: EnvLike;
-  fetchFn: AsaasFetch;
+  fetchFn: PagBankFetch;
   actor(jwt: string): Promise<{ id: string } | null>;
   role(venueId: string, userId: string, jwt: string): Promise<DocumentAccess>;
   subaccount(venueId: string): Promise<{ apiKey: string; walletId: string }>;
@@ -94,15 +94,15 @@ export async function roleOf(
   return "none";
 }
 
-export function officialAsaasBase(baseUrl: string): string | null {
+export function officialPagBankBase(baseUrl: string): string | null {
   const base = baseUrl.trim().replace(/\/$/, "");
-  if (base === asaasSandboxBaseUrl || base === asaasProductionBaseUrl) {
+  if (base === pagbankSandboxBaseUrl || base === pagbankProductionBaseUrl) {
     return base;
   }
   return null;
 }
 
-/// Só https em cadastro.io ou asaas.com. Outro host não abre e não volta.
+/// Só https em cadastro.io ou pagbank.com. Outro host não abre e não volta.
 export function safeOnboardingUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0 || value.length > 500) {
     return null;
@@ -117,8 +117,8 @@ export function safeOnboardingUrl(value: unknown): string | null {
   const host = url.hostname.toLowerCase();
   const ok = host === "cadastro.io" ||
     host.endsWith(".cadastro.io") ||
-    host === "asaas.com" ||
-    host.endsWith(".asaas.com");
+    host === "pagbank.com" ||
+    host.endsWith(".pagbank.com");
   if (!ok) return null;
   return url.toString();
 }
@@ -201,16 +201,16 @@ export async function handleVenueDocuments(
     if (isPointsReserve(deps.env, account.walletId, apiKey)) {
       return json({ error: "reserva" }, 403);
     }
-    const base = officialAsaasBase(
-      deps.env.get("ASAAS_BASE_URL") ?? asaasSandboxBaseUrl,
+    const base = officialPagBankBase(
+      deps.env.get("PAGBANK_BASE_URL") ?? pagbankSandboxBaseUrl,
     );
-    if (!base) return json({ error: "asaas_unavailable" }, 503);
+    if (!base) return json({ error: "pagbank_unavailable" }, 503);
     if (action === "upload") {
       const uploaded = await uploadDocument(deps, base, apiKey, body, json);
       if (uploaded instanceof Response) return uploaded;
       return json(uploaded);
     }
-    return json(await loadFromAsaas(deps.fetchFn, base, apiKey));
+    return json(await loadFromPagBank(deps.fetchFn, base, apiKey));
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "onboarding") {
@@ -218,7 +218,7 @@ export async function handleVenueDocuments(
     }
     if (message === "arquivo") return json({ error: "arquivo" }, 400);
     if (message === "status") return json({ error: "status" }, 409);
-    return json({ error: "asaas_unavailable" }, 502);
+    return json({ error: "pagbank_unavailable" }, 502);
   }
 }
 
@@ -235,7 +235,7 @@ async function uploadDocument(
   }
   const payload = decodeDocumentPayload(text(body?.content_base64));
   if (!payload) return json({ error: "arquivo" }, 400);
-  const current = await loadFromAsaas(deps.fetchFn, base, apiKey);
+  const current = await loadFromPagBank(deps.fetchFn, base, apiKey);
   const group = current.documents.find((item) => item.id === documentId);
   if (!group) return json({ error: "valor" }, 404);
   if (group.hosted) {
@@ -260,35 +260,35 @@ async function uploadDocument(
     `${base}/myAccount/documents/${documentId}`,
     {
       method: "POST",
-      headers: asaasHeaders(apiKey),
+      headers: pagbankHeaders(apiKey),
       body: form,
     },
   );
-  if (!response.ok) return json({ error: "asaas_unavailable" }, 502);
-  return await loadFromAsaas(deps.fetchFn, base, apiKey);
+  if (!response.ok) return json({ error: "pagbank_unavailable" }, 502);
+  return await loadFromPagBank(deps.fetchFn, base, apiKey);
 }
 
-async function loadFromAsaas(
-  fetchFn: AsaasFetch,
+async function loadFromPagBank(
+  fetchFn: PagBankFetch,
   base: string,
   apiKey: string,
 ): Promise<PublicDocuments> {
-  const headers = asaasHeaders(apiKey);
+  const headers = pagbankHeaders(apiKey);
   const [statusRes, docsRes] = await Promise.all([
     fetchFn(`${base}/myAccount/status`, { method: "GET", headers }),
     fetchFn(`${base}/myAccount/documents`, { method: "GET", headers }),
   ]);
   if (!statusRes.ok || !docsRes.ok) {
-    throw new Error("asaas");
+    throw new Error("pagbank");
   }
   const statusBody = await statusRes.json().catch(() => null);
   const listBody = await docsRes.json().catch(() => null);
   return presentDocuments(statusBody, listBody);
 }
 
-function asaasHeaders(apiKey: string): Record<string, string> {
+function pagbankHeaders(apiKey: string): Record<string, string> {
   return {
-    access_token: apiKey,
+    Authorization: `Bearer ${apiKey}`,
     "User-Agent": "EscapeMatch",
     Accept: "application/json",
   };

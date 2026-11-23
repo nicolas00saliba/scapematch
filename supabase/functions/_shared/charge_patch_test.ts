@@ -134,9 +134,9 @@ Deno.test("a migração trava a cobrança e falha se houver duplicata", async ()
   }
 });
 
-Deno.test("o webhook confirma no Asaas e usa a transição", async () => {
+Deno.test("o webhook confirma no PagBank e usa a transição", async () => {
   const source = await Deno.readTextFile(
-    new URL("../asaas-webhook/index.ts", import.meta.url),
+    new URL("../pagbank-webhook/index.ts", import.meta.url),
   );
   assert(source.includes("getPayment"));
   assert(source.includes("paymentRefForRead"));

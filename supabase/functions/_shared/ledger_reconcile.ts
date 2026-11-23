@@ -1,4 +1,4 @@
-// Conciliação diária. Só GET no Asaas. Não cria cobrança, estorno nem transferência.
+// Conciliação diária. Só GET no PagBank. Não cria cobrança, estorno nem transferência.
 
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
@@ -28,7 +28,7 @@ export type LocalWithdrawal = {
   id: string;
   venueId: string;
   externalReference: string;
-  asaasTransferId: string;
+  pagbankTransferId: string;
   status: string;
   amountCents: number;
 };
@@ -53,7 +53,7 @@ export function reaisToCents(value: unknown): number | null {
   return cents;
 }
 
-/// null = o Asaas mandou um status que o livro não tem.
+/// null = o PagBank mandou um status que o livro não tem.
 export function mapPaymentStatus(status: string): string | null {
   switch (status.trim().toUpperCase()) {
     case "PENDING":
@@ -226,7 +226,7 @@ export function compareLedger(input: {
       }
       if (uncheckedCharges.has(local.providerRef)) continue;
       found.push(row(
-        "charge_missing_asaas",
+        "charge_missing_pagbank",
         local.providerRef,
         local.id,
         local.status,
@@ -263,7 +263,7 @@ export function compareLedger(input: {
       seenTransfers.add(transfer.externalReference);
     }
     const local = withdrawals.find((item) =>
-      item.asaasTransferId === transfer.id ||
+      item.pagbankTransferId === transfer.id ||
       (transfer.externalReference !== "" &&
         item.externalReference === transfer.externalReference)
     );
@@ -309,16 +309,16 @@ export function compareLedger(input: {
     const unchecked = input.uncheckedWithdrawalIds ?? new Set<string>();
     for (const local of withdrawals) {
       if (unchecked.has(local.id)) continue;
-      if (local.asaasTransferId === "") continue;
+      if (local.pagbankTransferId === "") continue;
       if (
-        seenTransfers.has(local.asaasTransferId) ||
+        seenTransfers.has(local.pagbankTransferId) ||
         seenTransfers.has(local.externalReference)
       ) {
         continue;
       }
       found.push(row(
-        "transfer_missing_asaas",
-        local.asaasTransferId,
+        "transfer_missing_pagbank",
+        local.pagbankTransferId,
         local.id,
         local.status,
         "",
@@ -327,12 +327,12 @@ export function compareLedger(input: {
   }
 
   if (input.truncated) {
-    found.push(row("asaas_truncated", "", "", "", ""));
+    found.push(row("pagbank_truncated", "", "", "", ""));
   }
   return found;
 }
 
-/// Pré-autorização cancelada: o Asaas estorna e devolve REFUNDED.
+/// Pré-autorização cancelada: o PagBank estorna e devolve REFUNDED.
 /// O livro grava cancelled porque o valor não foi capturado.
 function chargeStatusesMatch(local: LocalCharge, remote: string): boolean {
   if (local.status === remote) return true;
@@ -418,8 +418,8 @@ export async function handleLedgerReconcile(
   if (!(await secretMatches(header, secret))) {
     return json({ error: "not authenticated" }, 401);
   }
-  const base = (deps.env.get("ASAAS_BASE_URL") ?? "").trim().replace(/\/+$/, "");
-  const apiKey = (deps.env.get("ASAAS_API_KEY") ?? "").trim();
+  const base = (deps.env.get("PAGBANK_BASE_URL") ?? "").trim().replace(/\/+$/, "");
+  const apiKey = (deps.env.get("PAGBANK_TOKEN") ?? "").trim();
   if (!base.startsWith("https://") || apiKey === "") {
     return json({ error: "config_ausente" }, 503);
   }
@@ -483,7 +483,7 @@ async function listPayments(
     fetchFn,
     base,
     apiKey,
-    "/payments",
+    "/charges",
     "dateCreated",
     window.sinceDay,
     window.untilDay,
@@ -493,7 +493,7 @@ async function listPayments(
     fetchFn,
     base,
     apiKey,
-    "/payments",
+    "/charges",
     "paymentDate",
     window.sinceDay,
     window.untilDay,
@@ -529,7 +529,7 @@ async function fillMissingPayments(
     }
     const read = await readOne(
       fetchFn,
-      `${base}/payments/${ref}`,
+      `${base}/charges/${ref}`,
       apiKey,
       parsePayment,
     );
@@ -570,7 +570,7 @@ async function readSubaccountTransfers(
     byVenue.set(venueId, group);
   }
   for (const [venueId, group] of byVenue) {
-    const keyResult = await store.rpc("read_venue_asaas_key", {
+    const keyResult = await store.rpc("read_venue_provider_key", {
       p_venue_id: venueId,
     });
     const apiKey = keyResult.error ? "" : text(keyResult.data).trim();
@@ -595,7 +595,7 @@ async function readSubaccountTransfers(
       rows.push(transfer);
     }
     for (const withdrawal of group) {
-      const id = withdrawal.asaasTransferId;
+      const id = withdrawal.pagbankTransferId;
       if (id === "" || seen.has(id)) continue;
       if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
         unchecked.add(withdrawal.id);
@@ -628,7 +628,7 @@ async function readOne<T>(
   const response = await fetchFn(url, {
     method: "GET",
     redirect: "manual",
-    headers: { access_token: apiKey },
+    headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (response.status === 404) return "missing";
   if (response.status >= 300 && response.status < 400) return "unchecked";
@@ -642,7 +642,7 @@ async function listCollection<T>(
   fetchFn: FetchFn,
   base: string,
   apiKey: string,
-  path: "/payments" | "/transfers",
+  path: "/charges" | "/transfers",
   dateField: "dateCreated" | "paymentDate",
   since: string,
   until: string,
@@ -661,12 +661,12 @@ async function listCollection<T>(
     const response = await fetchFn(url, {
       method: "GET",
       redirect: "manual",
-      headers: { access_token: apiKey },
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (response.status >= 300 && response.status < 400) {
       throw new Error("redirect");
     }
-    if (!response.ok) throw new Error("asaas");
+    if (!response.ok) throw new Error("pagbank");
     const body = await response.json() as {
       data?: unknown;
       hasMore?: unknown;
@@ -757,7 +757,7 @@ function readWithdrawal(value: unknown): LocalWithdrawal[] {
     id,
     venueId: text(row.venue_id),
     externalReference: text(row.external_reference),
-    asaasTransferId: text(row.asaas_transfer_id),
+    pagbankTransferId: text(row.pagbank_transfer_id),
     status: text(row.status),
     amountCents: amount,
   }];

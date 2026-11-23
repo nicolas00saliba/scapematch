@@ -46,7 +46,7 @@ void main() {
     expect(find.byKey(PartnerKeys.withdrawalReceipt), findsOneWidget);
     expect(find.textContaining('0199'), findsOneWidget);
     expect(
-      find.text(withdrawalFailureMessage('asaas_unavailable')),
+      find.text(withdrawalFailureMessage('pagbank_unavailable')),
       findsOneWidget,
     );
     expect(find.byKey(PartnerKeys.withdrawalRetry), findsOneWidget);
@@ -101,7 +101,7 @@ void main() {
     }
   });
 
-  test('failure reasons from Asaas become a short sentence', () {
+  test('failure reasons from PagBank become a short sentence', () {
     expect(
       withdrawalFailureMessage('Saldo insuficiente para a transferência'),
       'Saldo insuficiente para a transferência',

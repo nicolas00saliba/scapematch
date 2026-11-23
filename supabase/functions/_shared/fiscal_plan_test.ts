@@ -1,11 +1,11 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
   canEmitService,
-  mapAsaasInvoiceStatus,
+  mapInvoiceStatus,
   planInvoices,
   testInvoiceNumber,
 } from "./fiscal_plan.ts";
-import { commissionCents } from "./asaas_provider.ts";
+import { commissionCents } from "./pagbank_provider.ts";
 
 const venue = {
   documentKind: "cnpj" as const,
@@ -82,9 +82,9 @@ Deno.test("o número de teste é estável", () => {
   );
 });
 
-Deno.test("status do Asaas vira o status da tabela", () => {
-  assertEquals(mapAsaasInvoiceStatus("AUTHORIZED"), "authorized");
-  assertEquals(mapAsaasInvoiceStatus("SCHEDULED"), "processing");
-  assertEquals(mapAsaasInvoiceStatus("ERROR"), "error");
-  assertEquals(mapAsaasInvoiceStatus("CANCELED"), "canceled");
+Deno.test("status do PagBank vira o status da tabela", () => {
+  assertEquals(mapInvoiceStatus("AUTHORIZED"), "authorized");
+  assertEquals(mapInvoiceStatus("SCHEDULED"), "processing");
+  assertEquals(mapInvoiceStatus("ERROR"), "error");
+  assertEquals(mapInvoiceStatus("CANCELED"), "canceled");
 });

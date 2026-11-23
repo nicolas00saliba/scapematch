@@ -286,7 +286,7 @@ end $$;
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 update public.profiles
-  set asaas_customer_id = 'cus_teste'
+  set pagbank_customer_id = 'cus_teste'
   where id = 'c3333333-3333-3333-3333-333333333333';
 
 select set_config(
@@ -296,7 +296,7 @@ select set_config(
 );
 set local role authenticated;
 update public.profiles
-  set display_name = 'Nome Novo', asaas_customer_id = 'cus_hack'
+  set display_name = 'Nome Novo', pagbank_customer_id = 'cus_hack'
   where id = 'c3333333-3333-3333-3333-333333333333';
 reset role;
 
@@ -308,7 +308,7 @@ begin
     where id = 'c3333333-3333-3333-3333-333333333333'
       and username = 'estranho_rls'
       and display_name = 'Nome Novo'
-      and asaas_customer_id = 'cus_teste'
+      and pagbank_customer_id = 'cus_teste'
   ) then
     raise exception 'profiles_guard ou set_my_username mudou o perfil errado';
   end if;

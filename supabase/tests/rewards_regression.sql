@@ -1,5 +1,5 @@
 -- Regressão isolada dos dois pacotes de recompensa.
--- Não chama o Asaas e não grava nada: o bloco desfaz no final.
+-- Não chama o PagBank e não grava nada: o bloco desfaz no final.
 -- Rode de novo quando quiser revisar. Precisa do schema já migrado.
 
 \set ON_ERROR_STOP on

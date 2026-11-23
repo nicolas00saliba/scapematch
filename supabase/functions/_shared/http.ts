@@ -24,7 +24,7 @@ export const productionWebOrigins = [
 ];
 
 const allowedHeaders =
-  "authorization, x-client-info, apikey, content-type, asaas-access-token";
+  "authorization, x-client-info, apikey, content-type, x-authenticity-token";
 
 export type EnvLike = { get(name: string): string | undefined };
 

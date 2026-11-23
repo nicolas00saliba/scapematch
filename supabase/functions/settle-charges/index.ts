@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { clientFailure } from "../_shared/asaas_client_error.ts";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { clientFailure } from "../_shared/pagbank_client_error.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import {
   expireUnconfirmedGroups,
@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       return json({ error: "group_id obrigatório" }, 400);
     }
 
-    const asaas = AsaasProvider.fromEnv(Deno.env);
+    const pagbank = PagBankProvider.fromEnv(Deno.env);
     const settled: string[] = [];
     for (const groupId of ids) {
       const allowed = await maySettle(
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
         Boolean(adminRow),
       );
       if (!allowed) continue;
-      await settleGroup(admin, asaas, groupId);
+      await settleGroup(admin, pagbank, groupId);
       settled.push(groupId);
     }
     return json({ settled });

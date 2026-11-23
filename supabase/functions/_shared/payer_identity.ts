@@ -11,7 +11,7 @@ export async function documentHash(raw: string | null | undefined): Promise<stri
     .join("");
 }
 
-/// O Asaas não devolve fingerprint. O token pertence a um cliente.
+/// O PagBank não devolve fingerprint. O token pertence a um cliente.
 /// A chave entre contas é bandeira + 4 finais.
 export function cardKey(
   brand: string | null | undefined,

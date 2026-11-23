@@ -1,5 +1,5 @@
 -- Saque da casa: RLS, titularidade, bloqueio de 24h e um automático por período.
--- Roda depois das migrations. Não fala com o Asaas.
+-- Roda depois das migrations. Não fala com o PagBank.
 
 \set ON_ERROR_STOP on
 
@@ -96,7 +96,7 @@ values ('a5555555-5555-4555-8555-555555555555');
 insert into public.venues (
   id, owner_id, city_id, name, neighborhood, street_address, address_number,
   postal_code, latitude, longitude, income_value, document_kind,
-  document_number, phone, status, asaas_wallet_id
+  document_number, phone, status, pagbank_account_id
 ) values
   (
     'b1111111-1111-4111-8111-111111111111',
@@ -365,7 +365,7 @@ do $$
 declare
   v_manual jsonb;
 begin
-  -- O Asaas já tirou o pendente do saldo disponível. 6000 cabe em 9000
+  -- O PagBank já tirou o pendente do saldo disponível. 6000 cabe em 9000
   -- mesmo com outro saque pendente de 4000. Somar de novo recusaria este.
   v_manual := public.claim_venue_withdrawal(
     'b1111111-1111-4111-8111-111111111111',
@@ -675,7 +675,7 @@ declare
 begin
   insert into public.venue_withdrawals (
     venue_id, amount_cents, status, source, period_key,
-    external_reference, asaas_transfer_id, updated_at
+    external_reference, pagbank_transfer_id, updated_at
   ) values (
     'b2222222-2222-4222-8222-222222222222',
     100, 'pending', 'manual', 'manual:velho',
@@ -794,7 +794,7 @@ begin
 
   update public.venue_withdrawals
   set status = 'failed',
-      asaas_transfer_id = 'tra_semana_base',
+      pagbank_transfer_id = 'tra_semana_base',
       retry_count = 0,
       dispatch_started_at = null,
       updated_at = v_now
@@ -805,7 +805,7 @@ begin
     raise exception 'a retentativa saiu no mesmo dia da falha';
   end if;
   if public.begin_withdrawal_dispatch(v_id) then
-    raise exception 'reabriu uma transferencia que o Asaas ja conhece';
+    raise exception 'reabriu uma transferencia que o PagBank ja conhece';
   end if;
 
   update public.venue_withdrawals
@@ -847,7 +847,7 @@ begin
 
   update public.venue_withdrawals
   set status = 'failed',
-      asaas_transfer_id = 'tra_semana_r1',
+      pagbank_transfer_id = 'tra_semana_r1',
       updated_at = v_now - interval '1 day'
   where period_key = v_base || '-r1'
     and venue_id = 'b1111111-1111-4111-8111-111111111111';
@@ -860,7 +860,7 @@ begin
 
   insert into public.venue_withdrawals (
     venue_id, amount_cents, status, source, period_key,
-    external_reference, asaas_transfer_id, created_at, updated_at
+    external_reference, pagbank_transfer_id, created_at, updated_at
   ) values (
     'b1111111-1111-4111-8111-111111111111',
     4000, 'failed', 'automatic', v_base || '-r2',
