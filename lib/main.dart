@@ -15,6 +15,8 @@ import 'package:scapematch/features/groups/data/selected_game_type_store.dart';
 import 'package:scapematch/features/groups/presentation/selected_game_type_controller.dart';
 import 'package:scapematch/features/onboarding/data/onboarding_store.dart';
 import 'package:scapematch/features/onboarding/presentation/onboarding_controller.dart';
+import 'package:scapematch/features/scape_points/data/reward_rules_store.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/features/theme/data/theme_choice_store.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch/core/observability/sentry_boot.dart';
@@ -46,6 +48,8 @@ Future<void> _abrirApp() async {
   // Sem este load, recarregar a página entre Participar e o cadastro
   // cria um store vazio e a pessoa não entra no grupo.
   await pendingInvites.load();
+  final rewardRules = RewardRulesStore();
+  if (kAppMode == AppMode.real) await rewardRules.load();
   runApp(
     ProviderScope(
       // The screens already offer "Tentar de novo". A background retry
@@ -57,6 +61,7 @@ Future<void> _abrirApp() async {
         onboardingStoreProvider.overrideWithValue(onboarding),
         pendingInviteStoreProvider.overrideWithValue(pendingInvites),
         themeChoiceStoreProvider.overrideWithValue(themeStore),
+        rewardRulesStoreProvider.overrideWithValue(rewardRules),
       ],
       child: const ScapeMatchApp(),
     ),

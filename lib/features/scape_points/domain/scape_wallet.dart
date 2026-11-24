@@ -1,3 +1,5 @@
+import 'package:dominio/dominio.dart';
+
 /// Carteira de Scape Points. 1 ponto vale [pointValueCents] centavos.
 class ScapeWallet {
   const ScapeWallet({
@@ -317,6 +319,16 @@ int _intOf(Object? value, {int fallback = 0}) {
   if (value is int) return value;
   if (value is num) return value.round();
   return int.tryParse('$value') ?? fallback;
+}
+
+/// Frase da prévia. Os números vêm da regra vigente, não de constante.
+String rewardProgramLine(PublicRewardRules rules) {
+  return 'Indicação de amigos: ${formatBasisPoints(rules.c2cFromBps)} desde o primeiro, '
+      '${formatBasisPoints(rules.c2cMidBps)} a partir de ${rules.c2cMidActive} e '
+      '${formatBasisPoints(rules.c2cHighBps)} a partir de ${rules.c2cHighActive}. '
+      'Casa indicada: ${formatBasisPoints(rules.c2bBps)}. '
+      'Cashback de ${formatBasisPoints(rules.cashbackMinBps)} a ${formatBasisPoints(rules.cashbackMaxBps)}. '
+      'Primeira reserva indicada: ${formatBasisPoints(rules.firstBookingDiscountBps)} de desconto.';
 }
 
 String formatBasisPoints(int bps) {

@@ -1,7 +1,9 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 
 /// Termos da casa. Ficam neste app para não entrar no bundle do jogador.
 abstract final class PartnerLegal {
@@ -27,6 +29,13 @@ Indicação entre casas. O crédito de indicação fica 30 dias pendente e depoi
 
 Ao cadastrar a casa você confirma que leu este rascunho, a política de privacidade e a política de cancelamento e reembolso. O aceite fica registrado com a versão do texto e a data.
 ''';
+
+  /// Troca a faixa de cashback pela regra vigente. O padrão reproduz o texto.
+  static String bodyFor(PublicRewardRules rules) {
+    final range =
+        'de ${formatBasisPoints(rules.cashbackMinBps)} a ${formatBasisPoints(rules.cashbackMaxBps)}';
+    return termsBody.replaceFirst('de 0,5% a 5%', range);
+  }
 }
 
 class PartnerLegalScreen extends StatelessWidget {

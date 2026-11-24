@@ -12,6 +12,7 @@ import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_google_account.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_signup_gateway.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
@@ -52,7 +53,10 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
   void initState() {
     super.initState();
     _termsTap = TapGestureRecognizer()
-      ..onTap = () => _open(PartnerLegal.termsTitle, PartnerLegal.termsBody);
+      ..onTap = () => _open(
+        PartnerLegal.termsTitle,
+        PartnerLegal.bodyFor(ref.read(rewardRulesProvider)),
+      );
     _privacyTap = TapGestureRecognizer()
       ..onTap = () =>
           _open(LegalDocuments.privacyTitle, LegalDocuments.privacyBody);

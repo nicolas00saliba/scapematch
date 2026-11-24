@@ -17,6 +17,7 @@ import 'package:scapematch/features/payments/presentation/card_entry_fields.dart
 import 'package:scapematch/features/payments/presentation/own_card_holder.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Cartão de exemplo. O pagamento simulado não envia número.
@@ -511,6 +512,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     final height = MediaQuery.sizeOf(context).height;
     final saved = ref.watch(paymentMethodsProvider).asData?.value ?? const [];
     final live = ref.watch(backendPlanProvider).connectsSupabase;
+    final rules = ref.watch(rewardRulesProvider);
     final cards = live ? saved : [payTestCard, ...saved];
     _entry.requireHolderDocument = live;
     final issuedPix = _issuedPix;
@@ -558,7 +560,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                       ),
                     ),
                     Text(
-                      'Cashback sorteado de ${formatBasisPoints(widget.points?.cashbackMinBps ?? 50)} a ${formatBasisPoints(widget.points?.cashbackMaxBps ?? 500)} quando o pagamento confirma. O percentual sai no extrato.',
+                      'Cashback sorteado de ${formatBasisPoints(rules.cashbackMinBps)} a ${formatBasisPoints(rules.cashbackMaxBps)} quando o pagamento confirma. O percentual sai no extrato.',
                       key: AppKeys.payCashbackRange,
                     ),
                     const SizedBox(height: 8),

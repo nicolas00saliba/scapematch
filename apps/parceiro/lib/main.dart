@@ -3,10 +3,13 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:scapematch/app/retry.dart';
+import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/auth/data/google_oauth.dart';
 import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 import 'package:scapematch/app/url_strategy.dart';
+import 'package:scapematch/features/scape_points/data/reward_rules_store.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/features/theme/data/theme_choice_store.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch/core/observability/sentry_boot.dart';
@@ -24,10 +27,15 @@ Future<void> _abrirApp() async {
   await initializeDateFormatting('pt_BR');
   final themeStore = ThemeChoiceStore();
   await themeStore.load();
+  final rewardRules = RewardRulesStore();
+  if (kAppMode == AppMode.real) await rewardRules.load();
   runApp(
     ProviderScope(
       retry: noAutomaticRetry,
-      overrides: [themeChoiceStoreProvider.overrideWithValue(themeStore)],
+      overrides: [
+        themeChoiceStoreProvider.overrideWithValue(themeStore),
+        rewardRulesStoreProvider.overrideWithValue(rewardRules),
+      ],
       child: const ParceiroApp(),
     ),
   );

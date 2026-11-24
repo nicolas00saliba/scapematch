@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,14 +8,23 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/scape_points/domain/passport_book.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/features/scape_points/presentation/passport_card.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 
 /// Saldo e extrato. No modo real lê `my_scape_wallet`. Na demonstração,
 /// os números são de exemplo.
 class ScapePointsBody extends ConsumerStatefulWidget {
-  const ScapePointsBody({super.key, this.preview, this.passportPreview});
+  const ScapePointsBody({
+    super.key,
+    this.preview,
+    this.passportPreview,
+    this.rules,
+  });
 
   /// Quando preenchido, a tela não chama o servidor.
   final ScapeWallet? preview;
+
+  /// Regra vigente. Sem isto, a prévia usa o cache ou o padrão.
+  final PublicRewardRules? rules;
 
   /// Passaporte junto do preview. Nulo deixa a aba só com o extrato.
   final PassportBook? passportPreview;
@@ -109,20 +119,24 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
 
   @override
   Widget build(BuildContext context) {
+    final previewRules = widget.rules ?? PublicRewardRules.fallback;
     if (widget.preview != null) {
       return ScapePointsView(
         wallet: widget.preview!,
         sample: identical(widget.preview, ScapeWallet.sample),
         passport: widget.passportPreview,
+        rules: previewRules,
       );
     }
     if (!scapeUsesLiveBackend) {
-      return const ScapePointsView(
+      return ScapePointsView(
         wallet: ScapeWallet.sample,
         sample: true,
         passport: PassportBook.sample,
+        rules: previewRules,
       );
     }
+    final liveRules = ref.watch(rewardRulesProvider);
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
@@ -136,7 +150,12 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ScapePointsView(wallet: wallet, sample: false, passport: _passport),
+        ScapePointsView(
+          wallet: wallet,
+          sample: false,
+          passport: _passport,
+          rules: liveRules,
+        ),
         if (wallet.canClaim) ...[
           const SizedBox(height: 16),
           TextField(
@@ -170,11 +189,13 @@ class ScapePointsView extends StatelessWidget {
     required this.wallet,
     required this.sample,
     this.passport,
+    this.rules = PublicRewardRules.fallback,
   });
 
   final ScapeWallet wallet;
   final bool sample;
   final PassportBook? passport;
+  final PublicRewardRules rules;
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +257,12 @@ class ScapePointsView extends StatelessWidget {
                 Text('Nível ${wallet.tierLabel}. ${wallet.tierProgress}'),
                 const SizedBox(height: 8),
                 Text(
-                  '100 pontos = ${formatPrice(wallet.pointValueCents * 100)}. Não vencem e não sacam. Servem para pagar a sua parte da sala.',
+                  rewardProgramLine(rules),
+                  key: const Key('reward-program-line'),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '100 pontos = ${formatPrice(rules.pointValueCents * 100)}. Não vencem e não sacam. Servem para pagar a sua parte da sala.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.35,
