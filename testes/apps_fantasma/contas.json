@@ -1,0 +1,12 @@
+{
+  "_nota": "Sem senha, e-mail real, CPF ou telefone aqui. Só o que vira app no celular.",
+  "jogador_url": "https://app.escapematch.com.br/",
+  "casa_url": "https://parceiro.escapematch.com.br/",
+  "contas": [
+    {"slug": "jogador1", "tipo": "jogador", "numero": 1},
+    {"slug": "jogador2", "tipo": "jogador", "numero": 2},
+    {"slug": "jogador3", "tipo": "jogador", "numero": 3},
+    {"slug": "casa1", "tipo": "casa", "numero": 1},
+    {"slug": "casa2", "tipo": "casa", "numero": 2}
+  ]
+}

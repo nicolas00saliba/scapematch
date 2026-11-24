@@ -1,0 +1,55 @@
+# Prova que os APKs das contas fantasmas compilam. Não publica nada e não
+# fala com o Supabase. A keystore aqui é descartável; os APKs que vão para
+# o celular saem do build.sh no box, com a keystore guardada fora do repo.
+name: Apps fantasma
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - testes/apps_fantasma/**
+      - testes/contas_fantasma/**
+      - .github/workflows/apps-fantasma.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-fantasma-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          gradle-version: "9.4.1"
+
+      - name: Pillow
+        run: python3 -m pip install --user pillow
+
+      - name: Plano das contas (sem gravar)
+        run: python3 testes/contas_fantasma/criar_contas.py --senhas "$RUNNER_TEMP/nada.json"
+
+      - name: Build dos APKs
+        env:
+          APPS_FANTASMA_SECRETS: ${{ runner.temp }}/segredos
+        run: bash testes/apps_fantasma/build.sh "$RUNNER_TEMP/apks"
+
+      - name: Confere um APK por conta
+        run: |
+          set -euo pipefail
+          ls -l "$RUNNER_TEMP/apks"
+          test "$(ls "$RUNNER_TEMP/apks"/*.apk | wc -l)" -eq "$(python3 -c 'import json;print(len(json.load(open("testes/apps_fantasma/contas.json"))["contas"]))')"
