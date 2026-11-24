@@ -13,7 +13,6 @@ import 'package:scapematch/core/data/sample_data.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/scape_points/data/reward_rules_store.dart';
-import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
