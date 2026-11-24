@@ -12,12 +12,36 @@ import 'package:scapematch/features/payments/presentation/installment_grid.dart'
 import 'package:scapematch/features/payments/presentation/installment_summary.dart';
 
 void main() {
-  test('abaixo de R\$ 150 só à vista fica habilitada', () {
-    final options = cardInstallmentOptions(principalCents: 14999);
+  test('R\$ 100 libera até 3x e a cotação libera o restante', () {
+    final open = cardInstallmentOptions(
+      principalCents: 10000,
+      interestCentsByCount: {
+        for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
+      },
+    );
+    expect(open.every((item) => item.enabled), isTrue);
+    expect(open[2].interestFree, isTrue);
+    expect(open[3].showsTotal, isTrue);
+
+    final quoted = cardInstallmentOptions(principalCents: 14999);
+    expect(quoted.where((item) => item.enabled).map((item) => item.count), [
+      1,
+      2,
+      3,
+    ]);
+    expect(quoted[3].disabledReason, 'Cotação indisponível');
+  });
+
+  test('parcela abaixo de R\$ 5 fica desabilitada', () {
+    final options = cardInstallmentOptions(principalCents: 900);
     expect(options.where((item) => item.enabled).map((item) => item.count), [
       1,
     ]);
-    expect(options[3].disabledReason, 'parcelamento a partir de R\$150');
+    expect(options[1].disabledReason, 'parcela mínima de R\$ 5');
+
+    final exact = cardInstallmentOptions(principalCents: 1000);
+    expect(exact[1].enabled, isTrue);
+    expect(exact[2].enabled, isFalse);
   });
 
   testWidgets('a grade marca sem juros até 3x e o total a partir de 4x', (
@@ -67,33 +91,23 @@ void main() {
     expect(box.width, greaterThanOrEqualTo(48));
   });
 
-  testWidgets('abaixo de R\$ 150 as outras parcelas ficam desabilitadas', (
-    tester,
-  ) async {
+  testWidgets('parcela abaixo de R\$ 5 não seleciona', (tester) async {
     await tester.pumpWidget(
       _host(
         selected: 1,
-        options: cardInstallmentOptions(principalCents: 9000),
+        options: cardInstallmentOptions(
+          principalCents: 900,
+          interestCentsByCount: {
+            for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
+          },
+        ),
         onSelect: (_) {},
       ),
     );
-    expect(find.text('parcelamento a partir de R\$150'), findsNWidgets(11));
+    expect(find.text('parcela mínima de R\$ 5'), findsNWidgets(11));
     await tester.tap(find.byKey(const ValueKey('parcela-4')));
     await tester.pump();
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
-  });
-
-  test('R\$ 100 no app real só libera à vista', () {
-    final options = cardInstallmentOptions(
-      principalCents: 10000,
-      interestCentsByCount: {
-        for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
-      },
-    );
-    expect(options.where((item) => item.enabled).map((item) => item.count), [
-      1,
-    ]);
-    expect(options[1].disabledReason, 'parcelamento a partir de R\$150');
   });
 
   testWidgets('salva o resumo e a grade a 390px', (tester) async {
@@ -101,7 +115,6 @@ void main() {
     await tester.runAsync(_loadFonts);
     final options = cardInstallmentOptions(
       principalCents: 10000,
-      minAmountCents: 10000,
       interestCentsByCount: {
         for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
       },

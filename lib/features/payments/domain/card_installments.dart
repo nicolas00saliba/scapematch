@@ -1,5 +1,6 @@
-/// Mínimo para parcelar. Abaixo disto só à vista.
-const minCardInstallmentCents = 15000;
+/// Parcela mínima da PagBank, R$ 5,00. À vista não usa este piso.
+/// https://developer.pagbank.com.br/reference/criar-transacao-com-repasse-de-taxa
+const minCardInstallmentParcelCents = 500;
 
 const maxCardInstallments = 12;
 
@@ -40,50 +41,39 @@ int cardInstallmentCents(int totalCents, int count) {
 }
 
 /// 1x a 12x. Sem o juro cotado, 4x a 12x ficam desabilitadas.
-///
-/// [minAmountCents] só muda o piso desta lista. O app e o servidor
-/// continuam em [minCardInstallmentCents].
+/// Parcela abaixo de R$ 5 também fica desabilitada.
 List<CardInstallmentOption> cardInstallmentOptions({
   required int principalCents,
   Map<int, int> interestCentsByCount = const {},
-  int minAmountCents = minCardInstallmentCents,
 }) {
-  final below = principalCents < minAmountCents;
   return [
     for (var count = 1; count <= maxCardInstallments; count++)
       _option(
         count: count,
         principalCents: principalCents,
-        below: below,
         interest: interestCentsByCount[count],
       ),
   ];
 }
 
+bool _parcelTooSmall(int totalCents, int count) =>
+    count > 1 && totalCents < minCardInstallmentParcelCents * count;
+
 CardInstallmentOption _option({
   required int count,
   required int principalCents,
-  required bool below,
   required int? interest,
 }) {
   final interestFree = count <= interestFreeCardInstallments;
-  if (below && count > 1) {
-    return CardInstallmentOption(
-      count: count,
-      totalCents: principalCents,
-      installmentCents: cardInstallmentCents(principalCents, count),
-      interestFree: interestFree,
-      enabled: false,
-      disabledReason: 'parcelamento a partir de R\$150',
-    );
-  }
   if (interestFree) {
+    final tooSmall = _parcelTooSmall(principalCents, count);
     return CardInstallmentOption(
       count: count,
       totalCents: principalCents,
       installmentCents: cardInstallmentCents(principalCents, count),
       interestFree: true,
-      enabled: true,
+      enabled: !tooSmall,
+      disabledReason: tooSmall ? 'parcela mínima de R\$ 5' : null,
     );
   }
   if (interest == null || interest < 0) {
@@ -97,12 +87,14 @@ CardInstallmentOption _option({
     );
   }
   final total = principalCents + interest;
+  final tooSmall = _parcelTooSmall(total, count);
   return CardInstallmentOption(
     count: count,
     totalCents: total,
     installmentCents: cardInstallmentCents(total, count),
     interestFree: false,
-    enabled: true,
+    enabled: !tooSmall,
+    disabledReason: tooSmall ? 'parcela mínima de R\$ 5' : null,
   );
 }
 

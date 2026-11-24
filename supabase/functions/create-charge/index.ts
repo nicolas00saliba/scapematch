@@ -10,7 +10,10 @@ import {
   isCardDeclined,
   logProviderFailure,
 } from "../_shared/pagbank_client_error.ts";
-import { type InstallmentCharge } from "../_shared/pagbank_rules.ts";
+import {
+  installmentParcelTooSmall,
+  type InstallmentCharge,
+} from "../_shared/pagbank_rules.ts";
 import {
   providerPaymentGone,
   PagBankProvider,
@@ -182,8 +185,9 @@ export async function createCharge(
           enabled: plan.enabled,
           disabled_reason: plan.enabled
             ? null
-            : cents < 15_000
-            ? "parcelamento a partir de R$150"
+            : plan.merchantAbsorbsInterest ||
+                installmentParcelTooSmall(plan.amountCents, plan.installments)
+            ? "parcela mínima de R$ 5"
             : "Cotação indisponível",
         })),
       });

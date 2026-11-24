@@ -225,7 +225,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   Future<void> _loadQuote() async {
     final cents = _chargedCents;
     final quote = widget.quoteInstallments;
-    if (quote == null || cents < minCardInstallmentCents) {
+    if (quote == null) {
       if (!mounted) return;
       setState(() => _remotePlans = null);
       return;

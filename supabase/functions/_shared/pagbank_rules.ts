@@ -11,8 +11,17 @@ export const holdUntilGroupConfirms =
 /// Teto da comissão digitada no Admin: 30%. 10000 basis points são 100%.
 export const maxConfigurableCommissionBps = 3000;
 
-/// Abaixo disto o cartão só aceita 1x. R$ 150,00.
-export const minInstallmentAmountCents = 15_000;
+/// Parcela mínima da PagBank: R$ 5,00. À vista não usa este piso.
+/// https://developer.pagbank.com.br/reference/criar-transacao-com-repasse-de-taxa
+export const minInstallmentParcelCents = 500;
+
+/// 2x ou mais só vale quando cada parcela fica em pelo menos R$ 5.
+export function installmentParcelTooSmall(
+  amountCents: number,
+  count: number,
+): boolean {
+  return count > 1 && amountCents < minInstallmentParcelCents * count;
+}
 
 /// Até 3x a EscapeMatch absorve o juro. Da 4ª à 12ª o juro vai para o jogador.
 export const interestFreeInstallments = 3;
@@ -149,8 +158,8 @@ export type InstallmentCharge = {
 
 export type InstallmentOption = InstallmentCharge & { enabled: boolean };
 
-/// Grade de 1x a 12x. Abaixo de R$ 150 só 1x fica habilitado.
-/// De 4x a 12x só habilita quando a cotação trouxe o juro do comprador.
+/// Grade de 1x a 12x. 2x ou mais só habilita com parcela de pelo menos R$ 5.
+/// De 4x a 12x também precisa do juro cotado do comprador.
 export function installmentMenu(input: {
   principalCents: number;
   interestByCount?: Readonly<Record<number, number>>;
@@ -160,20 +169,19 @@ export function installmentMenu(input: {
     throw new Error("valor");
   }
   const quoted = input.interestByCount ?? {};
-  const below = principal < minInstallmentAmountCents;
   const options: InstallmentOption[] = [];
   for (let count = 1; count <= maxInstallments; count++) {
-    if (below && count > 1) {
-      options.push({
-        installments: count,
-        amountCents: principal,
-        buyerInterestCents: 0,
-        merchantAbsorbsInterest: count <= interestFreeInstallments,
-        enabled: false,
-      });
-      continue;
-    }
     if (count <= interestFreeInstallments) {
+      if (installmentParcelTooSmall(principal, count)) {
+        options.push({
+          installments: count,
+          amountCents: principal,
+          buyerInterestCents: 0,
+          merchantAbsorbsInterest: true,
+          enabled: false,
+        });
+        continue;
+      }
       options.push({
         ...installmentCharge({ principalCents: principal, installments: count }),
         enabled: true,
@@ -186,6 +194,17 @@ export function installmentMenu(input: {
         installments: count,
         amountCents: principal,
         buyerInterestCents: 0,
+        merchantAbsorbsInterest: false,
+        enabled: false,
+      });
+      continue;
+    }
+    const total = principal + interest;
+    if (installmentParcelTooSmall(total, count)) {
+      options.push({
+        installments: count,
+        amountCents: total,
+        buyerInterestCents: interest,
         merchantAbsorbsInterest: false,
         enabled: false,
       });
@@ -205,7 +224,7 @@ export function installmentMenu(input: {
 
 /// 1 a 3x: o valor cobrado é o principal e o objeto de juro do comprador
 /// não vai no pedido. 4 a 12x: o juro cotado na API entra no valor e em
-/// `fees.buyer.interest`. Abaixo de R$ 150 só 1x.
+/// `fees.buyer.interest`. Parcela abaixo de R$ 5 recusa a cobrança.
 export function installmentCharge(input: {
   principalCents: number;
   installments: number;
@@ -219,25 +238,30 @@ export function installmentCharge(input: {
   if (!Number.isInteger(count) || count < 1 || count > maxInstallments) {
     throw new Error("parcelas");
   }
-  if (principal < minInstallmentAmountCents && count > 1) {
-    throw new Error("parcelas");
-  }
   if (count <= interestFreeInstallments) {
-    return {
+    const plan: InstallmentCharge = {
       installments: count,
       amountCents: principal,
       buyerInterestCents: 0,
       merchantAbsorbsInterest: true,
     };
+    if (installmentParcelTooSmall(plan.amountCents, count)) {
+      throw new Error("parcelas");
+    }
+    return plan;
   }
   const interest = input.buyerInterestCents ?? 0;
   if (!Number.isInteger(interest) || interest < 0) throw new Error("juros");
-  return {
+  const plan: InstallmentCharge = {
     installments: count,
     amountCents: principal + interest,
     buyerInterestCents: interest,
     merchantAbsorbsInterest: false,
   };
+  if (installmentParcelTooSmall(plan.amountCents, count)) {
+    throw new Error("parcelas");
+  }
+  return plan;
 }
 
 /// `amount` do charge. Sem juro do comprador nas parcelas que a casa absorve.

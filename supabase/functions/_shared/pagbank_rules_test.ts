@@ -90,7 +90,10 @@ Deno.test("a grade habilita 1x a 3x sem juro e 4x só com a cotação", () => {
   assertEquals(below.length, 12);
   assertEquals(below[0].enabled, true);
   assertEquals(below[0].amountCents, 14_999);
-  assertEquals(below.filter((item) => item.enabled).length, 1);
+  assertEquals(below[1].enabled, true);
+  assertEquals(below[2].merchantAbsorbsInterest, true);
+  assertEquals(below.filter((item) => item.enabled).length, 3);
+  assertEquals(below[3].enabled, false);
 
   const open = installmentMenu({
     principalCents: 20_000,
@@ -106,13 +109,17 @@ Deno.test("a grade habilita 1x a 3x sem juro e 4x só com a cotação", () => {
   assertEquals(open[4].enabled, false);
 });
 
-Deno.test("abaixo de R$ 150 só cabe 1x", () => {
+Deno.test("parcela abaixo de R$ 5 recusa; R$ 100 em 2x passa", () => {
   assertEquals(
-    installmentCharge({ principalCents: 14_999, installments: 1 }).installments,
+    installmentCharge({ principalCents: 10_000, installments: 2 }).amountCents,
+    10_000,
+  );
+  assertEquals(
+    installmentCharge({ principalCents: 900, installments: 1 }).installments,
     1,
   );
   assertThrows(
-    () => installmentCharge({ principalCents: 14_999, installments: 2 }),
+    () => installmentCharge({ principalCents: 900, installments: 2 }),
     Error,
     "parcelas",
   );
@@ -121,6 +128,11 @@ Deno.test("abaixo de R$ 150 só cabe 1x", () => {
     Error,
     "parcelas",
   );
+  const small = installmentMenu({ principalCents: 900 });
+  assertEquals(small.filter((item) => item.enabled).length, 1);
+  const border = installmentMenu({ principalCents: 1_000 });
+  assertEquals(border[1].enabled, true);
+  assertEquals(border[2].enabled, false);
 });
 
 Deno.test("confirmação solta a custódia; sem confirmação estorna Pix e não captura cartão", () => {

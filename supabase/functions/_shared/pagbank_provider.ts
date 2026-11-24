@@ -12,7 +12,6 @@ import {
   installmentMenu,
   interestFreeInstallments,
   maxInstallments,
-  minInstallmentAmountCents,
   pagbankSplitBody,
   type FixedSplit,
   type InstallmentCharge,
@@ -671,8 +670,7 @@ export class PagBankProvider {
     principalCents: number,
     installments: number,
   ): Promise<number> {
-    const plan = installmentCharge({ principalCents, installments });
-    if (plan.merchantAbsorbsInterest) return 0;
+    if (installments <= interestFreeInstallments) return 0;
     const query = new URLSearchParams({
       payment_methods: "CREDIT_CARD",
       value: String(principalCents),
@@ -686,6 +684,11 @@ export class PagBankProvider {
     );
     const interest = buyerInterestFromQuote(body, installments);
     if (interest == null) throw new Error("PagBank 502: juros_indisponiveis");
+    installmentCharge({
+      principalCents,
+      installments,
+      buyerInterestCents: interest,
+    });
     return interest;
   }
 
@@ -693,9 +696,6 @@ export class PagBankProvider {
   async quoteCardPlans(principalCents: number): Promise<InstallmentOption[]> {
     if (!Number.isInteger(principalCents) || principalCents <= 0) {
       throw new Error("valor");
-    }
-    if (principalCents < minInstallmentAmountCents) {
-      return installmentMenu({ principalCents });
     }
     const query = new URLSearchParams({
       payment_methods: "CREDIT_CARD",

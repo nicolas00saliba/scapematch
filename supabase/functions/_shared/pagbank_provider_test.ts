@@ -330,7 +330,7 @@ Deno.test("a assinatura do webhook usa o corpo cru", async () => {
   assertEquals(await pagbankSignatureMatches(null, secret, raw), false);
 });
 
-Deno.test("abaixo de R$ 150 o cartão não parcela e a casa não perde a taxa", async () => {
+Deno.test("parcela abaixo de R$ 5 não vai para a PagBank e a casa não perde a taxa", async () => {
   let posted = 0;
   const fetchFn = () => {
     posted += 1;
@@ -340,11 +340,11 @@ Deno.test("abaixo de R$ 150 o cartão não parcela e a casa não perde a taxa", 
     () =>
       provider(fetchFn).authorizeCard({
         customer: "PB_CUS_1",
-        value: 149.99,
+        value: 9,
         dueDate: "2026-11-07",
         description: "EscapeMatch",
         externalReference: "card-baixo",
-        split: { walletId: venue, fixedValue: 100 },
+        split: { walletId: venue, fixedValue: 7 },
         creditCardToken: "CARD_1",
         installments: 2,
       }),
@@ -635,9 +635,14 @@ Deno.test("a cotação de parcelas sai de uma consulta só", async () => {
   assertEquals(plans[3].enabled, true);
   assertEquals(plans[4].enabled, false);
   const small = await client.quoteCardPlans(10_000);
-  assertEquals(quotes, 1);
-  assertEquals(small.filter((item) => item.enabled).length, 1);
+  assertEquals(quotes, 2);
+  assertEquals(
+    small.filter((item) => item.enabled).map((item) => item.installments),
+    [1, 2, 3, 4],
+  );
+  assertEquals(small[1].merchantAbsorbsInterest, true);
+  assertEquals(small[3].amountCents, 10_640);
   const checked = await client.cardPlan(20_000, 4);
   assertEquals(checked.amountCents, 20_640);
-  assertEquals(quotes, 2);
+  assertEquals(quotes, 3);
 });
