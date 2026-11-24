@@ -175,8 +175,14 @@ abstract final class PartnerMessages {
   static const claimNote = 'Por que a casa é sua?';
   static const claimNoteHint = 'Sem documento e sem telefone.';
   static const claimOfferTitle = 'Esta é a sua casa?';
-  static const claimOfferBody =
-      'Este CNPJ já tem um perfil. Reivindicar liga a sua conta a essa casa e mantém fotos, salas e avaliações. Não abre outra casa.';
+  static String claimOfferBody(String documentKind) {
+    final label = switch (documentKind) {
+      'cpf' => 'CPF',
+      'cnpj' => 'CNPJ',
+      _ => 'documento',
+    };
+    return 'Este $label já tem um perfil. Reivindicar liga a sua conta a essa casa e mantém fotos, salas e avaliações. Não abre outra casa.';
+  }
   static const claimOfferButton = 'Reivindicar';
   static const claimCodeTitle = 'Código da casa';
   static const claimCodeBody =
