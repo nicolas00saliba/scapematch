@@ -7,6 +7,7 @@ import {
   reconcilePayments,
 } from "../_shared/reconcile_payments.ts";
 import { retryPendingCustodyReleases } from "../_shared/custody_release.ts";
+import { processMemberRefunds } from "../_shared/member_refund.ts";
 import { pollPendingPagBankCharges } from "../_shared/charge_notice.ts";
 import {
   expireUnconfirmedGroups,
@@ -60,6 +61,7 @@ export async function handleReconcile(
       }
     }
     await settleAuthorizedCards(admin, pagbank);
+    await processMemberRefunds(admin, pagbank);
     await pollPendingPagBankCharges(admin, pagbank, Deno.env);
     await retryPendingCustodyReleases(admin, pagbank);
     const released = await admin.rpc("release_due_scape_points");

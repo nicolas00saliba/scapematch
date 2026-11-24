@@ -10,6 +10,10 @@ import {
   settleGroup,
 } from "../_shared/settle_group.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
+import {
+  memberRefundActor,
+  processMemberRefunds,
+} from "../_shared/member_refund.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -28,16 +32,34 @@ Deno.serve(async (req) => {
     if (!userData.user) return json({ error: "not authenticated" }, 401);
 
     const admin = createClient(url, service);
-    const body = await req.json().catch(() => ({})) as {
-      group_id?: string;
-      sweep?: boolean;
-    };
     const { data: adminLookup } = await admin
       .from("admins")
       .select("user_id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
     const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
+    const body = await req.json().catch(() => ({})) as {
+      group_id?: string;
+      sweep?: boolean;
+      member_refund?: boolean;
+    };
+    if (body.member_refund) {
+      const groupId = body.group_id ?? "";
+      if (!groupId) return json({ error: "group_id obrigatório" }, 400);
+      const scope = await memberRefundActor(
+        admin,
+        groupId,
+        userData.user.id,
+        Boolean(adminRow),
+      );
+      if (!scope) return json({ error: "not member" }, 403);
+      const pagbank = PagBankProvider.fromEnv(Deno.env);
+      const refunds = await processMemberRefunds(admin, pagbank, {
+        groupId,
+        userId: scope.userId,
+      });
+      return json({ refunds });
+    }
 
     const ids: string[] = [];
     if (body.sweep) {
@@ -71,6 +93,7 @@ Deno.serve(async (req) => {
       await settleGroup(admin, pagbank, groupId);
       settled.push(groupId);
     }
+    await processMemberRefunds(admin, pagbank);
     await pollPendingPagBankCharges(admin, pagbank, Deno.env);
     await retryPendingCustodyReleases(admin, pagbank);
     return json({ settled });

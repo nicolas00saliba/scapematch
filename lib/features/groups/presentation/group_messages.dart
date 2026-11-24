@@ -245,7 +245,7 @@ abstract final class GroupMessages {
   static String get leaveWithRefundTitle => 'Sair do grupo?';
 
   static String get leaveWithRefundBody =>
-      'Faltam $_hours horas ou mais para o início. Se você sair agora, o pagamento simulado volta integralmente e a vaga fica livre.';
+      'Faltam $_hours horas ou mais para o início. Se você sair agora, o pagamento volta integralmente e a vaga fica livre.';
 
   static String get leaveWithoutRefundTitle => 'Sair sem reembolso?';
 
@@ -260,7 +260,7 @@ abstract final class GroupMessages {
   /// the other outcome because the clock moved while the dialog was open.
   static String leavePreviewChanged({required bool refunded}) {
     if (refunded) {
-      return 'O horário mudou enquanto o aviso estava aberto. Você saiu do grupo e o reembolso simulado foi registrado.';
+      return 'O horário mudou enquanto o aviso estava aberto. Você saiu do grupo e o reembolso foi pedido.';
     }
     return 'O horário mudou enquanto o aviso estava aberto. Você saiu do grupo e não há reembolso.';
   }
@@ -325,7 +325,7 @@ abstract final class GroupMessages {
       'O cartão como imagem ainda não é enviado. Use o link.';
   static const confirmSuccess = 'Presença confirmada.';
   static const leaveRefunded =
-      'Você saiu do grupo. Reembolso simulado registrado.';
+      'Você saiu do grupo. O reembolso foi pedido e a PagBank confirma a volta do dinheiro.';
   static const leaveDenied = 'Você saiu do grupo. Sem reembolso.';
   static const deletedSnack =
       'Grupo excluído. Quem participava recebe reembolso integral.';

@@ -386,6 +386,7 @@ class SupabaseGroupRepository implements GroupRepository {
   }) async {
     try {
       await client.rpc('leave_group', params: {'p_group_id': groupId});
+      await _kickMemberRefund(groupId);
     } on PostgrestException catch (error) {
       return LeaveGroupFailure(
         leaveFailure(rpcText(code: error.code, message: error.message)),
@@ -459,6 +460,7 @@ class SupabaseGroupRepository implements GroupRepository {
         'remove_member',
         params: {'p_group_id': groupId, 'p_member_id': memberId},
       );
+      await _kickMemberRefund(groupId);
     } on PostgrestException catch (error) {
       return RemoveMemberFailure(
         removeFailure(rpcText(code: error.code, message: error.message)),
@@ -510,6 +512,18 @@ class SupabaseGroupRepository implements GroupRepository {
 
   /// Captura o cartão quando o grupo confirma ou lota.
   /// Se a chamada falhar, a rotina de reconcile tenta de novo.
+  /// Pede o estorno na PagBank. Se falhar, a reconciliação tenta de novo.
+  Future<void> _kickMemberRefund(String groupId) async {
+    try {
+      await client.functions.invoke(
+        'settle-charges',
+        body: {'group_id': groupId, 'member_refund': true},
+      );
+    } on Object {
+      // A saída já ficou na fila. O cron estorna.
+    }
+  }
+
   Future<void> _settleClosed(String groupId) async {
     try {
       await client.functions.invoke(
@@ -670,6 +684,7 @@ PaymentStatus paymentOf(String raw) {
 
 RefundStatus refundOf(String raw) {
   return switch (raw) {
+    'refund_pending' => RefundStatus.refundPending,
     'refunded' => RefundStatus.refunded,
     'denied' => RefundStatus.denied,
     _ => RefundStatus.none,

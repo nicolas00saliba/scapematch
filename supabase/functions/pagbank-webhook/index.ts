@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       const { data } = await admin
         .from("payment_charges")
         .select(
-          "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at",
+          "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at, refund_requested_at",
         )
         .eq("provider_ref", ref)
         .maybeSingle();

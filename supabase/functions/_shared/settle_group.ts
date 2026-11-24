@@ -35,6 +35,7 @@ type ChargeView = ChargeRow & {
   billing_type: string;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
+  refund_requested_at?: string | null;
   charged_amount_cents?: number | null;
   buyer_interest_cents?: number | null;
 };
@@ -112,13 +113,13 @@ export async function settleGroup(
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, charged_amount_cents, buyer_interest_cents, commission_bps, status, provider_ref, billing_type, provider_split_id, custody_released_at",
+      "id, group_id, user_id, venue_id, amount_cents, charged_amount_cents, buyer_interest_cents, commission_bps, status, provider_ref, billing_type, provider_split_id, custody_released_at, refund_requested_at",
     )
     .eq("group_id", groupId);
 
   for (const charge of charges ?? []) {
     const item = charge as ChargeView;
-    if (!item.provider_ref) continue;
+    if (!item.provider_ref || item.refund_requested_at) continue;
     if (item.status === "authorized" && item.billing_type === "CREDIT_CARD") {
       await captureAuthorizedCard(admin, pagbank, item);
       continue;

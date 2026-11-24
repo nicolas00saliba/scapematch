@@ -967,11 +967,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     if (preview == null || me == null || me.occupiesSeat) {
       return null;
     }
-    final refunded = me.refund == RefundStatus.refunded;
+    final refunded = _moneyBack(me.refund);
     if (refunded == preview) {
       return null;
     }
     return GroupMessages.leavePreviewChanged(refunded: refunded);
+  }
+
+  bool _moneyBack(RefundStatus? status) {
+    return status == RefundStatus.refunded ||
+        status == RefundStatus.refundPending;
   }
 
   Participant? _local(Group group) {
@@ -989,7 +994,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         me?.refundReason == RefundReason.holdReleased) {
       return GroupMessages.holdReleased;
     }
-    final refunded = me?.refund == RefundStatus.refunded;
+    final refunded = _moneyBack(me?.refund);
     if (refunded != previewRefunds) {
       return GroupMessages.leavePreviewChanged(refunded: refunded);
     }

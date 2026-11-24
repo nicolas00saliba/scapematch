@@ -15,6 +15,7 @@ type Charge = ChargeRow & {
   provider_ref: string | null;
   billing_type: string;
   charged_amount_cents?: number | null;
+  refund_requested_at?: string | null;
 };
 
 /// Estorna o que já foi pago. Pix pendente sai com DELETE. A pré-autorização
@@ -27,7 +28,7 @@ export async function releaseCancelledCharges(
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, charged_amount_cents, commission_bps, status, provider_ref, billing_type",
+      "id, group_id, user_id, venue_id, amount_cents, charged_amount_cents, commission_bps, status, provider_ref, billing_type, refund_requested_at",
     )
     .eq("group_id", groupId);
 
@@ -35,6 +36,10 @@ export async function releaseCancelledCharges(
   for (const charge of charges ?? []) {
     const row = charge as Charge;
     if (!row.provider_ref) continue;
+    if (row.refund_requested_at) {
+      stillPending.push(row.id);
+      continue;
+    }
     if (
       row.status === "refunded" || row.status === "cancelled" ||
       row.status === "failed"

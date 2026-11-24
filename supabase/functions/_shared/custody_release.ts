@@ -17,6 +17,7 @@ export type CustodyCharge = {
   venue_id?: string | null;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
+  refund_requested_at?: string | null;
   custody_release_attempts?: number | null;
   created_at?: string | null;
 };
@@ -71,6 +72,7 @@ export async function releaseHeldSplit(
   pagbank: CustodyClient,
   charge: CustodyCharge,
 ): Promise<boolean> {
+  if (charge.refund_requested_at) return false;
   const id = (charge.provider_split_id ?? "").trim();
   if (!id || !charge.id || charge.custody_released_at) return false;
   try {
@@ -147,7 +149,7 @@ export async function retryPendingCustodyReleases(
   const { data, error } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, provider_split_id, status, custody_released_at, custody_release_attempts, created_at, groups!inner(confirmed_at, closed_at, cancelled_at)",
+      "id, group_id, provider_split_id, status, custody_released_at, custody_release_attempts, refund_requested_at, created_at, groups!inner(confirmed_at, closed_at, cancelled_at)",
     )
     .eq("status", "paid")
     .is("custody_released_at", null)
@@ -164,7 +166,7 @@ export async function retryPendingCustodyReleases(
   let released = 0;
   for (const row of data) {
     const charge = row as CustodyCharge & { group_id?: string };
-    if (!charge.group_id) continue;
+    if (!charge.group_id || charge.refund_requested_at) continue;
     if ((charge.custody_release_attempts ?? 0) >= maxCustodyReleaseAttempts) {
       continue;
     }

@@ -36,6 +36,7 @@ export type NoticeCharge = {
   provider_ref: string | null;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
+  refund_requested_at?: string | null;
 };
 
 /// null = o status não move a cobrança.
@@ -157,7 +158,7 @@ export async function pollPendingPagBankCharges(
   const { data, error } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at, created_at",
+      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at, refund_requested_at, created_at",
     )
     .eq("status", "pending")
     .not("provider_ref", "is", null)
