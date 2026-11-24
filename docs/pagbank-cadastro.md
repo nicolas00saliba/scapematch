@@ -8,6 +8,16 @@ Quando a flag `pagbank_signup_settings.api_enabled` liga, o Parceiro passa sozin
 
 O titular ainda ativa a conta no aplicativo PagBank (documento, selfie e senha) e a casa autoriza o Connect.
 
+## Páginas que a PagBank enviou
+
+A [introdução das APIs](https://developer.pagbank.com.br/docs/apis-pagbank) separa três serviços que esta jornada usa em sequência. A [API de Cadastro](https://developer.pagbank.com.br/docs/cadastro-de-clientes) cria a conta de terceiro. O Connect liga essa conta à aplicação. A API de Pedido divide o pagamento. O modo A manda a casa para a página oficial porque a API de Cadastro ainda não está liberada. O modo B chama `POST /accounts` e, em seguida, pede o Connect. O PagVendas não entra nesse caminho.
+
+[PagVendas](https://pagbank.com.br/para-seu-negocio/pagvendas/) é o aplicativo de frente de caixa, estoque e nota da própria casa. A pergunta “onde recebo os valores” responde que o dinheiro cai na conta digital PagBank e fica disponível para usar. É o mesmo destino do split depois da custódia: a conta da casa, com Pix manual no app PagBank. O EscapeMatch não abre o PagVendas nem pede cadastro lá.
+
+A página [Configurando o Split](https://developer.pagbank.com.br/docs/config-split) instala o módulo Magento (`pagbank/split-magento`). Esse módulo não se aplica. O trecho que vale para o pedido é o objeto `splits`: `method` `FIXED`, `receivers` com `account.id` e `amount.value`, e a soma dos valores igual ao total pago. `fixedSplit` recusa a cobrança se a soma não fechar. Cada recebedor sai com `configurations.custody.apply = true`, então casa e EscapeMatch ficam HELD até a confirmação do grupo. Sem `release.scheduled`, a PagBank libera sozinha em 90 dias. A confirmação libera antes, pelo endpoint abaixo.
+
+[Liberar divisão de pagamento com custódia](https://developer.pagbank.com.br/reference/liberar-divisao-de-pagamento-com-custodia) é `POST /splits/{id}/custody/release` em `https://api.pagseguro.com` (sandbox em `https://sandbox.api.pagseguro.com`). Não usa o host do Connect. O corpo manda `receivers[].account.id` da casa e da EscapeMatch. Só o dono da transação libera: a chamada usa o token da conta que criou o pedido. Resposta vazia com HTTP 200 é sucesso. O limite publicado é 500 liberações a cada 5 minutos. Depois disso o valor fica na conta PagBank de cada recebedor.
+
 ## Sonda
 
 A cada 6 horas, no minuto 15 (`15 */6 * * *`), `private.invoke_pagbank_signup_probe()` chama `pagbank-signup-probe`. Sem os itens `pagbank_signup_probe_url` e `pagbank_signup_probe_secret` no Vault, a função não posta e grava o evento `config_ausente`. A URL só é aceita se for `https://<ref>.supabase.co/functions/v1/pagbank-signup-probe`.

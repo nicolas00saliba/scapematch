@@ -319,7 +319,7 @@ abstract final class PartnerMessages {
   static const withdrawalCancelled = 'Cancelado';
   static const withdrawalManual = 'Manual';
   static const withdrawalAutomatic = 'Automático';
-  static const documentsTitle = 'Documentos da subconta';
+  static const documentsTitle = 'Documentos da conta PagBank';
   static const documentsBody =
       'Os documentos aprovados liberam a conta PagBank da casa. O valor fica disponível na sua conta PagBank.';
   static const documentsApproved = 'Documentos e conta aprovados';
