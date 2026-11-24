@@ -109,6 +109,9 @@ echo "ledger reconcile ok"
 # supabase/migrations/20261113200000_venue_claim_official.sql
 run -f "$root/tests/venue_claim_official.sql"
 echo "venue claim official ok"
+# supabase/migrations/20261124190000_test_accounts.sql
+run -f "$root/tests/test_accounts.sql"
+echo "test accounts ok"
 run -f "$root/tests/reward_rules_20261124.sql"
 echo "reward rules 20261124 ok"
 run -f "$root/tests/platform_cac.sql"
