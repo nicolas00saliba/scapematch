@@ -10,11 +10,19 @@
 import { logCaught } from "./pagbank_client_error.ts";
 import { captureAmountCents } from "./pagbank_rules.ts";
 import { applyPaymentTransition } from "./ledger.ts";
+import { reconcilePagBankTimeoutMs } from "./reconcile_payments.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
 
 export const maxMemberRefundAttempts = 8;
+
+/// Igual ao interval '90 seconds' de claim_member_refunds.
+export const memberRefundLeaseMs = 90_000;
+
+if (reconcilePagBankTimeoutMs * 4 >= memberRefundLeaseMs) {
+  throw new Error("timeout do PagBank perto do lease do estorno");
+}
 
 type RefundClient = {
   getPayment(id: string): Promise<{ status: string }>;
@@ -34,6 +42,7 @@ type QueueRow = {
   action: string;
   status: string;
   attempts: number;
+  lease_until?: string | null;
 };
 
 type Charge = {
@@ -87,19 +96,14 @@ export async function processMemberRefunds(
   pagbank: RefundClient,
   filter?: { groupId?: string; userId?: string },
 ): Promise<MemberRefundResult> {
-  if (typeof admin?.from !== "function") return { done: 0, pending: 0 };
-  let query = admin
-    .from("member_refund_queue")
-    .select("id, charge_id, group_id, user_id, action, status, attempts")
-    .eq("status", "queued")
-    .lt("attempts", maxMemberRefundAttempts);
+  if (typeof admin?.rpc !== "function") return { done: 0, pending: 0 };
   const groupId = filter?.groupId ?? "";
   const userId = filter?.userId ?? "";
-  if (groupId) query = query.eq("group_id", groupId);
-  if (userId) query = query.eq("user_id", userId);
-  const { data, error } = await query
-    .order("created_at", { ascending: true })
-    .limit(20);
+  const { data, error } = await admin.rpc("claim_member_refunds", {
+    p_limit: 20,
+    p_group_id: groupId || null,
+    p_user_id: userId || null,
+  });
   if (error || !Array.isArray(data)) return { done: 0, pending: 0 };
 
   let done = 0;
@@ -112,21 +116,16 @@ export async function processMemberRefunds(
   return { done, pending };
 }
 
+function leaseOpen(row: QueueRow, now = Date.now()): boolean {
+  const until = Date.parse(row.lease_until ?? "");
+  return Number.isFinite(until) && until > now;
+}
+
 async function refundOne(
   admin: Admin,
   pagbank: RefundClient,
   row: QueueRow,
 ): Promise<boolean> {
-  const claimed = await admin
-    .from("member_refund_queue")
-    .update({ attempts: row.attempts + 1 })
-    .eq("id", row.id)
-    .eq("status", "queued")
-    .eq("attempts", row.attempts)
-    .select("id");
-  if (claimed.error || !Array.isArray(claimed.data) || claimed.data.length === 0) {
-    return false;
-  }
   try {
     const { data, error } = await admin
       .from("payment_charges")
@@ -140,6 +139,12 @@ async function refundOne(
     const ref = (charge.provider_ref ?? "").trim();
     if (!ref) throw new Error("erro");
     const remote = await pagbank.getPayment(ref);
+    const kind = remoteKind(remote.status);
+    // Timeout com a cobrança ainda paga: não reenvia neste lease.
+    // O próximo claim só existe depois que o prazo volta a fila.
+    if (kind !== "refunded" && kind !== "cancelled" && !leaseOpen(row)) {
+      return false;
+    }
     const next = await moveRemote(pagbank, charge, ref, remote.status);
     if (!next) return false;
     const transition = await applyPaymentTransition(admin, charge.id, next, false);
@@ -148,15 +153,20 @@ async function refundOne(
     }
     const finished = await admin
       .from("member_refund_queue")
-      .update({ status: "done", done_at: new Date().toISOString() })
+      .update({
+        status: "done",
+        done_at: new Date().toISOString(),
+        lease_until: null,
+      })
       .eq("id", row.id)
-      .eq("status", "queued")
+      .eq("status", "processing")
+      .eq("lease_until", row.lease_until ?? "")
       .select("id");
     return !finished.error && Array.isArray(finished.data) &&
       finished.data.length > 0;
   } catch (error) {
     logCaught("member_refund", error);
-    if (row.attempts + 1 >= maxMemberRefundAttempts) {
+    if (row.attempts >= maxMemberRefundAttempts) {
       logCaught("member_refund_exhausted", error);
     }
     return false;

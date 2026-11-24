@@ -1,8 +1,10 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   memberRefundActor,
+  memberRefundLeaseMs,
   processMemberRefunds,
 } from "./member_refund.ts";
+import { reconcilePagBankTimeoutMs } from "./reconcile_payments.ts";
 
 type QueueRow = {
   id: string;
@@ -13,6 +15,7 @@ type QueueRow = {
   status: string;
   attempts: number;
   created_at: string;
+  lease_until: string | null;
 };
 
 type Charge = {
@@ -38,6 +41,30 @@ function adminFor(store: Store) {
       return new Query(table, store);
     },
     rpc(name: string, args: Record<string, unknown>) {
+      if (name === "claim_member_refunds") {
+        const now = Date.now();
+        for (const row of store.queue) {
+          const until = Date.parse(row.lease_until ?? "");
+          if (row.status === "processing" && until <= now) {
+            row.status = "queued";
+            row.lease_until = null;
+          }
+        }
+        const limit = Number(args.p_limit ?? 20);
+        const picked = store.queue.filter((row) => {
+          if (row.status !== "queued" || row.attempts >= 8) return false;
+          if (args.p_group_id && row.group_id !== args.p_group_id) return false;
+          if (args.p_user_id && row.user_id !== args.p_user_id) return false;
+          return true;
+        }).slice(0, limit);
+        const until = new Date(now + memberRefundLeaseMs).toISOString();
+        for (const row of picked) {
+          row.status = "processing";
+          row.lease_until = until;
+          row.attempts += 1;
+        }
+        return Promise.resolve({ data: picked, error: null });
+      }
       if (name === "apply_payment_transition") {
         const id = String(args.p_charge_id);
         const next = String(args.p_next_status);
@@ -161,6 +188,7 @@ function queued(chargeId: string, action: string): QueueRow {
     status: "queued",
     attempts: 0,
     created_at: "2026-11-24T00:00:00Z",
+    lease_until: null,
   };
 }
 
@@ -283,8 +311,16 @@ Deno.test("falha da PagBank não marca refunded e a repetição estorna uma vez"
   const failed = await processMemberRefunds(adminFor(store), client);
   assertEquals(failed, { done: 0, pending: 1 });
   assertEquals(store.charges[0].status, "paid");
-  assertEquals(store.queue[0].status, "queued");
+  assertEquals(store.queue[0].status, "processing");
+  assert(Date.parse(store.queue[0].lease_until ?? "") > Date.now());
   assertEquals(store.queue[0].attempts, 1);
+  const early = await processMemberRefunds(adminFor(store), client);
+  assertEquals(early, { done: 0, pending: 0 });
+  assertEquals(
+    client.calls.filter((call) => call.startsWith("refund:")).length,
+    1,
+  );
+  store.queue[0].lease_until = new Date(Date.now() - 1000).toISOString();
   client.release();
   const retried = await processMemberRefunds(adminFor(store), client);
   assertEquals(retried, { done: 1, pending: 0 });
@@ -293,6 +329,27 @@ Deno.test("falha da PagBank não marca refunded e a repetição estorna uma vez"
     "refund:10000",
   ]);
   assertEquals(store.transitions, ["pix:refunded"]);
+});
+
+Deno.test("GET ainda PAID no meio do lease não reenvia o estorno", async () => {
+  const remote: Record<string, Remote> = { CHAR_pix: { status: "PAID" } };
+  const store: Store = {
+    queue: [queued("pix", "refund")],
+    charges: [charge({ id: "pix", provider_ref: "CHAR_pix" })],
+    transitions: [],
+  };
+  const client = bank({ remote });
+  const original = client.getPayment.bind(client);
+  client.getPayment = (id: string) => {
+    const reading = original(id);
+    store.queue[0].lease_until = new Date(Date.now() - 1000).toISOString();
+    return reading;
+  };
+  const held = await processMemberRefunds(adminFor(store), client);
+  assertEquals(held, { done: 0, pending: 1 });
+  assertEquals(client.calls.filter((call) => call.startsWith("refund:")), []);
+  assertEquals(store.charges[0].status, "paid");
+  assert(reconcilePagBankTimeoutMs * 4 < memberRefundLeaseMs);
 });
 
 Deno.test("cobrança já estornada não chama a PagBank de novo", async () => {

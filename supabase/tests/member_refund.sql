@@ -171,6 +171,135 @@ insert into public.scape_point_entries (
 );
 
 do $$
+declare
+  v_first jsonb;
+  v_second jsonb;
+  v_third jsonb;
+begin
+  v_first := private.claim_member_refunds(
+    20, 'fa400000-0000-4000-8000-000000000001', null
+  );
+  if jsonb_array_length(v_first) <> 1
+    or (v_first -> 0 ->> 'status') is distinct from 'processing'
+    or (v_first -> 0 ->> 'lease_until') is null
+    or (
+      select status from public.member_refund_queue
+      where charge_id = 'fa500000-0000-4000-8000-000000000001'
+    ) is distinct from 'processing'
+  then
+    raise exception 'claim nao segurou a fila';
+  end if;
+  v_second := private.claim_member_refunds(
+    20, 'fa400000-0000-4000-8000-000000000001', null
+  );
+  if jsonb_array_length(v_second) <> 0 then
+    raise exception 'segundo claim pegou a mesma cobranca';
+  end if;
+  update public.member_refund_queue
+  set lease_until = pg_catalog.now() - interval '1 second'
+  where charge_id = 'fa500000-0000-4000-8000-000000000001';
+  v_third := private.claim_member_refunds(
+    20, 'fa400000-0000-4000-8000-000000000001', null
+  );
+  if jsonb_array_length(v_third) <> 1
+    or (
+      select attempts from public.member_refund_queue
+      where charge_id = 'fa500000-0000-4000-8000-000000000001'
+    ) is distinct from 2
+  then
+    raise exception 'lease vencido nao voltou para a fila';
+  end if;
+  update public.member_refund_queue
+  set status = 'queued', lease_until = null, attempts = 0
+  where charge_id = 'fa500000-0000-4000-8000-000000000001';
+end $$;
+
+insert into public.room_sessions (id, room_id, starts_at, availability)
+values (
+  'fa310000-0000-4000-8000-000000000004',
+  'fa300000-0000-4000-8000-000000000001',
+  now() + interval '7 hours',
+  'partner_grid'
+);
+
+insert into public.groups (
+  id, city_id, venue_id, room_id, session_id, starts_at,
+  total_spots, minimum_spots, price_cents, created_by, confirmed_at
+) values (
+  'fa400000-0000-4000-8000-000000000004', 'curitiba',
+  'fa200000-0000-4000-8000-000000000001',
+  'fa300000-0000-4000-8000-000000000001',
+  'fa310000-0000-4000-8000-000000000004',
+  now() + interval '7 hours', 4, 2, 10000,
+  'fa100000-0000-4000-8000-000000000001', now()
+);
+
+insert into public.group_members (
+  id, group_id, user_id, display_name, is_creator, payment_status
+) values (
+  'fa410000-0000-4000-8000-000000000004',
+  'fa400000-0000-4000-8000-000000000004',
+  'fa100000-0000-4000-8000-000000000001', 'Org', true, 'paid'
+), (
+  'fa410000-0000-4000-8000-000000000014',
+  'fa400000-0000-4000-8000-000000000004',
+  'fa100000-0000-4000-8000-000000000002', 'Jog', false, 'paid'
+);
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  provider, provider_ref, idempotency_key, wallet_id, commission_bps,
+  paid_at, attempt_id
+) values (
+  'fa500000-0000-4000-8000-000000000004',
+  'fa400000-0000-4000-8000-000000000004',
+  'fa100000-0000-4000-8000-000000000002',
+  'fa200000-0000-4000-8000-000000000001',
+  10000, 'PIX', 'paid', 'pagbank', null,
+  'idem-fa-sem-ref', 'wal', 1000, now(),
+  'fa510000-0000-4000-8000-000000000004'
+);
+
+do $$
+begin
+  perform set_config(
+    'request.jwt.claim.sub', 'fa100000-0000-4000-8000-000000000002', true
+  );
+  perform public.leave_group('fa400000-0000-4000-8000-000000000004');
+  if (
+    select refund_status from public.group_members
+    where id = 'fa410000-0000-4000-8000-000000000014'
+  ) is distinct from 'refund_pending' or exists (
+    select 1 from public.member_refund_queue
+    where charge_id = 'fa500000-0000-4000-8000-000000000004'
+  ) then
+    raise exception 'sem pagbank marcou refunded';
+  end if;
+
+  perform set_config(
+    'request.jwt.claim.sub', 'fa100000-0000-4000-8000-000000000001', true
+  );
+  update public.payment_charges
+  set provider_ref = null
+  where id = 'fa500000-0000-4000-8000-000000000003';
+  delete from public.member_refund_queue
+  where charge_id = 'fa500000-0000-4000-8000-000000000003';
+  update public.group_members
+  set attendance = 'confirmed', refund_status = 'none', payment_status = 'paid'
+  where id = 'fa410000-0000-4000-8000-000000000013';
+  perform public.remove_member(
+    'fa400000-0000-4000-8000-000000000003',
+    'fa410000-0000-4000-8000-000000000013'
+  );
+  if (
+    select refund_status from public.group_members
+    where id = 'fa410000-0000-4000-8000-000000000013'
+  ) is distinct from 'refund_pending' then
+    raise exception 'remocao sem fila marcou refunded';
+  end if;
+end $$;
+
+do $$
 begin
   perform private.apply_payment_transition(
     'fa500000-0000-4000-8000-000000000001', 'paid', false

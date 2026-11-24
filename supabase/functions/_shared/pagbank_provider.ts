@@ -1020,6 +1020,10 @@ export class PagBankProvider {
     return id;
   }
 
+  /// Cancelar pagamento (POST /charges/{id}/cancel) não documenta header
+  /// de idempotência. `x-idempotency-key` está em Criar estorno de
+  /// pagamento recorrente (PAYM_), não neste recurso. O erro 40005 de
+  /// Pedidos não nomeia o header do cancelamento. A fila usa lease.
   #cancelCharge(
     paymentId: string,
     amountCents = 0,

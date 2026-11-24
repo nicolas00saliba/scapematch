@@ -14,28 +14,38 @@ import {
   memberRefundActor,
   processMemberRefunds,
 } from "../_shared/member_refund.ts";
+import { reconcilePagBankTimeoutMs } from "../_shared/reconcile_payments.ts";
 
-Deno.serve(async (req) => {
+// deno-lint-ignore no-explicit-any
+type Admin = any;
+
+type SettleDeps = {
+  user?: { id: string } | null;
+  admin?: Admin;
+  pagbank?: PagBankProvider;
+};
+
+export async function handleSettle(
+  req: Request,
+  deps?: SettleDeps,
+): Promise<Response> {
   const json = bindJson(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeadersFor(req, Deno.env) });
   }
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
-    const url = Deno.env.get("SUPABASE_URL") ?? "";
-    const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const userClient = createClient(url, anon, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData } = await userClient.auth.getUser();
-    if (!userData.user) return json({ error: "not authenticated" }, 401);
+    const user = await settleUser(req, authHeader, deps);
+    if (!user) return json({ error: "not authenticated" }, 401);
 
-    const admin = createClient(url, service);
+    const admin = deps?.admin ?? createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
     const { data: adminLookup } = await admin
       .from("admins")
       .select("user_id")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", user.id)
       .maybeSingle();
     const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
     const body = await req.json().catch(() => ({})) as {
@@ -43,17 +53,18 @@ Deno.serve(async (req) => {
       sweep?: boolean;
       member_refund?: boolean;
     };
+    const pagbank = deps?.pagbank ??
+      PagBankProvider.fromEnv(Deno.env, reconcilePagBankTimeoutMs);
     if (body.member_refund) {
       const groupId = body.group_id ?? "";
       if (!groupId) return json({ error: "group_id obrigatório" }, 400);
       const scope = await memberRefundActor(
         admin,
         groupId,
-        userData.user.id,
+        user.id,
         Boolean(adminRow),
       );
       if (!scope) return json({ error: "not member" }, 403);
-      const pagbank = PagBankProvider.fromEnv(Deno.env);
       const refunds = await processMemberRefunds(admin, pagbank, {
         groupId,
         userId: scope.userId,
@@ -80,20 +91,36 @@ Deno.serve(async (req) => {
       return json({ error: "group_id obrigatório" }, 400);
     }
 
-    const pagbank = PagBankProvider.fromEnv(Deno.env);
     const settled: string[] = [];
     for (const groupId of ids) {
       const allowed = await maySettle(
         admin,
         groupId,
-        userData.user.id,
+        user.id,
         Boolean(adminRow),
       );
       if (!allowed) continue;
       await settleGroup(admin, pagbank, groupId);
       settled.push(groupId);
+      if (!body.sweep) {
+        const scope = await memberRefundActor(
+          admin,
+          groupId,
+          user.id,
+          Boolean(adminRow),
+        );
+        if (scope) {
+          await processMemberRefunds(admin, pagbank, {
+            groupId,
+            userId: scope.userId,
+          });
+        }
+      }
     }
-    await processMemberRefunds(admin, pagbank);
+    if (body.sweep) await processMemberRefunds(admin, pagbank);
+    if (!body.sweep && ids.length === 1 && settled.length === 0) {
+      return json({ error: "not member" }, 403);
+    }
     await pollPendingPagBankCharges(admin, pagbank, Deno.env);
     await retryPendingCustodyReleases(admin, pagbank);
     return json({ settled });
@@ -101,4 +128,23 @@ Deno.serve(async (req) => {
     const failure = clientFailure(error, "settle-charges");
     return json(failure.body, failure.status);
   }
-});
+}
+
+async function settleUser(
+  req: Request,
+  authHeader: string,
+  deps?: SettleDeps,
+): Promise<{ id: string } | null> {
+  if (deps && "user" in deps) return deps.user ?? null;
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data } = await userClient.auth.getUser();
+  return data.user ? { id: data.user.id } : null;
+}
+
+if (import.meta.main) {
+  Deno.serve((req) => handleSettle(req));
+}
