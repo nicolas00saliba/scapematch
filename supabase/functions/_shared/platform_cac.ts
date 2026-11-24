@@ -6,8 +6,6 @@
 // valor, inclusive vazio, não fala com o PagBank.
 
 import {
-  pagbankApiBaseUrl,
-  pagbankOrderNotificationUrl,
   pagbankProductionBaseUrl,
   pagbankSandboxBaseUrl,
   type PagBankFetch,
@@ -40,8 +38,16 @@ type CacRpc = (
   args: Record<string, unknown>,
 ) => Promise<{ data: unknown; error: { message: string } | null }>;
 
+function readEnv(env: CacEnv, name: string): string {
+  try {
+    return (env.get(name) ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
 export function cacTransfersEnabled(env: CacEnv): boolean {
-  return (env.get("PAGBANK_CAC_TRANSFERS") ?? "").trim() === "on";
+  return readEnv(env, "PAGBANK_CAC_TRANSFERS") === "on";
 }
 
 /// O POST /transfers P2P não usa o host de pedidos.
@@ -231,16 +237,21 @@ export function pagbankCacClient(
   env: CacEnv,
   fetchFn: PagBankFetch = fetch,
 ): CacTransferClient {
-  const token = (env.get("PAGBANK_TOKEN") ?? "").trim();
-  const api = pagbankApiBaseUrl(env);
+  const token = readEnv(env, "PAGBANK_TOKEN");
+  const api = readEnv(env, "PAGBANK_ENV").toLowerCase() === "sandbox"
+    ? pagbankSandboxBaseUrl
+    : pagbankProductionBaseUrl;
   const secure = secureTransferBase(api);
+  const project = readEnv(env, "SUPABASE_URL").replace(/\/$/, "");
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: "application/json",
     "User-Agent": "EscapeMatch",
   };
   return {
-    notificationUrl: pagbankOrderNotificationUrl(env),
+    notificationUrl: project.startsWith("https://")
+      ? `${project}/functions/v1/pagbank-webhook`
+      : "",
     async balanceCents() {
       if (!token) return null;
       const response = await fetchFn(`${api}/accounts/balance`, {
