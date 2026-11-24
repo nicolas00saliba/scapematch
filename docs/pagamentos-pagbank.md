@@ -40,7 +40,9 @@ Não gravar:
 - `PAGBANK_BASE_URL`: não escolhe o host.
 - `PAGBANK_WEBHOOK_EMAIL`: a PagBank não pede e-mail no webhook de Pedidos. O saque está desligado e não cadastra webhook.
 
-O saque pelo EscapeMatch continua desligado (`venuePayoutsForcedOff`). A casa recebe na conta PagBank do Connect. Para o banco dela, a pessoa liga a Transferência Automática no PagBank, numa conta de qualquer banco com o mesmo CNPJ ou CPF. A API documentada não cadastra essa conta nem transfere com o token da casa. A tela do Parceiro explica o passo a passo e não pede dados bancários. `venue_finance_ready` é aprovada, não suspensa e com `pagbank_account_id`. Não exige `venue_bank_accounts`.
+O saque pelo EscapeMatch continua desligado (`venuePayoutsForcedOff`). A casa recebe na conta PagBank do Connect. O valor fica disponível na conta PagBank da casa. O Pix para outro banco é manual, no app do PagBank. A tela do Parceiro explica isso e não pede dados bancários. `venue_finance_ready` é aprovada, não suspensa e com `pagbank_account_id`. Não exige `venue_bank_accounts`.
+
+O cadastro da conta da casa está em [pagbank-cadastro.md](pagbank-cadastro.md). Enquanto a API de Cadastro não estiver liberada, a casa cria a conta em `https://cadastro.pagbank.com.br/` e conecta pelo fluxo abaixo.
 
 ## Ordem para publicar
 

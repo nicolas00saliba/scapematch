@@ -48,6 +48,9 @@ abstract class AdminApi {
   Future<void> setVenueContacts(String venueId, String email, String phone);
   Future<PaymentsBoard> payments();
   Future<bool> setVenuePayoutsEnabled(bool enabled);
+  Future<PagbankSignupSettings> pagbankSignupSettings();
+  Future<void> disablePagbankSignup();
+  Future<void> releasePagbankSignupHold();
   Future<DivergenceBoard> divergences();
 }
 
@@ -359,6 +362,24 @@ class WebhookErrorLine {
   final String code;
   final String providerRef;
   final DateTime? when;
+}
+
+class PagbankSignupSettings {
+  const PagbankSignupSettings({
+    required this.apiEnabled,
+    required this.heldOff,
+    required this.lastProbeCode,
+  });
+
+  final bool apiEnabled;
+  final bool heldOff;
+  final String lastProbeCode;
+
+  static const off = PagbankSignupSettings(
+    apiEnabled: false,
+    heldOff: false,
+    lastProbeCode: '',
+  );
 }
 
 class PaymentsBoard {
@@ -944,6 +965,26 @@ class SupabaseAdminApi implements AdminApi {
       'p_enabled': enabled,
     });
     return value == true;
+  }
+
+  @override
+  Future<PagbankSignupSettings> pagbankSignupSettings() async {
+    final row = _map(await _rpc('admin_pagbank_signup_settings'));
+    return PagbankSignupSettings(
+      apiEnabled: row['api_enabled'] == true,
+      heldOff: row['held_off'] == true,
+      lastProbeCode: _text(row['last_probe_code']),
+    );
+  }
+
+  @override
+  Future<void> disablePagbankSignup() async {
+    await _rpc('admin_disable_pagbank_signup');
+  }
+
+  @override
+  Future<void> releasePagbankSignupHold() async {
+    await _rpc('admin_release_pagbank_signup_hold');
   }
 
   @override
@@ -1538,6 +1579,31 @@ class MemoryAdminApi implements AdminApi {
       'enabled:$enabled',
     );
     return enabled;
+  }
+
+  PagbankSignupSettings signupSettings = PagbankSignupSettings.off;
+
+  @override
+  Future<PagbankSignupSettings> pagbankSignupSettings() async => signupSettings;
+
+  @override
+  Future<void> disablePagbankSignup() async {
+    signupSettings = PagbankSignupSettings(
+      apiEnabled: false,
+      heldOff: true,
+      lastProbeCode: signupSettings.lastProbeCode,
+    );
+    _note('disable_pagbank_signup', '1', 'held_off');
+  }
+
+  @override
+  Future<void> releasePagbankSignupHold() async {
+    signupSettings = PagbankSignupSettings(
+      apiEnabled: signupSettings.apiEnabled,
+      heldOff: false,
+      lastProbeCode: signupSettings.lastProbeCode,
+    );
+    _note('release_pagbank_signup_hold', '1', 'hold_cleared');
   }
 
   @override
