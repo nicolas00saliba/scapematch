@@ -111,3 +111,6 @@ run -f "$root/tests/venue_claim_official.sql"
 echo "venue claim official ok"
 run -f "$root/tests/pagbank_signup.sql"
 echo "pagbank signup ok"
+# supabase/migrations/20261124190000_test_accounts.sql
+run -f "$root/tests/test_accounts.sql"
+echo "test accounts ok"
