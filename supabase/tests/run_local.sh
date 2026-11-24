@@ -121,3 +121,6 @@ run -f "$root/tests/platform_cac.sql"
 echo "platform cac ok"
 run -f "$root/tests/reward_rules_public.sql"
 echo "reward rules public ok"
+# supabase/migrations/20261124220000_test_account_duplicate_exception.sql
+run -f "$root/tests/test_account_duplicate_exception.sql"
+echo "test account duplicate exception ok"
