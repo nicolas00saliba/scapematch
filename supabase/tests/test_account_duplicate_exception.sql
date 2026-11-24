@@ -1,5 +1,6 @@
--- Conta real continua bloqueada no documento e na conta PagBank.
--- Conta is_test cria a casa. Usuário comum não vira teste.
+-- Conta real continua bloqueada entre si no documento e na conta PagBank.
+-- Conta is_test cria a casa e não bloqueia a casa real nos dois sentidos.
+-- Usuário comum não vira teste.
 -- supabase/migrations/20261124223000_test_account_duplicate_exception.sql
 
 \set ON_ERROR_STOP on
@@ -146,7 +147,8 @@ begin
   end if;
 end $$;
 
--- Documento que só a casa de teste usa continua bloqueando conta real.
+-- Documento que só a casa de teste usa não bloqueia a casa real
+-- e não aparece para reivindicar.
 begin;
 select set_config('request.jwt.claim.sub', 'f1a33333-3333-4333-8333-333333333333', true);
 select set_config('request.jwt.claim.aal', 'aal1', true);
@@ -168,6 +170,44 @@ update public.venues
 set status = 'approved', claimed_at = null
 where id = 'f1b44444-4444-4444-8444-444444444444';
 
+-- Trocar o documento da casa real para o da casa de teste também passa.
+update public.venues
+set document_number = '42424242424'
+where id = 'f1b11111-1111-4111-8111-111111111111';
+update public.venues
+set document_number = '41414141414'
+where id = 'f1b11111-1111-4111-8111-111111111111';
+
+begin;
+select set_config('request.jwt.claim.sub', 'f1a22222-2222-4222-8222-222222222222', true);
+select set_config('request.jwt.claim.aal', 'aal1', true);
+set local role authenticated;
+do $$
+declare
+  v_found jsonb;
+  v_rows integer;
+begin
+  v_found := public.find_claimable_venue('42424242424');
+  if v_found is distinct from '{"path":"none"}'::jsonb then
+    raise exception 'conta real recebeu oferta da casa de teste: %', v_found;
+  end if;
+
+  select count(*)
+    into v_rows
+  from public.check_venue_duplicates(
+    '42424242424', 'Casa Teste Sozinha', 'curitiba', '80010013', '13'
+  );
+  if v_rows <> 0 then
+    raise exception 'conta real ainda vê a casa de teste no dedupe';
+  end if;
+end $$;
+reset role;
+commit;
+
+update public.venues
+set claimed_at = now()
+where id = 'f1b44444-4444-4444-8444-444444444444';
+
 begin;
 select set_config('request.jwt.claim.sub', 'f1a22222-2222-4222-8222-222222222222', true);
 select set_config('request.jwt.claim.aal', 'aal1', true);
@@ -177,27 +217,87 @@ declare
   v_found jsonb;
 begin
   v_found := public.find_claimable_venue('42424242424');
-  if v_found ->> 'path' is distinct from 'manual'
-    or v_found ->> 'name' is distinct from 'Casa Teste Sozinha'
-  then
-    raise exception 'conta real não reivindica casa de teste: %', v_found;
+  if v_found is distinct from '{"path":"none"}'::jsonb then
+    raise exception 'conta real recebeu already_claimed da casa de teste: %', v_found;
   end if;
+
+  insert into public.venues (
+    id, owner_id, city_id, name, neighborhood, street_address, address_number,
+    postal_code, latitude, longitude, income_value, document_kind,
+    document_number, phone
+  ) values (
+    'f1b55555-5555-4555-8555-555555555555',
+    'f1a22222-2222-4222-8222-222222222222',
+    'curitiba', 'Casa Real no CPF de teste', 'Centro', 'Rua Real', '14',
+    '80010014', -25.43, -49.27, 5000, 'cpf', '42424242424', '41911110005'
+  );
+end $$;
+reset role;
+commit;
+
+do $$
+begin
+  if (
+    select is_test from public.venues where id = 'f1b55555-5555-4555-8555-555555555555'
+  ) is distinct from false
+  or (
+    select is_test from public.venues where id = 'f1b44444-4444-4444-8444-444444444444'
+  ) is distinct from true
+  then
+    raise exception 'a casa real nasceu como teste ou a casa de teste sumiu';
+  end if;
+end $$;
+
+-- Com as duas casas no mesmo documento, a conta real reivindica a casa real.
+update public.venues
+set status = 'approved', claimed_at = null
+where id = 'f1b55555-5555-4555-8555-555555555555';
+
+begin;
+select set_config('request.jwt.claim.sub', 'f1a44444-4444-4444-8444-444444444444', true);
+select set_config('request.jwt.claim.aal', 'aal1', true);
+set local role authenticated;
+do $$
+declare
+  v_found jsonb;
+  v_type text;
+  v_name text;
+begin
+  v_found := public.find_claimable_venue('42424242424');
+  if v_found ->> 'path' is distinct from 'manual'
+    or v_found ->> 'name' is distinct from 'Casa Real no CPF de teste'
+  then
+    raise exception 'conta real não reivindicou a casa real: %', v_found;
+  end if;
+
+  select found.conflict_type, found.venue_name
+    into v_type, v_name
+  from public.check_venue_duplicates(
+    '42424242424', 'Outra Casa', 'curitiba', '01310000', '9'
+  ) found
+  where found.conflict_type = 'documento';
+  if v_type is distinct from 'documento'
+    or v_name is distinct from 'Casa Real no CPF de teste'
+  then
+    raise exception 'dedupe apontou para a casa de teste: % / %', v_type, v_name;
+  end if;
+
   begin
     insert into public.venues (
       id, owner_id, city_id, name, neighborhood, street_address, address_number,
       postal_code, latitude, longitude, income_value, document_kind,
       document_number, phone
     ) values (
-      'f1b55555-5555-4555-8555-555555555555',
-      'f1a22222-2222-4222-8222-222222222222',
-      'curitiba', 'Casa Real no CPF de teste', 'Centro', 'Rua Real', '14',
-      '80010014', -25.43, -49.27, 5000, 'cpf', '42424242424', '41911110005'
+      'f1b88888-8888-4888-8888-888888888888',
+      'f1a44444-4444-4444-8444-444444444444',
+      'curitiba', 'Segunda Real no CPF', 'Centro', 'Rua Real', '15',
+      '80010015', -25.43, -49.27, 5000, 'cpf', '42424242424', '41911110008'
     );
-    raise exception 'conta real passou no documento da casa de teste';
+    raise exception 'segunda conta real passou no documento da casa real';
   exception
     when unique_violation then
       if sqlerrm is distinct from 'duplicate document' then
-        raise exception 'mensagem mudou para a conta real: %', sqlerrm;
+        raise exception 'mensagem mudou entre casas reais: %', sqlerrm;
       end if;
   end;
 end $$;
@@ -364,6 +464,7 @@ delete from public.venues where id in (
   'f1b11111-1111-4111-8111-111111111111',
   'f1b33333-3333-4333-8333-333333333333',
   'f1b44444-4444-4444-8444-444444444444',
+  'f1b55555-5555-4555-8555-555555555555',
   'f1b77777-7777-4777-8777-777777777777'
 );
 delete from auth.users where id in (

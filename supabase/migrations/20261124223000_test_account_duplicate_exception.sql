@@ -1,7 +1,10 @@
 -- Conta de teste (profiles.is_test, só service_role ou admin aal2) cria
 -- outra casa com o mesmo documento, a mesma conta PagBank e a mesma
--- carteira antiga. Conta real segue no índice, na mensagem e na
--- reivindicação. O app não manda a exceção: o trigger lê o perfil.
+-- carteira antiga. Casa real só é comparada com casa real: o insert, a
+-- checagem e a reivindicação ignoram casa is_test. Casa de teste não
+-- aparece para reivindicar. Entre casas reais, índice, mensagem e
+-- reivindicação seguem iguais. O app não manda a exceção: o trigger lê
+-- o perfil.
 --
 -- Travas do cadastro da casa:
 -- * venues_document_digits_active_uidx
@@ -97,7 +100,6 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_test boolean;
-  v_see_test boolean;
 begin
   new.document_number := public.normalize_document(new.document_number);
   new.document_digits := new.document_number;
@@ -143,16 +145,8 @@ begin
     v_test := old.is_test;
   end if;
 
-  -- Insert de conta real continua vendo casa de teste. Update que não
-  -- troca o documento ignora a cópia de teste, senão ligar o PagBank
-  -- na casa real quebra depois que a conta de teste repetiu o CPF.
-  v_see_test := tg_op = 'INSERT';
-  if tg_op = 'UPDATE'
-    and new.document_digits is distinct from old.document_digits
-  then
-    v_see_test := true;
-  end if;
-
+  -- Casa real não vê casa de teste, no insert nem no update. A cópia
+  -- de teste do mesmo CPF não bloqueia o cadastro nem o PagBank.
   if not v_test
     and new.status not in ('rejected', 'merged')
     and new.document_digits is not null
@@ -162,7 +156,7 @@ begin
       where venue.document_digits = new.document_digits
         and venue.status not in ('rejected', 'merged')
         and venue.id is distinct from new.id
-        and (not venue.is_test or v_see_test)
+        and not venue.is_test
     ) then
     raise exception 'duplicate document' using errcode = '23505';
   end if;
@@ -255,6 +249,7 @@ begin
     from public.venues venue
     where venue.document_digits = v_digits
       and venue.status in ('pending', 'approved')
+      and not venue.is_test
     order by case when venue.status = 'approved' then 0 else 1 end, venue.created_at
     limit 1;
   end if;
@@ -267,6 +262,7 @@ begin
     venue.name
   from public.venues venue
   where venue.status = 'approved'
+    and not venue.is_test
     and char_length(v_cep) = 8
     and venue.postal_code = v_cep
     and venue.address_number_normalized = v_number
@@ -281,6 +277,7 @@ begin
     venue.name
   from public.venues venue
   where venue.status = 'approved'
+    and not venue.is_test
     and v_city is not null
     and venue.city_id = v_city
     and v_name <> ''
@@ -349,6 +346,7 @@ begin
   from public.venues venue
   where venue.document_digits = v_digits
     and venue.status not in ('rejected', 'merged')
+    and not venue.is_test
   order by case when venue.status = 'approved' then 0 else 1 end
   limit 1;
 
