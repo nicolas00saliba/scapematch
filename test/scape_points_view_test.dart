@@ -46,6 +46,7 @@ void main() {
     expect(LegalDocuments.termsBody, contains('1% desde o primeiro'));
     expect(LegalDocuments.termsBody, contains('0,5%'));
     expect(LegalDocuments.termsBody, contains('20% de desconto'));
+    expect(LegalDocuments.termsBody, contains('sem código tem 10%'));
     expect(LegalDocuments.termsBody, contains('5% a partir de 8'));
   });
 
@@ -63,6 +64,11 @@ void main() {
     expect(find.textContaining('Nível 1%'), findsOneWidget);
     expect(find.textContaining('100 pontos ='), findsOneWidget);
     expect(find.textContaining('1% desde o primeiro'), findsOneWidget);
+    expect(find.textContaining('Sem código: 10%'), findsOneWidget);
+    expect(
+      find.textContaining('Ganhe até 5% do que cada pessoa indicada gastar'),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('scape-level-progress')), findsOneWidget);
     expect(find.textContaining('SCAPEDEMO'), findsOneWidget);
     expect(find.text('Cashback'), findsOneWidget);
@@ -78,7 +84,12 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    const rules = PublicRewardRules(c2cFromBps: 150, c2bBps: 400);
+    const rules = PublicRewardRules(
+      c2cFromBps: 150,
+      c2bBps: 400,
+      c2cHighBps: 400,
+      organicFirstBookingDiscountBps: 800,
+    );
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -88,6 +99,11 @@ void main() {
     );
     expect(find.textContaining('1,5% desde o primeiro'), findsOneWidget);
     expect(find.textContaining('Casa indicada: 4%'), findsOneWidget);
+    expect(find.textContaining('Sem código: 8%'), findsOneWidget);
+    expect(
+      find.textContaining('Ganhe até 4% do que cada pessoa'),
+      findsOneWidget,
+    );
     expect(rules.previewC2cCents(10000, 1), 150);
   });
 }

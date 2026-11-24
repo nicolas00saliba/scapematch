@@ -18,6 +18,8 @@ import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -105,7 +107,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _busy = true;
       _error = null;
     });
-    final error = await ref.read(authSessionProvider.notifier).signInWithGoogle();
+    final error = await ref
+        .read(authSessionProvider.notifier)
+        .signInWithGoogle();
     if (!mounted) return;
     if (error != null) {
       setState(() {
@@ -401,10 +405,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               key: AppKeys.signupReferral,
               controller: _referral,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Código de indicação (opcional)',
-                helperText: 'Só entra neste cadastro. Um código por conta.',
-                border: OutlineInputBorder(),
+                helperText: referralCodeHint(ref.watch(rewardRulesProvider)),
+                helperMaxLines: 3,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),

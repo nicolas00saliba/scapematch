@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 /// Código da casa para compartilhar. Na demonstração é um exemplo.
-class VenueReferralCode extends StatefulWidget {
+class VenueReferralCode extends ConsumerStatefulWidget {
   const VenueReferralCode({super.key});
 
   @override
-  State<VenueReferralCode> createState() => _VenueReferralCodeState();
+  ConsumerState<VenueReferralCode> createState() => _VenueReferralCodeState();
 }
 
-class _VenueReferralCodeState extends State<VenueReferralCode> {
+class _VenueReferralCodeState extends ConsumerState<VenueReferralCode> {
   String? _code;
   var _loading = false;
 
@@ -75,6 +78,7 @@ class _VenueReferralCodeState extends State<VenueReferralCode> {
             'Exemplo. No app real este é o código da casa.',
             style: theme.textTheme.bodySmall,
           ),
+        Text(venueReferralHint(ref.watch(rewardRulesProvider))),
       ],
     );
   }

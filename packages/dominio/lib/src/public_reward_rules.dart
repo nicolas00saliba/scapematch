@@ -19,6 +19,7 @@ class PublicRewardRules {
     this.b2bBps = 500,
     this.pointValueCents = 1,
     this.firstBookingDiscountBps = 2000,
+    this.organicFirstBookingDiscountBps = 1000,
     this.redeemMaxBps = 10000,
     this.cashbackMinBps = 50,
     this.cashbackMaxBps = 500,
@@ -38,7 +39,12 @@ class PublicRewardRules {
   final int b2cBps;
   final int b2bBps;
   final int pointValueCents;
+
+  /// Desconto da primeira sessão de quem entrou com código, em basis points.
   final int firstBookingDiscountBps;
+
+  /// Desconto da primeira sessão de quem se cadastrou sem código.
+  final int organicFirstBookingDiscountBps;
   final int redeemMaxBps;
   final int cashbackMinBps;
   final int cashbackMaxBps;
@@ -71,6 +77,7 @@ class PublicRewardRules {
       c2cHighBps: c2cHighBps,
       pointValueCents: pointValueCents,
       firstBookingDiscountBps: firstBookingDiscountBps,
+      organicFirstBookingDiscountBps: organicFirstBookingDiscountBps,
       redeemMaxBps: redeemMaxBps,
     );
   }
@@ -89,6 +96,10 @@ class PublicRewardRules {
       b2bBps: _int(json['b2b_bps'], 500),
       pointValueCents: _int(json['point_value_cents'], 1),
       firstBookingDiscountBps: _int(json['first_booking_discount_bps'], 2000),
+      organicFirstBookingDiscountBps: _int(
+        json['organic_first_booking_discount_bps'],
+        1000,
+      ),
       redeemMaxBps: _int(json['redeem_max_bps'], 10000),
       cashbackMinBps: _int(json['cashback_min_bps'], 50),
       cashbackMaxBps: _int(json['cashback_max_bps'], 500),
@@ -108,6 +119,7 @@ class PublicRewardRules {
       'b2b_bps': b2bBps,
       'point_value_cents': pointValueCents,
       'first_booking_discount_bps': firstBookingDiscountBps,
+      'organic_first_booking_discount_bps': organicFirstBookingDiscountBps,
       'redeem_max_bps': redeemMaxBps,
       'cashback_min_bps': cashbackMinBps,
       'cashback_max_bps': cashbackMaxBps,
@@ -128,6 +140,8 @@ class PublicRewardRules {
         other.b2bBps == b2bBps &&
         other.pointValueCents == pointValueCents &&
         other.firstBookingDiscountBps == firstBookingDiscountBps &&
+        other.organicFirstBookingDiscountBps ==
+            organicFirstBookingDiscountBps &&
         other.redeemMaxBps == redeemMaxBps &&
         other.cashbackMinBps == cashbackMinBps &&
         other.cashbackMaxBps == cashbackMaxBps;
@@ -146,6 +160,7 @@ class PublicRewardRules {
     b2bBps,
     pointValueCents,
     firstBookingDiscountBps,
+    organicFirstBookingDiscountBps,
     redeemMaxBps,
     cashbackMinBps,
     cashbackMaxBps,

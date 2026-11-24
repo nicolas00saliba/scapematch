@@ -35,7 +35,8 @@ begin
       cashback_min_bps = 50,
       cashback_max_bps = 500,
       cashback_ev_cap_bps = 100,
-      first_booking_discount_bps = 0
+      first_booking_discount_bps = 0,
+      organic_first_booking_discount_bps = 0
   where id = 1;
 
   v_def := pg_catalog.pg_get_functiondef(

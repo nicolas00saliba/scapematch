@@ -4,6 +4,8 @@ import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
@@ -352,10 +354,11 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
           TextField(
             controller: _referral,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Código de indicação (opcional)',
-              helperText: 'De um jogador ou de outra casa. Só neste cadastro. Não é o convite.',
-              border: OutlineInputBorder(),
+              helperText: referralCodeHint(ref.watch(rewardRulesProvider)),
+              helperMaxLines: 3,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 8),

@@ -419,7 +419,8 @@ begin
     return;
   end if;
   update public.referral_program_settings
-  set first_booking_discount_bps = 0
+  set first_booking_discount_bps = 0,
+      organic_first_booking_discount_bps = 0
   where id = 1;
   insert into public.groups (
     id, city_id, venue_id, room_id, session_id, starts_at,

@@ -127,8 +127,9 @@ export const temas: Tema[] = [
         resposta: 'No cadastro ou nas primeiras 24 horas.',
       },
       {
-        pergunta: 'O desconto de 20% vale para quem já tem conta?',
-        resposta: 'Não. O desconto da primeira reserva é só para conta nova.',
+        pergunta: 'O desconto da primeira sessão vale para quem já tem conta?',
+        resposta:
+          'Não. A primeira sessão é 20% para quem entrou com código e 10% para quem se cadastrou sem código. Vale só para conta nova.',
       },
     ],
   },

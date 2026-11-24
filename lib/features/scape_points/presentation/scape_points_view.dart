@@ -162,10 +162,11 @@ class _ScapePointsBodyState extends ConsumerState<ScapePointsBody> {
             key: AppKeys.scapeReferralClaim,
             controller: _code,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Código de quem indicou',
-              helperText: 'Só no cadastro, nas primeiras 24 horas.',
-              border: OutlineInputBorder(),
+              helperText: referralCodeHint(liveRules),
+              helperMaxLines: 3,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 8),
@@ -282,7 +283,7 @@ class ScapePointsView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _CodeRow(code: wallet.referralCode),
+        _CodeRow(code: wallet.referralCode, rules: rules),
         if (passport != null) ...[
           const SizedBox(height: 16),
           PassportCard(book: passport!),
@@ -318,28 +319,35 @@ class ScapePointsView extends StatelessWidget {
 }
 
 class _CodeRow extends StatelessWidget {
-  const _CodeRow({required this.code});
+  const _CodeRow({required this.code, required this.rules});
 
   final String code;
+  final PublicRewardRules rules;
 
   @override
   Widget build(BuildContext context) {
     final shown = code.isEmpty
         ? 'Seu código aparece depois do cadastro.'
         : code;
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text('Seu código: $shown', key: AppKeys.scapeReferralCode),
+        Row(
+          children: [
+            Expanded(
+              child: Text('Seu código: $shown', key: AppKeys.scapeReferralCode),
+            ),
+            if (code.isNotEmpty)
+              IconButton(
+                tooltip: 'Copiar código',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: code));
+                },
+                icon: const Icon(Icons.copy_outlined),
+              ),
+          ],
         ),
-        if (code.isNotEmpty)
-          IconButton(
-            tooltip: 'Copiar código',
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: code));
-            },
-            icon: const Icon(Icons.copy_outlined),
-          ),
+        Text(ownReferralHint(rules)),
       ],
     );
   }

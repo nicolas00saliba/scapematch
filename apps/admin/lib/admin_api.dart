@@ -1225,6 +1225,7 @@ class MemoryAdminApi implements AdminApi {
         'hold_days': 30,
         'attribution_days': 365,
         'first_booking_discount_bps': 2000,
+        'organic_first_booking_discount_bps': 1000,
         'cashback_min_bps': 50,
         'cashback_max_bps': 500,
         'cashback_ev_cap_bps': 100,

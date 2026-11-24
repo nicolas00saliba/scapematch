@@ -26,6 +26,7 @@ create trigger test_stamp_payer_hash
 
 update public.referral_program_settings
 set first_booking_discount_bps = 0,
+    organic_first_booking_discount_bps = 0,
     redeem_min_points = 1,
     redeem_max_bps = 10000
 where id = 1;
@@ -1306,7 +1307,8 @@ begin
 end $$;
 
 update public.referral_program_settings
-set first_booking_discount_bps = 2000
+set first_booking_discount_bps = 2000,
+    organic_first_booking_discount_bps = 0
 where id = 1;
 
 insert into auth.users (id, email, raw_user_meta_data)
