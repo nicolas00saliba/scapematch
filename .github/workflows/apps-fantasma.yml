@@ -41,7 +41,7 @@ jobs:
         run: python3 -m pip install --user pillow
 
       - name: Plano das contas (sem gravar)
-        run: python3 testes/contas_fantasma/criar_contas.py --senhas "$RUNNER_TEMP/nada.json"
+        run: python3 testes/contas_fantasma/criar_contas.py
 
       - name: Build dos APKs
         env:

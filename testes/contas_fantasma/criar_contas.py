@@ -13,16 +13,12 @@ Não cria casa, sala, CPF, telefone nem cartão. A casa é cadastrada no app
 "EM Casa N" e já nasce de teste porque o dono é de teste. O CPF de quem
 paga entra no próprio app na hora do pagamento.
 
-Senhas: um JSON fora do repo (padrão ~/.secrets/contas-fantasma.json,
-chmod 600) no formato {"<slug>": "<senha>"}. Sem o arquivo, o script gera
-senhas fortes e grava lá. Nada de senha é impresso.
+Senha: a mesma para todas as contas, lida de EM_TEST_PASSWORD no ambiente.
+O script não gera, não grava e não imprime a senha.
 """
 import argparse
 import json
 import os
-import secrets
-import stat
-import string
 import sys
 import urllib.error
 import urllib.request
@@ -30,7 +26,6 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 CONTAS = AQUI.parent / "apps_fantasma" / "contas.json"
-SENHAS_PADRAO = Path.home() / ".secrets" / "contas-fantasma.json"
 EMAIL_PADRAO = "saliban3-hc6272+em-{slug}@mail.grokbot.com"
 NASCIMENTO = "1990-01-01"
 
@@ -39,33 +34,6 @@ def nome(conta):
     if conta["tipo"] == "jogador":
         return f"Jogador Fantasma {conta['numero']}"
     return f"Casa Fantasma {conta['numero']}"
-
-
-def gerar_senha():
-    alfabeto = string.ascii_letters + string.digits
-    corpo = "".join(secrets.choice(alfabeto) for _ in range(20))
-    return f"Em{corpo}#{secrets.randbelow(90) + 10}"
-
-
-def carregar_senhas(caminho, slugs, criar):
-    if caminho.exists():
-        modo = stat.S_IMODE(caminho.stat().st_mode)
-        if modo & 0o077:
-            sys.exit(f"{caminho} precisa de chmod 600")
-        senhas = json.loads(caminho.read_text())
-    else:
-        senhas = {}
-    faltando = [s for s in slugs if not senhas.get(s)]
-    if faltando and criar:
-        for slug in faltando:
-            senhas[slug] = gerar_senha()
-        caminho.parent.mkdir(parents=True, exist_ok=True)
-        os.chmod(caminho.parent, 0o700)
-        fd = os.open(caminho, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as arquivo:
-            json.dump(senhas, arquivo, indent=2)
-        faltando = []
-    return senhas, faltando
 
 
 class Supabase:
@@ -167,7 +135,6 @@ def executar(conta, email, senha, api):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--email-modelo", default=EMAIL_PADRAO)
-    parser.add_argument("--senhas", type=Path, default=SENHAS_PADRAO)
     parser.add_argument("--executar", action="store_true")
     parser.add_argument("--confirmo-producao", action="store_true")
     args = parser.parse_args()
@@ -175,29 +142,28 @@ def main():
     if "{slug}" not in args.email_modelo:
         sys.exit("--email-modelo precisa ter {slug}")
     contas = json.loads(CONTAS.read_text())["contas"]
-    slugs = [c["slug"] for c in contas]
-    senhas, faltando = carregar_senhas(args.senhas, slugs, criar=args.executar)
+    senha = os.environ.get("EM_TEST_PASSWORD") or ""
 
     print("Plano:")
     for conta in contas:
         email = args.email_modelo.format(slug=conta["slug"])
-        senha = "ok" if senhas.get(conta["slug"]) else "falta"
-        print(f"  {conta['slug']:<9} {nome(conta):<20} {email}  senha: {senha}")
+        print(f"  {conta['slug']:<9} {nome(conta):<20} {email}")
+    print(f"EM_TEST_PASSWORD: {'definida' if senha else 'ausente'}")
 
     if not args.executar:
         print("Só o plano. Nada foi gravado. Use --executar --confirmo-producao.")
         return
     if not args.confirmo_producao:
         sys.exit("Falta --confirmo-producao.")
-    if faltando:
-        sys.exit(f"Sem senha para: {', '.join(faltando)}")
+    if len(senha) < 8:
+        sys.exit("Defina EM_TEST_PASSWORD (mínimo 8 caracteres) no ambiente.")
     url = os.environ.get("SUPABASE_URL")
     chave = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not chave:
         sys.exit("Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no ambiente.")
     api = Supabase(url, chave)
     for conta in contas:
-        executar(conta, args.email_modelo.format(slug=conta["slug"]), senhas[conta["slug"]], api)
+        executar(conta, args.email_modelo.format(slug=conta["slug"]), senha, api)
 
 
 if __name__ == "__main__":
