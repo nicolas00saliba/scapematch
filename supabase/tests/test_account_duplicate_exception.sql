@@ -1,6 +1,6 @@
 -- Conta real continua bloqueada no documento e na conta PagBank.
 -- Conta is_test cria a casa. Usuário comum não vira teste.
--- supabase/migrations/20261124220000_test_account_duplicate_exception.sql
+-- supabase/migrations/20261124223000_test_account_duplicate_exception.sql
 
 \set ON_ERROR_STOP on
 
