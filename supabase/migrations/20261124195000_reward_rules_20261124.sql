@@ -1,4 +1,7 @@
 -- Regras de 24/11/2026. Não aplicado no remoto. Não publica função.
+-- Versão 20261124195000: depois de 20261124190000_test_accounts e antes
+-- de 20261124200000_platform_cac. Não mexe no cadastro PagBank
+-- (20261124180000_pagbank_account_signup).
 -- Tira o dobro do horário vazio. Indicação de pessoas vira taxa absoluta
 -- por nível. Casa que indica jogador e jogador que indica casa ficam em 5%.
 -- Casa que indica casa continua em 5%. 100 pontos = R$ 1.
