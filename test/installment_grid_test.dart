@@ -114,7 +114,7 @@ void main() {
     if (Platform.environment['SCAPEMATCH_INSTALLMENT_SHOT'] != '1') return;
     await tester.runAsync(_loadFonts);
     final options = cardInstallmentOptions(
-      principalCents: 10000,
+      principalCents: 11000,
       interestCentsByCount: {
         for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
       },
@@ -138,7 +138,7 @@ void main() {
               coverBytes: photo,
               houseName: 'Puzzle Room Escape Game',
               roomName: 'Acerto de Contas',
-              totalLabel: formatPrice(10000),
+              totalLabel: formatPrice(11000),
               installmentLabel: '3x sem juros',
               onOpenInstallments: () {},
             ),
