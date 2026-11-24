@@ -24,7 +24,7 @@ A casa realiza a sessão. O EscapeMatch forma o grupo e cobra a vaga de cada pes
 2. O app coloca essa pessoa num grupo com jogadores que não se conheciam. Cada um paga a própria vaga.
 3. Quando o grupo bate o mínimo, o jogo confirma. Quem chega depois paga a própria vaga na hora, até lotar.
 4. Se o mínimo não bater, o jogo não confirma. O Pix é estornado e o cartão não é capturado.
-5. Depois da confirmação não há reembolso. Se a casa cancelar, o valor é devolvido integralmente.
+5. Depois da confirmação, sair dentro da antecedência da sala (padrão de 2 horas) devolve o dinheiro. Fora desse prazo, o que já foi capturado não volta. Se a casa cancelar, o valor é devolvido integralmente.
 
 As pessoas se encontram na casa, no horário marcado. A casa conduz a sessão.
 

@@ -145,7 +145,7 @@ TOKEN_BLOQUEADO = re.compile(
 )
 ARQUIVO_GOOGLE = re.compile(r"google[A-Za-z0-9]{16,}\.html")
 CANCELAMENTO = (
-    "Não há reembolso depois que o grupo é confirmado.",
+    "sair com a antecedência da sala (padrão de 2 horas) devolve o dinheiro",
     "se o grupo não fechar, o Pix é estornado",
     "o Pix é estornado e o cartão não é capturado.",
     "Se a casa cancelar, o valor é devolvido integralmente.",
@@ -523,7 +523,9 @@ def main() -> None:
     for trecho in CANCELAMENTO:
         if trecho not in cancelamento:
             falha(f"cancelamento sem a regra: {trecho}")
-    if re.search(r"janela|anteced[eê]ncia|sete dias", cancelamento, re.I):
+    # A antecedência da sala (padrão de 2 horas) é a regra atual.
+    # "Sete dias" é o rascunho antigo do arrependimento e não volta aqui.
+    if re.search(r"sete dias", cancelamento, re.I):
         falha("cancelamento voltou à regra antiga")
 
     home_html = (DIST / "index.html").read_text()
