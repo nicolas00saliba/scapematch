@@ -51,6 +51,14 @@ verify_jwt = true
 [functions.pagbank-transfer-webhook]
 verify_jwt = false
 
+# O dono manda o JWT. A função só chama a PagBank com a flag ligada.
+[functions.pagbank-signup]
+verify_jwt = true
+
+# O cron manda x-pagbank-signup-probe-secret, não um JWT.
+[functions.pagbank-signup-probe]
+verify_jwt = false
+
 # E-mails do Auth, em pt-BR. O CLI local lê subject e content_path.
 # O projeto remoto não muda sozinho. Cole cada assunto e o HTML em
 # Authentication > Email Templates, ou rode tool/apply_auth_email_templates.sh

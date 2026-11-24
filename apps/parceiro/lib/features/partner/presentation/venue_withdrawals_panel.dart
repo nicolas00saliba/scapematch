@@ -6,12 +6,13 @@ import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repos
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_documents_card.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_pagbank_signup_card.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
-/// Explica o recebimento na conta PagBank e a Transferência Automática.
+/// Explica que o valor fica na conta PagBank. Não há saque automático.
 ///
-/// Não pede conta, chave Pix nem valor de saque. Os documentos da subconta
-/// continuam aqui. O token da casa não cadastra destino nem transfere.
+/// Não pede conta, chave Pix nem valor de saque. O cadastro da conta e os
+/// documentos continuam aqui.
 class VenueWithdrawalsPanel extends ConsumerStatefulWidget {
   const VenueWithdrawalsPanel({
     super.key,
@@ -129,6 +130,11 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
       key: PartnerKeys.withdrawals,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        VenuePagbankSignupCard(
+          venueId: widget.venueId,
+          onOpen: widget.onOpenPagBank,
+        ),
+        const SizedBox(height: 28),
         Text(
           PartnerMessages.withdrawalsTitle,
           style: theme.textTheme.headlineSmall?.copyWith(

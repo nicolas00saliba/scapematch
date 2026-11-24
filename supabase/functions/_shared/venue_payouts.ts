@@ -30,7 +30,7 @@ const reauthWindowSec = 300;
 /// A transferência Pix da PagBank pede liberação comercial e mTLS.
 /// O aviso vai em notification_urls no próprio POST /transfers.
 /// O cadastro com authToken, e-mail e TRANSFER_* não é dessa API.
-/// Saque fica desligado até um PR próprio.
+/// O valor fica na conta PagBank da casa. Não há saque automático.
 export const venuePayoutsForcedOff = true;
 
 const knownErrors = [

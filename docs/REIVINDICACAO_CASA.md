@@ -25,7 +25,7 @@ O envio usa Resend (`RESEND_API_KEY` e `CLAIM_MAIL_FROM` ou `PAYOUT_MAIL_FROM`).
 
 ## Subconta PagBank
 
-O checklist segue nesta ordem: subconta PagBank (`provision-venue-wallet`, também para o dono da própria casa quando `pagbank_account_id` está vazio), documentos da subconta (`VenueDocumentsCard`, função `venue-documents`) e o recebimento no banco. O status da subconta usa `receives_payments` (coluna gerada: `pagbank_account_id` preenchido, sem entregar a wallet). Os documentos carregam quando essa coluna é verdadeira. A casa pronta é `venue_finance_ready`: aprovada, não suspensa e com `pagbank_account_id`. Não exige linha em `venue_bank_accounts`. O saque para outro banco é a Transferência Automática no PagBank, no mesmo CNPJ ou CPF. A tela do Parceiro explica isso e não pede dados bancários.
+O checklist segue nesta ordem: conta PagBank (`provision-venue-wallet`, também para o dono da própria casa quando `pagbank_account_id` está vazio), documentos da conta (`VenueDocumentsCard`, função `venue-documents`) e o recebimento. O status da conta usa `receives_payments` (coluna gerada: `pagbank_account_id` preenchido, sem entregar a wallet). Os documentos carregam quando essa coluna é verdadeira. A casa pronta é `venue_finance_ready`: aprovada, não suspensa e com `pagbank_account_id`. Não exige linha em `venue_bank_accounts`. O valor fica disponível na conta PagBank da casa. O Pix para outro banco é manual. A tela do Parceiro explica isso e não pede dados bancários.
 
 A vitrine expõe `finance_ready`. `create-charge` chama essa função e responde 409 sem conta PagBank. A casa continua na vitrine: o catálogo não some só porque o recebimento está desligado.
 

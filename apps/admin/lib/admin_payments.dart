@@ -14,6 +14,7 @@ class PagamentosPage extends ConsumerStatefulWidget {
 class _PagamentosPageState extends ConsumerState<PagamentosPage> {
   PaymentsBoard? _board;
   PlatformCacReport? _cac;
+  PagbankSignupSettings? _signup;
   String? _error;
   bool _saving = false;
 
@@ -32,10 +33,12 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
         from: DateTime(now.year, now.month, 1),
         to: DateTime(now.year, now.month + 1, 0),
       );
+      final signup = await api.pagbankSignupSettings();
       if (!mounted) return;
       setState(() {
         _board = board;
         _cac = cac;
+        _signup = signup;
         _error = null;
       });
     } on Object catch (error) {
@@ -51,8 +54,8 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
         title: Text(next ? 'Ligar saques automáticos' : 'Desligar saques automáticos'),
         content: Text(
           next
-              ? 'O cron passa a pedir saque das casas com saldo. A mudança fica na auditoria.'
-              : 'O cron deixa de criar saques. Os que já saíram não voltam. A mudança fica na auditoria.',
+              ? 'A flag do banco liga, mas o código continua sem transferir. O valor fica disponível na conta PagBank da casa.'
+              : 'O cron deixa de criar saques. O valor fica disponível na conta PagBank da casa.',
         ),
         actions: [
           TextButton(
@@ -71,6 +74,74 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
     setState(() => _saving = true);
     try {
       await ref.read(adminApiProvider).setVenuePayoutsEnabled(next);
+      await _load();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _disableSignup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Desligar o cadastro pela API'),
+        content: const Text(
+          'O Parceiro volta a orientar a página oficial do PagBank. A checagem não liga de novo até você religar.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('admin-pagbank-signup-confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Desligar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(adminApiProvider).disablePagbankSignup();
+      await _load();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _releaseSignup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Religar o cadastro pela API'),
+        content: const Text(
+          'O Parceiro volta a enviar o cadastro pelo servidor. A casa que já tem conta segue para o Connect.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('admin-pagbank-signup-release-confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Religar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(adminApiProvider).releasePagbankSignupHold();
       await _load();
     } on Object catch (error) {
       if (!mounted) return;
@@ -101,6 +172,31 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
               value: board.payoutsEnabled,
               onChanged: _saving ? null : _toggle,
             ),
+            const Text(
+              'O saque pelo EscapeMatch está desligado no código. O valor fica disponível na conta PagBank da casa.',
+            ),
+            const SizedBox(height: 8),
+            const Text('Cadastro de contas no PagBank'),
+            const SizedBox(height: 8),
+            Text(_signupLine(_signup)),
+            if (_signup?.apiEnabled == true)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton(
+                  key: const Key('admin-pagbank-signup-off'),
+                  onPressed: _saving ? null : _disableSignup,
+                  child: const Text('Desligar'),
+                ),
+              ),
+            if (_signup?.heldOff == true && _signup?.apiEnabled != true)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton(
+                  key: const Key('admin-pagbank-signup-release'),
+                  onPressed: _saving ? null : _releaseSignup,
+                  child: const Text('Religar'),
+                ),
+              ),
             const SizedBox(height: 8),
             const Text('Prontidão'),
             const SizedBox(height: 8),
@@ -149,6 +245,18 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
       ),
     );
   }
+}
+
+String _signupLine(PagbankSignupSettings? signup) {
+  if (signup == null) return 'Carregando o cadastro.';
+  if (signup.apiEnabled) {
+    return 'Ligada. O Parceiro envia o cadastro pelo servidor.';
+  }
+  if (signup.heldOff) {
+    return 'Desligada pelo admin. Religar devolve o envio pelo servidor.';
+  }
+  final probe = signup.lastProbeCode.isEmpty ? '' : ' Última checagem: ${signup.lastProbeCode}.';
+  return 'Desligada. A casa cria a conta na página do PagBank.$probe';
 }
 
 String _yn(bool? value) {
