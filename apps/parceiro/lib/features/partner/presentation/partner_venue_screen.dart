@@ -384,6 +384,7 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
             const SizedBox(height: 12),
             VenueClaimOffer(
               venue: claim,
+              documentKind: _kind,
               onClaim: () => setState(() => _claiming = true),
             ),
           ],

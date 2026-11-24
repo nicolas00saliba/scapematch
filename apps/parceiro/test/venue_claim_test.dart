@@ -34,6 +34,21 @@ void main() {
     expect('$venue'.contains('oficial@ninja.example'), isFalse);
   });
 
+  test('o aviso de reivindicação usa o tipo do documento', () {
+    expect(
+      PartnerMessages.claimOfferBody('cpf'),
+      'Este CPF já tem um perfil. Reivindicar liga a sua conta a essa casa e mantém fotos, salas e avaliações. Não abre outra casa.',
+    );
+    expect(
+      PartnerMessages.claimOfferBody('cnpj'),
+      'Este CNPJ já tem um perfil. Reivindicar liga a sua conta a essa casa e mantém fotos, salas e avaliações. Não abre outra casa.',
+    );
+    expect(
+      PartnerMessages.claimOfferBody('outro'),
+      contains('Este documento já tem um perfil.'),
+    );
+  });
+
   testWidgets('o CNPJ encontrado oferece reivindicar a casa que já existe', (
     tester,
   ) async {
@@ -42,12 +57,14 @@ void main() {
       _app(
         VenueClaimOffer(
           venue: _ninja(VenueClaimPath.otp),
+          documentKind: 'cnpj',
           onClaim: () => claimed = true,
         ),
       ),
     );
     expect(find.text(PartnerMessages.claimOfferTitle), findsOneWidget);
     expect(find.text('Ninja Escape Room'), findsOneWidget);
+    expect(find.text(PartnerMessages.claimOfferBody('cnpj')), findsOneWidget);
     expect(find.text(PartnerMessages.claimOfferButton), findsOneWidget);
     await tester.tap(find.byKey(PartnerKeys.venueClaim));
     await tester.pump();

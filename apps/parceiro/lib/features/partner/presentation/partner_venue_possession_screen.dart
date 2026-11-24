@@ -10,10 +10,12 @@ class VenueClaimOffer extends StatelessWidget {
   const VenueClaimOffer({
     super.key,
     required this.venue,
+    required this.documentKind,
     required this.onClaim,
   });
 
   final ClaimableVenue venue;
+  final String documentKind;
   final VoidCallback onClaim;
 
   @override
@@ -43,7 +45,7 @@ class VenueClaimOffer extends StatelessWidget {
             ),
             if (venue.neighborhood.isNotEmpty) Text(venue.neighborhood),
             const SizedBox(height: 8),
-            Text(PartnerMessages.claimOfferBody),
+            Text(PartnerMessages.claimOfferBody(documentKind)),
             const SizedBox(height: 12),
             FilledButton(
               key: PartnerKeys.venueClaim,
