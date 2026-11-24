@@ -7,6 +7,7 @@ import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
 import 'package:scapematch/features/payments/presentation/installment_grid.dart';
@@ -190,6 +191,50 @@ void main() {
     expect(sent, 4);
     expect(expected, 20640);
   });
+
+  testWidgets('dinheiro, pontos e híbrido', (tester) async {
+    var paidPoints = -1;
+    await _open(
+      tester,
+      live: false,
+      amountCents: 10000,
+      points: PointSpendChoice(
+        points: 10000,
+        subsidyCents: 10000,
+        chargedCents: 0,
+        maxPoints: 10000,
+        pointsOnly: true,
+      ),
+      requotePoints: (points) async {
+        return PointSpendChoice(
+          points: points,
+          subsidyCents: points,
+          chargedCents: 10000 - points,
+          maxPoints: 10000,
+          pointsOnly: points >= 10000,
+        );
+      },
+      onPay: (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+        paidPoints = expectedAmountCents ?? -1;
+        return const ShareChargeView(outcome: PaySheetOutcome.reserved);
+      },
+    );
+    expect(find.text('Pix'), findsOneWidget);
+    expect(find.byKey(AppKeys.paySimulate), findsOneWidget);
+
+    await tester.tap(find.text('Híbrido'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.payPointsSlider), findsOneWidget);
+    expect(find.text('Pix'), findsOneWidget);
+
+    await tester.tap(find.text('Pontos'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pix'), findsNothing);
+    expect(find.text('Pagar com pontos'), findsOneWidget);
+    await tester.tap(find.text('Pagar com pontos'));
+    await tester.pumpAndSettle();
+    expect(paidPoints, 0);
+  });
 }
 
 Future<ShareChargeView> _unusedPay(
@@ -214,6 +259,8 @@ Future<void> _open(
   List<PaymentMethod> cards = const [],
   int discountCents = 0,
   int amountCents = 9000,
+  PointSpendChoice? points,
+  Future<PointSpendChoice?> Function(int points)? requotePoints,
   Future<List<CardInstallmentOption>> Function(int principalCents)?
   quoteInstallments,
 }) async {
@@ -242,6 +289,8 @@ Future<void> _open(
                     amountCents: amountCents,
                     reference: 'group-1',
                     discountCents: discountCents,
+                    points: points,
+                    requotePoints: requotePoints,
                     quoteInstallments: quoteInstallments,
                     onPay: onPay,
                   );

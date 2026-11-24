@@ -8,11 +8,12 @@ class ScapeWallet {
     required this.attributed,
     required this.canClaim,
     required this.entries,
-    this.redeemMinPoints = 1000,
-    this.tier = 'bronze',
+    this.redeemMinPoints = 0,
+    this.tier = 'nenhum',
+    this.tierBps = 0,
     this.activeReferrals = 0,
     this.silverAt = 5,
-    this.goldAt = 15,
+    this.goldAt = 8,
     this.backedPoints = 0,
     this.unbackedPoints = 0,
     this.freeSlotEnabled = false,
@@ -29,8 +30,15 @@ class ScapeWallet {
   final List<ScapePointEntry> entries;
   final int redeemMinPoints;
   final String tier;
+
+  /// Taxa absoluta da indicação de pessoas, em basis points, vinda do servidor.
+  final int tierBps;
   final int activeReferrals;
+
+  /// Indicados ativos para a taxa do meio. O nome antigo do campo é silver_at.
   final int silverAt;
+
+  /// Indicados ativos para a taxa alta. O nome antigo do campo é gold_at.
   final int goldAt;
   final int backedPoints;
   final int unbackedPoints;
@@ -38,22 +46,30 @@ class ScapeWallet {
   final int freeSlotMonthlyLimit;
   final int freeSlotsUsedThisMonth;
 
-  String get tierLabel => switch (tier) {
-    'prata' => 'Prata',
-    'ouro' => 'Ouro',
-    _ => 'Bronze',
-  };
+  String get tierLabel =>
+      tierBps > 0 ? formatBasisPoints(tierBps) : 'sem indicado ativo';
+
+  double get levelProgress {
+    if (goldAt <= 0) return 0;
+    final value = activeReferrals / goldAt;
+    if (value < 0) return 0;
+    if (value > 1) return 1;
+    return value;
+  }
 
   String get tierProgress {
-    if (tier == 'ouro' || activeReferrals >= goldAt) {
-      return 'Ouro. Seus indicados ativos estão no teto deste nível.';
+    if (activeReferrals >= goldAt && goldAt > 0) {
+      return 'Comissão atual $tierLabel. Este é o nível mais alto.';
     }
     if (activeReferrals >= silverAt) {
       final left = goldAt - activeReferrals;
-      return 'Prata. Faltam $left indicados ativos para Ouro.';
+      return 'Comissão atual $tierLabel. Faltam $left indicados ativos para o próximo nível.';
     }
-    final left = silverAt - activeReferrals;
-    return 'Bronze. Faltam $left indicados ativos para Prata.';
+    if (activeReferrals >= 1) {
+      final left = silverAt - activeReferrals;
+      return 'Comissão atual $tierLabel. Faltam $left indicados ativos para o próximo nível.';
+    }
+    return 'Falta 1 indicado ativo para começar a ganhar comissão.';
   }
 
   int get availableCents => availablePoints * pointValueCents;
@@ -66,6 +82,11 @@ class ScapeWallet {
     pointValueCents: 1,
     attributed: false,
     canClaim: false,
+    tier: 'nivel_1',
+    tierBps: 100,
+    activeReferrals: 2,
+    silverAt: 5,
+    goldAt: 8,
     entries: [
       ScapePointEntry(
         kind: 'accrual',
@@ -109,11 +130,12 @@ class ScapeWallet {
             if (item is Map)
               ScapePointEntry.fromJson(Map<String, dynamic>.from(item)),
       ],
-      redeemMinPoints: _intOf(json['redeem_min_points'], fallback: 1000),
-      tier: json['tier']?.toString() ?? 'bronze',
+      redeemMinPoints: _intOf(json['redeem_min_points']),
+      tier: json['tier']?.toString() ?? 'nenhum',
+      tierBps: _intOf(json['tier_bps'] ?? json['tier_bonus_bps']),
       activeReferrals: _intOf(json['active_referrals']),
       silverAt: _intOf(json['silver_at'], fallback: 5),
-      goldAt: _intOf(json['gold_at'], fallback: 15),
+      goldAt: _intOf(json['gold_at'], fallback: 8),
       backedPoints: _intOf(json['backed_points']),
       unbackedPoints: _intOf(json['unbacked_points']),
       freeSlotEnabled: json['backed_full_slot_enabled'] == true,
@@ -219,33 +241,49 @@ class PointSpendChoice {
     this.discountCents = 0,
     this.cashbackMinBps = 50,
     this.cashbackMaxBps = 500,
-    this.redeemMinPoints = 1000,
-    this.redeemMaxBps = 3000,
+    this.redeemMinPoints = 0,
+    this.redeemMaxBps = 10000,
+    this.maxPoints = 0,
+    this.pointsOnly = false,
   });
 
-  final int points;
-  final int subsidyCents;
-  final int chargedCents;
-  final int discountCents;
+  int points;
+  int subsidyCents;
+  int chargedCents;
+  int discountCents;
   final int cashbackMinBps;
   final int cashbackMaxBps;
   final int redeemMinPoints;
   final int redeemMaxBps;
+  int maxPoints;
+  bool pointsOnly;
   var use = false;
 
   int get selected => use && points > 0 ? points : 0;
 
+  void applyQuote(Map<String, dynamic> json) {
+    points = _intOf(json['points']);
+    subsidyCents = _intOf(json['subsidy_cents']);
+    chargedCents = _intOf(json['charged_cents']);
+    discountCents = _intOf(json['first_booking_discount_cents']);
+    pointsOnly = json['points_only'] == true;
+    final quotedMax = _intOf(json['max_points']);
+    if (quotedMax > maxPoints) maxPoints = quotedMax;
+    if (points > maxPoints) maxPoints = points;
+  }
+
   factory PointSpendChoice.fromQuote(Map<String, dynamic> json) {
-    return PointSpendChoice(
-      points: _intOf(json['points']),
-      subsidyCents: _intOf(json['subsidy_cents']),
-      chargedCents: _intOf(json['charged_cents']),
-      discountCents: _intOf(json['first_booking_discount_cents']),
+    final choice = PointSpendChoice(
+      points: 0,
+      subsidyCents: 0,
+      chargedCents: 0,
       cashbackMinBps: _intOf(json['cashback_min_bps'], fallback: 50),
       cashbackMaxBps: _intOf(json['cashback_max_bps'], fallback: 500),
-      redeemMinPoints: _intOf(json['redeem_min_points'], fallback: 1000),
-      redeemMaxBps: _intOf(json['redeem_max_bps'], fallback: 3000),
+      redeemMinPoints: _intOf(json['redeem_min_points']),
+      redeemMaxBps: _intOf(json['redeem_max_bps'], fallback: 10000),
     );
+    choice.applyQuote(json);
+    return choice;
   }
 }
 

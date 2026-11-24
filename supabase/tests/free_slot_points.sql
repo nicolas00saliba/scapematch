@@ -182,8 +182,8 @@ declare
   v_reserve integer;
 begin
   select * into v_before from public.referral_program_settings where id = 1;
-  if v_before.backed_full_slot_enabled then
-    raise exception 'a flag da vaga gratis nao nasceu desligada';
+  if not v_before.backed_full_slot_enabled then
+    raise exception 'a flag da vaga inteira nao nasceu ligada';
   end if;
 
   select pix_receipt_fee_cents, card_receipt_fee_cents, card_receipt_fee_bps
@@ -560,13 +560,10 @@ begin
     'e7a22222-2222-4222-8222-222222222222',
     'e7b11111-1111-4111-8111-111111111111',
     10000, 10000, 7500, 'PIX'
-  ) <> private.reward_cents(10000, (
-    select c2c_bps + private.referrer_tier_bonus(
-      'e7a55555-5555-4555-8555-555555555555'
-    )
-    from public.referral_program_settings
-    where id = 1
-  )) + public.cashback_reserve_split_cents(10000) then
+  ) <> private.reward_cents(
+    10000,
+    private.referrer_c2c_bps('e7a55555-5555-4555-8555-555555555555')
+  ) + public.cashback_reserve_split_cents(10000) then
     raise exception 'o split da reserva nao somou indicacao e cashback';
   end if;
   if public.points_reserve_split_cents(

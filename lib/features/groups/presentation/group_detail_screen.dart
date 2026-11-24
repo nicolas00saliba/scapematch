@@ -442,18 +442,15 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     return '$status · ${GroupMessages.paymentStatus(person.payment)}';
   }
 
-  Future<PointSpendChoice?> _pointSpend(String groupId) async {
+  Future<PointSpendChoice?> _pointSpend(String groupId, int points) async {
     if (!scapeUsesLiveBackend) return null;
     try {
       final data = await scapeSupabase.rpc(
         'quote_my_point_subsidy',
-        params: {'p_group_id': groupId, 'p_points': 100000000},
+        params: {'p_group_id': groupId, 'p_points': points},
       );
       if (data is! Map) return null;
-      final choice = PointSpendChoice.fromQuote(
-        Map<String, dynamic>.from(data),
-      );
-      return choice;
+      return PointSpendChoice.fromQuote(Map<String, dynamic>.from(data));
     } on Object {
       return null;
     }
@@ -461,7 +458,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
 
   Future<void> _pay(Group group) async {
     if (!await ensurePlayerCpf(context, ref) || !mounted) return;
-    final spend = await _pointSpend(group.id);
+    final spend = await _pointSpend(group.id, 100000000);
     if (!mounted) return;
     final outcome = await showPayShareSheet(
       context: context,
@@ -472,6 +469,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       roomName: group.roomName,
       points: spend,
       discountCents: spend?.discountCents ?? 0,
+      requotePoints: (points) => _pointSpend(group.id, points),
       quoteInstallments: (cents) {
         return ref.read(groupRepositoryProvider).quoteCardInstallments(cents);
       },
@@ -495,6 +493,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               card,
               installments: installments,
               expectedAmountCents: expectedAmountCents,
+              points: spend?.selected ?? 0,
             );
         return ShareChargeView.fromResult(result);
       },

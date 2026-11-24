@@ -437,6 +437,7 @@ class FakeGroupRepository implements GroupRepository {
     required CardDraft card,
     int installments = 1,
     int? expectedAmountCents,
+    int points = 0,
   }) {
     if (card.number.isEmpty) {
       return Future.value(
@@ -449,6 +450,7 @@ class FakeGroupRepository implements GroupRepository {
       kind: PaymentMethodKind.card,
       installments: installments,
       expectedAmountCents: expectedAmountCents,
+      points: points,
     );
   }
 

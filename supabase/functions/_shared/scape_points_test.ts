@@ -19,7 +19,7 @@ const window = {
   endsAt: "2027-01-01T00:00:00.000Z",
 };
 
-Deno.test("C2C de 2,5% vira 250 pontos de 1 centavo", () => {
+Deno.test("C2C do primeiro indicado vira 100 pontos de 1 centavo", () => {
   assertEquals(officialPointValueCents, 1);
   const lines = quoteReferralRewards({
     grossCents: 10000,
@@ -29,7 +29,7 @@ Deno.test("C2C de 2,5% vira 250 pontos de 1 centavo", () => {
   });
   assertEquals(lines, [
     { program: "cashback", cents: 100, points: 100, payee: "player_points" },
-    { program: "c2c", cents: 250, points: 250, payee: "player_points" },
+    { program: "c2c", cents: 100, points: 100, payee: "player_points" },
   ]);
 });
 
@@ -58,8 +58,8 @@ Deno.test("jogador e casa dividem a comissão, sem deixar a casa negativa", () =
     venueReferrer: window,
     venueReferrerIsPlayer: true,
   });
-  assertEquals(lines.map((line) => line.program), ["cashback", "c2c"]);
-  assertEquals(lines[0].points + lines[1].points, 300);
+  assertEquals(lines.map((line) => line.program), ["cashback", "c2c", "c2b"]);
+  assertEquals(lines[0].points + lines[1].points + lines[2].points, 300);
 });
 
 Deno.test("fora de um ano e na mesma casa não lança", () => {
@@ -210,7 +210,7 @@ Deno.test("abatimento muda o percentual e preserva o líquido da casa", () => {
     requestedPoints: 9000,
     availablePoints: 100,
   });
-  assertEquals(capped.points, 0);
+  assertEquals(capped.points, 100);
   assertEquals(capped.houseNetCents, 7500);
 });
 
@@ -221,6 +221,7 @@ Deno.test("vaga grátis usa só ponto de indicação e gera crédito da casa", (
     requestedPoints: 10000,
     availablePoints: 10000,
     availableBackedPoints: 10000,
+    backedFullSlotEnabled: false,
   });
   assertEquals(off.points, 2500);
   assertEquals(off.topupCents, 0);
@@ -238,13 +239,13 @@ Deno.test("vaga grátis usa só ponto de indicação e gera crédito da casa", (
   assertEquals(full.splitPercent, null);
   const promo = quotePointSubsidy({
     grossCents: 10000,
-    commissionBps: 10000,
+    commissionBps: 2500,
     requestedPoints: 10000,
     availablePoints: 10000,
     availableBackedPoints: 0,
     backedFullSlotEnabled: true,
   });
-  assertEquals(promo.points, 3000);
+  assertEquals(promo.points, 2500);
   assertEquals(promo.topupCents, 0);
   const again = quotePointSubsidy({
     grossCents: 10000,
@@ -263,7 +264,7 @@ Deno.test("vaga grátis usa só ponto de indicação e gera crédito da casa", (
   assertEquals(referralBookingsForPoints({
     targetPoints: 10000,
     grossCents: 10000,
-  }), 40);
+  }), 100);
 });
 
 Deno.test("pagador indicador e teto não tiram o cashback", () => {

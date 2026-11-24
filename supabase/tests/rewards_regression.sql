@@ -187,22 +187,23 @@ begin
   v_doubled := private.post_player_cashback(
     'aa500000-0000-4000-8000-000000000002', 2500
   );
-  if v_doubled <> 150
+  if v_doubled <> 100
     or (
       select points from public.scape_point_entries
       where source_charge_id = 'aa500000-0000-4000-8000-000000000002'
         and program = 'cashback' and kind = 'accrual'
-    ) <> 200
-    or (
-      select amount_cents from public.venue_cashback_debits
+    ) <> 100
+    or exists (
+      select 1 from public.venue_cashback_debits
       where source_charge_id = 'aa500000-0000-4000-8000-000000000002'
-    ) <> 50
-    or (
-      select applied_cents from public.venue_cashback_debits
-      where source_charge_id = 'aa500000-0000-4000-8000-000000000002'
-    ) <> 0
+    )
+    or exists (
+      select 1 from public.cashback_draws
+      where payment_charge_id = 'aa500000-0000-4000-8000-000000000002'
+        and doubled
+    )
   then
-    raise exception 'opt-in nao dobrou ou ja consumiu o repasse %', v_doubled;
+    raise exception 'horario vazio ainda dobrou o cashback %', v_doubled;
   end if;
 
   perform private.grant_welcome_points('aa100000-0000-4000-8000-000000000002');

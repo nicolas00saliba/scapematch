@@ -21,7 +21,7 @@ Responsabilidade pela nota. Quando a casa tem CNPJ ou MEI e informa inscrição 
 
 Pagamento. O Pix pago é estornado se o grupo não confirmar. A autorização do cartão não é capturada se o grupo não confirmar. A casa só reconhece como receita da sessão o que tiver sido confirmado.
 
-Horário vazio. A casa pode marcar faixas de horário em que quer dobrar o cashback do jogador. Isso é opt-in. Sem a marcação, o cashback sorteado (de 0,5% a 5%, com média de no máximo 1%) sai só da comissão da EscapeMatch. Com a marcação, o cashback dobra e a parte extra é dividida: o padrão é 50% descontado do repasse da casa e 50% da EscapeMatch. O desconto do repasse só existe se a casa marcou a faixa.
+Horário vazio. Nenhuma faixa dobra cashback nem indicação. O cashback sorteado (de 0,5% a 5%, com média de no máximo 1%) sai da comissão da EscapeMatch. A casa não marca horário para ganhar ponto em dobro.
 
 Indicação entre casas. O crédito de indicação fica 30 dias pendente e depois entra no repasse das cobranças seguintes, saindo da comissão da EscapeMatch. O líquido da reserva que gerou o crédito não muda.
 

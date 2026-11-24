@@ -41,10 +41,11 @@ void main() {
 
   test('os termos explicam o sorteio, o mínimo e os níveis', () {
     expect(LegalDocuments.termsBody, contains('0,5%'));
-    expect(LegalDocuments.termsBody, contains('1.000 pontos'));
-    expect(LegalDocuments.termsBody, contains('30%'));
-    expect(LegalDocuments.termsBody, contains('Prata'));
-    expect(LegalDocuments.termsBody, contains('Ouro'));
+    expect(LegalDocuments.termsBody, contains('100 pontos valem R\$ 1'));
+    expect(LegalDocuments.termsBody, contains('1% desde o primeiro'));
+    expect(LegalDocuments.termsBody, contains('0,5%'));
+    expect(LegalDocuments.termsBody, contains('20% de desconto'));
+    expect(LegalDocuments.termsBody, contains('5% a partir de 8'));
   });
 
   testWidgets('a tela mostra disponível, pendente e o código', (tester) async {
@@ -58,7 +59,9 @@ void main() {
     expect(find.byKey(AppKeys.scapePointsBalance), findsOneWidget);
     expect(find.textContaining('disponíveis'), findsOneWidget);
     expect(find.textContaining('250 pontos chegando'), findsOneWidget);
-    expect(find.textContaining('Nível Bronze'), findsOneWidget);
+    expect(find.textContaining('Nível 1%'), findsOneWidget);
+    expect(find.textContaining('100 pontos ='), findsOneWidget);
+    expect(find.byKey(const Key('scape-level-progress')), findsOneWidget);
     expect(find.textContaining('SCAPEDEMO'), findsOneWidget);
     expect(find.text('Cashback'), findsOneWidget);
     expect(find.text('Indicação de jogador'), findsOneWidget);

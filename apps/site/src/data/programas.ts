@@ -1,4 +1,4 @@
-export const regrasVersao = '2026-11-11';
+export const regrasVersao = '2026-11-24';
 
 export const comissaoPadrao = {
   percentual: 25,
@@ -81,7 +81,7 @@ export const programas: Programa[] = [
     titulo: 'Indique amigos',
     beneficio: '20% de desconto para ele, pontos para você',
     apoio:
-      'Seu amigo ganha 20% de desconto na primeira reserva. Você ganha 2,5% em pontos de cada reserva dele, por 1 ano.',
+      'Seu amigo ganha 20% de desconto na primeira reserva. Você ganha 1% em pontos desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8, por 1 ano.',
     passos: ['Mande seu código', 'Amigo entra e joga', 'Vocês ganham'],
     regras:
       'O amigo usa o seu código no cadastro. Conta da mesma pessoa não vale: mesmo CPF, telefone ou cartão.',
@@ -101,7 +101,7 @@ export const programas: Programa[] = [
     publico: 'jogador',
     icone: 'casa',
     titulo: 'Indique uma casa',
-    beneficio: '2,5% em pontos',
+    beneficio: '5% em pontos',
     apoio: 'Do que a casa indicada vender pelo app, por 1 ano.',
     passos: ['Indique a casa', 'A casa entra', 'Você ganha'],
     regras:
@@ -121,16 +121,16 @@ export const programas: Programa[] = [
     rota: '/vantagens/niveis',
     publico: 'jogador',
     icone: 'niveis',
-    titulo: 'Bronze, Prata e Ouro',
-    beneficio: 'Indique mais, ganhe mais',
+    titulo: 'Níveis de indicação',
+    beneficio: '1%, 2,5% e 5%',
     apoio:
-      'Quem mais indica, mais joga de graça. A base é 2,5% em pontos. Prata soma 0,5%. Ouro soma 1%.',
+      '1% desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8. Sem indicado ativo, a taxa é zero.',
     passos: ['Indique', 'Eles jogam', 'Você sobe'],
     regras:
-      'Conta como jogando quem pagou uma reserva nos últimos 90 dias. O extra vale para amigos e casas indicados.',
+      'Ativo é quem tem atribuição ativa e pagou uma reserva nos últimos 90 dias. Os níveis valem só para jogador que indica jogador. Casa indicada e casa que indica ficam em 5%, sem nível.',
     seoTitulo: 'Níveis para jogar de graça | EscapeMatch',
     seoDescricao:
-      'Quem mais indica, mais joga de graça. A base é 2,5% em pontos. 1 ponto vale R$ 0,01.',
+      '1% desde o primeiro indicado ativo. 100 pontos valem R$ 1.',
     og: '/assets/og/niveis.png',
     cta: {
       rotulo: 'Ver meu nível no app',
@@ -166,7 +166,7 @@ export const programas: Programa[] = [
     publico: 'casa',
     icone: 'pessoas',
     titulo: 'Indique jogadores',
-    beneficio: '2,5% em crédito',
+    beneficio: '5% em crédito',
     apoio:
       'Do que o seu cliente pagar em outras casas, por 1 ano. Ele ganha 20% de desconto na primeira reserva.',
     passos: ['Mostre seu código', 'Cliente entra', 'Vocês ganham'],
@@ -188,14 +188,14 @@ export const programas: Programa[] = [
     publico: 'casa',
     icone: 'relogio',
     titulo: 'Horário vazio',
-    beneficio: 'Pontos em dobro',
-    apoio: 'Para quem reservar nos horários que você marcar como vazios.',
-    passos: ['Marque o horário', 'Jogador vê o dobro', 'Horário enche'],
+    beneficio: 'Sem pontos em dobro',
+    apoio: 'Horário vazio não dobra cashback nem indicação, em nenhum programa.',
+    passos: ['Sem faixa extra', 'O ponto não dobra', 'A casa não paga o dobro'],
     regras:
-      'Você marca os horários no Parceiro. O custo do dobro é dividido: metade fica com a casa e metade com o EscapeMatch.',
-    seoTitulo: 'Encha seus horários vazios | EscapeMatch',
+      'Desde 24/11/2026 nenhuma faixa de horário dobra pontos ou cashback. A casa não marca horário para isso e nada extra sai do repasse por causa do horário.',
+    seoTitulo: 'Horário vazio não dobra pontos | EscapeMatch',
     seoDescricao:
-      'Marque horários vazios e o jogador ganha pontos em dobro para reservar neles.',
+      'Horário vazio não dobra cashback nem indicação. A casa não paga um extra por causa do horário.',
     og: '/assets/og/horario-vazio.png',
     cta: {
       rotulo: 'Marcar no Parceiro',
@@ -215,12 +215,12 @@ export function programaPorId(id: string): Programa {
 }
 
 export const regrasVagaGratis = [
-  'Dá para usar a partir de 1.000 pontos.',
+  'Dá para pagar em dinheiro, em pontos ou nos dois. Não há mínimo de pontos nem teto de 30%.',
   'Se a reserva for cancelada, os pontos usados são devolvidos.',
 ];
 
 export const regrasJogador = [
-  '1 ponto vale R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Só as boas-vindas dão desconto. Não viram dinheiro para saque.',
+  '100 pontos valem R$ 1. Não viram dinheiro para saque. Pontos de indicação e de cashback podem cobrir a vaga quando a reserva de pontos cobre a casa. Pontos de boas-vindas abatem até a comissão.',
   'Os pontos ganhos ficam disponíveis 30 dias depois do pagamento.',
   'O código de quem indicou entra no cadastro ou nas primeiras 24 horas. Uma indicação vale por 1 ano.',
   'Se a reserva for cancelada, os pontos ganhos nela também saem da conta.',
@@ -251,4 +251,4 @@ export const regrasFraude = [
 ];
 
 export const sorteioPontos =
-  'O cashback é sorteado a cada reserva paga, sobre o valor pago. As faixas são 0,5% (70% das vezes), 1% (17%), 2% (9%) e 5% (4%). A média desta tabela é 0,9%. Em horário vazio, o resultado vale em dobro.';
+  'O cashback é sorteado a cada reserva paga, sobre o valor pago. As faixas são 0,5% (70% das vezes), 1% (17%), 2% (9%) e 5% (4%). A média desta tabela é 0,9%. Horário vazio não dobra o resultado.';

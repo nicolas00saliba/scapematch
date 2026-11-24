@@ -154,6 +154,7 @@ class CardPaymentFlow {
     required String idempotencyKey,
     int installments = 1,
     int? expectedAmountCents,
+    int points = 0,
   }) async {
     final saved = await tokenize(card);
     return charge(
@@ -163,6 +164,7 @@ class CardPaymentFlow {
       savedCardId: saved.savedCardId,
       installments: installments,
       expectedAmountCents: expectedAmountCents,
+      points: points,
     );
   }
 

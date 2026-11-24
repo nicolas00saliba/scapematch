@@ -218,23 +218,25 @@ class ScapePointsView extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 8),
-                if (wallet.availablePoints < wallet.redeemMinPoints) ...[
-                  LinearProgressIndicator(
-                    value: wallet.redeemMinPoints == 0
-                        ? 1
-                        : wallet.availablePoints / wallet.redeemMinPoints,
-                  ),
-                  const SizedBox(height: 6),
+                if (wallet.redeemMinPoints > 0 &&
+                    wallet.availablePoints < wallet.redeemMinPoints) ...[
                   Text(
                     'Faltam ${formatPoints(wallet.redeemMinPoints - wallet.availablePoints)} pontos pra usar na sua próxima sala.',
                   ),
                 ] else
-                  const Text('Você já pode usar pontos na próxima sala.'),
+                  const Text(
+                    'Dá para pagar a sala em dinheiro, em pontos ou nos dois.',
+                  ),
                 const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  key: const Key('scape-level-progress'),
+                  value: wallet.levelProgress,
+                ),
+                const SizedBox(height: 6),
                 Text('Nível ${wallet.tierLabel}. ${wallet.tierProgress}'),
                 const SizedBox(height: 8),
                 Text(
-                  '1 ponto = ${formatPrice(wallet.pointValueCents)}. Não vencem e não sacam. Servem para pagar a sua parte da sala.',
+                  '100 pontos = ${formatPrice(wallet.pointValueCents * 100)}. Não vencem e não sacam. Servem para pagar a sua parte da sala.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.35,

@@ -52,15 +52,24 @@ void main() {
     );
   }
 
-  test('1 ponto vale 1 centavo e o C2C fica em 2,5%', () {
+  test('100 pontos valem R\$ 1 e o C2C começa em 1%', () {
     expect(ReferralRates.official.pointValueCents, 1);
-    expect(ReferralRates.official.c2cBps, 250);
+    expect(ReferralRates.official.c2cRateBps(0), 0);
+    expect(ReferralRates.official.c2cRateBps(1), 100);
+    expect(ReferralRates.official.c2cRateBps(5), 250);
+    expect(ReferralRates.official.c2cRateBps(8), 500);
+    expect(ReferralRates.official.b2cBps, 500);
+    expect(ReferralRates.official.c2bBps, 500);
+    expect(ReferralRates.official.b2bBps, 500);
+    expect(ReferralRates.official.redeemMinPoints, 0);
+    expect(ReferralRates.official.redeemMaxBps, 10000);
+    expect(ReferralRates.official.backedFullSlotEnabled, isTrue);
     expect(ReferralRates.official.cashbackBps, 100);
     final lines = quoteReferralRewards(spend(playerReferrer: window));
     expect(lines.map((line) => line.program), ['cashback', 'c2c']);
     expect(lines.first.points, 100);
-    expect(lines.last.points, 250);
-    expect(lines.last.cents, 250);
+    expect(lines.last.points, 100);
+    expect(lines.last.cents, 100);
     expect(lines.last.payee, RewardPayee.playerPoints);
   });
 
@@ -82,10 +91,11 @@ void main() {
         commissionBps: 300,
       ),
     );
-    expect(lines.map((line) => line.program), ['cashback', 'c2c']);
+    expect(lines.map((line) => line.program), ['cashback', 'c2c', 'c2b']);
     expect(lines[0].points, 100);
-    expect(lines[1].points, 200);
-    expect(lines[0].cents + lines[1].cents, 300);
+    expect(lines[1].points, 100);
+    expect(lines[2].points, 100);
+    expect(lines.fold<int>(0, (sum, line) => sum + line.cents), 300);
   });
 
   test('fora da janela de um ano não lança', () {
@@ -117,7 +127,7 @@ void main() {
     expect(lines.first.program, 'cashback');
     expect(credit.payee, RewardPayee.venueCredit);
     expect(credit.points, 0);
-    expect(credit.cents, 250);
+    expect(credit.cents, 500);
   });
 
   test('B2B é 5% em toda reserva do ano, menos a do desconto de 20%', () {
@@ -142,7 +152,7 @@ void main() {
       spend(venueReferrer: window, venueReferrerIsPlayer: true),
     );
     expect(lines.map((line) => line.program), ['cashback', 'c2b']);
-    expect(lines.last.points, 250);
+    expect(lines.last.points, 500);
   });
 
   test('CPF ausente segura o ponto e a fraude zera o lançamento', () {
@@ -237,18 +247,18 @@ void main() {
       requestedPoints: 9000,
       availablePoints: 100,
     );
-    expect(quote.points, 0);
-    expect(quote.chargedCents, 10000);
+    expect(quote.points, 100);
+    expect(quote.chargedCents, 9900);
     expect(quote.houseNetCents, 7500);
-    expect(quote.maxPoints, 0);
+    expect(quote.maxPoints, greaterThan(0));
     final capped = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 10000,
       requestedPoints: 5000,
       availablePoints: 5000,
     );
-    expect(capped.points, 3000);
-    expect(capped.chargedCents, 7000);
+    expect(capped.points, 5000);
+    expect(capped.chargedCents, 5000);
   });
 
   test('com a flag desligada o lastro continua no teto da comissão', () {
@@ -258,6 +268,7 @@ void main() {
       requestedPoints: 10000,
       availablePoints: 10000,
       availableBackedPoints: 10000,
+      rates: const ReferralRates(backedFullSlotEnabled: false),
     );
     expect(quote.points, 2500);
     expect(quote.backedPoints, 2500);
@@ -288,21 +299,21 @@ void main() {
     expect(quote.subsidyCents, 10000);
   });
 
-  test('boas-vindas e promoção não passam do teto mesmo com a flag ligada', () {
+  test('boas-vindas e promoção não passam da comissão mesmo com a flag ligada', () {
     const rates = ReferralRates(backedFullSlotEnabled: true);
     final quote = quotePointSubsidy(
       grossCents: 10000,
-      commissionBps: 10000,
+      commissionBps: 2500,
       requestedPoints: 10000,
       availablePoints: 10000,
       availableBackedPoints: 0,
       rates: rates,
     );
-    expect(quote.points, 3000);
-    expect(quote.unbackedPoints, 3000);
+    expect(quote.points, 2500);
+    expect(quote.unbackedPoints, 2500);
     expect(quote.topupCents, 0);
     expect(quote.pointsOnly, isFalse);
-    expect(quote.chargedCents, 7000);
+    expect(quote.chargedCents, 7500);
   });
 
   test('o lastro completa o que a promoção não pode passar da comissão', () {
@@ -376,10 +387,10 @@ void main() {
     expect(fraud.topupCents, 0);
   });
 
-  test('dez mil pontos de indicação pedem quarenta reservas de R\$ 100', () {
+  test('dez mil pontos no primeiro nível pedem cem reservas de R\$ 100', () {
     expect(
       referralBookingsForPoints(targetPoints: 10000, grossCents: 10000),
-      40,
+      100,
     );
     expect(
       pointsFromCents(commissionCents(10000, 250), 1),
@@ -398,7 +409,7 @@ void main() {
         discountBps: 2000,
         commissionCentsValue: 1500,
       ),
-      1500,
+      2000,
     );
     expect(
       payerDocumentStatus(

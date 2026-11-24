@@ -231,6 +231,7 @@ class SupabaseGroupRepository implements GroupRepository {
     required CardDraft card,
     int installments = 1,
     int? expectedAmountCents,
+    int points = 0,
   }) {
     return _charge(groupId, userId, () {
       return CardPaymentFlow(_invoke).payWithNewCard(
@@ -239,6 +240,7 @@ class SupabaseGroupRepository implements GroupRepository {
         idempotencyKey: _chargeKey(groupId, userId),
         installments: installments,
         expectedAmountCents: expectedAmountCents,
+        points: points,
       );
     });
   }

@@ -193,7 +193,7 @@ begin
   select pending_points, available_points
     into v_pending, v_available
   from private.scape_balances('bb111111-1111-1111-1111-111111111111');
-  if v_pending <> 250 or v_available <> 0 then
+  if v_pending <> 100 or v_available <> 0 then
     raise exception 'saldo pendente inesperado % / %', v_pending, v_available;
   end if;
 
@@ -219,7 +219,7 @@ begin
   select pending_points, available_points
     into v_pending, v_available
   from private.scape_balances('bb111111-1111-1111-1111-111111111111');
-  if v_pending <> 250 or v_available <> 0 then
+  if v_pending <> 100 or v_available <> 0 then
     raise exception 'liberou antes dos 30 dias';
   end if;
 
@@ -228,7 +228,7 @@ begin
   select pending_points, available_points
     into v_pending, v_available
   from private.scape_balances('bb111111-1111-1111-1111-111111111111');
-  if v_pending <> 0 or v_available <> 250 then
+  if v_pending <> 0 or v_available <> 100 then
     raise exception 'liberacao nao idempotente % / %', v_pending, v_available;
   end if;
   if (
@@ -455,7 +455,7 @@ begin
     where source_charge_id = 'bb911111-1111-1111-1111-111111111111'
       and kind = 'accrual'
       and program = 'c2c'
-  ) is distinct from 250 then
+  ) is distinct from 100 then
     raise exception 'pagamento por terceiro nao liberou a indicacao';
   end if;
   if not private.cashback_points_ok('bb911111-1111-1111-1111-111111111111') then
@@ -487,7 +487,7 @@ begin
     where source_charge_id = 'bb911111-1111-1111-1111-111111111111'
       and kind = 'accrual'
       and program = 'c2c'
-  ) is distinct from 250 then
+  ) is distinct from 100 then
     raise exception 'depois de conferir o CPF a recompensa nao entrou';
   end if;
   if private.referral_benefit_allowed(
@@ -560,7 +560,7 @@ begin
     where source_charge_id = 'bba11111-1111-1111-1111-111111111111'
       and kind = 'accrual'
       and program = 'c2c'
-  ) is distinct from 200 then
+  ) is distinct from 80 then
     raise exception 'cartao de terceiro nao liberou a indicacao';
   end if;
   if not private.cashback_points_ok('bba11111-1111-1111-1111-111111111111') then
@@ -611,8 +611,8 @@ begin
     2500,
     1000
   );
-  if (v_quote ->> 'points')::integer <> 250
-    or (v_quote ->> 'charged_cents')::integer <> 9750
+  if (v_quote ->> 'points')::integer <> 100
+    or (v_quote ->> 'charged_cents')::integer <> 9900
     or (v_quote ->> 'house_net_cents')::integer <> 7500
   then
     raise exception 'quote de abatimento inesperada %', v_quote;
@@ -631,7 +631,7 @@ begin
     (v_quote ->> 'points')::integer,
     (v_quote ->> 'split_percent')::numeric
   );
-  if (v_reserved ->> 'split_percent')::numeric <> 76.9231 then
+  if (v_reserved ->> 'split_percent')::numeric <> 75.7576 then
     raise exception 'split nao devolve o liquido %', v_reserved;
   end if;
 
@@ -660,7 +660,7 @@ begin
   from public.ledger_entries
   where payment_charge_id = (v_reserved ->> 'id')::uuid
     and kind = 'commission';
-  if v_house <> 7500 or v_fee <> 2250 then
+  if v_house <> 7500 or v_fee <> 2400 then
     raise exception 'abatimento comeu a casa % / %', v_house, v_fee;
   end if;
   select available_points into v_available
@@ -2048,8 +2048,8 @@ begin
     'idem-replay-cashback', 'wal_house', 180, v_paid
   );
   v_again := private.post_player_cashback('be720000-0000-4000-8000-000000000006', 180);
-  if v_again <> 150
-    or private.post_player_cashback('be720000-0000-4000-8000-000000000006', 180) <> 150
+  if v_again <> 100
+    or private.post_player_cashback('be720000-0000-4000-8000-000000000006', 180) <> 100
   then
     raise exception 'replay do cashback nao devolveu a parte da plataforma %', v_again;
   end if;
@@ -2057,18 +2057,19 @@ begin
     select points from public.scape_point_entries
     where source_charge_id = 'be720000-0000-4000-8000-000000000006'
       and program = 'cashback' and kind = 'accrual'
-  ) <> 200 or (
+  ) <> 100 or (
     select count(*) from public.scape_point_entries
     where source_charge_id = 'be720000-0000-4000-8000-000000000006'
       and program = 'cashback' and kind = 'accrual'
-  ) <> 1 or (
-    select applied_cents from public.venue_cashback_debits
+  ) <> 1 or exists (
+    select 1 from public.venue_cashback_debits
     where source_charge_id = 'be720000-0000-4000-8000-000000000006'
-  ) <> 0 or (
-    select amount_cents from public.venue_cashback_debits
-    where source_charge_id = 'be720000-0000-4000-8000-000000000006'
-  ) <> 50 then
-    raise exception 'dobro do horario vazio nao ficou como obrigacao da casa';
+  ) or exists (
+    select 1 from public.cashback_draws
+    where payment_charge_id = 'be720000-0000-4000-8000-000000000006'
+      and doubled
+  ) then
+    raise exception 'horario vazio ainda dobrou o cashback';
   end if;
   if not exists (
     select 1 from public.referral_attributions
@@ -2083,7 +2084,7 @@ begin
   from public.scape_point_entries
   where source_charge_id = 'be720000-0000-4000-8000-000000000006'
     and program = 'c2c' and kind = 'accrual';
-  if v_c2c is distinct from 30 then
+  if v_c2c is distinct from 80 then
     raise exception 'replay do cashback encolheu a indicacao %', v_c2c;
   end if;
   update public.referral_program_settings
