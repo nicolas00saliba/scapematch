@@ -23,9 +23,12 @@ import 'package:scapematch_parceiro/features/partner/presentation/venue_referral
 
 void main() {
   setUpAll(() async {
-    const dir = '/home/ubuntu/flutter/bin/cache/artifacts/material_fonts';
+    const dir = '/opt/flutter/bin/cache/artifacts/material_fonts';
+    const alt = '/home/ubuntu/flutter/bin/cache/artifacts/material_fonts';
+    final root = Directory(dir).existsSync() ? dir : alt;
+    if (!File('$root/Roboto-Regular.ttf').existsSync()) return;
     Future<ByteData> bytes(String name) async {
-      final data = File('$dir/$name').readAsBytesSync();
+      final data = File('$root/$name').readAsBytesSync();
       return ByteData.view(Uint8List.fromList(data).buffer);
     }
 
