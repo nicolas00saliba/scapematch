@@ -122,6 +122,8 @@ void main() {
     expect(options.every((item) => item.enabled), isTrue);
     expect(options[2].interestFree, isTrue);
     expect(options[3].showsTotal, isTrue);
+    final photo = File('test/fixtures/sala-acerto-de-contas.jpeg')
+        .readAsBytesSync();
     await _shot(
       tester,
       const Size(390, 280),
@@ -132,9 +134,10 @@ void main() {
           body: Padding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
             child: ReservationPaySummary(
-              coverAsset: 'assets/images/news/biblioteca.jpg',
-              houseName: 'Biblioteca de São Paulo',
-              roomName: 'Sala Mistério',
+              coverAsset: '',
+              coverBytes: photo,
+              houseName: 'Puzzle Room Escape Game',
+              roomName: 'Acerto de Contas',
               totalLabel: formatPrice(10000),
               installmentLabel: '3x sem juros',
               onOpenInstallments: () {},
@@ -143,6 +146,7 @@ void main() {
         ),
       ),
       '/opt/cursor/artifacts/resumo-parcelas-390.png',
+      photo: MemoryImage(photo),
     );
     await _shot(
       tester,
@@ -161,20 +165,21 @@ Future<void> _shot(
   WidgetTester tester,
   Size size,
   Widget app,
-  String path,
-) async {
+  String path, {
+  ImageProvider? photo,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(app);
   final context = tester.element(find.byType(Scaffold).first);
-  await tester.runAsync(() async {
-    await precacheImage(
-      const AssetImage('assets/images/news/biblioteca.jpg'),
-      context,
-    );
-  });
+  final provider = photo;
+  if (provider != null) {
+    await tester.runAsync(() async {
+      await precacheImage(provider, context);
+    });
+  }
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
   final view = tester.binding.renderViews.first;

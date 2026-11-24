@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/scape_photo.dart';
@@ -9,6 +11,7 @@ class ReservationPaySummary extends StatelessWidget {
   const ReservationPaySummary({
     super.key,
     required this.coverAsset,
+    this.coverBytes,
     required this.houseName,
     required this.roomName,
     required this.totalLabel,
@@ -17,6 +20,9 @@ class ReservationPaySummary extends StatelessWidget {
   });
 
   final String coverAsset;
+
+  /// Foto já lida, só para o print de divulgação. A folha real usa [coverAsset].
+  final Uint8List? coverBytes;
   final String houseName;
   final String roomName;
   final String totalLabel;
@@ -40,10 +46,11 @@ class ReservationPaySummary extends StatelessWidget {
               child: SizedBox(
                 width: 88,
                 height: 88,
-                child: coverAsset.isEmpty
+                child: coverBytes == null && coverAsset.isEmpty
                     ? ColoredBox(color: scheme.primaryContainer)
                     : ScapePhoto(
                         asset: coverAsset,
+                        bytes: coverBytes,
                         semanticLabel: roomName.isEmpty ? houseName : roomName,
                       ),
               ),
