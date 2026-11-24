@@ -23,7 +23,6 @@ import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/features/scape_points/presentation/scape_points_view.dart';
 import 'package:scapematch/providers/repositories.dart';
-import 'package:dominio/dominio.dart';
 
 void main() {
   setUpAll(() async {
