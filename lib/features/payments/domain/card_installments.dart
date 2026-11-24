@@ -40,11 +40,15 @@ int cardInstallmentCents(int totalCents, int count) {
 }
 
 /// 1x a 12x. Sem o juro cotado, 4x a 12x ficam desabilitadas.
+///
+/// [minAmountCents] só muda o piso desta lista. O app e o servidor
+/// continuam em [minCardInstallmentCents].
 List<CardInstallmentOption> cardInstallmentOptions({
   required int principalCents,
   Map<int, int> interestCentsByCount = const {},
+  int minAmountCents = minCardInstallmentCents,
 }) {
-  final below = principalCents < minCardInstallmentCents;
+  final below = principalCents < minAmountCents;
   return [
     for (var count = 1; count <= maxCardInstallments; count++)
       _option(

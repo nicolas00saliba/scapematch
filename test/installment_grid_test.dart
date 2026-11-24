@@ -83,10 +83,32 @@ void main() {
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
   });
 
+  test('R\$ 100 no app real só libera à vista', () {
+    final options = cardInstallmentOptions(
+      principalCents: 10000,
+      interestCentsByCount: {
+        for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
+      },
+    );
+    expect(options.where((item) => item.enabled).map((item) => item.count), [
+      1,
+    ]);
+    expect(options[1].disabledReason, 'parcelamento a partir de R\$150');
+  });
+
   testWidgets('salva o resumo e a grade a 390px', (tester) async {
     if (Platform.environment['SCAPEMATCH_INSTALLMENT_SHOT'] != '1') return;
     await tester.runAsync(_loadFonts);
-    final options = cardInstallmentOptions(principalCents: 10000);
+    final options = cardInstallmentOptions(
+      principalCents: 10000,
+      minAmountCents: 10000,
+      interestCentsByCount: {
+        for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
+      },
+    );
+    expect(options.every((item) => item.enabled), isTrue);
+    expect(options[2].interestFree, isTrue);
+    expect(options[3].showsTotal, isTrue);
     await _shot(
       tester,
       const Size(390, 280),
@@ -101,7 +123,7 @@ void main() {
               houseName: 'Biblioteca de São Paulo',
               roomName: 'Sala Mistério',
               totalLabel: formatPrice(10000),
-              installmentLabel: 'À vista',
+              installmentLabel: '3x sem juros',
               onOpenInstallments: () {},
             ),
           ),
@@ -115,7 +137,7 @@ void main() {
       MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(Brightness.light),
-        home: InstallmentPickerPage(options: options, selected: 1),
+        home: InstallmentPickerPage(options: options, selected: 3),
       ),
       '/opt/cursor/artifacts/parcelas-390.png',
     );
