@@ -12,6 +12,8 @@ import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 /// Cadastro que o Google não traz: nome, nascimento, termos e o que for
@@ -160,7 +162,10 @@ class _CompleteSignupScreenState extends ConsumerState<CompleteSignupScreen> {
       appBar: AppBar(
         title: const Text('Completar cadastro'),
         actions: [
-          TextButton(onPressed: _busy ? null : _signOut, child: const Text('Sair')),
+          TextButton(
+            onPressed: _busy ? null : _signOut,
+            child: const Text('Sair'),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -255,7 +260,8 @@ class _CompleteSignupScreenState extends ConsumerState<CompleteSignupScreen> {
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Telefone (opcional)',
-                helperText: 'DDD e número. Serve para a indicação não se repetir.',
+                helperText:
+                    'DDD e número. Serve para a indicação não se repetir.',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -264,10 +270,11 @@ class _CompleteSignupScreenState extends ConsumerState<CompleteSignupScreen> {
               key: AppKeys.signupReferral,
               controller: _referral,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Código de indicação (opcional)',
-                helperText: 'Só entra neste cadastro. Um código por conta.',
-                border: OutlineInputBorder(),
+                helperText: referralCodeHint(ref.watch(rewardRulesProvider)),
+                helperMaxLines: 3,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),

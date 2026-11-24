@@ -111,6 +111,21 @@ const rewardFields = <RewardField>[
     percentOf: 'da reserva',
   ),
   RewardField(
+    id: 'first_booking_discount_bps',
+    section: 'Primeira sessão',
+    label: 'Desconto com código',
+    help: 'Primeira sessão de quem entrou com código de jogador ou de casa. O padrão é 20%.',
+    kind: RewardKind.basisPoints,
+    percentOf: 'da reserva',
+  ),
+  RewardField(
+    id: 'organic_first_booking_discount_bps',
+    label: 'Desconto sem código',
+    help: 'Primeira sessão de quem se cadastrou sozinho. O padrão é 10%.',
+    kind: RewardKind.basisPoints,
+    percentOf: 'da reserva',
+  ),
+  RewardField(
     id: 'cashback_bps',
     section: 'Cashback',
     label: 'Cashback do pagador',

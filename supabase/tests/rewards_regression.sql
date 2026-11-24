@@ -24,7 +24,8 @@ begin
       welcome_points = 100,
       redeem_min_points = 1000,
       redeem_max_bps = 3000,
-      first_booking_discount_bps = 0
+      first_booking_discount_bps = 0,
+      organic_first_booking_discount_bps = 0
   where id = 1;
 
   insert into auth.users (id, email, raw_user_meta_data)

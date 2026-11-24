@@ -7,7 +7,8 @@ begin;
 select set_config('request.jwt.claim.sub', '', true);
 
 update public.referral_program_settings
-set first_booking_discount_bps = 0
+set first_booking_discount_bps = 0,
+    organic_first_booking_discount_bps = 0
 where id = 1;
 
 update public.platform_settings

@@ -198,6 +198,7 @@ begin
 
   update public.referral_program_settings
   set first_booking_discount_bps = 0,
+      organic_first_booking_discount_bps = 0,
       redeem_min_points = 1000,
       redeem_max_bps = 3000,
       backed_full_slot_enabled = false

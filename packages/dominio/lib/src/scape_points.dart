@@ -23,6 +23,7 @@ class ReferralRates {
     this.holdDays = 30,
     this.cashbackBps = 100,
     this.firstBookingDiscountBps = 2000,
+    this.organicFirstBookingDiscountBps = 1000,
     this.redeemMinPoints = 0,
     this.redeemMaxBps = 10000,
     this.backedFullSlotEnabled = false,
@@ -78,10 +79,13 @@ class ReferralRates {
   /// 100 = 1%. Sai da comissão que sobrou.
   final int cashbackBps;
 
-  /// Desconto da primeira reserva com código, em basis points.
+  /// Desconto da primeira sessão de quem entrou com código, em basis points.
   /// Não é aplicado sozinho. Quando a cobrança traz esse desconto,
   /// o B2B daquela reserva não é lançado.
   final int firstBookingDiscountBps;
+
+  /// Desconto da primeira sessão de quem se cadastrou sem código.
+  final int organicFirstBookingDiscountBps;
 
   /// O pagador é o próprio indicador: aquela indicação não é lançada.
   final bool blockSelfPayer;
@@ -591,7 +595,8 @@ PointSubsidyQuote quotePointSubsidy({
   if (grossCents <= 0) {
     throw ArgumentError('A reserva precisa de um valor.');
   }
-  if (receiptFeeCents < 0 || (reservedBalanceCents != null && reservedBalanceCents < 0)) {
+  if (receiptFeeCents < 0 ||
+      (reservedBalanceCents != null && reservedBalanceCents < 0)) {
     throw ArgumentError('A taxa e o saldo reservado não podem ser negativos.');
   }
   final commission = commissionCents(grossCents, commissionBps);
@@ -604,12 +609,9 @@ PointSubsidyQuote quotePointSubsidy({
   );
   final backedPool = _clampBacked(availableBackedPoints, availablePoints);
   final unbackedPool = availablePoints - backedPool;
-  final extensionOff =
-      !rates.backedFullSlotEnabled || backedFraudHold;
+  final extensionOff = !rates.backedFullSlotEnabled || backedFraudHold;
   if (extensionOff) {
-    final reason = !rates.backedFullSlotEnabled
-        ? null
-        : 'antifraud';
+    final reason = !rates.backedFullSlotEnabled ? null : 'antifraud';
     return _classicQuote(
       grossCents: grossCents,
       commission: commission,
@@ -624,7 +626,8 @@ PointSubsidyQuote quotePointSubsidy({
   }
 
   final fullPoints = pointsFromCents(grossCents, rates.pointValueCents);
-  final reserved = reservedBalanceCents ??
+  final reserved =
+      reservedBalanceCents ??
       centsFromPoints(backedPool, rates.pointValueCents);
   final ceiling = _allocateFullSlot(
     want: availablePoints > fullPoints ? fullPoints : availablePoints,
@@ -827,7 +830,9 @@ _FullAllocation _allocateFullSlot({
       backedSpend -= 1;
       continue;
     }
-    final topup = charged == 0 ? houseNet : (houseNet > net ? houseNet - net : 0);
+    final topup = charged == 0
+        ? houseNet
+        : (houseNet > net ? houseNet - net : 0);
     if (backedSpend == 0) {
       return _FullAllocation(
         points: unbackedSpend,

@@ -79,9 +79,9 @@ export const programas: Programa[] = [
     publico: 'jogador',
     icone: 'pessoas',
     titulo: 'Indique amigos',
-    beneficio: '20% de desconto para ele, pontos para você',
+    beneficio: '20% com código, 10% sem, pontos para você',
     apoio:
-      'Seu amigo ganha 20% de desconto na primeira reserva. Você ganha 1% em pontos desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8, por 1 ano.',
+      'Seu amigo ganha 20% de desconto na primeira sessão se usar o seu código, e 10% se entrar sem código. Você ganha 1% em pontos desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8, por 1 ano.',
     passos: ['Mande seu código', 'Amigo entra e joga', 'Vocês ganham'],
     regras:
       'O amigo usa o seu código no cadastro. Conta da mesma pessoa não vale: mesmo CPF, telefone ou cartão.',
@@ -146,10 +146,10 @@ export const programas: Programa[] = [
     titulo: 'Indique uma casa',
     beneficio: '5% em crédito',
     apoio:
-      'De tudo que a casa indicada vender pelo app, por 1 ano. Seus clientes ganham 20% na primeira visita a ela.',
+      'De tudo que a casa indicada vender pelo app, por 1 ano. A primeira sessão do cliente é 20% se ele entrou com código e 10% se entrou sem.',
     passos: ['Mande seu código', 'A casa entra', 'Vocês ganham'],
     regras:
-      'A reserva que teve os 20% de desconto não gera crédito. O crédito sai da comissão do EscapeMatch, não da casa indicada. Dono ou sócio não indica a própria casa.',
+      'A reserva da primeira sessão, com 20% ou 10%, não gera crédito. O crédito sai da comissão do EscapeMatch, não da casa indicada. Dono ou sócio não indica a própria casa.',
     seoTitulo: 'Indique uma casa parceira | EscapeMatch',
     seoDescricao:
       'Indique outra casa e ganhe crédito sobre o que ela vender pelo app, por 1 ano.',
@@ -168,7 +168,7 @@ export const programas: Programa[] = [
     titulo: 'Indique jogadores',
     beneficio: '5% em crédito',
     apoio:
-      'Do que o seu cliente pagar em outras casas, por 1 ano. Ele ganha 20% de desconto na primeira reserva.',
+      'Do que o seu cliente pagar em outras casas, por 1 ano. Ele ganha 20% na primeira sessão se usar o seu código, e 10% se entrar sem código.',
     passos: ['Mostre seu código', 'Cliente entra', 'Vocês ganham'],
     regras:
       'Reservas na sua própria casa não geram crédito. O cliente usa o seu código no cadastro.',

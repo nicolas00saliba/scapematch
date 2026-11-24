@@ -46,15 +46,15 @@ Formas de ganhar, com os valores publicados no site:
 
 - Boas-vindas: 100 pontos, uma vez por conta.
 - Pontos de volta: cashback de até 5% em pontos a cada jogo. O valor é sorteado a cada reserva paga: 0,5% (70% das vezes), 1% (17%), 2% (9%) e 5% (4%). A média desta tabela é 0,9%. Horário vazio não dobra o resultado.
-- Indique amigos: o amigo ganha 20% de desconto na primeira reserva. Quem indicou ganha 1% desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8, por 1 ano.
+- Indique amigos: o amigo ganha 20% de desconto na primeira sessão se usar o código, e 10% se entrar sem código. Quem indicou ganha 1% desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8, por 1 ano.
 - Indique uma casa: 5% em pontos do que a casa indicada vender pelo app, por 1 ano. Dono ou sócio não indica a própria casa.
 - Níveis: 1% desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8. Ativo é quem tem atribuição ativa e pagou uma reserva nos últimos 90 dias. Os níveis valem só para jogador que indica jogador.
 
-O código de quem indicou entra no cadastro ou nas primeiras 24 horas. O desconto de 20% da primeira reserva é só para conta nova.
+O código de quem indicou entra no cadastro ou nas primeiras 24 horas. A primeira sessão é 20% com código e 10% sem código, só para conta nova.
 
 Contas da mesma pessoa não geram indicação: mesmo CPF, mesmo telefone ou mesmo cartão. Se quem paga é o próprio indicador, aquela indicação não vale. Um mesmo pagador gera prêmio para no máximo 3 contas indicadas. Contas criadas no mesmo aparelho pelo mesmo indicador passam por revisão antes de liberar os pontos.
 
-Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no repasse das próximas reservas pelo app. Indicar outra casa rende 5% em crédito do que ela vender pelo app, por 1 ano, fora a reserva que teve os 20% de desconto. Indicar jogadores rende 5% em crédito do que o cliente pagar em outras casas, por 1 ano.
+Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no repasse das próximas reservas pelo app. Indicar outra casa rende 5% em crédito do que ela vender pelo app, por 1 ano, fora a primeira sessão, que é 20% com código e 10% sem. Indicar jogadores rende 5% em crédito do que o cliente pagar em outras casas, por 1 ano.
 
 ## Páginas principais
 

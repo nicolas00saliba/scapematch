@@ -141,9 +141,7 @@ class ScapeWallet {
       backedPoints: _intOf(json['backed_points']),
       unbackedPoints: _intOf(json['unbacked_points']),
       freeSlotEnabled: json['backed_full_slot_enabled'] == true,
-      freeSlotMonthlyLimit: _intOf(
-        json['free_slot_monthly_limit'],
-      ),
+      freeSlotMonthlyLimit: _intOf(json['free_slot_monthly_limit']),
       freeSlotsUsedThisMonth: _intOf(json['free_slots_used_this_month']),
     );
   }
@@ -328,7 +326,8 @@ String rewardProgramLine(PublicRewardRules rules) {
       '${formatBasisPoints(rules.c2cHighBps)} a partir de ${rules.c2cHighActive}. '
       'Casa indicada: ${formatBasisPoints(rules.c2bBps)}. '
       'Cashback de ${formatBasisPoints(rules.cashbackMinBps)} a ${formatBasisPoints(rules.cashbackMaxBps)}. '
-      'Primeira reserva indicada: ${formatBasisPoints(rules.firstBookingDiscountBps)} de desconto.';
+      'Primeira sessão com código: ${formatBasisPoints(rules.firstBookingDiscountBps)}. '
+      'Sem código: ${formatBasisPoints(rules.organicFirstBookingDiscountBps)}.';
 }
 
 String formatBasisPoints(int bps) {
@@ -339,6 +338,21 @@ String formatBasisPoints(int bps) {
       .replaceFirst(RegExp(r'0+$'), '');
   if (frac.isEmpty) return '$whole%';
   return '$whole,$frac%';
+}
+
+/// Lembrete do campo em que a pessoa cola o código de quem indicou.
+String referralCodeHint(PublicRewardRules rules) {
+  return 'Com o código, ${formatBasisPoints(rules.firstBookingDiscountBps)} de desconto na primeira sessão. Sem código, ${formatBasisPoints(rules.organicFirstBookingDiscountBps)}.';
+}
+
+/// Lembrete embaixo do código que a pessoa compartilha.
+String ownReferralHint(PublicRewardRules rules) {
+  return 'Ganhe até ${formatBasisPoints(rules.c2cHighBps)} do que cada pessoa indicada gastar na EscapeMatch, ou ${formatBasisPoints(rules.c2bBps)} do faturamento de uma casa indicada.';
+}
+
+/// O mesmo lembrete para o código da casa. As taxas são as da casa.
+String venueReferralHint(PublicRewardRules rules) {
+  return 'Ganhe até ${formatBasisPoints(rules.b2cBps)} do que cada pessoa indicada gastar na EscapeMatch, ou ${formatBasisPoints(rules.b2bBps)} do faturamento de uma casa indicada.';
 }
 
 String formatPoints(int points) {
