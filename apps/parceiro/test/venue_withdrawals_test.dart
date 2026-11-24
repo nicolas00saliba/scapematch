@@ -7,18 +7,26 @@ import 'package:scapematch_parceiro/features/partner/presentation/venue_withdraw
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 void main() {
-  testWidgets('a tela explica a Transferência Automática e não pede banco', (
+  testWidgets('a tela explica a conta PagBank e não pede banco', (
     tester,
   ) async {
     Uri? opened;
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
           theme: buildAppTheme(Brightness.light),
           home: Scaffold(
-            body: VenueWithdrawalsPanel(
-              venueId: 'casa-1',
-              onOpenPagBank: (uri) => opened = uri,
+            body: ListView(
+              children: [
+                VenueWithdrawalsPanel(
+                  venueId: 'casa-1',
+                  onOpenPagBank: (uri) => opened = uri,
+                ),
+              ],
             ),
           ),
         ),
@@ -38,6 +46,7 @@ void main() {
     expect(find.byKey(PartnerKeys.withdrawalDocument), findsNothing);
 
     final button = find.byKey(PartnerKeys.receiveOpenPagBank);
+    await tester.ensureVisible(button);
     expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
     await tester.tap(button);
     expect(opened, VenueWithdrawalsPanel.pagBankUri);

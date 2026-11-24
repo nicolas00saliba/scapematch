@@ -106,6 +106,63 @@ void main() {
       isNotEmpty,
     );
   });
+
+  testWidgets('o admin desliga o cadastro e libera a checagem', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = MemoryAdminApi()
+      ..signupSettings = const PagbankSignupSettings(
+        apiEnabled: true,
+        heldOff: false,
+        lastProbeCode: '40002',
+      );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adminApiProvider.overrideWithValue(api),
+          adminSessionProvider.overrideWith(ReadyAdminSession.new),
+        ],
+        child: const AdminApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Pagamentos'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    final off = find.byKey(const Key('admin-pagbank-signup-off'));
+    await tester.ensureVisible(off);
+    await tester.pump();
+    expect(
+      find.text('Ligada. O Parceiro envia o cadastro pelo servidor.'),
+      findsOneWidget,
+    );
+    await tester.tap(off);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('admin-pagbank-signup-confirm')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(api.signupSettings.apiEnabled, isFalse);
+    expect(api.signupSettings.heldOff, isTrue);
+    final release = find.byKey(const Key('admin-pagbank-signup-release'));
+    await tester.ensureVisible(release);
+    await tester.pump();
+    await tester.tap(release);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('admin-pagbank-signup-release-confirm')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(api.signupSettings.heldOff, isFalse);
+    expect(api.signupSettings.apiEnabled, isTrue);
+    expect(
+      find.text('Ligada. O Parceiro envia o cadastro pelo servidor.'),
+      findsOneWidget,
+    );
+  });
 }
 
 class ReadyAdminSession extends AdminSessionController {

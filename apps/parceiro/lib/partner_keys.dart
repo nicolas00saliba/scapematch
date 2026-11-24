@@ -178,4 +178,32 @@ abstract final class PartnerKeys {
   static const venueDocumentOnboarding = Key('venue-document-onboarding');
   static const venueDocumentUpload = Key('venue-document-upload');
   static const venueDocumentRefresh = Key('venue-document-refresh');
+  static const pagbankSignup = Key('pagbank-signup');
+  static const pagbankSignupForm = Key('pagbank-signup-form');
+  static const pagbankSignupCpf = Key('pagbank-signup-cpf');
+  static const pagbankSignupCnpj = Key('pagbank-signup-cnpj');
+  static const pagbankSignupDocument = Key('pagbank-signup-document');
+  static const pagbankSignupCompany = Key('pagbank-signup-company');
+  static const pagbankSignupResponsibleCpf = Key(
+    'pagbank-signup-responsible-cpf',
+  );
+  static const pagbankSignupStreet = Key('pagbank-signup-street');
+  static const pagbankSignupNumber = Key('pagbank-signup-number');
+  static const pagbankSignupComplement = Key('pagbank-signup-complement');
+  static const pagbankSignupLocality = Key('pagbank-signup-locality');
+  static const pagbankSignupCity = Key('pagbank-signup-city');
+  static const pagbankSignupPostal = Key('pagbank-signup-postal');
+  static const pagbankSignupRegion = Key('pagbank-signup-region');
+  static const pagbankSignupName = Key('pagbank-signup-name');
+  static const pagbankSignupBirth = Key('pagbank-signup-birth');
+  static const pagbankSignupPhone = Key('pagbank-signup-phone');
+  static const pagbankSignupEmail = Key('pagbank-signup-email');
+  static const pagbankSignupCategory = Key('pagbank-signup-category');
+  static const pagbankSignupTerms = Key('pagbank-signup-terms');
+  static const pagbankSignupSubmit = Key('pagbank-signup-submit');
+  static const pagbankSignupError = Key('pagbank-signup-error');
+  static const pagbankSignupManual = Key('pagbank-signup-manual');
+  static const pagbankSignupOfficial = Key('pagbank-signup-official');
+  static const pagbankSignupConnect = Key('pagbank-signup-connect');
+  static const pagbankSignupActivation = Key('pagbank-signup-activation');
 }
