@@ -47,6 +47,10 @@ abstract class AdminApi {
   Future<void> reviewVenueClaim(String id, String decision);
   Future<void> setVenueContacts(String venueId, String email, String phone);
   Future<PaymentsBoard> payments();
+  Future<PlatformCacReport> platformCac({
+    required DateTime from,
+    required DateTime to,
+  });
   Future<bool> setVenuePayoutsEnabled(bool enabled);
   Future<DivergenceBoard> divergences();
 }
@@ -393,6 +397,48 @@ class PaymentsBoard {
   final List<PaymentLine> refunds;
   final List<PaymentLine> withdrawals;
   final List<WebhookErrorLine> webhookErrors;
+}
+
+class PlatformCacAlert {
+  const PlatformCacAlert({
+    required this.id,
+    required this.venueName,
+    required this.amountCents,
+    required this.status,
+    required this.lastError,
+    required this.attempts,
+  });
+
+  final String id;
+  final String venueName;
+  final int amountCents;
+  final String status;
+  final String lastError;
+  final int attempts;
+}
+
+class PlatformCacReport {
+  const PlatformCacReport({
+    required this.assumedCents,
+    required this.paidCents,
+    required this.pendingCents,
+    required this.failedCents,
+    required this.alerts,
+  });
+
+  final int assumedCents;
+  final int paidCents;
+  final int pendingCents;
+  final int failedCents;
+  final List<PlatformCacAlert> alerts;
+
+  static const empty = PlatformCacReport(
+    assumedCents: 0,
+    paidCents: 0,
+    pendingCents: 0,
+    failedCents: 0,
+    alerts: [],
+  );
 }
 
 class DivergenceRow {
@@ -919,6 +965,34 @@ class SupabaseAdminApi implements AdminApi {
             code: _text(item['code']),
             providerRef: _text(item['provider_ref']),
             when: DateTime.tryParse(_text(item['created_at'])),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Future<PlatformCacReport> platformCac({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final row = _map(await _rpc('admin_platform_cac_report', {
+      'p_from': _isoDay(from),
+      'p_to': _isoDay(to),
+    }));
+    return PlatformCacReport(
+      assumedCents: _int(row['assumed_cents']),
+      paidCents: _int(row['paid_cents']),
+      pendingCents: _int(row['pending_cents']),
+      failedCents: _int(row['failed_cents']),
+      alerts: [
+        for (final item in _list(row['alerts']))
+          PlatformCacAlert(
+            id: _text(item['id']),
+            venueName: _text(item['venue_name'], 'Casa'),
+            amountCents: _int(item['amount_cents']),
+            status: _text(item['status']),
+            lastError: _text(item['last_error']),
+            attempts: _int(item['attempts']),
           ),
       ],
     );
@@ -1493,6 +1567,7 @@ class MemoryAdminApi implements AdminApi {
 
   bool payoutsEnabled = false;
   PaymentsBoard? paymentsFixture;
+  PlatformCacReport cacFixture = PlatformCacReport.empty;
   DivergenceBoard divergenceFixture = DivergenceBoard.empty;
 
   @override
@@ -1532,6 +1607,15 @@ class MemoryAdminApi implements AdminApi {
       withdrawals: const [],
       webhookErrors: const [],
     );
+  }
+
+  @override
+  Future<PlatformCacReport> platformCac({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    if (to.isBefore(from)) return PlatformCacReport.empty;
+    return cacFixture;
   }
 
   @override
@@ -1577,6 +1661,12 @@ List<Map<String, dynamic>> _list(Object? value) {
       else if (item is Map)
         Map<String, dynamic>.from(item),
   ];
+}
+
+String _isoDay(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
 }
 
 String _text(Object? value, [String fallback = '']) {

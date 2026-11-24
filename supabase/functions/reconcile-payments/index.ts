@@ -7,6 +7,7 @@ import {
   reconcilePayments,
 } from "../_shared/reconcile_payments.ts";
 import { retryPendingCustodyReleases } from "../_shared/custody_release.ts";
+import { pagbankCacClient, runPlatformCac } from "../_shared/platform_cac.ts";
 import { processMemberRefunds } from "../_shared/member_refund.ts";
 import { pollPendingPagBankCharges } from "../_shared/charge_notice.ts";
 import {
@@ -64,6 +65,7 @@ export async function handleReconcile(
     await processMemberRefunds(admin, pagbank);
     await pollPendingPagBankCharges(admin, pagbank, Deno.env);
     await retryPendingCustodyReleases(admin, pagbank);
+    await runPlatformCac(admin, Deno.env, pagbankCacClient(Deno.env));
     const released = await admin.rpc("release_due_scape_points");
     if (released.error) throw new Error("points");
     return json(reconciled);

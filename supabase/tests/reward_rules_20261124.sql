@@ -436,14 +436,19 @@ begin
   perform private.apply_payment_transition(
     (v_reserved ->> 'id')::uuid, 'paid', true
   );
-  if (
-    select amount_cents
-    from public.free_slot_topups
+  if exists (
+    select 1 from public.free_slot_topups
     where payment_charge_id = (v_reserved ->> 'id')::uuid
-      and redemption_id is null
       and voided_at is null
-  ) <> 1000 then
-    raise exception 'o pagamento nao lançou o complemento';
+  ) then
+    raise exception 'o pagamento ainda lançou complemento na casa';
+  end if;
+  if (
+    select status || ':' || amount_cents::text || ':' || assumed_cents::text
+    from public.platform_cac_transfers
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+  ) is distinct from 'pending:1000:1000' then
+    raise exception 'o pagamento nao lançou o CAC da plataforma';
   end if;
   update public.payment_charges
   set provider_ref = 'pagbank-regras-estorno'
@@ -456,12 +461,11 @@ begin
     raise exception 'o estorno individual nao entrou na fila';
   end if;
   if (
-    select amount_cents
-    from public.free_slot_topups
+    select status
+    from public.platform_cac_transfers
     where payment_charge_id = (v_reserved ->> 'id')::uuid
-      and voided_at is null
-  ) <> 1000 then
-    raise exception 'a fila do estorno apagou o complemento antes da PagBank';
+  ) is distinct from 'pending' then
+    raise exception 'a fila do estorno cancelou o CAC antes da PagBank';
   end if;
   perform private.apply_payment_transition(
     (v_reserved ->> 'id')::uuid, 'refunded', false
@@ -473,6 +477,13 @@ begin
       and applied_cents < amount_cents
   ) or private.open_free_slot_cents() <> 0 then
     raise exception 'o estorno individual deixou o complemento aberto';
+  end if;
+  if (
+    select status || ':' || coalesce(last_error, '')
+    from public.platform_cac_transfers
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+  ) is distinct from 'failed:estorno' then
+    raise exception 'o estorno nao cancelou o CAC pendente';
   end if;
 end $$;
 
