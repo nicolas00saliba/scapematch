@@ -47,6 +47,9 @@ type Store = {
   member: string;
   closed: boolean;
   quoteOk?: boolean;
+  reserveAmountCents?: number;
+  reserveHouseFixedCents?: number;
+  failChargedTotal?: boolean;
   detachMissing?: boolean;
   releaseExpiredError?: boolean;
 };
@@ -237,6 +240,16 @@ function adminFor(store: Store) {
         ) {
           try {
             if (mode === "update") {
+              if (
+                store.failChargedTotal &&
+                Object.prototype.hasOwnProperty.call(
+                  patch,
+                  "charged_amount_cents",
+                )
+              ) {
+                resolve({ data: null, error: { message: "check" } });
+                return;
+              }
               const hit = matched();
               for (const row of hit) Object.assign(row, patch);
               resolve({ data: returning ? hit : null, error: null });
@@ -284,7 +297,18 @@ function adminFor(store: Store) {
           return { data: reserve("PIX", args), error: null };
         }
         if (name === "reserve_card_charge") {
-          return { data: reserve("CREDIT_CARD", args), error: null };
+          return {
+            data: {
+              ...reserve("CREDIT_CARD", args),
+              ...(typeof store.reserveAmountCents === "number"
+                ? { amount_cents: store.reserveAmountCents }
+                : {}),
+              ...(typeof store.reserveHouseFixedCents === "number"
+                ? { house_fixed_cents: store.reserveHouseFixedCents }
+                : {}),
+            },
+            error: null,
+          };
         }
         if (name === "claim_expired_pix_reservation") {
           const row = byId(String(args.p_charge_id));
@@ -310,6 +334,7 @@ function adminFor(store: Store) {
           return { data: row?.provider_ref ?? null, error: null };
         }
         if (name === "release_pix_reservation") {
+          store.calls.push("release_pix_reservation");
           const row = byId(String(args.p_charge_id));
           if (
             row && row.status === "creating" && row.provider_ref === null &&
@@ -1131,6 +1156,58 @@ Deno.test("reserva vencida que não apaga ainda cancela a autorização", async 
   );
   assert(authorized?.status === "DELETED" || authorized?.status === "REFUNDED");
   assertEquals(store.charges[0].provider_ref, null);
+});
+
+Deno.test("4x não reautoriza quando o valor reservado muda", async () => {
+  const store = makeStore();
+  store.reserveAmountCents = 8000;
+  store.reserveHouseFixedCents = 7200;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-valor-mudou",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).error, "valor_parcelas");
+  assertEquals(
+    store.calls.filter((call) => call.includes("/orders")).length,
+    1,
+  );
+  assertEquals(store.money, [10640]);
+});
+
+Deno.test("falha ao gravar o total solta a reserva do cartão", async () => {
+  const store = makeStore();
+  store.failChargedTotal = true;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-total-falhou",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).error, "pagamento em andamento");
+  assertEquals(store.money, [10640]);
+  assert(
+    store.calls.some((call) => call === "release_pix_reservation"),
+  );
 });
 
 Deno.test("4x sem o total confirmado não cobra", async () => {

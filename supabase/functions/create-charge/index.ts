@@ -12,6 +12,7 @@ import {
 } from "../_shared/pagbank_client_error.ts";
 import {
   installmentParcelTooSmall,
+  interestFreeInstallments,
   quoteAmountInRange,
   quotedTotalAccepted,
   type InstallmentCharge,
@@ -860,11 +861,14 @@ export async function createCharge(
         nextAmount: number,
         chargeId: string,
         attempt: string | null,
-      ) => {
+      ): Promise<"valor_parcelas" | undefined> => {
         if (fixedCents < 0) return;
         const nextFixed = fixedReaisFromCents(fixedCents);
         if (nextFixed === split.fixedValue && nextAmount === amountCents) return;
         await loseCard(chargeId, attempt);
+        if (plan.installments > interestFreeInstallments) {
+          return "valor_parcelas";
+        }
         split.fixedValue = nextFixed;
         amountCents = nextAmount;
         const nextPlan = await resolveCardPlan(
@@ -956,12 +960,15 @@ export async function createCharge(
           }
           throw error;
         }
-        await alignCardSplit(
+        const aligned = await alignCardSplit(
           reservedCard.house_fixed_cents,
           reservedCard.amount_cents || amountCents,
           reservedCard.id,
           reservedCard.attempt_id,
         );
+        if (aligned === "valor_parcelas") {
+          return json({ error: "valor_parcelas" }, 409);
+        }
         await reserveSplitsFor(
           reservedCard.house_fixed_cents,
           reservedCard.id,
@@ -1021,12 +1028,15 @@ export async function createCharge(
             throw error;
           }
           holdOpen = false;
-          await alignCardSplit(
+          const alignedAgain = await alignCardSplit(
             again.house_fixed_cents,
             again.amount_cents || amountCents,
             again.id,
             again.attempt_id,
           );
+          if (alignedAgain === "valor_parcelas") {
+            return json({ error: "valor_parcelas" }, 409);
+          }
           amountCents = again.amount_cents || amountCents;
           await noteCardPayer(admin, user.id, savedCardId, again.id);
           if (!again.inserted || !again.attempt_id) {
@@ -1073,6 +1083,7 @@ export async function createCharge(
         await rememberChargedTotal(admin, cardChargeId, plan);
       } catch (_error) {
         await loseCard(cardChargeId, attemptId);
+        await releasePixReservation(admin, cardChargeId, attemptId);
         return json({ error: "pagamento em andamento" }, 409);
       }
       if (!capturedAlready && mayCredit && status === "authorized") {
