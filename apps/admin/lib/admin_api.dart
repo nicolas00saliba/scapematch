@@ -1113,7 +1113,7 @@ class MemoryAdminApi implements AdminApi {
         'cashback_min_bps': 50,
         'cashback_max_bps': 500,
         'cashback_ev_cap_bps': 100,
-        'backed_full_slot_enabled': true,
+        'backed_full_slot_enabled': false,
       },
       passport = {
         'passport_enabled': false,

@@ -29,7 +29,7 @@ begin
       point_value_cents = 1,
       redeem_min_points = 0,
       redeem_max_bps = 10000,
-      backed_full_slot_enabled = true,
+      backed_full_slot_enabled = false,
       first_booking_discount_bps = 2000,
       c2c_from_bps = 100,
       c2c_mid_active = 5,
@@ -44,7 +44,7 @@ begin
     or v_settings.point_value_cents <> 1
     or v_settings.redeem_min_points <> 0
     or v_settings.redeem_max_bps <> 10000
-    or v_settings.backed_full_slot_enabled is not true
+    or v_settings.backed_full_slot_enabled is true
     or v_settings.first_booking_discount_bps <> 2000
     or v_settings.c2c_from_bps <> 100
     or v_settings.c2c_mid_active <> 5
@@ -241,6 +241,9 @@ begin
   ) values (
     v_player, 'release', 10000, 10000, 'c2c', 'regras-lastro'
   );
+  update public.referral_program_settings
+  set backed_full_slot_enabled = true
+  where id = 1;
   v_quote := private.subsidy_quote(v_player, 10000, 2500, 10000, false);
   if (v_quote ->> 'points')::integer <> 10000
     or (v_quote ->> 'charged_cents')::integer <> 0
@@ -250,6 +253,9 @@ begin
   then
     raise exception 'a vaga inteira em pontos com lastro nao fechou %', v_quote;
   end if;
+  update public.referral_program_settings
+  set backed_full_slot_enabled = false
+  where id = 1;
 
   insert into auth.users (id, email, raw_user_meta_data)
   values (
@@ -302,15 +308,171 @@ begin
       from public.payment_charges
       where id = (v_reserved ->> 'id')::uuid
     ) <> 1000
-    or (
-      select amount_cents
+    or exists (
+      select 1
       from public.free_slot_topups
       where payment_charge_id = (v_reserved ->> 'id')::uuid
-        and redemption_id is null
         and voided_at is null
-    ) <> 1000
+    )
   then
-    raise exception 'o desconto com prejuizo nao virou complemento %', v_reserved;
+    raise exception 'o desconto lançou complemento antes do pagamento %', v_reserved;
+  end if;
+
+  insert into public.group_members (group_id, user_id, display_name)
+  values (
+    'c2470000-0000-4000-8000-000000000001',
+    'c2410000-0000-4000-8000-0000000000cc',
+    'Primeira'
+  );
+  perform private.apply_payment_transition(
+    (v_reserved ->> 'id')::uuid, 'cancelled', false
+  );
+  if exists (
+    select 1 from public.free_slot_topups
+    where venue_id = 'c2420000-0000-4000-8000-000000000001'
+      and voided_at is null
+      and applied_cents < amount_cents
+  ) then
+    raise exception 'cancelar a reserva deixou complemento aberto';
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'c2470000-0000-4000-8000-000000000002', 'curitiba',
+    'c2420000-0000-4000-8000-000000000001',
+    'c2430000-0000-4000-8000-000000000001',
+    'c2431000-0000-4000-8000-000000000001',
+    '2027-12-25 18:00:00+00', 4, 2, 10000, v_referrer
+  );
+  insert into public.group_members (group_id, user_id, display_name)
+  values (
+    'c2470000-0000-4000-8000-000000000002',
+    'c2410000-0000-4000-8000-0000000000cc',
+    'Primeira'
+  );
+  v_reserved := private.reserve_pix_charge(
+    'c2470000-0000-4000-8000-000000000002',
+    'c2410000-0000-4000-8000-0000000000cc',
+    'c2420000-0000-4000-8000-000000000001',
+    10000,
+    'idem-regras-desconto-2',
+    'wal',
+    1000
+  );
+  update public.payment_charges
+  set reserved_at = pg_catalog.now() - interval '5 minutes'
+  where id = (v_reserved ->> 'id')::uuid;
+  if not private.release_expired_pix_reservation(
+    (v_reserved ->> 'id')::uuid,
+    (
+      select attempt_id from public.payment_charges
+      where id = (v_reserved ->> 'id')::uuid
+    )
+  ) then
+    raise exception 'o pix expirado nao soltou a reserva';
+  end if;
+  v_reserved := private.reserve_pix_charge(
+    'c2470000-0000-4000-8000-000000000002',
+    'c2410000-0000-4000-8000-0000000000cc',
+    'c2420000-0000-4000-8000-000000000001',
+    10000,
+    'idem-regras-desconto-3',
+    'wal',
+    1000
+  );
+  update public.payment_charges
+  set reserved_at = pg_catalog.now() - interval '5 minutes'
+  where id = (v_reserved ->> 'id')::uuid;
+  if not private.release_expired_pix_reservation(
+    (v_reserved ->> 'id')::uuid,
+    (
+      select attempt_id from public.payment_charges
+      where id = (v_reserved ->> 'id')::uuid
+    )
+  ) then
+    raise exception 'o segundo pix expirado nao soltou a reserva';
+  end if;
+  if private.open_free_slot_cents() <> 0
+    or exists (
+      select 1 from public.free_slot_topups
+      where venue_id = 'c2420000-0000-4000-8000-000000000001'
+        and voided_at is null
+        and applied_cents < amount_cents
+    )
+  then
+    raise exception 'abandono repetido deixou complemento aberto';
+  end if;
+
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    'c2470000-0000-4000-8000-000000000003', 'curitiba',
+    'c2420000-0000-4000-8000-000000000001',
+    'c2430000-0000-4000-8000-000000000001',
+    'c2431000-0000-4000-8000-000000000001',
+    '2027-12-26 18:00:00+00', 4, 2, 10000, v_referrer
+  );
+  insert into public.group_members (
+    id, group_id, user_id, display_name, payment_status
+  ) values (
+    'c2480000-0000-4000-8000-000000000003',
+    'c2470000-0000-4000-8000-000000000003',
+    'c2410000-0000-4000-8000-0000000000cc',
+    'Primeira',
+    'paid'
+  );
+  v_reserved := private.reserve_pix_charge(
+    'c2470000-0000-4000-8000-000000000003',
+    'c2410000-0000-4000-8000-0000000000cc',
+    'c2420000-0000-4000-8000-000000000001',
+    10000,
+    'idem-regras-desconto-pago',
+    'wal',
+    1000
+  );
+  perform private.apply_payment_transition(
+    (v_reserved ->> 'id')::uuid, 'paid', true
+  );
+  if (
+    select amount_cents
+    from public.free_slot_topups
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+      and redemption_id is null
+      and voided_at is null
+  ) <> 1000 then
+    raise exception 'o pagamento nao lançou o complemento';
+  end if;
+  update public.payment_charges
+  set provider_ref = 'pagbank-regras-estorno'
+  where id = (v_reserved ->> 'id')::uuid;
+  if not private.enqueue_member_refund(
+    'c2470000-0000-4000-8000-000000000003',
+    'c2410000-0000-4000-8000-0000000000cc',
+    'c2480000-0000-4000-8000-000000000003'
+  ) then
+    raise exception 'o estorno individual nao entrou na fila';
+  end if;
+  if (
+    select amount_cents
+    from public.free_slot_topups
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+      and voided_at is null
+  ) <> 1000 then
+    raise exception 'a fila do estorno apagou o complemento antes da PagBank';
+  end if;
+  perform private.apply_payment_transition(
+    (v_reserved ->> 'id')::uuid, 'refunded', false
+  );
+  if exists (
+    select 1 from public.free_slot_topups
+    where payment_charge_id = (v_reserved ->> 'id')::uuid
+      and voided_at is null
+      and applied_cents < amount_cents
+  ) or private.open_free_slot_cents() <> 0 then
+    raise exception 'o estorno individual deixou o complemento aberto';
   end if;
 end $$;
 

@@ -2,9 +2,11 @@
 -- Tira o dobro do horário vazio. Indicação de pessoas vira taxa absoluta
 -- por nível. Casa que indica jogador e jogador que indica casa ficam em 5%.
 -- Casa que indica casa continua em 5%. 100 pontos = R$ 1.
--- O resgate não exige 1.000 pontos nem para em 30%. A vaga inteira em
--- pontos com lastro usa a reserva. O desconto de 20% não encolhe para
--- evitar prejuízo.
+-- O resgate não exige 1.000 pontos nem para em 30%. A flag da vaga
+-- inteira em pontos continua desligada, como em produção.
+-- O desconto de 20% não encolhe para evitar prejuízo. O complemento
+-- só entra em free_slot_topups quando a cobrança fica paga, e sai
+-- se ela for cancelada, expirar ou for estornada.
 
 alter table public.referral_program_settings
   add column if not exists c2c_from_bps integer not null default 100
@@ -46,7 +48,6 @@ set c2b_bps = 500,
     point_value_cents = 1,
     redeem_min_points = 0,
     redeem_max_bps = 10000,
-    backed_full_slot_enabled = true,
     first_booking_discount_bps = 2000,
     c2c_from_bps = 100,
     c2c_mid_active = 5,
@@ -786,23 +787,8 @@ begin
         first_booking_discount_cents = v_discount,
         free_slot_topup_cents = greatest(v_house - greatest(v_charged, 0), 0)
     where id = v_charge.id;
-    if not private.note_free_slot_shortfall(v_charge.id)
-      and v_house > greatest(v_charged, 0)
-    then
-      insert into public.free_slot_topups (
-        venue_id, user_id, redemption_id, payment_charge_id, amount_cents
-      )
-      select
-        v_charge.venue_id, v_charge.user_id, null, v_charge.id,
-        v_house - greatest(v_charged, 0)
-      where not exists (
-        select 1
-        from public.free_slot_topups t
-        where t.payment_charge_id = v_charge.id
-          and t.redemption_id is null
-          and t.voided_at is null
-      );
-    end if;
+    -- A linha de complemento espera o pagamento. Reserva, Pix expirado
+    -- e cancelamento não deixam crédito aberto para a casa.
     return;
   end if;
   if v_charged <= 0 or v_house > v_charged then
@@ -1130,5 +1116,319 @@ begin
     v_uid, 'save_reward_settings', 'referral_program_settings', '1', v_before, v_after
   );
   return v_after - 'id';
+end;
+$$;
+
+-- Complemento do desconto. A linha só existe depois do pagamento.
+-- Cancelamento, falha, expiração e estorno anulam pelo payment_charge_id,
+-- inclusive quando redemption_id é nulo.
+
+create or replace function private.realize_discount_topup(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_charge public.payment_charges%rowtype;
+begin
+  select * into v_charge
+  from public.payment_charges
+  where id = p_charge_id
+  for update;
+  if v_charge.id is null or v_charge.status <> 'paid' then
+    return;
+  end if;
+  if coalesce(v_charge.free_slot_topup_cents, 0) <= 0 then
+    return;
+  end if;
+  if exists (
+    select 1
+    from public.free_slot_topups t
+    where t.payment_charge_id = p_charge_id
+      and t.voided_at is null
+  ) then
+    return;
+  end if;
+  insert into public.free_slot_topups (
+    venue_id, user_id, redemption_id, payment_charge_id, amount_cents
+  ) values (
+    v_charge.venue_id,
+    v_charge.user_id,
+    null,
+    v_charge.id,
+    v_charge.free_slot_topup_cents
+  );
+end;
+$$;
+
+create or replace function private.void_charge_free_slot_topups(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row public.free_slot_topups%rowtype;
+begin
+  for v_row in
+    select *
+    from public.free_slot_topups
+    where payment_charge_id = p_charge_id
+      and voided_at is null
+    for update
+  loop
+    if v_row.applied_cents = 0 then
+      update public.free_slot_topups
+      set voided_at = pg_catalog.now()
+      where id = v_row.id;
+    else
+      insert into public.free_slot_clawbacks (topup_id, venue_id, amount_cents)
+      values (v_row.id, v_row.venue_id, v_row.applied_cents)
+      on conflict (topup_id) do nothing;
+      update public.free_slot_topups
+      set amount_cents = applied_cents
+      where id = v_row.id
+        and applied_cents > 0;
+    end if;
+    insert into public.free_slot_audits (
+      user_id, idempotency_key, payment_charge_id, gross_cents, subsidy_cents,
+      backed_points, unbacked_points, topup_cents, points_only,
+      platform_cash_cents, reserve_cents, monthly_count, decision
+    ) values (
+      v_row.user_id, null, v_row.payment_charge_id, v_row.amount_cents,
+      v_row.amount_cents, 0, 0, v_row.applied_cents, false,
+      0, 0, 0, 'reversed'
+    );
+  end loop;
+end;
+$$;
+
+revoke all on function private.realize_discount_topup(uuid)
+  from public, anon, authenticated;
+revoke all on function private.void_charge_free_slot_topups(uuid)
+  from public, anon, authenticated;
+
+create or replace function private.release_unpaid_components(p_charge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_status text;
+begin
+  select status into v_status
+  from public.payment_charges
+  where id = p_charge_id
+  for update;
+  if v_status is null or v_status in ('paid', 'refunded', 'authorized') then
+    return;
+  end if;
+
+  perform private.void_charge_free_slot_topups(p_charge_id);
+
+  perform private.lock_venue_rewards(ch.venue_id)
+  from public.payment_charges ch
+  where ch.id = p_charge_id;
+
+  update public.venue_credit_clawbacks c
+  set voided_at = pg_catalog.now()
+  from public.venue_credit_applications a
+  where a.payment_charge_id = p_charge_id
+    and a.entry_id = c.entry_id
+    and c.voided_at is null
+    and c.neutralized_at is null
+    and (c.applied_charge_id is null or c.applied_charge_id = p_charge_id);
+
+  update public.venue_credit_clawbacks
+  set applied_cents = 0,
+      applied_charge_id = null
+  where applied_charge_id = p_charge_id
+    and voided_at is null
+    and neutralized_at is null;
+
+  update public.venue_referral_entries e
+  set applied_cents = greatest(e.applied_cents - a.amount_cents, 0),
+      settlement = case
+        when e.applied_cents - a.amount_cents <= 0 then 'released'
+        else e.settlement
+      end
+  from public.venue_credit_applications a
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and a.entry_id = e.id
+    and not exists (
+      select 1 from public.venue_referral_entries r
+      where r.relates_to = e.id and r.kind = 'reversal'
+    );
+
+  delete from public.venue_credit_applications
+  where payment_charge_id = p_charge_id;
+
+  update public.venue_cashback_refunds f
+  set voided_at = pg_catalog.now()
+  from public.venue_cashback_debits d
+  where d.applied_charge_id = p_charge_id
+    and f.debit_id = d.id
+    and f.voided_at is null
+    and f.applied_cents = 0;
+
+  update public.venue_cashback_debits
+  set applied_cents = 0,
+      applied_charge_id = null
+  where applied_charge_id = p_charge_id
+    and voided_at is null;
+
+  update public.venue_cashback_refunds
+  set applied_cents = 0,
+      applied_charge_id = null
+  where applied_charge_id = p_charge_id
+    and voided_at is null;
+
+  update public.free_slot_topups t
+  set applied_cents = greatest(t.applied_cents - a.amount_cents, 0)
+  from public.free_slot_applications a
+  where a.payment_charge_id = p_charge_id
+    and a.reversed_at is null
+    and a.topup_id = t.id;
+
+  update public.free_slot_applications
+  set reversed_at = pg_catalog.now()
+  where payment_charge_id = p_charge_id
+    and reversed_at is null;
+
+  update public.free_slot_clawbacks
+  set applied_cents = 0,
+      applied_charge_id = null
+  where applied_charge_id = p_charge_id
+    and voided_at is null;
+
+  insert into public.scape_point_entries (
+    user_id, kind, points, amount_cents, program,
+    source_charge_id, payment_charge_id, relates_to, client_key, idempotency_key
+  )
+  select
+    e.user_id,
+    'redemption_reversal',
+    e.points,
+    e.amount_cents,
+    'redeem',
+    e.source_charge_id,
+    e.payment_charge_id,
+    e.id,
+    e.client_key,
+    'redemption_reversal:' || e.id::text
+  from public.scape_point_entries e
+  where e.payment_charge_id = p_charge_id
+    and e.kind = 'redemption'
+    and not exists (
+      select 1 from public.scape_point_entries r
+      where r.relates_to = e.id and r.kind = 'redemption_reversal'
+    );
+
+  update public.payment_charges
+  set venue_credit_applied_cents = 0,
+      venue_credit_clawback_cents = 0,
+      empty_slot_offset_cents = 0,
+      cashback_refund_cents = 0,
+      free_slot_applied_cents = 0,
+      free_slot_clawback_cents = 0
+  where id = p_charge_id;
+end;
+$$;
+
+create or replace function private.apply_payment_transition(
+  p_charge_id uuid,
+  p_next_status text,
+  p_credit boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_charge public.payment_charges%rowtype;
+  v_previous text;
+  v_applied boolean := false;
+begin
+  select * into v_charge
+  from public.payment_charges
+  where id = p_charge_id
+  for update;
+  if v_charge.id is null then
+    raise exception 'charge_not_found' using errcode = 'P0002';
+  end if;
+
+  v_previous := v_charge.status;
+
+  if v_previous = 'refunded' then
+    perform private.ledger_reverse_charge(v_charge.id);
+    perform private.reverse_referral_rewards(v_charge.id);
+    perform private.void_charge_free_slot_topups(v_charge.id);
+    perform private.sync_charge_member(v_charge);
+    return pg_catalog.jsonb_build_object(
+      'applied', false,
+      'status', v_charge.status,
+      'paid_at', v_charge.paid_at,
+      'refunded_at', v_charge.refunded_at
+    );
+  end if;
+
+  if not private.payment_status_allowed(v_previous, p_next_status) then
+    perform private.sync_charge_member(v_charge);
+    return pg_catalog.jsonb_build_object(
+      'applied', false,
+      'status', v_charge.status,
+      'paid_at', v_charge.paid_at,
+      'refunded_at', v_charge.refunded_at
+    );
+  end if;
+
+  if v_previous is distinct from p_next_status
+    or (p_next_status = 'paid' and v_charge.paid_at is null)
+    or (p_next_status = 'refunded' and v_charge.refunded_at is null)
+  then
+    update public.payment_charges
+    set
+      status = p_next_status,
+      paid_at = case
+        when p_next_status = 'paid' then coalesce(paid_at, pg_catalog.now())
+        else paid_at
+      end,
+      refunded_at = case
+        when p_next_status = 'refunded'
+          then coalesce(refunded_at, pg_catalog.now())
+        else refunded_at
+      end
+    where id = v_charge.id
+    returning * into v_charge;
+    v_applied := v_previous is distinct from v_charge.status;
+  end if;
+
+  if v_charge.status = 'paid' then
+    perform private.realize_discount_topup(v_charge.id);
+  end if;
+  if v_charge.status = 'paid' and p_credit then
+    perform private.ledger_credit_charge(v_charge.id);
+    perform private.post_referral_rewards(v_charge.id);
+  end if;
+  if v_charge.status = 'refunded' then
+    perform private.ledger_reverse_charge(v_charge.id);
+    perform private.reverse_referral_rewards(v_charge.id);
+    perform private.void_charge_free_slot_topups(v_charge.id);
+  end if;
+  if v_charge.status in ('cancelled', 'failed') then
+    perform private.release_unpaid_components(v_charge.id);
+  end if;
+
+  perform private.sync_charge_member(v_charge);
+  return pg_catalog.jsonb_build_object(
+    'applied', v_applied,
+    'status', v_charge.status,
+    'paid_at', v_charge.paid_at,
+    'refunded_at', v_charge.refunded_at
+  );
 end;
 $$;

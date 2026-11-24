@@ -182,8 +182,8 @@ declare
   v_reserve integer;
 begin
   select * into v_before from public.referral_program_settings where id = 1;
-  if not v_before.backed_full_slot_enabled then
-    raise exception 'a flag da vaga inteira nao nasceu ligada';
+  if v_before.backed_full_slot_enabled then
+    raise exception 'a flag da vaga inteira nasceu ligada';
   end if;
 
   select pix_receipt_fee_cents, card_receipt_fee_cents, card_receipt_fee_bps

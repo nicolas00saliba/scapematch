@@ -63,7 +63,7 @@ void main() {
     expect(ReferralRates.official.b2bBps, 500);
     expect(ReferralRates.official.redeemMinPoints, 0);
     expect(ReferralRates.official.redeemMaxBps, 10000);
-    expect(ReferralRates.official.backedFullSlotEnabled, isTrue);
+    expect(ReferralRates.official.backedFullSlotEnabled, isFalse);
     expect(ReferralRates.official.cashbackBps, 100);
     final lines = quoteReferralRewards(spend(playerReferrer: window));
     expect(lines.map((line) => line.program), ['cashback', 'c2c']);

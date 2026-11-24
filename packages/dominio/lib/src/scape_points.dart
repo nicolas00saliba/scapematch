@@ -25,7 +25,7 @@ class ReferralRates {
     this.firstBookingDiscountBps = 2000,
     this.redeemMinPoints = 0,
     this.redeemMaxBps = 10000,
-    this.backedFullSlotEnabled = true,
+    this.backedFullSlotEnabled = false,
     this.freeSlotMonthlyLimit = 0,
     this.blockSelfPayer = true,
     this.payerReferredAccountCap = 3,
