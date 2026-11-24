@@ -129,14 +129,14 @@ void main() {
     );
     expect(
       _equiv(tester, 'redeem_max_bps'),
-      '3.000 pontos-base = 30% da reserva',
+      '10.000 pontos-base = 100% da reserva',
     );
     expect(
       _equiv(tester, 'empty_slot_house_share_bps'),
       '5.000 pontos-base = 50% do extra',
     );
     expect(_equiv(tester, 'welcome_points'), '100 pontos = R\$ 1,00');
-    expect(_equiv(tester, 'redeem_min_points'), '1.000 pontos = R\$ 10,00');
+    expect(_equiv(tester, 'redeem_min_points'), '0 pontos = R\$ 0,00');
     expect(
       _equiv(tester, 'tier_silver_bonus_bps'),
       '50 pontos-base = 0,5% a mais',
@@ -162,7 +162,7 @@ void main() {
     );
     await tester.pump();
     expect(_equiv(tester, 'welcome_points'), '100 pontos = R\$ 2,00');
-    expect(_equiv(tester, 'redeem_min_points'), '1.000 pontos = R\$ 20,00');
+    expect(_equiv(tester, 'redeem_min_points'), '0 pontos = R\$ 0,00');
     expect(_equiv(tester, 'point_value_cents'), '1 ponto = R\$ 0,02');
     expect(find.textContaining('Cada ponto vale R\$ 0,02'), findsWidgets);
 
@@ -180,7 +180,7 @@ void main() {
     expect(api.settings['c2c_bps'], 1000);
     expect(api.settings['welcome_points'], 100);
     expect(api.settings['point_value_cents'], 2);
-    expect(api.settings['redeem_max_bps'], 3000);
+    expect(api.settings['redeem_max_bps'], 10000);
     expect(api.settings['payer_referred_account_cap'], 0);
     expect(find.text('Regras gravadas.'), findsOneWidget);
 

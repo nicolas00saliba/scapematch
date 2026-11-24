@@ -18,15 +18,13 @@ Você paga só a sua parte. A cobrança é confirmada quando o grupo atinge o m�
 
 A nota fiscal do serviço, quando a casa emite, é da casa para você. A comissão da intermediação é uma nota à parte, da EscapeMatch para a casa, e não aparece como nota sua.
 
-Scape Points. 1 ponto vale R\$ 0,01. Não há saque. Os pontos só abatem a sua parte de uma sala. Para usar, a conta precisa juntar pelo menos 1.000 pontos (R\$ 10). Numa reserva, os pontos pagam no máximo 30% do valor da sua parte. O restante continua no meio de pagamento que você escolher. Esses dois limites podem ser ajustados pela plataforma e a tela de pagamento mostra o valor que vale na hora.
+Scape Points. 100 pontos valem R\$ 1. Não há saque. Dá para pagar a sua parte em dinheiro, em pontos ou nos dois. Não há mínimo de pontos nem teto de 30%. O servidor calcula quanto do saldo cabe na reserva. Se os pontos cobrem o valor inteiro e a reserva de pontos cobre a parte da casa, não há cobrança no PagBank. Se não cobrem, o restante sai em dinheiro. Pontos de boas-vindas e de promoção não têm lastro na reserva: eles abatem até a comissão. Pontos de indicação e de cashback podem cobrir a vaga quando a reserva tem saldo.
 
-Boas-vindas. Quando o cadastro fica com um CPF válido, a conta recebe 100 pontos uma única vez. Esses pontos já podem entrar na conta, mas só são usados depois que o saldo chega ao mínimo de resgate.
+Boas-vindas. Quando o cadastro fica com um CPF válido, a conta recebe 100 pontos uma única vez. Esses pontos entram no saldo e podem abater uma reserva até o limite da comissão.
 
-Cashback. Em cada reserva paga, o servidor sorteia uma taxa entre 0,5% e 5% do valor que você pagou. A distribuição é configurada para que a média não passe de 1% (o padrão esperado é 0,9%). A taxa sorteada e a semente da auditoria ficam gravadas. O resultado aparece no extrato depois que o pagamento confirma. A tela, antes de pagar, mostra a faixa de 0,5% a 5%. O cashback nasce da comissão da EscapeMatch, fica pendente por 30 dias e é estornado se o pagamento for cancelado.
+Cashback. Em cada reserva paga, o servidor sorteia uma taxa entre 0,5% e 5% do valor que você pagou. A distribuição é configurada para que a média não passe de 1% (o padrão esperado é 0,9%). A taxa sorteada e a semente da auditoria ficam gravadas. O resultado aparece no extrato depois que o pagamento confirma. A tela, antes de pagar, mostra a faixa de 0,5% a 5%. O cashback nasce da comissão da EscapeMatch, fica pendente por 30 dias e é estornado se o pagamento for cancelado. Horário vazio não dobra esse valor.
 
-Horário vazio. A casa pode marcar, por escolha dela, faixas de horário vazio. Nessas reservas o cashback sorteado dobra. A parte extra é dividida: 50% sai do repasse da casa que fez essa escolha e 50% sai da EscapeMatch. Sem essa marcação, nada é descontado da casa.
-
-Indicação. Quem indica começa no nível Bronze, com a taxa base. Com 5 indicados ativos passa a Prata e ganha 0,5 ponto percentual a mais. Com 15 passa a Ouro e ganha 1 ponto percentual a mais. Ativo é o indicado com reserva paga nos últimos 90 dias. O nível é recalculado quando a recompensa é lançada. A tela de indicação mostra o nível e quantos indicados faltam para o próximo.
+Indicação de pessoas. A taxa é absoluta e só muda com o número de indicados ativos: 1% desde o primeiro, 2,5% a partir de 5 e 5% a partir de 8. Sem indicado ativo, a taxa é zero. Ativo é o indicado com atribuição ativa e reserva paga nos últimos 90 dias. O nível é recalculado quando a recompensa é lançada. Jogador que indica casa ganha 5%, sem níveis. Casa que indica jogador ganha 5% em crédito, sem níveis, e só sobre gasto em outra casa. Casa que indica casa continua em 5%. A primeira reserva de quem foi indicado continua com 20% de desconto.
 
 Nesta versão de demonstração os dados de exemplo continuam no aparelho até a conta real entrar no ar. As regras acima são o combinado que a versão ligada ao servidor vai aplicar.
 ''';

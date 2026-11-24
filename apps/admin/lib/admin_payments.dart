@@ -13,6 +13,7 @@ class PagamentosPage extends ConsumerStatefulWidget {
 
 class _PagamentosPageState extends ConsumerState<PagamentosPage> {
   PaymentsBoard? _board;
+  PlatformCacReport? _cac;
   PagbankSignupSettings? _signup;
   String? _error;
   bool _saving = false;
@@ -26,11 +27,17 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
   Future<void> _load() async {
     try {
       final api = ref.read(adminApiProvider);
+      final now = DateTime.now();
       final board = await api.payments();
+      final cac = await api.platformCac(
+        from: DateTime(now.year, now.month, 1),
+        to: DateTime(now.year, now.month + 1, 0),
+      );
       final signup = await api.pagbankSignupSettings();
       if (!mounted) return;
       setState(() {
         _board = board;
+        _cac = cac;
         _signup = signup;
         _error = null;
       });
@@ -215,6 +222,7 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
                   : 'ok',
             ),
             const SizedBox(height: 16),
+            _CacReport(report: _cac),
             _Lines(title: 'Cobranças', rows: board.charges, empty: 'Nenhuma cobrança recente.'),
             _Lines(title: 'Estornos', rows: board.refunds, empty: 'Nenhum estorno recente.'),
             _Lines(title: 'Saques', rows: board.withdrawals, empty: 'Nenhum saque recente.'),
@@ -257,6 +265,40 @@ String _yn(bool? value) {
     false => 'não',
     null => 'sem leitura',
   };
+}
+
+class _CacReport extends StatelessWidget {
+  const _CacReport({required this.report});
+
+  final PlatformCacReport? report;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = report;
+    if (data == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Text('CAC assumido no mês: ${reais(data.assumedCents)}'),
+        Text('Pago pela conta da EscapeMatch: ${reais(data.paidCents)}'),
+        Text('Pendente: ${reais(data.pendingCents)}'),
+        Text('Falhou: ${reais(data.failedCents)}'),
+        if (data.alerts.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Text('Alerta de CAC'),
+          for (final alert in data.alerts)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('${alert.venueName} · ${reais(alert.amountCents)}'),
+              subtitle: Text(
+                '${alert.status} · ${alert.lastError.isEmpty ? 'sem detalhe' : alert.lastError} · tentativa ${alert.attempts}',
+              ),
+            ),
+        ],
+      ],
+    );
+  }
 }
 
 class _HealthRow extends StatelessWidget {

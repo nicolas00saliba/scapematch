@@ -3,6 +3,7 @@ import { clientFailure } from "../_shared/pagbank_client_error.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { retryPendingCustodyReleases } from "../_shared/custody_release.ts";
+import { pagbankCacClient, runPlatformCac } from "../_shared/platform_cac.ts";
 import { pollPendingPagBankCharges } from "../_shared/charge_notice.ts";
 import {
   expireUnconfirmedGroups,
@@ -123,6 +124,7 @@ export async function handleSettle(
     }
     await pollPendingPagBankCharges(admin, pagbank, Deno.env);
     await retryPendingCustodyReleases(admin, pagbank);
+    await runPlatformCac(admin, Deno.env, pagbankCacClient(Deno.env));
     return json({ settled });
   } catch (error) {
     const failure = clientFailure(error, "settle-charges");

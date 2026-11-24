@@ -114,3 +114,10 @@ echo "pagbank signup ok"
 # supabase/migrations/20261124190000_test_accounts.sql
 run -f "$root/tests/test_accounts.sql"
 echo "test accounts ok"
+# supabase/migrations/20261124195000_reward_rules_20261124.sql
+run -f "$root/tests/reward_rules_20261124.sql"
+echo "reward rules 20261124 ok"
+run -f "$root/tests/platform_cac.sql"
+echo "platform cac ok"
+run -f "$root/tests/reward_rules_public.sql"
+echo "reward rules public ok"

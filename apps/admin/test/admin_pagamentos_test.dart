@@ -15,6 +15,22 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final api = MemoryAdminApi()
       ..payoutsEnabled = false
+      ..cacFixture = const PlatformCacReport(
+        assumedCents: 1250,
+        paidCents: 0,
+        pendingCents: 0,
+        failedCents: 1250,
+        alerts: [
+          PlatformCacAlert(
+            id: 'cac-1',
+            venueName: 'Casa do Painel',
+            amountCents: 1250,
+            status: 'failed',
+            lastError: 'saldo',
+            attempts: 8,
+          ),
+        ],
+      )
       ..paymentsFixture = PaymentsBoard(
         pagbankToken: true,
         pagbankBaseUrlProduction: true,
@@ -79,6 +95,9 @@ void main() {
     expect(find.text('Casa do Painel · PIX'), findsOneWidget);
     expect(find.text('Nenhum estorno recente.'), findsOneWidget);
     expect(find.text('pagbank-webhook · internal_error'), findsOneWidget);
+    expect(find.text('CAC assumido no mês: R\$ 12,50'), findsOneWidget);
+    expect(find.text('Falhou: R\$ 12,50'), findsOneWidget);
+    expect(find.text('failed · saldo · tentativa 8'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('admin-payouts-switch')));
     await tester.pump();

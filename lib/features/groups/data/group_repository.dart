@@ -72,6 +72,7 @@ abstract class GroupRepository {
     required CardDraft card,
     int installments = 1,
     int? expectedAmountCents,
+    int points = 0,
   }) {
     return Future.value(
       const PayShareFailure(PayShareFailureReason.unavailable),

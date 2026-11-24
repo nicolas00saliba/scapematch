@@ -59,6 +59,7 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
     CardDraft card, {
     int installments = 1,
     int? expectedAmountCents,
+    int points = 0,
   }) async {
     final user = ref.read(currentUserProvider);
     final result = await ref.read(groupRepositoryProvider).payWithNewCard(
@@ -67,6 +68,7 @@ class GroupDetailViewModel extends AsyncNotifier<Group> {
       card: card,
       installments: installments,
       expectedAmountCents: expectedAmountCents,
+      points: points,
     );
     if (ref.mounted && result is PayShareSuccess) {
       _publish(result.group);

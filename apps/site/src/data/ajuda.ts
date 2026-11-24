@@ -137,13 +137,13 @@ export const temas: Tema[] = [
     nome: 'Pontos',
     frase: 'Como ganhar, quando liberam e como usar.',
     seoTitulo: 'Pontos para jogar de graça | EscapeMatch',
-    seoDescricao: 'Junte pontos e jogue de graça. 1 ponto vale R$ 0,01. Cashback e indicação pagam a vaga inteira.',
+    seoDescricao: '100 pontos valem R$ 1. Dá para pagar em dinheiro, em pontos ou nos dois.',
     relacionados: ['conta', 'pagamento'],
     perguntas: [
       {
-        pergunta: 'Quanto vale 1 ponto?',
+        pergunta: 'Quanto valem 100 pontos?',
         resposta:
-          'R$ 0,01. Cashback e indicação se somam e pagam a vaga inteira. Só as boas-vindas dão desconto. Não viram dinheiro para saque.',
+          'R$ 1. Não viram dinheiro para saque. Dá para pagar a reserva em dinheiro, em pontos ou nos dois.',
       },
       {
         pergunta: 'Quando os pontos liberam?',
@@ -152,7 +152,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'A partir de quando dá para usar?',
         resposta:
-          'A partir de 1.000 pontos. Se a reserva for cancelada, os pontos usados são devolvidos.',
+          'Com qualquer saldo. Não há mínimo nem teto de 30%. Se a reserva for cancelada, os pontos usados são devolvidos.',
       },
       {
         pergunta: 'Quantos pontos eu ganho ao criar a conta?',
@@ -184,9 +184,9 @@ export const temas: Tema[] = [
           'Fica 30 dias pendente e depois entra no repasse das próximas reservas pelo app.',
       },
       {
-        pergunta: 'Quem paga o ponto em dobro do horário vazio?',
+        pergunta: 'O horário vazio ainda dobra os pontos?',
         resposta:
-          'O custo é dividido: metade fica com a casa e metade com o EscapeMatch.',
+          'Não. Desde 24/11/2026 horário vazio não dobra cashback nem indicação, e a casa não paga um extra por causa do horário.',
       },
     ],
   },

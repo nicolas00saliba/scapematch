@@ -4,22 +4,27 @@ import 'package:dominio/src/commission.dart';
 /// o banco guarda a mesma tabela e pode mudá-la sem recompilar o app.
 ///
 /// 1 Scape Point vale [ReferralRates.pointValueCents] centavos.
-/// O padrão é 1 ponto = R\$ 0,01. O ponto não vence e não saca:
-/// só abate sala. A casa continua recebendo o líquido cheio;
-/// o abatimento sai da comissão da EscapeMatch.
+/// O padrão é 100 pontos = R\$ 1. O ponto não vence e não saca.
+/// A casa continua recebendo o líquido cheio.
+/// O abatimento de pontos sem lastro sai da comissão da EscapeMatch.
+/// Pontos com lastro podem cobrir a vaga quando a reserva cobre a casa.
 class ReferralRates {
   const ReferralRates({
-    this.c2cBps = 250,
-    this.b2cBps = 250,
-    this.c2bBps = 250,
+    this.b2cBps = 500,
+    this.c2bBps = 500,
     this.b2bBps = 500,
+    this.c2cFromBps = 100,
+    this.c2cMidActive = 5,
+    this.c2cMidBps = 250,
+    this.c2cHighActive = 8,
+    this.c2cHighBps = 500,
     this.pointValueCents = 1,
     this.attributionDays = 365,
     this.holdDays = 30,
     this.cashbackBps = 100,
     this.firstBookingDiscountBps = 2000,
-    this.redeemMinPoints = 1000,
-    this.redeemMaxBps = 3000,
+    this.redeemMinPoints = 0,
+    this.redeemMaxBps = 10000,
     this.backedFullSlotEnabled = false,
     this.freeSlotMonthlyLimit = 0,
     this.blockSelfPayer = true,
@@ -27,19 +32,40 @@ class ReferralRates {
     this.sameDeviceReviewThreshold = 2,
   });
 
-  /// Jogador que indicou outro jogador, sobre o gasto do indicado.
-  final int c2cBps;
-
-  /// Casa que indicou o jogador, sobre o gasto dele em outra casa.
+  /// Casa que indicou o jogador, sobre o gasto dele em outra casa. 500 = 5%.
   final int b2cBps;
 
-  /// Jogador que indicou a casa, sobre o faturamento dela na plataforma.
+  /// Jogador que indicou a casa, sobre o faturamento dela na plataforma. 500 = 5%.
   final int c2bBps;
+
+  /// Taxa absoluta da indicação de pessoas a partir do primeiro indicado ativo.
+  final int c2cFromBps;
+
+  /// Indicados ativos a partir dos quais vale [c2cMidBps].
+  final int c2cMidActive;
+
+  /// Taxa absoluta a partir de [c2cMidActive] indicados ativos.
+  final int c2cMidBps;
+
+  /// Indicados ativos a partir dos quais vale [c2cHighBps].
+  final int c2cHighActive;
+
+  /// Taxa absoluta a partir de [c2cHighActive] indicados ativos.
+  final int c2cHighBps;
+
+  /// Taxa da indicação de pessoas. Zero sem indicado ativo.
+  /// 1% desde o primeiro, 2,5% desde 5 e 5% desde 8.
+  int c2cRateBps(int activeReferrals) {
+    if (activeReferrals >= c2cHighActive) return c2cHighBps;
+    if (activeReferrals >= c2cMidActive) return c2cMidBps;
+    if (activeReferrals >= 1) return c2cFromBps;
+    return 0;
+  }
 
   /// Casa que indicou outra casa. Não incide na reserva com desconto de primeira visita.
   final int b2bBps;
 
-  /// Centavos de um ponto. 1 = R\$ 0,01.
+  /// Centavos de um ponto. 1 = R\$ 0,01, ou seja, 100 pontos = R\$ 1.
   final int pointValueCents;
 
   /// Janela da indicação, em dias, contada do cadastro de quem foi indicado.
@@ -67,15 +93,16 @@ class ReferralRates {
   /// ficam em revisão. 0 desliga.
   final int sameDeviceReviewThreshold;
 
-  /// Mínimo de pontos para usar o saldo numa reserva.
+  /// Mínimo de pontos para usar o saldo. Zero: qualquer saldo positivo vale.
   final int redeemMinPoints;
 
   /// Teto da reserva que pode ser pago com pontos, em basis points.
-  /// Vale para pontos sem lastro e, com a flag desligada, para todos.
+  /// 10000 tira o teto de 30%. Pontos sem lastro continuam na comissão.
   final int redeemMaxBps;
 
   /// Pontos com lastro (indicação e cashback) já liberados podem cobrir
-  /// a vaga inteira. Nasce desligado. Boas-vindas e promoção ficam no teto.
+  /// a vaga inteira quando a reserva cobre a casa. Boas-vindas e promoção
+  /// ficam no teto da comissão.
   final bool backedFullSlotEnabled;
 
   /// Não trava a vaga. A coluna antiga fica no tipo para clientes que
@@ -144,6 +171,7 @@ class SpendRewardInput {
     this.venueSubjectAlreadyRewarded = false,
     this.playerDeviceCluster = 0,
     this.venueDeviceCluster = 0,
+    this.c2cActiveReferrals = 1,
   });
 
   final int grossCents;
@@ -192,6 +220,10 @@ class SpendRewardInput {
   /// Contas deste indicador criadas no mesmo aparelho, incluindo esta.
   final int playerDeviceCluster;
   final int venueDeviceCluster;
+
+  /// Indicados ativos de quem indicou o jogador, na hora do lançamento.
+  /// O pagamento que está sendo lançado já conta.
+  final int c2cActiveReferrals;
 }
 
 class PointSubsidyQuote {
@@ -310,9 +342,8 @@ int centsFromPoints(int points, int pointValueCents) {
   return points * pointValueCents;
 }
 
-/// Desconto da primeira reserva, limitado à comissão. Não entra no
-/// lançamento automático; existe para o ledger tratar o mesmo teto
-/// quando o desconto for ligado.
+/// Desconto da primeira reserva. Não encolhe para caber na comissão:
+/// o prejuízo inicial fica com a plataforma.
 int firstBookingDiscountCents({
   required int grossCents,
   required int discountBps,
@@ -322,7 +353,8 @@ int firstBookingDiscountCents({
     throw ArgumentError('A comissão não pode ser negativa.');
   }
   final wanted = commissionCents(grossCents, discountBps);
-  return wanted > commissionCentsValue ? commissionCentsValue : wanted;
+  if (wanted < 0) return 0;
+  return wanted > grossCents ? grossCents : wanted;
 }
 
 /// CPF, telefone e cartão iguais, ou CPF do jogador igual ao da casa.
@@ -443,7 +475,7 @@ List<RewardLine> quoteReferralRewards(
     } else if (!input.playerReferrerCpfMissing) {
       final taken = _takePoints(
         gross,
-        rates.c2cBps,
+        rates.c2cRateBps(input.c2cActiveReferrals),
         pool,
         rates.pointValueCents,
       );
@@ -516,7 +548,7 @@ List<RewardLine> quoteReferralRewards(
 int referralBookingsForPoints({
   required int targetPoints,
   required int grossCents,
-  int c2cBps = 250,
+  int c2cBps = 100,
   int pointValueCents = 1,
 }) {
   final each = pointsFromCents(

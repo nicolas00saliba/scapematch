@@ -8,6 +8,7 @@ import 'package:scapematch/features/payments/presentation/pagbank_connect_return
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/pwa/pwa_frame.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_sync.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_screen.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
@@ -77,7 +78,9 @@ class ParceiroApp extends ConsumerWidget {
               solidPeach: true,
             );
           },
-          child: PwaFrame(child: child ?? const SizedBox.shrink()),
+          child: RewardRulesSync(
+            child: PwaFrame(child: child ?? const SizedBox.shrink()),
+          ),
         );
       },
       locale: const Locale('pt', 'BR'),

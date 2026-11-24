@@ -4,7 +4,7 @@
 // bancária e a apiKey dela não sai do backend.
 //
 // O percentual do PagBank incide no líquido depois da taxa. Por isso o lastro
-// vai em fixedValue, no valor em centavos da indicação (2,5% do bruto).
+// vai em fixedValue, nos centavos que o servidor calculou para a indicação.
 // O valor da cobrança do jogador não muda: a linha só reparte o que já foi
 // calculado. O claim grava a linha pending antes de qualquer chamada.
 // A listagem de transferências não filtra por externalReference: a busca

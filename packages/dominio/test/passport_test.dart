@@ -207,7 +207,11 @@ void main() {
   });
 
   test('pontos do passaporte são sem lastro e param no teto', () {
-    const off = ReferralRates(redeemMinPoints: 1, redeemMaxBps: 3000);
+    const off = ReferralRates(
+      redeemMinPoints: 1,
+      redeemMaxBps: 3000,
+      backedFullSlotEnabled: false,
+    );
     final passport = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 10000,

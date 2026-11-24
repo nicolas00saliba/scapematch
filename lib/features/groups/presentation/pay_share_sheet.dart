@@ -17,6 +17,7 @@ import 'package:scapematch/features/payments/presentation/card_entry_fields.dart
 import 'package:scapematch/features/payments/presentation/own_card_holder.dart';
 import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 
 /// Cartão de exemplo. O pagamento simulado não envia número.
@@ -96,6 +97,7 @@ Future<PaySheetOutcome> showPayShareSheet({
   Future<List<CardInstallmentOption>> Function(int principalCents)?
   quoteInstallments,
   PointSpendChoice? points,
+  Future<PointSpendChoice?> Function(int points)? requotePoints,
   int discountCents = 0,
   String coverAsset = '',
   String houseName = '',
@@ -115,6 +117,7 @@ Future<PaySheetOutcome> showPayShareSheet({
         onPayNewCard: onPayNewCard,
         quoteInstallments: quoteInstallments,
         points: points,
+        requotePoints: requotePoints,
         discountCents: discountCents > 0
             ? discountCents
             : points?.discountCents ?? 0,
@@ -136,6 +139,7 @@ class PayShareSheet extends ConsumerStatefulWidget {
     this.onPayNewCard,
     this.quoteInstallments,
     this.points,
+    this.requotePoints,
     this.discountCents = 0,
     this.coverAsset = '',
     this.houseName = '',
@@ -148,6 +152,7 @@ class PayShareSheet extends ConsumerStatefulWidget {
   final String houseName;
   final String roomName;
   final PointSpendChoice? points;
+  final Future<PointSpendChoice?> Function(int points)? requotePoints;
   final int discountCents;
   final Future<ShareChargeView> Function(
     PaymentMethodKind kind, {
@@ -178,7 +183,9 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   String? _issuedPix;
   Uint8List? _issuedPixImage;
   String? _cardId = payTestCard.id;
-  var _usePoints = false;
+  var _payMode = 'money';
+  var _quoting = false;
+  var _hybridPoints = 1;
   var _installments = 1;
   var _quoteToken = 0;
   List<CardInstallmentOption>? _remotePlans;
@@ -187,12 +194,94 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
   bool get _done => _seat != null;
 
   int get _chargedCents {
-    final discount = widget.discountCents;
     final points = widget.points;
-    if (_usePoints && points != null && points.points > 0) {
-      return points.chargedCents - discount;
+    if (points != null && points.use && points.points > 0) {
+      final charged = points.chargedCents;
+      return charged < 0 ? 0 : charged;
     }
-    return widget.amountCents - discount;
+    final cash = widget.amountCents - widget.discountCents;
+    return cash < 0 ? 0 : cash;
+  }
+
+  int get _sliderMax {
+    final points = widget.points;
+    if (points == null) return 0;
+    return points.maxPoints > 0 ? points.maxPoints : points.points;
+  }
+
+  Future<void> _setPayMode(String mode) async {
+    final points = widget.points;
+    if (points == null) return;
+    if (mode == 'money') {
+      setState(() {
+        _payMode = mode;
+        points.use = false;
+        _installments = 1;
+        _remotePlans = null;
+      });
+      return;
+    }
+    if (mode == 'points') {
+      final requote = widget.requotePoints;
+      PointSpendChoice? full;
+      if (requote != null && _sliderMax > 0) {
+        setState(() => _quoting = true);
+        full = await requote(_sliderMax);
+        if (!mounted) return;
+      }
+      setState(() {
+        _quoting = false;
+        _payMode = mode;
+        if (full != null) points.applyQuote(_quoteMap(full));
+        points.use = points.points > 0;
+        _installments = 1;
+        _remotePlans = null;
+      });
+      return;
+    }
+    final start = points.points > 0 && points.points < _sliderMax
+        ? points.points
+        : (_sliderMax > 1 ? _sliderMax ~/ 2 : _sliderMax);
+    setState(() {
+      _payMode = mode;
+      _hybridPoints = start;
+      points.use = true;
+    });
+    await _requoteHybrid(start);
+  }
+
+  Future<void> _requoteHybrid(int requested) async {
+    final points = widget.points;
+    final requote = widget.requotePoints;
+    if (points == null) return;
+    if (requote == null) {
+      setState(() => points.use = requested > 0);
+      return;
+    }
+    setState(() => _quoting = true);
+    final next = await requote(requested);
+    if (!mounted) return;
+    setState(() {
+      _quoting = false;
+      if (next != null) points.applyQuote(_quoteMap(next));
+      points.use = points.points > 0;
+      _installments = 1;
+      _remotePlans = null;
+    });
+    if (_method == PaymentMethodKind.card && _chargedCents > 0) {
+      _loadQuote();
+    }
+  }
+
+  Map<String, dynamic> _quoteMap(PointSpendChoice choice) {
+    return {
+      'points': choice.points,
+      'subsidy_cents': choice.subsidyCents,
+      'charged_cents': choice.chargedCents,
+      'first_booking_discount_cents': choice.discountCents,
+      'points_only': choice.pointsOnly,
+      'max_points': choice.maxPoints,
+    };
   }
 
   List<CardInstallmentOption> get _plans {
@@ -315,10 +404,14 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     });
     final live = ref.read(backendPlanProvider).connectsSupabase;
     _entry.requireHolderDocument = live;
-    final draft = _method == PaymentMethodKind.card && _entry.started
+    final pointsOnly = _chargedCents == 0 && widget.points?.use == true;
+    final draft = !pointsOnly && _method == PaymentMethodKind.card && _entry.started
         ? _entry.draft
         : null;
-    if (_method == PaymentMethodKind.card && _entry.started && draft == null) {
+    if (!pointsOnly &&
+        _method == PaymentMethodKind.card &&
+        _entry.started &&
+        draft == null) {
       if (!mounted) return;
       setState(() {
         _busy = false;
@@ -331,7 +424,12 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
 
     final chosen = _chosenPlan();
     final ShareChargeView view;
-    if (draft != null) {
+    if (pointsOnly) {
+      view = await widget.onPay(
+        PaymentMethodKind.pix,
+        expectedAmountCents: 0,
+      );
+    } else if (draft != null) {
       final payNew = widget.onPayNewCard;
       view = payNew == null
           ? const ShareChargeView(message: liveChargeFailed)
@@ -414,6 +512,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
     final height = MediaQuery.sizeOf(context).height;
     final saved = ref.watch(paymentMethodsProvider).asData?.value ?? const [];
     final live = ref.watch(backendPlanProvider).connectsSupabase;
+    final rules = ref.watch(rewardRulesProvider);
     final cards = live ? saved : [payTestCard, ...saved];
     _entry.requireHolderDocument = live;
     final issuedPix = _issuedPix;
@@ -461,7 +560,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                       ),
                     ),
                     Text(
-                      'Cashback sorteado de ${formatBasisPoints(widget.points?.cashbackMinBps ?? 50)} a ${formatBasisPoints(widget.points?.cashbackMaxBps ?? 500)} quando o pagamento confirma. O percentual sai no extrato.',
+                      'Cashback sorteado de ${formatBasisPoints(rules.cashbackMinBps)} a ${formatBasisPoints(rules.cashbackMaxBps)} quando o pagamento confirma. O percentual sai no extrato.',
                       key: AppKeys.payCashbackRange,
                     ),
                     const SizedBox(height: 8),
@@ -472,39 +571,53 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                         key: AppKeys.payFirstDiscount,
                       ),
                     ],
-                    if (widget.points != null && widget.points!.points == 0)
-                      Text(
-                        'Para usar pontos é preciso juntar pelo menos ${formatPoints(widget.points!.redeemMinPoints)}. O máximo é ${formatBasisPoints(widget.points!.redeemMaxBps)} do valor da sala.',
+                    if (widget.points != null && _sliderMax <= 0)
+                      const Text(
+                        'Esta conta ainda não tem pontos para esta reserva.',
                       ),
-                    if (widget.points != null && widget.points!.points > 0) ...[
+                    if (widget.points != null && _sliderMax > 0) ...[
                       const SizedBox(height: 8),
-                      SwitchListTile(
+                      SegmentedButton<String>(
                         key: AppKeys.payUsePoints,
-                        contentPadding: EdgeInsets.zero,
-                        value: _usePoints,
-                        title: Text(
-                          'Usar ${formatPoints(widget.points!.points)} Scape Points',
-                        ),
-                        subtitle: Text(
-                          widget.points!.chargedCents == 0
-                              ? 'A vaga fica grátis. A casa recebe os 75% no crédito do próximo repasse. Se a reserva for cancelada, os pontos voltam.'
-                              : 'Abate ${formatPrice(widget.points!.subsidyCents)}. A casa recebe o valor cheio.',
-                        ),
-                        onChanged: _busy
+                        segments: const [
+                          ButtonSegment(value: 'money', label: Text('Dinheiro')),
+                          ButtonSegment(value: 'points', label: Text('Pontos')),
+                          ButtonSegment(value: 'hybrid', label: Text('Híbrido')),
+                        ],
+                        selected: {_payMode},
+                        onSelectionChanged: _busy || _quoting
                             ? null
-                            : (value) {
-                                setState(() {
-                                  _usePoints = value;
-                                  widget.points!.use = value;
-                                  _installments = 1;
-                                  _remotePlans = null;
-                                });
-                                if (_method == PaymentMethodKind.card) {
-                                  _loadQuote();
-                                }
-                              },
+                            : (value) => _setPayMode(value.first),
                       ),
+                      if (_payMode == 'hybrid' && _sliderMax > 1) ...[
+                        const SizedBox(height: 8),
+                        Slider(
+                          key: AppKeys.payPointsSlider,
+                          min: 1,
+                          max: _sliderMax.toDouble(),
+                          divisions: _sliderMax - 1,
+                          value: _hybridPoints.clamp(1, _sliderMax).toDouble(),
+                          label: formatPoints(_hybridPoints),
+                          onChanged: _busy || _quoting
+                              ? null
+                              : (value) => setState(() => _hybridPoints = value.round()),
+                          onChangeEnd: _busy || _quoting
+                              ? null
+                              : (value) => _requoteHybrid(value.round()),
+                        ),
+                      ],
+                      if (_payMode != 'money')
+                        Text(
+                          widget.points!.chargedCents == 0
+                              ? 'Paga ${formatPoints(widget.points!.points)} pontos. Sem cobrança no PagBank. Se a reserva for cancelada, os pontos voltam.'
+                              : 'Abate ${formatPrice(widget.points!.subsidyCents)} em pontos. O restante sai em dinheiro. A casa recebe o valor cheio.',
+                        ),
                     ],
+                    if (_chargedCents == 0 && widget.points?.use == true)
+                      const Text(
+                        'Sem cobrança no PagBank. A casa recebe o líquido pelo complemento da reserva de pontos.',
+                      )
+                    else ...[
                     const SizedBox(height: 4),
                     Text(
                       live
@@ -591,6 +704,7 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                               ],
                             ),
                     ),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -614,7 +728,9 @@ class _PayShareSheetState extends ConsumerState<PayShareSheet> {
                               ),
                             )
                           : Text(
-                              live
+                              _chargedCents == 0 && widget.points?.use == true
+                                  ? 'Pagar com pontos'
+                                  : live
                                   ? (_method == PaymentMethodKind.pix
                                         ? GroupMessages.generatePix
                                         : GroupMessages.payWithCard)

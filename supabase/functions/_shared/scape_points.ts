@@ -3,10 +3,15 @@
 // e confere o percentual que o SQL devolve antes de chamar o PagBank.
 
 export const officialPointValueCents = 1;
-export const officialC2cBps = 250;
-export const officialB2cBps = 250;
-export const officialC2bBps = 250;
+export const officialC2cBps = 100;
+export const officialB2cBps = 500;
+export const officialC2bBps = 500;
 export const officialB2bBps = 500;
+export const officialC2cFromBps = 100;
+export const officialC2cMidActive = 5;
+export const officialC2cMidBps = 250;
+export const officialC2cHighActive = 8;
+export const officialC2cHighBps = 500;
 export const officialCashbackBps = 100;
 export const officialAttributionDays = 365;
 export const officialHoldDays = 30;
@@ -44,6 +49,7 @@ export type SpendRewardInput = {
   venueReferrerCpfMissing?: boolean;
   fraudReason?: string | null;
   c2cBps?: number;
+  c2cActiveReferrals?: number;
   b2cBps?: number;
   c2bBps?: number;
   b2bBps?: number;
@@ -173,7 +179,7 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
     } else if (!input.playerReferrerCpfMissing) {
       const taken = takePoints(
         input.grossCents,
-        input.c2cBps ?? officialC2cBps,
+        input.c2cBps ?? c2cRateBps(input.c2cActiveReferrals ?? 1),
         pool,
         pointValue,
       );
@@ -266,6 +272,13 @@ export type PointSubsidyQuote = {
   limitReason: "monthly_limit" | "antifraud" | "reserve" | null;
 };
 
+export function c2cRateBps(activeReferrals: number): number {
+  if (activeReferrals >= officialC2cHighActive) return officialC2cHighBps;
+  if (activeReferrals >= officialC2cMidActive) return officialC2cMidBps;
+  if (activeReferrals >= 1) return officialC2cFromBps;
+  return 0;
+}
+
 export function referralBookingsForPoints(input: {
   targetPoints: number;
   grossCents: number;
@@ -297,8 +310,8 @@ export function quotePointSubsidy(input: {
   backedFraudHold?: boolean;
 }): PointSubsidyQuote {
   const pointValue = input.pointValueCents ?? officialPointValueCents;
-  const minPoints = input.redeemMinPoints ?? 1000;
-  const maxBps = input.redeemMaxBps ?? 3000;
+  const minPoints = input.redeemMinPoints ?? 0;
+  const maxBps = input.redeemMaxBps ?? 10000;
   const feeFlat = input.receiptFeeCents ?? 0;
   const commission = commissionCents(input.grossCents, input.commissionBps);
   const houseNet = input.grossCents - commission;

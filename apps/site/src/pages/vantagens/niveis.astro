@@ -10,26 +10,26 @@ const programa = programaPorId('niveis');
 ---
 
 <Base title={programa.seoTitulo} description={programa.seoDescricao} path={programa.rota} ogImage={programa.og}>
-  <PageTop titulo="Níveis Bronze, Prata e Ouro" frase={programa.apoio} />
+  <PageTop titulo="Níveis de indicação" frase={programa.apoio} />
   <div class="miolo pagina">
     <DescontoPontos />
     <div class="niveis">
       <article class="nivel">
-        <h2>Bronze</h2>
-        <p>O começo. Cada reserva indicada rende 2,5% em pontos, sem o extra de nível.</p>
+        <h2>1%</h2>
+        <p>Desde o primeiro indicado ativo. Cada reserva dele rende 1% em pontos.</p>
       </article>
       <article class="nivel">
-        <h2>Prata</h2>
-        <p>5 indicados jogando. Mais 0,5% em pontos sobre o que eles pagarem.</p>
+        <h2>2,5%</h2>
+        <p>A partir de 5 indicados ativos. A taxa passa a ser 2,5%, no lugar da anterior.</p>
       </article>
       <article class="nivel">
-        <h2>Ouro</h2>
-        <p>15 indicados jogando. Mais 1% em pontos sobre o que eles pagarem.</p>
+        <h2>5%</h2>
+        <p>A partir de 8 indicados ativos. A taxa passa a ser 5%.</p>
       </article>
     </div>
     <section class="leitura">
       <h2>Como subir</h2>
-      <p>Conta como jogando quem pagou uma reserva nos últimos 90 dias. O extra vale para amigos e casas indicados.</p>
+      <p>Ativo é quem tem atribuição ativa e pagou uma reserva nos últimos 90 dias. Os níveis valem só quando um jogador indica outro jogador.</p>
     </section>
     <ProgramCard programa={programa} />
   </div>

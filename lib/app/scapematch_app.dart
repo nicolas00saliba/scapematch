@@ -5,6 +5,7 @@ import 'package:scapematch/app/router.dart';
 import 'package:scapematch/app/splash_gate.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/pwa/pwa_frame.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_sync.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 
 class ScapeMatchApp extends ConsumerWidget {
@@ -25,7 +26,9 @@ class ScapeMatchApp extends ConsumerWidget {
       builder: (context, child) {
         // No celular, a abertura cobre o primeiro frame. O site largo segue.
         return SplashGate(
-          child: PwaFrame(child: child ?? const SizedBox.shrink()),
+          child: RewardRulesSync(
+            child: PwaFrame(child: child ?? const SizedBox.shrink()),
+          ),
         );
       },
       routerConfig: router,

@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
@@ -41,10 +42,11 @@ void main() {
 
   test('os termos explicam o sorteio, o mínimo e os níveis', () {
     expect(LegalDocuments.termsBody, contains('0,5%'));
-    expect(LegalDocuments.termsBody, contains('1.000 pontos'));
-    expect(LegalDocuments.termsBody, contains('30%'));
-    expect(LegalDocuments.termsBody, contains('Prata'));
-    expect(LegalDocuments.termsBody, contains('Ouro'));
+    expect(LegalDocuments.termsBody, contains('100 pontos valem R\$ 1'));
+    expect(LegalDocuments.termsBody, contains('1% desde o primeiro'));
+    expect(LegalDocuments.termsBody, contains('0,5%'));
+    expect(LegalDocuments.termsBody, contains('20% de desconto'));
+    expect(LegalDocuments.termsBody, contains('5% a partir de 8'));
   });
 
   testWidgets('a tela mostra disponível, pendente e o código', (tester) async {
@@ -58,7 +60,10 @@ void main() {
     expect(find.byKey(AppKeys.scapePointsBalance), findsOneWidget);
     expect(find.textContaining('disponíveis'), findsOneWidget);
     expect(find.textContaining('250 pontos chegando'), findsOneWidget);
-    expect(find.textContaining('Nível Bronze'), findsOneWidget);
+    expect(find.textContaining('Nível 1%'), findsOneWidget);
+    expect(find.textContaining('100 pontos ='), findsOneWidget);
+    expect(find.textContaining('1% desde o primeiro'), findsOneWidget);
+    expect(find.byKey(const Key('scape-level-progress')), findsOneWidget);
     expect(find.textContaining('SCAPEDEMO'), findsOneWidget);
     expect(find.text('Cashback'), findsOneWidget);
     expect(find.text('Indicação de jogador'), findsOneWidget);
@@ -66,5 +71,23 @@ void main() {
       find.text('Números de exemplo. Nada aqui é uma carteira real.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a tela mostra o percentual novo da regra vigente', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    const rules = PublicRewardRules(c2cFromBps: 150, c2bBps: 400);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ScapePointsBody(preview: ScapeWallet.sample, rules: rules),
+        ),
+      ),
+    );
+    expect(find.textContaining('1,5% desde o primeiro'), findsOneWidget);
+    expect(find.textContaining('Casa indicada: 4%'), findsOneWidget);
+    expect(rules.previewC2cCents(10000, 1), 150);
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
@@ -67,6 +68,7 @@ class _PartnerTermsScreenState extends ConsumerState<PartnerTermsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final termsBody = PartnerLegal.bodyFor(ref.watch(rewardRulesProvider));
     return AppScaffold(
       desktopMaxWidth: AppScaffold.formMax,
       appBar: AppBar(
@@ -131,10 +133,7 @@ class _PartnerTermsScreenState extends ConsumerState<PartnerTermsScreen> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               TextButton(
-                onPressed: () => _open(
-                  PartnerLegal.termsTitle,
-                  PartnerLegal.termsBody,
-                ),
+                onPressed: () => _open(PartnerLegal.termsTitle, termsBody),
                 child: const Text('Termos do Parceiro'),
               ),
               TextButton(

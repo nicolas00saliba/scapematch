@@ -1,5 +1,19 @@
 # Decisões provisórias
 
+## A regra vigente chega no app sem versão nova
+
+- **Data:** 2026-11-24
+- **Decisão:** o Admin continua gravando em `referral_program_settings` por `admin_save_reward_settings`. O app lê `public.reward_rules_public()`, que devolve só taxa, limiar, valor do ponto, desconto da primeira reserva, teto de resgate e a faixa de cashback, mais `updated_at` como versão. Não devolve a distribuição do sorteio nem trava de antifraude. O jogador e o Parceiro carregam isso ao abrir, a cada 15 minutos e ao voltar ao primeiro plano. Sem rede, usam o último cache. O padrão do código só entra se nunca houve cache. A prévia e os textos de percentual usam esses números. A próxima cobrança lê a tabela na hora de calcular desconto, pontos e split. Um pedido que já virou Order no PagBank fica com o valor, o `split_percent` e o `house_fixed_cents` gravados na cobrança: com `provider_ref` preenchido o banco não recalcula o fixo da casa. Mudar a regra não chama o PagBank e não pede reconfiguração da conta. O PagBank não guarda a taxa de indicação. O lançamento de pontos de uma cobrança que ainda não foi paga continua na confirmação, com a tabela daquele momento. Não existe coluna `max_installments_interest_free`; as parcelas sem juros seguem a constante do checkout.
+- **Onde está no código:** `supabase/migrations/20261124210000_reward_rules_public.sql`, `packages/dominio/lib/src/public_reward_rules.dart`, a tela de pontos e a folha de pagamento do jogador, e o texto de cashback do Parceiro.
+- **Como trocar depois:** a migration não foi aplicada no remoto e nenhuma função foi publicada. O site em `apps/site/src/data/programas.ts` e os termos estáticos em `lib/features/legal/legal_documents.dart` continuam com percentuais fixos.
+
+## Regras de pontos e indicação em 24/11/2026
+
+- **Data:** 2026-11-24
+- **Decisão:** horário vazio não dobra cashback nem indicação. Jogador que indica jogador ganha 1% desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8. Sem indicado ativo, a taxa é zero. Ativo continua sendo atribuição `active` com cobrança paga do sujeito dentro de `tier_active_days` (90). Jogador que indica casa e casa que indica jogador ficam em 5%, sem nível. Casa que indica casa continua em 5%. 100 pontos = R$ 1. Não há mínimo de 1.000 pontos nem teto de 30%. A flag `backed_full_slot_enabled` continua desligada, como em produção; ligar a vaga inteira em pontos é uma decisão separada. O desconto de 20% da primeira reserva permanece mesmo quando passa da comissão. Quando desconto, pontos e indicações passam da comissão, a casa fica com o valor cheio e a conta PagBank da EscapeMatch cobre o que o split não alcança. Esse complemento não vira crédito em `free_slot_topups`. A execução da transferência fica desligada até `PAGBANK_CAC_TRANSFERS=on`.
+- **Onde está no código:** migrations `20261124195000_reward_rules_20261124.sql` e `20261124200000_platform_cac.sql`, `private.book_platform_cac`, `supabase/functions/_shared/platform_cac.ts`, o painel de pagamentos do Admin e o seletor de pagamento do app.
+- **Como trocar depois:** as migrations não foram aplicadas no remoto e nenhuma função foi publicada. Sem a carteira `PAGBANK_POINTS_RESERVE_ACCOUNT_ID`, o resgate acima da comissão é cortado. A vaga inteira em pontos só passa a valer se o Nícolas ligar `backed_full_slot_enabled`. A transferência P2P só sai depois do certificado, da liberação comercial e de `PAGBANK_CAC_TRANSFERS=on`.
+
 ## A nota fiscal nasce desligada em produção
 
 - **Data:** 2026-11-13

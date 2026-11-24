@@ -44,6 +44,7 @@ abstract final class AppKeys {
   static const scapeReferralCode = Key('scape-referral-code');
   static const scapeReferralClaim = Key('scape-referral-claim');
   static const payUsePoints = Key('pay-use-points');
+  static const payPointsSlider = Key('pay-points-slider');
   static const payFirstDiscount = Key('pay-first-discount');
   static const payCashbackRange = Key('pay-cashback-range');
   static const accountDelete = Key('account-delete');

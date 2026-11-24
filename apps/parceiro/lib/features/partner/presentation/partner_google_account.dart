@@ -10,6 +10,7 @@ import 'package:scapematch/features/auth/data/google_oauth.dart';
 import 'package:scapematch/features/auth/data/google_oauth_flow.dart';
 import 'package:scapematch/features/auth/data/supabase_auth_repository.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
+import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
@@ -191,7 +192,10 @@ class _PartnerGoogleFinishScreenState
       _name = TextEditingController();
     }
     _termsTap = TapGestureRecognizer()
-      ..onTap = () => _open(PartnerLegal.termsTitle, PartnerLegal.termsBody);
+      ..onTap = () => _open(
+        PartnerLegal.termsTitle,
+        PartnerLegal.bodyFor(ref.read(rewardRulesProvider)),
+      );
     _privacyTap = TapGestureRecognizer()
       ..onTap = () =>
           _open(LegalDocuments.privacyTitle, LegalDocuments.privacyBody);
