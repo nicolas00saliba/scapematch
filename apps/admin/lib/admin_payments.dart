@@ -82,7 +82,7 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
       builder: (context) => AlertDialog(
         title: const Text('Desligar o cadastro pela API'),
         content: const Text(
-          'O Parceiro volta a orientar a página oficial do PagBank. A checagem não liga de novo até você liberar.',
+          'O Parceiro volta a orientar a página oficial do PagBank. A checagem não liga de novo até você religar.',
         ),
         actions: [
           TextButton(
@@ -111,6 +111,27 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
   }
 
   Future<void> _releaseSignup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Religar o cadastro pela API'),
+        content: const Text(
+          'O Parceiro volta a enviar o cadastro pelo servidor. A casa que já tem conta segue para o Connect.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            key: const Key('admin-pagbank-signup-release-confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Religar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _saving = true);
     try {
       await ref.read(adminApiProvider).releasePagbankSignupHold();
@@ -166,7 +187,7 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
                 child: OutlinedButton(
                   key: const Key('admin-pagbank-signup-release'),
                   onPressed: _saving ? null : _releaseSignup,
-                  child: const Text('Liberar a checagem'),
+                  child: const Text('Religar'),
                 ),
               ),
             const SizedBox(height: 8),
@@ -224,7 +245,7 @@ String _signupLine(PagbankSignupSettings? signup) {
     return 'Ligada. O Parceiro envia o cadastro pelo servidor.';
   }
   if (signup.heldOff) {
-    return 'Desligada pelo admin. A checagem não liga de novo até liberar.';
+    return 'Desligada pelo admin. Religar devolve o envio pelo servidor.';
   }
   final probe = signup.lastProbeCode.isEmpty ? '' : ' Última checagem: ${signup.lastProbeCode}.';
   return 'Desligada. A casa cria a conta na página do PagBank.$probe';

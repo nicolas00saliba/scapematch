@@ -49,12 +49,21 @@ Deno.serve((req) => {
         if (error) throw new Error("erro");
         return data === true;
       },
-      async existingAccount(venueId) {
-        const { data, error } = await admin.rpc("venue_pagbank_account_id", {
+      async existingSignup(venueId) {
+        const { data, error } = await admin.rpc("venue_pagbank_signup_gate", {
           p_venue_id: venueId,
         });
         if (error) throw new Error("erro");
-        return typeof data === "string" && data.trim() ? data.trim() : null;
+        if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+        const row = data as { account_id?: unknown; account_status?: unknown };
+        const accountId = typeof row.account_id === "string" && row.account_id.trim()
+          ? row.account_id.trim()
+          : null;
+        const status = typeof row.account_status === "string" && row.account_status.trim()
+          ? row.account_status.trim()
+          : null;
+        if (!accountId && !status) return null;
+        return { accountId, status };
       },
       async saveAccount(input) {
         const { error } = await admin.rpc("save_venue_pagbank_signup", {

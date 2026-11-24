@@ -9,9 +9,11 @@
 -- o id ACCO_ e o status. Os documentos não são coluna.
 --
 -- Sonda a cada 6 horas (minuto 15). POST /accounts com {"type":"SELLER"},
--- sem os outros campos, para não criar conta. A flag só liga se a função
--- apply receber enable e o código 40001 ou 40002. 401, 403, 404 e 2xx
--- não ligam. held_off, gravado pelo admin com aal2, impede a ligação.
+-- sem os outros campos, para não criar conta. A flag só liga na segunda
+-- resposta seguida com enable e código 40001 ou 40002. Uma resposta que
+-- não é inequívoca zera a contagem. 401, 403, 404 e 2xx não ligam.
+-- held_off, gravado pelo admin com aal2, impede a ligação. O admin religa
+-- em admin_release_pagbank_signup_hold.
 -- O cron não posta o segredo se a URL do Vault não for a desta função.
 
 create or replace function private.pagbank_business_category_ok(p_value text)
@@ -49,15 +51,17 @@ create table public.pagbank_signup_settings (
   last_probe_at timestamptz,
   last_probe_http integer,
   last_probe_code text,
+  unequivocal_streak smallint not null default 0,
   updated_at timestamptz not null default pg_catalog.now(),
   check (last_probe_code is null or last_probe_code ~ '^[a-z0-9_]{1,48}$'),
-  check (last_probe_http is null or last_probe_http between 0 and 599)
+  check (last_probe_http is null or last_probe_http between 0 and 599),
+  check (unequivocal_streak between 0 and 2)
 );
 
 insert into public.pagbank_signup_settings (id) values (1);
 
 comment on table public.pagbank_signup_settings is
-  'Modo B do cadastro PagBank. Nasce desligado. O cron só liga com 40001 ou 40002. held_off é o desligamento do admin aal2.';
+  'Modo B do cadastro PagBank. Nasce desligado. O cron liga na segunda 40001 ou 40002 seguida. held_off trava. O admin aal2 religa.';
 
 create table public.venue_pagbank_signups (
   venue_id uuid primary key references public.venues (id) on delete cascade,
@@ -125,7 +129,8 @@ as $$
     'detected_at', s.detected_at,
     'last_probe_at', s.last_probe_at,
     'last_probe_http', s.last_probe_http,
-    'last_probe_code', s.last_probe_code
+    'last_probe_code', s.last_probe_code,
+    'unequivocal_streak', s.unequivocal_streak
   )
   from public.pagbank_signup_settings s
   where s.id = 1;
@@ -303,6 +308,25 @@ revoke all on function public.venue_pagbank_account_id(uuid)
   from public, anon, authenticated;
 grant execute on function public.venue_pagbank_account_id(uuid) to service_role;
 
+create or replace function public.venue_pagbank_signup_gate(p_venue_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select pg_catalog.jsonb_build_object(
+    'account_id', row.pagbank_account_id,
+    'account_status', row.account_status
+  )
+  from public.venue_pagbank_signups row
+  where row.venue_id = p_venue_id;
+$$;
+
+revoke all on function public.venue_pagbank_signup_gate(uuid)
+  from public, anon, authenticated;
+grant execute on function public.venue_pagbank_signup_gate(uuid) to service_role;
+
 create or replace function public.save_venue_pagbank_signup(
   p_venue_id uuid,
   p_document_kind text,
@@ -387,8 +411,10 @@ as $$
 declare
   v_held boolean;
   v_enabled boolean;
+  v_streak integer;
   v_changed boolean := false;
-  v_turn_on boolean;
+  v_match boolean;
+  v_next integer;
   v_kind text;
 begin
   if p_code is null or p_code !~ '^[a-z0-9_]{1,48}$' then
@@ -397,30 +423,40 @@ begin
   if p_http is null or p_http < 0 or p_http > 599 then
     raise exception 'http' using errcode = 'P0001';
   end if;
-  select s.held_off, s.api_enabled into v_held, v_enabled
+  select s.held_off, s.api_enabled, s.unequivocal_streak
+    into v_held, v_enabled, v_streak
   from public.pagbank_signup_settings s
   where s.id = 1
   for update;
-  v_turn_on := coalesce(p_enable, false)
-    and p_code in ('40001', '40002')
+  v_match := coalesce(p_enable, false) and p_code in ('40001', '40002');
+  if coalesce(v_held, false) or not v_match then
+    v_next := 0;
+  elsif coalesce(v_enabled, false) then
+    v_next := 2;
+  else
+    v_next := least(coalesce(v_streak, 0) + 1, 2);
+  end if;
+  v_changed := v_next = 2
+    and v_match
     and not coalesce(v_held, false)
     and not coalesce(v_enabled, false);
   update public.pagbank_signup_settings s
-  set api_enabled = case when v_turn_on then true else s.api_enabled end,
+  set api_enabled = case when v_changed then true else s.api_enabled end,
       detected_at = case
-        when v_turn_on then pg_catalog.now()
+        when v_changed then pg_catalog.now()
         else s.detected_at
       end,
+      unequivocal_streak = v_next,
       last_probe_at = pg_catalog.now(),
       last_probe_http = p_http,
       last_probe_code = p_code,
       updated_at = pg_catalog.now()
   where s.id = 1;
-  v_changed := v_turn_on;
   v_kind := case
     when p_code = 'probe_criou_conta' then 'probe_criou_conta'
-    when coalesce(p_enable, false) and coalesce(v_held, false) then 'probe_held'
+    when v_match and coalesce(v_held, false) then 'probe_held'
     when v_changed then 'probe_enabled'
+    when v_match and not coalesce(v_enabled, false) then 'probe_confirming'
     else 'probe_closed'
   end;
   insert into public.pagbank_signup_events (venue_id, kind, code)
@@ -428,7 +464,8 @@ begin
   return pg_catalog.jsonb_build_object(
     'enabled', coalesce(v_enabled, false) or v_changed,
     'changed', v_changed,
-    'held_off', coalesce(v_held, false)
+    'held_off', coalesce(v_held, false),
+    'streak', v_next
   );
 end;
 $$;
@@ -470,6 +507,7 @@ begin
   update public.pagbank_signup_settings
   set api_enabled = false,
       held_off = true,
+      unequivocal_streak = 0,
       updated_at = pg_catalog.now()
   where id = 1;
   perform private.admin_audit(
@@ -504,6 +542,9 @@ begin
   v_before := private.pagbank_signup_state();
   update public.pagbank_signup_settings
   set held_off = false,
+      api_enabled = true,
+      detected_at = coalesce(detected_at, pg_catalog.now()),
+      unequivocal_streak = 2,
       updated_at = pg_catalog.now()
   where id = 1;
   perform private.admin_audit(
@@ -515,7 +556,7 @@ begin
     private.pagbank_signup_state()
   );
   insert into public.pagbank_signup_events (venue_id, kind, code)
-  values (null, 'admin_release', 'hold_cleared');
+  values (null, 'admin_release', 'api_enabled');
   return private.pagbank_signup_state();
 end;
 $$;

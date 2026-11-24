@@ -153,8 +153,15 @@ void main() {
     await tester.tap(release);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const Key('admin-pagbank-signup-release-confirm')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
     expect(api.signupSettings.heldOff, isFalse);
-    expect(api.signupSettings.apiEnabled, isFalse);
+    expect(api.signupSettings.apiEnabled, isTrue);
+    expect(
+      find.text('Ligada. O Parceiro envia o cadastro pelo servidor.'),
+      findsOneWidget,
+    );
   });
 }
 

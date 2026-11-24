@@ -184,6 +184,59 @@ Deno.test("modo B cria a conta e não ecoa o documento", async () => {
   }
 });
 
+Deno.test("conta exists sem ACCO_ não chama POST de novo", async () => {
+  let calls = 0;
+  let prior: { accountId: string | null; status: string | null } | null = null;
+  const saved: string[] = [];
+  const stateful: SignupStore = {
+    actor: () => Promise.resolve({ id: owner, admin: false }),
+    venue: () => Promise.resolve({ id: venue, ownerId: owner, status: "approved" }),
+    apiEnabled: () => Promise.resolve(true),
+    existingSignup: () => Promise.resolve(prior),
+    saveAccount: (input) => {
+      saved.push(`${input.status}:${input.accountId ?? ""}`);
+      prior = { accountId: input.accountId, status: input.status };
+      return Promise.resolve();
+    },
+  };
+  const fetchFn = () => {
+    calls += 1;
+    return Promise.resolve(new Response(JSON.stringify({
+      error_messages: [{
+        code: "42001",
+        description: "conta já existe",
+        parameter_name: "email",
+      }],
+    }), { status: 400 }));
+  };
+  const deps = {
+    env: readyEnv(),
+    fetchFn,
+    now: () => today,
+    store: stateful,
+  };
+  const first = await handlePagbankSignup(
+    request(bodyOf("cpf"), { "x-real-ip": "203.0.113.8" }),
+    deps,
+  );
+  assertEquals(first.status, 409);
+  assertEquals(await first.json(), {
+    error: "conta_existente",
+    account_status: "exists",
+  });
+  const second = await handlePagbankSignup(
+    request(bodyOf("cpf"), { "x-real-ip": "203.0.113.8" }),
+    deps,
+  );
+  assertEquals(second.status, 409);
+  assertEquals(await second.json(), {
+    error: "conta_existente",
+    account_status: "exists",
+  });
+  assertEquals(calls, 1);
+  assertEquals(saved, ["exists:"]);
+});
+
 Deno.test("a sonda não liga em 401 e avisa só na transição", async () => {
   const alerts: string[] = [];
   const applied: boolean[] = [];
@@ -303,7 +356,7 @@ function store(input: { api: boolean }): SignupStore {
     actor: () => Promise.resolve({ id: owner, admin: false }),
     venue: () => Promise.resolve({ id: venue, ownerId: owner, status: "approved" }),
     apiEnabled: () => Promise.resolve(input.api),
-    existingAccount: () => Promise.resolve(null),
+    existingSignup: () => Promise.resolve(null),
     saveAccount: () => Promise.resolve(),
   };
 }

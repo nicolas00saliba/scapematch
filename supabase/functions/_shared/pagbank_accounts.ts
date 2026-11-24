@@ -119,11 +119,16 @@ export type SignupActor = { id: string; admin: boolean };
 
 export type SignupVenue = { id: string; ownerId: string; status: string };
 
+export type SignupPrior = {
+  accountId: string | null;
+  status: string | null;
+};
+
 export type SignupStore = {
   actor(authHeader: string): Promise<SignupActor | null>;
   venue(id: string): Promise<SignupVenue | null>;
   apiEnabled(): Promise<boolean>;
-  existingAccount(venueId: string): Promise<string | null>;
+  existingSignup(venueId: string): Promise<SignupPrior | null>;
   saveAccount(input: {
     venueId: string;
     status: string;
@@ -347,11 +352,14 @@ export async function handlePagbankSignup(
   }
   const parsed = parseSignup(record, deps.now());
   if (typeof parsed === "string") return json({ error: parsed }, 400);
-  const existing = await deps.store.existingAccount(venueId);
-  if (existing && accountIdPattern.test(existing)) {
+  const prior = await deps.store.existingSignup(venueId);
+  if (prior?.status === "exists") {
+    return json({ error: "conta_existente", account_status: "exists" }, 409);
+  }
+  if (prior?.accountId && accountIdPattern.test(prior.accountId)) {
     return json({
       mode: "api",
-      account_id: existing,
+      account_id: prior.accountId,
       account_status: "pending_activation",
     });
   }
@@ -470,6 +478,11 @@ export async function handlePagbankSignupProbe(
   if (decision.decision === "accident") {
     await deps.alert("probe_criou_conta");
   } else if (applied.changed) {
+    console.error(JSON.stringify({
+      scope: "pagbank-signup-probe",
+      code: "api_liberada",
+      http: status,
+    }));
     await deps.alert("api_liberada");
   }
   return json({

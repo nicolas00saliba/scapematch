@@ -46,6 +46,29 @@ void main() {
     expect(repo.created.single.responsibleCpf, '52998224725');
     expect(find.text('11222333000181'), findsNothing);
   });
+
+  testWidgets('conta já existente abre o Connect sem novo cadastro', (
+    tester,
+  ) async {
+    final repo = MemoryPagbankSignupRepository(
+      apiEnabled: true,
+      signup: const PagbankSignupRow(
+        mode: 'api',
+        documentKind: 'cnpj',
+        businessCategory: 'ENTERTAINMENT',
+        accountStatus: 'exists',
+      ),
+    );
+    final opened = <Uri>[];
+    await _pump(tester, repo, opened);
+    expect(find.text(PartnerMessages.pagbankSignupExists), findsOneWidget);
+    expect(find.byKey(PartnerKeys.pagbankSignupSubmit), findsNothing);
+    expect(repo.created, isEmpty);
+    await tester.tap(find.byKey(PartnerKeys.pagbankSignupConnect));
+    await tester.pump();
+    expect(opened.single, repo.connectUri);
+    expect(repo.created, isEmpty);
+  });
 }
 
 Future<void> _pump(

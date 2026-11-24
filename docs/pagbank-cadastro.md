@@ -24,7 +24,7 @@ A cada 6 horas, no minuto 15 (`15 */6 * * *`), `private.invoke_pagbank_signup_pr
 
 A sonda manda `POST /accounts` com o corpo exatamente `{"type":"SELLER"}`. Não há e-mail, pessoa, empresa, categoria nem aceite, então esse corpo não cria conta.
 
-A flag só liga se todas estas condições forem verdadeiras:
+Uma resposta só conta se todas estas condições forem verdadeiras:
 
 - HTTP 400
 - JSON com `error_messages` (ou `errors`) não vazio
@@ -33,11 +33,13 @@ A flag só liga se todas estas condições forem verdadeiras:
 - o corpo não contém `ACCO_`, `access_token` nem `refresh_token`
 - o corpo não contém texto de permissão (`unauthorized`, `forbidden`, `permission`, `scope`, `escopo`)
 
-401, 403, 404, 2xx, 5xx, timeout, corpo vazio e 400 sem esses códigos deixam a flag como está. HTTP 201, ou um corpo com `ACCO_` ou token, não liga a flag, não grava id de conta e dispara o alerta Sentry `pagbank-signup-probe` / `probe_criou_conta`.
+A flag liga na segunda resposta seguida que passa nisso. A primeira grava o evento `probe_confirming` e não avisa. Qualquer resposta que não é inequívoca zera a contagem. 401, 403, 404, 2xx, 5xx, timeout, corpo vazio e 400 sem esses códigos deixam a flag como está. HTTP 201, ou um corpo com `ACCO_` ou token, não liga a flag, não grava id de conta e dispara o alerta Sentry `pagbank-signup-probe` / `probe_criou_conta`.
 
-A transição de desligada para ligada grava o evento `probe_enabled` e dispara o alerta `api_liberada`, para avisar o Nícolas. Uma sonda seguinte, com a flag já ligada, não dispara de novo.
+Na segunda resposta seguida, a função grava o evento `probe_enabled` e, na mesma chamada, escreve o log e dispara o alerta `api_liberada`, para avisar o Nícolas. Uma sonda seguinte, com a flag já ligada, não dispara de novo.
 
-`held_off` impede a ligação mesmo com resposta inequívoca. O admin com sessão `aal2` desliga em `admin_disable_pagbank_signup`. `admin_release_pagbank_signup_hold` só tira a trava. Não liga a API. A próxima sonda é quem pode ligar.
+`held_off` impede a ligação mesmo com duas respostas inequívocas e zera a contagem. O admin com sessão `aal2` desliga em `admin_disable_pagbank_signup`. `admin_release_pagbank_signup_hold` religa o modo B na hora: `api_enabled` volta a verdadeiro e a trava sai. O evento é `admin_release` / `api_enabled`.
+
+Se o `POST /accounts` responder `42001` sem id `ACCO_`, a função grava `account_status = exists` e não chama `POST /accounts` de novo. A casa vai ao Connect, que é quem traz o `account_id`.
 
 ## Publicar
 

@@ -1599,11 +1599,11 @@ class MemoryAdminApi implements AdminApi {
   @override
   Future<void> releasePagbankSignupHold() async {
     signupSettings = PagbankSignupSettings(
-      apiEnabled: signupSettings.apiEnabled,
+      apiEnabled: true,
       heldOff: false,
       lastProbeCode: signupSettings.lastProbeCode,
     );
-    _note('release_pagbank_signup_hold', '1', 'hold_cleared');
+    _note('release_pagbank_signup_hold', '1', 'api_enabled');
   }
 
   @override

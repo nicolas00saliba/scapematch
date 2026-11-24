@@ -64,6 +64,10 @@ begin
   ) or not has_function_privilege(
     'service_role', 'public.apply_pagbank_signup_probe(integer, text, boolean)', 'execute'
   ) or has_function_privilege(
+    'authenticated', 'public.venue_pagbank_signup_gate(uuid)', 'execute'
+  ) or not has_function_privilege(
+    'service_role', 'public.venue_pagbank_signup_gate(uuid)', 'execute'
+  ) or has_function_privilege(
     'anon', 'private.invoke_pagbank_signup_probe()', 'execute'
   ) or has_function_privilege(
     'service_role', 'private.invoke_pagbank_signup_probe()', 'execute'
@@ -142,6 +146,44 @@ declare
   v_state jsonb;
   v_probe jsonb;
 begin
+  set local role service_role;
+  v_probe := public.apply_pagbank_signup_probe(400, '40002', true);
+  if v_probe ->> 'enabled' is distinct from 'false'
+    or v_probe ->> 'changed' is distinct from 'false'
+    or v_probe ->> 'streak' is distinct from '1'
+  then
+    raise exception 'a primeira sonda ligou sozinha: %', v_probe;
+  end if;
+  v_probe := public.apply_pagbank_signup_probe(401, 'http_401', true);
+  if v_probe ->> 'enabled' is distinct from 'false'
+    or v_probe ->> 'streak' is distinct from '0'
+  then
+    raise exception '401 não zerou a contagem: %', v_probe;
+  end if;
+  v_probe := public.apply_pagbank_signup_probe(400, '40001', true);
+  if v_probe ->> 'enabled' is distinct from 'false'
+    or v_probe ->> 'streak' is distinct from '1'
+  then
+    raise exception 'a contagem não recomeçou: %', v_probe;
+  end if;
+  v_probe := public.apply_pagbank_signup_probe(400, '40002', true);
+  if v_probe ->> 'enabled' is distinct from 'true'
+    or v_probe ->> 'changed' is distinct from 'true'
+    or v_probe ->> 'streak' is distinct from '2'
+  then
+    raise exception 'a segunda sonda seguida não ligou: %', v_probe;
+  end if;
+  v_probe := public.apply_pagbank_signup_probe(400, '40001', true);
+  if v_probe ->> 'changed' is distinct from 'false'
+    or v_probe ->> 'enabled' is distinct from 'true'
+  then
+    raise exception 'a sonda seguinte avisaria de novo: %', v_probe;
+  end if;
+  v_probe := public.apply_pagbank_signup_probe(201, 'probe_criou_conta', true);
+  if v_probe ->> 'enabled' is distinct from 'true' then
+    raise exception 'um acidente desligou a flag já ligada';
+  end if;
+
   perform set_config(
     'request.jwt.claim.sub', '7a333333-3333-4333-8333-333333333703', true
   );
@@ -150,42 +192,28 @@ begin
   v_state := public.admin_disable_pagbank_signup();
   if v_state ->> 'api_enabled' is distinct from 'false'
     or v_state ->> 'held_off' is distinct from 'true'
+    or v_state ->> 'unequivocal_streak' is distinct from '0'
   then
     raise exception 'o interruptor não travou: %', v_state;
   end if;
   set local role service_role;
   v_probe := public.apply_pagbank_signup_probe(400, '40001', true);
+  perform public.apply_pagbank_signup_probe(400, '40002', true);
+  v_probe := public.apply_pagbank_signup_probe(400, '40001', true);
   if v_probe ->> 'enabled' is distinct from 'false'
     or v_probe ->> 'changed' is distinct from 'false'
     or v_probe ->> 'held_off' is distinct from 'true'
+    or v_probe ->> 'streak' is distinct from '0'
   then
     raise exception 'a sonda ligou com a trava: %', v_probe;
   end if;
   set local role authenticated;
   perform set_config('request.jwt.claim.aal', 'aal2', true);
-  perform public.admin_release_pagbank_signup_hold();
-  set local role service_role;
-  v_probe := public.apply_pagbank_signup_probe(401, 'http_401', true);
-  if v_probe ->> 'enabled' is distinct from 'false'
-    or v_probe ->> 'changed' is distinct from 'false'
+  v_state := public.admin_release_pagbank_signup_hold();
+  if v_state ->> 'api_enabled' is distinct from 'true'
+    or v_state ->> 'held_off' is distinct from 'false'
   then
-    raise exception '401 ligou a API: %', v_probe;
-  end if;
-  v_probe := public.apply_pagbank_signup_probe(400, '40002', true);
-  if v_probe ->> 'enabled' is distinct from 'true'
-    or v_probe ->> 'changed' is distinct from 'true'
-  then
-    raise exception '40002 não ligou: %', v_probe;
-  end if;
-  v_probe := public.apply_pagbank_signup_probe(400, '40001', true);
-  if v_probe ->> 'changed' is distinct from 'false'
-    or v_probe ->> 'enabled' is distinct from 'true'
-  then
-    raise exception 'a segunda sonda avisaria de novo: %', v_probe;
-  end if;
-  v_probe := public.apply_pagbank_signup_probe(201, 'probe_criou_conta', true);
-  if v_probe ->> 'enabled' is distinct from 'true' then
-    raise exception 'um acidente desligou a flag já ligada';
+    raise exception 'o admin não religou: %', v_state;
   end if;
 end $$;
 
@@ -198,6 +226,20 @@ begin
   where kind = 'probe_enabled' and code = '40002';
   if v_count <> 1 then
     raise exception 'evento de liberação: %', v_count;
+  end if;
+  if (
+    select count(*)
+    from public.pagbank_signup_events
+    where kind = 'probe_confirming'
+  ) <> 2 then
+    raise exception 'a primeira sonda de cada par não ficou registrada';
+  end if;
+  if (
+    select count(*)
+    from public.pagbank_signup_events
+    where kind = 'admin_release' and code = 'api_enabled'
+  ) <> 1 then
+    raise exception 'o religar manual não ficou registrado';
   end if;
   if exists (
     select 1
@@ -258,6 +300,28 @@ begin
         raise;
       end if;
   end;
+end $$;
+
+do $$
+declare
+  v_gate jsonb;
+begin
+  set local role service_role;
+  perform public.save_venue_pagbank_signup(
+    '7a555555-5555-4555-8555-555555555705',
+    'cnpj',
+    'ENTERTAINMENT',
+    null,
+    'exists'
+  );
+  v_gate := public.venue_pagbank_signup_gate(
+    '7a555555-5555-4555-8555-555555555705'
+  );
+  if v_gate ->> 'account_status' is distinct from 'exists'
+    or v_gate ->> 'account_id' is not null
+  then
+    raise exception 'conta existente sem ACCO_ não ficou: %', v_gate;
+  end if;
 end $$;
 
 do $$
