@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import {
-  reconcileAsaasTimeoutMs,
+  reconcilePagBankTimeoutMs,
   reconcilePayments,
 } from "../_shared/reconcile_payments.ts";
 import { pixLeaseMs } from "../_shared/pix_charge.ts";
@@ -64,8 +64,9 @@ function providerFor(
   const fetchFn = (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     calls.push(`${method} ${url}`);
-    if (method === "GET" && url.includes("externalReference=")) {
-      const reference = new URL(url).searchParams.get("externalReference");
+    if (method === "GET" && (url.includes("externalReference=") || url.includes("reference_id="))) {
+      const params = new URL(url).searchParams;
+      const reference = params.get("reference_id") ?? params.get("externalReference");
       const rows = payments.filter((item) =>
         item.externalReference === reference
       );
@@ -73,14 +74,20 @@ function providerFor(
         new Response(JSON.stringify({ data: rows }), { status: 200 }),
       );
     }
-    const match = url.match(/\/payments\/([^/?]+)(?:\/refund)?$/);
+    const match = url.match(/\/charges\/([^/?]+)(?:\/cancel)?$/);
     if (match && method === "GET") {
       const payment = payments.find((item) => item.id === match[1]);
       if (!payment) {
         return Promise.resolve(new Response("não", { status: 404 }));
       }
+      const cents = typeof payment.value === "number"
+        ? Math.round(payment.value * 100)
+        : 10000;
       return Promise.resolve(
-        new Response(JSON.stringify(payment), { status: 200 }),
+        new Response(JSON.stringify({
+          ...payment,
+          amount: payment.amount ?? { value: cents, currency: "BRL" },
+        }), { status: 200 }),
       );
     }
     if (match && method === "DELETE") {
@@ -92,7 +99,7 @@ function providerFor(
         }),
       );
     }
-    if (url.endsWith("/refund") && method === "POST") {
+    if (url.endsWith("/cancel") && method === "POST") {
       const id = match?.[1] ?? "pay";
       return Promise.resolve(
         new Response(JSON.stringify({ id, status: "REFUNDED" }), {
@@ -102,10 +109,12 @@ function providerFor(
     }
     return Promise.resolve(new Response("não", { status: 500 }));
   };
-  return new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  return new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     fetchFn,
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
   );
 }
 
@@ -118,7 +127,7 @@ const creatingCard = {
 
 const attemptId = "55555555-5555-5555-5555-555555555555";
 
-Deno.test("creating vencido sem cobrança no Asaas libera a reserva", async () => {
+Deno.test("creating vencido sem cobrança no PagBank libera a reserva", async () => {
   const rpc: Call[] = [];
   const http: string[] = [];
   const result = await reconcilePayments(
@@ -126,7 +135,7 @@ Deno.test("creating vencido sem cobrança no Asaas libera a reserva", async () =
     providerFor(http, []),
   );
   assertEquals(result, { resolved: 1, pending: 0 });
-  assert(http.some((call) => call.includes("externalReference=idem-card-1")));
+  assert(http.some((call) => call.includes("reference_id=idem-card-1")));
   assertEquals(
     rpc.some((call) =>
       call.name === "release_pix_reservation" &&
@@ -176,12 +185,12 @@ Deno.test("pré-autorização vencida sai com refund, Pix pendente com DELETE", 
   ));
   assert(
     http.some((call) =>
-      call === "POST https://api-sandbox.asaas.com/v3/payments/pay_card/refund"
+      call === "POST https://sandbox.api.pagseguro.com/charges/pay_card/cancel"
     ),
   );
   assert(
     http.some((call) =>
-      call.startsWith("DELETE ") && call.endsWith("/payments/pay_pix")
+      call.startsWith("POST ") && call.endsWith("/charges/pay_pix/cancel")
     ),
   );
   assertEquals(
@@ -224,12 +233,12 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
     false,
   );
   assertEquals(
-    okHttp.some((call) => call.includes("/payments/pay_vivo")),
+    okHttp.some((call) => call.includes("/charges/pay_vivo")),
     false,
   );
   assert(
     okHttp.some((call) =>
-      call === "POST https://api-sandbox.asaas.com/v3/payments/pay_orfao/refund"
+      call === "POST https://sandbox.api.pagseguro.com/charges/pay_orfao/cancel"
     ),
   );
   const transition = okCalls.find((call) =>
@@ -261,7 +270,7 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
   );
 });
 
-Deno.test("lease vencido depois da retomada não cancela no Asaas", async () => {
+Deno.test("lease vencido depois da retomada não cancela no PagBank", async () => {
   const rpc: Call[] = [];
   const http: string[] = [];
   const result = await reconcilePayments(
@@ -295,7 +304,7 @@ Deno.test("lease vencido depois da retomada não cancela no Asaas", async () => 
     ]),
   );
   assertEquals(result, { resolved: 1, pending: 1 });
-  assertEquals(http.some((call) => call.includes("/refund")), false);
+  assertEquals(http.some((call) => call.includes("/cancel")), false);
   assertEquals(http.some((call) => call.includes("DELETE")), false);
   assert(rpc.some((call) => call.name === "confirm_reconcile_claim"));
   assert(rpc.some((call) => call.name === "confirm_orphan_claim"));
@@ -342,7 +351,7 @@ Deno.test("erro ou attempt divergente não marca o órfão como resolvido", asyn
   );
 });
 
-Deno.test("órfão já estornado no Asaas só marca resolvido", async () => {
+Deno.test("órfão já estornado no PagBank só marca resolvido", async () => {
   const calls: Call[] = [];
   const http: string[] = [];
   const result = await reconcilePayments(
@@ -359,9 +368,9 @@ Deno.test("órfão já estornado no Asaas só marca resolvido", async () => {
     providerFor(http, []),
   );
   assertEquals(result.resolved, 1);
-  assert(http.some((call) => call.includes("/payments/pay_gone")));
+  assert(http.some((call) => call.includes("/charges/pay_gone")));
   assertEquals(http.some((call) => call.includes("externalReference=")), false);
-  assertEquals(http.some((call) => call.includes("/refund")), false);
+  assertEquals(http.some((call) => call.includes("/cancel")), false);
   assert(calls.some((call) => call.name === "mark_orphan_resolved"));
 });
 
@@ -539,7 +548,7 @@ Deno.test("reconcile-payments só aceita o segredo do cron", async () => {
     {
       reconcileSecret: secret,
       admin: adminFor({ creating: [], orphans: [] }, []),
-      asaas: providerFor([], []),
+      pagbank: providerFor([], []),
     },
   );
   assertEquals(accepted.status, 200);
@@ -568,14 +577,14 @@ Deno.test("migrações cercam a chave, o lote e o cron sem service role", async 
   const config = await Deno.readTextFile(
     new URL("../../config.toml", import.meta.url),
   );
-  assert(wallet.includes("asaas_subaccount_key ausente no vault"));
+  assert(wallet.includes("ausente no vault"));
   assertEquals(wallet.includes("vault.create_secret"), false);
   assert(claim.includes("for update skip locked"));
   assert(claim.includes("limit 10"));
   assertEquals(claim.includes("limit 50"), false);
   assert(claim.includes("confirm_reconcile_claim"));
   assert(claim.includes("confirm_orphan_claim"));
-  assert(reconcileAsaasTimeoutMs * 4 < pixLeaseMs);
+  assert(reconcilePagBankTimeoutMs * 4 < pixLeaseMs);
   assert(claim.includes("order by"));
   assertEquals(claim.includes("left join"), false);
   assert(schedule.includes("x-reconcile-secret"));

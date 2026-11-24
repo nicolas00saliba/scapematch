@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { createCharge } from "./index.ts";
 
 const groupId = "11111111-1111-1111-1111-111111111111";
@@ -43,8 +43,13 @@ type Store = {
   orphans: { provider_ref: string; reason: string }[];
   payments: Payment[];
   calls: string[];
+  money: number[];
   member: string;
   closed: boolean;
+  quoteOk?: boolean;
+  reserveAmountCents?: number;
+  reserveHouseFixedCents?: number;
+  failChargedTotal?: boolean;
   detachMissing?: boolean;
   releaseExpiredError?: boolean;
 };
@@ -67,6 +72,7 @@ function makeStore(seed?: Partial<Charge>): Store {
     orphans: [],
     payments: [],
     calls: [],
+    money: [],
     member: "pending",
     closed: false,
   };
@@ -174,7 +180,7 @@ function adminFor(store: Store) {
           return [{
             id: venueId,
             name: "Casa",
-            asaas_wallet_id: "wal_house",
+            pagbank_account_id: "wal_house",
             status: "approved",
           }];
         }
@@ -182,7 +188,7 @@ function adminFor(store: Store) {
           return [{
             id: userId,
             display_name: "Jogador",
-            asaas_customer_id: "cus_1",
+            pagbank_customer_id: "PB_CUS_jogador",
             cpf: "52998224725",
           }];
         }
@@ -234,6 +240,16 @@ function adminFor(store: Store) {
         ) {
           try {
             if (mode === "update") {
+              if (
+                store.failChargedTotal &&
+                Object.prototype.hasOwnProperty.call(
+                  patch,
+                  "charged_amount_cents",
+                )
+              ) {
+                resolve({ data: null, error: { message: "check" } });
+                return;
+              }
               const hit = matched();
               for (const row of hit) Object.assign(row, patch);
               resolve({ data: returning ? hit : null, error: null });
@@ -253,6 +269,9 @@ function adminFor(store: Store) {
     },
     rpc(name: string, args: Record<string, unknown>) {
       return lock(() => {
+        if (name === "claim_installment_quote") {
+          return { data: store.quoteOk !== false, error: null };
+        }
         if (name === "venue_finance_ready") {
           return { data: true, error: null };
         }
@@ -278,7 +297,18 @@ function adminFor(store: Store) {
           return { data: reserve("PIX", args), error: null };
         }
         if (name === "reserve_card_charge") {
-          return { data: reserve("CREDIT_CARD", args), error: null };
+          return {
+            data: {
+              ...reserve("CREDIT_CARD", args),
+              ...(typeof store.reserveAmountCents === "number"
+                ? { amount_cents: store.reserveAmountCents }
+                : {}),
+              ...(typeof store.reserveHouseFixedCents === "number"
+                ? { house_fixed_cents: store.reserveHouseFixedCents }
+                : {}),
+            },
+            error: null,
+          };
         }
         if (name === "claim_expired_pix_reservation") {
           const row = byId(String(args.p_charge_id));
@@ -304,6 +334,7 @@ function adminFor(store: Store) {
           return { data: row?.provider_ref ?? null, error: null };
         }
         if (name === "release_pix_reservation") {
+          store.calls.push("release_pix_reservation");
           const row = byId(String(args.p_charge_id));
           if (
             row && row.status === "creating" && row.provider_ref === null &&
@@ -426,6 +457,8 @@ function paymentBody(payment: Payment): Record<string, unknown> {
     value: payment.value,
     split: payment.split,
     deleted: payment.deleted === true,
+    payload: payment.billingType === "PIX" ? "qr" : "",
+    encodedImage: payment.billingType === "PIX" ? "imgimgimgimg" : "",
   };
 }
 
@@ -440,8 +473,77 @@ function providerFor(
 ) {
   let seq = 0;
   const fetchFn = async (url: string, init?: RequestInit) => {
-    const method = init?.method ?? "GET";
+    let method = init?.method ?? "GET";
     store.calls.push(`${method} ${url}`);
+    if (method === "GET" && url.includes("/charges/fees/calculate")) {
+      return new Response(JSON.stringify({
+        payment_methods: {
+          credit_card: {
+            visa: {
+              installment_plans: [{
+                installments: 4,
+                interest_free: false,
+                amount: {
+                  value: 10640,
+                  fees: { buyer: { interest: { total: 640 } } },
+                },
+              }],
+            },
+          },
+        },
+      }), { status: 200 });
+    }
+    if (method === "POST" && url.includes("/custody/release")) {
+      return new Response("{}", { status: 200 });
+    }
+    if (
+      method === "POST" && /\/charges\/[^/]+\/(capture|cancel)$/.test(url)
+    ) {
+      const posted = JSON.parse(String(init?.body ?? "{}")) as {
+        amount?: { value?: number };
+      };
+      store.money.push(Number(posted.amount?.value ?? 0));
+    }
+    if (method === "GET" && url.includes("/orders?")) {
+      const ref = new URL(url).searchParams.get("reference_id") ?? "";
+      url = `${url.split("?")[0].replace("/orders", "/payments")}?externalReference=${
+        encodeURIComponent(ref)
+      }`;
+    } else if (method === "POST" && url.endsWith("/orders")) {
+      const parsed = JSON.parse(String(init?.body ?? "{}")) as {
+        reference_id?: string;
+        charges?: { payment_method?: { type?: string } }[];
+      };
+      const type = parsed.charges?.[0]?.payment_method?.type;
+      url = url.replace(/\/orders$/, "/payments");
+      init = {
+        ...init,
+        body: JSON.stringify({
+          billingType: type === "CREDIT_CARD" ? "CREDIT_CARD" : "PIX",
+          externalReference: parsed.reference_id,
+        }),
+      };
+    } else if (method === "POST" && /\/charges\/[^/]+\/cancel$/.test(url)) {
+      const id = url.match(/\/charges\/([^/]+)\/cancel$/)?.[1];
+      const payment = store.payments.find((item) => item.id === id);
+      const captured = payment &&
+        (payment.status === "CONFIRMED" || payment.status === "RECEIVED" ||
+          payment.status === "PAID" ||
+          (Boolean(hooks.onRefund) && payment.billingType === "CREDIT_CARD"));
+      if (captured) {
+        url = url.replace(/\/charges\/([^/]+)\/cancel$/, "/payments/$1/refund");
+      } else {
+        method = "DELETE";
+        url = url.replace(/\/charges\/([^/]+)\/cancel$/, "/payments/$1");
+      }
+    } else if (method === "POST" && /\/charges\/[^/]+\/capture$/.test(url)) {
+      url = url.replace(
+        /\/charges\/([^/]+)\/capture$/,
+        "/payments/$1/captureAuthorizedPayment",
+      );
+    } else if (method === "GET" && /\/charges\/[^/?]+$/.test(url)) {
+      url = url.replace(/\/charges\/([^/?]+)$/, "/payments/$1");
+    }
     if (url.includes("/customers/")) {
       return new Response(
         JSON.stringify({ id: "cus_1", cpfCnpj: "52998224725" }),
@@ -568,11 +670,12 @@ function providerFor(
     }
     return new Response("não", { status: 500 });
   };
-  return new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  return new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     fetchFn,
     () => Promise.resolve(),
+    "ACCO_PRIMARY",
   );
 }
 
@@ -588,11 +691,11 @@ function request(billing: string, key: string): Request {
   });
 }
 
-function chargeRuntime(store: Store, asaas: AsaasProvider) {
+function chargeRuntime(store: Store, pagbank: PagBankProvider) {
   return {
     user: { id: userId, email: "jogador@example.com" },
     admin: adminFor(store),
-    asaas,
+    pagbank,
   };
 }
 
@@ -607,7 +710,7 @@ Deno.test("Pix e Pix: a tentativa que perde cancela o próprio pagamento", async
     started = resolve;
   });
   let pixPosts = 0;
-  const asaas = providerFor(store, {
+  const pagbank = providerFor(store, {
     onPixPost: async (payment) => {
       pixPosts += 1;
       if (pixPosts === 1) {
@@ -619,7 +722,7 @@ Deno.test("Pix e Pix: a tentativa que perde cancela o próprio pagamento", async
       return payment;
     },
   });
-  const runtime = chargeRuntime(store, asaas);
+  const runtime = chargeRuntime(store, pagbank);
   const first = createCharge(request("PIX", "idem-pix-a1"), runtime);
   await startedGate;
   const second = await createCharge(request("PIX", "idem-pix-b1"), runtime);
@@ -647,7 +750,7 @@ Deno.test("Pix e cartão: o cartão é aceito antes de apagar o Pix", async () =
   const startedGate = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const asaas = providerFor(store, {
+  const pagbank = providerFor(store, {
     onPixPost: async (payment) => {
       store.payments.push(payment);
       const row = store.charges[0];
@@ -657,7 +760,7 @@ Deno.test("Pix e cartão: o cartão é aceito antes de apagar o Pix", async () =
       return payment;
     },
   });
-  const runtime = chargeRuntime(store, asaas);
+  const runtime = chargeRuntime(store, pagbank);
   const pix = createCharge(request("PIX", "idem-pix-card"), runtime);
   await startedGate;
   const card = await createCharge(
@@ -677,13 +780,13 @@ Deno.test("Pix e cartão: o cartão é aceito antes de apagar o Pix", async () =
   assertEquals(pixPayment?.status, "DELETED");
   const searches = store.calls
     .map((call, index) => ({ call, index }))
-    .filter((item) => item.call.includes("externalReference="));
+    .filter((item) => item.call.includes("reference_id="));
   const posts = store.calls
     .map((call, index) => ({ call, index }))
     .filter((item) =>
-      item.call.startsWith("POST ") && item.call.endsWith("/payments")
+      item.call.startsWith("POST ") && item.call.endsWith("/orders")
     );
-  const deleted = store.calls.findIndex((call) => call.startsWith("DELETE "));
+  const deleted = store.calls.findIndex((call) => call.includes("/cancel"));
   assert(searches.length >= 2);
   assert(posts.length >= 2);
   assert(posts[1].index > posts[0].index);
@@ -706,7 +809,7 @@ Deno.test("cartão e cartão: captura já feita vira estorno, não cancelAuthori
     started = resolve;
   });
   let cardPosts = 0;
-  const asaas = providerFor(store, {
+  const pagbank = providerFor(store, {
     onCardPost: async (payment) => {
       cardPosts += 1;
       if (cardPosts === 1) {
@@ -719,7 +822,7 @@ Deno.test("cartão e cartão: captura já feita vira estorno, não cancelAuthori
       return payment;
     },
   });
-  const runtime = chargeRuntime(store, asaas);
+  const runtime = chargeRuntime(store, pagbank);
   const first = createCharge(request("CREDIT_CARD", "idem-card-a"), runtime);
   await startedGate;
   const second = await createCharge(
@@ -736,10 +839,10 @@ Deno.test("cartão e cartão: captura já feita vira estorno, não cancelAuthori
   assertEquals(store.charges[0].provider_ref, winner.provider_ref);
   const captured = store.payments.find((item) => item.status === "REFUNDED");
   assert(captured);
-  assert(store.calls.some((call) => call.includes("/refund")));
+  assert(store.calls.some((call) => call.includes("/cancel")));
   assertEquals(store.orphans.length, 0);
   assertEquals(
-    store.calls.some((call) => call.includes("captureAuthorizedPayment")),
+    store.calls.some((call) => call.includes("/capture")),
     false,
   );
 });
@@ -763,7 +866,7 @@ Deno.test("release atrasado não apaga a reserva que o reclaim já assumiu", asy
     winnerInside = resolve;
   });
   let pixPosts = 0;
-  const asaas = providerFor(store, {
+  const pagbank = providerFor(store, {
     onPixPost: async (payment) => {
       pixPosts += 1;
       if (pixPosts === 1) {
@@ -781,7 +884,7 @@ Deno.test("release atrasado não apaga a reserva que o reclaim já assumiu", asy
       return payment;
     },
   });
-  const runtime = chargeRuntime(store, asaas);
+  const runtime = chargeRuntime(store, pagbank);
   const loser = createCharge(request("PIX", "idem-release-a"), runtime);
   await loserInsideGate;
   const winner = createCharge(request("PIX", "idem-release-b"), runtime);
@@ -802,18 +905,18 @@ Deno.test("release atrasado não apaga a reserva que o reclaim já assumiu", asy
 Deno.test("captura com erro estorna e não deixa a cobrança em creating", async () => {
   const store = makeStore();
   store.closed = true;
-  const asaas = providerFor(store, {
+  const pagbank = providerFor(store, {
     onCapture: () => Promise.resolve(new Response("falhou", { status: 500 })),
   });
   const response = await createCharge(
     request("CREDIT_CARD", "idem-capture-fail"),
-    chargeRuntime(store, asaas),
+    chargeRuntime(store, pagbank),
   );
   const authorizedAt = store.calls.indexOf("transition authorized");
   const captureAt = store.calls.findIndex((call) =>
-    call.includes("captureAuthorizedPayment")
+    call.includes("/capture")
   );
-  const refundAt = store.calls.findIndex((call) => call.includes("/refund"));
+  const refundAt = store.calls.findIndex((call) => call.includes("/cancel"));
   assert(authorizedAt >= 0 && authorizedAt < captureAt);
   assert(captureAt < refundAt);
   assertEquals(response.status, 502);
@@ -826,13 +929,13 @@ Deno.test("captura com erro estorna e não deixa a cobrança em creating", async
 Deno.test("estorno da captura que falha registra o órfão e fica authorized", async () => {
   const store = makeStore();
   store.closed = true;
-  const asaas = providerFor(store, {
+  const pagbank = providerFor(store, {
     onCapture: () => Promise.resolve(new Response("falhou", { status: 500 })),
     onRefund: () => Promise.resolve(new Response("falhou", { status: 500 })),
   });
   const response = await createCharge(
     request("CREDIT_CARD", "idem-refund-fail"),
-    chargeRuntime(store, asaas),
+    chargeRuntime(store, pagbank),
   );
   const body = await response.json();
   assertEquals(response.status, 200);
@@ -871,9 +974,9 @@ Deno.test("troca Pix para cartão com deleted:true e PENDING", async () => {
   );
   const body = await response.json();
   const cardPost = store.calls.findIndex((call) =>
-    call.startsWith("POST ") && call.endsWith("/payments")
+    call.startsWith("POST ") && call.endsWith("/orders")
   );
-  const deleted = store.calls.findIndex((call) => call.startsWith("DELETE "));
+  const deleted = store.calls.findIndex((call) => call.includes("/cancel"));
   assert(cardPost >= 0 && cardPost < deleted);
   assertEquals(response.status, 200);
   assertEquals(body.billing_type, "CREDIT_CARD");
@@ -904,7 +1007,7 @@ Deno.test("troca para cartão trata Pix 404 como já cancelado", async () => {
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].billing_type, "CREDIT_CARD");
   assertEquals(store.charges[0].provider_ref, body.provider_ref);
-  assert(store.calls.some((call) => call.startsWith("DELETE ")));
+  assert(store.calls.some((call) => call.includes("/charges/pay_sumiu")));
 });
 
 Deno.test("Pix pendente 404 abre outra cobrança sem órfão", async () => {
@@ -951,7 +1054,7 @@ Deno.test("cartão recusado não cancela o Pix nem reserva a vaga", async () => 
   const body = await response.json();
   assertEquals(response.status, 422);
   assertEquals(body.error, "card_declined");
-  assertEquals(store.calls.some((call) => call.startsWith("DELETE ")), false);
+  assertEquals(store.calls.some((call) => call.includes("/cancel")), false);
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].billing_type, "PIX");
   assertEquals(store.charges[0].status, "pending");
@@ -991,7 +1094,7 @@ Deno.test("cartão ausente não reserva vaga nem mexe no Pix", async () => {
     chargeRuntime(store, providerFor(store, {})),
   );
   assertEquals(notOwned.status, 403);
-  assertEquals(store.calls.some((call) => call.includes("/payments")), false);
+  assertEquals(store.calls.some((call) => call.includes("/orders")), false);
   assertEquals(store.charges[0].billing_type, "PIX");
   assertEquals(store.charges[0].qr_code, "qr-antigo");
   assertEquals(store.charges.length, 1);
@@ -1053,4 +1156,178 @@ Deno.test("reserva vencida que não apaga ainda cancela a autorização", async 
   );
   assert(authorized?.status === "DELETED" || authorized?.status === "REFUNDED");
   assertEquals(store.charges[0].provider_ref, null);
+});
+
+Deno.test("4x não reautoriza quando o valor reservado muda", async () => {
+  const store = makeStore();
+  store.reserveAmountCents = 8000;
+  store.reserveHouseFixedCents = 7200;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-valor-mudou",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).error, "valor_parcelas");
+  assertEquals(
+    store.calls.filter((call) => call.includes("/orders")).length,
+    1,
+  );
+  assertEquals(store.money, [10640]);
+});
+
+Deno.test("falha ao gravar o total solta a reserva do cartão", async () => {
+  const store = makeStore();
+  store.failChargedTotal = true;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-total-falhou",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).error, "pagamento em andamento");
+  assertEquals(store.money, [10640]);
+  assert(
+    store.calls.some((call) => call === "release_pix_reservation"),
+  );
+});
+
+Deno.test("4x sem o total confirmado não cobra", async () => {
+  const store = makeStore();
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-sem-total",
+        saved_card_id: cardId,
+        installments: 4,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).error, "valor_parcelas");
+  assertEquals(store.calls.some((call) => call.includes("/orders")), false);
+});
+
+Deno.test("4x captura e cancela o total com juros", async () => {
+  const store = makeStore();
+  store.closed = true;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-juros",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {
+      onCapture: () => Promise.resolve(new Response("falhou", { status: 500 })),
+    })),
+  );
+  assertEquals(response.status, 502);
+  assertEquals(store.money, [10640, 10640]);
+});
+
+Deno.test("4x autorizado grava o total e captura esse valor", async () => {
+  const store = makeStore();
+  store.closed = true;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-captura",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(store.money, [10640]);
+  const row = store.charges[0] as Charge & {
+    charged_amount_cents?: number;
+    buyer_interest_cents?: number;
+  };
+  assertEquals(row.charged_amount_cents, 10640);
+  assertEquals(row.buyer_interest_cents, 640);
+  assertEquals(row.amount_cents, 10000);
+});
+
+Deno.test("cotação fora da faixa não chama a PagBank", async () => {
+  const store = makeStore();
+  const low = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "quote_installments",
+        amount_cents: 50,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(low.status, 400);
+  const high = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "quote_installments",
+        amount_cents: 500_001,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(high.status, 400);
+  assertEquals(
+    store.calls.some((call) => call.includes("fees/calculate")),
+    false,
+  );
+});
+
+Deno.test("cotação acima do teto do usuário responde 429", async () => {
+  const store = makeStore();
+  store.quoteOk = false;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "quote_installments",
+        amount_cents: 11000,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 429);
+  assertEquals((await response.json()).error, "cotacao_limite");
+  assertEquals(
+    store.calls.some((call) => call.includes("fees/calculate")),
+    false,
+  );
 });

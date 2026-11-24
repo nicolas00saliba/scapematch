@@ -1,9 +1,9 @@
-// Subconta "Reserva de pontos" no Asaas. Sandbox e produção usam o mesmo
-// contrato, só nas bases oficiais (api-sandbox.asaas.com e api.asaas.com).
+// Subconta "Reserva de pontos" no PagBank. Sandbox e produção usam o mesmo
+// contrato, só nas bases oficiais (sandbox.api.pagseguro.com e api.pagseguro.com).
 // A documentação não oferece um bloqueio de saque: a subconta fica sem conta
 // bancária e a apiKey dela não sai do backend.
 //
-// O percentual do Asaas incide no líquido depois da taxa. Por isso o lastro
+// O percentual do PagBank incide no líquido depois da taxa. Por isso o lastro
 // vai em fixedValue, no valor em centavos da indicação (2,5% do bruto).
 // O valor da cobrança do jogador não muda: a linha só reparte o que já foi
 // calculado. O claim grava a linha pending antes de qualquer chamada.
@@ -12,12 +12,12 @@
 // Autorização de evento crítico não liquida a reserva.
 
 import {
-  asaasSandboxBaseUrl,
+  pagbankApiBaseUrl,
   fixedReaisFromCents,
-  isOfficialAsaasBase,
-  type AsaasFetch,
+  isOfficialPagBankBase,
+  type PagBankFetch,
   type ChargeSplit,
-} from "./asaas_provider.ts";
+} from "./pagbank_provider.ts";
 
 /// Sem permissão de ambiente, a reserva simplesmente não entra.
 export function readEnv(
@@ -95,7 +95,7 @@ export function backedCentsOf(entry: {
 }
 
 export function reserveTransferAllowed(baseUrl: string, apiKey: string): boolean {
-  return isOfficialAsaasBase(baseUrl) && apiKey.trim().length > 0;
+  return isOfficialPagBankBase(baseUrl) && apiKey.trim().length > 0;
 }
 
 type RpcResult = { data: unknown; error: { message: string } | null };
@@ -114,7 +114,7 @@ export type ReservePayoutInput = {
   chargeId: string;
   backedCents: number;
   houseOwedCents: number;
-  fetchFn: AsaasFetch;
+  fetchFn: PagBankFetch;
 };
 
 /// Transfere da subconta da reserva. Recusa URL que não seja a API oficial
@@ -266,7 +266,7 @@ async function finishLeg(
 export type ReserveTransferInput = {
   baseUrl: string;
   apiKey: string;
-  fetchFn: AsaasFetch;
+  fetchFn: PagBankFetch;
   valueCents: number;
   destinationWalletId: string;
   externalReference: string;
@@ -310,9 +310,9 @@ export async function findReserveTransfer(
   for (let page = 0; page < reserveListPages; page++) {
     const response = await input.fetchFn(
       transferListUrl(base, input.createdOn, offset),
-      { method: "GET", headers: asaasHeaders(key) },
+      { method: "GET", headers: pagbankHeaders(key) },
     );
-    if (!response.ok) throw new Error(`Asaas ${response.status}`);
+    if (!response.ok) throw new Error(`PagBank ${response.status}`);
     const body = await response.json().catch(() => null);
     if (!body || typeof body !== "object") {
       throw new Error("lista de transferências");
@@ -344,7 +344,7 @@ export async function postReserveTransfer(
   const response = await input.fetchFn(`${base}/transfers`, {
     method: "POST",
     headers: {
-      ...asaasHeaders(input.apiKey.trim()),
+      ...pagbankHeaders(input.apiKey.trim()),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -354,9 +354,9 @@ export async function postReserveTransfer(
     }),
   });
   const text = await response.text();
-  if (!response.ok) throw new Error(`Asaas ${response.status}`);
+  if (!response.ok) throw new Error(`PagBank ${response.status}`);
   const hit = classifyReserveTransfer(JSON.parse(text), input.valueCents);
-  if (!hit) throw new Error("Resposta do Asaas sem id");
+  if (!hit) throw new Error("Resposta do PagBank sem id");
   return hit;
 }
 
@@ -428,8 +428,8 @@ function safeToken(value: string): string {
 
 function officialBase(baseUrl: string): string {
   const base = baseUrl.trim().replace(/\/$/, "");
-  if (!isOfficialAsaasBase(base)) {
-    throw new Error("reserva de pontos fora da API Asaas");
+  if (!isOfficialPagBankBase(base)) {
+    throw new Error("reserva de pontos fora da API PagBank");
   }
   return base;
 }
@@ -445,9 +445,9 @@ function assertReference(reference: string): void {
   }
 }
 
-function asaasHeaders(apiKey: string): Record<string, string> {
+function pagbankHeaders(apiKey: string): Record<string, string> {
   return {
-    access_token: apiKey,
+    Authorization: `Bearer ${apiKey}`,
     "User-Agent": "EscapeMatch",
     Accept: "application/json",
   };
@@ -460,15 +460,14 @@ export async function fundCashbackReserve(
   admin: unknown,
   env: { get(name: string): string | undefined },
   chargeId: string,
-  fetchFn: AsaasFetch = fetch,
+  fetchFn: PagBankFetch = fetch,
 ): Promise<void> {
-  const baseUrl = (readEnv(env, "ASAAS_BASE_URL") || asaasSandboxBaseUrl)
-    .replace(/\/$/, "");
-  const rootKey = readEnv(env, "ASAAS_API_KEY");
-  const reserveKey = readEnv(env, "ASAAS_POINTS_RESERVE_API_KEY");
-  const reserveWallet = readEnv(env, "ASAAS_POINTS_RESERVE_WALLET_ID").trim();
-  const rootWallet = readEnv(env, "ASAAS_ROOT_WALLET_ID").trim();
-  if (!isOfficialAsaasBase(baseUrl) || !chargeId) return;
+  const baseUrl = pagbankApiBaseUrl(env);
+  const rootKey = readEnv(env, "PAGBANK_TOKEN");
+  const reserveKey = readEnv(env, "PAGBANK_POINTS_RESERVE_TOKEN");
+  const reserveWallet = readEnv(env, "PAGBANK_POINTS_RESERVE_ACCOUNT_ID").trim();
+  const rootWallet = readEnv(env, "PAGBANK_ROOT_WALLET_ID").trim();
+  if (!isOfficialPagBankBase(baseUrl) || !chargeId) return;
   if (!reserveWallet || !rootWallet || reserveWallet === rootWallet) return;
   if (!rootKey.trim() && !reserveKey.trim()) return;
   const client = admin as { rpc: ReserveRpc };
@@ -529,12 +528,11 @@ export async function settlePaidChargeReserve(
   admin: unknown,
   env: { get(name: string): string | undefined },
   chargeId: string,
-  fetchFn: AsaasFetch = fetch,
+  fetchFn: PagBankFetch = fetch,
 ): Promise<void> {
   const client = admin as { rpc: ReserveRpc; from: (table: string) => unknown };
-  const baseUrl = (readEnv(env, "ASAAS_BASE_URL") || asaasSandboxBaseUrl)
-    .replace(/\/$/, "");
-  const apiKey = readEnv(env, "ASAAS_POINTS_RESERVE_API_KEY");
+  const baseUrl = pagbankApiBaseUrl(env);
+  const apiKey = readEnv(env, "PAGBANK_POINTS_RESERVE_TOKEN");
   if (!reserveTransferAllowed(baseUrl, apiKey)) return;
   const topup = await readRow(
     client,
@@ -556,7 +554,7 @@ export async function settlePaidChargeReserve(
     rpc: client.rpc,
     baseUrl,
     reserveApiKey: apiKey,
-    rootWalletId: readEnv(env, "ASAAS_ROOT_WALLET_ID"),
+    rootWalletId: readEnv(env, "PAGBANK_ROOT_WALLET_ID"),
     houseWalletId: String(charge?.wallet_id ?? ""),
     chargeId,
     backedCents: backedCentsOf(redemption),

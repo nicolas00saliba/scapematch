@@ -25,6 +25,8 @@ void main() {
       expect(body.containsKey('expiry_month'), isFalse);
       expect(body.containsKey('expiry_year'), isFalse);
       expect(body.containsKey('remote_ip'), isFalse);
+      expect(body['installments'], 1);
+      expect(body.containsKey('expected_amount_cents'), isFalse);
       return {'charge_id': 'ch-1', 'status': 'authorized'};
     });
 

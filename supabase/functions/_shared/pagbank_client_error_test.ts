@@ -1,11 +1,11 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
-  asaasUnavailable,
+  providerUnavailable,
   clientFailure,
-  logAsaasFailure,
-} from "./asaas_client_error.ts";
+  logProviderFailure,
+} from "./pagbank_client_error.ts";
 
-Deno.test("falha do Asaas vira código estável e o log não leva o corpo", () => {
+Deno.test("falha do PagBank vira código estável e o log não leva o corpo", () => {
   const logs: string[] = [];
   const original = console.error;
   console.error = (...args: unknown[]) => {
@@ -14,16 +14,16 @@ Deno.test("falha do Asaas vira código estável e o log não leva o corpo", () =
   const secret = "4111111111111111";
   const body = `cartão ${secret} cpf 04252011000110 token tok_segredo`;
   try {
-    const error = new Error(`Asaas 400: ${body}`);
+    const error = new Error(`PagBank 400: ${body}`);
     const failure = clientFailure(error, "provision-venue-wallet");
     assertEquals(failure.status, 502);
-    assertEquals(failure.body, { error: asaasUnavailable });
-    logAsaasFailure("settle-charges", error);
+    assertEquals(failure.body, { error: providerUnavailable });
+    logProviderFailure("settle-charges", error);
   } finally {
     console.error = original;
   }
   const joined = logs.join("\n");
-  assert(joined.includes(asaasUnavailable));
+  assert(joined.includes(providerUnavailable));
   assert(joined.includes("provision-venue-wallet"));
   assertEquals(joined.includes(secret), false);
   assertEquals(joined.includes("04252011000110"), false);
@@ -32,7 +32,7 @@ Deno.test("falha do Asaas vira código estável e o log não leva o corpo", () =
   assert(joined.includes('"status":"400"'));
 });
 
-Deno.test("o log do Asaas leva só status e código da allowlist", () => {
+Deno.test("o log do PagBank leva só status e código da allowlist", () => {
   const logs: string[] = [];
   const original = console.error;
   console.error = (...args: unknown[]) => {
@@ -47,7 +47,7 @@ Deno.test("o log do Asaas leva só status e código da allowlist", () => {
     }],
   });
   try {
-    logAsaasFailure("provision-venue-wallet", new Error(`Asaas 400: ${body}`));
+    logProviderFailure("provision-venue-wallet", new Error(`PagBank 400: ${body}`));
   } finally {
     console.error = original;
   }
@@ -67,9 +67,9 @@ Deno.test("código fora da allowlist não entra no log", () => {
   };
   const leaked = "dono@casa.com";
   try {
-    logAsaasFailure(
+    logProviderFailure(
       "provision-venue-wallet",
-      new Error(`Asaas 400: ${
+      new Error(`PagBank 400: ${
         JSON.stringify({
           errors: [{ code: leaked, description: "segredo livre" }],
         })
@@ -83,7 +83,7 @@ Deno.test("código fora da allowlist não entra no log", () => {
   assertEquals(logs[0].includes("segredo"), false);
 });
 
-Deno.test("as funções não devolvem error.message do Asaas", async () => {
+Deno.test("as funções não devolvem error.message do PagBank", async () => {
   const files = [
     "../provision-venue-wallet/index.ts",
     "../create-charge/index.ts",
@@ -92,7 +92,7 @@ Deno.test("as funções não devolvem error.message do Asaas", async () => {
     "../configure-venue-fiscal/index.ts",
     "../tokenize-card/index.ts",
     "../invoice-document/index.ts",
-    "../asaas-webhook/index.ts",
+    "../pagbank-webhook/index.ts",
   ];
   for (const file of files) {
     const source = await Deno.readTextFile(new URL(file, import.meta.url));

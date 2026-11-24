@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { AsaasProvider } from "./asaas_provider.ts";
+import { PagBankProvider } from "./pagbank_provider.ts";
 import {
   isPixRejected,
   mapTransferEvent,
@@ -7,7 +7,8 @@ import {
   requestFromBank,
   transferPayload,
   transferWebhookEvents,
-} from "./asaas_transfers.ts";
+  webhookAuthToken,
+} from "./pagbank_transfers.ts";
 import {
   ensureTransferWebhook,
   handleScheduledWithdrawals,
@@ -51,12 +52,18 @@ type Fake = {
   calls: { fn: string; args: Record<string, unknown> }[];
   created: Record<string, unknown>[];
   keys: string[];
+  refreshers: Array<(() => Promise<string>) | undefined>;
   deps: PayoutDeps;
 };
 
 function fake(options?: {
   wallet?: string;
   apiKey?: string;
+  tokens?: {
+    access_token: string;
+    refresh_token: string;
+    access_expires_at: string | null;
+  };
   begin?: boolean;
   enabled?: boolean;
   role?: string;
@@ -86,6 +93,7 @@ function fake(options?: {
   const calls: Fake["calls"] = [];
   const created: Record<string, unknown>[] = [];
   const keys: string[] = [];
+  const refreshers: Array<(() => Promise<string>) | undefined> = [];
   const wallet = options?.wallet ?? "wal_casa";
   const apiKey = options?.apiKey ?? subKey;
   const client: TransferClient = {
@@ -134,7 +142,11 @@ function fake(options?: {
         });
       }
       if (fn === "venue_payout_wallet") return Promise.resolve(wallet);
-      if (fn === "read_venue_asaas_key") return Promise.resolve(apiKey);
+      if (fn === "read_venue_pagbank_tokens") {
+        return Promise.resolve(options?.tokens ?? null);
+      }
+      if (fn === "read_venue_provider_key") return Promise.resolve(apiKey);
+      if (fn === "transfer_ref_venue") return Promise.resolve(venue);
       if (fn === "venue_payouts_enabled") {
         return Promise.resolve(options?.enabled ?? true);
       }
@@ -198,25 +210,26 @@ function fake(options?: {
     env: {
       get: (name) => {
         const values: Record<string, string> = {
-          ASAAS_POINTS_RESERVE_WALLET_ID: "wal_reserva",
-          ASAAS_POINTS_RESERVE_API_KEY: reserveKey,
-          ASAAS_WEBHOOK_TOKEN: webhookToken,
+          PAGBANK_POINTS_RESERVE_ACCOUNT_ID: "wal_reserva",
+          PAGBANK_POINTS_RESERVE_TOKEN: reserveKey,
+          PAGBANK_WEBHOOK_SECRET: webhookToken,
           VENUE_WITHDRAWALS_SECRET: "cron-secret",
-          ASAAS_BASE_URL: "https://api-sandbox.asaas.com/v3",
+          PAGBANK_BASE_URL: "https://sandbox.api.pagseguro.com",
         };
         return values[name];
       },
     },
     store,
-    clientFor: (key) => {
+    clientFor: (key, refresh) => {
       keys.push(key);
+      refreshers.push(refresh);
       return client;
     },
     nowSec: now,
     today: "2026-11-12",
     fetchFn: () => Promise.resolve(new Response("{}", { status: 200 })),
   };
-  return { store, calls, created, keys, deps };
+  return { store, calls, created, keys, refreshers, deps };
 }
 
 function post(body: unknown, jwt = freshToken()): Request {
@@ -273,7 +286,7 @@ Deno.test("reautenticacao exige senha recente ou totp em aal2", () => {
   );
 });
 
-Deno.test("o saldo nao devolve chave e a equipe nao chama o Asaas", async () => {
+Deno.test("o saldo nao devolve chave e a equipe nao chama o PagBank", async () => {
   const owner = fake();
   const response = await handleVenuePayouts(
     post({ action: "snapshot", venue_id: venue }),
@@ -281,6 +294,8 @@ Deno.test("o saldo nao devolve chave e a equipe nao chama o Asaas", async () => 
   );
   const body = await response.json();
   assertEquals(response.status, 200);
+  assertEquals(body.enabled, false);
+  assertEquals(body.payouts_paused, true);
   assertEquals(body.available_cents, 10_000);
   assertEquals(body.receivables[0].creditDate, "2026-11-18");
   assertEquals(owner.keys, [subKey]);
@@ -295,6 +310,71 @@ Deno.test("o saldo nao devolve chave e a equipe nao chama o Asaas", async () => 
   const lockedBody = await locked.json();
   assertEquals(lockedBody.can_withdraw, false);
   assertEquals(staff.keys, []);
+});
+
+Deno.test("o 401 do saque renova o refresh token e grava a sessão", async () => {
+  const gate = fake({
+    tokens: {
+      access_token: "access-antigo",
+      refresh_token: "refresh-antigo",
+      access_expires_at: "2099-01-01T00:00:00.000Z",
+    },
+  });
+  gate.deps.env = {
+    get: (name) => {
+      const values: Record<string, string> = {
+        PAGBANK_TOKEN: "token-plataforma",
+        PAGBANK_ENV: "sandbox",
+        PAGBANK_CONNECT_CLIENT_ID: "client",
+        PAGBANK_CONNECT_CLIENT_SECRET: "secret-do-connect",
+      };
+      return values[name];
+    },
+  };
+  gate.deps.fetchFn = () =>
+    Promise.resolve(Response.json({
+      access_token: "access-novo",
+      refresh_token: "refresh-novo",
+      expires_in: 3600,
+      account_id: "ACCO_casa",
+    }));
+  const response = await handleVenuePayouts(
+    post({ action: "snapshot", venue_id: venue }),
+    gate.deps,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(gate.keys, ["access-antigo"]);
+  const refresh = gate.refreshers[0];
+  assert(refresh);
+  assertEquals(await refresh(), "access-novo");
+  const saved = gate.calls.find((call) =>
+    call.fn === "store_venue_pagbank_tokens"
+  );
+  assertEquals(saved?.args.p_access_token, "access-novo");
+  assertEquals(saved?.args.p_refresh_token, "refresh-novo");
+  assertEquals(saved?.args.p_venue_id, venue);
+});
+
+Deno.test("dados bancários não são gravados", async () => {
+  const gate = fake();
+  const bank = await handleVenuePayouts(
+    post({
+      action: "save_bank",
+      venue_id: venue,
+      pix_key: "chave-que-nao-pode-ir-ao-banco",
+      account_number: "12345",
+      owner_document: "12345678901",
+    }),
+    gate.deps,
+  );
+  assertEquals(bank.status, 403);
+  assertEquals((await bank.json()).error, "dados_bancarios_recusados");
+  const schedule = await handleVenuePayouts(
+    post({ action: "save_schedule", venue_id: venue, enabled: true }),
+    gate.deps,
+  );
+  assertEquals(schedule.status, 403);
+  assertEquals(gate.calls, []);
 });
 
 Deno.test("saque manual sem reauth nao transfere", async () => {
@@ -321,18 +401,11 @@ Deno.test("saque manual manda a chave da subconta e a referencia unica", async (
     gate.deps,
   );
   const body = await response.json();
-  assertEquals(response.status, 200);
-  assertEquals(body.status, "pending");
-  assertEquals(gate.keys, [subKey]);
-  assertEquals(gate.created.length, 1);
-  const payload = gate.created[0];
-  assertEquals(payload.pixAddressKey, "11222333000181");
-  assertEquals(payload.externalReference, withdrawal);
-  assert(!JSON.stringify(body).includes("11222333000181"));
+  assertEquals(response.status, 403);
+  assertEquals(body.error, "saques_desligados");
+  assertEquals(gate.created, []);
+  assertEquals(gate.keys, []);
   assert(!JSON.stringify(body).includes(subKey));
-  const claim = gate.calls.find((call) => call.fn === "claim_venue_withdrawal");
-  assertEquals(claim?.args.p_actor, actor);
-  assertEquals(claim?.args.p_source, "manual");
 });
 
 Deno.test("a reserva de pontos nao abre transferencia", async () => {
@@ -341,11 +414,11 @@ Deno.test("a reserva de pontos nao abre transferencia", async () => {
     post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
     gate.deps,
   );
-  assertEquals((await response.json()).error, "reserva");
+  assertEquals((await response.json()).error, "saques_desligados");
   assertEquals(gate.created, []);
   assertEquals(gate.keys, []);
   assert(
-    !gate.calls.some((call) => call.fn === "read_venue_asaas_key"),
+    !gate.calls.some((call) => call.fn === "read_venue_provider_key"),
   );
 });
 
@@ -359,8 +432,9 @@ Deno.test("o cron nao repete o periodo e ignora a reserva", async () => {
     new Request("https://example.test/cron", { method: "POST", headers: secret }),
     first.deps,
   );
-  assertEquals((await created.json()).created, 1);
-  assertEquals(first.created.length, 1);
+  assertEquals((await created.json()).created, 0);
+  assertEquals(first.created.length, 0);
+  assert(!first.calls.some((call) => call.fn === "list_due_venue_payouts"));
 
   const again = fake({ begin: false });
   const repeat = await handleScheduledWithdrawals(
@@ -387,8 +461,43 @@ Deno.test("o cron nao repete o periodo e ignora a reserva", async () => {
   assert(!off.calls.some((call) => call.fn === "list_due_venue_payouts"));
 });
 
+async function authenticity(raw: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${webhookToken}-${raw}`),
+  );
+  return [...new Uint8Array(digest)].map((byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+}
+
+Deno.test("o token da conta assina mesmo quando é a apiKey", () => {
+  const token = "a".repeat(40);
+  const env = {
+    get: (name: string) => name === "PAGBANK_TOKEN" ? token : undefined,
+  };
+  assertEquals(webhookAuthToken(env, token), token);
+  const override = "b".repeat(40);
+  const replaced = {
+    get: (name: string) => {
+      if (name === "PAGBANK_WEBHOOK_SECRET") return override;
+      if (name === "PAGBANK_TOKEN") return token;
+      return undefined;
+    },
+  };
+  assertEquals(webhookAuthToken(replaced, token), override);
+});
+
 Deno.test("webhook de transferencia exige o token e conclui o saque", async () => {
-  const gate = fake();
+  const gate = fake({
+    transfer: {
+      id: "TR_teste",
+      status: "done",
+      receiptUrl: "https://example.com/recibo",
+      externalReference: withdrawal,
+      failReason: "",
+    },
+  });
   const baseEnv = gate.deps.env;
   const mailed: string[] = [];
   gate.deps.env = {
@@ -405,47 +514,76 @@ Deno.test("webhook de transferencia exige o token e conclui o saque", async () =
   const denied = await handleTransferWebhook(
     new Request("https://example.test/hook", {
       method: "POST",
-      headers: { "asaas-access-token": "curto" },
-      body: JSON.stringify({ event: "TRANSFER_DONE" }),
+      headers: { "x-authenticity-token": "curto" },
+      body: JSON.stringify({ id: "TR_teste", reference_id: withdrawal }),
     }),
     gate.deps,
   );
   assertEquals(denied.status, 401);
 
+  const raw = JSON.stringify({
+    id: "TR_teste",
+    reference_id: withdrawal,
+    status: "FAILED",
+  });
   const done = await handleTransferWebhook(
     new Request("https://example.test/hook", {
       method: "POST",
-      headers: { "asaas-access-token": webhookToken },
-      body: JSON.stringify({
-        event: "TRANSFER_DONE",
-        transfer: {
-          id: "tra_teste",
-          externalReference: withdrawal,
-          transactionReceiptUrl: "https://example.com/recibo",
-        },
-      }),
+      headers: { "x-authenticity-token": await authenticity(raw) },
+      body: raw,
     }),
     gate.deps,
   );
   assertEquals(done.status, 200);
   const applied = gate.calls.find((call) => call.fn === "apply_transfer_event");
   assertEquals(applied?.args.p_status, "done");
+  assertEquals(applied?.args.p_transfer_id, "TR_teste");
   assertEquals(applied?.args.p_receipt, "https://example.com/recibo");
   assert(gate.calls.some((call) => call.fn === "mark_payout_notice_sent"));
   assert(mailed.some((body) => body.includes("Saque concluído no EscapeMatch")));
   assert(!mailed.some((body) => body.includes(subKey) || body.includes(reserveKey)));
 
   const ignored = fake();
+  const noise = JSON.stringify({
+    id: "CHAR_1",
+    status: "PAID",
+    payment_method: { type: "PIX" },
+  });
   const payment = await handleTransferWebhook(
     new Request("https://example.test/hook", {
       method: "POST",
-      headers: { "asaas-access-token": webhookToken },
-      body: JSON.stringify({ event: "PAYMENT_RECEIVED", payment: { id: "pay" } }),
+      headers: { "x-authenticity-token": await authenticity(noise) },
+      body: noise,
     }),
     ignored.deps,
   );
   assertEquals(payment.status, 200);
   assertEquals(ignored.calls, []);
+
+  const venueSigned = fake();
+  const signed = JSON.stringify({
+    id: "TR_teste",
+    reference_id: withdrawal,
+    status: "DONE",
+  });
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${subKey}-${signed}`),
+  );
+  const venueToken = [...new Uint8Array(digest)].map((byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+  const accepted = await handleTransferWebhook(
+    new Request("https://example.test/hook", {
+      method: "POST",
+      headers: { "x-authenticity-token": venueToken },
+      body: signed,
+    }),
+    venueSigned.deps,
+  );
+  assertEquals(accepted.status, 200);
+  assert(venueSigned.calls.some((call) => call.fn === "read_venue_provider_key"));
+  assert(!JSON.stringify(await accepted.clone().json()).includes(subKey));
 });
 
 Deno.test("toda transferencia sai como pix e nunca como ted", () => {
@@ -457,9 +595,12 @@ Deno.test("toda transferencia sai como pix e nunca como ted", () => {
     pixKey: "11222333000181",
     pixKeyType: "CNPJ",
   });
-  assertEquals(pix.value, 15);
-  assertEquals(pix.operationType, "PIX");
-  assertEquals(pix.pixAddressKeyType, "CNPJ");
+  assertEquals((pix.amount as { value: number }).value, 1500);
+  assertEquals((pix.instrument as { type: string }).type, "PIX");
+  assertEquals(
+    (pix.instrument as { pix: { key_type: string } }).pix.key_type,
+    "CNPJ",
+  );
   const account = transferPayload({
     valueCents: 2000,
     externalReference: withdrawal,
@@ -474,7 +615,7 @@ Deno.test("toda transferencia sai como pix e nunca como ted", () => {
     ownerDocument: "11222333000181",
   });
   const bank = account.bankAccount as { bank: { code: string } };
-  assertEquals(account.operationType, "PIX");
+  assertEquals((account.instrument as { type: string }).type, "PIX");
   assert(!JSON.stringify(account).includes("TED"));
   assertEquals(bank.bank.code, "341");
   let refused = false;
@@ -489,7 +630,7 @@ Deno.test("toda transferencia sai como pix e nunca como ted", () => {
   }
   assert(refused);
   assert(isPixRejected(new Error(
-    'Asaas 400: {"errors":[{"description":"A instituição de destino não participa do arranjo Pix."}]}',
+    'PagBank 400: {"errors":[{"description":"A instituição de destino não participa do arranjo Pix."}]}',
   )));
   assertEquals(mapTransferEvent("TRANSFER_FAILED"), "failed");
   assertEquals(mapTransferEvent("PAYMENT_RECEIVED"), null);
@@ -509,35 +650,20 @@ Deno.test("banco sem pix falha com mensagem clara e nao vira ted", async () => {
     post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
     saved.deps,
   );
-  assertEquals((await response.json()).error, "sem pix");
+  assertEquals((await response.json()).error, "saques_desligados");
   assertEquals(saved.created, []);
-  const failed = saved.calls.find((call) => call.fn === "fail_venue_withdrawal");
-  assertEquals(failed?.args.p_reason, "sem pix");
-
-  const rejected = fake({
-    failTransfer: new Error(
-      'Asaas 400: {"errors":[{"description":"A instituição de destino não participa do arranjo Pix."}]}',
-    ),
-  });
-  const again = await handleVenuePayouts(
-    post({ action: "withdraw", venue_id: venue, amount_cents: 1500 }),
-    rejected.deps,
-  );
-  const body = await again.json();
-  assertEquals(body.error, "sem pix");
-  assertEquals(rejected.created, []);
-  assert(!JSON.stringify(body).includes("instituição"));
-  assert(!JSON.stringify(body).includes("TED"));
+  assert(!saved.calls.some((call) => call.fn === "fail_venue_withdrawal"));
+  assert(!saved.calls.some((call) => call.fn === "claim_venue_withdrawal"));
 });
 
 Deno.test("a transferencia usa a chave da subconta e nao a devolve no erro", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
-  const provider = new AsaasProvider(
+  const provider = new PagBankProvider(
     subKey,
-    "https://api-sandbox.asaas.com/v3",
+    "https://sandbox.api.pagseguro.com",
     (url, init) => {
       calls.push({ url, init });
-      if (url.includes("/finance/balance")) {
+      if (url.includes("/accounts/balance")) {
         return Promise.resolve(
           new Response(JSON.stringify({ balance: 12.5 }), { status: 200 }),
         );
@@ -552,7 +678,7 @@ Deno.test("a transferencia usa a chave da subconta e nao a devolve no erro", asy
   );
   assertEquals(await provider.financeBalanceCents(), 1250);
   const header = new Headers(calls[0].init?.headers);
-  assertEquals(header.get("access_token"), subKey);
+  assertEquals(header.get("Authorization"), `Bearer ${subKey}`);
   const error = await provider.createTransfer({
     valueCents: 100,
     externalReference: withdrawal,
@@ -565,7 +691,7 @@ Deno.test("a transferencia usa a chave da subconta e nao a devolve no erro", asy
   assert(!error.message.includes(subKey));
 });
 
-Deno.test("o automatico usa o saldo inteiro porque o Asaas ja descontou o pendente", async () => {
+Deno.test("o automatico usa o saldo inteiro porque o PagBank ja descontou o pendente", async () => {
   const gate = fake({ pending: 4_000, balance: 10_000, period: "auto:2026-W46-r1" });
   const secret = {
     "x-venue-withdrawals-secret": "cron-secret",
@@ -575,30 +701,29 @@ Deno.test("o automatico usa o saldo inteiro porque o Asaas ja descontou o penden
     new Request("https://example.test/cron", { method: "POST", headers: secret }),
     gate.deps,
   );
-  assertEquals((await response.json()).created, 1);
-  const claim = gate.calls.find((call) => call.fn === "claim_venue_withdrawal");
-  assertEquals(claim?.args.p_amount_cents, 10_000);
-  assertEquals(claim?.args.p_available_cents, 10_000);
-  assertEquals(claim?.args.p_period_key, "auto:2026-W46-r1");
-  assertEquals(gate.created[0].value, 100);
-  assertEquals(gate.created.length, 1);
+  const body = await response.json();
+  assertEquals(body.created, 0);
+  assertEquals(body.webhooks, 0);
+  assertEquals(gate.created, []);
+  assert(!gate.calls.some((call) => call.fn === "claim_venue_withdrawal"));
+  assert(!gate.calls.some((call) => call.fn === "list_due_venue_payouts"));
 });
 
 Deno.test("o webhook de transferencia fica na subconta e nao duplica", async () => {
   const webhookUrl =
-    "https://example.supabase.co/functions/v1/asaas-transfer-webhook";
+    "https://example.supabase.co/functions/v1/pagbank-transfer-webhook";
   const saved: { body: Record<string, unknown>; id?: string }[] = [];
   const listed = {
     data: [] as Record<string, unknown>[],
   };
   const calls: { url: string; method: string; token: string }[] = [];
-  const provider = new AsaasProvider(
+  const provider = new PagBankProvider(
     subKey,
-    "https://api-sandbox.asaas.com/v3",
+    "https://sandbox.api.pagseguro.com",
     (url, init) => {
       const method = init?.method ?? "GET";
       const headers = new Headers(init?.headers);
-      calls.push({ url, method, token: headers.get("access_token") ?? "" });
+      calls.push({ url, method, token: headers.get("Authorization") ?? "" });
       if (method === "GET") {
         return Promise.resolve(new Response(JSON.stringify(listed), { status: 200 }));
       }
@@ -618,8 +743,8 @@ Deno.test("o webhook de transferencia fica na subconta e nao duplica", async () 
     get: (name: string) => {
       const values: Record<string, string> = {
         SUPABASE_URL: "https://example.supabase.co",
-        ASAAS_WEBHOOK_EMAIL: "ops@example.com",
-        ASAAS_WEBHOOK_TOKEN: webhookToken,
+        PAGBANK_WEBHOOK_EMAIL: "ops@example.com",
+        PAGBANK_WEBHOOK_SECRET: webhookToken,
       };
       return values[name];
     },
@@ -636,16 +761,16 @@ Deno.test("o webhook de transferencia fica na subconta e nao duplica", async () 
   assertEquals(saved[0].id, undefined);
   assertEquals(saved[0].body.authToken, webhookToken);
   assertEquals(saved[0].body.url, webhookUrl);
-  assertEquals(calls.every((call) => call.token === subKey), true);
+  assertEquals(calls.every((call) => call.token === `Bearer ${subKey}`), true);
   assertEquals(calls.filter((call) => call.method === "POST").length, 1);
 
   assertEquals(await ensureTransferWebhook(client, env), "ready");
   assertEquals(saved.length, 1);
   assertEquals(calls.filter((call) => call.method === "POST").length, 1);
 
-  const leaking = new AsaasProvider(
+  const leaking = new PagBankProvider(
     subKey,
-    "https://api-sandbox.asaas.com/v3",
+    "https://sandbox.api.pagseguro.com",
     () =>
       Promise.resolve(new Response(
         JSON.stringify({ errors: [{ description: webhookToken }] }),
@@ -670,7 +795,7 @@ Deno.test("subcontas existentes ganham o webhook e a reserva fica de fora", asyn
   gate.deps.env = {
     get: (name) => {
       if (name === "SUPABASE_URL") return "https://example.supabase.co";
-      if (name === "ASAAS_WEBHOOK_EMAIL") return "ops@example.com";
+      if (name === "PAGBANK_WEBHOOK_EMAIL") return "ops@example.com";
       return base.get(name);
     },
   };
@@ -683,12 +808,11 @@ Deno.test("subcontas existentes ganham o webhook e a reserva fica de fora", asyn
     gate.deps,
   );
   const body = await response.json();
-  assertEquals(body.webhooks, 1);
-  assertEquals(saved.length, 1);
-  assert(
-    (saved[0].body.events as string[]).includes("TRANSFER_FAILED"),
-  );
+  assertEquals(body.created, 0);
+  assertEquals(body.webhooks, 0);
+  assertEquals(saved, []);
   assert(!JSON.stringify(body).includes(webhookToken));
+  assert(!JSON.stringify(saved).includes("TRANSFER_"));
 
   const reserveSaved: { body: Record<string, unknown>; id?: string }[] = [];
   const reserve = fake({
@@ -701,7 +825,7 @@ Deno.test("subcontas existentes ganham o webhook e a reserva fica de fora", asyn
   reserve.deps.env = {
     get: (name) => {
       if (name === "SUPABASE_URL") return "https://example.supabase.co";
-      if (name === "ASAAS_WEBHOOK_EMAIL") return "ops@example.com";
+      if (name === "PAGBANK_WEBHOOK_EMAIL") return "ops@example.com";
       return reserveBase.get(name);
     },
   };
@@ -710,7 +834,7 @@ Deno.test("subcontas existentes ganham o webhook e a reserva fica de fora", asyn
     reserve.deps,
   );
   assertEquals(reserveSaved, []);
-  assert(!reserve.calls.some((call) => call.fn === "read_venue_asaas_key"));
+  assert(!reserve.calls.some((call) => call.fn === "read_venue_provider_key"));
 });
 
 Deno.test("a reconciliacao consulta o pendente antigo e nao cria outra transferencia", async () => {
@@ -719,7 +843,7 @@ Deno.test("a reconciliacao consulta o pendente antigo e nao cria outra transfere
     stale: [{
       id: withdrawal,
       venue_id: venue,
-      asaas_transfer_id: "tra_teste",
+      pagbank_transfer_id: "tra_teste",
       external_reference: withdrawal,
     }],
     transfer: {
@@ -752,7 +876,7 @@ Deno.test("a reconciliacao consulta o pendente antigo e nao cria outra transfere
     stale: [{
       id: withdrawal,
       venue_id: venue,
-      asaas_transfer_id: "tra_teste",
+      pagbank_transfer_id: "tra_teste",
       external_reference: withdrawal,
     }],
     transfer: {
@@ -776,7 +900,7 @@ Deno.test("a reconciliacao consulta o pendente antigo e nao cria outra transfere
     stale: [{
       id: withdrawal,
       venue_id: venue,
-      asaas_transfer_id: "tra_teste",
+      pagbank_transfer_id: "tra_teste",
       external_reference: withdrawal,
     }],
   });

@@ -1,4 +1,4 @@
-// Solta o Pix que o Asaas já apagou. Sem a função nova no banco, o
+// Solta o Pix que o PagBank já apagou. Sem a função nova no banco, o
 // service role faz o mesmo update: QR fora, lease vencido, Pix continua Pix.
 
 const missingFunction = new Set(["PGRST202", "42883"]);

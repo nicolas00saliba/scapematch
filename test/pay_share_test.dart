@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
@@ -69,6 +70,19 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(AppKeys.payTestCard));
     await tester.pumpAndSettle();
+    final sheetScrolls = tester.stateList<ScrollableState>(
+      find.descendant(
+        of: find.byKey(AppKeys.paySheet),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final overflow = sheetScrolls.where(
+      (state) => state.position.maxScrollExtent > 0,
+    );
+    if (overflow.isNotEmpty) {
+      overflow.first.position.jumpTo(overflow.first.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+    }
     await tester.tap(find.byKey(AppKeys.paySimulate));
     await tester.pumpAndSettle();
     expect(find.text('Valor reservado'), findsOneWidget);

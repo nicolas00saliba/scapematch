@@ -207,10 +207,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 ),
                 if (me.payment == PaymentStatus.paid &&
                     me.refund != RefundStatus.refunded)
-                  TeamNameSlot(
-                    groupId: group.id,
-                    canEdit: true,
-                  ),
+                  TeamNameSlot(groupId: group.id, canEdit: true),
               ],
               if (_leaveMismatch(me) case final mismatch?) ...[
                 const SizedBox(height: 12),
@@ -470,22 +467,35 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       context: context,
       amountCents: group.priceCents,
       reference: group.id,
+      coverAsset: group.coverAsset,
+      houseName: group.houseName,
+      roomName: group.roomName,
       points: spend,
       discountCents: spend?.discountCents ?? 0,
-      onPay: (kind, {savedCardId}) async {
-        final result = await ref
-            .read(groupDetailViewModelProvider(widget.groupId).notifier)
-            .payShare(
-              kind,
-              savedCardId: savedCardId,
-              points: spend?.selected ?? 0,
-            );
-        return ShareChargeView.fromResult(result);
+      quoteInstallments: (cents) {
+        return ref.read(groupRepositoryProvider).quoteCardInstallments(cents);
       },
-      onPayNewCard: (card) async {
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            final result = await ref
+                .read(groupDetailViewModelProvider(widget.groupId).notifier)
+                .payShare(
+                  kind,
+                  savedCardId: savedCardId,
+                  points: spend?.selected ?? 0,
+                  installments: installments,
+                  expectedAmountCents: expectedAmountCents,
+                );
+            return ShareChargeView.fromResult(result);
+          },
+      onPayNewCard: (card, {installments = 1, expectedAmountCents}) async {
         final result = await ref
             .read(groupDetailViewModelProvider(widget.groupId).notifier)
-            .payWithNewCard(card);
+            .payWithNewCard(
+              card,
+              installments: installments,
+              expectedAmountCents: expectedAmountCents,
+            );
         return ShareChargeView.fromResult(result);
       },
     );
@@ -628,8 +638,8 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           ),
         );
       }
-        if (me.isCreator) {
-          if (started) {
+      if (me.isCreator) {
+        if (started) {
           buttons.add(
             Text(
               GroupMessages.sessionAlreadyStarted,
@@ -957,11 +967,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     if (preview == null || me == null || me.occupiesSeat) {
       return null;
     }
-    final refunded = me.refund == RefundStatus.refunded;
+    final refunded = _moneyBack(me.refund);
     if (refunded == preview) {
       return null;
     }
     return GroupMessages.leavePreviewChanged(refunded: refunded);
+  }
+
+  bool _moneyBack(RefundStatus? status) {
+    return status == RefundStatus.refunded ||
+        status == RefundStatus.refundPending;
   }
 
   Participant? _local(Group group) {
@@ -979,7 +994,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         me?.refundReason == RefundReason.holdReleased) {
       return GroupMessages.holdReleased;
     }
-    final refunded = me?.refund == RefundStatus.refunded;
+    final refunded = _moneyBack(me?.refund);
     if (refunded != previewRefunds) {
       return GroupMessages.leavePreviewChanged(refunded: refunded);
     }

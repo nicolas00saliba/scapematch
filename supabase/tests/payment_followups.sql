@@ -12,7 +12,7 @@ values (
 insert into public.venues (
   id, owner_id, city_id, name, neighborhood, street_address, address_number,
   postal_code, latitude, longitude, income_value, document_kind,
-  document_number, phone, status, asaas_wallet_id
+  document_number, phone, status, pagbank_account_id
 ) values (
   'cc211111-1111-4111-8111-111111111111',
   'cc111111-1111-4111-8111-111111111111',
@@ -151,7 +151,7 @@ insert into public.ledger_entries (
   'cc811111-1111-4111-8111-111111111111'
 );
 
-select public.store_venue_asaas_key(
+select public.store_venue_provider_key(
   'cc211111-1111-4111-8111-111111111111',
   'chave-super-secreta'
 );
@@ -177,18 +177,18 @@ begin
   select data_type into v_type
   from information_schema.columns
   where table_schema = 'public'
-    and table_name = 'venue_asaas_keys'
+    and table_name = 'venue_provider_keys'
     and column_name = 'api_key';
   if v_type is distinct from 'bytea' then
     raise exception 'api_key não está cifrada: %', v_type;
   end if;
 
-  v_plain := public.read_venue_asaas_key('cc211111-1111-4111-8111-111111111111');
+  v_plain := public.read_venue_provider_key('cc211111-1111-4111-8111-111111111111');
   if v_plain is distinct from 'chave-super-secreta' then
     raise exception 'leitura da chave não bate';
   end if;
   select encode(api_key, 'escape') into v_raw
-  from public.venue_asaas_keys
+  from public.venue_provider_keys
   where venue_id = 'cc211111-1111-4111-8111-111111111111';
   if v_raw like '%chave-super-secreta%' then
     raise exception 'api_key da subconta ficou em claro';
@@ -196,7 +196,7 @@ begin
 
   select pg_get_function_result('public.venue_private(uuid)'::regprocedure)
     into v_result;
-  if v_result ilike '%asaas_wallet_id%' then
+  if v_result ilike '%pagbank_account_id%' then
     raise exception 'venue_private ainda devolve a wallet';
   end if;
   if v_result not ilike '%document_number%' then
@@ -309,7 +309,7 @@ begin
       'refunded'
     );
     if v_settle->>'status' is distinct from 'refunded' then
-      raise exception 'paid reembolsado no Asaas não virou refunded: %', v_settle;
+      raise exception 'paid reembolsado no PagBank não virou refunded: %', v_settle;
     end if;
     select count(*) into v_debits
     from public.ledger_entries
@@ -455,7 +455,7 @@ begin
 end $$;
 
 set role service_role;
-select asaas_wallet_id as wallet_servidor
+select pagbank_account_id as wallet_servidor
 from public.venues
 where id = 'cc211111-1111-4111-8111-111111111111';
 reset role;
@@ -466,8 +466,8 @@ begin
     execute 'set local role authenticated';
     perform 1 from public.venues
     where id = 'cc211111-1111-4111-8111-111111111111'
-      and asaas_wallet_id is not null;
-    raise exception 'asaas_wallet_id visível para authenticated';
+      and pagbank_account_id is not null;
+    raise exception 'pagbank_account_id visível para authenticated';
   exception
     when insufficient_privilege then
       null;
@@ -483,7 +483,7 @@ begin
   end;
   begin
     execute 'set local role anon';
-    perform public.read_venue_asaas_key('cc211111-1111-4111-8111-111111111111');
+    perform public.read_venue_provider_key('cc211111-1111-4111-8111-111111111111');
     raise exception 'anon leu a chave da subconta';
   exception
     when insufficient_privilege then
@@ -491,7 +491,7 @@ begin
   end;
   begin
     execute 'set local role authenticated';
-    perform public.read_venue_asaas_key('cc211111-1111-4111-8111-111111111111');
+    perform public.read_venue_provider_key('cc211111-1111-4111-8111-111111111111');
     raise exception 'authenticated leu a chave da subconta';
   exception
     when insufficient_privilege then
@@ -504,10 +504,36 @@ declare
   v_wallet text;
 begin
   set local role service_role;
-  select asaas_wallet_id into v_wallet
+  select pagbank_account_id into v_wallet
   from public.venues
   where id = 'cc211111-1111-4111-8111-111111111111';
   if v_wallet is distinct from 'wal_follow' then
     raise exception 'service_role perdeu a wallet: %', v_wallet;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'venue_pagbank_tokens'
+      and c.relrowsecurity
+  ) or not exists (
+    select 1
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'pagbank_connect_states'
+      and c.relrowsecurity
+  ) or exists (
+    select 1
+    from pg_catalog.pg_policies
+    where schemaname = 'public'
+      and tablename in ('venue_pagbank_tokens', 'pagbank_connect_states')
+  ) then
+    raise exception 'RLS dos tokens do Connect saiu do combinado';
   end if;
 end $$;

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Aplica a main e só as migrations novas deste branch, depois executa o estorno.
-# Não usa o socket local quando DATABASE_URL existe. Não cobra no Asaas.
+# Não usa o socket local quando DATABASE_URL existe. Não cobra no PagBank.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"

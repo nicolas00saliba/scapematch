@@ -7,12 +7,15 @@ import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/features/groups/presentation/pay_share_sheet.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/payments/domain/payment_method.dart';
+import 'package:scapematch/features/payments/presentation/installment_grid.dart';
+import 'package:scapematch/features/payments/presentation/installment_summary.dart';
 import 'package:scapematch/features/wallet/presentation/wallet_providers.dart';
 import 'package:scapematch/providers/repositories.dart';
 
 const _realPix =
-    '00020126580014BR.GOV.BCB.PIX0136asaas.real.payload520400005303986540590.00';
+    '00020126580014BR.GOV.BCB.PIX0136pagbank.real.payload520400005303986540590.00';
 const _png =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
@@ -48,10 +51,14 @@ void main() {
     await _open(
       tester,
       live: true,
-      onPay: (kind, {savedCardId}) async {
-        calls.add((kind, savedCardId));
-        return const ShareChargeView(pixCode: _realPix, pixImageBase64: _png);
-      },
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            calls.add((kind, savedCardId));
+            return const ShareChargeView(
+              pixCode: _realPix,
+              pixImageBase64: _png,
+            );
+          },
     );
 
     expect(find.text(GroupMessages.simulatedNotice), findsNothing);
@@ -81,17 +88,18 @@ void main() {
     await _open(
       tester,
       live: true,
-      onPay: (kind, {savedCardId}) async {
-        return const ShareChargeView(
-          message: 'A casa ainda não tem subconta Asaas.',
-        );
-      },
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            return const ShareChargeView(
+              message: 'A casa ainda não tem subconta PagBank.',
+            );
+          },
     );
 
     await tester.tap(find.byKey(AppKeys.payCharge));
     await tester.pumpAndSettle();
 
-    expect(find.text('A casa ainda não tem subconta Asaas.'), findsOneWidget);
+    expect(find.text('A casa ainda não tem subconta PagBank.'), findsOneWidget);
     expect(find.byKey(AppKeys.payConfirmed), findsNothing);
     expect(find.text(GroupMessages.simulatedNotice), findsNothing);
     expect(find.textContaining('scapematch.'), findsNothing);
@@ -112,11 +120,12 @@ void main() {
           nickname: 'Pessoal',
         ),
       ],
-      onPay: (kind, {savedCardId}) async {
-        chargedId = savedCardId;
-        expect(kind, PaymentMethodKind.card);
-        return const ShareChargeView(outcome: PaySheetOutcome.reserved);
-      },
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            chargedId = savedCardId;
+            expect(kind, PaymentMethodKind.card);
+            return const ShareChargeView(outcome: PaySheetOutcome.reserved);
+          },
     );
 
     await tester.tap(find.byKey(AppKeys.payMethodCard));
@@ -134,11 +143,60 @@ void main() {
     expect(find.text(GroupMessages.simulatedNotice), findsNothing);
     expect(find.byKey(AppKeys.payConfirmed), findsOneWidget);
   });
+
+  testWidgets('a parcela escolhida vai para a cobrança', (tester) async {
+    int? sent;
+    int? expected;
+    await _open(
+      tester,
+      live: true,
+      amountCents: 20000,
+      cards: [
+        PaymentMethod(
+          id: 'card-real',
+          brand: CardBrand.visa,
+          last4: '1111',
+          nickname: 'Pessoal',
+        ),
+      ],
+      quoteInstallments: (cents) async => cardInstallmentOptions(
+        principalCents: cents,
+        interestCentsByCount: {4: 640},
+      ),
+      onPay:
+          (kind, {savedCardId, installments = 1, expectedAmountCents}) async {
+            sent = installments;
+            expected = expectedAmountCents;
+            expect(kind, PaymentMethodKind.card);
+            return const ShareChargeView(outcome: PaySheetOutcome.reserved);
+          },
+    );
+
+    await tester.tap(find.byKey(AppKeys.payMethodCard));
+    await tester.pumpAndSettle();
+    expect(find.text('À vista'), findsOneWidget);
+    expect(find.byType(InstallmentGrid), findsNothing);
+    await tester.tap(find.byKey(AppKeys.payInstallments));
+    await tester.pumpAndSettle();
+    expect(find.text(InstallmentPickerPage.title), findsOneWidget);
+    expect(find.text('sem juros'), findsNWidgets(3));
+    expect(find.text('com juros'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('parcela-4')));
+    await tester.pumpAndSettle();
+    expect(find.text('4x com juros'), findsOneWidget);
+    await tester.tap(find.byKey(AppKeys.payCharge));
+    await tester.pumpAndSettle();
+
+    expect(sent, 4);
+    expect(expected, 20640);
+  });
 }
 
 Future<ShareChargeView> _unusedPay(
   PaymentMethodKind kind, {
   String? savedCardId,
+  int installments = 1,
+  int? expectedAmountCents,
 }) async {
   return const ShareChargeView(outcome: PaySheetOutcome.reserved);
 }
@@ -149,10 +207,15 @@ Future<void> _open(
   required Future<ShareChargeView> Function(
     PaymentMethodKind kind, {
     String? savedCardId,
+    int installments,
+    int? expectedAmountCents,
   })
   onPay,
   List<PaymentMethod> cards = const [],
   int discountCents = 0,
+  int amountCents = 9000,
+  Future<List<CardInstallmentOption>> Function(int principalCents)?
+  quoteInstallments,
 }) async {
   tester.view.physicalSize = const Size(400, 2200);
   tester.view.devicePixelRatio = 1;
@@ -176,9 +239,10 @@ Future<void> _open(
                 onPressed: () {
                   showPayShareSheet(
                     context: context,
-                    amountCents: 9000,
+                    amountCents: amountCents,
                     reference: 'group-1',
                     discountCents: discountCents,
+                    quoteInstallments: quoteInstallments,
                     onPay: onPay,
                   );
                 },

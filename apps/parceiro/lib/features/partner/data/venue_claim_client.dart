@@ -43,9 +43,11 @@ class VenueClaimClient {
       );
       final data = response.data;
       if (data is Map && data['error'] != null) {
-        return 'Não foi possível criar a subconta.';
+        return 'Não foi possível abrir o PagBank Connect.';
       }
-      return null;
+      final url = data is Map ? data['connect_url'] : null;
+      if (url is String && url.startsWith('https://')) return url;
+      return 'Não foi possível abrir o PagBank Connect.';
     } on Object {
       return 'Não foi possível criar a subconta.';
     }

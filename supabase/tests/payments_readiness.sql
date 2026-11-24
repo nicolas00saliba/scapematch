@@ -1,4 +1,4 @@
--- Prontidão e falha alta do cron de saques. Não fala com o Asaas
+-- Prontidão e falha alta do cron de saques. Não fala com o PagBank
 -- nem com a rede. O substituto de net.http_post só existe neste arquivo.
 
 \set ON_ERROR_STOP on

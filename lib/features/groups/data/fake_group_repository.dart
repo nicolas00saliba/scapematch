@@ -13,6 +13,7 @@ import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/social/data/social_repository.dart';
 
 /// Sample implementation of [GroupRepository].
@@ -302,7 +303,7 @@ class FakeGroupRepository implements GroupRepository {
           kind: NoticeKind.partySeat,
           title: 'Vaga reservada',
           body:
-              '$leaderName reservou sua vaga em ${current.roomName}. Pague a sua parte para confirmar. Nada é cobrado se o grupo não confirmar.',
+              '$leaderName reservou sua vaga em ${current.roomName}. Pague a sua parte para confirmar. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.',
           at: clock.now(),
           groupId: current.id,
           scope: 'party-${current.id}-${person.id}',
@@ -421,17 +422,34 @@ class FakeGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<List<CardInstallmentOption>> quoteCardInstallments(
+    int principalCents,
+  ) {
+    return Future.value(
+      cardInstallmentOptions(principalCents: principalCents),
+    );
+  }
+
+  @override
   Future<PayShareResult> payWithNewCard(
     String groupId, {
     required String userId,
     required CardDraft card,
+    int installments = 1,
+    int? expectedAmountCents,
   }) {
     if (card.number.isEmpty) {
       return Future.value(
         const PayShareFailure(PayShareFailureReason.unavailable),
       );
     }
-    return payShare(groupId, userId: userId, kind: PaymentMethodKind.card);
+    return payShare(
+      groupId,
+      userId: userId,
+      kind: PaymentMethodKind.card,
+      installments: installments,
+      expectedAmountCents: expectedAmountCents,
+    );
   }
 
   @override
@@ -441,7 +459,11 @@ class FakeGroupRepository implements GroupRepository {
     required PaymentMethodKind kind,
     String? savedCardId,
     int points = 0,
+    int installments = 1,
+    int? expectedAmountCents,
   }) async {
+    assert(installments >= 1);
+    assert(expectedAmountCents == null || expectedAmountCents >= 0);
     await _pause();
     final index = _indexOf(groupId);
     if (index < 0) {

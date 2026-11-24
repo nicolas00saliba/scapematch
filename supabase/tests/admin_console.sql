@@ -1,6 +1,6 @@
 -- Admin: só o administrador lê e grava. Jogador, dono e anônimo não.
 -- A comissão nova não reescreve o snapshot da cobrança.
--- A taxa do Asaas fica nula até existir o dado.
+-- A taxa do PagBank fica nula até existir o dado.
 
 \set ON_ERROR_STOP on
 
@@ -550,16 +550,16 @@ begin
   v_fee := public.admin_earnings(
     null, null, 'ad311111-1111-4111-8111-111111111111'
   );
-  if v_fee -> 'asaas_fee_cents' <> 'null'::jsonb
-    or (v_fee ->> 'asaas_fee_rows')::integer <> 0
+  if v_fee -> 'provider_fee_cents' <> 'null'::jsonb
+    or (v_fee ->> 'pagbank_fee_rows')::integer <> 0
   then
-    raise exception 'taxa inventada: %', v_fee -> 'asaas_fee_cents';
+    raise exception 'taxa inventada: %', v_fee -> 'provider_fee_cents';
   end if;
 end $$;
 reset role;
 
 update public.payment_charges
-set asaas_fee_cents = 321
+set provider_fee_cents = 321
 where id = 'ad611111-1111-4111-8111-111111111111';
 insert into public.venue_referral_entries (
   id, venue_id, kind, amount_cents, program, settlement,
@@ -618,8 +618,8 @@ begin
   v_fee := public.admin_earnings(
     null, null, 'ad311111-1111-4111-8111-111111111111'
   );
-  if (v_fee ->> 'asaas_fee_cents')::integer <> 321 then
-    raise exception 'taxa gravada sumiu: %', v_fee -> 'asaas_fee_cents';
+  if (v_fee ->> 'provider_fee_cents')::integer <> 321 then
+    raise exception 'taxa gravada sumiu: %', v_fee -> 'provider_fee_cents';
   end if;
   select coalesce(sum((item ->> 'open_cents')::integer), 0)
     into v_debt

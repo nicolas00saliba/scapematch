@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
@@ -418,12 +419,16 @@ class _CasaPageState extends ConsumerState<CasaPage> {
     String? wallet;
     if (result.needsSubaccount) {
       wallet = await api.provisionWallet(widget.id);
+      if (wallet != null && wallet.startsWith('https://')) {
+        await launchExternalUrl(Uri.parse(wallet));
+        wallet = 'Continue na PagBank para ligar a casa.';
+      }
     }
     await _load();
     setState(() {
       _message = result.needsSubaccount
           ? (wallet ??
-                'Aprovada. A subconta Asaas foi pedida no fluxo que já existe.')
+                'Aprovada. Abra o PagBank Connect para ligar a casa.')
           : 'Decisão gravada: ${result.status}.';
     });
   }
@@ -992,15 +997,15 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                if (report.asaasFeeCents == null)
+                if (report.pagbankFeeCents == null)
                   const Text(
-                    'A taxa do Asaas ainda não chegou neste recorte. O painel não estima esse valor.',
+                    'A taxa do PagBank ainda não chegou neste recorte. O painel não estima esse valor.',
                     key: Key('admin-taxa-ausente'),
                   )
                 else
                   Text(
-                    'Taxa do Asaas, paga pela comissão do EscapeMatch: ${reais(report.asaasFeeCents!)} em ${report.asaasFeeRows} cobranças.',
-                    key: const Key('admin-taxa-asaas'),
+                    'Taxa do PagBank, paga pela comissão do EscapeMatch: ${reais(report.pagbankFeeCents!)} em ${report.pagbankFeeRows} cobranças.',
+                    key: const Key('admin-taxa-pagbank'),
                   ),
                 const SizedBox(height: 16),
                 Text(

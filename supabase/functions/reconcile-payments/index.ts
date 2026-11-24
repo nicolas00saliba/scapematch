@@ -1,11 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { logCaught } from "../_shared/asaas_client_error.ts";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
+import { logCaught } from "../_shared/pagbank_client_error.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import {
-  reconcileAsaasTimeoutMs,
+  reconcilePagBankTimeoutMs,
   reconcilePayments,
 } from "../_shared/reconcile_payments.ts";
+import { retryPendingCustodyReleases } from "../_shared/custody_release.ts";
+import { processMemberRefunds } from "../_shared/member_refund.ts";
+import { pollPendingPagBankCharges } from "../_shared/charge_notice.ts";
 import {
   expireUnconfirmedGroups,
   settleAuthorizedCards,
@@ -15,7 +18,7 @@ import {
 type Deps = {
   // deno-lint-ignore no-explicit-any
   admin?: any;
-  asaas?: AsaasProvider;
+  pagbank?: PagBankProvider;
   reconcileSecret?: string;
 };
 
@@ -38,26 +41,29 @@ export async function handleReconcile(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
-    const asaas = deps?.asaas ??
-      AsaasProvider.fromEnv(Deno.env, reconcileAsaasTimeoutMs);
+    const pagbank = deps?.pagbank ??
+      PagBankProvider.fromEnv(Deno.env, reconcilePagBankTimeoutMs);
     const groupId = await settleGroupId(req);
-    const reconciled = await reconcilePayments(admin, asaas);
+    const reconciled = await reconcilePayments(admin, pagbank);
     const expired = await expireUnconfirmedGroups(admin);
     for (const id of expired) {
       try {
-        await settleGroup(admin, asaas, id);
+        await settleGroup(admin, pagbank, id);
       } catch (error) {
         logCaught("settle-charges", error);
       }
     }
     if (groupId) {
       try {
-        await settleGroup(admin, asaas, groupId);
+        await settleGroup(admin, pagbank, groupId);
       } catch (error) {
         logCaught("settle-charges", error);
       }
     }
-    await settleAuthorizedCards(admin, asaas);
+    await settleAuthorizedCards(admin, pagbank);
+    await processMemberRefunds(admin, pagbank);
+    await pollPendingPagBankCharges(admin, pagbank, Deno.env);
+    await retryPendingCustodyReleases(admin, pagbank);
     const released = await admin.rpc("release_due_scape_points");
     if (released.error) throw new Error("points");
     return json(reconciled);

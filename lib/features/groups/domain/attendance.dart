@@ -10,7 +10,7 @@ enum AttendanceStatus { joined, confirmed, cancelled }
 enum PaymentStatus { pending, reserved, paid, released }
 
 /// What happened to the simulated payment after the person left the seat.
-enum RefundStatus { none, refunded, denied }
+enum RefundStatus { none, refundPending, refunded, denied }
 
 /// Why [RefundStatus] is what it is. [none] means the seat is still active.
 enum RefundReason {

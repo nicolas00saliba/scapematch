@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
+import 'package:scapematch/features/payments/presentation/pagbank_connect_return_page.dart';
 import 'package:scapematch_admin/admin_mfa.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 import 'package:scapematch_admin/admin_payments.dart';
@@ -31,11 +34,47 @@ class AdminApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: adminTheme(),
       home: switch (session.phase) {
-        AdminPhase.ready => const AdminShell(),
+        AdminPhase.ready => const _AdminReady(),
         AdminPhase.enroll || AdminPhase.verify => const AdminMfaPage(),
         AdminPhase.loading => const AdminSplash(),
         _ => const AdminLoginPage(),
       },
+    );
+  }
+}
+
+class _AdminReady extends StatefulWidget {
+  const _AdminReady();
+
+  @override
+  State<_AdminReady> createState() => _AdminReadyState();
+}
+
+class _AdminReadyState extends State<_AdminReady> {
+  PagbankConnectReturn? _hit;
+
+  @override
+  void initState() {
+    super.initState();
+    _hit = pendingPagbankConnectReturn;
+    pendingPagbankConnectReturn = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hit = _hit;
+    if (hit == null) return const AdminShell();
+    return PagbankConnectReturnPage(
+      hit: hit,
+      complete: (item) async {
+        final response = await scapeSupabase.functions.invoke(
+          'pagbank-connect',
+          body: {'code': item.code, 'state': item.state},
+        );
+        final data = response.data;
+        return data is Map && data['linked'] == true;
+      },
+      onDone: () => setState(() => _hit = null),
     );
   }
 }

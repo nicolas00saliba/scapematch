@@ -86,8 +86,9 @@ alter default privileges in schema public
   grant all on functions to anon, authenticated, service_role;
 
 -- O Postgres do CI não traz a extensão vault. Este substituto só existe
--- no teste. A migração da subconta só lê o segredo; produção cria o
--- asaas_subaccount_key no Vault antes de aplicá-la.
+-- no teste. A migração histórica da subconta só lê o segredo; produção
+-- já tem asaas_subaccount_key no Vault. O nome não muda: a função
+-- histórica procura exatamente esse item.
 create schema if not exists vault;
 
 create table if not exists vault.secrets (

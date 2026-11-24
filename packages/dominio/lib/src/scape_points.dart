@@ -236,7 +236,7 @@ class PointSubsidyQuote {
   /// Saem do lastro da EscapeMatch e esperam o próximo repasse da casa.
   final int topupCents;
 
-  /// A vaga inteira foi coberta. Não há cobrança no Asaas.
+  /// A vaga inteira foi coberta. Não há cobrança no PagBank.
   final bool pointsOnly;
 
   /// `antifraud` ou `reserve` quando a extensão não coube inteira.
@@ -532,7 +532,7 @@ int referralBookingsForPoints({
 
 /// Abate pontos do valor cobrado do jogador. O líquido da casa fica o do
 /// preço cheio. O percentual novo só existe quando o líquido cabe na
-/// cobrança; ele é arredondado para cima em 4 casas, que é o limite do Asaas.
+/// cobrança; ele é arredondado para cima em 4 casas, que é o limite do PagBank.
 ///
 /// Com [ReferralRates.backedFullSlotEnabled], pontos com lastro já
 /// liberados ([availableBackedPoints], indicação e cashback) podem cobrir
@@ -836,7 +836,7 @@ _FullAllocation _allocateFullSlot({
 
 /// Percentual do valor cobrado (já com abatimento) que devolve o líquido
 /// cheio da casa. Sobe na 4ª casa decimal para a casa não perder centavo
-/// por arredondamento. O Asaas aplica esse percentual sobre o líquido
+/// por arredondamento. O PagBank aplica esse percentual sobre o líquido
 /// depois da taxa dele; o centavo que sobrar sai da EscapeMatch.
 double subsidizedHouseSplitPercent({
   required int houseNetCents,
@@ -906,7 +906,7 @@ String? _digits(String? value) {
   return digits;
 }
 
-/// Documento inteiro. Asterisco é máscara do Asaas e não serve para comparar.
+/// Documento inteiro. Asterisco é máscara do PagBank e não serve para comparar.
 String? _fullDocument(String? value) {
   if (value == null || value.contains('*')) return null;
   final digits = _digits(value);

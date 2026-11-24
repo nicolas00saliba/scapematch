@@ -87,7 +87,7 @@ O app chama as duas. O corpo não atravessa o RLS.
 | Função | Quem chama | Por quê pode virar INVOKER |
 | --- | --- | --- |
 | `accept_waitlist(uuid)` | App jogador | Só lê a própria linha de `waitlist` (a policy já permite) e delega a escrita a `join_group`, que continua DEFINER. |
-| `set_my_username(text)` | Ninguém no app nem nas Edge Functions. `EXECUTE` está concedido a `authenticated` | Atualiza `profiles.username` da própria linha. A policy de update e o grant da coluna já cobrem isso. `profiles_guard` só trava `asaas_customer_id`. |
+| `set_my_username(text)` | Ninguém no app nem nas Edge Functions. `EXECUTE` está concedido a `authenticated` | Atualiza `profiles.username` da própria linha. A policy de update e o grant da coluna já cobrem isso. `profiles_guard` só trava `pagbank_customer_id`. |
 
 ## Mover para `private` e manter DEFINER
 
@@ -103,7 +103,7 @@ resultado no dia em que o chamador deixasse de ser o dono.
 | `offer_waitlist(uuid)` | `leave_group`, `remove_member` e o fluxo de vaga | Atualiza `waitlist` de outras pessoas. |
 | `post_app_notice(uuid, text, text, text, uuid, text)` | Funções de grupo, amigos, `house_cancel_group` e `delete_group` | Insere aviso para outro usuário. `app_notices` não tem policy de `INSERT`. |
 | `profile_display_name(uuid)` | Funções de grupo | Lê o nome de qualquer perfil para gravar no membro. |
-| `saved_cards_guard()` | Trigger `saved_cards_guard` em `saved_cards` | Confere o customer Asaas no perfil. Quem grava o cartão é a service role. |
+| `saved_cards_guard()` | Trigger `saved_cards_guard` em `saved_cards` | Confere o customer PagBank no perfil. Quem grava o cartão é a service role. |
 | `saved_cards_limit()` | Trigger `saved_cards_limit` em `saved_cards` | Conta os cartões da pessoa antes de aceitar outro. |
 | `user_has_overlap(uuid, timestamptz, integer, uuid)` | Funções de entrar e criar grupo | Vê grupos e membros que o RLS esconderia. Como `INVOKER`, uma sessão oculta deixaria de bloquear a sobreposição. |
 | `venue_link_status(uuid)` | Ninguém no app nem nas Edge Functions. `EXECUTE` só de `service_role` | Lê `possible_duplicate_of` e `merged_into`, colunas sem `SELECT` para `authenticated`. |
@@ -116,7 +116,7 @@ eles deixam de aparecer no schema da API.
 
 | Função | Quem chama | Por quê |
 | --- | --- | --- |
-| `profiles_guard()` | Trigger `profiles_guard` em `profiles` | Só copia `asaas_customer_id` antigo para o novo. Não lê outra linha. |
+| `profiles_guard()` | Trigger `profiles_guard` em `profiles` | Só copia `pagbank_customer_id` antigo para o novo. Não lê outra linha. |
 | `users_are_friends(uuid, uuid)` | `create_crew` | Hoje roda dentro de uma função DEFINER, então como INVOKER ainda executa como o dono. Se `create_crew` também virar INVOKER, `friendships_select` já mostra a amizade de quem chama. |
 | `venue_claims_guard()` | Trigger `venue_claims_guard` em `venue_claims` | Só força campos de `NEW` e lê casa aprovada ou a pendente do próprio dono, que as policies já mostram. `private.is_admin` segue DEFINER. |
 | `venues_guard()` | Trigger `venues_guard` em `venues` | Força dono, status e wallet em `NEW`. Convite ativo e cidade são legíveis pelas policies. `private.is_admin` segue DEFINER. |

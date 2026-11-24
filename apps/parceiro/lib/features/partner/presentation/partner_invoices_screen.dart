@@ -235,8 +235,8 @@ class _PartnerInvoicesState extends ConsumerState<PartnerInvoices> {
       SnackBar(
         content: Text(
           scapeUsesLiveBackend
-              ? 'Dados fiscais enviados. A função configura a subconta no Asaas.'
-              : 'Dados fiscais salvos nesta sessão. No servidor, a função configura a subconta no Asaas.',
+              ? 'Dados fiscais enviados. A função configura a subconta no PagBank.'
+              : 'Dados fiscais salvos nesta sessão. No servidor, a função configura a subconta no PagBank.',
         ),
       ),
     );

@@ -1,7 +1,7 @@
 export type SavedCard = {
   id: string;
   userId: string;
-  asaasCustomerId: string;
+  pagbankCustomerId: string;
   creditCardToken: string;
   last4: string;
   brand: string;
@@ -32,7 +32,7 @@ export function requestedSavedCardId(body: {
 export function last4Digits(value: string): string {
   const digits = value.replace(/\D/g, "");
   if (digits.length < 4) {
-    throw new Error("Resposta do Asaas sem final do cartão");
+    throw new Error("Resposta do PagBank sem final do cartão");
   }
   return digits.slice(-4);
 }
@@ -67,7 +67,7 @@ export function assertOwnedCard(
     !card ||
     card.id !== cardId ||
     card.userId !== userId ||
-    card.asaasCustomerId !== customerId ||
+    card.pagbankCustomerId !== customerId ||
     card.creditCardToken.length < 8
   ) {
     throw new Error("cartão não encontrado");
@@ -155,7 +155,7 @@ export async function loadOwnedCard(
   return {
     id,
     userId,
-    asaasCustomerId: customerId,
+    pagbankCustomerId: customerId,
     creditCardToken: token,
     last4,
     brand,

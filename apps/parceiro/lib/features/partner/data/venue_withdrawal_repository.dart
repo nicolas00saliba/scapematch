@@ -43,32 +43,6 @@ class VenueBankSummary {
   final String? accountMasked;
 }
 
-class VenueBankDraft {
-  const VenueBankDraft({
-    required this.destination,
-    required this.ownerName,
-    required this.ownerDocument,
-    required this.operationType,
-    this.pixKey = '',
-    this.pixKeyType = 'CNPJ',
-    this.bankCode = '',
-    this.agency = '',
-    this.accountNumber = '',
-    this.accountDigit = '',
-  });
-
-  final String destination;
-  final String ownerName;
-  final String ownerDocument;
-  final String operationType;
-  final String pixKey;
-  final String pixKeyType;
-  final String bankCode;
-  final String agency;
-  final String accountNumber;
-  final String accountDigit;
-}
-
 class VenuePayoutSchedule {
   const VenuePayoutSchedule({
     required this.enabled,
@@ -130,6 +104,7 @@ class VenuePayoutSnapshot {
     required this.withdrawals,
     this.blockedUntil,
     this.bank,
+    this.payoutsPaused = false,
   });
 
   final bool enabled;
@@ -142,6 +117,7 @@ class VenuePayoutSnapshot {
   final List<VenueWithdrawal> withdrawals;
   final DateTime? blockedUntil;
   final VenueBankSummary? bank;
+  final bool payoutsPaused;
 
   static const hidden = VenuePayoutSnapshot(
     enabled: false,
@@ -208,7 +184,7 @@ class VenuePayoutSnapshot {
           amountCents: 4000,
           status: 'failed',
           source: 'manual',
-          failureReason: 'asaas_unavailable',
+          failureReason: 'pagbank_unavailable',
           createdAt: DateTime.utc(2026, 11, 8),
         ),
       ],
@@ -265,13 +241,6 @@ abstract class VenueWithdrawalRepository {
     String? totp,
   });
 
-  Future<VenuePayoutSnapshot> saveBank(String venueId, VenueBankDraft draft);
-
-  Future<VenuePayoutSnapshot> saveSchedule(
-    String venueId,
-    VenuePayoutSchedule schedule,
-  );
-
   Future<VenuePayoutSnapshot> withdraw(String venueId, int amountCents);
 }
 
@@ -306,80 +275,6 @@ class MemoryVenueWithdrawalRepository implements VenueWithdrawalRepository {
     }
     confirmed = true;
     return null;
-  }
-
-  @override
-  Future<VenuePayoutSnapshot> saveBank(
-    String venueId,
-    VenueBankDraft draft,
-  ) async {
-    _requireConfirmed();
-    final document = draft.ownerDocument.replaceAll(RegExp(r'\D'), '');
-    if (document != houseDocument) throw const PayoutFailure('titularidade');
-    if (draft.operationType.toUpperCase() == 'TED') {
-      throw const PayoutFailure('sem pix');
-    }
-    if (draft.destination == 'pix' &&
-        (draft.pixKeyType == 'CPF' || draft.pixKeyType == 'CNPJ')) {
-      final key = draft.pixKey.replaceAll(RegExp(r'\D'), '');
-      if (key != houseDocument) throw const PayoutFailure('titularidade');
-    }
-    actions.add('bank');
-    final masked = draft.destination == 'pix'
-        ? draft.pixKey
-        : draft.accountNumber;
-    final tail = masked.length <= 4
-        ? masked
-        : masked.substring(masked.length - 4);
-    _snapshot = VenuePayoutSnapshot(
-      enabled: _snapshot.enabled,
-      canWithdraw: _snapshot.canWithdraw,
-      role: _snapshot.role,
-      availableCents: _snapshot.availableCents,
-      pendingCents: _snapshot.pendingCents,
-      schedule: _snapshot.schedule,
-      receivables: _snapshot.receivables,
-      withdrawals: _snapshot.withdrawals,
-      blockedUntil: DateTime.now().add(const Duration(hours: 24)),
-      bank: VenueBankSummary(
-        destination: draft.destination,
-        operationType: 'PIX',
-        ownerName: draft.ownerName,
-        pixKeyType: draft.pixKeyType,
-        pixKeyMasked: '****$tail',
-        bankCode: draft.bankCode,
-        agency: draft.agency,
-        accountMasked: '****$tail',
-      ),
-    );
-    confirmed = false;
-    return _snapshot;
-  }
-
-  @override
-  Future<VenuePayoutSnapshot> saveSchedule(
-    String venueId,
-    VenuePayoutSchedule schedule,
-  ) async {
-    _requireConfirmed();
-    if (schedule.frequency != 'weekly' || schedule.weekday == null) {
-      throw const PayoutFailure('valor');
-    }
-    actions.add('schedule');
-    _snapshot = VenuePayoutSnapshot(
-      enabled: _snapshot.enabled,
-      canWithdraw: _snapshot.canWithdraw,
-      role: _snapshot.role,
-      availableCents: _snapshot.availableCents,
-      pendingCents: _snapshot.pendingCents,
-      schedule: schedule,
-      receivables: _snapshot.receivables,
-      withdrawals: _snapshot.withdrawals,
-      blockedUntil: _snapshot.blockedUntil,
-      bank: _snapshot.bank,
-    );
-    confirmed = false;
-    return _snapshot;
   }
 
   @override
@@ -478,46 +373,6 @@ class SupabaseVenueWithdrawalRepository implements VenueWithdrawalRepository {
   }
 
   @override
-  Future<VenuePayoutSnapshot> saveBank(
-    String venueId,
-    VenueBankDraft draft,
-  ) async {
-    return _snapshot(
-      await _invoke({
-        'action': 'save_bank',
-        'venue_id': venueId,
-        'destination': draft.destination,
-        'pix_key': draft.pixKey,
-        'pix_key_type': draft.pixKeyType,
-        'bank_code': draft.bankCode,
-        'agency': draft.agency,
-        'account_number': draft.accountNumber,
-        'account_digit': draft.accountDigit,
-        'owner_name': draft.ownerName,
-        'owner_document': draft.ownerDocument,
-        'operation_type': draft.operationType,
-      }),
-    );
-  }
-
-  @override
-  Future<VenuePayoutSnapshot> saveSchedule(
-    String venueId,
-    VenuePayoutSchedule schedule,
-  ) async {
-    return _snapshot(
-      await _invoke({
-        'action': 'save_schedule',
-        'venue_id': venueId,
-        'enabled': schedule.enabled,
-        'frequency': schedule.frequency,
-        'weekday': schedule.weekday,
-        'min_amount_cents': schedule.minAmountCents,
-      }),
-    );
-  }
-
-  @override
   Future<VenuePayoutSnapshot> withdraw(String venueId, int amountCents) async {
     return _snapshot(
       await _invoke({
@@ -582,6 +437,7 @@ class SupabaseVenueWithdrawalRepository implements VenueWithdrawalRepository {
     final scheduleMap = schedule is Map ? schedule : const {};
     return VenuePayoutSnapshot(
       enabled: json['enabled'] == true,
+      payoutsPaused: json['payouts_paused'] == true,
       canWithdraw: json['can_withdraw'] == true,
       role: json['role']?.toString() ?? 'none',
       availableCents: _int(json['available_cents']),

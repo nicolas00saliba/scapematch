@@ -81,7 +81,7 @@ class VenueDraft {
     return null;
   }
 
-  /// Tipos aceitos pela API de subcontas do Asaas. LIMITED é o padrão.
+  /// Tipos aceitos pela API de subcontas do PagBank. LIMITED é o padrão.
   static const companyTypes = <String, String>{
     'MEI': 'MEI',
     'LIMITED': 'Sociedade limitada (LTDA)',

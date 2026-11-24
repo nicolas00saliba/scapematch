@@ -16,6 +16,7 @@ import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/domain/party_companion.dart';
 import 'package:scapematch/features/payments/data/card_payment_flow.dart';
+import 'package:scapematch/features/payments/domain/card_installments.dart';
 import 'package:scapematch/features/payments/domain/live_charge.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -185,12 +186,21 @@ class SupabaseGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<List<CardInstallmentOption>> quoteCardInstallments(
+    int principalCents,
+  ) {
+    return CardPaymentFlow(_invoke).quoteInstallments(principalCents);
+  }
+
+  @override
   Future<PayShareResult> payShare(
     String groupId, {
     required String userId,
     required PaymentMethodKind kind,
     String? savedCardId,
     int points = 0,
+    int installments = 1,
+    int? expectedAmountCents,
   }) {
     if (kind == PaymentMethodKind.card &&
         (savedCardId == null || savedCardId.isEmpty)) {
@@ -208,6 +218,8 @@ class SupabaseGroupRepository implements GroupRepository {
         kind: kind,
         savedCardId: savedCardId,
         points: points,
+        installments: installments,
+        expectedAmountCents: expectedAmountCents,
       );
     });
   }
@@ -217,12 +229,16 @@ class SupabaseGroupRepository implements GroupRepository {
     String groupId, {
     required String userId,
     required CardDraft card,
+    int installments = 1,
+    int? expectedAmountCents,
   }) {
     return _charge(groupId, userId, () {
       return CardPaymentFlow(_invoke).payWithNewCard(
         card: card,
         groupId: groupId,
         idempotencyKey: _chargeKey(groupId, userId),
+        installments: installments,
+        expectedAmountCents: expectedAmountCents,
       );
     });
   }
@@ -370,6 +386,7 @@ class SupabaseGroupRepository implements GroupRepository {
   }) async {
     try {
       await client.rpc('leave_group', params: {'p_group_id': groupId});
+      await _kickMemberRefund(groupId);
     } on PostgrestException catch (error) {
       return LeaveGroupFailure(
         leaveFailure(rpcText(code: error.code, message: error.message)),
@@ -443,6 +460,7 @@ class SupabaseGroupRepository implements GroupRepository {
         'remove_member',
         params: {'p_group_id': groupId, 'p_member_id': memberId},
       );
+      await _kickMemberRefund(groupId);
     } on PostgrestException catch (error) {
       return RemoveMemberFailure(
         removeFailure(rpcText(code: error.code, message: error.message)),
@@ -494,6 +512,18 @@ class SupabaseGroupRepository implements GroupRepository {
 
   /// Captura o cartão quando o grupo confirma ou lota.
   /// Se a chamada falhar, a rotina de reconcile tenta de novo.
+  /// Pede o estorno na PagBank. Se falhar, a reconciliação tenta de novo.
+  Future<void> _kickMemberRefund(String groupId) async {
+    try {
+      await client.functions.invoke(
+        'settle-charges',
+        body: {'group_id': groupId, 'member_refund': true},
+      );
+    } on Object {
+      // A saída já ficou na fila. O cron estorna.
+    }
+  }
+
   Future<void> _settleClosed(String groupId) async {
     try {
       await client.functions.invoke(
@@ -654,6 +684,7 @@ PaymentStatus paymentOf(String raw) {
 
 RefundStatus refundOf(String raw) {
   return switch (raw) {
+    'refund_pending' => RefundStatus.refundPending,
     'refunded' => RefundStatus.refunded,
     'denied' => RefundStatus.denied,
     _ => RefundStatus.none,

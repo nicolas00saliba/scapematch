@@ -110,7 +110,7 @@ class _AddBalanceScreenState extends State<AddBalanceScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Em breve. Nada é cobrado e o saldo não muda.',
+            'Em breve. O saldo não muda.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               height: 1.35,

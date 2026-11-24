@@ -335,7 +335,7 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
               labelText: 'Renda mensal (R\$)',
-              helperText: 'O Asaas pede este valor para a conta da casa.',
+              helperText: 'O PagBank pede este valor para a conta da casa.',
               border: OutlineInputBorder(),
             ),
           ),

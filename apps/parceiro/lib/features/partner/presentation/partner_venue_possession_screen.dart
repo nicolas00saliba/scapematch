@@ -301,11 +301,16 @@ class _VenueFinanceStepState extends State<VenueFinanceStep> {
     setState(() => _busy = true);
     final failure = await widget.onProvision();
     if (!mounted) return;
+    final connect = failure != null && failure.startsWith('https://');
+    if (connect) widget.onOpenUrl?.call(Uri.parse(failure));
     setState(() {
       _busy = false;
       if (failure == null) {
         _subaccount = true;
         _subaccountNote = PartnerMessages.claimProvisionDone;
+      } else if (connect) {
+        _subaccount = false;
+        _subaccountNote = PartnerMessages.claimConnectOpened;
       } else {
         _subaccountNote = failure;
       }

@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { AsaasProvider } from "./asaas_provider.ts";
+import { PagBankProvider } from "./pagbank_provider.ts";
 import { clientIp } from "./client_ip.ts";
 import { readCard } from "./tokenize_input.ts";
 
@@ -56,9 +56,9 @@ Deno.test("sem header válido o pedido não leva remoteIp", async () => {
   assertEquals(clientIp(emptyReal), "2001:db8::1");
 
   const bodies: string[] = [];
-  const provider = new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  const provider = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     (_url, init) => {
       bodies.push(String(init?.body ?? ""));
       return Promise.resolve(
@@ -74,6 +74,8 @@ Deno.test("sem header válido o pedido não leva remoteIp", async () => {
         ),
       );
     },
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
   );
   await provider.tokenizeCard({
     customer: "cus_1",
@@ -86,7 +88,7 @@ Deno.test("sem header válido o pedido não leva remoteIp", async () => {
     dueDate: "2026-11-07",
     description: "reserva",
     externalReference: "charge-2",
-    split: { walletId: "wal_house", fixedValue: 90 },
+    split: { walletId: "wal_house", fixedValue: 60 },
     creditCardToken: "tok_card_1",
   });
   for (const body of bodies) {

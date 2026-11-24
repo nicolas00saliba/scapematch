@@ -2,12 +2,51 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/splash_gate.dart';
+import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
+import 'package:scapematch/features/payments/presentation/pagbank_connect_return_page.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/pwa/pwa_frame.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_screen.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
+
+class _ParceiroHome extends StatefulWidget {
+  const _ParceiroHome();
+
+  @override
+  State<_ParceiroHome> createState() => _ParceiroHomeState();
+}
+
+class _ParceiroHomeState extends State<_ParceiroHome> {
+  PagbankConnectReturn? _hit;
+
+  @override
+  void initState() {
+    super.initState();
+    _hit = pendingPagbankConnectReturn;
+    pendingPagbankConnectReturn = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hit = _hit;
+    if (hit == null) return const PartnerScreen();
+    return PagbankConnectReturnPage(
+      hit: hit,
+      complete: (item) async {
+        final response = await scapeSupabase.functions.invoke(
+          'pagbank-connect',
+          body: {'code': item.code, 'state': item.state},
+        );
+        final data = response.data;
+        return data is Map && data['linked'] == true;
+      },
+      onDone: () => setState(() => _hit = null),
+    );
+  }
+}
 
 class ParceiroApp extends ConsumerWidget {
   const ParceiroApp({super.key});
@@ -48,7 +87,7 @@ class ParceiroApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const PartnerScreen(),
+      home: const _ParceiroHome(),
     );
   }
 }

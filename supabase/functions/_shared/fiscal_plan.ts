@@ -102,14 +102,14 @@ export function testInvoiceNumber(
 }
 
 export function testPdfUrl(number: string): string {
-  return `https://api-sandbox.asaas.com/notas/teste/${number}.pdf`;
+  return `https://sandbox.api.pagseguro.com/notas/teste/${number}.pdf`;
 }
 
 export function testXmlUrl(number: string): string {
-  return `https://api-sandbox.asaas.com/notas/teste/${number}.xml`;
+  return `https://sandbox.api.pagseguro.com/notas/teste/${number}.xml`;
 }
 
-export function mapAsaasInvoiceStatus(status: string): string {
+export function mapInvoiceStatus(status: string): string {
   switch (status) {
     case "AUTHORIZED":
       return "authorized";

@@ -1,4 +1,4 @@
--- Reivindicação oficial. Não fala com Asaas nem com o projeto remoto.
+-- Reivindicação oficial. Não fala com PagBank nem com o projeto remoto.
 -- O job duplicates-sql sobe postgres sem pgTAP. O harness já usado no CI
 -- executa este arquivo.
 
@@ -474,18 +474,25 @@ begin
     raise exception 'a casa de dois pedidos ficou sem claimed_at';
   end if;
   if public.venue_finance_ready('e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5') then
-    raise exception 'casa sem subconta e sem banco já recebe';
+    raise exception 'casa sem conta PagBank já recebe';
   end if;
 end $$;
 
 update public.venues
-set asaas_wallet_id = 'wal_ninja_claim'
+set pagbank_account_id = 'wal_ninja_claim'
 where id = 'e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5';
 
 do $$
 begin
-  if public.venue_finance_ready('e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5') then
-    raise exception 'subconta sem conta bancária já recebe';
+  if not public.venue_finance_ready('e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5') then
+    raise exception 'conta PagBank sem banco não liberou o recebimento';
+  end if;
+  if not exists (
+    select 1 from public.venues_vitrine
+    where id = 'e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5'
+      and finance_ready
+  ) then
+    raise exception 'a vitrine não mostra que a casa pode receber';
   end if;
 end $$;
 
@@ -506,7 +513,7 @@ insert into public.venue_bank_accounts (
 do $$
 begin
   if not public.venue_finance_ready('e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5') then
-    raise exception 'subconta e Pix não liberaram o recebimento';
+    raise exception 'a conta PagBank deixou de liberar o recebimento';
   end if;
   if not exists (
     select 1 from public.venues_vitrine

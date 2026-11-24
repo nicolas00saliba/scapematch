@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { AsaasProvider } from "./asaas_provider.ts";
+import { PagBankProvider } from "./pagbank_provider.ts";
 import { memberPaymentForStatus } from "./charge_patch.ts";
 import { maySettle, settleGroup } from "./settle_group.ts";
 
@@ -14,10 +14,13 @@ type Charge = {
   user_id: string;
   venue_id: string;
   amount_cents: number;
+  charged_amount_cents?: number;
+  buyer_interest_cents?: number;
   commission_bps: number;
   status: string;
   provider_ref: string | null;
   billing_type: string;
+  provider_split_id?: string | null;
 };
 
 function adminFor(options: {
@@ -109,7 +112,10 @@ function adminFor(options: {
         }
         if (table === "venues") {
           return {
-            data: { owner_id: options.owner ?? "owner-1" },
+            data: {
+              owner_id: options.owner ?? "owner-1",
+              pagbank_account_id: "ACCO_VENUE",
+            },
             error: null,
           };
         }
@@ -160,7 +166,7 @@ function provider(
 ) {
   const fetchFn = (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
-    if (method === "GET" && url.includes("/payments/pay_card")) {
+    if (method === "GET" && url.includes("/charges/pay_card")) {
       return Promise.resolve(
         new Response(
           JSON.stringify({
@@ -173,7 +179,10 @@ function provider(
         ),
       );
     }
-    if (method === "POST" && url.includes("captureAuthorizedPayment")) {
+    if (method === "POST" && url.includes("/custody/release")) {
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    if (method === "POST" && url.includes("/capture")) {
       captures.push(url);
       return Promise.resolve(
         new Response(
@@ -184,11 +193,12 @@ function provider(
     }
     return Promise.resolve(new Response("não", { status: 500 }));
   };
-  return new AsaasProvider(
-    "asaas-secret-key",
-    "https://api-sandbox.asaas.com/v3",
+  return new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
     fetchFn,
     () => Promise.resolve(),
+    "ACCO_PRIMARY",
   );
 }
 
@@ -218,15 +228,15 @@ Deno.test("grupo fechado captura o cartão autorizado uma vez", async () => {
     },
   });
   const captures: string[] = [];
-  const asaas = provider("AUTHORIZED", captures);
-  await settleGroup(admin, asaas, groupId);
-  await settleGroup(admin, asaas, groupId);
+  const pagbank = provider("AUTHORIZED", captures);
+  await settleGroup(admin, pagbank, groupId);
+  await settleGroup(admin, pagbank, groupId);
   assertEquals(captures.length, 1);
   assertEquals(charges[0].status, "paid");
   assert(admin.calls.includes("apply_payment_transition"));
 });
 
-Deno.test("cartão já confirmado no Asaas não captura de novo", async () => {
+Deno.test("cartão já confirmado no PagBank não captura de novo", async () => {
   const charges = [card()];
   const admin = adminFor({ closed: true, charges });
   const captures: string[] = [];
@@ -342,6 +352,40 @@ Deno.test("prazo vencido sem confirmação cancela e não captura", async () => 
   );
 });
 
+Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
+  const charges = [{
+    ...card(),
+    status: "paid",
+    billing_type: "PIX",
+    provider_ref: "pay_pix",
+    provider_split_id: "SPLI_PIX",
+  }];
+  const admin = adminFor({ closed: true, charges });
+  const releases: string[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    if ((init?.method ?? "GET") === "POST" && url.includes("/custody/release")) {
+      const posted = JSON.parse(String(init?.body ?? "{}"));
+      assertEquals(
+        posted.receivers.map((item: { account: { id: string } }) => item.account.id),
+        ["ACCO_VENUE", "ACCO_PRIMARY"],
+      );
+      releases.push(url);
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  };
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
+    fetchFn,
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
+  );
+  await settleGroup(admin, pagbank, groupId);
+  assertEquals(releases.length, 1);
+  assert(releases[0].includes("/splits/SPLI_PIX/custody/release"));
+});
+
 Deno.test("grupo confirmado captura mesmo sem lotar", async () => {
   const charges = [card()];
   const admin = adminFor({
@@ -377,4 +421,46 @@ Deno.test("membro liquida grupo fechado e não o grupo aberto", async () => {
   });
   assertEquals(await maySettle(open, groupId, member, false), false);
   assertEquals(await maySettle(open, groupId, userId, false), true);
+});
+
+Deno.test("captura de 4x usa o total com juros, não o principal", async () => {
+  const charges = [{
+    ...card(),
+    charged_amount_cents: 20640,
+    buyer_interest_cents: 640,
+  }];
+  const admin = adminFor({ closed: true, charges });
+  const bodies: number[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET") {
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "pay_card",
+        status: "AUTHORIZED",
+        billingType: "CREDIT_CARD",
+      }), { status: 200 }));
+    }
+    if (url.includes("/capture") || url.includes("/cancel")) {
+      bodies.push(JSON.parse(String(init?.body)).amount.value);
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "pay_card",
+        status: url.includes("/capture") ? "PAID" : "CANCELED",
+      }), { status: 200 }));
+    }
+    if (url.includes("/custody/release")) {
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
+    fetchFn,
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
+  );
+  await settleGroup(admin, pagbank, groupId);
+  assertEquals(bodies, [20640]);
+  assertEquals(charges[0].status, "paid");
+  assertEquals(charges[0].amount_cents, 10000);
 });

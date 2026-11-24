@@ -1,27 +1,30 @@
 // Prontidão dos pagamentos. Cada campo é sim ou não.
 // Nenhum valor de segredo, URL ou e-mail sai daqui.
 
-import { asaasProductionBaseUrl } from "./asaas_provider.ts";
+import {
+  pagbankApiBaseUrl,
+  pagbankProductionBaseUrl,
+} from "./pagbank_provider.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
-import { logCaught } from "./asaas_client_error.ts";
+import { logCaught } from "./pagbank_client_error.ts";
 
 export function secretPresent(value: string | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }
 
 /// Só a base oficial de produção, sem barra no fim. Sandbox e vazio são não.
-export function asaasBaseUrlIsProduction(value: string | undefined): boolean {
+export function pagbankBaseUrlIsProduction(value: string | undefined): boolean {
   const normalized = (value ?? "").trim().replace(/\/+$/, "");
-  return normalized === asaasProductionBaseUrl;
+  return normalized === pagbankProductionBaseUrl;
 }
 
 const failureCodes = new Set(["config_ausente", "cron_failed"]);
 
 export type ReadinessReport = {
-  asaas_api_key: boolean;
-  asaas_base_url_production: boolean;
-  asaas_webhook_token: boolean;
-  asaas_webhook_email: boolean;
+  pagbank_api_key: boolean;
+  pagbank_base_url_production: boolean;
+  pagbank_webhook_token: boolean;
+  pagbank_webhook_email: boolean;
   venue_withdrawals_secret: boolean;
   ledger_reconcile_secret: boolean;
   vault_venue_withdrawals_url: boolean;
@@ -46,12 +49,12 @@ export function buildReadiness(env: EnvLike, vault: unknown): ReadinessReport {
     ? false
     : null;
   return {
-    asaas_api_key: secretPresent(env.get("ASAAS_API_KEY")),
-    asaas_base_url_production: asaasBaseUrlIsProduction(
-      env.get("ASAAS_BASE_URL"),
+    pagbank_api_key: secretPresent(env.get("PAGBANK_TOKEN")),
+    pagbank_base_url_production: pagbankBaseUrlIsProduction(
+      pagbankApiBaseUrl(env),
     ),
-    asaas_webhook_token: secretPresent(env.get("ASAAS_WEBHOOK_TOKEN")),
-    asaas_webhook_email: secretPresent(env.get("ASAAS_WEBHOOK_EMAIL")),
+    pagbank_webhook_token: secretPresent(env.get("PAGBANK_WEBHOOK_SECRET")),
+    pagbank_webhook_email: secretPresent(env.get("PAGBANK_WEBHOOK_EMAIL")),
     venue_withdrawals_secret: secretPresent(
       env.get("VENUE_WITHDRAWALS_SECRET"),
     ) || row.vault_venue_withdrawals_secret === true,

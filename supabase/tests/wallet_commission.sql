@@ -87,10 +87,10 @@ values
   ('f3333333-3333-3333-3333-333333333333', 'admin-comissao@example.com', '{"display_name":"Admin"}');
 
 update public.profiles
-set asaas_customer_id = 'cus_dona'
+set pagbank_customer_id = 'cus_dona'
 where id = 'f1111111-1111-1111-1111-111111111111';
 update public.profiles
-set asaas_customer_id = 'cus_outro'
+set pagbank_customer_id = 'cus_outro'
 where id = 'f2222222-2222-2222-2222-222222222222';
 
 insert into public.admins (user_id)
@@ -418,7 +418,7 @@ reset role;
 commit;
 
 update public.venues
-set asaas_wallet_id = 'wal_casa_sem'
+set pagbank_account_id = 'wal_casa_sem'
 where id = 'f5111111-1111-1111-1111-111111111111';
 
 begin;

@@ -254,11 +254,11 @@ values (
 );
 
 update public.profiles
-set asaas_customer_id = 'cus_review_dona'
+set pagbank_customer_id = 'cus_review_dona'
 where id = 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
 
 update public.profiles
-set asaas_customer_id = 'cus_review_gemeo'
+set pagbank_customer_id = 'cus_review_gemeo'
 where id = 'c0aaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7';
 
 select private.insert_saved_card(

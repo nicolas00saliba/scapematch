@@ -103,6 +103,9 @@ abstract final class AppKeys {
   static const priceLabel = Key('price-label');
   static const payMyShare = Key('pay-my-share');
   static const paySheet = Key('pay-sheet');
+  static const payReservation = Key('pay-reservation');
+  static const payInstallments = Key('pay-installments');
+  static const installmentPicker = Key('installment-picker');
   static const payMethodPix = Key('pay-method-pix');
   static const payMethodCard = Key('pay-method-card');
   static const paySimulate = Key('pay-simulate');

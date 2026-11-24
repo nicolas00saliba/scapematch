@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 /// Cobrança devolvida por `create-charge`. O Pix usa [qrCode] (copia-e-cola)
-/// e [qrImageBase64] (QR do Asaas). O app não inventa payload.
+/// e [qrImageBase64] (QR do PagBank). O app não inventa payload.
 class LiveCharge {
   const LiveCharge({
     required this.status,
@@ -17,7 +17,7 @@ class LiveCharge {
   final String qrCode;
   final String? qrImageBase64;
 
-  /// Vaga paga só com pontos. Não existe cobrança nem QR no Asaas.
+  /// Vaga paga só com pontos. Não existe cobrança nem QR no PagBank.
   final bool pointsOnly;
 
   bool get isPix => billingType == 'PIX';
@@ -57,7 +57,7 @@ class LiveCharge {
 
 const liveChargeFailed = 'Não foi possível criar a cobrança.';
 const liveChargeRejected = 'A cobrança não foi aceita.';
-const livePixMissing = 'O Asaas não devolveu o código Pix.';
+const livePixMissing = 'O PagBank não devolveu o código Pix.';
 const liveCardPending = 'A cobrança do cartão ainda está pendente.';
 const liveCardDeclined = 'O cartão foi recusado.';
 const liveCardReregister =
@@ -70,19 +70,22 @@ String liveChargeErrorMessage(Object? details) {
   final code = _errorCode(details);
   if (code == null || code.isEmpty) return liveChargeFailed;
   return switch (code) {
-    'A casa ainda não tem subconta Asaas.' => code,
+    'A casa ainda não tem subconta PagBank.' => code,
     'A casa ainda não pode receber.' => code,
     'A cobrança não recebe dados do cartão.' => code,
     'card_declined' => liveCardDeclined,
     'card_reregister' => liveCardReregister,
-    'cpf_required' => 'Para pagar, o Asaas precisa do seu CPF.',
-    'asaas_unavailable' => 'O Asaas não respondeu. Tente de novo em instantes.',
+    'cpf_required' => 'Para pagar, o PagBank precisa do seu CPF.',
+    'pagbank_unavailable' => 'O PagBank não respondeu. Tente de novo em instantes.',
     'pix_em_aberto' => 'Já existe um Pix em aberto para esta parte.',
     'pagamento em andamento' =>
       'Há um pagamento em andamento. Espere um instante e tente de novo.',
     'pix_reuse_mismatch' => 'Não foi possível reutilizar o Pix desta parte.',
     'saved_card_id é obrigatório' => liveChooseCard,
     'cartão não encontrado' => 'Não encontramos esse cartão.',
+    'parcelas' => 'Essa parcela não está disponível para este valor.',
+    'valor_parcelas' =>
+      'O valor das parcelas mudou. Escolha de novo antes de pagar.',
     'group not found' => 'Não encontramos esse grupo.',
     'session started' => 'Esta sessão já começou.',
     'not member' => 'Você não está neste grupo.',

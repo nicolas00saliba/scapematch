@@ -16,7 +16,7 @@ O EscapeMatch junta pessoas que querem jogar e não têm um grupo. O uso princip
 
 A modalidade disponível é escape room. Jogos de tabuleiro, laser tag e outras modalidades estão marcados como em breve, quando houver casa parceira. O lançamento começa por Curitiba. As salas abertas aparecem no app.
 
-A casa realiza a sessão. O EscapeMatch forma o grupo e cobra a vaga de cada pessoa. O pagamento passa pela Asaas, em Pix ou cartão. O app não guarda o número do cartão.
+A casa realiza a sessão. O EscapeMatch forma o grupo e cobra a vaga de cada pessoa. O pagamento passa pela PagBank, em Pix ou cartão. O app não guarda o número do cartão.
 
 ## Como funciona
 
@@ -24,7 +24,7 @@ A casa realiza a sessão. O EscapeMatch forma o grupo e cobra a vaga de cada pes
 2. O app coloca essa pessoa num grupo com jogadores que não se conheciam. Cada um paga a própria vaga.
 3. Quando o grupo bate o mínimo, o jogo confirma. Quem chega depois paga a própria vaga na hora, até lotar.
 4. Se o mínimo não bater, o jogo não confirma. O Pix é estornado e o cartão não é capturado.
-5. Depois da confirmação não há reembolso. Se a casa cancelar, o valor é devolvido integralmente.
+5. Depois da confirmação, sair dentro da antecedência da sala (padrão de 2 horas) devolve o dinheiro. Fora desse prazo, o que já foi capturado não volta. Se a casa cancelar, o valor é devolvido integralmente.
 
 As pessoas se encontram na casa, no horário marcado. A casa conduz a sessão.
 
@@ -32,7 +32,7 @@ As pessoas se encontram na casa, no horário marcado. A casa conduz a sessão.
 
 Não há tabela única de ingresso. O preço é por pessoa e é o da sala, mostrado no app no momento do grupo.
 
-Para a casa, a comissão padrão é 25% e incide só sobre o que o app vender. O que a casa vende por fora não entra. Exemplo publicado no site: uma vaga de R$ 100, comissão de R$ 25, casa com R$ 75. Casas podem ter condição combinada. O líquido entra no recebimento processado pela Asaas quando a cobrança é paga, na confirmação do grupo.
+Para a casa, a comissão padrão é 25% e incide só sobre o que o app vender. O que a casa vende por fora não entra. Exemplo publicado no site: uma vaga de R$ 100, comissão de R$ 25, casa com R$ 75. Casas podem ter condição combinada. O líquido entra no recebimento processado pela PagBank quando a cobrança é paga, na confirmação do grupo.
 
 ## Pontos e vaga grátis
 

@@ -1,37 +1,12 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import {
-  clientFailure,
-  logAsaasFailure,
-  logCaught,
-} from "../_shared/asaas_client_error.ts";
-import { AsaasProvider } from "../_shared/asaas_provider.ts";
-import { companyTypeForSubaccount } from "../_shared/subaccount_company.ts";
-import { isPointsReserve } from "../_shared/asaas_transfers.ts";
-import { bindJson, corsHeadersFor } from "../_shared/http.ts";
-import {
-  nextSubaccountEmail,
-  subaccountEmailPlan,
-} from "../_shared/subaccount_email.ts";
-import {
-  ensureTransferWebhook,
-  transferClient,
-} from "../_shared/venue_payouts.ts";
-import { adminWithMfa } from "../_shared/admin_session.ts";
+// Não cria subconta. Devolve o link do PagBank Connect. O state é
+// aleatório, de uso único, e fica preso ao usuário desta sessão.
 
-type VenueRow = {
-  id: string;
-  owner_id: string;
-  name: string;
-  document_kind: string;
-  document_number: string;
-  company_type: string | null;
-  phone: string;
-  street_address: string;
-  address_number: string;
-  neighborhood: string;
-  postal_code: string;
-  income_value: number;
-};
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { clientFailure, logCaught } from "../_shared/pagbank_client_error.ts";
+import { connectRedirectUri } from "../_shared/pagbank_connect.ts";
+import { PagBankProvider } from "../_shared/pagbank_provider.ts";
+import { bindJson, corsHeadersFor } from "../_shared/http.ts";
+import { adminWithMfa } from "../_shared/admin_session.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -59,104 +34,52 @@ Deno.serve(async (req) => {
       .eq("user_id", userData.user.id)
       .maybeSingle();
     const adminRow = adminWithMfa(Boolean(adminLookup), authHeader);
-
-    const body = await req.json().catch(() => ({})) as { venue_id?: string };
+    const body = await req.json().catch(() => ({})) as {
+      venue_id?: string;
+      surface?: string;
+    };
     const venueId = (body.venue_id ?? "").trim();
-    if (!adminRow && !venueId) return json({ error: "not admin" }, 403);
-    let query = admin
-      .from("venues")
-      .select(
-        "id, owner_id, name, document_kind, document_number, company_type, phone, street_address, address_number, neighborhood, postal_code, income_value",
-      )
-      .eq("status", "approved")
-      .is("asaas_wallet_id", null);
-    if (venueId) query = query.eq("id", venueId);
-    if (!adminRow) query = query.eq("owner_id", userData.user.id);
-    const { data: venues, error } = await query;
-    if (error) return json({ error: "erro" }, 400);
+    if (!venueId) return json({ error: "venue_id" }, 400);
 
-    const asaas = AsaasProvider.fromEnv(Deno.env);
-    const provisioned: { venue_id: string }[] = [];
-    for (const venue of (venues ?? []) as VenueRow[]) {
-      const { data: profile } = await admin
-        .from("profiles")
-        .select("birth_date")
-        .eq("id", venue.owner_id)
-        .maybeSingle();
-      const plan = subaccountEmailPlan(venue, Deno.env);
-      const birthDate = venue.document_kind === "cpf"
-        ? profile?.birth_date ?? undefined
-        : undefined;
-      const created = await openSubaccount(asaas, venue, plan, birthDate);
-      const { error: updateError } = await admin
-        .from("venues")
-        .update({ asaas_wallet_id: created.walletId })
-        .eq("id", venue.id);
-      if (updateError) return json({ error: "erro" }, 400);
-      const { error: keyError } = await admin.rpc("store_venue_asaas_key", {
-        p_venue_id: venue.id,
-        p_api_key: created.apiKey,
-      });
-      if (keyError) return json({ error: "erro" }, 400);
-      if (!isPointsReserve(Deno.env, created.walletId, created.apiKey)) {
-        try {
-          await ensureTransferWebhook(
-            transferClient(asaas.withKey(created.apiKey)),
-            Deno.env,
-          );
-        } catch (error) {
-          logCaught("provision-venue-wallet", error);
-        }
-      }
-      provisioned.push({ venue_id: venue.id });
+    const { data: venue, error } = await admin
+      .from("venues")
+      .select("id, owner_id, status")
+      .eq("id", venueId)
+      .maybeSingle();
+    if (error || !venue) return json({ error: "erro" }, 400);
+    if (!adminRow && venue.owner_id !== userData.user.id) {
+      return json({ error: "not admin" }, 403);
     }
-    return json({ provisioned });
+    if (venue.status !== "approved") return json({ error: "casa" }, 400);
+
+    const clientId = (Deno.env.get("PAGBANK_CONNECT_CLIENT_ID") ?? "").trim();
+    const redirect = connectRedirectUri({
+      partner: Deno.env.get("PAGBANK_CONNECT_REDIRECT_URI") ?? "",
+      admin: Deno.env.get("PAGBANK_CONNECT_ADMIN_REDIRECT_URI") ?? "",
+      surface: body.surface === "admin" ? "admin" : "parceiro",
+    });
+    if (!clientId) return json({ error: "pagbank_connect" }, 500);
+    const { data: state, error: stateError } = await admin.rpc(
+      "begin_pagbank_connect",
+      {
+        p_venue_id: venueId,
+        p_user_id: userData.user.id,
+        p_redirect_uri: redirect,
+      },
+    );
+    const connectState = typeof state === "string" ? state.trim() : "";
+    if (stateError || !connectState || connectState === venueId) {
+      return json({ error: "state" }, 500);
+    }
+    const connectUrl = PagBankProvider.fromEnv(Deno.env).connectAuthorizeUrl({
+      clientId,
+      redirectUri: redirect,
+      state: connectState,
+    });
+    return json({ venue_id: venueId, connect_url: connectUrl });
   } catch (error) {
+    logCaught("provision-venue-wallet", error);
     const failure = clientFailure(error, "provision-venue-wallet");
     return json(failure.body, failure.status);
   }
 });
-
-function subaccountBody(
-  venue: VenueRow,
-  email: string,
-  birthDate: string | undefined,
-) {
-  return {
-    name: venue.name,
-    email,
-    cpfCnpj: venue.document_number,
-    companyType: companyTypeForSubaccount(
-      venue.document_kind,
-      venue.company_type,
-    ),
-    birthDate,
-    phone: venue.phone,
-    mobilePhone: venue.phone,
-    incomeValue: Number(venue.income_value),
-    address: venue.street_address,
-    addressNumber: venue.address_number,
-    province: venue.neighborhood,
-    postalCode: venue.postal_code,
-  };
-}
-
-async function openSubaccount(
-  asaas: AsaasProvider,
-  venue: VenueRow,
-  plan: { primary: string; alias: string },
-  birthDate: string | undefined,
-) {
-  try {
-    return await asaas.createSubaccount(
-      subaccountBody(venue, plan.primary, birthDate),
-    );
-  } catch (error) {
-    const alias = nextSubaccountEmail(plan.primary, plan.alias, error);
-    if (!alias) throw error;
-    logAsaasFailure("provision-venue-wallet", error);
-    return await asaas.createSubaccount(
-      subaccountBody(venue, alias, birthDate),
-    );
-  }
-}

@@ -1,27 +1,27 @@
 // Emite as duas NFS-e quando a cobrança já está paga e o grupo fechou.
 // No sandbox não chama /v3/invoices: grava status simulated com links de teste.
-// Em produção a emissão fica desligada até ASAAS_INVOICE_EMISSION=on.
-// Desligada, a nota que seria enviada fica scheduled, sem chamar o Asaas,
+// Em produção a emissão fica desligada até FISCAL_INVOICE_EMISSION=on.
+// Desligada, a nota que seria enviada fica scheduled, sem chamar o PagBank,
 // para sair depois que o certificado A1 estiver na conta. A cobrança não falha.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import {
-  asaasUnavailable,
-  asaasErrorItems,
-  isAsaasFailure,
+  providerUnavailable,
+  providerErrorItems,
+  isProviderFailure,
   logCaught,
   storedFailure,
-} from "./asaas_client_error.ts";
+} from "./pagbank_client_error.ts";
 import { customerWithCpf, playerCpfDigits } from "./player_cpf.ts";
 import {
-  AsaasProvider,
+  PagBankProvider,
   centsToReais,
   type ScheduleInvoiceInput,
-} from "./asaas_provider.ts";
-import { commissionCents } from "./asaas_provider.ts";
+} from "./pagbank_provider.ts";
+import { commissionCents } from "./pagbank_provider.ts";
 import {
   type InvoiceDraft,
-  mapAsaasInvoiceStatus,
+  mapInvoiceStatus,
   planInvoices,
   testInvoiceNumber,
   testPdfUrl,
@@ -52,7 +52,7 @@ const defaultPlatform = {
 };
 
 /// Só o valor `on` liga a emissão. Qualquer outra coisa, inclusive vazio, desliga.
-export const invoiceEmissionSetting = "ASAAS_INVOICE_EMISSION";
+export const invoiceEmissionSetting = "FISCAL_INVOICE_EMISSION";
 
 export function invoiceEmissionEnabled(
   env: { get(name: string): string | undefined },
@@ -64,7 +64,7 @@ export function invoiceEmissionEnabled(
   }
 }
 
-/// Produção com a chave ligada e cliente Asaas. Sandbox continua simulado.
+/// Produção com a chave ligada e cliente PagBank. Sandbox continua simulado.
 export function shouldEmitInvoice(input: {
   status: string;
   sandbox: boolean;
@@ -77,24 +77,24 @@ export function shouldEmitInvoice(input: {
     input.hasClient;
 }
 
-/// Tentativas de uma nota que falhou sem id no Asaas.
+/// Tentativas de uma nota que falhou sem id no PagBank.
 export const invoiceAttemptLimit = 5;
 
 /// Uma trava `processing` mais velha que isso pode ser reaberta.
 export const invoiceProcessingStaleMs = 15 * 60 * 1000;
 
-/// Sem certificado e indisponibilidade do Asaas podem sair de novo.
+/// Sem certificado e indisponibilidade do PagBank podem sair de novo.
 export function invoiceErrorRetryable(reason: unknown): boolean {
-  return reason === "sem_certificado" || reason === asaasUnavailable;
+  return reason === "sem_certificado" || reason === providerUnavailable;
 }
 
 export function invoiceFailureReason(error: unknown): string {
-  const blob = asaasErrorItems(error)
+  const blob = providerErrorItems(error)
     .map((item) => item.description)
     .join(" ")
     .toLowerCase();
   if (blob.includes("certificado")) return "sem_certificado";
-  if (isAsaasFailure(error)) return asaasUnavailable;
+  if (isProviderFailure(error)) return providerUnavailable;
   return storedFailure("issue_invoices", error);
 }
 
@@ -111,7 +111,7 @@ type StoredInvoice = {
 export async function issuePaidInvoices(
   admin: Admin,
   charge: ChargeRow,
-  options: { sandbox: boolean; asaas?: AsaasProvider; emissionEnabled?: boolean },
+  options: { sandbox: boolean; pagbank?: PagBankProvider; emissionEnabled?: boolean },
 ): Promise<void> {
   try {
     await issuePaidInvoicesBody(admin, charge, options);
@@ -123,11 +123,11 @@ export async function issuePaidInvoices(
 /// Reprocessa notas em error por motivo transitório, com a chave ligada.
 export async function retryFailedInvoices(
   admin: Admin,
-  options: { sandbox: boolean; asaas?: AsaasProvider; emissionEnabled?: boolean },
+  options: { sandbox: boolean; pagbank?: PagBankProvider; emissionEnabled?: boolean },
 ): Promise<number> {
   const emissionEnabled = options.emissionEnabled ??
     invoiceEmissionEnabled(safeEnv());
-  if (!emissionEnabled || options.sandbox || !options.asaas) return 0;
+  if (!emissionEnabled || options.sandbox || !options.pagbank) return 0;
   const { data } = await admin
     .from("fiscal_invoices")
     .select(
@@ -168,7 +168,7 @@ export async function retryFailedInvoices(
 async function issuePaidInvoicesBody(
   admin: Admin,
   charge: ChargeRow,
-  options: { sandbox: boolean; asaas?: AsaasProvider; emissionEnabled?: boolean },
+  options: { sandbox: boolean; pagbank?: PagBankProvider; emissionEnabled?: boolean },
 ): Promise<void> {
   const emissionEnabled = options.emissionEnabled ??
     invoiceEmissionEnabled(safeEnv());
@@ -201,7 +201,7 @@ async function issuePaidInvoicesBody(
 export async function cancelInvoicesForCharge(
   admin: Admin,
   chargeId: string,
-  options: { sandbox: boolean; asaas?: AsaasProvider },
+  options: { sandbox: boolean; pagbank?: PagBankProvider },
 ): Promise<void> {
   const { data } = await admin
     .from("fiscal_invoices")
@@ -217,14 +217,14 @@ export async function cancelInvoicesForCharge(
     if (row.status === "sem_emissao" || row.status === "canceled") continue;
     if (
       !options.sandbox &&
-      options.asaas &&
+      options.pagbank &&
       row.provider_invoice_id &&
       row.status === "authorized"
     ) {
       try {
         const client = row.issuer === "venue"
-          ? await venueClient(admin, options.asaas, row.id)
-          : options.asaas;
+          ? await venueClient(admin, options.pagbank, row.id)
+          : options.pagbank;
         if (client) await client.cancelInvoice(row.provider_invoice_id);
       } catch (error) {
         await admin.from("fiscal_invoices").update({
@@ -240,9 +240,9 @@ export async function cancelInvoicesForCharge(
 
 async function venueClient(
   admin: Admin,
-  root: AsaasProvider,
+  root: PagBankProvider,
   invoiceId: string,
-): Promise<AsaasProvider | null> {
+): Promise<PagBankProvider | null> {
   const { data: invoice } = await admin
     .from("fiscal_invoices")
     .select("venue_id")
@@ -258,7 +258,7 @@ async function writeDraft(
   admin: Admin,
   charge: ChargeRow,
   draft: InvoiceDraft,
-  options: { sandbox: boolean; asaas?: AsaasProvider; emissionEnabled: boolean },
+  options: { sandbox: boolean; pagbank?: PagBankProvider; emissionEnabled: boolean },
   existing?: StoredInvoice,
 ) {
   const suffix = draft.kind === "service" ? "S" : "C";
@@ -293,9 +293,9 @@ async function writeDraft(
     status: draft.status,
     sandbox: options.sandbox,
     emissionEnabled: options.emissionEnabled,
-    hasClient: Boolean(options.asaas),
+    hasClient: Boolean(options.pagbank),
   });
-  if (!emit || !options.asaas) {
+  if (!emit || !options.pagbank) {
     if (existing) return;
     await insertInvoice(admin, base);
     return;
@@ -313,7 +313,7 @@ async function writeDraft(
   if (!won) return;
 
   try {
-    const emitted = await emitOrAdopt(admin, options.asaas, charge, draft);
+    const emitted = await emitOrAdopt(admin, options.pagbank, charge, draft);
     await admin.from("fiscal_invoices").update({
       status: emitted.status,
       number: emitted.number || null,
@@ -321,7 +321,7 @@ async function writeDraft(
       xml_url: emitted.xmlUrl || null,
       provider_invoice_id: emitted.id,
       issued_at: emitted.status === "authorized" ? now.toISOString() : null,
-      error_message: emitted.status === "error" ? "Asaas recusou a nota" : null,
+      error_message: emitted.status === "error" ? "PagBank recusou a nota" : null,
       updated_at: new Date().toISOString(),
     }).eq("id", row.id).eq("status", "processing");
   } catch (error) {
@@ -374,7 +374,7 @@ async function claimInvoice(
 
 async function emitOrAdopt(
   admin: Admin,
-  root: AsaasProvider,
+  root: PagBankProvider,
   charge: ChargeRow,
   draft: InvoiceDraft,
 ): Promise<{
@@ -393,13 +393,13 @@ async function emitOrAdopt(
     const view = await client.getInvoice(found.id);
     return {
       id: view.id,
-      status: mapAsaasInvoiceStatus(view.status),
+      status: mapInvoiceStatus(view.status),
       number: view.number,
       pdfUrl: view.pdfUrl,
       xmlUrl: view.xmlUrl,
     };
   }
-  return await emitOnAsaas(admin, root, charge, draft);
+  return await emitOnPagBank(admin, root, charge, draft);
 }
 
 async function loadInvoices(
@@ -460,9 +460,9 @@ async function insertInvoice(
   throw new Error("erro");
 }
 
-async function emitOnAsaas(
+async function emitOnPagBank(
   admin: Admin,
-  root: AsaasProvider,
+  root: PagBankProvider,
   charge: ChargeRow,
   draft: InvoiceDraft,
 ): Promise<
@@ -499,7 +499,7 @@ async function emitOnAsaas(
   const view = await client.getInvoice(scheduled.id);
   return {
     id: view.id,
-    status: mapAsaasInvoiceStatus(view.status),
+    status: mapInvoiceStatus(view.status),
     number: view.number,
     pdfUrl: view.pdfUrl,
     xmlUrl: view.xmlUrl,
@@ -508,9 +508,9 @@ async function emitOnAsaas(
 
 async function subaccount(
   admin: Admin,
-  root: AsaasProvider,
+  root: PagBankProvider,
   venueId: string,
-): Promise<AsaasProvider> {
+): Promise<PagBankProvider> {
   const apiKey = await venueApiKey(admin, venueId);
   if (!apiKey) {
     throw new Error(
@@ -524,7 +524,7 @@ async function venueApiKey(
   admin: Admin,
   venueId: string,
 ): Promise<string | null> {
-  const { data, error } = await admin.rpc("read_venue_asaas_key", {
+  const { data, error } = await admin.rpc("read_venue_provider_key", {
     p_venue_id: venueId,
   });
   if (error || typeof data !== "string" || data.length === 0) return null;
@@ -533,12 +533,12 @@ async function venueApiKey(
 
 async function ensurePlayerCustomer(
   admin: Admin,
-  client: AsaasProvider,
+  client: PagBankProvider,
   charge: ChargeRow,
 ): Promise<string> {
   const { data: found } = await admin
-    .from("asaas_customers")
-    .select("asaas_customer_id")
+    .from("pagbank_customers")
+    .select("pagbank_customer_id")
     .eq("scope", "venue_player")
     .eq("venue_id", charge.venue_id)
     .eq("user_id", charge.user_id)
@@ -552,18 +552,18 @@ async function ensurePlayerCustomer(
     throw error;
   }
   const customerId = await customerWithCpf(client, {
-    customerId: (found?.asaas_customer_id as string | null) ?? null,
+    customerId: (found?.pagbank_customer_id as string | null) ?? null,
     name,
     email: email ?? `jogador-${charge.user_id}@escapematch.invalid`,
     externalReference: `player:${charge.venue_id}:${charge.user_id}`,
     cpf,
   });
-  if (!found?.asaas_customer_id) {
-    await admin.from("asaas_customers").insert({
+  if (!found?.pagbank_customer_id) {
+    await admin.from("pagbank_customers").insert({
       scope: "venue_player",
       venue_id: charge.venue_id,
       user_id: charge.user_id,
-      asaas_customer_id: customerId,
+      pagbank_customer_id: customerId,
     });
   }
   return customerId;
@@ -571,16 +571,16 @@ async function ensurePlayerCustomer(
 
 async function ensureHouseCustomer(
   admin: Admin,
-  client: AsaasProvider,
+  client: PagBankProvider,
   venueId: string,
 ): Promise<string> {
   const { data: found } = await admin
-    .from("asaas_customers")
-    .select("asaas_customer_id")
+    .from("pagbank_customers")
+    .select("pagbank_customer_id")
     .eq("scope", "platform_house")
     .eq("venue_id", venueId)
     .maybeSingle();
-  if (found?.asaas_customer_id) return found.asaas_customer_id as string;
+  if (found?.pagbank_customer_id) return found.pagbank_customer_id as string;
   const venue = await loadVenue(admin, venueId);
   if (!venue) throw new Error("Casa ausente");
   const ownerEmail = await emailOf(admin, venue.ownerId);
@@ -590,11 +590,11 @@ async function ensureHouseCustomer(
     cpfCnpj: venue.documentNumber,
     externalReference: `house:${venueId}`,
   });
-  await admin.from("asaas_customers").insert({
+  await admin.from("pagbank_customers").insert({
     scope: "platform_house",
     venue_id: venueId,
     user_id: null,
-    asaas_customer_id: created.id,
+    pagbank_customer_id: created.id,
   });
   return created.id;
 }
@@ -674,9 +674,9 @@ async function emailOf(admin: Admin, userId: string): Promise<string | null> {
 }
 
 function platformFromEnv() {
-  const code = envValue("ASAAS_FISCAL_SERVICE_CODE");
-  const name = envValue("ASAAS_FISCAL_SERVICE_NAME");
-  const iss = Number(envValue("ASAAS_FISCAL_ISS"));
+  const code = envValue("FISCAL_SERVICE_CODE");
+  const name = envValue("FISCAL_SERVICE_NAME");
+  const iss = Number(envValue("FISCAL_ISS"));
   if (!code || !name || !(iss > 0)) return defaultPlatform;
   return { serviceCode: code, serviceName: name, issRate: iss };
 }

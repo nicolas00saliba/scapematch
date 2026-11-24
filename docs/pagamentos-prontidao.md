@@ -1,4 +1,4 @@
-# Prontidão dos pagamentos no Asaas de produção
+# Prontidão dos pagamentos no PagBank de produção
 
 O cron `venue-withdrawals` dispara todo dia às 08:20 em Brasília (`20 11 * * *` em UTC). Ele chama `private.invoke_venue_withdrawals()`, que lê dois itens do Vault e faz `POST` na Edge Function `schedule-venue-withdrawals` com o header `x-venue-withdrawals-secret`.
 
@@ -16,10 +16,10 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 
 | Campo | Onde olha |
 | --- | --- |
-| `asaas_api_key` | env `ASAAS_API_KEY` não vazia |
-| `asaas_base_url_production` | env `ASAAS_BASE_URL` é exatamente `https://api.asaas.com/v3` |
-| `asaas_webhook_token` | env `ASAAS_WEBHOOK_TOKEN` não vazia |
-| `asaas_webhook_email` | env `ASAAS_WEBHOOK_EMAIL` não vazia |
+| `pagbank_api_key` | env `PAGBANK_TOKEN` não vazia |
+| `pagbank_base_url_production` | `PAGBANK_ENV` ausente ou `production` (base `https://api.pagseguro.com`). `sandbox` conta como não |
+| `pagbank_webhook_token` | env `PAGBANK_WEBHOOK_SECRET` não vazia |
+| `pagbank_webhook_email` | não é exigido. `PAGBANK_WEBHOOK_EMAIL` não entra no webhook de Pedidos |
 | `venue_withdrawals_secret` | env `VENUE_WITHDRAWALS_SECRET` não vazia, ou Vault `venue_withdrawals_secret` não vazio |
 | `ledger_reconcile_secret` | env `LEDGER_RECONCILE_SECRET` não vazia, ou Vault `ledger_reconcile_secret` não vazio |
 | `vault_venue_withdrawals_url` | Vault `venue_withdrawals_url` não vazio |
@@ -27,7 +27,7 @@ Nada abaixo foi aplicado neste repositório no projeto remoto. Quem aplica é o 
 | `vault_ledger_reconcile_secret` | Vault `ledger_reconcile_secret` não vazio |
 | `venue_payouts_enabled` | `venue_payouts_settings.enabled` |
 
-Sandbox (`https://api-sandbox.asaas.com/v3`), URL vazia e qualquer outro host contam como não.
+`PAGBANK_ENV=sandbox` conta como não. `PAGBANK_BASE_URL` não entra nessa conta.
 
 ## Migration
 
@@ -37,18 +37,17 @@ Aplicar no projeto antes de publicar a função `payments-readiness` e antes de 
 
 ## Envs da Edge Function
 
-Trocar os placeholders. Não gravar os valores no git. `ASAAS_BASE_URL` de produção é a URL pública abaixo, não um segredo.
+Trocar os placeholders. Não gravar os valores no git. A base de produção é `https://api.pagseguro.com` quando `PAGBANK_ENV` está ausente ou vale `production`.
 
 ```bash
 supabase secrets set --project-ref <project-ref> \
-  ASAAS_API_KEY='<chave da conta Asaas de produção>' \
-  ASAAS_BASE_URL='https://api.asaas.com/v3' \
-  ASAAS_WEBHOOK_TOKEN='<token de 32 a 255 caracteres, sem espaço>' \
-  ASAAS_WEBHOOK_EMAIL='<email que o Asaas usa no webhook>' \
+  PAGBANK_TOKEN='<chave da conta PagBank de produção>' \
+  PAGBANK_ENV='production' \
+  PAGBANK_WEBHOOK_SECRET='<opcional; se vazio, a assinatura usa PAGBANK_TOKEN>' \
   VENUE_WITHDRAWALS_SECRET='<segredo longo, o mesmo do Vault>'
 ```
 
-`VENUE_WITHDRAWALS_SECRET` é opcional. Sem ela, a função usa o item `venue_withdrawals_secret` do Vault, o mesmo texto que o cron manda no header. Se a env existir, ela ganha e tem de ser esse texto. `ASAAS_WEBHOOK_TOKEN` não é a chave da API.
+`VENUE_WITHDRAWALS_SECRET` é opcional. Sem ela, a função usa o item `venue_withdrawals_secret` do Vault, o mesmo texto que o cron manda no header. Se a env existir, ela ganha e tem de ser esse texto. `PAGBANK_WEBHOOK_SECRET` não é a chave da API.
 
 Publicar as funções, sem fazer isso daqui:
 

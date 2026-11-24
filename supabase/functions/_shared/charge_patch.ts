@@ -49,40 +49,20 @@ export function paymentChargePatch(input: {
   return patch;
 }
 
-/// Bloqueio do split no recebimento. Não muda o status da cobrança.
-export function splitDivergenceEvent(event: string): string | null {
-  if (
-    event === "PAYMENT_SPLIT_DIVERGENCE_BLOCK" ||
-    event === "PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED"
-  ) {
-    return event;
-  }
-  return null;
-}
-
-/// O que o webhook pediu. null = evento que não move a cobrança.
+/// O que o webhook pediu, pelo status da cobrança PagBank.
+/// null = notificação que não move a cobrança.
 export function requestedChargeStatus(
-  event: string,
+  _event: string,
   paymentStatus: string,
 ): string | null {
-  if (event === "PAYMENT_REFUNDED" || paymentStatus === "REFUNDED") {
-    return "refunded";
-  }
-  if (
-    event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED" ||
-    paymentStatus === "RECEIVED" || paymentStatus === "CONFIRMED"
-  ) {
-    return "paid";
-  }
-  if (event === "PAYMENT_AUTHORIZED" || paymentStatus === "AUTHORIZED") {
-    return "authorized";
-  }
-  return null;
+  const next = confirmedChargeStatus(paymentStatus);
+  if (next === "pending") return null;
+  return next;
 }
 
 /// Status confirmado no GET /payments/{id}. null = não aplicar.
-export function confirmedChargeStatus(asaasStatus: string): string | null {
-  switch (asaasStatus.trim().toUpperCase()) {
+export function confirmedChargeStatus(providerStatus: string): string | null {
+  switch (providerStatus.trim().toUpperCase()) {
     case "REFUNDED":
       return "refunded";
     case "RECEIVED":
@@ -90,8 +70,17 @@ export function confirmedChargeStatus(asaasStatus: string): string | null {
       return "paid";
     case "AUTHORIZED":
       return "authorized";
+    case "PAID":
+      return "paid";
+    case "CANCELED":
+    case "CANCELLED":
+      return "cancelled";
+    case "DECLINED":
+      return "failed";
     case "PENDING":
     case "OVERDUE":
+    case "WAITING":
+    case "IN_ANALYSIS":
       return "pending";
     default:
       return null;

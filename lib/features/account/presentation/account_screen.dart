@@ -289,7 +289,7 @@ class _WalletCard extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Créditos fictícios. Reembolsos simulados apareceriam aqui. Nada é cobrado.',
+              'Créditos fictícios. Reembolsos simulados apareceriam aqui.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onPrimary,
                 height: 1.35,

@@ -9,11 +9,11 @@ values
   ('d2222222-2222-2222-2222-222222222222', 'cartb@example.com', '{"display_name":"Bruno"}');
 
 update public.profiles
-set asaas_customer_id = 'cus_ana'
+set pagbank_customer_id = 'cus_ana'
 where id = 'd1111111-1111-1111-1111-111111111111';
 
 update public.profiles
-set asaas_customer_id = 'cus_bruno'
+set pagbank_customer_id = 'cus_bruno'
 where id = 'd2222222-2222-2222-2222-222222222222';
 
 select private.insert_saved_card(
@@ -87,7 +87,7 @@ end $$;
 begin;
 
 update public.profiles
-set asaas_customer_id = 'cus_ana_nova'
+set pagbank_customer_id = 'cus_ana_nova'
 where id = 'd1111111-1111-1111-1111-111111111111';
 
 select public.deactivate_customer_saved_cards(
@@ -202,7 +202,7 @@ end $$;
 select set_config('request.jwt.claim.sub', '', true);
 
 update public.venues
-set status = 'approved', asaas_wallet_id = 'wal_tipo_empresa_teste'
+set status = 'approved', pagbank_account_id = 'wal_tipo_empresa_teste'
 where id = 'd5555555-5555-4555-8555-555555555555';
 
 select set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', true);

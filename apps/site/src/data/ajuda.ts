@@ -73,7 +73,7 @@ export const temas: Tema[] = [
       {
         pergunta: 'Quais formas de pagamento existem?',
         resposta:
-          'Pix e cartão, processados pela Asaas. O app não guarda o número do cartão.',
+          'Pix e cartão, processados pela PagBank. O app não guarda o número do cartão.',
       },
       {
         pergunta: 'Quando a cobrança acontece?',
@@ -91,7 +91,7 @@ export const temas: Tema[] = [
     nome: 'Cancelamento',
     frase: 'O que acontece se você, o grupo ou a casa cancelar.',
     seoTitulo: 'Cancelamento: dúvidas frequentes | EscapeMatch',
-    seoDescricao: 'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. Depois da confirmação não há reembolso.',
+    seoDescricao: 'Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. Sair no prazo da sala (padrão de 2 horas) devolve o dinheiro.',
     relacionados: ['pagamento', 'grupo'],
     perguntas: [
       {
@@ -101,7 +101,8 @@ export const temas: Tema[] = [
       },
       {
         pergunta: 'Tem reembolso depois que o grupo confirma?',
-        resposta: 'Não. Depois da confirmação não há reembolso.',
+        resposta:
+          'Sim, dentro da antecedência da sala, no padrão de 2 horas. Fora desse prazo, o que já foi capturado não volta.',
       },
       {
         pergunta: 'E se a casa cancelar?',

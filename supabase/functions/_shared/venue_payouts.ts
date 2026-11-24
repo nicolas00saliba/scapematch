@@ -1,13 +1,16 @@
-// Saque da casa. A apiKey da subconta e a ASAAS_API_KEY não saem daqui.
+// Saque da casa. A apiKey da subconta e a PAGBANK_TOKEN não saem daqui.
 // A Reserva de pontos não é casa: wallet ou chave iguais às dela param o fluxo.
 
-import { clientFailure, logCaught, storedFailure } from "./asaas_client_error.ts";
-import { AsaasProvider, asaasSandboxBaseUrl, tokensMatch } from "./asaas_provider.ts";
+import { clientFailure, logCaught, storedFailure } from "./pagbank_client_error.ts";
+import { freshConnectAccess } from "./pagbank_connect.ts";
+import {
+  PagBankProvider,
+  pagbankSignatureMatches,
+} from "./pagbank_provider.ts";
 import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
 import {
   isPixRejected,
   isPointsReserve,
-  mapTransferEvent,
   mergeReceivables,
   nextWebhookAction,
   requestFromBank,
@@ -19,10 +22,16 @@ import {
   type TransferRequest,
   type TransferResult,
   type WebhookView,
-} from "./asaas_transfers.ts";
+} from "./pagbank_transfers.ts";
 import { bindJson, corsHeadersFor, todayInSaoPaulo } from "./http.ts";
 
 const reauthWindowSec = 300;
+
+/// A transferência Pix da PagBank pede liberação comercial e mTLS.
+/// O aviso vai em notification_urls no próprio POST /transfers.
+/// O cadastro com authToken, e-mail e TRANSFER_* não é dessa API.
+/// Saque fica desligado até um PR próprio.
+export const venuePayoutsForcedOff = true;
 
 const knownErrors = [
   "titularidade",
@@ -71,7 +80,10 @@ export type PayoutStore = {
 export type PayoutDeps = {
   env: EnvLike;
   store: PayoutStore;
-  clientFor(apiKey: string): TransferClient;
+  clientFor(
+    apiKey: string,
+    refresh?: () => Promise<string>,
+  ): TransferClient;
   fetchFn?: typeof fetch;
   nowSec?: number;
   today?: string;
@@ -130,13 +142,22 @@ export function publicCode(error: unknown): string {
   return "erro";
 }
 
-export function payoutProvider(env: EnvLike, apiKey: string): AsaasProvider {
-  const base = (env.get("ASAAS_BASE_URL") ?? asaasSandboxBaseUrl)
-    .replace(/\/$/, "");
-  return new AsaasProvider(apiKey, base);
+export function payoutProvider(env: EnvLike, apiKey: string): PagBankProvider {
+  return PagBankProvider.fromEnv(env).withKey(apiKey);
 }
 
-export function transferClient(provider: AsaasProvider): TransferClient {
+/// Cliente de saque. No 401, troca o access token uma vez e repete.
+export function payoutClientFor(
+  env: EnvLike,
+): (apiKey: string, refresh?: () => Promise<string>) => TransferClient {
+  return (apiKey, refresh) => {
+    const provider = payoutProvider(env, apiKey);
+    if (refresh) provider.bindAccessRefresh(refresh);
+    return transferClient(provider);
+  };
+}
+
+export function transferClient(provider: PagBankProvider): TransferClient {
   return {
     balanceCents: () => provider.financeBalanceCents(),
     async receivables(today: string) {
@@ -150,7 +171,7 @@ export function transferClient(provider: AsaasProvider): TransferClient {
     createTransfer: (input) => provider.createTransfer(input),
     readTransfer: (id) =>
       provider.readTransfer(id).catch((error: unknown) => {
-        if (error instanceof Error && error.message.startsWith("Asaas 404")) {
+        if (error instanceof Error && error.message.startsWith("PagBank 404")) {
           return null;
         }
         throw error;
@@ -227,36 +248,13 @@ export async function handleVenuePayouts(
       deps.nowSec ?? Math.floor(Date.now() / 1000),
     );
     if (gate !== "ok") return json({ error: gate }, 401);
-    if (action === "save_bank") {
-      const notice = await deps.store.rpc("save_venue_bank_account", {
-        p_venue_id: venueId,
-        p_actor: actor.id,
-        p_destination: text(body?.destination),
-        p_pix_key: text(body?.pix_key),
-        p_pix_key_type: text(body?.pix_key_type),
-        p_bank_code: text(body?.bank_code),
-        p_agency: text(body?.agency),
-        p_account_number: text(body?.account_number),
-        p_account_digit: text(body?.account_digit),
-        p_owner_name: text(body?.owner_name),
-        p_owner_document: text(body?.owner_document),
-        p_operation_type: text(body?.operation_type),
-      });
-      await deliverNotice(deps, notice);
-      return json(await loadSnapshot(deps, actor, claims, venueId));
-    }
-    if (action === "save_schedule") {
-      await deps.store.rpc("save_venue_payout_schedule", {
-        p_venue_id: venueId,
-        p_actor: actor.id,
-        p_enabled: body?.enabled === true,
-        p_frequency: text(body?.frequency),
-        p_weekday: integerOrNull(body?.weekday),
-        p_min_amount_cents: integerOrNull(body?.min_amount_cents) ?? -1,
-      });
-      return json(await loadSnapshot(deps, actor, claims, venueId));
+    if (action === "save_bank" || action === "save_schedule") {
+      return json({ error: "dados_bancarios_recusados" }, 403);
     }
     if (action === "withdraw") {
+      if (venuePayoutsForcedOff) {
+        return json({ error: "saques_desligados" }, 403);
+      }
       const amount = integerOrNull(body?.amount_cents);
       if (amount == null || amount <= 0) return json({ error: "valor" }, 400);
       const result = await sendWithdrawal(deps, {
@@ -285,39 +283,48 @@ export async function handleTransferWebhook(
 ): Promise<Response> {
   const json = bindJson(req, deps.env);
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  const expected = deps.env.get("ASAAS_WEBHOOK_TOKEN");
-  if (!tokensMatch(req.headers.get("asaas-access-token"), expected)) {
-    return json({ error: "unauthorized" }, 401);
-  }
+  const raw = await req.text();
+  const header = req.headers.get("x-authenticity-token");
+  const override = (deps.env.get("PAGBANK_WEBHOOK_SECRET") ?? "").trim();
+  const platform = override || (deps.env.get("PAGBANK_TOKEN") ?? "").trim();
+  const authentic = await pagbankSignatureMatches(header, platform, raw) ||
+    await venueSignatureMatches(deps, header, raw);
+  if (!authentic) return json({ error: "unauthorized" }, 401);
   let transferId = "";
   try {
-    const payload = await req.json().catch(() => null) as {
-      event?: string;
-      transfer?: Record<string, unknown>;
-    } | null;
-    const status = mapTransferEvent(payload?.event ?? "");
-    if (!status || !payload?.transfer) return json({ ok: true });
-    const transfer = payload.transfer;
-    transferId = text(transfer.id);
+    const payload = JSON.parse(raw) as Record<string, unknown>;
+    const reference = text(payload.reference_id);
+    transferId = text(payload.id);
+    if (!reference) return json({ ok: true });
+    const venueId = text(await deps.store.rpc("transfer_ref_venue", {
+      p_reference: reference,
+    }));
+    if (!venueId) return json({ ok: true });
+    const keys = await subaccount(deps, venueId);
+    if (keys.kind !== "ok") return json({ ok: true });
+    const transfer = transferId
+      ? await keys.client.readTransfer(transferId)
+      : await keys.client.findTransfer(reference);
+    if (!transfer) return json({ ok: true });
     const applied = await deps.store.rpc("apply_transfer_event", {
-      p_external_reference: text(transfer.externalReference),
-      p_transfer_id: text(transfer.id),
-      p_status: status,
-      p_receipt: text(transfer.transactionReceiptUrl),
-      p_reason: text(transfer.failReason).slice(0, 80),
+      p_external_reference: transfer.externalReference || reference,
+      p_transfer_id: transfer.id,
+      p_status: transfer.status,
+      p_receipt: transfer.receiptUrl,
+      p_reason: transfer.failReason.slice(0, 80),
     });
     await deliverNotice(deps, record(applied)?.notice_id);
     return json({ ok: true });
   } catch (error) {
-    const failure = clientFailure(error, "asaas-transfer-webhook");
+    const failure = clientFailure(error, "pagbank-transfer-webhook");
     try {
       await deps.store.rpc("note_webhook_error", {
-        p_source: "asaas-transfer-webhook",
+        p_source: "pagbank-transfer-webhook",
         p_code: failure.body.error,
         p_provider_ref: transferId,
       });
     } catch (noteError) {
-      logCaught("asaas-transfer-webhook", noteError);
+      logCaught("pagbank-transfer-webhook", noteError);
     }
     return json(failure.body, failure.status);
   }
@@ -351,6 +358,10 @@ export async function handleScheduledWithdrawals(
     return json({ error: "not authenticated" }, 401);
   }
   try {
+    if (venuePayoutsForcedOff) {
+      const reconciled = await reconcileStaleWithdrawals(deps);
+      return json({ ok: true, created: 0, webhooks: 0, reconciled });
+    }
     const webhooks = await syncTransferWebhooks(deps);
     const reconciled = await reconcileStaleWithdrawals(deps);
     const enabled = await deps.store.rpc("venue_payouts_enabled", {});
@@ -366,7 +377,7 @@ export async function handleScheduledWithdrawals(
         const keys = await subaccount(deps, venueId);
         if (keys.kind !== "ok") continue;
         const balance = await keys.client.balanceCents();
-        // O saldo disponível do Asaas já desconta a transferência em andamento.
+        // O saldo disponível do PagBank já desconta a transferência em andamento.
         // O cancelamento devolve o valor. Subtrair o pendente local de novo
         // recusaria um saque que ainda cabe nesse saldo.
         const amount = balance;
@@ -390,6 +401,34 @@ export async function handleScheduledWithdrawals(
   } catch (error) {
     const failure = clientFailure(error, "schedule-venue-withdrawals");
     return json(failure.body, failure.status);
+  }
+}
+
+async function venueSignatureMatches(
+  deps: PayoutDeps,
+  header: string | null,
+  raw: string,
+): Promise<boolean> {
+  try {
+    const payload = JSON.parse(raw) as Record<string, unknown>;
+    const reference = text(payload.reference_id);
+    if (!reference) return false;
+    const venueId = text(await deps.store.rpc("transfer_ref_venue", {
+      p_reference: reference,
+    }));
+    if (!venueId) return false;
+    const session = record(await deps.store.rpc("read_venue_pagbank_tokens", {
+      p_venue_id: venueId,
+    }));
+    let access = text(session?.access_token);
+    if (!access) {
+      access = text(await deps.store.rpc("read_venue_provider_key", {
+        p_venue_id: venueId,
+      }));
+    }
+    return await pagbankSignatureMatches(header, access, raw);
+  } catch {
+    return false;
   }
 }
 
@@ -420,7 +459,7 @@ async function reconcileStaleWithdrawals(deps: PayoutDeps): Promise<number> {
     try {
       const keys = await subaccount(deps, text(row.venue_id));
       if (keys.kind !== "ok") continue;
-      const transferId = text(row.asaas_transfer_id);
+      const transferId = text(row.pagbank_transfer_id);
       const transfer = transferId
         ? await keys.client.readTransfer(transferId)
         : await keys.client.findTransfer(text(row.external_reference));
@@ -510,7 +549,7 @@ async function sendWithdrawal(
     if (rejected) return { status: 403, body: { error: "sem pix" } };
     const code = publicCode(error);
     if (code !== "erro") return { status: 403, body: { error: code } };
-    return { status: 502, body: { error: "asaas_unavailable" } };
+    return { status: 502, body: { error: "pagbank_unavailable" } };
   }
 }
 
@@ -526,19 +565,25 @@ async function loadSnapshot(
     p_actor: actor.id,
     p_as_admin: asAdmin,
   })) ?? { enabled: false, can_withdraw: false };
-  if (snap.enabled !== true) return snap;
+  const paused = (body: Record<string, unknown>) =>
+    venuePayoutsForcedOff
+      ? { ...body, enabled: false, payouts_paused: true }
+      : body;
+  if (snap.enabled !== true) return paused(snap);
   const role = text(snap.role);
-  if (role !== "owner" && role !== "partner" && role !== "admin") return snap;
+  if (role !== "owner" && role !== "partner" && role !== "admin") {
+    return paused(snap);
+  }
   const keys = await subaccount(deps, venueId);
   if (keys.kind !== "ok") {
-    return { ...snap, available_cents: 0, receivables: [] };
+    return paused({ ...snap, available_cents: 0, receivables: [] });
   }
   const today = deps.today ?? todayInSaoPaulo();
   const [available, receivables] = await Promise.all([
     keys.client.balanceCents(),
     keys.client.receivables(today),
   ]);
-  return { ...snap, available_cents: available, receivables };
+  return paused({ ...snap, available_cents: available, receivables });
 }
 
 async function subaccount(
@@ -549,12 +594,87 @@ async function subaccount(
     p_venue_id: venueId,
   }));
   if (isPointsReserve(deps.env, wallet, "")) return { kind: "reserve" };
-  const apiKey = text(await deps.store.rpc("read_venue_asaas_key", {
+  const creds = await venueCredentials(deps, venueId);
+  if (!creds.access) return { kind: "missing" };
+  if (isPointsReserve(deps.env, wallet, creds.access)) return { kind: "reserve" };
+  const refresh = creds.refresh
+    ? () => rotateVenueAccess(deps, venueId, creds.refresh)
+    : undefined;
+  return { kind: "ok", client: deps.clientFor(creds.access, refresh) };
+}
+
+async function venueCredentials(
+  deps: PayoutDeps,
+  venueId: string,
+): Promise<{ access: string; refresh: string }> {
+  const session = record(await deps.store.rpc("read_venue_pagbank_tokens", {
     p_venue_id: venueId,
   }));
-  if (!apiKey) return { kind: "missing" };
-  if (isPointsReserve(deps.env, wallet, apiKey)) return { kind: "reserve" };
-  return { kind: "ok", client: deps.clientFor(apiKey) };
+  let refreshToken = text(session?.refresh_token);
+  let accessToken = text(session?.access_token);
+  const expiresAt = text(session?.access_expires_at);
+  const expiresAtMs = expiresAt ? Date.parse(expiresAt) : null;
+  if (accessToken && refreshToken) {
+    const fresh = await freshConnectAccess({
+      accessToken,
+      refreshToken,
+      expiresAtMs: Number.isFinite(expiresAtMs) ? expiresAtMs : null,
+      nowMs: (deps.nowSec ?? Math.floor(Date.now() / 1000)) * 1000,
+      refresh: () => refreshVenueToken(deps, refreshToken),
+    });
+    accessToken = fresh.accessToken;
+    refreshToken = fresh.refreshToken;
+    if (fresh.refreshed) {
+      await deps.store.rpc("store_venue_pagbank_tokens", {
+        p_venue_id: venueId,
+        p_access_token: fresh.accessToken,
+        p_refresh_token: fresh.refreshToken,
+        p_expires_at: fresh.expiresAtMs == null
+          ? null
+          : new Date(fresh.expiresAtMs).toISOString(),
+      });
+    }
+  }
+  if (accessToken) return { access: accessToken, refresh: refreshToken };
+  return {
+    access: text(await deps.store.rpc("read_venue_provider_key", {
+      p_venue_id: venueId,
+    })),
+    refresh: "",
+  };
+}
+
+async function rotateVenueAccess(
+  deps: PayoutDeps,
+  venueId: string,
+  refreshToken: string,
+): Promise<string> {
+  const next = await refreshVenueToken(deps, refreshToken);
+  const expiresAt = next.expiresIn > 0
+    ? new Date(Date.now() + next.expiresIn * 1000).toISOString()
+    : null;
+  await deps.store.rpc("store_venue_pagbank_tokens", {
+    p_venue_id: venueId,
+    p_access_token: next.accessToken,
+    p_refresh_token: next.refreshToken || refreshToken,
+    p_expires_at: expiresAt,
+  });
+  return next.accessToken;
+}
+
+async function refreshVenueToken(
+  deps: PayoutDeps,
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+  const clientId = (deps.env.get("PAGBANK_CONNECT_CLIENT_ID") ?? "").trim();
+  const clientSecret = (deps.env.get("PAGBANK_CONNECT_CLIENT_SECRET") ?? "")
+    .trim();
+  return await PagBankProvider.fromEnv(deps.env, 0, deps.fetchFn)
+    .refreshConnectToken({
+    clientId,
+    clientSecret,
+    refreshToken,
+  });
 }
 
 async function deliverNotice(deps: PayoutDeps, notice: unknown): Promise<void> {

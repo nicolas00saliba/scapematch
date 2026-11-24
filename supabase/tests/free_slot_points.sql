@@ -1,4 +1,4 @@
--- Vaga grátis com pontos de indicação. Não fala com o Asaas.
+-- Vaga grátis com pontos de indicação. Não fala com o PagBank.
 \set ON_ERROR_STOP on
 
 insert into auth.users (id, email, raw_user_meta_data)
@@ -346,13 +346,13 @@ begin
     or (v_confirmed ->> 'topup_cents')::integer <> 7500
     or (v_confirmed ->> 'house_fixed_cents')::integer <> 0
   then
-    raise exception 'confirmacao sem asaas falhou %', v_confirmed;
+    raise exception 'confirmacao sem pagbank falhou %', v_confirmed;
   end if;
   if (
     select provider from public.payment_charges
     where id = (v_confirmed ->> 'id')::uuid
   ) is distinct from 'points' then
-    raise exception 'vaga gratis virou cobranca asaas';
+    raise exception 'vaga gratis virou cobranca pagbank';
   end if;
   if (
     select payment_status from public.group_members
@@ -394,7 +394,7 @@ begin
     'e7a22222-2222-4222-8222-222222222222',
     'e7b11111-1111-4111-8111-111111111111',
     10000, 'PIX', 'creating',
-    'asaas', 'vaga-repasse-colega', 2500, 'wallet-vaga'
+    'pagbank', 'vaga-repasse-colega', 2500, 'wallet-vaga'
   );
   perform private.apply_share_adjustments('e7f11111-1111-4111-8111-111111111111');
   if private.sync_house_fixed('e7f11111-1111-4111-8111-111111111111') <> 10000 then

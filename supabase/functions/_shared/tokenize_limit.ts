@@ -1,7 +1,7 @@
 export const tokenizeLimitedMessage =
   "Muitas tentativas. Tente de novo mais tarde.";
 
-/// Registra a decisão antes do Asaas. Se a claim recusar, a tokenização não roda.
+/// Registra a decisão antes do PagBank. Se a claim recusar, a tokenização não roda.
 export async function gateTokenize(
   claim: () => Promise<boolean>,
   tokenize: () => Promise<void>,

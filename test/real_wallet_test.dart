@@ -28,7 +28,7 @@ void main() {
     expect(find.text('Meus pagamentos'), findsNothing);
     expect(
       find.text(
-        'Créditos fictícios. Reembolsos simulados apareceriam aqui. Nada é cobrado.',
+        'Créditos fictícios. Reembolsos simulados apareceriam aqui.',
       ),
       findsOneWidget,
     );

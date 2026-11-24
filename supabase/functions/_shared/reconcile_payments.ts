@@ -1,12 +1,12 @@
-import { asaasPaymentGone, AsaasProvider } from "./asaas_provider.ts";
+import { providerPaymentGone, PagBankProvider } from "./pagbank_provider.ts";
 import { detachGonePix } from "./detach_gone_pix.ts";
 import { lostAttemptCompensation, pixLeaseMs } from "./pix_charge.ts";
 
-/// Cada chamada ao Asaas cabe várias vezes dentro do lease de 2 minutos.
-export const reconcileAsaasTimeoutMs = 8_000;
+/// Cada chamada ao PagBank cabe várias vezes dentro do lease de 2 minutos.
+export const reconcilePagBankTimeoutMs = 8_000;
 
-if (reconcileAsaasTimeoutMs * 4 >= pixLeaseMs) {
-  throw new Error("timeout do Asaas perto do lease");
+if (reconcilePagBankTimeoutMs * 4 >= pixLeaseMs) {
+  throw new Error("timeout do PagBank perto do lease");
 }
 
 type CreatingRow = {
@@ -40,7 +40,7 @@ type Admin = any;
 
 export async function reconcilePayments(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
 ): Promise<{ resolved: number; pending: number }> {
   const { data, error } = await admin.rpc("claim_payment_reconciliation");
   if (error) throw new Error("erro");
@@ -48,11 +48,11 @@ export async function reconcilePayments(
   let resolved = 0;
   let pending = 0;
   for (const row of work.creating) {
-    if (await reconcileCreating(admin, asaas, row)) resolved += 1;
+    if (await reconcileCreating(admin, pagbank, row)) resolved += 1;
     else pending += 1;
   }
   for (const row of work.orphans) {
-    if (await reconcileOrphan(admin, asaas, row)) resolved += 1;
+    if (await reconcileOrphan(admin, pagbank, row)) resolved += 1;
     else pending += 1;
   }
   return { resolved, pending };
@@ -60,13 +60,13 @@ export async function reconcilePayments(
 
 async function reconcileCreating(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   row: CreatingRow,
 ): Promise<boolean> {
   let remote: RemotePayment | null = null;
   try {
     remote = row.external_reference
-      ? await asaas.findByExternalReference(row.external_reference)
+      ? await pagbank.findByExternalReference(row.external_reference)
       : null;
   } catch (_error) {
     return false;
@@ -75,7 +75,7 @@ async function reconcileCreating(
     return await releaseClaim(admin, row);
   }
   const outcome = await releaseRemote(
-    asaas,
+    pagbank,
     remote.id,
     remote.status,
     remote.billingType || row.billing_type,
@@ -98,19 +98,19 @@ async function reconcileCreating(
 
 async function reconcileOrphan(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   row: OrphanRow,
 ): Promise<boolean> {
   if (!row.provider_ref) return false;
   let remote: RemotePayment | null = null;
   try {
-    remote = await asaas.getPayment(row.provider_ref);
+    remote = await pagbank.getPayment(row.provider_ref);
   } catch (error) {
     if (!isMissing(error)) return false;
     return await finishOrphan(admin, row, "cancelled");
   }
   if (!remote || remote.id !== row.provider_ref) return false;
-  if (remote.deleted === true || asaasPaymentGone(remote)) {
+  if (remote.deleted === true || providerPaymentGone(remote)) {
     if (
       row.charge_id &&
       (row.billing_type === "PIX" || remote.billingType === "PIX") &&
@@ -135,7 +135,7 @@ async function reconcileOrphan(
     return await finishOrphan(admin, row, next);
   }
   const outcome = await releaseRemote(
-    asaas,
+    pagbank,
     row.provider_ref,
     remote.status,
     remote.billingType || row.billing_type,
@@ -150,7 +150,7 @@ async function reconcileOrphan(
 }
 
 async function releaseRemote(
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   paymentId: string,
   status: string,
   billingType: string,
@@ -162,11 +162,11 @@ async function releaseRemote(
   if (gate !== "owned") return gate === "lost" ? "lost" : "failed";
   try {
     if (billingType === "PIX" && action === "cancel") {
-      const gone = await asaas.cancelPaymentConfirmed(paymentId);
+      const gone = await pagbank.cancelPaymentConfirmed(paymentId);
       return gone ? "gone" : "failed";
     }
-    if (action === "refund") await asaas.refund(paymentId);
-    else await asaas.cancelAuthorization(paymentId);
+    if (action === "refund") await pagbank.refund(paymentId);
+    else await pagbank.cancelAuthorization(paymentId);
     return "gone";
   } catch (_error) {
     return "failed";
@@ -258,5 +258,5 @@ function asWork(
 
 function isMissing(error: unknown): boolean {
   const raw = error instanceof Error ? error.message : "";
-  return raw.startsWith("Asaas 404");
+  return raw.startsWith("PagBank 404");
 }

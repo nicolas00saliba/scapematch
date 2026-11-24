@@ -5,8 +5,8 @@
 -- inserir o seu usuário em public.admins.
 --
 -- O walletId da subconta sandbox NÃO entra neste arquivo. Depois de gravar
--- ASAAS_API_KEY na função, chame provision-venue-wallet. Ela cria a subconta
--- da EscapeMatch Demo e salva venues.asaas_wallet_id.
+-- PAGBANK_TOKEN na função, chame provision-venue-wallet. Ela cria a subconta
+-- da EscapeMatch Demo e salva venues.pagbank_account_id.
 
 do $$
 declare

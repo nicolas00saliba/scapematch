@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { AsaasProvider } from "./asaas_provider.ts";
+import { PagBankProvider } from "./pagbank_provider.ts";
+import { captureAmountCents } from "./pagbank_rules.ts";
 import { cancelInvoicesForCharge } from "./issue_invoices.ts";
 import {
   applyPaymentTransition,
@@ -13,19 +14,21 @@ type Charge = ChargeRow & {
   status: string;
   provider_ref: string | null;
   billing_type: string;
+  charged_amount_cents?: number | null;
+  refund_requested_at?: string | null;
 };
 
 /// Estorna o que já foi pago. Pix pendente sai com DELETE. A pré-autorização
 /// do cartão sai com refund. O status local só muda depois da API.
 export async function releaseCancelledCharges(
   admin: Admin,
-  asaas: AsaasProvider,
+  pagbank: PagBankProvider,
   groupId: string,
 ): Promise<string[]> {
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type",
+      "id, group_id, user_id, venue_id, amount_cents, charged_amount_cents, commission_bps, status, provider_ref, billing_type, refund_requested_at",
     )
     .eq("group_id", groupId);
 
@@ -33,6 +36,10 @@ export async function releaseCancelledCharges(
   for (const charge of charges ?? []) {
     const row = charge as Charge;
     if (!row.provider_ref) continue;
+    if (row.refund_requested_at) {
+      stillPending.push(row.id);
+      continue;
+    }
     if (
       row.status === "refunded" || row.status === "cancelled" ||
       row.status === "failed"
@@ -41,19 +48,22 @@ export async function releaseCancelledCharges(
     }
     try {
       if (row.status === "paid") {
-        await asaas.refund(row.provider_ref);
+        await pagbank.refund(row.provider_ref, captureAmountCents(row));
         await reverseLedger(admin, row);
         await cancelInvoicesForCharge(admin, row.id, {
-          sandbox: asaas.sandbox,
-          asaas,
+          sandbox: pagbank.sandbox,
+          pagbank,
         });
         continue;
       }
       if (row.billing_type === "PIX") {
-        const gone = await asaas.cancelPaymentConfirmed(row.provider_ref);
+        const gone = await pagbank.cancelPaymentConfirmed(row.provider_ref);
         if (!gone) throw new Error("erro");
       } else {
-        await asaas.cancelAuthorization(row.provider_ref);
+        await pagbank.cancelAuthorization(
+          row.provider_ref,
+          captureAmountCents(row),
+        );
       }
       const cancelled = await applyPaymentTransition(
         admin,
