@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/time/clock.dart';
@@ -8,9 +9,11 @@ import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
+import 'package:scapematch/features/groups/presentation/create_group_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
+import 'support/pick_open_slot.dart';
 import 'support/pump_app.dart';
 import 'support/sample_clock.dart';
 
@@ -125,7 +128,9 @@ void main() {
     await pumpScapeMatch(
       tester,
       overrides: [
-        clockProvider.overrideWithValue(FixedClock(DateTime(2026, 11, 3, 17, 30))),
+        clockProvider.overrideWithValue(
+          FixedClock(DateTime(2026, 11, 3, 17, 30)),
+        ),
       ],
     );
     await _openGroup(tester, SampleIds.saoPaulo, SampleIds.groupSpMetroAlmost);
@@ -183,7 +188,7 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.housePoaRedencao);
     await _pick(tester, 'room', SampleIds.roomPoaEstufa);
-    await _pick(tester, 'slot', SampleIds.slotPoaEstufaFree);
+    await pickOpenSlot(tester, SampleIds.slotPoaEstufaFree);
     await tester.tap(find.byKey(AppKeys.createSubmit));
     await tester.pumpAndSettle();
 
@@ -244,7 +249,7 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.houseSpLiberdade);
     await _pick(tester, 'room', SampleIds.roomSpIzakaya);
-    await _pick(tester, 'slot', SampleIds.slotSpIzakayaOverlap);
+    await pickOpenSlot(tester, SampleIds.slotSpIzakayaOverlap);
     await tester.tap(find.byKey(AppKeys.createSubmit));
     await tester.pumpAndSettle();
 
@@ -268,17 +273,14 @@ void main() {
 
     await _pick(tester, 'house', SampleIds.houseSpAugusta);
     await _pick(tester, 'room', SampleIds.roomSpMetro);
-    await _pick(tester, 'slot', SampleIds.slotSpMetroPast);
-    final startedScroll = find.descendant(
-      of: find.byType(CreateGroupScreen),
-      matching: find.byType(Scrollable),
+    final open = ProviderScope.containerOf(
+      tester.element(find.byType(CreateGroupScreen)),
+    ).read(createGroupViewModelProvider);
+    expect(
+      open.openSlots.any((item) => item.slot.id == SampleIds.slotSpMetroPast),
+      isFalse,
     );
-    await tester.scrollUntilVisible(
-      find.text(GroupMessages.alreadyStartedHint),
-      200,
-      scrollable: startedScroll,
-    );
-    expect(find.text(GroupMessages.alreadyStartedHint), findsOneWidget);
+    expect(find.text(GroupMessages.alreadyStartedHint), findsNothing);
     expect(_submitEnabled(tester), isFalse);
   });
 

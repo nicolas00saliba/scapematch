@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/open_schedule.dart';
+import 'package:scapematch/features/catalog/domain/open_slot.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -25,8 +27,10 @@ class CreateGroupState {
     this.houseId,
     this.rooms = const [],
     this.roomId,
-    this.slots = const [],
+    this.openSlots = const [],
+    this.selectedDay,
     this.slotId,
+    this.scheduleError = false,
     this.extraSpots = 2,
     this.minimumPlayers = 2,
     this.crewId,
@@ -41,8 +45,10 @@ class CreateGroupState {
   final String? houseId;
   final List<EscapeRoom> rooms;
   final String? roomId;
-  final List<TimeSlot> slots;
+  final List<OpenSlot> openSlots;
+  final DateTime? selectedDay;
   final String? slotId;
+  final bool scheduleError;
   final int extraSpots;
 
   /// Mínimo para confirmar, contando quem cria.
@@ -61,7 +67,29 @@ class CreateGroupState {
 
   EscapeRoom? get room => _byId(rooms, roomId, (room) => room.id);
 
-  TimeSlot? get slot => _byId(slots, slotId, (slot) => slot.id);
+  TimeSlot? get slot {
+    for (final opening in openSlots) {
+      if (opening.slot.id == slotId) return opening.slot;
+    }
+    return null;
+  }
+
+  List<DateTime> get openDays => openDaysOf(openSlots);
+
+  List<RoomOpenings> get openingsForSelectedDay {
+    final day = selectedDay;
+    if (day == null) return const [];
+    final byRoom = <String, List<OpenSlot>>{};
+    for (final opening in openSlots) {
+      if (!sameCalendarDay(opening.day, day)) continue;
+      byRoom.putIfAbsent(opening.slot.roomId, () => []).add(opening);
+    }
+    return [
+      for (final room in rooms)
+        if (byRoom[room.id] != null)
+          RoomOpenings(room: room, slots: byRoom[room.id]!),
+    ];
+  }
 
   GroupSizeValidation get sizeValidation {
     final selected = room;
@@ -149,9 +177,13 @@ class CreateGroupState {
     List<EscapeRoom>? rooms,
     String? roomId,
     bool clearRoom = false,
-    List<TimeSlot>? slots,
+    List<OpenSlot>? openSlots,
+    DateTime? selectedDay,
+    bool clearDay = false,
     String? slotId,
     bool clearSlot = false,
+    bool? scheduleError,
+    bool clearScheduleError = false,
     int? extraSpots,
     int? minimumPlayers,
     String? crewId,
@@ -168,8 +200,12 @@ class CreateGroupState {
       houseId: clearHouse ? null : (houseId ?? this.houseId),
       rooms: rooms ?? this.rooms,
       roomId: clearRoom ? null : (roomId ?? this.roomId),
-      slots: slots ?? this.slots,
+      openSlots: openSlots ?? this.openSlots,
+      selectedDay: clearDay ? null : (selectedDay ?? this.selectedDay),
       slotId: clearSlot ? null : (slotId ?? this.slotId),
+      scheduleError: clearScheduleError
+          ? false
+          : (scheduleError ?? this.scheduleError),
       extraSpots: extraSpots ?? this.extraSpots,
       minimumPlayers: minimumPlayers ?? this.minimumPlayers,
       crewId: clearCrew ? null : (crewId ?? this.crewId),
@@ -233,22 +269,23 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     if (!ref.mounted || generation != _generation) {
       return;
     }
-    final slots = await ref
-        .read(catalogRepositoryProvider)
-        .listSlotsByRoom(roomId);
-    if (!ref.mounted || generation != _generation) {
-      return;
-    }
     final known = rooms.any((room) => room.id == roomId);
     if (!known) {
       state = state.copyWith(loadingOptions: false);
+      return;
+    }
+    final openSlots = await _openSlots(listing.houseId);
+    if (!ref.mounted || generation != _generation) {
       return;
     }
     state = state.copyWith(
       houseId: listing.houseId,
       rooms: rooms,
       roomId: roomId,
-      slots: slots,
+      openSlots: openSlots ?? const [],
+      scheduleError: openSlots == null,
+      clearDay: true,
+      clearSlot: true,
       loadingOptions: false,
     );
   }
@@ -264,8 +301,10 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
       houseId: houseId,
       rooms: const [],
       clearRoom: true,
-      slots: const [],
+      openSlots: const [],
+      clearDay: true,
       clearSlot: true,
+      clearScheduleError: true,
       loadingOptions: true,
       clearFailure: true,
     );
@@ -275,24 +314,51 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
     if (!ref.mounted || generation != _generation) {
       return;
     }
-    state = state.copyWith(rooms: rooms, loadingOptions: false);
-  }
-
-  Future<void> selectRoom(String roomId) async {
-    final generation = ++_generation;
-    state = state.copyWith(
-      roomId: roomId,
-      slots: const [],
-      clearSlot: true,
-      loadingOptions: true,
-      clearFailure: true,
-    );
-    final slots = await ref
-        .read(catalogRepositoryProvider)
-        .listSlotsByRoom(roomId);
+    final openSlots = await _openSlots(houseId);
     if (!ref.mounted || generation != _generation) {
       return;
     }
+    state = state.copyWith(
+      rooms: rooms,
+      openSlots: openSlots ?? const [],
+      scheduleError: openSlots == null,
+      loadingOptions: false,
+    );
+  }
+
+  Future<void> selectRoom(String roomId) async {
+    state = state.copyWith(roomId: roomId, clearSlot: true, clearFailure: true);
+    _fitBandToRoom();
+  }
+
+  void selectDay(DateTime day) {
+    state = state.copyWith(
+      selectedDay: day,
+      clearSlot: true,
+      clearFailure: true,
+    );
+  }
+
+  void selectSlot(String slotId) {
+    OpenSlot? opening;
+    for (final item in state.openSlots) {
+      if (item.slot.id == slotId) {
+        opening = item;
+        break;
+      }
+    }
+    if (opening == null) return;
+    final roomChanged = state.roomId != opening.slot.roomId;
+    state = state.copyWith(
+      roomId: opening.slot.roomId,
+      selectedDay: opening.day,
+      slotId: slotId,
+      clearFailure: true,
+    );
+    if (roomChanged) _fitBandToRoom();
+  }
+
+  void _fitBandToRoom() {
     final selected = state.room;
     final roomFloor = GroupRules.minimumExtraSpots(
       minimumPlayers: selected?.minimumPlayers ?? GroupRules.minGroupSize,
@@ -304,19 +370,18 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
         ? roomMin
         : state.minimumPlayers;
     final size = 1 + spots;
-    if (minimum > size) {
-      minimum = size;
-    }
-    state = state.copyWith(
-      slots: slots,
-      extraSpots: spots,
-      minimumPlayers: minimum,
-      loadingOptions: false,
-    );
+    if (minimum > size) minimum = size;
+    state = state.copyWith(extraSpots: spots, minimumPlayers: minimum);
   }
 
-  void selectSlot(String slotId) {
-    state = state.copyWith(slotId: slotId, clearFailure: true);
+  Future<List<OpenSlot>?> _openSlots(String houseId) async {
+    try {
+      return await ref
+          .read(catalogRepositoryProvider)
+          .listOpenSlots(houseId, now: ref.read(clockProvider).now());
+    } catch (_) {
+      return null;
+    }
   }
 
   void setExtraSpots(int value) {

@@ -186,6 +186,12 @@ abstract final class AppKeys {
   static Key newsCategory(String id) => Key('news-category-$id');
   static Key option(String id) => Key('option-$id');
   static Key selectionField(String name) => Key('selection-$name');
+  static const openDays = Key('open-days');
+  static const openSlots = Key('open-slots');
+  static Key openDay(int year, int month, int day) =>
+      Key('open-day-$year-$month-$day');
+  static Key openSlot(String id) => Key('open-slot-$id');
+  static Key openRoom(String roomId) => Key('open-room-$roomId');
   static Key roomCarousel(String category) => Key('room-carousel-$category');
   static Key roomCard(String id) => Key('room-card-$id');
   static Key roomDetail(String id) => Key('room-detail-$id');

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
@@ -11,7 +10,8 @@ import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/player_range.dart';
-import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/catalog/presentation/open_day_block.dart';
+import 'package:scapematch/features/catalog/presentation/open_slot_block.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
@@ -106,17 +106,31 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             onTap: () => _pickRoom(state),
           ),
           const SizedBox(height: 12),
-          _SelectionField(
-            fieldKey: AppKeys.selectionField('slot'),
-            label: 'Horário',
-            value: state.slot == null
+          OpenDayBlock(
+            days: state.openDays,
+            selected: state.selectedDay,
+            loading: state.loadingOptions && state.houseId != null,
+            emptyMessage: state.scheduleError
+                ? 'Não foi possível carregar os horários desta casa.'
+                : state.houseId == null
+                ? 'Escolha a casa primeiro.'
+                : 'Esta casa não tem dia com horário livre.',
+            onSelected: state.houseId == null || state.loadingOptions
                 ? null
-                : formatSession(state.slot!.startsAt),
-            hint: state.roomId == null
-                ? 'Escolha a sala primeiro'
-                : 'Escolha o horário',
-            enabled: state.roomId != null && state.slots.isNotEmpty,
-            onTap: () => _pickSlot(state),
+                : (day) => ref
+                      .read(createGroupViewModelProvider.notifier)
+                      .selectDay(day),
+          ),
+          const SizedBox(height: 12),
+          OpenSlotBlock(
+            day: state.selectedDay,
+            openings: state.openingsForSelectedDay,
+            selectedSlotId: state.slotId,
+            onSelected: state.selectedDay == null
+                ? null
+                : (opening) => ref
+                      .read(createGroupViewModelProvider.notifier)
+                      .selectSlot(opening.slot.id),
           ),
           const SizedBox(height: 20),
           Text(
@@ -332,20 +346,6 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       return;
     }
     await ref.read(createGroupViewModelProvider.notifier).selectRoom(room.id);
-  }
-
-  Future<void> _pickSlot(CreateGroupState state) async {
-    final slot = await showOptionSheet<TimeSlot>(
-      context: context,
-      title: 'Horário',
-      options: state.slots,
-      idOf: (slot) => slot.id,
-      labelOf: (slot) => formatSession(slot.startsAt),
-    );
-    if (slot == null || !mounted) {
-      return;
-    }
-    ref.read(createGroupViewModelProvider.notifier).selectSlot(slot.id);
   }
 
   Future<void> _submit() async {

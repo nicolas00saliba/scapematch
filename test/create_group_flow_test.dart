@@ -7,6 +7,7 @@ import 'package:scapematch/features/auth/data/fake_auth_repository.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/providers/repositories.dart';
 
+import 'support/pick_open_slot.dart';
 import 'support/pump_app.dart';
 
 void main() {
@@ -32,7 +33,7 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.housePoaRedencao);
     await _pick(tester, 'room', SampleIds.roomPoaEstufa);
-    await _pick(tester, 'slot', SampleIds.slotPoaEstufaFree);
+    await pickOpenSlot(tester, SampleIds.slotPoaEstufaFree);
 
     expect(_submitEnabled(tester), isTrue);
     await tester.tap(find.byKey(AppKeys.createSubmit));
@@ -61,9 +62,7 @@ void main() {
     expect(find.text('A Estufa'), findsWidgets);
   });
 
-  testWidgets('creating a duplicate session explains it in Portuguese', (
-    tester,
-  ) async {
+  testWidgets('a reserved slot is not offered on its day', (tester) async {
     await pumpScapeMatch(tester);
 
     await _selectCity(tester, SampleIds.portoAlegre);
@@ -71,31 +70,16 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.housePoaRedencao);
     await _pick(tester, 'room', SampleIds.roomPoaEstufa);
-    await _pick(tester, 'slot', SampleIds.slotPoaEstufaTaken);
+    await pickOpenSlot(tester, SampleIds.slotPoaEstufaFree);
 
-    await tester.tap(find.byKey(AppKeys.createSubmit));
-    await tester.pumpAndSettle();
-
-    final formScroll = find.descendant(
-      of: find.byType(CreateGroupScreen),
-      matching: find.byType(Scrollable),
-    );
-    await tester.scrollUntilVisible(
-      find.byKey(AppKeys.createFailure),
-      200,
-      scrollable: formScroll,
-    );
     expect(
-      find.text(
-        'Já existe um grupo nessa sala nesse horário. Escolha outro horário.',
-      ),
-      findsOneWidget,
+      find.byKey(AppKeys.openSlot(SampleIds.slotPoaEstufaTaken)),
+      findsNothing,
     );
     expect(find.text('Você está neste grupo'), findsNothing);
-    expect(find.text('Criar grupo'), findsWidgets);
   });
 
-  testWidgets('the slot sheet lists several times for the same room', (
+  testWidgets('the chosen day lists the free times of that room', (
     tester,
   ) async {
     await pumpScapeMatch(tester);
@@ -105,13 +89,16 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.houseSpAugusta);
     await _pick(tester, 'room', SampleIds.roomSpMetro);
-    await tester.tap(find.byKey(AppKeys.selectionField('slot')));
-    await tester.pumpAndSettle();
+    await pickOpenSlot(tester, SampleIds.slotSpMetroSun);
 
-    expect(find.byType(ListTile), findsAtLeastNWidgets(4));
+    expect(find.byKey(AppKeys.openRoom(SampleIds.roomSpMetro)), findsOneWidget);
     expect(
-      find.byKey(AppKeys.option(SampleIds.slotSpMetroSun)),
+      find.byKey(AppKeys.openSlot(SampleIds.slotSpMetroSun)),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(AppKeys.openSlot(SampleIds.slotSpMetroPast)),
+      findsNothing,
     );
   });
 }

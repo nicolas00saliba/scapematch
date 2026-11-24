@@ -4,6 +4,7 @@ import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 
+import 'support/pick_open_slot.dart';
 import 'support/pump_app.dart';
 
 void main() {
@@ -25,7 +26,7 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.housePoaRedencao);
     await _pick(tester, 'room', SampleIds.roomPoaEstufa);
-    await _pick(tester, 'slot', SampleIds.slotPoaEstufaFree);
+    await pickOpenSlot(tester, SampleIds.slotPoaEstufaFree);
     await tester.tap(find.byKey(AppKeys.createSubmit));
     await tester.pumpAndSettle();
 
