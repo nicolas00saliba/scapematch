@@ -14,6 +14,8 @@ type Charge = {
   user_id: string;
   venue_id: string;
   amount_cents: number;
+  charged_amount_cents?: number;
+  buyer_interest_cents?: number;
   commission_bps: number;
   status: string;
   provider_ref: string | null;
@@ -110,7 +112,10 @@ function adminFor(options: {
         }
         if (table === "venues") {
           return {
-            data: { owner_id: options.owner ?? "owner-1" },
+            data: {
+              owner_id: options.owner ?? "owner-1",
+              pagbank_account_id: "ACCO_VENUE",
+            },
             error: null,
           };
         }
@@ -174,7 +179,7 @@ function provider(
         ),
       );
     }
-    if (method === "POST" && url.includes("/release-custody")) {
+    if (method === "POST" && url.includes("/custody/release")) {
       return Promise.resolve(new Response("{}", { status: 200 }));
     }
     if (method === "POST" && url.includes("/capture")) {
@@ -358,7 +363,12 @@ Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
   const admin = adminFor({ closed: true, charges });
   const releases: string[] = [];
   const fetchFn = (url: string, init?: RequestInit) => {
-    if ((init?.method ?? "GET") === "POST" && url.includes("/release-custody")) {
+    if ((init?.method ?? "GET") === "POST" && url.includes("/custody/release")) {
+      const posted = JSON.parse(String(init?.body ?? "{}"));
+      assertEquals(
+        posted.receivers.map((item: { account: { id: string } }) => item.account.id),
+        ["ACCO_VENUE", "ACCO_PRIMARY"],
+      );
       releases.push(url);
       return Promise.resolve(new Response("{}", { status: 200 }));
     }
@@ -373,7 +383,7 @@ Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
   );
   await settleGroup(admin, pagbank, groupId);
   assertEquals(releases.length, 1);
-  assert(releases[0].includes("/splits/SPLI_PIX/release-custody"));
+  assert(releases[0].includes("/splits/SPLI_PIX/custody/release"));
 });
 
 Deno.test("grupo confirmado captura mesmo sem lotar", async () => {
@@ -411,4 +421,46 @@ Deno.test("membro liquida grupo fechado e não o grupo aberto", async () => {
   });
   assertEquals(await maySettle(open, groupId, member, false), false);
   assertEquals(await maySettle(open, groupId, userId, false), true);
+});
+
+Deno.test("captura de 4x usa o total com juros, não o principal", async () => {
+  const charges = [{
+    ...card(),
+    charged_amount_cents: 20640,
+    buyer_interest_cents: 640,
+  }];
+  const admin = adminFor({ closed: true, charges });
+  const bodies: number[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET") {
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "pay_card",
+        status: "AUTHORIZED",
+        billingType: "CREDIT_CARD",
+      }), { status: 200 }));
+    }
+    if (url.includes("/capture") || url.includes("/cancel")) {
+      bodies.push(JSON.parse(String(init?.body)).amount.value);
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "pay_card",
+        status: url.includes("/capture") ? "PAID" : "CANCELED",
+      }), { status: 200 }));
+    }
+    if (url.includes("/custody/release")) {
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
+    fetchFn,
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
+  );
+  await settleGroup(admin, pagbank, groupId);
+  assertEquals(bodies, [20640]);
+  assertEquals(charges[0].status, "paid");
+  assertEquals(charges[0].amount_cents, 10000);
 });

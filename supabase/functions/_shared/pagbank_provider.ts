@@ -657,13 +657,22 @@ export class PagBankProvider {
   ): Promise<void> {
     const id = splitId.trim();
     if (!id) return Promise.resolve();
-    const receivers = accountIds.filter((item) => item.trim().length > 0).map(
-      (accountId) => ({ account: { id: accountId } }),
-    );
+    const receivers = accountIds
+      .map((item) => item.trim())
+      .filter((item, index, all) => item.length > 0 && all.indexOf(item) === index)
+      .map((accountId) => ({ account: { id: accountId } }));
+    if (receivers.length === 0) {
+      return Promise.reject(new Error("custodia_recebedores"));
+    }
     return this.#send(
-      `/splits/${encodeURIComponent(id)}/release-custody`,
-      receivers.length > 0 ? { receivers } : {},
+      `/splits/${encodeURIComponent(id)}/custody/release`,
+      { receivers },
     ).then(() => undefined);
+  }
+
+  /// Conta primária da EscapeMatch. Entra na liberação da custódia.
+  accountId(): string {
+    return this.#primary();
   }
 
   async quoteBuyerInterest(

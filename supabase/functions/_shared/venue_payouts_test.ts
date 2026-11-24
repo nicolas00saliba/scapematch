@@ -355,6 +355,28 @@ Deno.test("o 401 do saque renova o refresh token e grava a sessão", async () =>
   assertEquals(saved?.args.p_venue_id, venue);
 });
 
+Deno.test("dados bancários não são gravados", async () => {
+  const gate = fake();
+  const bank = await handleVenuePayouts(
+    post({
+      action: "save_bank",
+      venue_id: venue,
+      pix_key: "chave-que-nao-pode-ir-ao-banco",
+      account_number: "12345",
+      owner_document: "12345678901",
+    }),
+    gate.deps,
+  );
+  assertEquals(bank.status, 403);
+  assertEquals((await bank.json()).error, "dados_bancarios_recusados");
+  const schedule = await handleVenuePayouts(
+    post({ action: "save_schedule", venue_id: venue, enabled: true }),
+    gate.deps,
+  );
+  assertEquals(schedule.status, 403);
+  assertEquals(gate.calls, []);
+});
+
 Deno.test("saque manual sem reauth nao transfere", async () => {
   const gate = fake();
   const stale = token({

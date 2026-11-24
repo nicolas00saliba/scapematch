@@ -34,6 +34,12 @@ function adminFor(rows: Record<string, unknown>[]) {
         return self;
       },
       maybeSingle() {
+        if (table === "venues") {
+          return Promise.resolve({
+            data: { pagbank_account_id: "ACCO_VENUE" },
+            error: null,
+          });
+        }
         if (table === "groups") {
           return Promise.resolve({
             data: {
@@ -90,6 +96,8 @@ function provider(status: string) {
         status,
         payment_method: { type: "PIX" },
       }), { status: 200 })),
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
   );
 }
 
@@ -159,10 +167,21 @@ Deno.test("webhook casa o pedido e o split sai do charge pago", async () => {
     pagbankProductionBaseUrl,
     (url: string, init?: RequestInit) => {
       urls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes("/custody/release")) {
+        const posted = JSON.parse(String(init?.body ?? "{}"));
+        assertEquals(
+          posted.receivers.map((item: { account: { id: string } }) =>
+            item.account.id
+          ),
+          ["ACCO_VENUE", "ACCO_PRIMARY"],
+        );
+      }
       return Promise.resolve(
         new Response(JSON.stringify(paid), { status: 200 }),
       );
     },
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
   );
   const row = { ...pending, provider_ref: "ORDE_PIX", provider_split_id: null };
   const admin = adminFor([row]);
@@ -173,7 +192,7 @@ Deno.test("webhook casa o pedido e o split sai do charge pago", async () => {
   );
   assertEquals(applied, 1);
   assert(urls.some((url) => url.includes("/orders/ORDE_PIX")));
-  assert(urls.some((url) => url.includes("/splits/SPLI_PAGO/release-custody")));
+  assert(urls.some((url) => url.includes("/splits/SPLI_PAGO/custody/release")));
 });
 
 Deno.test("Pix vencido sai da fila como cancelado", async () => {

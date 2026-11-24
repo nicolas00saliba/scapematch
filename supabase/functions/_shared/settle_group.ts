@@ -10,6 +10,7 @@ import {
 import { syncPayerDocument } from "./payer_document.ts";
 import { bandConfirmed, bandMissed, bandSettlement } from "./group_band.ts";
 import { releaseCancelledCharges } from "./release_charges.ts";
+import { captureAmountCents } from "./pagbank_rules.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -34,6 +35,8 @@ type ChargeView = ChargeRow & {
   billing_type: string;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
+  charged_amount_cents?: number | null;
+  buyer_interest_cents?: number | null;
 };
 
 /// Admin, criador e dono da casa liquidam ou liberam.
@@ -109,7 +112,7 @@ export async function settleGroup(
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type, provider_split_id, custody_released_at",
+      "id, group_id, user_id, venue_id, amount_cents, charged_amount_cents, buyer_interest_cents, commission_bps, status, provider_ref, billing_type, provider_split_id, custody_released_at",
     )
     .eq("group_id", groupId);
 
@@ -207,7 +210,7 @@ async function captureAuthorizedCard(
     if (!already) {
       const captured = await pagbank.capture(
         row.provider_ref,
-        row.amount_cents,
+        captureAmountCents(row),
       );
       paid = captured.status === "CONFIRMED" || captured.status === "RECEIVED";
     }

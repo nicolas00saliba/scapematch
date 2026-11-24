@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { PagBankProvider } from "./pagbank_provider.ts";
+import { captureAmountCents } from "./pagbank_rules.ts";
 import { cancelInvoicesForCharge } from "./issue_invoices.ts";
 import {
   applyPaymentTransition,
@@ -13,6 +14,7 @@ type Charge = ChargeRow & {
   status: string;
   provider_ref: string | null;
   billing_type: string;
+  charged_amount_cents?: number | null;
 };
 
 /// Estorna o que já foi pago. Pix pendente sai com DELETE. A pré-autorização
@@ -25,7 +27,7 @@ export async function releaseCancelledCharges(
   const { data: charges } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, provider_ref, billing_type",
+      "id, group_id, user_id, venue_id, amount_cents, charged_amount_cents, commission_bps, status, provider_ref, billing_type",
     )
     .eq("group_id", groupId);
 
@@ -41,7 +43,7 @@ export async function releaseCancelledCharges(
     }
     try {
       if (row.status === "paid") {
-        await pagbank.refund(row.provider_ref);
+        await pagbank.refund(row.provider_ref, captureAmountCents(row));
         await reverseLedger(admin, row);
         await cancelInvoicesForCharge(admin, row.id, {
           sandbox: pagbank.sandbox,
@@ -53,7 +55,10 @@ export async function releaseCancelledCharges(
         const gone = await pagbank.cancelPaymentConfirmed(row.provider_ref);
         if (!gone) throw new Error("erro");
       } else {
-        await pagbank.cancelAuthorization(row.provider_ref);
+        await pagbank.cancelAuthorization(
+          row.provider_ref,
+          captureAmountCents(row),
+        );
       }
       const cancelled = await applyPaymentTransition(
         admin,

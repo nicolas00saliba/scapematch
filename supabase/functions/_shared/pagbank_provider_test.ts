@@ -293,7 +293,12 @@ Deno.test("captura, estorno e custódia usam os caminhos da PagBank", async () =
         }),
       );
     }
-    if (url.endsWith("/release-custody")) {
+    if (url.endsWith("/custody/release")) {
+      const posted = JSON.parse(String(init?.body));
+      assertEquals(posted.receivers, [
+        { account: { id: venue } },
+        { account: { id: primary } },
+      ]);
       return Promise.resolve(new Response("", { status: 200 }));
     }
     return Promise.resolve(new Response("não", { status: 500 }));
@@ -309,10 +314,21 @@ Deno.test("captura, estorno e custódia usam os caminhos da PagBank", async () =
   assert(calls.some((call) => call.includes("/charges/CHAR_1/capture")));
   assert(calls.some((call) => call.includes("/charges/CHAR_1/cancel")));
   assert(calls.some((call) =>
-    call.endsWith("/splits/SPLI_1/release-custody")
+    call.endsWith("/splits/SPLI_1/custody/release")
   ));
-  const release = calls.find((call) => call.includes("release-custody"));
+  const release = calls.find((call) => call.includes("custody/release"));
   assert(release);
+  let posted = 0;
+  await assertRejects(
+    () =>
+      provider(() => {
+        posted += 1;
+        return Promise.resolve(new Response("", { status: 200 }));
+      }).releaseCustody("SPLI_1", []),
+    Error,
+    "custodia_recebedores",
+  );
+  assertEquals(posted, 0);
 });
 
 Deno.test("a assinatura do webhook usa o corpo cru", async () => {
@@ -387,7 +403,12 @@ Deno.test("confirmação solta a custódia; sem confirmação estorna o Pix e ca
   const calls: string[] = [];
   const fetchFn = (url: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
-    if (url.endsWith("/release-custody")) {
+    if (url.endsWith("/custody/release")) {
+      const posted = JSON.parse(String(init?.body));
+      assertEquals(posted.receivers, [
+        { account: { id: venue } },
+        { account: { id: primary } },
+      ]);
       return Promise.resolve(new Response("", { status: 200 }));
     }
     if ((init?.method ?? "GET") === "GET") {
@@ -431,7 +452,7 @@ Deno.test("confirmação solta a custódia; sem confirmação estorna o Pix e ca
   });
   assertEquals(card, "void_card");
   if (card === "void_card") await client.cancelAuthorization("CHAR_CARD");
-  assert(calls.some((call) => call.endsWith("/splits/SPLI_OK/release-custody")));
+  assert(calls.some((call) => call.endsWith("/splits/SPLI_OK/custody/release")));
   assert(calls.some((call) => call.endsWith("/charges/CHAR_PIX/cancel")));
   assert(calls.some((call) => call.endsWith("/charges/CHAR_CARD/cancel")));
   assertEquals(calls.some((call) => call.includes("/capture")), false);

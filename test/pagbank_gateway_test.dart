@@ -51,7 +51,7 @@ void main() {
     expect(text.contains('saved_cards'), isTrue);
     expect(text.contains('https://sandbox.api.pagseguro.com'), isTrue);
     expect(text.contains('/orders'), isTrue);
-    expect(text.contains('release-custody'), isTrue);
+    expect(text.contains('custody/release'), isTrue);
     expect(text.contains('fiscal_invoices'), isTrue);
     expect(text.contains('terms_acceptances'), isTrue);
     expect(text.contains('venue_provider_keys'), isTrue);

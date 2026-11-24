@@ -27,6 +27,48 @@ export function installmentParcelTooSmall(
 export const interestFreeInstallments = 3;
 export const maxInstallments = 12;
 
+/// Faixa da cotação de parcelas. Abaixo de R$ 1 e acima de R$ 5.000
+/// a consulta nem sai para a PagBank.
+export const minQuoteAmountCents = 100;
+export const maxQuoteAmountCents = 500_000;
+
+/// Total autorizado na PagBank. Sem a coluna nova, vale o principal.
+export function captureAmountCents(row: {
+  amount_cents: number;
+  charged_amount_cents?: number | null;
+}): number {
+  const charged = row.charged_amount_cents;
+  if (typeof charged === "number" && Number.isInteger(charged) && charged > 0) {
+    return charged;
+  }
+  return row.amount_cents;
+}
+
+export function quoteAmountInRange(cents: number): boolean {
+  return Number.isInteger(cents) &&
+    cents >= minQuoteAmountCents &&
+    cents <= maxQuoteAmountCents;
+}
+
+/// De 4x em diante o cliente tem de confirmar o total cotado.
+export function quotedTotalAccepted(input: {
+  installments: number;
+  expectedCents: number | undefined;
+  chargedCents: number;
+}): boolean {
+  const count = input.installments;
+  const expected = input.expectedCents;
+  if (count > interestFreeInstallments) {
+    if (typeof expected !== "number" || !Number.isInteger(expected)) {
+      return false;
+    }
+  }
+  if (typeof expected === "number" && expected !== input.chargedCents) {
+    return false;
+  }
+  return true;
+}
+
 /// Meio centavo sobe. A mesma conta do livro.
 export function commissionCents(
   amountCents: number,

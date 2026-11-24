@@ -12,6 +12,8 @@ import {
 } from "../_shared/pagbank_client_error.ts";
 import {
   installmentParcelTooSmall,
+  quoteAmountInRange,
+  quotedTotalAccepted,
   type InstallmentCharge,
 } from "../_shared/pagbank_rules.ts";
 import {
@@ -120,8 +122,11 @@ async function resolveCardPlan(
   }
   if (
     checkExpected &&
-    typeof expected === "number" &&
-    expected !== plan.amountCents
+    !quotedTotalAccepted({
+      installments: plan.installments,
+      expectedCents: expected,
+      chargedCents: plan.amountCents,
+    })
   ) {
     throw new Error("valor_parcelas");
   }
@@ -171,8 +176,15 @@ export async function createCharge(
     const body = await req.json() as ChargeBody;
     if (body.action === "quote_installments") {
       const cents = body.amount_cents;
-      if (typeof cents !== "number" || !Number.isInteger(cents) || cents <= 0) {
+      if (typeof cents !== "number" || !quoteAmountInRange(cents)) {
         return json({ error: "valor" }, 400);
+      }
+      const { data: allowed, error: limitError } = await admin.rpc(
+        "claim_installment_quote",
+        { p_user_id: user.id },
+      );
+      if (limitError || allowed !== true) {
+        return json({ error: "cotacao_limite" }, 429);
       }
       const quoted = deps?.pagbank ?? PagBankProvider.fromEnv(Deno.env);
       const plans = await quoted.quoteCardPlans(cents);
@@ -841,6 +853,7 @@ export async function createCharge(
           chargeId,
           attemptId: attempt,
           billingType: "CREDIT_CARD",
+          chargedCents: plan.amountCents,
         });
       const alignCardSplit = async (
         fixedCents: number,
@@ -1051,8 +1064,15 @@ export async function createCharge(
           chargeId: cardChargeId,
           attemptId,
           billingType: "CREDIT_CARD",
+          chargedCents: plan.amountCents,
         });
         await releasePixReservation(admin, cardChargeId, attemptId);
+        return json({ error: "pagamento em andamento" }, 409);
+      }
+      try {
+        await rememberChargedTotal(admin, cardChargeId, plan);
+      } catch (_error) {
+        await loseCard(cardChargeId, attemptId);
         return json({ error: "pagamento em andamento" }, 409);
       }
       if (!capturedAlready && mayCredit && status === "authorized") {
@@ -1069,11 +1089,12 @@ export async function createCharge(
             chargeId: cardChargeId,
             attemptId,
             billingType: "CREDIT_CARD",
+            chargedCents: plan.amountCents,
           });
           return json({ error: "pagamento em andamento" }, 409);
         }
         try {
-          const captured = await pagbank.capture(stored, amountCents);
+          const captured = await pagbank.capture(stored, plan.amountCents);
           status = captured.status === "CONFIRMED" ||
               captured.status === "RECEIVED"
             ? "paid"
@@ -1081,7 +1102,7 @@ export async function createCharge(
         } catch (_captureError) {
           let refunded = false;
           try {
-            await pagbank.refund(stored, amountCents);
+            await pagbank.refund(stored, plan.amountCents);
             refunded = true;
           } catch (_refundError) {
             await recordOrphanPayment(admin, {
@@ -1465,13 +1486,15 @@ async function compensateLostPayment(
     chargeId: string;
     attemptId: string | null;
     billingType: string;
+    chargedCents?: number;
   },
 ): Promise<void> {
   const action = lostAttemptCompensation(input.status);
   if (action === "none") return;
+  const cents = input.chargedCents ?? 0;
   try {
-    if (action === "refund") await pagbank.refund(input.providerRef);
-    else await pagbank.cancelAuthorization(input.providerRef);
+    if (action === "refund") await pagbank.refund(input.providerRef, cents);
+    else await pagbank.cancelAuthorization(input.providerRef, cents);
   } catch (error) {
     if (providerStatus(error) === 404) return;
     await recordOrphanPayment(admin, {
@@ -1482,6 +1505,18 @@ async function compensateLostPayment(
       reason: action === "refund" ? "refund_failed" : "cancel_failed",
     });
   }
+}
+
+async function rememberChargedTotal(
+  admin: ChargeDb,
+  chargeId: string,
+  plan: InstallmentCharge,
+): Promise<void> {
+  const { error } = await admin.from("payment_charges").update({
+    charged_amount_cents: plan.amountCents,
+    buyer_interest_cents: plan.buyerInterestCents,
+  }).eq("id", chargeId);
+  if (error) throw new Error("erro");
 }
 
 async function groupClosedForCredit(

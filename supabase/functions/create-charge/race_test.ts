@@ -43,8 +43,10 @@ type Store = {
   orphans: { provider_ref: string; reason: string }[];
   payments: Payment[];
   calls: string[];
+  money: number[];
   member: string;
   closed: boolean;
+  quoteOk?: boolean;
   detachMissing?: boolean;
   releaseExpiredError?: boolean;
 };
@@ -67,6 +69,7 @@ function makeStore(seed?: Partial<Charge>): Store {
     orphans: [],
     payments: [],
     calls: [],
+    money: [],
     member: "pending",
     closed: false,
   };
@@ -253,6 +256,9 @@ function adminFor(store: Store) {
     },
     rpc(name: string, args: Record<string, unknown>) {
       return lock(() => {
+        if (name === "claim_installment_quote") {
+          return { data: store.quoteOk !== false, error: null };
+        }
         if (name === "venue_finance_ready") {
           return { data: true, error: null };
         }
@@ -444,6 +450,35 @@ function providerFor(
   const fetchFn = async (url: string, init?: RequestInit) => {
     let method = init?.method ?? "GET";
     store.calls.push(`${method} ${url}`);
+    if (method === "GET" && url.includes("/charges/fees/calculate")) {
+      return new Response(JSON.stringify({
+        payment_methods: {
+          credit_card: {
+            visa: {
+              installment_plans: [{
+                installments: 4,
+                interest_free: false,
+                amount: {
+                  value: 10640,
+                  fees: { buyer: { interest: { total: 640 } } },
+                },
+              }],
+            },
+          },
+        },
+      }), { status: 200 });
+    }
+    if (method === "POST" && url.includes("/custody/release")) {
+      return new Response("{}", { status: 200 });
+    }
+    if (
+      method === "POST" && /\/charges\/[^/]+\/(capture|cancel)$/.test(url)
+    ) {
+      const posted = JSON.parse(String(init?.body ?? "{}")) as {
+        amount?: { value?: number };
+      };
+      store.money.push(Number(posted.amount?.value ?? 0));
+    }
     if (method === "GET" && url.includes("/orders?")) {
       const ref = new URL(url).searchParams.get("reference_id") ?? "";
       url = `${url.split("?")[0].replace("/orders", "/payments")}?externalReference=${
@@ -1096,4 +1131,126 @@ Deno.test("reserva vencida que não apaga ainda cancela a autorização", async 
   );
   assert(authorized?.status === "DELETED" || authorized?.status === "REFUNDED");
   assertEquals(store.charges[0].provider_ref, null);
+});
+
+Deno.test("4x sem o total confirmado não cobra", async () => {
+  const store = makeStore();
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-sem-total",
+        saved_card_id: cardId,
+        installments: 4,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).error, "valor_parcelas");
+  assertEquals(store.calls.some((call) => call.includes("/orders")), false);
+});
+
+Deno.test("4x captura e cancela o total com juros", async () => {
+  const store = makeStore();
+  store.closed = true;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-juros",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {
+      onCapture: () => Promise.resolve(new Response("falhou", { status: 500 })),
+    })),
+  );
+  assertEquals(response.status, 502);
+  assertEquals(store.money, [10640, 10640]);
+});
+
+Deno.test("4x autorizado grava o total e captura esse valor", async () => {
+  const store = makeStore();
+  store.closed = true;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        group_id: groupId,
+        billing_type: "CREDIT_CARD",
+        idempotency_key: "idem-4x-captura",
+        saved_card_id: cardId,
+        installments: 4,
+        expected_amount_cents: 10640,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(store.money, [10640]);
+  const row = store.charges[0] as Charge & {
+    charged_amount_cents?: number;
+    buyer_interest_cents?: number;
+  };
+  assertEquals(row.charged_amount_cents, 10640);
+  assertEquals(row.buyer_interest_cents, 640);
+  assertEquals(row.amount_cents, 10000);
+});
+
+Deno.test("cotação fora da faixa não chama a PagBank", async () => {
+  const store = makeStore();
+  const low = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "quote_installments",
+        amount_cents: 50,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(low.status, 400);
+  const high = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "quote_installments",
+        amount_cents: 500_001,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(high.status, 400);
+  assertEquals(
+    store.calls.some((call) => call.includes("fees/calculate")),
+    false,
+  );
+});
+
+Deno.test("cotação acima do teto do usuário responde 429", async () => {
+  const store = makeStore();
+  store.quoteOk = false;
+  const response = await createCharge(
+    new Request("https://example.test/create-charge", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "quote_installments",
+        amount_cents: 11000,
+      }),
+    }),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  assertEquals(response.status, 429);
+  assertEquals((await response.json()).error, "cotacao_limite");
+  assertEquals(
+    store.calls.some((call) => call.includes("fees/calculate")),
+    false,
+  );
 });

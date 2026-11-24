@@ -8,6 +8,8 @@ import {
   holdUntilGroupConfirms,
   installmentCharge,
   installmentMenu,
+  quoteAmountInRange,
+  quotedTotalAccepted,
   pagbankSplitBody,
   venueShareCents,
 } from "./pagbank_rules.ts";
@@ -107,6 +109,37 @@ Deno.test("a grade habilita 1x a 3x sem juro e 4x só com a cotação", () => {
   assertEquals(open[3].amountCents, 20_640);
   assertEquals(open[3].enabled, true);
   assertEquals(open[4].enabled, false);
+});
+
+Deno.test("4x exige o total cotado e a cotação fica entre R$ 1 e R$ 5.000", () => {
+  assertEquals(quoteAmountInRange(100), true);
+  assertEquals(quoteAmountInRange(500_000), true);
+  assertEquals(quoteAmountInRange(99), false);
+  assertEquals(quoteAmountInRange(500_001), false);
+  assertEquals(
+    quotedTotalAccepted({
+      installments: 4,
+      expectedCents: 20_640,
+      chargedCents: 20_640,
+    }),
+    true,
+  );
+  assertEquals(
+    quotedTotalAccepted({
+      installments: 4,
+      expectedCents: undefined,
+      chargedCents: 20_640,
+    }),
+    false,
+  );
+  assertEquals(
+    quotedTotalAccepted({
+      installments: 3,
+      expectedCents: undefined,
+      chargedCents: 20_000,
+    }),
+    true,
+  );
 });
 
 Deno.test("parcela abaixo de R$ 5 recusa; R$ 100 em 2x passa", () => {

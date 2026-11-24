@@ -9,10 +9,12 @@ type Admin = any;
 
 export type CustodyClient = {
   releaseCustody(splitId: string, accountIds: string[]): Promise<void>;
+  accountId(): string;
 };
 
 export type CustodyCharge = {
   id: string;
+  venue_id?: string | null;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
   custody_release_attempts?: number | null;
@@ -72,7 +74,9 @@ export async function releaseHeldSplit(
   const id = (charge.provider_split_id ?? "").trim();
   if (!id || !charge.id || charge.custody_released_at) return false;
   try {
-    await pagbank.releaseCustody(id, []);
+    const accounts = await custodyAccountIds(admin, pagbank, charge);
+    if (accounts.length === 0) throw new Error("custodia_recebedores");
+    await pagbank.releaseCustody(id, accounts);
     const { error } = await admin.from("payment_charges").update({
       custody_released_at: new Date().toISOString(),
       custody_release_failed_at: null,
@@ -92,6 +96,40 @@ export async function releaseHeldSplit(
     }
     return false;
   }
+}
+
+/// Casa e EscapeMatch, como no exemplo de POST /splits/{id}/custody/release.
+async function custodyAccountIds(
+  admin: Admin,
+  pagbank: CustodyClient,
+  charge: CustodyCharge,
+): Promise<string[]> {
+  let venueId = (charge.venue_id ?? "").trim();
+  if (!venueId) {
+    const { data } = await admin
+      .from("payment_charges")
+      .select("venue_id")
+      .eq("id", charge.id)
+      .maybeSingle();
+    venueId = typeof data?.venue_id === "string" ? data.venue_id : "";
+  }
+  const { data: venue } = await admin
+    .from("venues")
+    .select("pagbank_account_id")
+    .eq("id", venueId)
+    .maybeSingle();
+  const venueAccount = typeof venue?.pagbank_account_id === "string"
+    ? venue.pagbank_account_id.trim()
+    : "";
+  let primary = "";
+  try {
+    primary = pagbank.accountId().trim();
+  } catch (_error) {
+    primary = "";
+  }
+  return [venueAccount, primary].filter((item, index, all) =>
+    item.length > 0 && all.indexOf(item) === index
+  );
 }
 
 function nextCustodyAttempt(current: number | null | undefined): number {

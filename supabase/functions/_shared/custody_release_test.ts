@@ -45,6 +45,20 @@ function adminFor(rows: Record<string, unknown>[]) {
           return self;
         },
         maybeSingle() {
+          if (table === "venues") {
+            return Promise.resolve({
+              data: { pagbank_account_id: "ACCO_VENUE" },
+              error: null,
+            });
+          }
+          if (table === "payment_charges") {
+            return Promise.resolve({
+              data: rows[0] ?? {
+                venue_id: "33333333-3333-4333-8333-333333333333",
+              },
+              error: null,
+            });
+          }
           return Promise.resolve({
             data: {
               cancelled_at: null,
@@ -76,16 +90,17 @@ Deno.test("cartão capturado com o grupo confirmado solta a custódia", async ()
   await finishCapturedCard({
     admin,
     pagbank: {
-      releaseCustody: (splitId) => {
-        releases.push(splitId);
+      releaseCustody: (splitId, accounts) => {
+        releases.push(`${splitId}:${accounts.join(",")}`);
         return Promise.resolve();
       },
+      accountId: () => "ACCO_PRIMARY",
     },
     chargeId,
     splitId: "SPLI_CARD",
     paid: true,
   });
-  assertEquals(releases, ["SPLI_CARD"]);
+  assertEquals(releases, ["SPLI_CARD:ACCO_VENUE,ACCO_PRIMARY"]);
   assertEquals(admin.updates[0].provider_split_id, "SPLI_CARD");
   assert(typeof admin.updates[1].custody_released_at === "string");
   assertEquals(admin.updates[1].custody_release_failed_at, null);
@@ -103,6 +118,7 @@ Deno.test("falha ao soltar a custódia fica registrada para o cron", async () =>
       admin,
       pagbank: {
         releaseCustody: () => Promise.reject(new Error("PagBank 500: indisponivel")),
+        accountId: () => "ACCO_PRIMARY",
       },
       chargeId,
       splitId: "SPLI_CARD",
@@ -130,6 +146,7 @@ Deno.test("Pix pago depois da confirmação solta a custódia e o aberto não", 
       releases.push(splitId);
       return Promise.resolve();
     },
+    accountId: () => "ACCO_PRIMARY",
   };
   const closed = adminFor([]);
   await releasePaidIfClosed({
@@ -163,6 +180,7 @@ Deno.test("o cron repete a custódia que falhou", async () => {
       releases.push(splitId);
       return Promise.resolve();
     },
+    accountId: () => "ACCO_PRIMARY",
   });
   assertEquals(count, 1);
   assertEquals(releases, ["SPLI_RETRY"]);
@@ -178,6 +196,7 @@ Deno.test("a custódia para depois do limite e alerta", async () => {
     const admin = adminFor([]);
     const ok = await releaseHeldSplit(admin, {
       releaseCustody: () => Promise.reject(new Error("PagBank 500: indisponivel")),
+      accountId: () => "ACCO_PRIMARY",
     }, {
       id: chargeId,
       provider_split_id: "SPLI_CARD",

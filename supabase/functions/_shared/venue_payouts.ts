@@ -248,34 +248,8 @@ export async function handleVenuePayouts(
       deps.nowSec ?? Math.floor(Date.now() / 1000),
     );
     if (gate !== "ok") return json({ error: gate }, 401);
-    if (action === "save_bank") {
-      const notice = await deps.store.rpc("save_venue_bank_account", {
-        p_venue_id: venueId,
-        p_actor: actor.id,
-        p_destination: text(body?.destination),
-        p_pix_key: text(body?.pix_key),
-        p_pix_key_type: text(body?.pix_key_type),
-        p_bank_code: text(body?.bank_code),
-        p_agency: text(body?.agency),
-        p_account_number: text(body?.account_number),
-        p_account_digit: text(body?.account_digit),
-        p_owner_name: text(body?.owner_name),
-        p_owner_document: text(body?.owner_document),
-        p_operation_type: text(body?.operation_type),
-      });
-      await deliverNotice(deps, notice);
-      return json(await loadSnapshot(deps, actor, claims, venueId));
-    }
-    if (action === "save_schedule") {
-      await deps.store.rpc("save_venue_payout_schedule", {
-        p_venue_id: venueId,
-        p_actor: actor.id,
-        p_enabled: body?.enabled === true,
-        p_frequency: text(body?.frequency),
-        p_weekday: integerOrNull(body?.weekday),
-        p_min_amount_cents: integerOrNull(body?.min_amount_cents) ?? -1,
-      });
-      return json(await loadSnapshot(deps, actor, claims, venueId));
+    if (action === "save_bank" || action === "save_schedule") {
+      return json({ error: "dados_bancarios_recusados" }, 403);
     }
     if (action === "withdraw") {
       if (venuePayoutsForcedOff) {
