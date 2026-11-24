@@ -4,7 +4,7 @@
 
 - **Data:** 2026-11-24
 - **Decisão:** quem entrou com código de jogador ou de casa ganha 20% na primeira sessão. Quem se cadastrou sem código ganha 10%. Os dois ficam em `referral_program_settings` (`first_booking_discount_bps` 2000 e `organic_first_booking_discount_bps` 1000) e o Admin grava os dois por `admin_save_reward_settings`. `public.reward_rules_public()` devolve os dois e mantém `first_booking_discount_bps`. O cálculo lê o snapshot do cadastro (`profiles.signup_referred`, gravado quando o código entra). A cotação, o `create-charge` e o CAC usam o centavo dessa conta. O desconto continua podendo passar da comissão. A casa recebe o valor cheio.
-- **Onde está no código:** `supabase/migrations/20261124220000_first_session_discount.sql`, o formulário de regras do Admin, o cadastro do jogador, o cadastro da casa no Parceiro e o código que cada um compartilha.
+- **Onde está no código:** `supabase/migrations/20261124230000_first_session_discount.sql`, o formulário de regras do Admin, o cadastro do jogador, o cadastro da casa no Parceiro e o código que cada um compartilha.
 - **Como trocar depois:** a migration não foi aplicada no remoto e nenhuma função foi publicada. O site e os termos estáticos repetem 20% e 10% em texto fixo.
 
 ## A regra vigente chega no app sem versão nova
