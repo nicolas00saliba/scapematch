@@ -453,14 +453,14 @@ Deno.test("grupo confirmado captura e segura a custódia antes do horário", asy
     calls.push(`${method} ${url}`);
     if (method === "GET") {
       return Promise.resolve(new Response(JSON.stringify({
-        id: "pay_card",
+        id: "CHAR_CARD",
         status: "AUTHORIZED",
         billingType: "CREDIT_CARD",
       }), { status: 200 }));
     }
     if (url.includes("/capture")) {
       return Promise.resolve(new Response(JSON.stringify({
-        id: "pay_card",
+        id: "CHAR_CARD",
         status: "PAID",
       }), { status: 200 }));
     }
