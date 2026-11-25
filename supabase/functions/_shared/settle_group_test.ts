@@ -178,11 +178,11 @@ function provider(
 ) {
   const fetchFn = (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
-    if (method === "GET" && url.includes("/charges/pay_card")) {
+    if (method === "GET" && url.includes("CHAR_CARD")) {
       return Promise.resolve(
         new Response(
           JSON.stringify({
-            id: "pay_card",
+            id: "CHAR_CARD",
             status: remoteStatus,
             billingType: "CREDIT_CARD",
             deleted,
@@ -198,7 +198,7 @@ function provider(
       captures.push(url);
       return Promise.resolve(
         new Response(
-          JSON.stringify({ id: "pay_card", status: "CONFIRMED" }),
+          JSON.stringify({ id: "CHAR_CARD", status: "CONFIRMED" }),
           { status: 200 },
         ),
       );
@@ -223,7 +223,7 @@ function card(): Charge {
     amount_cents: 10000,
     commission_bps: 1000,
     status: "authorized",
-    provider_ref: "pay_card",
+    provider_ref: "CHAR_CARD",
     billing_type: "CREDIT_CARD",
   };
 }
@@ -411,7 +411,7 @@ Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
     ...card(),
     status: "paid",
     billing_type: "PIX",
-    provider_ref: "pay_pix",
+    provider_ref: "CHAR_PIX",
     provider_split_id: "SPLI_PIX",
   }];
   const admin = adminFor({ closed: true, charges });
@@ -528,7 +528,7 @@ Deno.test("captura de 4x usa o total com juros, não o principal", async () => {
     const method = init?.method ?? "GET";
     if (method === "GET") {
       return Promise.resolve(new Response(JSON.stringify({
-        id: "pay_card",
+        id: "CHAR_CARD",
         status: "AUTHORIZED",
         billingType: "CREDIT_CARD",
       }), { status: 200 }));
@@ -536,7 +536,7 @@ Deno.test("captura de 4x usa o total com juros, não o principal", async () => {
     if (url.includes("/capture") || url.includes("/cancel")) {
       bodies.push(JSON.parse(String(init?.body)).amount.value);
       return Promise.resolve(new Response(JSON.stringify({
-        id: "pay_card",
+        id: "CHAR_CARD",
         status: url.includes("/capture") ? "PAID" : "CANCELED",
       }), { status: 200 }));
     }

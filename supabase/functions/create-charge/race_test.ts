@@ -558,6 +558,14 @@ function providerFor(
       store.money.push(Number(posted.amount?.value ?? 0));
     }
     if (method === "GET" && url.includes("/orders?")) {
+      const chargeId = new URL(url).searchParams.get("charge_id");
+      if (chargeId) {
+        const payment = store.payments.find((item) => item.id === chargeId);
+        if (!payment || payment.status === "DELETED") {
+          return new Response("não", { status: 404 });
+        }
+        return new Response(JSON.stringify(paymentBody(payment)), { status: 200 });
+      }
       const ref = new URL(url).searchParams.get("reference_id") ?? "";
       url = `${url.split("?")[0].replace("/orders", "/payments")}?externalReference=${
         encodeURIComponent(ref)
@@ -696,7 +704,7 @@ function providerFor(
       };
       seq += 1;
       const payment: Payment = {
-        id: `pay_${seq}`,
+        id: `CHAR_${seq}`,
         status: body.billingType === "CREDIT_CARD" ? "AUTHORIZED" : "PENDING",
         billingType: body.billingType ?? "PIX",
         externalReference: body.externalReference ?? "",
@@ -1000,7 +1008,7 @@ Deno.test("estorno da captura que falha registra o órfão e fica authorized", a
   assertEquals(store.member, "reserved");
 });
 
-function openPix(store: Store, id = "pay_pix") {
+function openPix(store: Store, id = "CHAR_PIX") {
   store.charges[0].billing_type = "PIX";
   store.charges[0].status = "pending";
   store.charges[0].provider_ref = id;
@@ -1046,7 +1054,7 @@ Deno.test("troca Pix para cartão com deleted:true e PENDING", async () => {
 
 Deno.test("troca para cartão trata Pix 404 como já cancelado", async () => {
   const store = makeStore({});
-  openPix(store, "pay_sumiu");
+  openPix(store, "CHAR_SUMIU");
   store.payments.length = 0;
   const response = await createCharge(
     request("CREDIT_CARD", "idem-switch-404"),
@@ -1060,12 +1068,12 @@ Deno.test("troca para cartão trata Pix 404 como já cancelado", async () => {
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].billing_type, "CREDIT_CARD");
   assertEquals(store.charges[0].provider_ref, body.provider_ref);
-  assert(store.calls.some((call) => call.includes("/charges/pay_sumiu")));
+  assert(store.calls.some((call) => call.includes("charge_id=CHAR_SUMIU")));
 });
 
 Deno.test("Pix pendente 404 abre outra cobrança sem órfão", async () => {
   const store = makeStore({});
-  openPix(store, "pay_sumiu");
+  openPix(store, "CHAR_SUMIU");
   store.payments.length = 0;
   const response = await createCharge(
     request("PIX", "idem-pix-404"),
@@ -1076,7 +1084,7 @@ Deno.test("Pix pendente 404 abre outra cobrança sem órfão", async () => {
   assertEquals(body.billing_type, "PIX");
   assertEquals(body.status, "pending");
   assertEquals(store.orphans.length, 0);
-  assert(body.provider_ref !== "pay_sumiu");
+  assert(body.provider_ref !== "CHAR_SUMIU");
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].provider_ref, body.provider_ref);
 });
@@ -1111,7 +1119,7 @@ Deno.test("cartão recusado não cancela o Pix nem reserva a vaga", async () => 
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].billing_type, "PIX");
   assertEquals(store.charges[0].status, "pending");
-  assertEquals(store.charges[0].provider_ref, "pay_pix");
+  assertEquals(store.charges[0].provider_ref, "CHAR_PIX");
   assertEquals(store.charges[0].qr_code, "qr-antigo");
   assertEquals(store.orphans.length, 0);
   assertEquals(store.payments[0].deleted, undefined);
@@ -1168,7 +1176,7 @@ Deno.test("Pix apagado com PENDING não devolve o QR antigo", async () => {
   assertEquals(body.qr_code === "qr-antigo", false);
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].provider_ref, body.provider_ref);
-  assertEquals(store.charges[0].provider_ref === "pay_pix", false);
+  assertEquals(store.charges[0].provider_ref === "CHAR_PIX", false);
 });
 
 Deno.test("Pix apagado sem detach_gone_pix ainda solta o QR", async () => {
@@ -1186,7 +1194,7 @@ Deno.test("Pix apagado sem detach_gone_pix ainda solta o QR", async () => {
   assertEquals(body.qr_code === "qr-antigo", false);
   assertEquals(store.charges.length, 1);
   assertEquals(store.charges[0].billing_type, "PIX");
-  assertEquals(store.charges[0].provider_ref === "pay_pix", false);
+  assertEquals(store.charges[0].provider_ref === "CHAR_PIX", false);
   assertEquals(store.charges[0].qr_code === "qr-antigo", false);
 });
 
