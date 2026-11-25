@@ -245,12 +245,13 @@ begin
   v_quote := private.subsidy_quote(
     'e7a11111-1111-4111-8111-111111111111', 10000, 2500, 20000, false
   );
-  if (v_quote ->> 'points')::integer <> 2500
-    or (v_quote ->> 'topup_cents')::integer <> 0
+  if (v_quote ->> 'points')::integer <> 3000
+    or (v_quote ->> 'charged_cents')::integer <> 7000
+    or (v_quote ->> 'topup_cents')::integer <> 500
     or coalesce((v_quote ->> 'points_only')::boolean, false)
-    or (v_quote ->> 'split_percent')::numeric <> 100
+    or v_quote ->> 'split_percent' is not null
   then
-    raise exception 'flag desligada nao manteve o teto %', v_quote;
+    raise exception 'flag desligada nao cobriu ate o teto configurado %', v_quote;
   end if;
 
   update public.referral_program_settings

@@ -55,7 +55,7 @@ abstract class GroupRepository {
     int? expectedAmountCents,
   });
 
-  /// Cotação de 1x a 12x. A demonstração devolve a grade local, sem juro inventado.
+  /// Cotação de 1x a 3x. A demonstração devolve a grade local, sem juro inventado.
   Future<List<CardInstallmentOption>> quoteCardInstallments(
     int principalCents,
   ) {

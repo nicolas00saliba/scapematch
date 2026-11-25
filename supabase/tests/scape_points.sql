@@ -1688,8 +1688,9 @@ begin
     'be710000-0000-4000-8000-000000000001',
     9000
   );
-  if v_cap <> 2652 or (v_quote ->> 'points')::integer <> v_cap
+  if v_cap <> 3000 or (v_quote ->> 'points')::integer <> v_cap
     or (v_quote ->> 'first_booking_discount_cents')::integer <> 0
+    or (v_quote ->> 'charged_cents')::integer <> 7000
   then
     raise exception 'cap e cotacao divergiram sem desconto % / %', v_cap, v_quote;
   end if;
@@ -1715,9 +1716,9 @@ begin
     (v_held ->> 'split_percent')::numeric
   );
   v_id := (v_reserved ->> 'id')::uuid;
-  if (v_reserved ->> 'amount_cents')::integer <> 7348
+  if (v_reserved ->> 'amount_cents')::integer <> 7000
     or (v_reserved ->> 'gross_amount_cents')::integer <> 10000
-    or (v_reserved ->> 'subsidy_cents')::integer <> 2652
+    or (v_reserved ->> 'subsidy_cents')::integer <> 3000
   then
     raise exception 'so pontos nao gravou o bruto %', v_reserved;
   end if;
@@ -1748,10 +1749,10 @@ begin
   if (
     select amount_cents from public.ledger_entries
     where payment_charge_id = v_id and kind = 'house_net'
-  ) is distinct from 7000 or (
-    select amount_cents from public.ledger_entries
+  ) is distinct from 7000 or exists (
+    select 1 from public.ledger_entries
     where payment_charge_id = v_id and kind = 'commission'
-  ) is distinct from 348 then
+  ) then
     raise exception 'livro usou o liquido como bruto na cobranca so com pontos';
   end if;
 
@@ -1899,14 +1900,14 @@ begin
     'be710000-0000-4000-8000-000000000004',
     9000
   );
-  if v_cap <> 1353
-    or (v_quote ->> 'points')::integer <> 1353
-    or (v_quote ->> 'subsidy_cents')::integer <> 1353
+  if v_cap <> 6000
+    or (v_quote ->> 'points')::integer <> 6000
+    or (v_quote ->> 'subsidy_cents')::integer <> 6000
     or (v_quote ->> 'first_booking_discount_cents')::integer <> 4000
-    or (v_quote ->> 'charged_cents')::integer <> 14647
-    or (v_quote ->> 'max_points')::integer <> 1353
+    or (v_quote ->> 'charged_cents')::integer <> 10000
+    or (v_quote ->> 'max_points')::integer <> 6000
   then
-    raise exception 'cap nao descontou os 20%% como a cotacao % / %', v_cap, v_quote;
+    raise exception 'cap nao cobriu o pagavel ate o teto configurado % / %', v_cap, v_quote;
   end if;
   perform set_config('request.jwt.claim.sub', '', true);
   v_held := private.hold_point_redemption(
@@ -1936,7 +1937,7 @@ begin
     'be444444-4444-4444-8444-444444444444',
     'Desconto e pontos', true, 'pending', 'none', 'none'
   );
-  if (v_reserved ->> 'amount_cents')::integer <> 14647
+  if (v_reserved ->> 'amount_cents')::integer <> 10000
     or (v_reserved ->> 'gross_amount_cents')::integer <> 20000
     or (
       select first_booking_discount_cents from public.payment_charges
@@ -1958,7 +1959,16 @@ begin
     select amount_cents from public.ledger_entries
     where payment_charge_id = (v_reserved ->> 'id')::uuid
       and kind = 'house_net'
-  ) is distinct from 14000 then
+  ) is distinct from 10000
+    or (
+      select free_slot_topup_cents from public.payment_charges
+      where id = (v_reserved ->> 'id')::uuid
+    ) is distinct from 4000
+    or (
+      select amount_cents from public.platform_cac_transfers
+      where payment_charge_id = (v_reserved ->> 'id')::uuid
+    ) is distinct from 4000
+  then
     raise exception 'livro errou a casa na combinacao de pontos e desconto';
   end if;
 
@@ -2086,7 +2096,7 @@ begin
   from public.scape_point_entries
   where source_charge_id = 'be720000-0000-4000-8000-000000000006'
     and program = 'c2c' and kind = 'accrual';
-  if v_c2c is distinct from 80 then
+  if v_c2c is distinct from 250 then
     raise exception 'replay do cashback encolheu a indicacao %', v_c2c;
   end if;
   update public.referral_program_settings

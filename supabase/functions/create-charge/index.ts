@@ -496,7 +496,11 @@ export async function createCharge(
         }
         throw error;
       }
-      amountCents = reserved.amount_cents || amountCents;
+      amountCents = reservedAmountCents(reserved.amount_cents, amountCents);
+      if (amountCents === 0 && pointsRedeemed > 0) {
+        holdOpen = false;
+        return json(await settlePointsCovered(admin, reserved.id, billingType));
+      }
       if (reserved.house_fixed_cents >= 0) {
         split.fixedValue = fixedReaisFromCents(reserved.house_fixed_cents);
       } else {
@@ -960,9 +964,18 @@ export async function createCharge(
           }
           throw error;
         }
+        const coveredCard = reservedAmountCents(
+          reservedCard.amount_cents,
+          amountCents,
+        );
+        if (coveredCard === 0 && pointsRedeemed > 0) {
+          await loseCard(reservedCard.id, reservedCard.attempt_id);
+          holdOpen = false;
+          return json(await settlePointsCovered(admin, reservedCard.id, billingType));
+        }
         const aligned = await alignCardSplit(
           reservedCard.house_fixed_cents,
-          reservedCard.amount_cents || amountCents,
+          coveredCard,
           reservedCard.id,
           reservedCard.attempt_id,
         );
@@ -973,7 +986,7 @@ export async function createCharge(
           reservedCard.house_fixed_cents,
           reservedCard.id,
         );
-        amountCents = reservedCard.amount_cents || amountCents;
+        amountCents = reservedAmountCents(reservedCard.amount_cents, amountCents);
         holdOpen = false;
         cardChargeId = reservedCard.id;
         await noteCardPayer(admin, user.id, savedCardId, cardChargeId);
@@ -1028,16 +1041,22 @@ export async function createCharge(
             throw error;
           }
           holdOpen = false;
+          const coveredAgain = reservedAmountCents(again.amount_cents, amountCents);
+          if (coveredAgain === 0 && pointsRedeemed > 0) {
+            await loseCard(again.id, again.attempt_id);
+            holdOpen = false;
+            return json(await settlePointsCovered(admin, again.id, billingType));
+          }
           const alignedAgain = await alignCardSplit(
             again.house_fixed_cents,
-            again.amount_cents || amountCents,
+            coveredAgain,
             again.id,
             again.attempt_id,
           );
           if (alignedAgain === "valor_parcelas") {
             return json({ error: "valor_parcelas" }, 409);
           }
-          amountCents = again.amount_cents || amountCents;
+          amountCents = reservedAmountCents(again.amount_cents, amountCents);
           await noteCardPayer(admin, user.id, savedCardId, again.id);
           if (!again.inserted || !again.attempt_id) {
             await loseCard(again.id || reservedCard.id, again.attempt_id);
@@ -1556,6 +1575,34 @@ async function filledSpots(
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
   return count ?? 0;
+}
+
+function reservedAmountCents(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+  return fallback;
+}
+
+async function settlePointsCovered(
+  admin: ChargeDb,
+  chargeId: string,
+  billingType: string,
+): Promise<Record<string, unknown>> {
+  const settled = await admin.rpc("settle_points_covered_charge", {
+    p_charge_id: chargeId,
+  });
+  if (settled.error || !settled.data) throw new Error("erro");
+  return {
+    charge_id: chargeId,
+    status: "paid",
+    provider_ref: null,
+    qr_code: "",
+    qr_code_base64: null,
+    billing_type: billingType,
+    amount_cents: 0,
+    points_only: true,
+  };
 }
 
 function requestedPoints(value: unknown): number {

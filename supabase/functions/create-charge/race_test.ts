@@ -1158,7 +1158,7 @@ Deno.test("reserva vencida que não apaga ainda cancela a autorização", async 
   assertEquals(store.charges[0].provider_ref, null);
 });
 
-Deno.test("4x não reautoriza quando o valor reservado muda", async () => {
+Deno.test("4x é recusado antes de autorizar", async () => {
   const store = makeStore();
   store.reserveAmountCents = 8000;
   store.reserveHouseFixedCents = 7200;
@@ -1176,13 +1176,10 @@ Deno.test("4x não reautoriza quando o valor reservado muda", async () => {
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
-  assertEquals(response.status, 409);
-  assertEquals((await response.json()).error, "valor_parcelas");
-  assertEquals(
-    store.calls.filter((call) => call.includes("/orders")).length,
-    1,
-  );
-  assertEquals(store.money, [10640]);
+  assertEquals(response.status, 400);
+  assertEquals((await response.json()).error, "parcelas");
+  assertEquals(store.calls.some((call) => call.includes("/orders")), false);
+  assertEquals(store.money, []);
 });
 
 Deno.test("falha ao gravar o total solta a reserva do cartão", async () => {
@@ -1196,15 +1193,14 @@ Deno.test("falha ao gravar o total solta a reserva do cartão", async () => {
         billing_type: "CREDIT_CARD",
         idempotency_key: "idem-4x-total-falhou",
         saved_card_id: cardId,
-        installments: 4,
-        expected_amount_cents: 10640,
+        installments: 1,
       }),
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
   assertEquals(response.status, 409);
   assertEquals((await response.json()).error, "pagamento em andamento");
-  assertEquals(store.money, [10640]);
+  assertEquals(store.money, [10000]);
   assert(
     store.calls.some((call) => call === "release_pix_reservation"),
   );
@@ -1225,12 +1221,12 @@ Deno.test("4x sem o total confirmado não cobra", async () => {
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
-  assertEquals(response.status, 409);
-  assertEquals((await response.json()).error, "valor_parcelas");
+  assertEquals(response.status, 400);
+  assertEquals((await response.json()).error, "parcelas");
   assertEquals(store.calls.some((call) => call.includes("/orders")), false);
 });
 
-Deno.test("4x captura e cancela o total com juros", async () => {
+Deno.test("3x com falha na captura cancela o principal", async () => {
   const store = makeStore();
   store.closed = true;
   const response = await createCharge(
@@ -1239,10 +1235,9 @@ Deno.test("4x captura e cancela o total com juros", async () => {
       body: JSON.stringify({
         group_id: groupId,
         billing_type: "CREDIT_CARD",
-        idempotency_key: "idem-4x-juros",
+        idempotency_key: "idem-3x-captura-falhou",
         saved_card_id: cardId,
-        installments: 4,
-        expected_amount_cents: 10640,
+        installments: 3,
       }),
     }),
     chargeRuntime(store, providerFor(store, {
@@ -1250,10 +1245,10 @@ Deno.test("4x captura e cancela o total com juros", async () => {
     })),
   );
   assertEquals(response.status, 502);
-  assertEquals(store.money, [10640, 10640]);
+  assertEquals(store.money, [10000, 10000]);
 });
 
-Deno.test("4x autorizado grava o total e captura esse valor", async () => {
+Deno.test("3x autorizado grava o principal e captura esse valor", async () => {
   const store = makeStore();
   store.closed = true;
   const response = await createCharge(
@@ -1262,22 +1257,21 @@ Deno.test("4x autorizado grava o total e captura esse valor", async () => {
       body: JSON.stringify({
         group_id: groupId,
         billing_type: "CREDIT_CARD",
-        idempotency_key: "idem-4x-captura",
+        idempotency_key: "idem-3x-captura",
         saved_card_id: cardId,
-        installments: 4,
-        expected_amount_cents: 10640,
+        installments: 3,
       }),
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
   assertEquals(response.status, 200);
-  assertEquals(store.money, [10640]);
+  assertEquals(store.money, [10000]);
   const row = store.charges[0] as Charge & {
     charged_amount_cents?: number;
     buyer_interest_cents?: number;
   };
-  assertEquals(row.charged_amount_cents, 10640);
-  assertEquals(row.buyer_interest_cents, 640);
+  assertEquals(row.charged_amount_cents, 10000);
+  assertEquals(row.buyer_interest_cents, 0);
   assertEquals(row.amount_cents, 10000);
 });
 
