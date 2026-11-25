@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum AdminSection {
   casas,
+  operacao,
   jogadores,
   regras,
   ganhos,
@@ -27,6 +28,10 @@ class AdminPlaceController extends Notifier<AdminPlace> {
   void go(AdminSection section) => state = AdminPlace(section: section);
 
   void open(String id) => state = AdminPlace(section: state.section, id: id);
+
+  void openSection(AdminSection section, String id) {
+    state = AdminPlace(section: section, id: id);
+  }
 
   void close() => state = AdminPlace(section: state.section);
 }
