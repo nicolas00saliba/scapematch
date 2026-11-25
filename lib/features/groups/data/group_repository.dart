@@ -59,9 +59,7 @@ abstract class GroupRepository {
   Future<List<CardInstallmentOption>> quoteCardInstallments(
     int principalCents,
   ) {
-    return Future.value(
-      cardInstallmentOptions(principalCents: principalCents),
-    );
+    return Future.value(cardInstallmentOptions(principalCents: principalCents));
   }
 
   /// Tokeniza em `tokenize-card` e cobra em `create-charge` com o id devolvido.
@@ -111,6 +109,11 @@ abstract class GroupRepository {
 
   /// The creator cannot leave. They delete the group instead.
   Future<LeaveGroupResult> leave(String groupId, {required String userId});
+
+  /// Centavos que voltam se [userId] sair agora com o pagamento capturado
+  /// e ainda dentro do prazo. Nulo quando não há reembolso em dinheiro.
+  /// A taxa de pagamento já saiu desse número.
+  Future<int?> previewLeaveRefund(String groupId, {required String userId});
 
   /// Fecha o grupo com quem já está sentado, se chegou no mínimo da sala.
   Future<CloseGroupResult> closeWithFewer(

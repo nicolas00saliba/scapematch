@@ -916,11 +916,23 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final paid = me != null && me.payment == PaymentStatus.paid;
     final reserved = me != null && me.payment == PaymentStatus.reserved;
     final expectsRefund = paid && previewRefunds;
+    final refundCents = expectsRefund
+        ? await ref
+              .read(groupRepositoryProvider)
+              .previewLeaveRefund(
+                group.id,
+                userId: ref.read(currentUserProvider).id,
+              )
+        : null;
+    if (!mounted) {
+      return;
+    }
     final accepted = await showLeaveDialog(
       context,
       refunds: expectsRefund,
       paid: paid,
       reserved: reserved,
+      refundCents: refundCents,
     );
     if (!accepted || !mounted) {
       return;

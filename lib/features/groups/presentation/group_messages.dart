@@ -1,3 +1,4 @@
+import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_phase.dart';
@@ -244,8 +245,11 @@ abstract final class GroupMessages {
 
   static String get leaveWithRefundTitle => 'Sair do grupo?';
 
-  static String get leaveWithRefundBody =>
-      'Faltam $_hours horas ou mais para o início. Se você sair agora, o pagamento volta integralmente e a vaga fica livre.';
+  static String leaveRefundAmount(int cents) =>
+      'Você recebe ${formatPrice(cents)}. A taxa de pagamento não é devolvida. A vaga fica livre.';
+
+  static const leaveRefundUnknown =
+      'Não foi possível calcular o valor agora. A taxa de pagamento não é devolvida. A vaga fica livre.';
 
   static String get leaveWithoutRefundTitle => 'Sair sem reembolso?';
 
@@ -305,7 +309,7 @@ abstract final class GroupMessages {
   static String removeTitle(String name) => 'Remover $name?';
 
   static String removeBody(String name) =>
-      'Remover $name cancela a vaga dessa pessoa. O reembolso é integral, porque a saída foi decisão do organizador.';
+      'Remover $name cancela a vaga dessa pessoa. O valor devolvido é o pago menos a taxa de pagamento.';
 
   static const removeAction = 'Remover';
 

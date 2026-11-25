@@ -830,6 +830,45 @@ class FakeGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<int?> previewLeaveRefund(
+    String groupId, {
+    required String userId,
+  }) async {
+    await _pause();
+    switch (_lookupSeat(groupId, userId)) {
+      case _SeatProblem():
+        return null;
+      case _SeatFound(group: final group, member: final member):
+        if (member.payment != PaymentStatus.paid) {
+          return null;
+        }
+        if (!GroupRules.refundsOnParticipantCancel(
+          startsAt: group.startsAt,
+          now: clock.now(),
+          window: group.cancelWindow,
+        )) {
+          return null;
+        }
+        final cash = _cashPaid(group, userId);
+        const pixFeeCents = 199;
+        final fee = cash < pixFeeCents ? cash : pixFeeCents;
+        return cash - fee;
+    }
+  }
+
+  int _cashPaid(Group group, String userId) {
+    final reservation = payments.lookup(group.id);
+    if (reservation != null) {
+      for (final share in reservation.shares) {
+        if (share.playerId == userId && share.amountCents > 0) {
+          return share.amountCents;
+        }
+      }
+    }
+    return group.priceCents < 0 ? 0 : group.priceCents;
+  }
+
+  @override
   Future<DeleteGroupResult> deleteGroup(
     String groupId, {
     required String userId,
