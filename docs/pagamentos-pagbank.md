@@ -70,6 +70,6 @@ O access token é renovado quando falta menos de dois minutos para vencer, e de 
 
 ## Colunas
 
-`20261125230000_eliminar_provedor_antigo.sql` tira as colunas espelho, os gatilhos que copiavam a conta PagBank para elas e o item antigo do Vault. A função nova é `private.pagbank_token_key()`. O valor cifrado dos tokens não muda. Cobrança antiga com outro `provider` continua no livro. Casa que já existia fica sem `pagbank_account_id` até passar pelo Connect.
+`20261125200103_eliminar_provedor_antigo.sql` tira as colunas espelho, os gatilhos que copiavam a conta PagBank para elas e o item antigo do Vault. A função nova é `private.pagbank_token_key()`. O valor cifrado dos tokens não muda. Cobrança antiga com outro `provider` continua no livro. Casa que já existia fica sem `pagbank_account_id` até passar pelo Connect.
 
 O harness local ainda planta o item antigo antes da cadeia, porque `20261105220000` lê esse nome na hora em que roda. A migration nova copia e apaga. O teste do allowlist do cron consulta `pagbank_token_key` e continua recebendo nulo.
