@@ -127,6 +127,9 @@ echo "test account duplicate exception ok"
 # supabase/migrations/20261124230000_first_session_discount.sql
 run -f "$root/tests/first_session_discount.sql"
 echo "first session discount ok"
+# supabase/migrations/20261125150000_reward_audit_20261125.sql
+run -f "$root/tests/reward_audit_20261125.sql"
+echo "reward audit 20261125 ok"
 run -f "$root/tests/venue_open_schedule.sql"
 echo "venue open schedule ok"
 run -f "$root/tests/paid_seat_count.sql"

@@ -73,16 +73,16 @@ void main() {
     expect(lines.last.payee, RewardPayee.playerPoints);
   });
 
-  test('a recompensa não passa da comissão que sobrou', () {
+  test('a taxa cheia não encolhe para caber na comissão', () {
     final lines = quoteReferralRewards(
       spend(playerReferrer: window, commissionBps: 100, subsidyCents: 40),
     );
-    expect(lines.single.program, 'cashback');
-    expect(lines.single.points, 60);
-    expect(lines.single.cents, 60);
+    expect(lines.map((line) => line.program), ['cashback', 'c2c']);
+    expect(lines[0].cents, 100);
+    expect(lines[1].cents, 100);
   });
 
-  test('jogador e casa dividem a mesma comissão, o jogador primeiro', () {
+  test('jogador e casa recebem a taxa cheia mesmo acima da comissão', () {
     final lines = quoteReferralRewards(
       spend(
         playerReferrer: window,
@@ -94,8 +94,7 @@ void main() {
     expect(lines.map((line) => line.program), ['cashback', 'c2c', 'c2b']);
     expect(lines[0].points, 100);
     expect(lines[1].points, 100);
-    expect(lines[2].points, 100);
-    expect(lines.fold<int>(0, (sum, line) => sum + line.cents), 300);
+    expect(lines[2].points, 500);
   });
 
   test('fora da janela de um ano não lança', () {
@@ -136,6 +135,12 @@ void main() {
         spend(venueReferrer: window, firstBookingDiscountCents: 2000),
       ).map((line) => line.program),
       ['cashback'],
+    );
+    expect(
+      quoteReferralRewards(
+        spend(venueReferrer: window, firstBookingDiscountCents: 1000),
+      ).singleWhere((line) => line.program == 'b2b').cents,
+      500,
     );
     final firstVisit = quoteReferralRewards(spend(venueReferrer: window));
     final nextVisit = quoteReferralRewards(spend(venueReferrer: window));
@@ -261,7 +266,7 @@ void main() {
     expect(capped.chargedCents, 5000);
   });
 
-  test('com a flag desligada o lastro continua no teto da comissão', () {
+  test('com a flag desligada os pontos cobrem a reserva e a casa recebe complemento', () {
     final quote = quotePointSubsidy(
       grossCents: 10000,
       commissionBps: 2500,
@@ -270,12 +275,12 @@ void main() {
       availableBackedPoints: 10000,
       rates: const ReferralRates(backedFullSlotEnabled: false),
     );
-    expect(quote.points, 2500);
-    expect(quote.backedPoints, 2500);
-    expect(quote.topupCents, 0);
-    expect(quote.pointsOnly, isFalse);
-    expect(quote.chargedCents, 7500);
-    expect(quote.splitPercent, 100);
+    expect(quote.points, 10000);
+    expect(quote.backedPoints, 10000);
+    expect(quote.topupCents, 7500);
+    expect(quote.pointsOnly, isTrue);
+    expect(quote.chargedCents, 0);
+    expect(quote.splitPercent, isNull);
   });
 
   test('pontos de indicação cobrem a vaga e o resto vira crédito da casa', () {

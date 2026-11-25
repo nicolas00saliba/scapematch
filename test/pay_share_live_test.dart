@@ -181,15 +181,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(InstallmentPickerPage.title), findsOneWidget);
     expect(find.text('sem juros'), findsNWidgets(3));
-    expect(find.text('com juros'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('parcela-4')));
+    expect(find.text('com juros'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('parcela-3')));
     await tester.pumpAndSettle();
-    expect(find.text('4x com juros'), findsOneWidget);
+    expect(find.text('3x sem juros'), findsOneWidget);
     await tester.tap(find.byKey(AppKeys.payCharge));
     await tester.pumpAndSettle();
 
-    expect(sent, 4);
-    expect(expected, 20640);
+    expect(sent, 3);
+    expect(expected, 20000);
   });
 
   testWidgets('dinheiro, pontos e híbrido', (tester) async {

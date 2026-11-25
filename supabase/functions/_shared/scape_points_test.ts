@@ -33,7 +33,7 @@ Deno.test("C2C do primeiro indicado vira 100 pontos de 1 centavo", () => {
   ]);
 });
 
-Deno.test("a recompensa não passa da comissão restante", () => {
+Deno.test("a taxa cheia não encolhe para caber na comissão", () => {
   const lines = quoteReferralRewards({
     grossCents: 10000,
     commissionBps: 100,
@@ -41,15 +41,12 @@ Deno.test("a recompensa não passa da comissão restante", () => {
     paidAt: "2026-06-01T00:00:00.000Z",
     playerReferrer: window,
   });
-  assertEquals(lines, [{
-    program: "cashback",
-    cents: 60,
-    points: 60,
-    payee: "player_points",
-  }]);
+  assertEquals(lines.map((line) => line.program), ["cashback", "c2c"]);
+  assertEquals(lines[0].cents, 100);
+  assertEquals(lines[1].cents, 100);
 });
 
-Deno.test("jogador e casa dividem a comissão, sem deixar a casa negativa", () => {
+Deno.test("jogador e casa recebem a taxa cheia mesmo acima da comissão", () => {
   const lines = quoteReferralRewards({
     grossCents: 10000,
     commissionBps: 300,
@@ -59,7 +56,9 @@ Deno.test("jogador e casa dividem a comissão, sem deixar a casa negativa", () =
     venueReferrerIsPlayer: true,
   });
   assertEquals(lines.map((line) => line.program), ["cashback", "c2c", "c2b"]);
-  assertEquals(lines[0].points + lines[1].points + lines[2].points, 300);
+  assertEquals(lines[0].points, 100);
+  assertEquals(lines[1].points, 100);
+  assertEquals(lines[2].points, 500);
 });
 
 Deno.test("fora de um ano e na mesma casa não lança", () => {
@@ -93,6 +92,16 @@ Deno.test("fora de um ano e na mesma casa não lança", () => {
       firstBookingDiscountCents: 2000,
     }).map((line) => line.program),
     ["cashback"],
+  );
+  assertEquals(
+    quoteReferralRewards({
+      grossCents: 10000,
+      commissionBps: 2500,
+      paidAt: "2026-06-01T00:00:00.000Z",
+      venueReferrer: window,
+      firstBookingDiscountCents: 1000,
+    }).some((line) => line.program === "b2b" && line.cents === 500),
+    true,
   );
   const b2b = quoteReferralRewards({
     grossCents: 10000,
@@ -223,8 +232,11 @@ Deno.test("vaga grátis usa só ponto de indicação e gera crédito da casa", (
     availableBackedPoints: 10000,
     backedFullSlotEnabled: false,
   });
-  assertEquals(off.points, 2500);
-  assertEquals(off.topupCents, 0);
+  assertEquals(off.points, 10000);
+  assertEquals(off.chargedCents, 0);
+  assertEquals(off.topupCents, 7500);
+  assertEquals(off.pointsOnly, true);
+  assertEquals(off.splitPercent, null);
   const full = quotePointSubsidy({
     grossCents: 10000,
     commissionBps: 2500,

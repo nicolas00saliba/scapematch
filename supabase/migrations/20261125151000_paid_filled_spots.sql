@@ -2,7 +2,9 @@
 -- reserved (custódia HELD). Quem só entrou, no modelo antigo, não ocupa.
 -- Dois pagamentos da última vaga travam a linha do grupo. O segundo
 -- já cobrado vai para a fila de estorno e sai do grupo.
--- Não aplicado no remoto.
+-- Versão 20261125151000 para não repetir 20261125150000 da auditoria
+-- de recompensas. Não redefine player_payable_cents, quote_redemption
+-- nem create-charge. Não aplicado no remoto.
 
 create or replace function private.group_filled_spots(p_group_id uuid)
 returns integer

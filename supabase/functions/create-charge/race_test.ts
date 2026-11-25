@@ -49,6 +49,9 @@ type Store = {
   quoteOk?: boolean;
   reserveAmountCents?: number;
   reserveHouseFixedCents?: number;
+  heldChargedCents?: number;
+  playerPayableCents?: number;
+  settleStatus?: string;
   failChargedTotal?: boolean;
   detachMissing?: boolean;
   releaseExpiredError?: boolean;
@@ -282,6 +285,48 @@ function adminFor(store: Store) {
           // A corrida não resgata. A regra de verdade está em cap_point_redemption no SQL.
           return { data: Number(args.p_points ?? 0), error: null };
         }
+        if (name === "hold_point_redemption") {
+          const points = Number(args.p_points ?? 0);
+          const gross = Number(args.p_gross ?? 0);
+          const charged = store.heldChargedCents ?? Math.max(gross - points, 0);
+          return {
+            data: {
+              points,
+              charged_cents: charged,
+              subsidy_cents: points,
+              gross_cents: gross,
+              house_net_cents: 7500,
+              split_percent: null,
+              points_only: false,
+              held: points > 0,
+            },
+            error: null,
+          };
+        }
+        if (name === "player_payable_cents") {
+          if (typeof store.playerPayableCents !== "number") {
+            return { data: null, error: { code: "42883" } };
+          }
+          return { data: store.playerPayableCents, error: null };
+        }
+        if (name === "settle_points_covered_charge") {
+          const row = byId(String(args.p_charge_id));
+          const status = store.settleStatus ??
+            (row && ["creating", "pending", "authorized"].includes(row.status)
+              ? "paid"
+              : row?.status ?? "failed");
+          if (row && status === "paid") row.status = "paid";
+          return {
+            data: {
+              id: row?.id ?? args.p_charge_id,
+              status,
+              amount_cents: 0,
+              points_only: status === "paid",
+              applied: status === "paid",
+            },
+            error: null,
+          };
+        }
         if (name === "load_owned_card") {
           return {
             data: {
@@ -294,7 +339,15 @@ function adminFor(store: Store) {
           };
         }
         if (name === "reserve_pix_charge") {
-          return { data: reserve("PIX", args), error: null };
+          return {
+            data: {
+              ...reserve("PIX", args),
+              ...(typeof store.reserveAmountCents === "number"
+                ? { amount_cents: store.reserveAmountCents }
+                : {}),
+            },
+            error: null,
+          };
         }
         if (name === "reserve_card_charge") {
           return {
@@ -1158,7 +1211,7 @@ Deno.test("reserva vencida que não apaga ainda cancela a autorização", async 
   assertEquals(store.charges[0].provider_ref, null);
 });
 
-Deno.test("4x não reautoriza quando o valor reservado muda", async () => {
+Deno.test("4x é recusado antes de autorizar", async () => {
   const store = makeStore();
   store.reserveAmountCents = 8000;
   store.reserveHouseFixedCents = 7200;
@@ -1176,13 +1229,10 @@ Deno.test("4x não reautoriza quando o valor reservado muda", async () => {
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
-  assertEquals(response.status, 409);
-  assertEquals((await response.json()).error, "valor_parcelas");
-  assertEquals(
-    store.calls.filter((call) => call.includes("/orders")).length,
-    1,
-  );
-  assertEquals(store.money, [10640]);
+  assertEquals(response.status, 400);
+  assertEquals((await response.json()).error, "parcelas");
+  assertEquals(store.calls.some((call) => call.includes("/orders")), false);
+  assertEquals(store.money, []);
 });
 
 Deno.test("falha ao gravar o total solta a reserva do cartão", async () => {
@@ -1196,15 +1246,14 @@ Deno.test("falha ao gravar o total solta a reserva do cartão", async () => {
         billing_type: "CREDIT_CARD",
         idempotency_key: "idem-4x-total-falhou",
         saved_card_id: cardId,
-        installments: 4,
-        expected_amount_cents: 10640,
+        installments: 1,
       }),
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
   assertEquals(response.status, 409);
   assertEquals((await response.json()).error, "pagamento em andamento");
-  assertEquals(store.money, [10640]);
+  assertEquals(store.money, [10000]);
   assert(
     store.calls.some((call) => call === "release_pix_reservation"),
   );
@@ -1225,12 +1274,12 @@ Deno.test("4x sem o total confirmado não cobra", async () => {
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
-  assertEquals(response.status, 409);
-  assertEquals((await response.json()).error, "valor_parcelas");
+  assertEquals(response.status, 400);
+  assertEquals((await response.json()).error, "parcelas");
   assertEquals(store.calls.some((call) => call.includes("/orders")), false);
 });
 
-Deno.test("4x captura e cancela o total com juros", async () => {
+Deno.test("3x com falha na captura cancela o principal", async () => {
   const store = makeStore();
   store.closed = true;
   const response = await createCharge(
@@ -1239,10 +1288,9 @@ Deno.test("4x captura e cancela o total com juros", async () => {
       body: JSON.stringify({
         group_id: groupId,
         billing_type: "CREDIT_CARD",
-        idempotency_key: "idem-4x-juros",
+        idempotency_key: "idem-3x-captura-falhou",
         saved_card_id: cardId,
-        installments: 4,
-        expected_amount_cents: 10640,
+        installments: 3,
       }),
     }),
     chargeRuntime(store, providerFor(store, {
@@ -1250,10 +1298,10 @@ Deno.test("4x captura e cancela o total com juros", async () => {
     })),
   );
   assertEquals(response.status, 502);
-  assertEquals(store.money, [10640, 10640]);
+  assertEquals(store.money, [10000, 10000]);
 });
 
-Deno.test("4x autorizado grava o total e captura esse valor", async () => {
+Deno.test("3x autorizado grava o principal e captura esse valor", async () => {
   const store = makeStore();
   store.closed = true;
   const response = await createCharge(
@@ -1262,22 +1310,21 @@ Deno.test("4x autorizado grava o total e captura esse valor", async () => {
       body: JSON.stringify({
         group_id: groupId,
         billing_type: "CREDIT_CARD",
-        idempotency_key: "idem-4x-captura",
+        idempotency_key: "idem-3x-captura",
         saved_card_id: cardId,
-        installments: 4,
-        expected_amount_cents: 10640,
+        installments: 3,
       }),
     }),
     chargeRuntime(store, providerFor(store, {})),
   );
   assertEquals(response.status, 200);
-  assertEquals(store.money, [10640]);
+  assertEquals(store.money, [10000]);
   const row = store.charges[0] as Charge & {
     charged_amount_cents?: number;
     buyer_interest_cents?: number;
   };
-  assertEquals(row.charged_amount_cents, 10640);
-  assertEquals(row.buyer_interest_cents, 640);
+  assertEquals(row.charged_amount_cents, 10000);
+  assertEquals(row.buyer_interest_cents, 0);
   assertEquals(row.amount_cents, 10000);
 });
 
@@ -1330,4 +1377,84 @@ Deno.test("cotação acima do teto do usuário responde 429", async () => {
     store.calls.some((call) => call.includes("fees/calculate")),
     false,
   );
+});
+
+function pointsRequest(billing: string, key: string): Request {
+  return new Request("https://example.test/create-charge", {
+    method: "POST",
+    body: JSON.stringify({
+      group_id: groupId,
+      billing_type: billing,
+      idempotency_key: key,
+      saved_card_id: cardId,
+      points: 8000,
+    }),
+  });
+}
+
+Deno.test("pontos que cobrem a reserva não autorizam o cartão", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 2000;
+  store.playerPayableCents = 0;
+  store.reserveAmountCents = 0;
+  const response = await createCharge(
+    pointsRequest("CREDIT_CARD", "idem-pontos-cheios"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "paid");
+  assertEquals(body.points_only, true);
+  assertEquals(store.payments, []);
+  assertEquals(store.money, []);
+});
+
+Deno.test("corrida que zera depois da autorização ainda estorna o cartão", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 10000;
+  store.playerPayableCents = 10000;
+  store.reserveAmountCents = 0;
+  const response = await createCharge(
+    pointsRequest("CREDIT_CARD", "idem-pontos-corrida"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "paid");
+  assert(store.payments.length > 0);
+  assert(
+    store.payments.some((item) =>
+      item.status === "DELETED" || item.status === "REFUNDED"
+    ),
+  );
+});
+
+Deno.test("liquidação recusada devolve o status da cobrança cancelada", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 2000;
+  store.reserveAmountCents = 0;
+  store.settleStatus = "cancelled";
+  const response = await createCharge(
+    pointsRequest("PIX", "idem-pontos-cancelada"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 409);
+  assertEquals(body.status, "cancelled");
+  assertEquals(body.points_only, false);
+});
+
+Deno.test("liquidação recusada devolve o status da cobrança expirada", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 2000;
+  store.reserveAmountCents = 0;
+  store.settleStatus = "failed";
+  const response = await createCharge(
+    pointsRequest("PIX", "idem-pontos-expirada"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 409);
+  assertEquals(body.status, "failed");
+  assertEquals(body.points_only, false);
 });

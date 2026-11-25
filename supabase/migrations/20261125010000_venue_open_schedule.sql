@@ -1,4 +1,6 @@
 -- Dias e horários em que o jogador ainda pode criar um grupo.
+-- Não redefine funções da auditoria de 25/11 (player_payable_cents,
+-- quote_redemption, subsidy_quote, post_referral_rewards).
 -- Não aplicado no remoto.
 --
 -- Livre: sessão da casa com hora marcada, sem cancelled_at, com mais de

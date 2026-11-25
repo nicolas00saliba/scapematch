@@ -4,7 +4,8 @@
 -- paga estorna todo mundo. Não aplicado no remoto.
 --
 -- Não mexe em preço, desconto, pontos, indicação nem em
--- post_referral_rewards, subsidy_quote ou quote_redemption.
+-- post_referral_rewards, subsidy_quote, quote_redemption ou
+-- player_payable_cents. Corre depois da auditoria 20261125120937.
 
 create or replace function public.app_time_zone()
 returns text

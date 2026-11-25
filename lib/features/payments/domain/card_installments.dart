@@ -2,11 +2,11 @@
 /// https://developer.pagbank.com.br/reference/criar-transacao-com-repasse-de-taxa
 const minCardInstallmentParcelCents = 500;
 
-const maxCardInstallments = 12;
+const maxCardInstallments = 3;
 
 const interestFreeCardInstallments = 3;
 
-/// Uma opção da grade. O total de 4x a 12x já inclui o juro cotado.
+/// Uma opção da grade. O teto é 3x sem juros.
 class CardInstallmentOption {
   const CardInstallmentOption({
     required this.count,
@@ -40,8 +40,7 @@ int cardInstallmentCents(int totalCents, int count) {
   return (totalCents + count - 1) ~/ count;
 }
 
-/// 1x a 12x. Sem o juro cotado, 4x a 12x ficam desabilitadas.
-/// Parcela abaixo de R$ 5 também fica desabilitada.
+/// 1x a 3x, sem juros. Parcela abaixo de R$ 5 fica desabilitada.
 List<CardInstallmentOption> cardInstallmentOptions({
   required int principalCents,
   Map<int, int> interestCentsByCount = const {},
@@ -109,7 +108,9 @@ List<CardInstallmentOption> cardInstallmentsFromQuote(
     if (item is! Map) continue;
     final count = item['installments'];
     final total = item['amount_cents'];
-    if (count is! int || total is! int || count < 1 || count > 12) continue;
+    if (count is! int || total is! int || count < 1 || count > maxCardInstallments) {
+      continue;
+    }
     final interestFree = item['interest_free'] == true;
     options.add(
       CardInstallmentOption(
