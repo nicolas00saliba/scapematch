@@ -154,3 +154,5 @@ echo "admin people ok"
 # supabase/migrations/20261125182833_admin_reports.sql
 run -f "$root/tests/admin_reports.sql"
 echo "admin reports ok"
+run -f "$root/tests/eliminar_provedor_antigo.sql"
+echo "eliminar provedor antigo ok"
