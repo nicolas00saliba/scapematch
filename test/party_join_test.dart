@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/features/community/domain/community_board.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
@@ -75,12 +76,28 @@ void main() {
     );
     expect(joined, isA<JoinSuccess>());
     final seated = (joined as JoinSuccess).group;
-    expect(seated.filledSpots, openBefore.filledSpots + party.length + 1);
-    expect(seated.filledSpots, lessThanOrEqualTo(seated.totalSpots));
-    expect(seated.openSeats, openBefore.openSeats - 3);
+    expect(seated.filledSpots, openBefore.filledSpots);
+    expect(seated.openSeats, openBefore.openSeats);
     expect(seated.participantForUser(sampleLocalUserId)?.occupiesSeat, isTrue);
     expect(seated.participantForUser(sampleCrewMateLuna)?.occupiesSeat, isTrue);
     expect(seated.participantForUser(sampleCrewMateEnzo)?.occupiesSeat, isTrue);
+    for (final userId in [
+      sampleLocalUserId,
+      sampleCrewMateLuna,
+      sampleCrewMateEnzo,
+    ]) {
+      expect(
+        await groups.payShare(
+          openId,
+          userId: userId,
+          kind: PaymentMethodKind.pix,
+        ),
+        isA<PayShareSuccess>(),
+      );
+    }
+    final held = (await groups.getById(openId))!;
+    expect(held.filledSpots, openBefore.filledSpots + party.length + 1);
+    expect(held.openSeats, openBefore.openSeats - 3);
 
     final overflow = await groups.joinParty(
       openId,
@@ -93,7 +110,7 @@ void main() {
     );
     expect(overflow, isA<JoinFailure>());
     final still = (await groups.getById(openId))!;
-    expect(still.filledSpots, seated.filledSpots);
+    expect(still.filledSpots, held.filledSpots);
     expect(still.participantForUser('user-marina'), isNull);
     expect(still.filledSpots, lessThanOrEqualTo(still.totalSpots));
   });
@@ -161,9 +178,10 @@ void main() {
     );
     expect(created, isA<CreateGroupSuccess>());
     final group = (created as CreateGroupSuccess).group;
-    expect(group.filledSpots, 1 + party.length);
-    expect(group.totalSpots, group.filledSpots + 1);
-    expect(group.openSeats, 1);
+    expect(group.participants, hasLength(1 + party.length));
+    expect(group.totalSpots, group.participants.length + 1);
+    expect(group.filledSpots, 0);
+    expect(group.openSeats, group.totalSpots);
     expect(group.participantForUser(sampleCrewMateLuna), isNotNull);
     expect(group.participantForUser(sampleCrewMateEnzo), isNotNull);
   });

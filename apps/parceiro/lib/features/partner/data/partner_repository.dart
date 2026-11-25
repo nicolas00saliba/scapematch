@@ -388,9 +388,6 @@ class PartnerRepository implements PartnerDesk {
     if (!startsAt.isAfter(now)) {
       return 'Esse horário já passou.';
     }
-    if (GroupRules.tooCloseToCreate(startsAt: startsAt, now: now)) {
-      return 'Falta menos de 1 h. Escolha outro horário.';
-    }
     final taken = database.groups.any(
       (group) =>
           !group.isCancelled &&

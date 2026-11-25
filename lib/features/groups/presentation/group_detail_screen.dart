@@ -615,6 +615,14 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     if (me != null && me.occupiesSeat && !group.isCancelled && !ended) {
       if (me.payment == PaymentStatus.pending) {
         buttons.add(
+          Text(
+            'Pague para entrar. Sem pagamento a vaga não é sua.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(height: 1.35),
+          ),
+        );
+        buttons.add(
           FilledButton(
             key: AppKeys.payMyShare,
             onPressed: _busy || !group.houseAcceptsPayment
@@ -625,15 +633,6 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   ? GroupMessages.payMyShare(formatPrice(group.priceCents))
                   : GroupMessages.houseCannotReceive,
             ),
-          ),
-        );
-      }
-      if (me.attendance != AttendanceStatus.confirmed) {
-        buttons.add(
-          FilledButton(
-            key: AppKeys.confirmAttendance,
-            onPressed: _busy ? null : _confirm,
-            child: const Text('Confirmar presença'),
           ),
         );
       }
@@ -901,25 +900,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         return;
       }
       final message = reason == null
-          ? 'Você entrou no grupo.'
+          ? 'Você entrou. Pague a sua parte para a vaga valer.'
           : GroupMessages.joinFailure(reason);
       _snack(message);
-    });
-  }
-
-  Future<void> _confirm() async {
-    await _run(() async {
-      final reason = await ref
-          .read(groupDetailViewModelProvider(widget.groupId).notifier)
-          .confirmAttendance();
-      if (!mounted) {
-        return;
-      }
-      _snack(
-        reason == null
-            ? GroupMessages.confirmSuccess
-            : GroupMessages.actionFailed,
-      );
     });
   }
 
@@ -933,11 +916,23 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final paid = me != null && me.payment == PaymentStatus.paid;
     final reserved = me != null && me.payment == PaymentStatus.reserved;
     final expectsRefund = paid && previewRefunds;
+    final refundCents = expectsRefund
+        ? await ref
+              .read(groupRepositoryProvider)
+              .previewLeaveRefund(
+                group.id,
+                userId: ref.read(currentUserProvider).id,
+              )
+        : null;
+    if (!mounted) {
+      return;
+    }
     final accepted = await showLeaveDialog(
       context,
       refunds: expectsRefund,
       paid: paid,
       reserved: reserved,
+      refundCents: refundCents,
     );
     if (!accepted || !mounted) {
       return;

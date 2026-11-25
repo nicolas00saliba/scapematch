@@ -7,6 +7,7 @@ Future<bool> showLeaveDialog(
   required bool refunds,
   required bool paid,
   bool reserved = false,
+  int? refundCents,
 }) {
   if (reserved) {
     return _showConfirmDialog(
@@ -32,7 +33,9 @@ Future<bool> showLeaveDialog(
         ? GroupMessages.leaveWithRefundTitle
         : GroupMessages.leaveWithoutRefundTitle,
     body: refunds
-        ? GroupMessages.leaveWithRefundBody
+        ? (refundCents == null
+              ? GroupMessages.leaveRefundUnknown
+              : GroupMessages.leaveRefundAmount(refundCents))
         : GroupMessages.leaveWithoutRefundBody,
     confirmLabel: refunds
         ? GroupMessages.leaveWithRefundAction

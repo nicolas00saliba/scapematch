@@ -230,11 +230,11 @@ class GroupRules {
   /// Lembrete "em até 2 h".
   static const reminder2h = Duration(hours: 2);
 
-  /// Prazo para atingir o mínimo. Sempre antes do início.
+  /// Prazo para atingir o mínimo. Nunca fica no passado.
   ///
   /// Com mais de 24 h de antecedência, o prazo é 24 h antes. Com mais de
-  /// 1 h e até 24 h, é 1 h antes. Com 1 h ou menos a criação é recusada:
-  /// esse prazo já estaria no passado.
+  /// 1 h e até 24 h, é 1 h antes. Com 1 h ou menos, o prazo é o início:
+  /// a reserva entra assim mesmo e o grupo não nasce já cancelado.
   static DateTime closeDeadline({
     required DateTime startsAt,
     required DateTime now,
@@ -243,13 +243,18 @@ class GroupRules {
     if (dayBefore.isAfter(now)) {
       return dayBefore;
     }
-    return startsAt.subtract(shortCloseLead);
+    final hourBefore = startsAt.subtract(shortCloseLead);
+    if (hourBefore.isAfter(now)) {
+      return hourBefore;
+    }
+    return startsAt;
   }
 
   /// A sessão ainda não começou e falta no máximo [shortCloseLead].
   ///
-  /// Exatamente 1 h também entra: o prazo curto seria o instante atual
-  /// e o grupo nasceria já cancelado.
+  /// Exatamente 1 h também entra. Não bloqueia mais a reserva: o horário
+  /// aparece em vermelho e o cancelamento do jogador não reembolsa,
+  /// porque já está dentro da janela de 2 h.
   static bool tooCloseToCreate({
     required DateTime startsAt,
     required DateTime now,
