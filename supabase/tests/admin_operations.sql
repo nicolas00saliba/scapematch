@@ -10,7 +10,8 @@ values
   ('0a222222-2222-4222-8222-222222222222', 'op-pago@example.com', '{"display_name":"Pago Op"}'),
   ('0a333333-3333-4333-8333-333333333333', 'op-aberto@example.com', '{"display_name":"Aberto Op"}'),
   ('0a444444-4444-4444-8444-444444444444', 'op-host@example.com', '{"display_name":"Host Op"}'),
-  ('0a555555-5555-4555-8555-555555555555', 'op-solo@example.com', '{"display_name":"Solo Op"}');
+  ('0a555555-5555-4555-8555-555555555555', 'op-solo@example.com', '{"display_name":"Solo Op"}'),
+  ('0a666666-6666-4666-8666-666666666666', 'op-pontos@example.com', '{"display_name":"Pontos Op"}');
 
 insert into public.admins (user_id)
 values ('0a111111-1111-4111-8111-111111111111');
@@ -79,7 +80,8 @@ insert into public.group_members (
   ('0f333333-3333-4333-8333-333333333333', '0e111111-1111-4111-8111-111111111111', '0a333333-3333-4333-8333-333333333333', 'Aberto Op', false, 'pending'),
   ('0f444444-4444-4444-8444-444444444444', '0e222222-2222-4222-8222-222222222222', '0a444444-4444-4444-8444-444444444444', 'Host Op', true, 'pending'),
   ('0f555555-5555-4555-8555-555555555555', '0e222222-2222-4222-8222-222222222222', '0a222222-2222-4222-8222-222222222222', 'Pago Op', false, 'paid'),
-  ('0f666666-6666-4666-8666-666666666666', '0e333333-3333-4333-8333-333333333333', '0a555555-5555-4555-8555-555555555555', 'Solo Op', true, 'pending');
+  ('0f666666-6666-4666-8666-666666666666', '0e333333-3333-4333-8333-333333333333', '0a555555-5555-4555-8555-555555555555', 'Solo Op', true, 'pending'),
+  ('0f777777-7777-4777-8777-777777777777', '0e333333-3333-4333-8333-333333333333', '0a666666-6666-4666-8666-666666666666', 'Pontos Op', false, 'paid');
 
 insert into public.payment_charges (
   id, group_id, user_id, venue_id, amount_cents, billing_type, status,
@@ -269,6 +271,20 @@ begin
     raise exception 'exclusao: %', v_gone;
   end if;
 
+  begin
+    perform public.admin_remove_group_member(
+      '0e222222-2222-4222-8222-222222222222',
+      '0f444444-4444-4444-8444-444444444444',
+      'REMOVER'
+    );
+    raise exception 'host saiu sozinho';
+  exception
+    when sqlstate 'P0001' then
+      if sqlerrm not like '%host nao sai sozinho%' then
+        raise;
+      end if;
+  end;
+
   perform public.admin_remove_group_member(
     '0e222222-2222-4222-8222-222222222222',
     '0f555555-5555-4555-8555-555555555555',
@@ -344,6 +360,27 @@ begin
     where group_id = '0e333333-3333-4333-8333-333333333333'
   ) then
     raise exception 'grupo sem cobranca entrou na fila';
+  end if;
+  if not exists (
+    select 1 from public.group_members
+    where id = '0f777777-7777-4777-8777-777777777777'
+      and payment_status = 'paid'
+      and attendance = 'cancelled'
+      and refund_status = 'pending'
+      and refund_reason = 'organizer_cancelled_event'
+  ) then
+    raise exception 'pago sem cobranca nao ficou pendente';
+  end if;
+  if exists (
+    select 1 from public.group_members
+    where id = '0f444444-4444-4444-8444-444444444444'
+      and attendance = 'cancelled'
+  ) or exists (
+    select 1 from public.groups
+    where id = '0e222222-2222-4222-8222-222222222222'
+      and created_by is distinct from '0a444444-4444-4444-8444-444444444444'
+  ) then
+    raise exception 'host mudou de dono';
   end if;
   if not exists (
     select 1 from public.admin_audit_log

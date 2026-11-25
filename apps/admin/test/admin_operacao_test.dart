@@ -61,7 +61,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.byKey(const Key('admin-grupo')), findsOneWidget);
     expect(find.textContaining('Ana'), findsOneWidget);
-    expect(find.textContaining('custódia HELD'), findsWidgets);
+    expect(find.textContaining('custódia retida'), findsWidgets);
+    expect(find.byKey(const Key('admin-host-aviso')), findsOneWidget);
+    expect(find.byKey(const Key('admin-remover-membro-host')), findsNothing);
     expect(find.textContaining('2 de 6 vagas'), findsOneWidget);
     await _shot(tester, 'admin-operacao-grupo');
 

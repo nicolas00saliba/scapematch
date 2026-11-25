@@ -2,6 +2,8 @@
 -- Excluir sessão ou cancelar grupo com jogador pago pede reembolso
 -- integral pela fila private.enqueue_member_refund, motivo
 -- organizer_cancelled_event. Não chama a PagBank daqui.
+-- Sem trava de horário: o admin exclui sessão, cancela grupo e remove
+-- membro mesmo depois do início. Decisão do dono.
 -- Não aplicada no remoto.
 
 create or replace function private.admin_queue_member_refund(
@@ -37,7 +39,7 @@ begin
   set attendance = 'cancelled',
       refund_status = case
         when v_queued then 'refund_pending'
-        when payment_status = 'paid' then 'refunded'
+        when payment_status = 'paid' then 'pending'
         else 'none'
       end,
       refund_reason = case
@@ -638,6 +640,13 @@ begin
   end if;
   if v_member.attendance = 'cancelled' then
     raise exception 'membro ja saiu' using errcode = 'P0001';
+  end if;
+  -- O created_by manda no grupo no app do jogador. Passar isso a outro
+  -- membro pago daria poder de organizador a quem não pediu. Sem outro
+  -- caminho seguro, o host só sai quando o grupo inteiro é cancelado.
+  if v_member.is_creator or v_member.user_id = v_group.created_by then
+    raise exception 'o host nao sai sozinho; cancele o grupo'
+      using errcode = 'P0001';
   end if;
 
   v_queued := private.admin_queue_member_refund(

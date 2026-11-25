@@ -484,6 +484,14 @@ String _payLabel(String status) => switch (status) {
   _ => status,
 };
 
+String _custodyLabel(String status) => switch (status) {
+  'HELD' => 'retida',
+  'sem_custodia' => 'sem custódia',
+  'liberada' => 'liberada',
+  'falha' => 'falha na liberação',
+  _ => status,
+};
+
 class OperacaoPage extends ConsumerStatefulWidget {
   const OperacaoPage({super.key});
 
@@ -741,7 +749,7 @@ class _OperacaoPageState extends ConsumerState<OperacaoPage> {
                   child: const Text('Cancelar grupo'),
                 ),
               ),
-            for (final member in group.members)
+            for (final member in group.members) ...[
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
@@ -750,9 +758,9 @@ class _OperacaoPageState extends ConsumerState<OperacaoPage> {
                 subtitle: Text(
                   member.chargeStatus.isEmpty
                       ? 'Sem cobrança'
-                      : '${_payLabel(member.chargeStatus)} · ${reais(member.amountCents)} · custódia ${member.custody} · estorno ${_payLabel(member.refundStatus)}',
+                      : '${_payLabel(member.chargeStatus)} · ${reais(member.amountCents)} · custódia ${_custodyLabel(member.custody)} · estorno ${_payLabel(member.refundStatus)}',
                 ),
-                trailing: member.attendance == 'cancelled'
+                trailing: member.attendance == 'cancelled' || member.host
                     ? null
                     : TextButton(
                         key: Key('admin-remover-${member.id}'),
@@ -766,7 +774,13 @@ class _OperacaoPageState extends ConsumerState<OperacaoPage> {
                         ),
                         child: const Text('Remover'),
                       ),
-              ),
+                ),
+                if (member.host && member.attendance != 'cancelled')
+                  const Text(
+                    'O host não sai sozinho. Cancele o grupo para estornar todo mundo.',
+                    key: Key('admin-host-aviso'),
+                  ),
+            ],
           ],
         ],
       ),
