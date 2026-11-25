@@ -1,4 +1,6 @@
 -- Admin: casa (reabrir, teste, mescla, comissão oficial) e pontos manuais.
+-- A mescla só move a lista fechada de conteúdo. Equipe, acesso e dinheiro
+-- recusam a casa inteira. O débito trava o perfil e os lançamentos.
 -- Não troca a taxa de indicação. admin_player fica como está.
 
 alter table public.scape_point_entries
@@ -249,6 +251,90 @@ begin
 end;
 $$;
 
+-- Cada tabela public com venue_id entra na lista que move ou na que recusa.
+-- Tabela nova sem classificação derruba esta migration.
+do $$
+declare
+  v_allow text[] := array[
+    'absences',
+    'commission_changes',
+    'groups',
+    'news_items',
+    'passport_gifts',
+    'passport_plays',
+    'passport_stamps',
+    'promotions',
+    'review_replies',
+    'room_rating_rollups',
+    'room_reviews',
+    'room_time_audit',
+    'room_time_entries',
+    'rooms',
+    'session_checkins',
+    'terms_acceptances',
+    'venue_commissions',
+    'venue_time_ranking'
+  ];
+  v_block text[] := array[
+    'asaas_customers',
+    'fiscal_invoices',
+    'free_slot_clawbacks',
+    'free_slot_topups',
+    'ledger_entries',
+    'pagbank_connect_states',
+    'pagbank_signup_events',
+    'payment_charges',
+    'platform_cac_transfers',
+    'venue_asaas_keys',
+    'venue_bank_accounts',
+    'venue_cashback_debits',
+    'venue_cashback_refunds',
+    'venue_claims',
+    'venue_credit_clawbacks',
+    'venue_empty_slots',
+    'venue_fiscal',
+    'venue_pagbank_signups',
+    'venue_pagbank_tokens',
+    'venue_payout_audit',
+    'venue_payout_notices',
+    'venue_payout_schedules',
+    'venue_referral_entries',
+    'venue_staff',
+    'venue_withdrawals'
+  ];
+  v_missing text;
+  v_extra text;
+begin
+  select string_agg(t, ', ' order by t)
+  into v_missing
+  from unnest(v_allow || v_block) as t
+  where not exists (
+    select 1
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relkind = 'r'
+      and c.relname = t
+  );
+  if v_missing is not null then
+    raise exception 'mescla cita tabela inexistente: %', v_missing;
+  end if;
+  select string_agg(c.relname, ', ' order by c.relname)
+  into v_extra
+  from pg_catalog.pg_class c
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  join pg_catalog.pg_attribute a on a.attrelid = c.oid
+  where n.nspname = 'public'
+    and c.relkind = 'r'
+    and a.attname = 'venue_id'
+    and a.attnum > 0
+    and not a.attisdropped
+    and c.relname <> all (v_allow || v_block || array['venues']);
+  if v_extra is not null then
+    raise exception 'tabela com venue_id fora da mescla: %', v_extra;
+  end if;
+end $$;
+
 create or replace function public.admin_merge_venues(
   p_source_id uuid,
   p_target_id uuid,
@@ -283,18 +369,73 @@ begin
   if v_source = 'merged' or v_target in ('merged', 'rejected') then
     raise exception 'casa nao pode ser mesclada' using errcode = 'P0001';
   end if;
-  for v_table in
-    select c.relname
-    from pg_catalog.pg_class c
-    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-    join pg_catalog.pg_attribute a on a.attrelid = c.oid
-    where n.nspname = 'public'
-      and c.relkind = 'r'
-      and a.attname = 'venue_id'
-      and a.attnum > 0
-      and not a.attisdropped
-      and c.relname <> 'venues'
-    order by c.relname
+  if exists (
+    select 1 from public.venue_staff where venue_id = p_source_id
+  ) then
+    raise exception 'casa com equipe' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.venues
+    where id = p_source_id
+      and pagbank_account_id is not null
+      and pg_catalog.btrim(pagbank_account_id) <> ''
+  )
+  or exists (select 1 from public.venue_pagbank_tokens where venue_id = p_source_id)
+  or exists (select 1 from public.venue_pagbank_signups where venue_id = p_source_id)
+  or exists (select 1 from public.pagbank_connect_states where venue_id = p_source_id)
+  or exists (select 1 from public.pagbank_signup_events where venue_id = p_source_id)
+  or exists (select 1 from public.venue_bank_accounts where venue_id = p_source_id)
+  or exists (select 1 from public.venue_asaas_keys where venue_id = p_source_id)
+  or exists (select 1 from public.asaas_customers where venue_id = p_source_id)
+  or exists (select 1 from public.venue_fiscal where venue_id = p_source_id)
+  or exists (select 1 from public.venue_claims where venue_id = p_source_id)
+  then
+    raise exception 'casa com acesso' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.ledger_entries where venue_id = p_source_id)
+  or exists (select 1 from public.venue_cashback_debits where venue_id = p_source_id)
+  or exists (select 1 from public.venue_cashback_refunds where venue_id = p_source_id)
+  or exists (select 1 from public.venue_credit_clawbacks where venue_id = p_source_id)
+  or exists (select 1 from public.venue_referral_entries where venue_id = p_source_id)
+  or exists (select 1 from public.free_slot_clawbacks where venue_id = p_source_id)
+  or exists (select 1 from public.free_slot_topups where venue_id = p_source_id)
+  or exists (select 1 from public.venue_empty_slots where venue_id = p_source_id)
+  then
+    raise exception 'casa com saldo' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.payment_charges where venue_id = p_source_id)
+  or exists (select 1 from public.fiscal_invoices where venue_id = p_source_id)
+  then
+    raise exception 'casa com cobranca' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.venue_withdrawals where venue_id = p_source_id)
+  or exists (select 1 from public.platform_cac_transfers where venue_id = p_source_id)
+  or exists (select 1 from public.venue_payout_schedules where venue_id = p_source_id)
+  or exists (select 1 from public.venue_payout_audit where venue_id = p_source_id)
+  or exists (select 1 from public.venue_payout_notices where venue_id = p_source_id)
+  then
+    raise exception 'casa com repasse' using errcode = 'P0001';
+  end if;
+  foreach v_table in array array[
+    'absences',
+    'commission_changes',
+    'groups',
+    'news_items',
+    'passport_gifts',
+    'passport_plays',
+    'passport_stamps',
+    'promotions',
+    'review_replies',
+    'room_rating_rollups',
+    'room_reviews',
+    'room_time_audit',
+    'room_time_entries',
+    'rooms',
+    'session_checkins',
+    'terms_acceptances',
+    'venue_commissions',
+    'venue_time_ranking'
+  ]
   loop
     begin
       execute format(
@@ -354,11 +495,21 @@ begin
   then
     raise exception 'ajuste invalido' using errcode = '22023';
   end if;
-  if not exists (select 1 from public.profiles where id = p_user_id) then
-    raise exception 'jogador nao encontrado' using errcode = 'P0002';
-  end if;
   select point_value_cents into v_value
   from public.referral_program_settings where id = 1;
+  -- Trava o perfil e os lançamentos já gravados. O segundo débito espera
+  -- e relê o saldo; o que passaria de zero é recusado.
+  perform 1
+  from public.profiles
+  where id = p_user_id
+  for update;
+  if not found then
+    raise exception 'jogador nao encontrado' using errcode = 'P0002';
+  end if;
+  perform 1
+  from public.scape_point_entries
+  where user_id = p_user_id
+  for update;
   select available_points into v_available
   from private.scape_balances(p_user_id);
   v_available := coalesce(v_available, 0);
