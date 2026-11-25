@@ -12,7 +12,7 @@ const groupId = "11111111-1111-4111-8111-111111111111";
 
 function adminFor(
   rows: Record<string, unknown>[],
-  clock?: {
+  clock?: string | {
     startsAt?: string;
     cancelledAt?: string | null;
     sessionId?: string | null;
@@ -21,8 +21,9 @@ function adminFor(
   },
 ) {
   const updates: Record<string, unknown>[] = [];
-  const startsAt = clock?.startsAt ?? "2020-01-01T00:00:00Z";
-  const sessionId = clock?.sessionId ?? null;
+  const options = typeof clock === "string" ? { startsAt: clock } : clock;
+  const startsAt = options?.startsAt ?? "2020-01-01T00:00:00Z";
+  const sessionId = options?.sessionId ?? null;
   return {
     updates,
     from(table: string) {
@@ -78,15 +79,15 @@ function adminFor(
           }
           if (table === "room_sessions") {
             return Promise.resolve({
-              data: clock?.session ?? null,
+              data: options?.session ?? null,
               error: null,
             });
           }
           return Promise.resolve({
             data: {
-              cancelled_at: clock?.cancelledAt ?? null,
-              confirmed_at: clock && "confirmedAt" in clock
-                ? clock.confirmedAt
+              cancelled_at: options?.cancelledAt ?? null,
+              confirmed_at: options && "confirmedAt" in options
+                ? options.confirmedAt
                 : "2026-11-06T10:00:00Z",
               closed_at: null,
               closes_at: "2099-01-01T00:00:00Z",
@@ -304,6 +305,24 @@ Deno.test("o cron repete a custódia que falhou", async () => {
   });
   assertEquals(count, 1);
   assertEquals(releases, ["SPLI_RETRY"]);
+});
+
+Deno.test("custódia não sai antes do horário da sessão", async () => {
+  const releases: string[] = [];
+  const admin = adminFor([], "2099-01-01T00:00:00Z");
+  const ok = await releaseHeldSplit(admin, {
+    releaseCustody: (splitId) => {
+      releases.push(splitId);
+      return Promise.resolve();
+    },
+    accountId: () => "ACCO_PRIMARY",
+  }, {
+    id: chargeId,
+    provider_split_id: "SPLI_CEDO",
+  });
+  assertEquals(ok, false);
+  assertEquals(releases, []);
+  assertEquals(admin.updates.length, 0);
 });
 
 Deno.test("a custódia para depois do limite e alerta", async () => {

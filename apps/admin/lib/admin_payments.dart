@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch_admin/admin_api.dart';
 import 'package:scapematch_admin/admin_format.dart';
+import 'package:scapematch_admin/admin_money.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 
 class PagamentosPage extends ConsumerStatefulWidget {
@@ -226,6 +227,7 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
             ),
             const SizedBox(height: 16),
             _CacReport(report: _cac),
+            const MoneyDesk(),
             _Lines(
               title: 'Cobranças',
               rows: board.charges,
