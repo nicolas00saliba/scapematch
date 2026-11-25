@@ -5,6 +5,8 @@
 -- Não imprime o segredo.
 -- Redefine admin_payments_board e admin_merge_venues da pilha de admin
 -- para não lerem a coluna nem as tabelas removidas.
+-- Cartão salvo ativo com customer que não é o da PagBank, ou sem token
+-- PagBank, recebe deactivated_at. A linha fica.
 
 do $$
 declare
@@ -1096,6 +1098,66 @@ begin
   return new;
 end;
 $function$;
+
+-- Mesmo caminho de deactivate_customer_saved_cards: só grava deactivated_at.
+-- Token PagBank de cartão salvo começa com CARD_ ou tok_. O resto não cobra.
+create or replace function private.deactivate_legacy_saved_cards()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row record;
+  v_plain text;
+  v_pagbank boolean;
+  v_count integer := 0;
+  v_updated integer;
+begin
+  for v_row in
+    select
+      c.id,
+      c.provider_customer_id,
+      c.credit_card_token,
+      p.pagbank_customer_id
+    from public.saved_cards c
+    left join public.profiles p on p.id = c.user_id
+    where c.deactivated_at is null
+  loop
+    v_plain := null;
+    begin
+      v_plain := extensions.pgp_sym_decrypt(
+        v_row.credit_card_token,
+        private.card_token_key()
+      );
+    exception
+      when others then
+        v_plain := null;
+    end;
+    v_pagbank := v_plain is not null
+      and (
+        pg_catalog.starts_with(v_plain, 'CARD_')
+        or pg_catalog.starts_with(v_plain, 'tok_')
+      );
+    if v_row.provider_customer_id is distinct from v_row.pagbank_customer_id
+      or not v_pagbank
+    then
+      update public.saved_cards
+      set deactivated_at = pg_catalog.now()
+      where id = v_row.id
+        and deactivated_at is null;
+      get diagnostics v_updated = row_count;
+      v_count := v_count + v_updated;
+    end if;
+  end loop;
+  return v_count;
+end;
+$$;
+
+revoke all on function private.deactivate_legacy_saved_cards()
+  from public, anon, authenticated, service_role;
+
+select private.deactivate_legacy_saved_cards();
 
 CREATE OR REPLACE FUNCTION public.deactivate_customer_saved_cards(p_user_id uuid, p_customer_id text)
  RETURNS integer
