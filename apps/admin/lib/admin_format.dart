@@ -20,7 +20,11 @@ String percentInput(int bps) {
 /// Percentual digitado (22,5 ou 22.5) em pontos-base. Fora de 0% a 30%,
 /// ou com mais de duas casas, devolve nulo.
 int? bpsFromPercent(String raw) {
-  final text = raw.trim().replaceAll('%', '').replaceAll(' ', '').replaceAll(',', '.');
+  final text = raw
+      .trim()
+      .replaceAll('%', '')
+      .replaceAll(' ', '')
+      .replaceAll(',', '.');
   if (!RegExp(r'^\d{1,2}(\.\d{1,2})?$').hasMatch(text)) return null;
   final value = double.tryParse(text);
   if (value == null) return null;
@@ -40,9 +44,22 @@ String _thousands(int value) {
   return buffer.toString();
 }
 
+/// Relógio de Brasília (America/Sao_Paulo, UTC-3 o ano todo desde 2019).
+/// O painel mostra a hora de Curitiba, não a do aparelho.
+const brasiliaOffset = Duration(hours: 3);
+
+/// Data e hora de parede em Brasília, num DateTime marcado como UTC.
+DateTime brasiliaWall(DateTime value) => value.toUtc().subtract(brasiliaOffset);
+
+/// Início do mês corrente em Brasília, em UTC.
+DateTime brasiliaMonthStartUtc(DateTime now) {
+  final wall = brasiliaWall(now);
+  return DateTime.utc(wall.year, wall.month).add(brasiliaOffset);
+}
+
 String whenLabel(DateTime? value) {
   if (value == null) return '—';
-  final local = value.toLocal();
+  final local = brasiliaWall(value);
   final day = local.day.toString().padLeft(2, '0');
   final month = local.month.toString().padLeft(2, '0');
   final hour = local.hour.toString().padLeft(2, '0');

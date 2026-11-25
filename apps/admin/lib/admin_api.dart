@@ -75,10 +75,7 @@ class AdminWho {
 }
 
 class VenueBoard {
-  const VenueBoard({
-    required this.platformBps,
-    required this.houses,
-  });
+  const VenueBoard({required this.platformBps, required this.houses});
   final int platformBps;
   final List<VenueRow> houses;
 }
@@ -509,6 +506,7 @@ class DivergenceBoard {
 
 class AuditRow {
   const AuditRow({
+    this.actorId = '',
     required this.action,
     required this.targetTable,
     required this.targetId,
@@ -516,6 +514,7 @@ class AuditRow {
     required this.before,
     required this.after,
   });
+  final String actorId;
   final String action;
   final String targetTable;
   final String targetId;
@@ -544,10 +543,7 @@ class SupabaseAdminApi implements AdminApi {
   @override
   Future<VenueBoard> venues({String? status, String? query}) async {
     final row = _map(
-      await _rpc('admin_list_venues', {
-        'p_status': status,
-        'p_query': query,
-      }),
+      await _rpc('admin_list_venues', {'p_status': status, 'p_query': query}),
     );
     return VenueBoard(
       platformBps: _int(row['platform_bps']),
@@ -637,13 +633,13 @@ class SupabaseAdminApi implements AdminApi {
   }
 
   @override
-  Future<VenueProfile> updateVenue(String id, Map<String, Object?> patch) async {
+  Future<VenueProfile> updateVenue(
+    String id,
+    Map<String, Object?> patch,
+  ) async {
     return _venue(
       _map(
-        await _rpc('admin_update_venue', {
-          'p_venue_id': id,
-          'p_patch': patch,
-        }),
+        await _rpc('admin_update_venue', {'p_venue_id': id, 'p_patch': patch}),
       ),
     );
   }
@@ -760,9 +756,7 @@ class SupabaseAdminApi implements AdminApi {
     Map<String, Object?> patch,
   ) async {
     try {
-      return _map(
-        await _rpc('admin_save_reward_settings', {'p_patch': patch}),
-      );
+      return _map(await _rpc('admin_save_reward_settings', {'p_patch': patch}));
     } on PostgrestException catch (error) {
       throw AdminRejected(error.message);
     }
@@ -883,6 +877,7 @@ class SupabaseAdminApi implements AdminApi {
     return [
       for (final item in _list(await _rpc('admin_audit', {'p_limit': 40})))
         AuditRow(
+          actorId: _text(item['actor_id']),
           action: _text(item['action']),
           targetTable: _text(item['target_table']),
           targetId: _text(item['target_id']),
@@ -921,11 +916,15 @@ class SupabaseAdminApi implements AdminApi {
     String email,
     String phone,
   ) async {
-    await _rpc('admin_set_venue_contacts', {
-      'p_venue_id': venueId,
-      'p_email': email,
-      'p_phone': phone,
-    });
+    try {
+      await _rpc('admin_set_venue_contacts', {
+        'p_venue_id': venueId,
+        'p_email': email,
+        'p_phone': phone,
+      });
+    } on PostgrestException catch (error) {
+      throw AdminRejected(error.message);
+    }
   }
 
   @override
@@ -996,10 +995,12 @@ class SupabaseAdminApi implements AdminApi {
     required DateTime from,
     required DateTime to,
   }) async {
-    final row = _map(await _rpc('admin_platform_cac_report', {
-      'p_from': _isoDay(from),
-      'p_to': _isoDay(to),
-    }));
+    final row = _map(
+      await _rpc('admin_platform_cac_report', {
+        'p_from': _isoDay(from),
+        'p_to': _isoDay(to),
+      }),
+    );
     return PlatformCacReport(
       assumedCents: _int(row['assumed_cents']),
       paidCents: _int(row['paid_cents']),
@@ -1088,10 +1089,15 @@ class SupabaseAdminApi implements AdminApi {
 
   @override
   Future<String?> provisionWallet(String venueId) async {
-    final response = await _client.functions.invoke(
-      'provision-venue-wallet',
-      body: {'venue_id': venueId, 'surface': 'admin'},
-    );
+    final FunctionResponse response;
+    try {
+      response = await _client.functions.invoke(
+        'provision-venue-wallet',
+        body: {'venue_id': venueId, 'surface': 'admin'},
+      );
+    } on FunctionException {
+      return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
+    }
     final data = response.data;
     if (data is Map && data['error'] != null) {
       return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
@@ -1383,9 +1389,7 @@ class MemoryAdminApi implements AdminApi {
       platformBps = bps;
     } else {
       final house = await venue(venueId);
-      _replace(
-        _copy(house, commissionBps: bps, commissionOverride: true),
-      );
+      _replace(_copy(house, commissionBps: bps, commissionOverride: true));
     }
     _note('set_commission', venueId ?? 'platform', '$bps');
   }
@@ -1447,9 +1451,7 @@ class MemoryAdminApi implements AdminApi {
     String? venueId,
     required String decision,
   }) async {
-    queue.removeWhere(
-      (row) => row.userId == userId && row.venueId == venueId,
-    );
+    queue.removeWhere((row) => row.userId == userId && row.venueId == venueId);
     _note('decide_referral_account', userId ?? venueId ?? '', decision);
   }
 
@@ -1556,9 +1558,7 @@ class MemoryAdminApi implements AdminApi {
               rank: house.id == 'casa-ninja' ? 0 : null,
             ),
       ],
-      rooms: [
-        for (final house in houses) ...house.rooms,
-      ],
+      rooms: [for (final house in houses) ...house.rooms],
       news: const [
         NamedRank(
           id: 'noticia-1',
@@ -1604,7 +1604,11 @@ class MemoryAdminApi implements AdminApi {
     String phone,
   ) async {
     await venue(venueId);
-    _note('set_venue_contacts', venueId, '${email.isNotEmpty}:${phone.isNotEmpty}');
+    _note(
+      'set_venue_contacts',
+      venueId,
+      '${email.isNotEmpty}:${phone.isNotEmpty}',
+    );
   }
 
   bool payoutsEnabled = false;
@@ -1663,11 +1667,7 @@ class MemoryAdminApi implements AdminApi {
   @override
   Future<bool> setVenuePayoutsEnabled(bool enabled) async {
     payoutsEnabled = enabled;
-    _note(
-      'set_venue_payouts_enabled',
-      '1',
-      'enabled:$enabled',
-    );
+    _note('set_venue_payouts_enabled', '1', 'enabled:$enabled');
     return enabled;
   }
 

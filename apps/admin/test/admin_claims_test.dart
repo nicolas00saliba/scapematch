@@ -56,7 +56,10 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('admin-gravar-contato')));
     await tester.tap(find.byKey(const Key('admin-gravar-contato')));
     await tester.pump();
-    expect(find.text('Informe o e-mail ou o telefone oficial.'), findsOneWidget);
+    expect(
+      find.text('Informe o e-mail ou o telefone oficial.'),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.byKey(const Key('admin-contato-email')),
@@ -66,10 +69,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Contato oficial gravado.'), findsOneWidget);
-    expect(
-      api.audits.any((row) => row.action == 'set_venue_contacts'),
-      isTrue,
-    );
+    expect(api.audits.any((row) => row.action == 'set_venue_contacts'), isTrue);
   });
 }
 

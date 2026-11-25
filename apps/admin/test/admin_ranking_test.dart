@@ -55,7 +55,10 @@ void main() {
     await tester.tap(find.byKey(const Key('admin-ranking-remover-tempo-1')));
     await tester.pumpAndSettle();
     expect(find.textContaining('removido'), findsOneWidget);
-    expect(find.byKey(const Key('admin-ranking-remover-tempo-1')), findsNothing);
+    expect(
+      find.byKey(const Key('admin-ranking-remover-tempo-1')),
+      findsNothing,
+    );
   });
 }
 

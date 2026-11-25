@@ -340,13 +340,15 @@ class _AvaliacoesPageState extends ConsumerState<AvaliacoesPage> {
       return;
     }
     try {
-      await ref.read(reviewAdminProvider).save(
-        ReviewSettings(
-          enabled: _enabled,
-          priorWeight: prior,
-          rankingMinimum: minimum,
-        ),
-      );
+      await ref
+          .read(reviewAdminProvider)
+          .save(
+            ReviewSettings(
+              enabled: _enabled,
+              priorWeight: prior,
+              rankingMinimum: minimum,
+            ),
+          );
       await _load();
     } on AdminRejected catch (error) {
       if (!mounted) return;
@@ -414,8 +416,7 @@ class _AvaliacoesPageState extends ConsumerState<AvaliacoesPage> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(
               labelText: 'Mínimo para o ranking',
-              helperText:
-                  'Salas e casas entram no ranking e no JSON-LD a partir deste número. Padrão 10.',
+              helperText: 'Salas e casas entram no ranking e no JSON-LD a partir deste número. Padrão 10.',
             ),
           ),
           const SizedBox(height: 12),
@@ -434,9 +435,8 @@ class _AvaliacoesPageState extends ConsumerState<AvaliacoesPage> {
           const SizedBox(height: 24),
           Text(
             'Moderação',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           if (_queue.isEmpty) const Text('Nenhum comentário para moderar.'),
@@ -462,9 +462,7 @@ class _AvaliacoesPageState extends ConsumerState<AvaliacoesPage> {
                     TextField(
                       key: Key('admin-motivo-${comment.id}'),
                       controller: _reasonFor(comment.id),
-                      decoration: const InputDecoration(
-                        labelText: 'Motivo',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Motivo'),
                       maxLength: 280,
                     ),
                     Align(
@@ -482,9 +480,8 @@ class _AvaliacoesPageState extends ConsumerState<AvaliacoesPage> {
           const SizedBox(height: 16),
           Text(
             'Auditoria',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800),
           ),
           if (_audit.isEmpty)
             const Text('Nenhuma alteração nesta sessão.')
