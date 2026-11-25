@@ -1,8 +1,16 @@
 // Conciliação diária. Só GET no PagBank. Não cria cobrança, estorno nem transferência.
+// A API de Pedidos não lista cobrança por data. A janela sai do nosso banco
+// e cada id vai em GET /orders/{ORDE_} ou GET /orders?charge_id={CHAR_}.
 
-import { pagbankApiBaseUrl } from "./pagbank_provider.ts";
+import { PagBankProvider, pagbankApiBaseUrl } from "./pagbank_provider.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
+import {
+  isProviderFailure,
+  logCaught,
+  logInternalError,
+  providerStatus,
+} from "./pagbank_client_error.ts";
 
 export type RemotePayment = {
   id: string;
@@ -64,6 +72,13 @@ export function mapPaymentStatus(status: string): string | null {
       return "pending";
     case "AUTHORIZED":
       return "authorized";
+    case "PAID":
+      return "paid";
+    case "WAITING":
+    case "IN_ANALYSIS":
+      return "pending";
+    case "DECLINED":
+      return "failed";
     case "RECEIVED":
     case "CONFIRMED":
     case "RECEIVED_IN_CASH":
@@ -98,7 +113,18 @@ export function mapTransferStatus(status: string): string | null {
     case "BANK_PROCESSING":
       return "pending";
     case "DONE":
+    case "PAID":
+    case "TRANSFER_DONE":
       return "done";
+    case "TRANSFER_PENDING":
+    case "TRANSFER_CREATED":
+    case "TRANSFER_IN_BANK_PROCESSING":
+    case "TRANSFER_BLOCKED":
+      return "pending";
+    case "TRANSFER_CANCELLED":
+      return "cancelled";
+    case "TRANSFER_FAILED":
+      return "failed";
     case "CANCELLED":
       return "cancelled";
     case "FAILED":
@@ -386,9 +412,6 @@ export type LedgerDeps = {
   secretCache?: SecretCache;
 };
 
-const pageLimit = 100;
-const maxPages = 5;
-
 export async function handleLedgerReconcile(
   req: Request,
   deps: LedgerDeps,
@@ -429,126 +452,109 @@ export async function handleLedgerReconcile(
   if (!store) return json({ error: "indisponivel" }, 500);
   try {
     const window = saoPauloWindow(deps.now ?? new Date());
-    const payments = await listPayments(fetchFn, base, apiKey, window);
     const snapshot = await store.rpc("ledger_reconcile_snapshot", {
       p_since: window.sinceIso,
       p_until: window.untilIso,
-      p_payment_ids: payments.rows.map((item) => item.id),
+      p_payment_ids: [],
       p_transfer_ids: [],
     });
-    if (snapshot.error) return json({ error: "indisponivel" }, 500);
+    if (snapshot.error) {
+      logInternalError("ledger-reconcile", new Error("snapshot"));
+      return json({ error: "indisponivel" }, 500);
+    }
     const local = readSnapshot(snapshot.data);
-    const filled = await fillMissingPayments(
-      fetchFn,
-      base,
-      apiKey,
-      payments,
-      local.charges,
-    );
+    const client = new PagBankProvider(apiKey, base, (input, init) =>
+      fetchFn(String(input), {
+        ...init,
+        redirect: "manual",
+        signal: init?.signal ?? AbortSignal.timeout(8_000),
+      }));
+    const payments = await consultCharges(client, local.charges);
     const transfers = await readSubaccountTransfers(
       fetchFn,
       base,
       store,
-      window,
       local.withdrawals,
     );
+    const truncated = payments.truncated || transfers.truncated || local.capped;
     const divergences = compareLedger({
-      payments: filled.rows,
+      payments: payments.rows,
       transfers: transfers.rows,
       charges: local.charges,
       withdrawals: local.withdrawals,
-      truncated: filled.truncated || transfers.truncated || local.capped,
-      uncheckedChargeRefs: filled.unchecked,
+      truncated,
+      uncheckedChargeRefs: payments.unchecked,
       uncheckedWithdrawalIds: transfers.unchecked,
     });
     const saved = await store.rpc("record_payment_divergences", {
-      p_payment_count: filled.rows.length,
+      p_payment_count: payments.rows.length,
       p_transfer_count: transfers.rows.length,
-      p_truncated: filled.truncated || transfers.truncated || local.capped,
+      p_truncated: truncated,
       p_rows: divergences,
     });
-    if (saved.error) return json({ error: "indisponivel" }, 500);
+    if (saved.error) {
+      logInternalError("ledger-reconcile", new Error("divergencias"));
+      return json({ error: "indisponivel" }, 500);
+    }
     return json({ ok: true, divergences: divergences.length });
-  } catch {
-    return json({ error: "indisponivel" }, 500);
+  } catch (error) {
+    if (isProviderFailure(error)) {
+      logCaught("ledger-reconcile", error);
+      return json({ error: "pagbank_unavailable" }, 502);
+    }
+    const ref = logInternalError("ledger-reconcile", error);
+    return json({ error: "internal_error", ref }, 500);
   }
 }
 
-async function listPayments(
-  fetchFn: FetchFn,
-  base: string,
-  apiKey: string,
-  window: { sinceDay: string; untilDay: string },
-): Promise<{ rows: RemotePayment[]; truncated: boolean }> {
-  const created = await listCollection(
-    fetchFn,
-    base,
-    apiKey,
-    "/charges",
-    "dateCreated",
-    window.sinceDay,
-    window.untilDay,
-    parsePayment,
-  );
-  const paid = await listCollection(
-    fetchFn,
-    base,
-    apiKey,
-    "/charges",
-    "paymentDate",
-    window.sinceDay,
-    window.untilDay,
-    parsePayment,
-  );
-  const byId = new Map<string, RemotePayment>();
-  for (const row of [...created.rows, ...paid.rows]) byId.set(row.id, row);
-  return {
-    rows: [...byId.values()],
-    truncated: created.truncated || paid.truncated,
-  };
-}
+const consultPageSize = 50;
 
-async function fillMissingPayments(
-  fetchFn: FetchFn,
-  base: string,
-  apiKey: string,
-  listed: { rows: RemotePayment[]; truncated: boolean },
+async function consultCharges(
+  client: PagBankProvider,
   charges: LocalCharge[],
 ): Promise<{
   rows: RemotePayment[];
   truncated: boolean;
   unchecked: Set<string>;
 }> {
-  const byId = new Map(listed.rows.map((row) => [row.id, row]));
+  const rows: RemotePayment[] = [];
   const unchecked = new Set<string>();
-  for (const charge of charges) {
-    const ref = charge.providerRef;
-    if (ref === "" || byId.has(ref)) continue;
-    if (!/^[A-Za-z0-9_-]{1,64}$/.test(ref)) {
-      unchecked.add(ref);
-      continue;
+  for (let index = 0; index < charges.length; index += consultPageSize) {
+    const page = charges.slice(index, index + consultPageSize);
+    for (const charge of page) {
+      const ref = charge.providerRef;
+      if (ref === "") continue;
+      if (!ref.startsWith("ORDE_") && !ref.startsWith("CHAR_")) {
+        unchecked.add(ref);
+        console.error(JSON.stringify({
+          scope: "ledger-reconcile",
+          code: "ref_invalida",
+          prefix: ref.slice(0, 4),
+        }));
+        continue;
+      }
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(ref)) {
+        unchecked.add(ref);
+        continue;
+      }
+      try {
+        const body = await client.readPayment(ref);
+        const parsed = paymentFromConsult(body, ref);
+        if (!parsed) unchecked.add(ref);
+        else rows.push(parsed);
+      } catch (error) {
+        if (providerStatus(error) === 404) continue;
+        throw error;
+      }
     }
-    const read = await readOne(
-      fetchFn,
-      `${base}/charges/${ref}`,
-      apiKey,
-      parsePayment,
-    );
-    if (read === "missing") continue;
-    if (read === "unchecked") {
-      unchecked.add(ref);
-      continue;
-    }
-    byId.set(read.id, read);
   }
-  return { rows: [...byId.values()], truncated: listed.truncated, unchecked };
+  return { rows, truncated: false, unchecked };
 }
 
 async function readSubaccountTransfers(
   fetchFn: FetchFn,
   base: string,
   store: Store,
-  window: { sinceDay: string; untilDay: string },
   withdrawals: LocalWithdrawal[],
 ): Promise<{
   rows: RemoteTransfer[];
@@ -578,22 +584,6 @@ async function readSubaccountTransfers(
     if (apiKey === "") {
       for (const withdrawal of group) unchecked.add(withdrawal.id);
       continue;
-    }
-    const listed = await listCollection(
-      fetchFn,
-      base,
-      apiKey,
-      "/transfers",
-      "dateCreated",
-      window.sinceDay,
-      window.untilDay,
-      parseTransfer,
-    );
-    if (listed.truncated) truncated = true;
-    for (const transfer of listed.rows) {
-      if (seen.has(transfer.id)) continue;
-      seen.add(transfer.id);
-      rows.push(transfer);
     }
     for (const withdrawal of group) {
       const id = withdrawal.pagbankTransferId;
@@ -626,12 +616,35 @@ async function readOne<T>(
   apiKey: string,
   parse: (row: Record<string, unknown>) => T | null,
 ): Promise<T | "missing" | "unchecked"> {
-  const response = await fetchFn(url, {
+  let response: Response;
+  try {
+    response = await fetchFn(url, {
     method: "GET",
     redirect: "manual",
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+    signal: AbortSignal.timeout(8_000),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "application/json",
+      "User-Agent": "EscapeMatch",
+    },
+    });
+  } catch (error) {
+    const name = error && typeof error === "object"
+      ? (error as { name?: unknown }).name
+      : "";
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new Error("PagBank 408: timeout");
+    }
+    throw error;
+  }
   if (response.status === 404) return "missing";
+  if (!response.ok) {
+    console.error(JSON.stringify({
+      scope: "ledger-reconcile",
+      code: "transfer_consulta",
+      status: String(response.status),
+    }));
+  }
   if (response.status >= 300 && response.status < 400) return "unchecked";
   if (!response.ok) return "unchecked";
   const body = await response.json();
@@ -639,66 +652,55 @@ async function readOne<T>(
   return parse(body as Record<string, unknown>) ?? "unchecked";
 }
 
-async function listCollection<T>(
-  fetchFn: FetchFn,
-  base: string,
-  apiKey: string,
-  path: "/charges" | "/transfers",
-  dateField: "dateCreated" | "paymentDate",
-  since: string,
-  until: string,
-  parse: (row: Record<string, unknown>) => T | null,
-): Promise<{ rows: T[]; truncated: boolean }> {
-  const rows: T[] = [];
-  let truncated = false;
-  for (let page = 0; page < maxPages; page++) {
-    const params = new URLSearchParams({
-      limit: String(pageLimit),
-      offset: String(page * pageLimit),
-      [`${dateField}[ge]`]: since,
-      [`${dateField}[le]`]: until,
-    });
-    const url = `${base}${path}?${params}`;
-    const response = await fetchFn(url, {
-      method: "GET",
-      redirect: "manual",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (response.status >= 300 && response.status < 400) {
-      throw new Error("redirect");
-    }
-    if (!response.ok) throw new Error("pagbank");
-    const body = await response.json() as {
-      data?: unknown;
-      hasMore?: unknown;
-    };
-    const data = Array.isArray(body.data) ? body.data : [];
-    for (const item of data) {
-      if (!item || typeof item !== "object") continue;
-      const parsed = parse(item as Record<string, unknown>);
-      if (parsed) rows.push(parsed);
-    }
-    const hasMore = body.hasMore === true;
-    if (!hasMore) return { rows, truncated };
-    if (page === maxPages - 1) truncated = true;
-  }
-  return { rows, truncated };
+function paymentFromConsult(
+  body: Record<string, unknown>,
+  ref: string,
+): RemotePayment | null {
+  const charge = chargeForRef(body, ref);
+  if (!charge) return null;
+  const valueCents = chargeAmountCents(charge);
+  if (valueCents == null) return null;
+  const status = typeof charge.status === "string" ? charge.status : "";
+  return { id: ref, status: mapPaymentStatus(status), valueCents };
 }
 
-function parsePayment(row: Record<string, unknown>): RemotePayment | null {
-  const id = typeof row.id === "string" ? row.id : "";
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
-  const valueCents = reaisToCents(row.value);
-  if (valueCents == null) return null;
-  return { id, status: remotePaymentStatus(row), valueCents };
+function chargeForRef(
+  body: Record<string, unknown>,
+  ref: string,
+): Record<string, unknown> | null {
+  const charges = Array.isArray(body.charges) ? body.charges : [];
+  if (ref.startsWith("CHAR_")) {
+    const found = charges.find((item) =>
+      !!item && typeof item === "object" &&
+      (item as { id?: unknown }).id === ref
+    );
+    if (found && typeof found === "object") {
+      return found as Record<string, unknown>;
+    }
+  }
+  const first = charges.find((item) => !!item && typeof item === "object");
+  if (first && typeof first === "object") return first as Record<string, unknown>;
+  if (typeof body.status === "string") return body;
+  return null;
+}
+
+function chargeAmountCents(charge: Record<string, unknown>): number | null {
+  const amount = charge.amount;
+  if (!amount || typeof amount !== "object") return null;
+  const value = (amount as { value?: unknown }).value;
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  if (value <= 0 || value > 100_000_000) return null;
+  return value;
 }
 
 function parseTransfer(row: Record<string, unknown>): RemoteTransfer | null {
   const id = typeof row.id === "string" ? row.id : "";
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
-  const valueCents = reaisToCents(row.value);
+  const valueCents = transferCents(row);
   if (valueCents == null) return null;
-  const reference = typeof row.externalReference === "string"
+  const reference = typeof row.reference_id === "string"
+    ? row.reference_id
+    : typeof row.externalReference === "string"
     ? row.externalReference
     : "";
   const safeReference = /^[A-Za-z0-9:_-]{1,80}$/.test(reference) ? reference : "";
@@ -709,6 +711,20 @@ function parseTransfer(row: Record<string, unknown>): RemoteTransfer | null {
     valueCents,
     externalReference: safeReference,
   };
+}
+
+function transferCents(row: Record<string, unknown>): number | null {
+  const amount = row.amount;
+  if (amount && typeof amount === "object") {
+    const value = (amount as { value?: unknown }).value;
+    if (
+      typeof value === "number" && Number.isInteger(value) && value > 0 &&
+      value <= 100_000_000
+    ) {
+      return value;
+    }
+  }
+  return reaisToCents(row.value);
 }
 
 function readSnapshot(data: unknown): {

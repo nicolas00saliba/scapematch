@@ -749,8 +749,17 @@ export class PagBankProvider {
     );
   }
 
-  /// CHAR_ vai em /charges. ORDE_ vai em /orders, como a doc de consulta do pedido.
+  /// ORDE_ é GET /orders/{id}. CHAR_ é GET /orders?charge_id=, a consulta
+  /// por parâmetro da API de Pedidos. GET /charges/{id} e GET /charges com
+  /// dateCreated/paymentDate não são essa API: o gateway não entrega o
+  /// pedido e a doc trata 406 como método que o recurso não aceita.
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
+    if (paymentId.startsWith("CHAR_")) {
+      const query = new URLSearchParams({ charge_id: paymentId });
+      return this.#send(`/orders?${query}`, undefined, "GET").then((body) =>
+        orderContainingCharge(body, paymentId)
+      );
+    }
     const path = paymentId.startsWith("ORDE_")
       ? `/orders/${encodeURIComponent(paymentId)}`
       : `/charges/${encodeURIComponent(paymentId)}`;
@@ -760,8 +769,11 @@ export class PagBankProvider {
   getPayment(paymentId: string): Promise<PaymentView> {
     return this.readPayment(paymentId).then((body) => {
       const normalized = normalizeCharge(body);
+      const id = paymentId.startsWith("CHAR_")
+        ? paymentId
+        : persistedPaymentId(body, normalized);
       return {
-        id: persistedPaymentId(body, normalized),
+        id,
         status: stringField(normalized, "status"),
         billingType: stringField(normalized, "billingType"),
         deleted: normalized.deleted === true,
@@ -1095,7 +1107,13 @@ export class PagBankProvider {
       headers["Content-Type"] = "application/json";
       init.body = JSON.stringify(payload ?? {});
     }
-    const response = await this.fetchFn(`${this.baseUrl}${path}`, init);
+    let response: Response;
+    try {
+      response = await this.fetchFn(`${this.baseUrl}${path}`, init);
+    } catch (error) {
+      if (isTimeoutError(error)) throw new Error("PagBank 408: timeout");
+      throw error;
+    }
     if (
       response.status === 401 &&
       allowRefresh &&
@@ -1119,6 +1137,35 @@ export class PagBankProvider {
       throw new Error("Resposta da PagBank inválida");
     }
   }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: unknown }).name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+/// A busca por charge_id devolve `{ orders: [...] }`. Um charge solto (teste
+/// ou resposta já aberta) também serve. Sem o CHAR_ pedido, é 404.
+export function orderContainingCharge(
+  body: Record<string, unknown>,
+  chargeId: string,
+): Record<string, unknown> {
+  if (Array.isArray(body.orders)) {
+    for (const item of body.orders) {
+      if (!item || typeof item !== "object") continue;
+      const order = item as Record<string, unknown>;
+      const charges = Array.isArray(order.charges) ? order.charges : [];
+      const found = charges.some((charge) =>
+        !!charge && typeof charge === "object" &&
+        (charge as { id?: unknown }).id === chargeId
+      );
+      if (found) return order;
+    }
+    throw new Error("PagBank 404: cobrança ausente");
+  }
+  if (body.id === chargeId || Array.isArray(body.charges)) return body;
+  throw new Error("PagBank 404: cobrança ausente");
 }
 
 function redactOutbound(text: string, apiKey: string): string {
