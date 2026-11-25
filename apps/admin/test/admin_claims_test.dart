@@ -53,7 +53,15 @@ void main() {
     await tester.tap(find.text('Ninja Escape'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    await tester.ensureVisible(find.byKey(const Key('admin-gravar-contato')));
+    Future<void> showContact() {
+      return Scrollable.ensureVisible(
+        tester.element(find.byKey(const Key('admin-gravar-contato'))),
+        alignment: 0.5,
+      );
+    }
+
+    await showContact();
+    await tester.pump();
     await tester.tap(find.byKey(const Key('admin-gravar-contato')));
     await tester.pump();
     expect(
@@ -65,6 +73,8 @@ void main() {
       find.byKey(const Key('admin-contato-email')),
       'oficial@ninja.example',
     );
+    await showContact();
+    await tester.pump();
     await tester.tap(find.byKey(const Key('admin-gravar-contato')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
