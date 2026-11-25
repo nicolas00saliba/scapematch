@@ -127,25 +127,13 @@ void main() {
     );
   });
 
-  test('Curitiba groups cover every game type with a matching name', () {
+  test('Curitiba sample groups are escape room and almost full', () {
     final curitiba = database.groups.where(
       (group) => group.cityId == SampleIds.curitiba,
     );
-    expect(
-      curitiba.map((group) => group.gameType).toSet(),
-      containsAll([
-        GameTypes.escapeRoom,
-        GameTypes.rpg,
-        GameTypes.boardGame,
-        GameTypes.laserTag,
-        GameTypes.immersive,
-      ]),
-    );
-    final rpg = curitiba.singleWhere(
-      (group) => group.gameType == GameTypes.rpg,
-    );
-    expect(rpg.roomName, 'Mesa de RPG no porão');
-    expect(rpg.roomName, isNot(contains('Porão sem Luz')));
+    expect(curitiba.map((group) => group.gameType).toSet(), {
+      GameTypes.escapeRoom,
+    });
     expect(
       curitiba.where((group) => group.isAlmostFull).length,
       greaterThanOrEqualTo(8),

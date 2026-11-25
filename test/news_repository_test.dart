@@ -18,20 +18,13 @@ void main() {
     repository = FakeNewsRepository(items: items, latency: Duration.zero);
   });
 
-  test('sample news keeps Curitiba stories for every game type', () {
+  test('sample news keeps Curitiba stories on escape room', () {
     final curitiba = items.where((item) => item.cityId == SampleIds.curitiba);
     final elsewhere = items.where((item) => item.cityId != SampleIds.curitiba);
-    expect(curitiba.length, 14);
-    expect(
-      curitiba.map((item) => item.gameType).toSet(),
-      containsAll(const [
-        GameTypes.escapeRoom,
-        GameTypes.rpg,
-        GameTypes.boardGame,
-        GameTypes.laserTag,
-        GameTypes.immersive,
-      ]),
-    );
+    expect(curitiba.length, 10);
+    expect(curitiba.map((item) => item.gameType).toSet(), {
+      GameTypes.escapeRoom,
+    });
     expect(elsewhere.length, greaterThanOrEqualTo(4));
     expect(
       items.map((item) => item.cityId).toSet(),
@@ -50,7 +43,7 @@ void main() {
 
   test('filter keeps the city, the category, and newest first', () {
     final curitiba = filterNews(items, cityId: SampleIds.curitiba);
-    expect(curitiba, hasLength(14));
+    expect(curitiba, hasLength(10));
     expect(curitiba.every((item) => item.cityId == SampleIds.curitiba), isTrue);
     expect(
       curitiba.first.publishedAt.isAfter(curitiba[1].publishedAt) ||

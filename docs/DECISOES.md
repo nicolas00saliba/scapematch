@@ -205,13 +205,29 @@
 - **Onde está no código:** `AbsencePolicy`, `AbsenceBook` e o botão Marcar falta no Parceiro. O aviso padrão é 1 e o bloqueio é 3.
 - **Como trocar depois:** outra política entra no construtor de `AbsencePolicy`. A tela do Parceiro chama `markAbsent`.
 
-## O EscapeMatch começa em escape room e abre outras categorias
+## O produto é escape room
 
-- **Data:** 2026-11-03
-- **Decisão:** escape room continua a categoria principal e o destaque. Jogos de tabuleiro, laser tag e jogos de tiro com laser entram como categorias preparadas, com filtro e ícone. Os textos não dizem que o EscapeMatch é só escape room.
-- **Motivo:** o produto começa nas salas e já deixa o caminho para os outros jogos.
-- **Onde está no código:** esta decisão fica registrada agora. O filtro e os ícones entram no PR das categorias.
-- **Como trocar depois:** uma categoria nova entra na lista de tipos de jogo.
+- **Data:** 2026-11-25
+- **Decisão:** o foco é escape room. O seletor oferece Todos e Escape room. O catálogo de exemplo, as notícias e o cadastro da casa não oferecem outro tipo. O site não anuncia outra modalidade.
+- **Motivo:** o Nícolas decidiu, em 25/11/2026, que por enquanto o produto é só escape room.
+- **Onde está no código:** `GameTypes.choices`, `VenueDraft.categories` e o texto do site em `apps/site`.
+- **Como trocar depois:** outra lista no app entra em `GameTypes.choices`. O check do banco não muda neste registro.
+
+## O site fala do Brasil
+
+- **Data:** 2026-11-25
+- **Decisão:** a mensagem principal do site é escape room no Brasil. O selo, os títulos, a definição, o FAQ, o `llms.txt` e o `areaServed` dizem Brasil. O app está começando com as primeiras casas e vai crescer. O site não lista casa, cidade nova nem número de cobertura. `/escape-room-curitiba` e os guias de Curitiba continuam como páginas dessa cidade. O endereço da empresa e o Meetup Escape Room Curitiba continuam em Curitiba.
+- **Motivo:** o Nícolas pediu, em 25/11/2026, para tirar o foco do site em Curitiba.
+- **Onde está no código:** `apps/site/src/data/seo.ts`, a home, `o-que-e-escape-room.astro` e `tool/check_site.py`.
+- **Como trocar depois:** outra área atendida entra em `organizacao.areaServed`. As páginas de cidade ficam.
+
+## O que as IAs leem fala do Brasil e do nome atual
+
+- **Data:** 2026-11-25
+- **Decisão:** a definição pública é que a EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. O guia `/guia/como-jogar-escape-room-sozinho` é nacional e tem a pergunta “O EscapeMatch é só em Curitiba?”. `/escape-room-curitiba` e os guias de Curitiba são páginas de cidade. O nome antigo e o domínio antigo saem do site, da landing, dos arquivos `llms`, do JSON-LD público, dos manifestos e dos textos visíveis dos apps. `alternateName` fica só `Escape Match` e `escapematch`. O `legalName` publicado já é `ESCAPEMATCH TECNOLOGIA LTDA`.
+- **Motivo:** o Nícolas pediu, em 25/11/2026, que o que as IAs leem não trate a EscapeMatch como um app só de Curitiba e não republica o nome antigo.
+- **Onde está no código:** `apps/site/src/data/seo.ts`, `perguntas-marca.ts`, o guia nacional, `apps/site/public/llms.txt`, `llms-full.txt` e `tool/check_site.py`.
+- **Como trocar depois:** outra definição entra em `definicaoCurta`. O nome antigo não volta para `alternateName`.
 
 ## O site institucional fica separado do app
 
@@ -409,7 +425,7 @@
 
 - **Data:** 2026-10-31
 - **Decisão:** a tela “Encontre pessoas para jogar” usa Pexels 17368156 (Matheus Bertelli): cerca de dez adultos num fliperama, rostos visíveis, em ambiente interno. O enquadramento fica no centro. O corte do celular e o da largura 1280 ainda mostram o grupo, com o texto embaixo no degradê. A foto do Jenga saiu. A festa (Pexels 20826894) também saiu.
-- **Motivo:** o fliperama é diversão presencial em grupo e continua com mais de cinco rostos nos dois cortes. A festa tinha gente junta, sem o lugar da brincadeira. O karaokê (Pexels 29298514) tem a placa e a alegria, com poucos rostos nítidos no corte largo. O boliche (Pexels 7429776) enquadra bem e para em quatro pessoas. O laser tag (Pexels 31107755) tem muita gente, com máscara e crianças. Nenhuma candidata era uma escape room com grupo.
+- **Motivo:** o fliperama é diversão presencial em grupo e continua com mais de cinco rostos nos dois cortes. A festa tinha gente junta, sem o lugar da brincadeira. O karaokê (Pexels 29298514) tem a placa e a alegria, com poucos rostos nítidos no corte largo. A foto Pexels 7429776 enquadra bem e para em quatro pessoas. A foto Pexels 31107755 tem muita gente, com máscara e crianças. Nenhuma candidata era uma escape room com grupo.
 - **Onde está no código:** `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
 - **Como trocar depois:** outra foto entra em `assets/images/onboarding/encontrar.jpg` e no crédito.
 
@@ -474,8 +490,8 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Tipo de jogo no topo
 
 - **Data:** 2026-10-28
-- **Decisão:** ao lado da cidade há um seletor de tipo de jogo: Todos, Escape room, RPG, Jogos de tabuleiro, Laser tag e Imersivo. A escolha fica no aparelho, na chave `selected_game_type`, do mesmo jeito que a cidade. Ela filtra a janela de grupos, o carrossel de novidades e o carrossel de salas. O catálogo de exemplo segue em maior parte escape room. Curitiba tem, além disso, uma sala e uma notícia de cada um dos outros tipos, para o filtro mostrar um resultado. Nas outras cidades o filtro desses tipos fica vazio até existir uma fonte real. Os grupos extras de Curitiba incluem escape room, RPG, tabuleiro, laser tag e imersivo, com nome da atividade (não o da sala de escape). No seletor fechado os rótulos são Todos, Escape, RPG, Tabuleiro, Laser e Imersivo; a folha mantém o nome completo. A cidade é que encolhe com reticências, para o jogo não cortar.
-- **Motivo:** o dono quer o mesmo filtro na janela de grupos e nas salas, e notícias dos outros gêneros no carrossel.
+- **Decisão:** ao lado da cidade há um seletor de tipo de jogo: Todos e Escape room. A escolha fica no aparelho, na chave `selected_game_type`, do mesmo jeito que a cidade. Ela filtra a janela de grupos, o carrossel de novidades e o carrossel de salas. O catálogo de exemplo é escape room. No seletor fechado os rótulos são Todos e Escape; a folha mantém o nome completo. A cidade é que encolhe com reticências, para o jogo não cortar.
+- **Motivo:** o dono quer o mesmo filtro na janela de grupos e nas salas. Em 25/11/2026 a lista ficou só com escape room.
 - **Onde está no código:** `GameTypeSelector`, `SelectedGameTypeStore`, `filterGroupsByGameType`, `filterNewsByGameType` e `filterRoomsByGameType`. O `main` lê o store antes do primeiro frame. O tipo da sala é `EscapeRoom.gameType`. O da notícia é `NewsItem.gameType`.
 - **Como trocar depois:** uma fonte real preenche o mesmo id. Mudar a lista é editar `GameTypes.choices`.
 
@@ -634,8 +650,8 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Novidades com gênero
 
 - **Data:** 2026-10-28
-- **Decisão:** o cartão de novidade da Home mostra título, resumo curto, etiqueta de gênero e data. A data é o relativo que o app já usava (“há 2 h”) mais o dia e o mês (“27 out”). O gênero usa o mesmo id do seletor de jogo. O chip mostra o nome completo (Escape room, RPG, Jogos de tabuleiro, Laser tag, Imersivo). Há uma notícia fictícia de cada gênero em Curitiba, além das dez de escape room que já existiam. As outras cidades continuam só com escape room. A tela “Ver tudo” segue filtrando por cidade e pela categoria (novas salas, horários, promoções, eventos), não pelo tipo de jogo. Uma fonte real preenche o mesmo `NewsItem`, inclusive `gameType`.
-- **Motivo:** o dono pediu notícias do escape room, do RPG e dos outros gêneros, com cara de que podem vir de fora depois.
+- **Decisão:** o cartão de novidade da Home mostra título, resumo curto, etiqueta de gênero e data. A data é o relativo que o app já usava (“há 2 h”) mais o dia e o mês (“27 out”). O gênero usa o mesmo id do seletor de jogo. O chip mostra o nome completo, Escape room. As notícias de exemplo são escape room. A tela “Ver tudo” segue filtrando por cidade e pela categoria (novas salas, horários, promoções, eventos), não pelo tipo de jogo. Uma fonte real preenche o mesmo `NewsItem`, inclusive `gameType`.
+- **Motivo:** o dono pediu a etiqueta de gênero e a data no cartão.
 - **Onde está no código:** `NewsItem.gameType`, `buildSampleNews`, `homeNewsProvider` e `_NewsStripCard`.
 - **Como trocar depois:** apontar `newsRepositoryProvider` para a fonte real. Se “Ver tudo” também passar a respeitar o jogo, o filtro entra em `NewsFeedViewModel`.
 
