@@ -373,7 +373,7 @@ Deno.test("sem env a conciliação aceita o segredo do vault", async () => {
     },
   );
   assertEquals(ok.status, 200);
-  assert(seen.length > 0);
+  assertEquals(seen.length, 0);
   assertEquals(calls.filter((name) => name === "cron_vault_secret").length, 1);
   const body = await ok.json();
   assert(!JSON.stringify(body).includes("segredo-vault"));
@@ -396,29 +396,41 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
         const headers = new Headers(init?.headers);
         seen.push({ url, key: headers.get("Authorization") ?? "" });
         assert((init?.method ?? "GET") === "GET");
+        assertEquals(headers.get("Accept"), "application/json");
+        assertEquals(headers.get("Content-Type"), null);
         assert(!url.includes("chave-de-teste"));
         assert(!url.includes("chave-da-casa"));
+        assert(!url.includes("dateCreated"));
+        assert(!url.includes("paymentDate"));
         if (url.includes("/transfers/tra_1")) {
           return Promise.resolve(new Response(JSON.stringify({
             id: "tra_1",
             status: "DONE",
-            value: 60,
-            externalReference: "saque-1",
+            amount: { value: 6000, currency: "BRL" },
+            reference_id: "saque-1",
           }), { status: 200 }));
         }
-        if (url.includes("/charges/pay_antiga")) {
+        if (url.endsWith("/orders/ORDE_ANTIGA")) {
           return Promise.resolve(new Response(JSON.stringify({
-            id: "pay_antiga",
-            status: "CONFIRMED",
-            value: 10,
+            id: "ORDE_ANTIGA",
+            charges: [{
+              id: "CHAR_ANTIGA",
+              status: "PAID",
+              amount: { value: 1000, currency: "BRL" },
+            }],
           }), { status: 200 }));
         }
-        const data = url.includes("/charges") && url.includes("dateCreated")
-          ? [{ id: "pay_1", status: "RECEIVED", value: 80 }]
-          : [];
-        return Promise.resolve(
-          new Response(JSON.stringify({ data, hasMore: false }), { status: 200 }),
-        );
+        if (url.endsWith("/orders/ORDE_1")) {
+          return Promise.resolve(new Response(JSON.stringify({
+            id: "ORDE_1",
+            charges: [{
+              id: "CHAR_1",
+              status: "PAID",
+              amount: { value: 8000, currency: "BRL" },
+            }],
+          }), { status: 200 }));
+        }
+        return Promise.resolve(new Response("não", { status: 404 }));
       },
       store: {
         rpc(name, args) {
@@ -433,14 +445,14 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
                 charges: [
                   {
                     id: "local-1",
-                    provider_ref: "pay_1",
+                    provider_ref: "ORDE_1",
                     status: "pending",
                     amount_cents: 8000,
                     ledger_kinds: [],
                   },
                   {
                     id: "local-antiga",
-                    provider_ref: "pay_antiga",
+                    provider_ref: "ORDE_ANTIGA",
                     status: "paid",
                     amount_cents: 1000,
                     ledger_kinds: ["house_net"],
@@ -478,11 +490,11 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
   const body = await response.json();
   assertEquals(body.ok, true);
   assert(body.divergences >= 1);
-  const paymentUrls = seen.filter((item) => item.url.includes("/charges"));
+  const paymentUrls = seen.filter((item) => item.url.includes("/orders/"));
   const transferUrls = seen.filter((item) => item.url.includes("/transfers"));
-  assert(paymentUrls.some((item) => item.url.includes("dateCreated%5Bge%5D=2026-11-12")));
-  assert(paymentUrls.some((item) => item.url.includes("paymentDate%5Bge%5D=2026-11-12")));
-  assert(paymentUrls.some((item) => item.url.endsWith("/charges/pay_antiga")));
+  assert(paymentUrls.some((item) => item.url.endsWith("/orders/ORDE_1")));
+  assert(paymentUrls.some((item) => item.url.endsWith("/orders/ORDE_ANTIGA")));
+  assert(seen.every((item) => !item.url.includes("/charges")));
   assert(paymentUrls.every((item) => item.key === "Bearer chave-de-teste"));
   assert(transferUrls.some((item) => item.url.endsWith("/transfers/tra_1")));
   assert(transferUrls.every((item) => item.key === "Bearer chave-da-casa"));
@@ -544,4 +556,340 @@ Deno.test("sem chave da subconta não consulta transferência", async () => {
   assertEquals(response.status, 200);
   assert(seen.every((url) => !url.includes("/transfers")));
   void response;
+});
+
+function consultStore(
+  charges: Record<string, unknown>[],
+  saved?: { rows: Array<Record<string, string>> },
+) {
+  const calls: string[] = [];
+  return {
+    calls,
+    rpc(name: string, args: Record<string, unknown>) {
+      calls.push(name);
+      if (name === "ledger_reconcile_snapshot") {
+        return Promise.resolve({
+          data: { capped: false, charges, withdrawals: [] },
+          error: null,
+        });
+      }
+      if (name === "record_payment_divergences") {
+        if (saved) saved.rows = args.p_rows as Array<Record<string, string>>;
+        return Promise.resolve({ data: "run-1", error: null });
+      }
+      return Promise.resolve({ data: null, error: { message: "inesperado" } });
+    },
+  };
+}
+
+function localCharge(
+  ref: string,
+  status: string,
+  cents: number,
+): Record<string, unknown> {
+  return {
+    id: `local-${ref}`,
+    provider_ref: ref,
+    status,
+    amount_cents: cents,
+    ledger_kinds: status === "paid" ? ["house_net"] : [],
+  };
+}
+
+function paidOrder(orderId: string, chargeId: string, cents: number) {
+  return {
+    id: orderId,
+    charges: [{
+      id: chargeId,
+      status: "PAID",
+      amount: { value: cents, currency: "BRL" },
+    }],
+  };
+}
+
+async function withLogs(
+  run: () => Promise<void>,
+): Promise<string[]> {
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map((item) => String(item)).join(" "));
+  };
+  try {
+    await run();
+  } finally {
+    console.error = original;
+  }
+  return logs;
+}
+
+Deno.test("consulta pedido e cobrança por id, com o header da doc", async () => {
+  const seen: string[] = [];
+  const store = consultStore([
+    localCharge("ORDE_OK", "paid", 8000),
+    localCharge("CHAR_OK", "pending", 5000),
+  ]);
+  const response = await handleLedgerReconcile(
+    new Request("https://example.test/ledger", {
+      method: "POST",
+      headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+    }),
+    {
+      env: envFor("segredo-cron"),
+      now: new Date("2026-11-13T15:00:00.000Z"),
+      fetchFn: (input, init) => {
+        const url = String(input);
+        seen.push(url);
+        const headers = new Headers(init?.headers);
+        assertEquals(init?.method, "GET");
+        assertEquals(headers.get("Accept"), "application/json");
+        assertEquals(headers.get("Content-Type"), null);
+        assertEquals(headers.get("Authorization"), "Bearer chave-de-teste");
+        if (url.endsWith("/orders/ORDE_OK")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(paidOrder("ORDE_OK", "CHAR_OK_ORDEM", 8000)), {
+              status: 200,
+            }),
+          );
+        }
+        if (url.includes("charge_id=CHAR_OK")) {
+          return Promise.resolve(new Response(JSON.stringify({
+            orders: [
+              paidOrder("ORDE_OUTRO", "CHAR_OUTRO", 100),
+              {
+                id: "ORDE_CHAR",
+                charges: [{
+                  id: "CHAR_OK",
+                  status: "WAITING",
+                  amount: { value: 5000, currency: "BRL" },
+                }],
+              },
+            ],
+          }), { status: 200 }));
+        }
+        return Promise.resolve(new Response("não", { status: 404 }));
+      },
+      store,
+    },
+  );
+  assertEquals(response.status, 200);
+  const body = await response.json();
+  assertEquals(body, { ok: true, divergences: 0 });
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_OK")));
+  assert(seen.some((url) => url.includes("/orders?charge_id=CHAR_OK")));
+  assert(seen.every((url) => !url.includes("dateCreated") && !url.includes("paymentDate")));
+  assert(seen.every((url) => !url.includes("/charges")));
+  assert(store.calls.includes("record_payment_divergences"));
+});
+
+Deno.test("406 na consulta do pedido alerta, grava a falha e não vaza o token", async () => {
+  const saved: { rows: Array<Record<string, string>> } = { rows: [] };
+  const store = consultStore([localCharge("ORDE_RECUSADO", "paid", 8000)], saved);
+  let status = 0;
+  let body = "";
+  const logs = await withLogs(async () => {
+    const response = await handleLedgerReconcile(
+      new Request("https://example.test/ledger", {
+        method: "POST",
+        headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+      }),
+      {
+        env: envFor("segredo-cron"),
+        fetchFn: () =>
+          Promise.resolve(
+            new Response("Not Acceptable chave-de-teste", { status: 406 }),
+          ),
+        store,
+      },
+    );
+    status = response.status;
+    body = await response.text();
+  });
+  assertEquals(status, 502);
+  const parsed = JSON.parse(body);
+  assertEquals(parsed.error, "pagbank_unavailable");
+  assertEquals(parsed.failures, 1);
+  assert(!body.includes("chave-de-teste"));
+  assert(logs.some((line) =>
+    line.includes("ledger-reconcile") && line.includes("406") &&
+    line.includes("pagbank_unavailable")
+  ));
+  assert(logs.every((line) => !line.includes("chave-de-teste")));
+  assert(store.calls.includes("record_payment_divergences"));
+  assert(saved.rows.some((row) =>
+    row.providerRef === "ORDE_RECUSADO" && row.actual === "406"
+  ));
+});
+
+Deno.test("404 de uma cobrança segue para a próxima e registra ausência", async () => {
+  const store = consultStore([
+    localCharge("ORDE_SUMIU", "paid", 8000),
+    localCharge("ORDE_OK", "paid", 1500),
+  ]);
+  const seen: string[] = [];
+  const response = await handleLedgerReconcile(
+    new Request("https://example.test/ledger", {
+      method: "POST",
+      headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+    }),
+    {
+      env: envFor("segredo-cron"),
+      fetchFn: (input) => {
+        const url = String(input);
+        seen.push(url);
+        if (url.endsWith("/orders/ORDE_SUMIU")) {
+          return Promise.resolve(new Response("não", { status: 404 }));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify(paidOrder("ORDE_OK", "CHAR_OK", 1500)), {
+            status: 200,
+          }),
+        );
+      },
+      store,
+    },
+  );
+  assertEquals(response.status, 200);
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_SUMIU")));
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_OK")));
+  assert(store.calls.includes("record_payment_divergences"));
+});
+
+Deno.test("406 numa cobrança segue para a próxima, grava a falha e alerta", async () => {
+  const saved: { rows: Array<{ kind: string; providerRef: string; actual: string }> } = {
+    rows: [],
+  };
+  const store = consultStore([
+    localCharge("ORDE_RECUSADO", "paid", 8000),
+    localCharge("ORDE_OK", "pending", 1500),
+  ], saved);
+  const seen: string[] = [];
+  let body = "";
+  const logs = await withLogs(async () => {
+    const response = await handleLedgerReconcile(
+      new Request("https://example.test/ledger", {
+        method: "POST",
+        headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+      }),
+      {
+        env: envFor("segredo-cron"),
+        fetchFn: (input) => {
+          const url = String(input);
+          seen.push(url);
+          if (url.endsWith("/orders/ORDE_RECUSADO")) {
+            return Promise.resolve(
+              new Response("Not Acceptable chave-de-teste", { status: 406 }),
+            );
+          }
+          return Promise.resolve(
+            new Response(JSON.stringify(paidOrder("ORDE_OK", "CHAR_OK", 1500)), {
+              status: 200,
+            }),
+          );
+        },
+        store,
+      },
+    );
+    assertEquals(response.status, 502);
+    body = await response.text();
+  });
+  const parsed = JSON.parse(body);
+  assertEquals(parsed.error, "pagbank_unavailable");
+  assertEquals(parsed.failures, 1);
+  assert(parsed.divergences >= 1);
+  assert(!body.includes("chave-de-teste"));
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_RECUSADO")));
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_OK")));
+  assert(saved.rows.some((row) =>
+    row.providerRef === "ORDE_RECUSADO" && row.actual === "406"
+  ));
+  assert(saved.rows.some((row) =>
+    row.kind === "charge_status" && row.providerRef === "ORDE_OK"
+  ));
+  assert(logs.some((line) =>
+    line.includes("ledger-reconcile") && line.includes("406")
+  ));
+  assert(logs.every((line) => !line.includes("chave-de-teste")));
+});
+
+Deno.test("timeout numa cobrança segue para a próxima e alerta sem segredo", async () => {
+  const saved: { rows: Array<Record<string, string>> } = { rows: [] };
+  const store = consultStore([
+    localCharge("ORDE_LENTO", "paid", 8000),
+    localCharge("ORDE_OK", "paid", 1500),
+  ], saved);
+  const seen: string[] = [];
+  let body = "";
+  const logs = await withLogs(async () => {
+    const response = await handleLedgerReconcile(
+      new Request("https://example.test/ledger", {
+        method: "POST",
+        headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+      }),
+      {
+        env: envFor("segredo-cron"),
+        fetchFn: (input) => {
+          const url = String(input);
+          seen.push(url);
+          if (url.endsWith("/orders/ORDE_LENTO")) {
+            return Promise.reject(
+              new DOMException("The signal has been aborted", "TimeoutError"),
+            );
+          }
+          return Promise.resolve(
+            new Response(JSON.stringify(paidOrder("ORDE_OK", "CHAR_OK", 1500)), {
+              status: 200,
+            }),
+          );
+        },
+        store,
+      },
+    );
+    assertEquals(response.status, 502);
+    body = await response.text();
+  });
+  assert(!body.includes("chave-de-teste"));
+  const parsed = JSON.parse(body);
+  assertEquals(parsed.error, "pagbank_unavailable");
+  assertEquals(parsed.failures, 1);
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_LENTO")));
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_OK")));
+  assert(logs.some((line) => line.includes("408") && line.includes("ledger-reconcile")));
+  assert(logs.every((line) => !line.includes("chave-de-teste")));
+  assert(store.calls.includes("record_payment_divergences"));
+  assert(saved.rows.some((row) =>
+    row.providerRef === "ORDE_LENTO" && row.actual === "408"
+  ));
+});
+
+Deno.test("paginação local consulta todas as cobranças, sem offset de data", async () => {
+  const charges = Array.from({ length: 51 }, (_, index) =>
+    localCharge(`ORDE_${index}`, "paid", 1000));
+  const store = consultStore(charges);
+  const seen: string[] = [];
+  const response = await handleLedgerReconcile(
+    new Request("https://example.test/ledger", {
+      method: "POST",
+      headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+    }),
+    {
+      env: envFor("segredo-cron"),
+      fetchFn: (input) => {
+        const url = String(input);
+        seen.push(url);
+        const id = url.split("/").pop() ?? "";
+        return Promise.resolve(
+          new Response(JSON.stringify(paidOrder(id, `CHAR_${id}`, 1000)), {
+            status: 200,
+          }),
+        );
+      },
+      store,
+    },
+  );
+  assertEquals(response.status, 200);
+  assertEquals(seen.length, 51);
+  assert(seen.every((url) => url.includes("/orders/ORDE_")));
+  assert(seen.every((url) => !url.includes("offset=") && !url.includes("dateCreated")));
+  assert(store.calls.includes("record_payment_divergences"));
 });

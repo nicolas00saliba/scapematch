@@ -30,6 +30,9 @@ function adminFor(rows: Record<string, unknown>[]) {
       limit() {
         return self;
       },
+      range() {
+        return self;
+      },
       update() {
         return self;
       },
@@ -254,3 +257,251 @@ Deno.test("Pix com validade futura continua pendente", async () => {
   assertEquals(applied, 0);
   assertEquals(admin.calls, []);
 });
+
+function captureLogs(run: () => Promise<void>): Promise<string[]> {
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map((item) => String(item)).join(" "));
+  };
+  return run().finally(() => {
+    console.error = original;
+  }).then(() => logs);
+}
+
+Deno.test("poll de CHAR_ usa o pedido por charge_id e segue depois do 406", async () => {
+  const urls: string[] = [];
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    (url: string, init?: RequestInit) => {
+      urls.push(`${init?.method ?? "GET"} ${url}`);
+      const headers = new Headers(init?.headers);
+      assertEquals(headers.get("Accept"), "application/json");
+      assertEquals(headers.get("Content-Type"), null);
+      if (url.includes("charge_id=CHAR_PENDENTE")) {
+        return Promise.resolve(new Response("Not Acceptable pb-token-secret", {
+          status: 406,
+        }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "ORDE_OK",
+        charges: [{
+          id: "CHAR_OK",
+          status: "WAITING",
+          payment_method: { type: "PIX" },
+        }],
+      }), { status: 200 }));
+    },
+  );
+  const second = {
+    ...pending,
+    id: "55555555-5555-4555-8555-555555555555",
+    provider_ref: "ORDE_OK",
+  };
+  const admin = adminFor([pending, second]);
+  const logs = await captureLogs(async () => {
+    const applied = await pollPendingPagBankCharges(
+      admin,
+      pagbank,
+      { get: () => undefined },
+    );
+    assertEquals(applied, 0);
+  });
+  assert(urls.some((url) => url.includes("/orders?charge_id=CHAR_PENDENTE")));
+  assert(urls.some((url) => url.includes("/orders/ORDE_OK")));
+  assert(urls.every((url) => !url.includes("/charges/CHAR_PENDENTE")));
+  assert(logs.some((line) =>
+    line.includes("pending_charge_poll") && line.includes("406")
+  ));
+  assert(logs.every((line) => !line.includes("pb-token-secret")));
+});
+
+Deno.test("404 no poll não vira indisponibilidade e a consulta seguinte anda", async () => {
+  const urls: string[] = [];
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    (url: string) => {
+      urls.push(url);
+      if (url.endsWith("/orders/ORDE_SUMIU")) {
+        return Promise.resolve(new Response("não", { status: 404 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "ORDE_OK",
+        charges: [{
+          id: "CHAR_OK",
+          status: "WAITING",
+          payment_method: { type: "PIX" },
+        }],
+      }), { status: 200 }));
+    },
+  );
+  const admin = adminFor([
+    { ...pending, provider_ref: "ORDE_SUMIU" },
+    {
+      ...pending,
+      id: "55555555-5555-4555-8555-555555555555",
+      provider_ref: "ORDE_OK",
+    },
+  ]);
+  const logs = await captureLogs(async () => {
+    const applied = await pollPendingPagBankCharges(
+      admin,
+      pagbank,
+      { get: () => undefined },
+    );
+    assertEquals(applied, 0);
+  });
+  assert(urls.some((url) => url.endsWith("/orders/ORDE_SUMIU")));
+  assert(urls.some((url) => url.endsWith("/orders/ORDE_OK")));
+  assert(logs.every((line) => !line.includes("pagbank_unavailable")));
+});
+
+Deno.test("timeout no poll registra 408 sem o token", async () => {
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    () => Promise.reject(new DOMException("The signal has been aborted", "TimeoutError")),
+  );
+  const admin = adminFor([{ ...pending, provider_ref: "ORDE_LENTO" }]);
+  const logs = await captureLogs(async () => {
+    const applied = await pollPendingPagBankCharges(
+      admin,
+      pagbank,
+      { get: () => undefined },
+    );
+    assertEquals(applied, 0);
+  });
+  assert(logs.some((line) =>
+    line.includes("pending_charge_poll") && line.includes("408")
+  ));
+  assert(logs.every((line) => !line.includes("pb-token-secret")));
+});
+
+Deno.test("poll pagina por cursor e não pula pendente que andou na fila", async () => {
+  const rows = Array.from({ length: 21 }, (_, index) => ({
+    ...pending,
+    id: `44444444-4444-4444-8444-${String(index).padStart(12, "0")}`,
+    provider_ref: `ORDE_${index}`,
+    created_at: index >= 19
+      ? "2026-11-01T00:19:00.000Z"
+      : `2026-11-01T00:${String(index).padStart(2, "0")}:00.000Z`,
+  }));
+  const pendingRows = rows.map((row) => ({ ...row }));
+  const urls: string[] = [];
+  const filters: string[] = [];
+  const ranges: number[] = [];
+  const chain = (table: string) => {
+    let cursor = "";
+    let pageLimit = pendingRows.length;
+    let start = -1;
+    let end = -1;
+    const self = {
+      select() {
+        return self;
+      },
+      eq() {
+        return self;
+      },
+      not() {
+        return self;
+      },
+      neq() {
+        return self;
+      },
+      order() {
+        return self;
+      },
+      limit(count: number) {
+        pageLimit = count;
+        return self;
+      },
+      or(filter: string) {
+        cursor = filter;
+        if (table === "payment_charges") filters.push(filter);
+        return self;
+      },
+      range(from: number, to: number) {
+        start = from;
+        end = to;
+        if (table === "payment_charges") ranges.push(from);
+        return self;
+      },
+      maybeSingle() {
+        return Promise.resolve({ data: null, error: null });
+      },
+      then(resolve: (value: unknown) => void) {
+        const sorted = pendingRows
+          .filter((row) => row.status === "pending")
+          .sort((left, right) =>
+            left.created_at === right.created_at
+              ? left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+              : left.created_at < right.created_at ? -1 : 1
+          );
+        const window = start >= 0
+          ? sorted.slice(start, end + 1)
+          : (cursor ? sorted.filter((row) => pastCursor(cursor, row)) : sorted)
+            .slice(0, pageLimit);
+        start = -1;
+        end = -1;
+        cursor = "";
+        const data = table === "payment_charges" ? window : [];
+        resolve({ data, error: null, count: data.length });
+      },
+    };
+    return self;
+  };
+  const admin = {
+    from: (table: string) => chain(table),
+    rpc() {
+      return Promise.resolve({ data: [], error: null });
+    },
+  };
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    (url: string) => {
+      urls.push(url);
+      if (url.endsWith("/orders/ORDE_0")) {
+        const row = pendingRows.find((item) => item.provider_ref === "ORDE_0");
+        if (row) row.status = "paid";
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "ORDE_PAGINA",
+        charges: [{
+          id: "CHAR_PAGINA",
+          status: "WAITING",
+          payment_method: { type: "PIX" },
+        }],
+      }), { status: 200 }));
+    },
+  );
+  const applied = await pollPendingPagBankCharges(
+    admin,
+    pagbank,
+    { get: () => undefined },
+  );
+  assertEquals(applied, 0);
+  assertEquals(ranges, []);
+  assertEquals(urls.length, 21);
+  assert(urls.every((url) => url.includes("/orders/ORDE_")));
+  assertEquals(filters.length, 1);
+  assert(filters[0].includes("2026-11-01T00:19:00.000Z"));
+  assert(filters[0].includes(rows[19].id));
+  assert(filters[0].includes("id.gt"));
+});
+
+function pastCursor(
+  filter: string,
+  row: { created_at: string; id: string },
+): boolean {
+  const match = filter.match(
+    /created_at\.gt\.(?:"([^"]+)"|([^,]+)),and\(created_at\.eq\.(?:"([^"]+)"|([^,]+)),id\.gt\.(?:"([^"]+)"|([^)]+))\)/,
+  );
+  if (!match) return false;
+  const createdAt = match[1] ?? match[2];
+  const id = match[5] ?? match[6];
+  if (row.created_at > createdAt) return true;
+  return row.created_at === createdAt && row.id > id;
+}
