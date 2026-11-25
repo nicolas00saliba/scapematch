@@ -17,7 +17,10 @@ export const idWebsite = `${origem}/#website`;
 export const idAplicativo = 'https://app.escapematch.com.br/#app';
 
 export const definicaoCurta =
-  'EscapeMatch é um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas.';
+  'EscapeMatch é um app de escape room no Brasil que forma grupos para jogar com pessoas desconhecidas.';
+
+export const primeirasCasas =
+  'O app está começando com as primeiras casas e vai crescer.';
 
 export const definicao =
   `${definicaoCurta} Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular.`;
@@ -31,17 +34,17 @@ export const frasePlayStore =
   `Jogos de celular da Google Play com nome parecido, como ${jogosParecidos}, são de outras empresas e não têm relação com a EscapeMatch.`;
 
 export const descricaoMarca =
-  'App que forma grupos para jogar escape room em Curitiba com pessoas desconhecidas.';
+  'App que forma grupos para jogar escape room no Brasil com pessoas desconhecidas.';
 
-export const tituloHome = 'EscapeMatch — app de escape room em Curitiba';
+export const tituloHome = 'EscapeMatch — app de escape room no Brasil';
 
 export const descricaoHome =
-  'EscapeMatch — app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Você chega sozinho e paga só a sua vaga.';
+  'EscapeMatch — app de escape room no Brasil que forma grupos para jogar com pessoas desconhecidas. Você chega sozinho e paga só a sua vaga.';
 
-export const tituloSobre = 'Sobre a EscapeMatch — app de escape room em Curitiba';
+export const tituloSobre = 'Sobre a EscapeMatch — app de escape room no Brasil';
 
 export const descricaoSobre =
-  'EscapeMatch — app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Não é jogo de celular nem modo de jogo de tiro.';
+  'EscapeMatch — app de escape room no Brasil que forma grupos para jogar com pessoas desconhecidas. Não é jogo de celular nem modo de jogo de tiro.';
 
 export const emailContato = 'contato@escapematch.com.br';
 
@@ -83,7 +86,7 @@ export const organizacao = {
   disambiguatingDescription:
     `${descricaoMarca} A sessão é presencial, numa casa de escape room. Não é um jogo de celular de quebra-cabeça ou match-3 nem um modo de jogo de tiro com nome parecido. ${frasePlayStore}`,
   slogan: 'Ninguém pra jogar? Agora tem.',
-  knowsAbout: ['escape room', 'escape room em Curitiba', 'jogos presenciais em grupo'],
+  knowsAbout: ['escape room', 'escape room no Brasil', 'jogos presenciais em grupo'],
   email: emailContato,
   sameAs: [instagram, meetup],
   founder: {
@@ -100,9 +103,8 @@ export const organizacao = {
     address: enderecoCuritiba(),
   },
   areaServed: {
-    '@type': 'City',
-    name: 'Curitiba',
-    address: enderecoCuritiba(),
+    '@type': 'Country',
+    name: 'Brasil',
   },
 };
 
@@ -130,6 +132,10 @@ export const aplicativo = {
   inLanguage: 'pt-BR',
   description: definicao,
   disambiguatingDescription: frasePlayStore,
+  areaServed: {
+    '@type': 'Country',
+    name: 'Brasil',
+  },
   offers: {
     '@type': 'Offer',
     price: 0,

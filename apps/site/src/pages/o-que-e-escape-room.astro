@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import CtaBlock from '../components/CtaBlock.astro';
-import { definicao, faqPage, textoAtualizado } from '../data/seo';
+import { definicao, faqPage, primeirasCasas, textoAtualizado } from '../data/seo';
 import { modificadoOQueE, publicadoOQueE } from '../../scripts/lastmod.mjs';
 
 const descricao =
@@ -41,7 +41,7 @@ const respostas = [
   {
     pergunta: 'Dá para jogar sozinho ou montar grupo pela EscapeMatch?',
     resposta:
-      'Dá. Sozinho, você escolhe a sala e o horário, entra num grupo e paga só a sua vaga. Quem já tem turma escolhe a mesma sala e, se faltar gente, o app completa as vagas. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. O lançamento é em Curitiba.',
+      `Dá. Sozinho, você escolhe a sala e o horário, entra num grupo e paga só a sua vaga. Quem já tem turma escolhe a mesma sala e, se faltar gente, o app completa as vagas. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. ${primeirasCasas}`,
   },
 ];
 

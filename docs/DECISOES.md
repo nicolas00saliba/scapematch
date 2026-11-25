@@ -213,6 +213,14 @@
 - **Onde está no código:** `GameTypes.choices`, `VenueDraft.categories` e o texto do site em `apps/site`.
 - **Como trocar depois:** outra lista no app entra em `GameTypes.choices`. O check do banco não muda neste registro.
 
+## O site fala do Brasil
+
+- **Data:** 2026-11-25
+- **Decisão:** a mensagem principal do site é escape room no Brasil. O selo, os títulos, a definição, o FAQ, o `llms.txt` e o `areaServed` dizem Brasil. O app está começando com as primeiras casas e vai crescer. O site não lista casa, cidade nova nem número de cobertura. `/escape-room-curitiba` e os guias de Curitiba continuam como páginas dessa cidade. O endereço da empresa e o Meetup Escape Room Curitiba continuam em Curitiba.
+- **Motivo:** o Nícolas pediu, em 25/11/2026, para tirar o foco do site em Curitiba.
+- **Onde está no código:** `apps/site/src/data/seo.ts`, a home, `o-que-e-escape-room.astro` e `tool/check_site.py`.
+- **Como trocar depois:** outra área atendida entra em `organizacao.areaServed`. As páginas de cidade ficam.
+
 ## O site institucional fica separado do app
 
 - **Data:** 2026-11-03

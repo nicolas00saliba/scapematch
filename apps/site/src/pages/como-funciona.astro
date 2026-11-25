@@ -12,9 +12,9 @@ const servico = {
   name: 'Grupo de escape room para quem está sozinho',
   serviceType: 'Formação de grupos para escape room',
   description:
-    'O EscapeMatch junta pessoas que querem jogar escape room e não têm grupo. Cada pessoa paga a própria vaga. O lançamento começa em Curitiba.',
+    'O EscapeMatch junta pessoas que querem jogar escape room e não têm grupo. Cada pessoa paga a própria vaga. O app está começando com as primeiras casas e vai crescer.',
   provider: { '@id': idOrganizacao },
-  areaServed: { '@type': 'City', name: 'Curitiba' },
+  areaServed: { '@type': 'Country', name: 'Brasil' },
   url: 'https://escapematch.com.br/como-funciona',
 };
 
@@ -49,7 +49,7 @@ const como = {
 
 <Base
   title="Como achar grupo de escape room | EscapeMatch"
-  description="Não tem com quem jogar escape room? Escolha a sala, entre num grupo e jogue no mínimo. Lançamento em Curitiba."
+  description="Não tem com quem jogar escape room? Escolha a sala, entre num grupo e jogue no mínimo. O app começa com as primeiras casas."
   path="/como-funciona"
   jsonLd={[servico, como, faqPage([completarGrupo])]}
 >

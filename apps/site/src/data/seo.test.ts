@@ -22,7 +22,7 @@ import {
   website,
 } from './seo.ts';
 
-const prefixo = 'EscapeMatch — app de escape room em Curitiba';
+const prefixo = 'EscapeMatch — app de escape room no Brasil';
 
 function chaves(valor: unknown, acc = new Set<string>()): Set<string> {
   if (Array.isArray(valor)) {
@@ -100,11 +100,11 @@ test('a Organization tem um @id estável e os fatos já publicados', () => {
   assert.equal(organizacao.foundingLocation.name, 'Curitiba');
   assert.equal(organizacao.foundingLocation.address.addressRegion, 'PR');
   assert.equal(organizacao.foundingLocation.address.addressCountry, 'BR');
-  assert.equal(organizacao.areaServed['@type'], 'City');
-  assert.equal(organizacao.areaServed.name, 'Curitiba');
-  assert.equal(organizacao.areaServed.address.addressLocality, 'Curitiba');
-  assert.equal(organizacao.areaServed.address.addressRegion, 'PR');
-  assert.equal(organizacao.areaServed.address.addressCountry, 'BR');
+  assert.equal(organizacao.areaServed['@type'], 'Country');
+  assert.equal(organizacao.areaServed.name, 'Brasil');
+  assert.equal('address' in organizacao.areaServed, false);
+  assert.equal(aplicativo.areaServed['@type'], 'Country');
+  assert.equal(aplicativo.areaServed.name, 'Brasil');
   const usadas = chaves(organizacao);
   assert.equal(usadas.has('telephone'), false);
   assert.equal(usadas.has('streetAddress'), false);
@@ -197,7 +197,7 @@ test('título e descrição da home cabem e começam pela marca', () => {
   assert.equal(descricaoHome.length <= 155, true, String(descricaoHome.length));
   assert.equal(descricaoSobre.length <= 155, true, String(descricaoSobre.length));
   assert.equal(definicao.startsWith(definicaoCurta), true);
-  assert.equal(definicaoCurta.startsWith('EscapeMatch é um app de escape room em Curitiba que'), true);
+  assert.equal(definicaoCurta.startsWith('EscapeMatch é um app de escape room no Brasil que'), true);
   assert.equal(definicao.includes('!'), false);
   assert.equal(descricaoHome.includes('!'), false);
 });
