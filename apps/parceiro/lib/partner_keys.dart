@@ -99,6 +99,10 @@ abstract final class PartnerKeys {
       Key('partner-remove-slot-$slotId');
   static Key partnerRemoveSlotIcon(String slotId) =>
       Key('partner-remove-slot-icon-$slotId');
+  static const newSlotSheet = Key('new-slot-sheet');
+  static const newSlotDate = Key('new-slot-date');
+  static const newSlotTime = Key('new-slot-time');
+  static const newSlotSave = Key('new-slot-save');
   static const removeSlotDialog = Key('remove-slot-dialog');
   static const confirmRemoveSlot = Key('confirm-remove-slot');
   static Key partnerAbsence(String groupId, String playerId) =>

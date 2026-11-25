@@ -12,6 +12,7 @@ type QueueRow = {
   group_id: string;
   user_id: string;
   action: string;
+  amount_cents?: number | null;
   status: string;
   attempts: number;
   created_at: string;
@@ -178,13 +179,18 @@ function charge(partial: Partial<Charge> & { id: string }): Charge {
   };
 }
 
-function queued(chargeId: string, action: string): QueueRow {
+function queued(
+  chargeId: string,
+  action: string,
+  amountCents?: number,
+): QueueRow {
   return {
     id: `q-${chargeId}`,
     charge_id: chargeId,
     group_id: "group-1",
     user_id: "user-1",
     action,
+    amount_cents: amountCents,
     status: "queued",
     attempts: 0,
     created_at: "2026-11-24T00:00:00Z",
@@ -253,6 +259,35 @@ Deno.test("Pix pago estorna e só então a cobrança fica refunded", async () =>
   const again = await processMemberRefunds(adminFor(store), client);
   assertEquals(again, { done: 0, pending: 0 });
   assertEquals(client.calls.filter((call) => call.startsWith("refund:")).length, 1);
+});
+
+Deno.test("estorno capturado usa o valor da fila, sem a taxa", async () => {
+  const remote: Record<string, Remote> = { CHAR_fee: { status: "PAID" } };
+  const store: Store = {
+    queue: [queued("fee", "refund", 9801)],
+    charges: [charge({ id: "fee", provider_ref: "CHAR_fee" })],
+    transitions: [],
+  };
+  const client = bank({ remote });
+  const result = await processMemberRefunds(adminFor(store), client);
+  assertEquals(result, { done: 1, pending: 0 });
+  assertEquals(client.calls.filter((call) => call.startsWith("refund:")), [
+    "refund:9801",
+  ]);
+});
+
+Deno.test("valor zero na fila não pede estorno integral", async () => {
+  const remote: Record<string, Remote> = { CHAR_zero: { status: "PAID" } };
+  const store: Store = {
+    queue: [queued("zero", "refund", 0)],
+    charges: [charge({ id: "zero", provider_ref: "CHAR_zero" })],
+    transitions: [],
+  };
+  const client = bank({ remote });
+  const result = await processMemberRefunds(adminFor(store), client);
+  assertEquals(result, { done: 0, pending: 1 });
+  assertEquals(client.calls.filter((call) => call.startsWith("refund:")), []);
+  assertEquals(store.charges[0].status, "paid");
 });
 
 Deno.test("cartão autorizado cancela sem captura", async () => {

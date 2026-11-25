@@ -172,12 +172,14 @@ insert into public.groups (
     'c1111111-1111-1111-1111-111111111111'
   );
 
-insert into public.group_members (group_id, user_id, display_name, is_creator)
+insert into public.group_members (
+  group_id, user_id, display_name, is_creator, payment_status
+)
 values
-  ('cd111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'Dono RLS', true),
-  ('cd111111-1111-1111-1111-111111111111', 'c4444444-4444-4444-4444-444444444444', 'Extra RLS', false),
-  ('cd222222-2222-2222-2222-222222222222', 'c1111111-1111-1111-1111-111111111111', 'Dono RLS', true),
-  ('cd222222-2222-2222-2222-222222222222', 'c2222222-2222-2222-2222-222222222222', 'Membro RLS', false);
+  ('cd111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'Dono RLS', true, 'paid'),
+  ('cd111111-1111-1111-1111-111111111111', 'c4444444-4444-4444-4444-444444444444', 'Extra RLS', false, 'reserved'),
+  ('cd222222-2222-2222-2222-222222222222', 'c1111111-1111-1111-1111-111111111111', 'Dono RLS', true, 'paid'),
+  ('cd222222-2222-2222-2222-222222222222', 'c2222222-2222-2222-2222-222222222222', 'Membro RLS', false, 'paid');
 
 begin;
 set local role anon;

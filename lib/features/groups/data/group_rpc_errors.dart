@@ -186,6 +186,9 @@ EditGroupFailureReason editFailure(String text) {
 }
 
 ConfirmAttendanceFailureReason confirmFailure(String text) {
+  if (text.contains('payment required')) {
+    return ConfirmAttendanceFailureReason.paymentRequired;
+  }
   if (text.contains('not member')) {
     return ConfirmAttendanceFailureReason.notMember;
   }

@@ -1,5 +1,6 @@
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/time/clock.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/map/domain/live_seat.dart';
 
@@ -62,6 +63,7 @@ class SampleLivePresence {
           displayName: name,
           isCreator: false,
           isLocalUser: false,
+          payment: PaymentStatus.reserved,
         ),
       ],
     );
