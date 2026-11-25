@@ -146,6 +146,9 @@ echo "admin operations ok"
 # supabase/migrations/20261125165000_admin_money.sql
 run -f "$root/tests/admin_money.sql"
 echo "admin money ok"
+# supabase/migrations/20261125166000_admin_people.sql
+run -f "$root/tests/admin_people.sql"
+echo "admin people ok"
 # supabase/migrations/20261125183000_custody_after_session.sql
 run -f "$root/tests/custody_after_session.sql"
 echo "custody after session ok"
