@@ -59,7 +59,8 @@ const rewardFields = <RewardField>[
   RewardField(
     id: 'c2c_mid_active',
     label: 'Indicados ativos para 2,5%',
-    help: 'A partir desta quantidade a taxa absoluta passa para o nível do meio.',
+    help:
+        'A partir desta quantidade a taxa absoluta passa para o nível do meio.',
     kind: RewardKind.count,
     one: 'indicação',
     many: 'indicações',

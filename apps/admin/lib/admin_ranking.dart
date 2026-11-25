@@ -267,15 +267,14 @@ class _RankingPageState extends ConsumerState<RankingPage> {
             Text(_error!, key: const Key('admin-ranking-erro')),
           ],
           const SizedBox(height: 24),
-          Text(
-            'Moderação',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('Moderação', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           for (final row in _rows)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('${row.groupName} · ${row.venueName} · ${row.roomName}'),
+              title: Text(
+                '${row.groupName} · ${row.venueName} · ${row.roomName}',
+              ),
               subtitle: Text(
                 '${formatRoomTimeLine(row.elapsedSeconds, row.remainingSeconds)} · ${row.escaped ? 'escapou' : 'não escapou'} · ${row.playedOn}${row.removed ? ' · removido' : ''}',
               ),
@@ -292,4 +291,3 @@ class _RankingPageState extends ConsumerState<RankingPage> {
     );
   }
 }
-

@@ -16,10 +16,5 @@ Future<void> _abrirApp() async {
   pendingPagbankConnectReturn = PagbankConnectReturn.fromUri(Uri.base);
   configureUrlStrategy();
   await initializeDateFormatting('pt_BR');
-  runApp(
-    ProviderScope(
-      retry: noAutomaticRetry,
-      child: const AdminApp(),
-    ),
-  );
+  runApp(ProviderScope(retry: noAutomaticRetry, child: const AdminApp()));
 }

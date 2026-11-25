@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch_admin/admin_api.dart';
+import 'package:scapematch_admin/admin_errors.dart';
 import 'package:scapematch_admin/admin_format.dart';
 import 'package:scapematch_admin/admin_place.dart';
 import 'package:scapematch_admin/admin_reward_fields.dart';
@@ -157,7 +158,13 @@ class _CasasPageState extends ConsumerState<CasasPage> {
   }
 
   Future<void> _reviewClaim(String id, String decision) async {
-    await ref.read(adminApiProvider).reviewVenueClaim(id, decision);
+    try {
+      await ref.read(adminApiProvider).reviewVenueClaim(id, decision);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
     await _load();
   }
 }
@@ -195,11 +202,30 @@ class _CasaPageState extends ConsumerState<CasaPage> {
   }
 
   Future<void> _load() async {
-    final house = await ref.read(adminApiProvider).venue(widget.id);
+    final VenueProfile house;
+    try {
+      house = await ref.read(adminApiProvider).venue(widget.id);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
     _neighborhood.text = house.neighborhood;
     _bps.text = percentInput(house.commissionBps);
     setState(() => _house = house);
+  }
+
+  /// Roda a ação e mostra o erro na tela, em vez de falhar calado.
+  Future<bool> _attempt(Future<void> Function() action) async {
+    try {
+      await action();
+      return true;
+    } on Object catch (error) {
+      if (!mounted) return false;
+      setState(() => _message = adminErrorText(error));
+      return false;
+    }
   }
 
   @override
@@ -214,7 +240,10 @@ class _CasaPageState extends ConsumerState<CasaPage> {
         icon: const Icon(Icons.arrow_back),
       ),
       child: house == null
-          ? const Text('Carregando casa…')
+          ? Text(
+              _message ?? 'Carregando casa…',
+              key: const Key('admin-casa-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -243,10 +272,12 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                     if (house.status == 'approved')
                       OutlinedButton(
                         onPressed: () async {
-                          await ref
-                              .read(adminApiProvider)
-                              .suspendVenue(house.id, !house.suspended);
-                          await _load();
+                          final ok = await _attempt(
+                            () => ref
+                                .read(adminApiProvider)
+                                .suspendVenue(house.id, !house.suspended),
+                          );
+                          if (ok) await _load();
                         },
                         child: Text(house.suspended ? 'Reativar' : 'Suspender'),
                       ),
@@ -262,11 +293,18 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                   alignment: Alignment.centerLeft,
                   child: FilledButton(
                     onPressed: () async {
-                      final next = await ref.read(adminApiProvider).updateVenue(
-                        house.id,
-                        {'neighborhood': _neighborhood.text.trim()},
-                      );
-                      setState(() => _house = next);
+                      VenueProfile? next;
+                      final ok = await _attempt(() async {
+                        next = await ref.read(adminApiProvider).updateVenue(
+                          house.id,
+                          {'neighborhood': _neighborhood.text.trim()},
+                        );
+                      });
+                      if (!ok || !mounted || next == null) return;
+                      setState(() {
+                        _house = next;
+                        _message = 'Dados gravados.';
+                      });
                     },
                     child: const Text('Salvar dados'),
                   ),
@@ -415,20 +453,32 @@ class _CasaPageState extends ConsumerState<CasaPage> {
 
   Future<void> _review(String decision) async {
     final api = ref.read(adminApiProvider);
-    final result = await api.reviewVenue(widget.id, decision);
+    final ReviewResult result;
+    try {
+      result = await api.reviewVenue(widget.id, decision);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     String? wallet;
     if (result.needsSubaccount) {
-      wallet = await api.provisionWallet(widget.id);
+      try {
+        wallet = await api.provisionWallet(widget.id);
+      } on Object {
+        wallet =
+            'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
+      }
       if (wallet != null && wallet.startsWith('https://')) {
         await launchExternalUrl(Uri.parse(wallet));
         wallet = 'Continue na PagBank para ligar a casa.';
       }
     }
     await _load();
+    if (!mounted) return;
     setState(() {
       _message = result.needsSubaccount
-          ? (wallet ??
-                'Aprovada. Abra o PagBank Connect para ligar a casa.')
+          ? (wallet ?? 'Aprovada. Abra o PagBank Connect para ligar a casa.')
           : 'Decisão gravada: ${result.status}.';
     });
   }
@@ -540,13 +590,19 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
   }
 
   Future<void> _decide(ReviewRow row, String decision) async {
-    await ref
-        .read(adminApiProvider)
-        .decideReferral(
-          userId: row.userId,
-          venueId: row.venueId,
-          decision: decision,
-        );
+    try {
+      await ref
+          .read(adminApiProvider)
+          .decideReferral(
+            userId: row.userId,
+            venueId: row.venueId,
+            decision: decision,
+          );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
     await _load();
   }
 }
@@ -562,6 +618,7 @@ class JogadorPage extends ConsumerStatefulWidget {
 
 class _JogadorPageState extends ConsumerState<JogadorPage> {
   PlayerProfile? _player;
+  String? _error;
 
   @override
   void initState() {
@@ -570,9 +627,19 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
   }
 
   Future<void> _load() async {
-    final player = await ref.read(adminApiProvider).player(widget.id);
+    final PlayerProfile player;
+    try {
+      player = await ref.read(adminApiProvider).player(widget.id);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
-    setState(() => _player = player);
+    setState(() {
+      _player = player;
+      _error = null;
+    });
   }
 
   @override
@@ -586,7 +653,10 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
         icon: const Icon(Icons.arrow_back),
       ),
       child: player == null
-          ? const Text('Carregando jogador…')
+          ? Text(
+              _error ?? 'Carregando jogador…',
+              key: const Key('admin-jogador-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -605,15 +675,23 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
                 const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: () async {
-                    await ref
-                        .read(adminApiProvider)
-                        .suspendPlayer(player.id, !player.suspended);
+                    try {
+                      await ref
+                          .read(adminApiProvider)
+                          .suspendPlayer(player.id, !player.suspended);
+                    } on Object catch (error) {
+                      if (!mounted) return;
+                      setState(() => _error = adminErrorText(error));
+                      return;
+                    }
                     await _load();
                   },
                   child: Text(
                     player.suspended ? 'Reativar conta' : 'Suspender conta',
                   ),
                 ),
+                if (_error != null)
+                  Text(_error!, key: const Key('admin-jogador-aviso')),
                 const SizedBox(height: 16),
                 const Text('Reservas'),
                 for (final line in player.reservations) Text(line),
@@ -672,9 +750,18 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
 
   Future<void> _load() async {
     final api = ref.read(adminApiProvider);
-    final settings = await api.rewardSettings();
-    final history = await api.rewardHistory();
-    final passport = await api.passportSettings();
+    final Map<String, Object?> settings;
+    final List<Map<String, Object?>> history;
+    final Map<String, Object?> passport;
+    try {
+      settings = await api.rewardSettings();
+      history = await api.rewardHistory();
+      passport = await api.passportSettings();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
     for (final field in rewardFields) {
       _fields[field.id]!.text = '${settings[field.id] ?? ''}';
@@ -697,7 +784,10 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
       key: const Key('admin-regras'),
       title: 'Comissões e recompensas',
       child: _settings == null
-          ? const Text('Carregando regras…')
+          ? Text(
+              _message ?? 'Carregando regras…',
+              key: const Key('admin-regras-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -729,9 +819,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 ],
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Permitir vaga grátis com pontos',
-                  ),
+                  title: const Text('Permitir vaga grátis com pontos'),
                   subtitle: const Text(
                     'Desligada por padrão. Ligada, pontos de indicação e de cashback já liberados podem cobrir a vaga, sem limite mensal. O que passar da comissão vira crédito da casa no próximo repasse. Boas-vindas e promoção continuam no teto.',
                   ),
@@ -765,10 +853,8 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 const SizedBox(height: 24),
                 Text(
                   'Passaporte de salas',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: adminTeal,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(color: adminTeal, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -810,7 +896,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 if (_history.isEmpty) const Text('Nenhuma alteração ainda.'),
                 for (final row in _history.take(8))
                   Text(
-                    '${row['created_at'] ?? 'agora'} · alteração registrada',
+                    '${whenLabel(DateTime.tryParse('${row['created_at'] ?? ''}'))} · alteração registrada',
                   ),
               ],
             ),
@@ -818,6 +904,17 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
   }
 
   Future<void> _save() async {
+    final empty = [
+      for (final field in rewardFields)
+        if (int.tryParse(_fields[field.id]!.text.trim()) == null) field.label,
+    ];
+    if (empty.isNotEmpty) {
+      setState(() {
+        _message =
+            'Preencha todos os campos antes de salvar. Campo vazio não vira zero. Faltando: ${empty.join(', ')}.';
+      });
+      return;
+    }
     final patch = <String, Object?>{
       for (final field in rewardFields)
         field.id: int.tryParse(_fields[field.id]!.text.trim()) ?? 0,
@@ -837,6 +934,18 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
   }
 
   Future<void> _savePassport() async {
+    final empty = [
+      for (final field in passportRuleFields)
+        if (int.tryParse(_passportInputs[field.id]!.text.trim()) == null)
+          field.label,
+    ];
+    if (empty.isNotEmpty) {
+      setState(() {
+        _passportMessage =
+            'Preencha todos os campos antes de salvar. Faltando: ${empty.join(', ')}.';
+      });
+      return;
+    }
     final patch = <String, Object?>{
       'passport_enabled': _passportOn,
       for (final field in passportRuleFields)
@@ -866,10 +975,7 @@ const passportRuleFields = <PassportRuleField>[
   PassportRuleField(id: 'passport_rooms_5', label: 'Salas do primeiro marco'),
   PassportRuleField(id: 'passport_points_5', label: 'Pontos do primeiro marco'),
   PassportRuleField(id: 'passport_rooms_10', label: 'Salas do segundo marco'),
-  PassportRuleField(
-    id: 'passport_points_10',
-    label: 'Pontos do segundo marco',
-  ),
+  PassportRuleField(id: 'passport_points_10', label: 'Pontos do segundo marco'),
   PassportRuleField(id: 'passport_rooms_25', label: 'Salas do terceiro marco'),
   PassportRuleField(
     id: 'passport_points_25',
@@ -892,6 +998,7 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
   EarningsReport? _report;
   ScapeLiability? _liability;
   String? _liabilityError;
+  String? _reportError;
   String _period = 'tudo';
 
   @override
@@ -904,9 +1011,17 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
     final now = DateTime.now().toUtc();
     DateTime? from;
     if (_period == '30') from = now.subtract(const Duration(days: 30));
-    if (_period == 'mes') from = DateTime.utc(now.year, now.month);
+    // "Este mês" começa à meia-noite de Brasília, não à meia-noite UTC.
+    if (_period == 'mes') from = brasiliaMonthStartUtc(now);
     final api = ref.read(adminApiProvider);
-    final report = await api.earnings(from: from);
+    final EarningsReport report;
+    try {
+      report = await api.earnings(from: from);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _reportError = adminErrorText(error));
+      return;
+    }
     ScapeLiability? liability;
     String? liabilityError;
     try {
@@ -917,6 +1032,7 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
     if (!mounted) return;
     setState(() {
       _report = report;
+      _reportError = null;
       _liability = liability;
       _liabilityError = liabilityError;
     });
@@ -930,7 +1046,10 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
       key: const Key('admin-ganhos'),
       title: 'Ganhos',
       child: report == null
-          ? const Text('Carregando ganhos…')
+          ? Text(
+              _reportError ?? 'Carregando ganhos…',
+              key: const Key('admin-ganhos-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1043,6 +1162,7 @@ class DestaquesPage extends ConsumerStatefulWidget {
 
 class _DestaquesPageState extends ConsumerState<DestaquesPage> {
   HighlightsBoard? _board;
+  String? _message;
   final _ranks = <String, TextEditingController>{};
 
   @override
@@ -1060,7 +1180,14 @@ class _DestaquesPageState extends ConsumerState<DestaquesPage> {
   }
 
   Future<void> _load() async {
-    final board = await ref.read(adminApiProvider).highlights();
+    final HighlightsBoard board;
+    try {
+      board = await ref.read(adminApiProvider).highlights();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
     setState(() => _board = board);
   }
@@ -1072,13 +1199,18 @@ class _DestaquesPageState extends ConsumerState<DestaquesPage> {
       key: const Key('admin-destaques'),
       title: 'Destaques',
       child: board == null
-          ? const Text('Carregando destaques…')
+          ? Text(
+              _message ?? 'Carregando destaques…',
+              key: const Key('admin-destaques-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
                   'O número menor aparece antes na home do jogador. Vazio tira o item da seleção.',
                 ),
+                if (_message != null)
+                  Text(_message!, key: const Key('admin-destaques-aviso')),
                 _block('Casas', 'venue', board.venues),
                 _block('Salas', 'room', board.rooms),
                 _block('Carrossel de novidades', 'news', board.news),
@@ -1131,9 +1263,24 @@ class _DestaquesPageState extends ConsumerState<DestaquesPage> {
 
   Future<void> _save(String kind, String id) async {
     final raw = _ranks[id]?.text.trim() ?? '';
-    await ref
-        .read(adminApiProvider)
-        .setHighlight(kind, id, raw.isEmpty ? null : int.tryParse(raw));
+    final rank = raw.isEmpty ? null : int.tryParse(raw);
+    if (raw.isNotEmpty && (rank == null || rank < 1)) {
+      // Antes, um texto inválido virava "sem número" e tirava o item.
+      setState(() {
+        _message =
+            'A ordem é um número inteiro a partir de 1. Vazio tira o item.';
+      });
+      return;
+    }
+    try {
+      await ref.read(adminApiProvider).setHighlight(kind, id, rank);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _message = 'Ordem gravada.');
     await _load();
   }
 }
@@ -1147,6 +1294,8 @@ class AuditoriaPage extends ConsumerStatefulWidget {
 
 class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
   List<AuditRow> _rows = const [];
+  String? _error;
+  bool _loaded = false;
 
   @override
   void initState() {
@@ -1155,9 +1304,20 @@ class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
   }
 
   Future<void> _load() async {
-    final rows = await ref.read(adminApiProvider).audit();
+    final List<AuditRow> rows;
+    try {
+      rows = await ref.read(adminApiProvider).audit();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
-    setState(() => _rows = rows);
+    setState(() {
+      _rows = rows;
+      _error = null;
+      _loaded = true;
+    });
   }
 
   @override
@@ -1170,13 +1330,16 @@ class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
         children: [
           const Text('Quem fez, quando, e o antes e o depois.'),
           const SizedBox(height: 12),
-          if (_rows.isEmpty) const Text('Nenhuma ação ainda.'),
+          if (_error != null)
+            Text(_error!, key: const Key('admin-auditoria-aviso')),
+          if (_error == null && !_loaded) const Text('Carregando auditoria…'),
+          if (_loaded && _rows.isEmpty) const Text('Nenhuma ação ainda.'),
           for (final row in _rows)
             Card(
               child: ListTile(
                 title: Text('${row.action} · ${row.targetTable}'),
                 subtitle: Text(
-                  '${whenLabel(row.createdAt)} · ${row.targetId}\nantes ${row.before}\ndepois ${row.after}',
+                  '${whenLabel(row.createdAt)}${row.actorId.isEmpty ? '' : ' · por ${row.actorId.length > 8 ? row.actorId.substring(0, 8) : row.actorId}'} · ${row.targetId}\nantes ${row.before}\ndepois ${row.after}',
                 ),
               ),
             ),
