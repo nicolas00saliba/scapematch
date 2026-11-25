@@ -37,9 +37,23 @@ class _RecordingApi extends MemoryAdminApi {
   }
 
   @override
-  Future<List<AuditRow>> audit() async {
+  Future<JsonPage> searchAudit({
+    String? action,
+    String? actor,
+    DateTime? from,
+    DateTime? to,
+    int limit = 40,
+    int offset = 0,
+  }) async {
     if (failAudit) throw const PostgrestException(message: 'boom');
-    return super.audit();
+    return super.searchAudit(
+      action: action,
+      actor: actor,
+      from: from,
+      to: to,
+      limit: limit,
+      offset: offset,
+    );
   }
 }
 
