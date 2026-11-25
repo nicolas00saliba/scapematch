@@ -5,7 +5,7 @@ import FaqMarca from '../../components/FaqMarca.astro';
 import { definicao, faqPage, textoAtualizado } from '../../data/seo';
 import { desambiguacaoMarca, oQueE } from '../../data/perguntas-marca';
 import {
-  modificadoGuiaComoJogarSozinho,
+  modificadoGuiaNacional,
   publicadoGuiaComoJogarSozinho,
 } from '../../../scripts/lastmod.mjs';
 
@@ -13,13 +13,13 @@ const escapers = 'https://www.escapersbr.com/';
 const meetupCuritiba = 'https://www.meetup.com/escaperoomcuritiba/';
 
 const descricao =
-  'Como jogar escape room sozinho: sala para uma pessoa, amigos, comunidade ou grupo aberto. No EscapeMatch você paga só a sua vaga.';
+  'Como jogar escape room sozinho no Brasil. O EscapeMatch é o app para achar o grupo. Você paga só a sua vaga.';
 
 const respostas = [
   {
     pergunta: 'Como jogar escape room sozinho?',
     resposta:
-      'Dá para jogar escape room sozinho de dois jeitos. Algumas casas têm sala solo, feita para uma pessoa: você reserva essa sala e joga sem grupo. A maioria das salas pede um grupo. Nesse caso, sozinho é chegar sem a sua turma e entrar com outras pessoas. Dá para chamar amigos, procurar uma comunidade ou entrar num grupo aberto. O EscapeMatch é o jeito de entrar num grupo aberto e pagar só a sua vaga. O app está começando com as primeiras casas e vai crescer. Não é um jogo de celular.',
+      'Dá para jogar escape room sozinho no Brasil de dois jeitos. Algumas casas têm sala solo, feita para uma pessoa: você reserva essa sala e joga sem grupo. A maioria das salas pede um grupo. Nesse caso, sozinho é chegar sem a sua turma e entrar com outras pessoas. Dá para chamar amigos, procurar uma comunidade ou entrar num grupo aberto. O EscapeMatch é o app para achar esse grupo, e você paga só a sua vaga. O app está começando com as primeiras casas e vai crescer. Não é só Curitiba e não é um jogo de celular.',
   },
   {
     pergunta: 'Escape room sozinho dá para jogar?',
@@ -46,6 +46,11 @@ const respostas = [
     resposta:
       'No EscapeMatch, você escolhe a sala e o horário no app. O app te coloca num grupo com outras pessoas que também chegaram sem a turma completa. Cada pessoa paga só a própria vaga, o preço da sala por pessoa, mostrado no app. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. O app está começando com as primeiras casas e vai crescer. Escape room é o que está disponível. O site não lista casas parceiras, endereço nem preço.',
   },
+  {
+    pergunta: 'O EscapeMatch é só em Curitiba?',
+    resposta:
+      'Não. O EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. O app está começando com as primeiras casas e vai crescer. Curitiba tem uma página de cidade, com o recorte local.',
+  },
   oQueE,
   ...desambiguacaoMarca,
 ];
@@ -54,7 +59,7 @@ const direta = respostas[0];
 const artigo = {
   headline: direta.pergunta,
   datePublished: publicadoGuiaComoJogarSozinho,
-  dateModified: modificadoGuiaComoJogarSozinho,
+  dateModified: modificadoGuiaNacional,
 };
 ---
 
@@ -127,6 +132,13 @@ const artigo = {
         Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
         A cobrança está em <a href="/como-funciona/pagamento">Pagamento e regras</a> e em <a href="/cancelamento">Regras de cancelamento</a>.
         O combinado de convivência está em <a href="/seguranca">Segurança</a>.
+      </p>
+    </section>
+    <section>
+      <h2>{respostas[6].pergunta}</h2>
+      <p>{respostas[6].resposta}</p>
+      <p>
+        A página da cidade está em <a href="/escape-room-curitiba">Escape room em Curitiba</a>.
       </p>
     </section>
     <section>

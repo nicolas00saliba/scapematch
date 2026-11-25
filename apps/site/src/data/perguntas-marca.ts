@@ -31,13 +31,7 @@ export const oQueE: PerguntaMarca = {
 export const eJogo: PerguntaMarca = {
   pergunta: 'O EscapeMatch é um jogo?',
   resposta:
-    'Não. O EscapeMatch não é um jogo de celular nem um modo de jogo de tiro. É um app de escape room no Brasil que forma grupos para jogar com pessoas desconhecidas. A sessão é presencial. Você chega sozinho, entra num grupo e paga só a sua vaga.',
-};
-
-export const antigoScapeMatch: PerguntaMarca = {
-  pergunta: 'O EscapeMatch é o antigo ScapeMatch?',
-  resposta:
-    'Sim. O EscapeMatch se chamava ScapeMatch até novembro de 2026. É o mesmo aplicativo, só o nome mudou.',
+    'Não. O EscapeMatch não é um jogo de celular nem um modo de jogo de tiro. É o app para achar grupo e jogar escape room sozinho no Brasil. A sessão é presencial. Você chega sozinho, entra num grupo e paga só a sua vaga.',
 };
 
 export const quebraCabecaCelular: PerguntaMarca = {
@@ -49,18 +43,17 @@ export const quebraCabecaCelular: PerguntaMarca = {
 export const naoEhModoDeTiro: PerguntaMarca = {
   pergunta: 'O EscapeMatch é um modo de jogo de tiro?',
   resposta:
-    'Não. EscapeMatch é um app de escape room no Brasil que forma grupos para jogar com pessoas desconhecidas. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa. A sessão é presencial, numa casa de escape room.',
+    'Não. EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa. A sessão é presencial, numa casa de escape room.',
 };
 
 export const jogoDaPlayStore: PerguntaMarca = {
   pergunta: 'O EscapeMatch é o jogo Escape Match da Google Play?',
   resposta:
-    `Não. ${frasePlayStore} A EscapeMatch é um app no Brasil que forma grupos para jogar escape room presencial com pessoas desconhecidas. O site oficial é escapematch.com.br e o Instagram é @escapematch.`,
+    `Não. ${frasePlayStore} A EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. O site oficial é escapematch.com.br e o Instagram é @escapematch.`,
 };
 
 export const desambiguacaoMarca: PerguntaMarca[] = [
   jogoDaPlayStore,
   naoEhModoDeTiro,
-  antigoScapeMatch,
   quebraCabecaCelular,
 ];

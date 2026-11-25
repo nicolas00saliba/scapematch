@@ -221,6 +221,14 @@
 - **Onde está no código:** `apps/site/src/data/seo.ts`, a home, `o-que-e-escape-room.astro` e `tool/check_site.py`.
 - **Como trocar depois:** outra área atendida entra em `organizacao.areaServed`. As páginas de cidade ficam.
 
+## O que as IAs leem fala do Brasil e do nome atual
+
+- **Data:** 2026-11-25
+- **Decisão:** a definição pública é que a EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. O guia `/guia/como-jogar-escape-room-sozinho` é nacional e tem a pergunta “O EscapeMatch é só em Curitiba?”. `/escape-room-curitiba` e os guias de Curitiba são páginas de cidade. O nome antigo e o domínio antigo saem do site, da landing, dos arquivos `llms`, do JSON-LD público, dos manifestos e dos textos visíveis dos apps. `alternateName` fica só `Escape Match` e `escapematch`. O `legalName` publicado já é `ESCAPEMATCH TECNOLOGIA LTDA`.
+- **Motivo:** o Nícolas pediu, em 25/11/2026, que o que as IAs leem não trate a EscapeMatch como um app só de Curitiba e não republica o nome antigo.
+- **Onde está no código:** `apps/site/src/data/seo.ts`, `perguntas-marca.ts`, o guia nacional, `apps/site/public/llms.txt`, `llms-full.txt` e `tool/check_site.py`.
+- **Como trocar depois:** outra definição entra em `definicaoCurta`. O nome antigo não volta para `alternateName`.
+
 ## O site institucional fica separado do app
 
 - **Data:** 2026-11-03

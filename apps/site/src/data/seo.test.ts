@@ -22,7 +22,7 @@ import {
   website,
 } from './seo.ts';
 
-const prefixo = 'EscapeMatch — app de escape room no Brasil';
+const prefixo = 'EscapeMatch — app para jogar escape room sozinho no Brasil';
 
 function chaves(valor: unknown, acc = new Set<string>()): Set<string> {
   if (Array.isArray(valor)) {
@@ -82,7 +82,7 @@ test('a Organization tem um @id estável e os fatos já publicados', () => {
   assert.equal(organizacao.name, 'EscapeMatch');
   assert.equal(organizacao.legalName, 'ESCAPEMATCH TECNOLOGIA LTDA');
   assert.equal(organizacao.taxID, '70.100.608/0001-73');
-  assert.deepEqual(organizacao.alternateName, ['Escape Match', 'escapematch', 'ScapeMatch', 'Scape Match']);
+  assert.deepEqual(organizacao.alternateName, ['Escape Match', 'escapematch']);
   assert.deepEqual(nomesAlternativos, organizacao.alternateName);
   assert.equal(organizacao.description, definicaoCurta);
   assert.equal(organizacao.disambiguatingDescription?.startsWith(descricaoMarca), true);
@@ -155,7 +155,8 @@ test('o grafo da home fecha as referências e o JSON é válido', () => {
   assert.equal(Array.isArray(lido), true);
   assert.equal(texto.includes('streetAddress'), false);
   assert.equal(texto.includes('GameApplication'), false);
-  assert.equal(texto.includes('ScapeMatch') && texto.includes('"name":"EscapeMatch"'), true);
+  assert.equal(texto.includes('ScapeMatch'), false);
+  assert.equal(texto.includes('"name":"EscapeMatch"'), true);
   const definidos = idsDefinidos(lido);
   for (const id of idsReferenciados(lido)) {
     assert.equal(definidos.has(id), true, id);
@@ -197,7 +198,7 @@ test('título e descrição da home cabem e começam pela marca', () => {
   assert.equal(descricaoHome.length <= 155, true, String(descricaoHome.length));
   assert.equal(descricaoSobre.length <= 155, true, String(descricaoSobre.length));
   assert.equal(definicao.startsWith(definicaoCurta), true);
-  assert.equal(definicaoCurta.startsWith('EscapeMatch é um app de escape room no Brasil que'), true);
+  assert.equal(definicaoCurta, 'EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil.');
   assert.equal(definicao.includes('!'), false);
   assert.equal(descricaoHome.includes('!'), false);
 });
