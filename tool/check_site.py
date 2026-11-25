@@ -19,6 +19,7 @@ ROTAS = [
     "/como-funciona/pagamento",
     "/experiencias",
     "/experiencias/escape-room",
+    "/o-que-e-escape-room",
     "/guia",
     "/guia/como-jogar-escape-room-sozinho",
     "/guia/escape-room-sozinho",

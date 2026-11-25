@@ -10,6 +10,7 @@ export type Coluna = {
 };
 
 export const jogarLinks: Link[] = [
+  { rotulo: 'O que é escape room', href: '/o-que-e-escape-room' },
   { rotulo: 'Como jogar escape room sozinho', href: '/guia/como-jogar-escape-room-sozinho' },
   { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
   { rotulo: 'Escape room sozinho em Curitiba', href: '/guia/escape-room-sozinho-curitiba' },
@@ -58,6 +59,7 @@ export const rodape: Coluna[] = [
   {
     titulo: 'Quero jogar',
     links: [
+      { rotulo: 'O que é escape room', href: '/o-que-e-escape-room' },
       { rotulo: 'Escape room sozinho', href: '/guia/escape-room-sozinho' },
       { rotulo: 'Escape room sozinho em Curitiba', href: '/guia/escape-room-sozinho-curitiba' },
       { rotulo: 'Onde achar grupo', href: '/guia/como-achar-grupo-escape-room' },
@@ -128,6 +130,7 @@ const nomes: Record<string, string> = {
   '/como-funciona/pagamento': 'Pagamento e regras',
   '/experiencias': 'Experiências',
   '/experiencias/escape-room': 'Escape room',
+  '/o-que-e-escape-room': 'O que é escape room',
   '/cidades/curitiba': 'Curitiba',
   '/seguranca': 'Segurança',
   '/app': 'Baixar o app',
