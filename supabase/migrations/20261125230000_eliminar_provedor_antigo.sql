@@ -3,6 +3,8 @@
 -- não há check que liste o provedor, e o default novo não reescreve linha antiga.
 -- O segredo novo copia o valor que já cifra os tokens. Não recifra.
 -- Não imprime o segredo.
+-- Redefine admin_payments_board e admin_merge_venues da pilha de admin
+-- para não lerem a coluna nem as tabelas removidas.
 
 do $$
 declare
@@ -831,12 +833,13 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.admin_payments_board()
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+create or replace function public.admin_payments_board()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
 declare
   v_ready jsonb;
   v_charges jsonb;
@@ -855,11 +858,28 @@ begin
       c.status,
       c.billing_type,
       c.amount_cents,
+      c.charged_amount_cents,
+      c.buyer_interest_cents,
+      c.first_booking_discount_cents,
+      c.subsidy_cents,
+      c.points_redeemed,
+      c.house_fixed_cents,
+      c.custody_release_attempts,
       coalesce(c.provider_ref, '') as provider_ref,
       c.created_at,
-      v.name as venue_name
+      v.name as venue_name,
+      case
+        when c.custody_released_at is not null then 'liberada'
+        when c.custody_release_failed_at is not null then 'falha'
+        when c.status = 'paid'
+          and c.provider_split_id is not null
+          and c.refund_requested_at is null
+          then 'HELD'
+        else 'sem_custodia'
+      end as custody
     from public.payment_charges c
     join public.venues v on v.id = c.venue_id
+    where v.is_test = false
     order by c.created_at desc
     limit 20
   ) s;
@@ -878,6 +898,7 @@ begin
     from public.payment_charges c
     join public.venues v on v.id = c.venue_id
     where c.status = 'refunded'
+      and v.is_test = false
     order by coalesce(c.refunded_at, c.created_at) desc
     limit 20
   ) s;
@@ -895,6 +916,7 @@ begin
       v.name as venue_name
     from public.venue_withdrawals w
     join public.venues v on v.id = w.venue_id
+    where v.is_test = false
     order by w.created_at desc
     limit 20
   ) s;
@@ -916,7 +938,8 @@ begin
     'webhook_errors', v_errors
   );
 end;
-$function$;
+$$;
+
 
 CREATE OR REPLACE FUNCTION public.store_venue_pagbank_tokens(p_venue_id uuid, p_access_token text, p_refresh_token text, p_expires_at timestamp with time zone)
  RETURNS void
@@ -1143,6 +1166,137 @@ drop function private.read_venue_asaas_key(uuid);
 
 drop table public.asaas_customers;
 drop table public.venue_asaas_keys;
+
+-- admin_merge_venues foi criada enquanto asaas_customers e venue_asaas_keys existiam.
+-- O corpo novo não consulta essas tabelas.
+create or replace function public.admin_merge_venues(
+  p_source_id uuid,
+  p_target_id uuid,
+  p_confirm text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := private.admin_require();
+  v_source text;
+  v_target text;
+  v_table text;
+  v_moved integer := 0;
+begin
+  if p_confirm is distinct from 'MESCLAR' then
+    raise exception 'confirmacao invalida' using errcode = '22023';
+  end if;
+  if p_source_id is null or p_target_id is null or p_source_id = p_target_id then
+    raise exception 'casas invalidas' using errcode = '22023';
+  end if;
+  select status into v_source from public.venues where id = p_source_id for update;
+  if not found then
+    raise exception 'casa de origem nao encontrada' using errcode = 'P0002';
+  end if;
+  select status into v_target from public.venues where id = p_target_id for update;
+  if not found then
+    raise exception 'casa de destino nao encontrada' using errcode = 'P0002';
+  end if;
+  if v_source = 'merged' or v_target in ('merged', 'rejected') then
+    raise exception 'casa nao pode ser mesclada' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.venue_staff where venue_id = p_source_id
+  ) then
+    raise exception 'casa com equipe' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.venues
+    where id = p_source_id
+      and pagbank_account_id is not null
+      and pg_catalog.btrim(pagbank_account_id) <> ''
+  )
+  or exists (select 1 from public.venue_pagbank_tokens where venue_id = p_source_id)
+  or exists (select 1 from public.venue_pagbank_signups where venue_id = p_source_id)
+  or exists (select 1 from public.pagbank_connect_states where venue_id = p_source_id)
+  or exists (select 1 from public.pagbank_signup_events where venue_id = p_source_id)
+  or exists (select 1 from public.venue_bank_accounts where venue_id = p_source_id)
+  or exists (select 1 from public.venue_fiscal where venue_id = p_source_id)
+  or exists (select 1 from public.venue_claims where venue_id = p_source_id)
+  then
+    raise exception 'casa com acesso' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.ledger_entries where venue_id = p_source_id)
+  or exists (select 1 from public.venue_cashback_debits where venue_id = p_source_id)
+  or exists (select 1 from public.venue_cashback_refunds where venue_id = p_source_id)
+  or exists (select 1 from public.venue_credit_clawbacks where venue_id = p_source_id)
+  or exists (select 1 from public.venue_referral_entries where venue_id = p_source_id)
+  or exists (select 1 from public.free_slot_clawbacks where venue_id = p_source_id)
+  or exists (select 1 from public.free_slot_topups where venue_id = p_source_id)
+  or exists (select 1 from public.venue_empty_slots where venue_id = p_source_id)
+  then
+    raise exception 'casa com saldo' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.payment_charges where venue_id = p_source_id)
+  or exists (select 1 from public.fiscal_invoices where venue_id = p_source_id)
+  then
+    raise exception 'casa com cobranca' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.venue_withdrawals where venue_id = p_source_id)
+  or exists (select 1 from public.platform_cac_transfers where venue_id = p_source_id)
+  or exists (select 1 from public.venue_payout_schedules where venue_id = p_source_id)
+  or exists (select 1 from public.venue_payout_audit where venue_id = p_source_id)
+  or exists (select 1 from public.venue_payout_notices where venue_id = p_source_id)
+  then
+    raise exception 'casa com repasse' using errcode = 'P0001';
+  end if;
+  foreach v_table in array array[
+    'absences',
+    'commission_changes',
+    'groups',
+    'news_items',
+    'passport_gifts',
+    'passport_plays',
+    'passport_stamps',
+    'promotions',
+    'review_replies',
+    'room_rating_rollups',
+    'room_reviews',
+    'room_time_audit',
+    'room_time_entries',
+    'rooms',
+    'session_checkins',
+    'terms_acceptances',
+    'venue_commissions',
+    'venue_time_ranking'
+  ]
+  loop
+    begin
+      execute format(
+        'update public.%I set venue_id = $1 where venue_id = $2',
+        v_table
+      ) using p_target_id, p_source_id;
+      get diagnostics v_moved = row_count;
+    exception
+      when unique_violation then
+        raise exception 'mescla conflitante em %', v_table using errcode = 'P0001';
+    end;
+  end loop;
+  update public.venues
+  set status = 'merged',
+      merged_into = p_target_id
+  where id = p_source_id;
+  perform private.admin_audit(
+    v_actor, 'merge_venues', 'venues', p_source_id::text,
+    pg_catalog.jsonb_build_object('status', v_source),
+    pg_catalog.jsonb_build_object('status', 'merged', 'merged_into', p_target_id)
+  );
+  return pg_catalog.jsonb_build_object(
+    'source_id', p_source_id,
+    'target_id', p_target_id,
+    'status', 'merged'
+  );
+end;
+$$;
+
 
 delete from public.payment_webhook_errors
 where source in ('asaas-webhook', 'asaas-transfer-webhook');
