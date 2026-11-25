@@ -250,6 +250,16 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                 Text(
                   '${_statusLabelRow(house)} · ${house.cityId} · ${house.ownerName} · ${house.ownerEmail}',
                 ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: const Key('admin-casa-operacao'),
+                    onPressed: () => ref
+                        .read(adminPlaceProvider.notifier)
+                        .openSection(AdminSection.operacao, house.id),
+                    child: const Text('Salas e sessões'),
+                  ),
+                ),
                 Text(
                   '${house.documentKind.toUpperCase()} final ${house.documentLast4} · ${house.phone}',
                 ),
