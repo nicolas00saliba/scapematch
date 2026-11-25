@@ -5,6 +5,7 @@ import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 import 'package:scapematch/features/payments/presentation/pagbank_connect_return_page.dart';
 import 'package:scapematch_admin/admin_mfa.dart';
+import 'package:scapematch_admin/admin_ops.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 import 'package:scapematch_admin/admin_payments.dart';
 import 'package:scapematch_admin/admin_reconcile.dart';
@@ -84,6 +85,7 @@ class AdminShell extends ConsumerWidget {
 
   static const destinations = <(AdminSection, String, IconData)>[
     (AdminSection.casas, 'Casas', Icons.storefront_outlined),
+    (AdminSection.operacao, 'Operação', Icons.event_note_outlined),
     (AdminSection.jogadores, 'Jogadores', Icons.people_outline),
     (AdminSection.regras, 'Regras', Icons.tune),
     (AdminSection.ganhos, 'Ganhos', Icons.payments_outlined),
@@ -106,6 +108,7 @@ class AdminShell extends ConsumerWidget {
     final page = switch (place.section) {
       AdminSection.casas =>
         place.id == null ? const CasasPage() : CasaPage(id: place.id!),
+      AdminSection.operacao => const OperacaoPage(),
       AdminSection.jogadores =>
         place.id == null ? const JogadoresPage() : JogadorPage(id: place.id!),
       AdminSection.regras => const RegrasPage(),

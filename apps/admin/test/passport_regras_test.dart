@@ -101,9 +101,9 @@ Future<void> _reveal(WidgetTester tester, Finder target) async {
 
 Future<void> _shot(WidgetTester tester, String name) async {
   await tester.pump();
-  final boundary =
-      tester.renderObject(find.byType(RepaintBoundary).first)
-          as RenderRepaintBoundary;
+  final boundary = tester.renderObject(
+    find.byType(RepaintBoundary).first,
+  ) as RenderRepaintBoundary;
   try {
     await tester.runAsync(() async {
       final image = await boundary.toImage(pixelRatio: 1);

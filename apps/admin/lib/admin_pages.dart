@@ -4,7 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch_admin/admin_api.dart';
+import 'package:scapematch_admin/admin_confirm.dart';
+import 'package:scapematch_admin/admin_errors.dart';
 import 'package:scapematch_admin/admin_format.dart';
+import 'package:scapematch_admin/admin_people.dart';
 import 'package:scapematch_admin/admin_place.dart';
 import 'package:scapematch_admin/admin_reward_fields.dart';
 import 'package:scapematch_admin/admin_theme.dart';
@@ -157,7 +160,13 @@ class _CasasPageState extends ConsumerState<CasasPage> {
   }
 
   Future<void> _reviewClaim(String id, String decision) async {
-    await ref.read(adminApiProvider).reviewVenueClaim(id, decision);
+    try {
+      await ref.read(adminApiProvider).reviewVenueClaim(id, decision);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
     await _load();
   }
 }
@@ -174,10 +183,21 @@ class CasaPage extends ConsumerStatefulWidget {
 class _CasaPageState extends ConsumerState<CasaPage> {
   VenueProfile? _house;
   String? _message;
+  final _name = TextEditingController();
   final _neighborhood = TextEditingController();
+  final _street = TextEditingController();
+  final _number = TextEditingController();
+  final _postal = TextEditingController();
+  final _phone = TextEditingController();
+  final _category = TextEditingController();
+  final _badge = TextEditingController();
+  final _city = TextEditingController();
   final _bps = TextEditingController();
+  final _platform = TextEditingController();
+  final _mergeTarget = TextEditingController();
   final _officialEmail = TextEditingController();
   final _officialPhone = TextEditingController();
+  bool _testHouse = false;
 
   @override
   void initState() {
@@ -187,19 +207,57 @@ class _CasaPageState extends ConsumerState<CasaPage> {
 
   @override
   void dispose() {
+    _name.dispose();
     _neighborhood.dispose();
+    _street.dispose();
+    _number.dispose();
+    _postal.dispose();
+    _phone.dispose();
+    _category.dispose();
+    _badge.dispose();
+    _city.dispose();
     _bps.dispose();
+    _platform.dispose();
+    _mergeTarget.dispose();
     _officialEmail.dispose();
     _officialPhone.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
-    final house = await ref.read(adminApiProvider).venue(widget.id);
+    final VenueProfile house;
+    try {
+      house = await ref.read(adminApiProvider).venue(widget.id);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
+    _name.text = house.name;
     _neighborhood.text = house.neighborhood;
+    _street.text = house.streetAddress;
+    _number.text = house.addressNumber;
+    _postal.text = house.postalCode;
+    _phone.text = house.phone;
+    _category.text = house.category;
+    _badge.text = house.badge;
+    _city.text = house.cityId;
     _bps.text = percentInput(house.commissionBps);
+    _platform.text = percentInput(house.platformBps);
     setState(() => _house = house);
+  }
+
+  /// Roda a ação e mostra o erro na tela, em vez de falhar calado.
+  Future<bool> _attempt(Future<void> Function() action) async {
+    try {
+      await action();
+      return true;
+    } on Object catch (error) {
+      if (!mounted) return false;
+      setState(() => _message = adminErrorText(error));
+      return false;
+    }
   }
 
   @override
@@ -214,12 +272,25 @@ class _CasaPageState extends ConsumerState<CasaPage> {
         icon: const Icon(Icons.arrow_back),
       ),
       child: house == null
-          ? const Text('Carregando casa…')
+          ? Text(
+              _message ?? 'Carregando casa…',
+              key: const Key('admin-casa-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   '${_statusLabelRow(house)} · ${house.cityId} · ${house.ownerName} · ${house.ownerEmail}',
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: const Key('admin-casa-operacao'),
+                    onPressed: () => ref
+                        .read(adminPlaceProvider.notifier)
+                        .openSection(AdminSection.operacao, house.id),
+                    child: const Text('Salas e sessões'),
+                  ),
                 ),
                 Text(
                   '${house.documentKind.toUpperCase()} final ${house.documentLast4} · ${house.phone}',
@@ -243,33 +314,16 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                     if (house.status == 'approved')
                       OutlinedButton(
                         onPressed: () async {
-                          await ref
-                              .read(adminApiProvider)
-                              .suspendVenue(house.id, !house.suspended);
-                          await _load();
+                          final ok = await _attempt(
+                            () => ref
+                                .read(adminApiProvider)
+                                .suspendVenue(house.id, !house.suspended),
+                          );
+                          if (ok) await _load();
                         },
                         child: Text(house.suspended ? 'Reativar' : 'Suspender'),
                       ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _neighborhood,
-                  decoration: const InputDecoration(labelText: 'Bairro'),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
-                    onPressed: () async {
-                      final next = await ref.read(adminApiProvider).updateVenue(
-                        house.id,
-                        {'neighborhood': _neighborhood.text.trim()},
-                      );
-                      setState(() => _house = next);
-                    },
-                    child: const Text('Salvar dados'),
-                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -336,6 +390,213 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                     child: const Text('Gravar contato oficial'),
                   ),
                 ),
+                TextField(
+                  key: const Key('admin-casa-nome'),
+                  controller: _name,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                ),
+                TextField(
+                  controller: _street,
+                  decoration: const InputDecoration(labelText: 'Endereço'),
+                ),
+                TextField(
+                  controller: _number,
+                  decoration: const InputDecoration(labelText: 'Número'),
+                ),
+                TextField(
+                  controller: _postal,
+                  decoration: const InputDecoration(labelText: 'CEP'),
+                ),
+                TextField(
+                  controller: _neighborhood,
+                  decoration: const InputDecoration(labelText: 'Bairro'),
+                ),
+                TextField(
+                  controller: _city,
+                  decoration: const InputDecoration(labelText: 'Cidade'),
+                ),
+                TextField(
+                  controller: _phone,
+                  decoration: const InputDecoration(labelText: 'Telefone'),
+                ),
+                TextField(
+                  controller: _category,
+                  decoration: const InputDecoration(labelText: 'Categoria'),
+                ),
+                TextField(
+                  controller: _badge,
+                  decoration: const InputDecoration(labelText: 'Selo'),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton(
+                    key: const Key('admin-salvar-casa'),
+                    onPressed: () async {
+                      VenueProfile? next;
+                      final ok = await _attempt(() async {
+                        next = await ref.read(adminApiProvider).updateVenue(
+                          house.id,
+                          {
+                            'name': _name.text.trim(),
+                            'street_address': _street.text.trim(),
+                            'address_number': _number.text.trim(),
+                            'postal_code': _postal.text.trim(),
+                            'neighborhood': _neighborhood.text.trim(),
+                            'city_id': _city.text.trim(),
+                            'phone': _phone.text.trim(),
+                            'category': _category.text.trim(),
+                            'badge': _badge.text.trim(),
+                          },
+                        );
+                      });
+                      if (!ok || !mounted || next == null) return;
+                      setState(() {
+                        _house = next;
+                        _message = 'Dados gravados.';
+                      });
+                    },
+                    child: const Text('Salvar dados'),
+                  ),
+                ),
+                if (house.status == 'rejected')
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      key: const Key('admin-reabrir-casa'),
+                      onPressed: () async {
+                        final ok = await _attempt(
+                          () => ref
+                              .read(adminPeopleProvider)
+                              .reopenVenue(house.id),
+                        );
+                        if (ok) await _load();
+                      },
+                      child: const Text('Reabrir casa reprovada'),
+                    ),
+                  ),
+                SwitchListTile(
+                  key: const Key('admin-casa-teste'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Casa de teste'),
+                  value: _testHouse,
+                  onChanged: (value) async {
+                    final ok = await _attempt(
+                      () => ref
+                          .read(adminPeopleProvider)
+                          .setTest(kind: 'venue', id: house.id, enabled: value),
+                    );
+                    if (ok && mounted) setState(() => _testHouse = value);
+                  },
+                ),
+                TextField(
+                  key: const Key('admin-mesclar-destino'),
+                  controller: _mergeTarget,
+                  decoration: const InputDecoration(
+                    labelText: 'Id da casa que fica',
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: const Key('admin-mesclar'),
+                    onPressed: () async {
+                      final okWord = await confirmTyped(
+                        context,
+                        title: 'MESCLAR',
+                        body: 'As salas, sessões e cobranças passam para a casa que fica. A origem fica marcada como mesclada.',
+                        word: 'MESCLAR',
+                      );
+                      if (!okWord || !mounted) return;
+                      final ok = await _attempt(
+                        () => ref
+                            .read(adminPeopleProvider)
+                            .mergeVenues(
+                              house.id,
+                              _mergeTarget.text.trim(),
+                              'MESCLAR',
+                            ),
+                      );
+                      if (ok && mounted) {
+                        setState(() => _message = 'Casas mescladas.');
+                      }
+                    },
+                    child: const Text('Mesclar nesta casa'),
+                  ),
+                ),
+
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: const Key('admin-comissao-oficial'),
+                    onPressed: () async {
+                      final okWord = await confirmTyped(
+                        context,
+                        title: 'OFICIAL',
+                        body: 'Esta casa volta a usar a comissão oficial da plataforma.',
+                        word: 'OFICIAL',
+                      );
+                      if (!okWord || !mounted) return;
+                      final ok = await _attempt(
+                        () => ref
+                            .read(adminPeopleProvider)
+                            .clearCommission(house.id, 'OFICIAL'),
+                      );
+                      if (ok) await _load();
+                    },
+                    child: const Text('Voltar à comissão oficial'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Comissão oficial da plataforma, em percentual. Vale para as casas sem taxa própria.',
+                ),
+                TextField(
+                  key: const Key('admin-comissao-plataforma'),
+                  controller: _platform,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'Comissão oficial (%)',
+                    helperText: 'De 0 a 30. Sem atalho.',
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton(
+                    key: const Key('admin-gravar-plataforma'),
+                    onPressed: () async {
+                      final bps = bpsFromPercent(_platform.text);
+                      if (bps == null) {
+                        setState(
+                          () => _message = 'A comissão fica entre 0% e 30%.',
+                        );
+                        return;
+                      }
+                      final okWord = await confirmTyped(
+                        context,
+                        title: 'COMISSAO',
+                        body:
+                            'A comissão oficial da plataforma passa a ser ${percentBps(bps)}.',
+                        word: 'COMISSAO',
+                      );
+                      if (!okWord || !mounted) return;
+                      final ok = await _attempt(
+                        () =>
+                            ref.read(adminApiProvider).setCommission(bps: bps),
+                      );
+                      if (ok && mounted) {
+                        setState(() => _message = 'Comissão oficial gravada.');
+                      }
+                    },
+                    child: const Text('Gravar comissão oficial'),
+                  ),
+                ),
+
                 if (_message != null) ...[
                   const SizedBox(height: 12),
                   Text(_message!, key: const Key('admin-casa-aviso')),
@@ -415,20 +676,32 @@ class _CasaPageState extends ConsumerState<CasaPage> {
 
   Future<void> _review(String decision) async {
     final api = ref.read(adminApiProvider);
-    final result = await api.reviewVenue(widget.id, decision);
+    final ReviewResult result;
+    try {
+      result = await api.reviewVenue(widget.id, decision);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     String? wallet;
     if (result.needsSubaccount) {
-      wallet = await api.provisionWallet(widget.id);
+      try {
+        wallet = await api.provisionWallet(widget.id);
+      } on Object {
+        wallet =
+            'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
+      }
       if (wallet != null && wallet.startsWith('https://')) {
         await launchExternalUrl(Uri.parse(wallet));
         wallet = 'Continue na PagBank para ligar a casa.';
       }
     }
     await _load();
+    if (!mounted) return;
     setState(() {
       _message = result.needsSubaccount
-          ? (wallet ??
-                'Aprovada. Abra o PagBank Connect para ligar a casa.')
+          ? (wallet ?? 'Aprovada. Abra o PagBank Connect para ligar a casa.')
           : 'Decisão gravada: ${result.status}.';
     });
   }
@@ -444,6 +717,9 @@ class JogadoresPage extends ConsumerStatefulWidget {
 class _JogadoresPageState extends ConsumerState<JogadoresPage> {
   final _query = TextEditingController();
   List<PlayerRow> _players = const [];
+  int _total = 0;
+  int _offset = 0;
+  bool _includeTest = false;
   List<ReviewRow> _queue = const [];
   String? _error;
 
@@ -462,11 +738,16 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
   Future<void> _load() async {
     final api = ref.read(adminApiProvider);
     try {
-      final players = await api.players(_query.text);
+      final players = await api.searchPlayers(
+        query: _query.text,
+        includeTest: _includeTest,
+        offset: _offset,
+      );
       final queue = await api.referralQueue();
       if (!mounted) return;
       setState(() {
-        _players = players;
+        _players = players.rows;
+        _total = players.total;
         _queue = queue;
         _error = null;
       });
@@ -519,10 +800,28 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
             decoration: const InputDecoration(
               labelText: 'Nome, e-mail ou usuário',
             ),
-            onSubmitted: (_) => _load(),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          FilterChip(
+            label: const Text('Mostrar teste'),
+            selected: _includeTest,
+            onSelected: (value) {
+              setState(() {
+                _includeTest = value;
+                _offset = 0;
+              });
+              _load();
+            },
           ),
           const SizedBox(height: 8),
           if (_error != null) Text(_error!),
+          Text(
+            '$_total jogadores neste recorte.',
+            key: const Key('admin-jogadores-total'),
+          ),
           for (final player in _players)
             Card(
               child: ListTile(
@@ -534,19 +833,50 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
                     ref.read(adminPlaceProvider.notifier).open(player.id),
               ),
             ),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _offset == 0
+                    ? null
+                    : () {
+                        setState(
+                          () => _offset = (_offset - 40).clamp(0, _offset),
+                        );
+                        _load();
+                      },
+                child: const Text('Anterior'),
+              ),
+              TextButton(
+                key: const Key('admin-jogadores-proxima'),
+                onPressed: _offset + _players.length >= _total
+                    ? null
+                    : () {
+                        setState(() => _offset += 40);
+                        _load();
+                      },
+                child: const Text('Próxima'),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
   Future<void> _decide(ReviewRow row, String decision) async {
-    await ref
-        .read(adminApiProvider)
-        .decideReferral(
-          userId: row.userId,
-          venueId: row.venueId,
-          decision: decision,
-        );
+    try {
+      await ref
+          .read(adminApiProvider)
+          .decideReferral(
+            userId: row.userId,
+            venueId: row.venueId,
+            decision: decision,
+          );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
     await _load();
   }
 }
@@ -562,6 +892,11 @@ class JogadorPage extends ConsumerStatefulWidget {
 
 class _JogadorPageState extends ConsumerState<JogadorPage> {
   PlayerProfile? _player;
+  PlayerLedger? _ledger;
+  String? _error;
+  final _points = TextEditingController();
+  final _reason = TextEditingController();
+  bool _playerTest = false;
 
   @override
   void initState() {
@@ -569,10 +904,68 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _points.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
-    final player = await ref.read(adminApiProvider).player(widget.id);
+    final PlayerProfile player;
+    try {
+      player = await ref.read(adminApiProvider).player(widget.id);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
+    PlayerLedger? ledger;
+    try {
+      ledger = await ref.read(adminPeopleProvider).ledger(widget.id);
+    } on Object {
+      ledger = null;
+    }
     if (!mounted) return;
-    setState(() => _player = player);
+    setState(() {
+      _player = player;
+      _ledger = ledger;
+      _playerTest = ledger?.isTest ?? false;
+      _error = null;
+    });
+  }
+
+  Future<void> _pointsMove(String direction) async {
+    final points = int.tryParse(_points.text.trim());
+    if (points == null || points < 1 || _reason.text.trim().length < 3) {
+      setState(() => _error = 'Informe os pontos e um motivo.');
+      return;
+    }
+    final okWord = await confirmTyped(
+      context,
+      title: 'PONTOS',
+      body: direction == 'credit'
+          ? 'Credita $points pontos na hora, com o motivo no livro.'
+          : 'Debita $points pontos se houver saldo livre.',
+      word: 'PONTOS',
+    );
+    if (!okWord || !mounted) return;
+    try {
+      await ref
+          .read(adminPeopleProvider)
+          .adjustPoints(
+            userId: widget.id,
+            points: points,
+            direction: direction,
+            reason: _reason.text.trim(),
+            confirm: 'PONTOS',
+          );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+      return;
+    }
+    await _load();
   }
 
   @override
@@ -586,7 +979,10 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
         icon: const Icon(Icons.arrow_back),
       ),
       child: player == null
-          ? const Text('Carregando jogador…')
+          ? Text(
+              _error ?? 'Carregando jogador…',
+              key: const Key('admin-jogador-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -605,14 +1001,70 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
                 const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: () async {
-                    await ref
-                        .read(adminApiProvider)
-                        .suspendPlayer(player.id, !player.suspended);
+                    try {
+                      await ref
+                          .read(adminApiProvider)
+                          .suspendPlayer(player.id, !player.suspended);
+                    } on Object catch (error) {
+                      if (!mounted) return;
+                      setState(() => _error = adminErrorText(error));
+                      return;
+                    }
                     await _load();
                   },
                   child: Text(
                     player.suspended ? 'Reativar conta' : 'Suspender conta',
                   ),
+                ),
+                if (_error != null)
+                  Text(_error!, key: const Key('admin-jogador-aviso')),
+                SwitchListTile(
+                  key: const Key('admin-jogador-teste'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Conta de teste'),
+                  value: _playerTest,
+                  onChanged: (value) async {
+                    try {
+                      await ref
+                          .read(adminPeopleProvider)
+                          .setTest(
+                            kind: 'player',
+                            id: player.id,
+                            enabled: value,
+                          );
+                    } on Object catch (error) {
+                      if (!mounted) return;
+                      setState(() => _error = adminErrorText(error));
+                      return;
+                    }
+                    if (mounted) setState(() => _playerTest = value);
+                  },
+                ),
+                TextField(
+                  key: const Key('admin-pontos'),
+                  controller: _points,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Pontos'),
+                ),
+                TextField(
+                  key: const Key('admin-pontos-motivo'),
+                  controller: _reason,
+                  decoration: const InputDecoration(labelText: 'Motivo'),
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      key: const Key('admin-pontos-credito'),
+                      onPressed: () => _pointsMove('credit'),
+                      child: const Text('Creditar'),
+                    ),
+                    TextButton(
+                      key: const Key('admin-pontos-debito'),
+                      onPressed: () => _pointsMove('debit'),
+                      child: const Text('Debitar'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 const Text('Reservas'),
@@ -620,6 +1072,8 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
                 const SizedBox(height: 12),
                 const Text('Extrato de Scape Points'),
                 for (final line in player.entries) Text(line),
+                for (final line in _ledger?.lines ?? const <String>[])
+                  Text(line),
                 const SizedBox(height: 12),
                 const Text('Indicações feitas'),
                 for (final line in player.referralsMade) Text(line),
@@ -672,9 +1126,18 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
 
   Future<void> _load() async {
     final api = ref.read(adminApiProvider);
-    final settings = await api.rewardSettings();
-    final history = await api.rewardHistory();
-    final passport = await api.passportSettings();
+    final Map<String, Object?> settings;
+    final List<Map<String, Object?>> history;
+    final Map<String, Object?> passport;
+    try {
+      settings = await api.rewardSettings();
+      history = await api.rewardHistory();
+      passport = await api.passportSettings();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
     for (final field in rewardFields) {
       _fields[field.id]!.text = '${settings[field.id] ?? ''}';
@@ -697,7 +1160,10 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
       key: const Key('admin-regras'),
       title: 'Comissões e recompensas',
       child: _settings == null
-          ? const Text('Carregando regras…')
+          ? Text(
+              _message ?? 'Carregando regras…',
+              key: const Key('admin-regras-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -729,9 +1195,7 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 ],
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Permitir vaga grátis com pontos',
-                  ),
+                  title: const Text('Permitir vaga grátis com pontos'),
                   subtitle: const Text(
                     'Desligada por padrão. Ligada, pontos de indicação e de cashback já liberados podem cobrir a vaga, sem limite mensal. O que passar da comissão vira crédito da casa no próximo repasse. Boas-vindas e promoção continuam no teto.',
                   ),
@@ -765,10 +1229,8 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 const SizedBox(height: 24),
                 Text(
                   'Passaporte de salas',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: adminTeal,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(color: adminTeal, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -810,14 +1272,27 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                 if (_history.isEmpty) const Text('Nenhuma alteração ainda.'),
                 for (final row in _history.take(8))
                   Text(
-                    '${row['created_at'] ?? 'agora'} · alteração registrada',
+                    '${whenLabel(DateTime.tryParse('${row['created_at'] ?? ''}'))} · alteração registrada',
                   ),
+                const SizedBox(height: 24),
+                const CheckoutDesk(),
               ],
             ),
     );
   }
 
   Future<void> _save() async {
+    final empty = [
+      for (final field in rewardFields)
+        if (int.tryParse(_fields[field.id]!.text.trim()) == null) field.label,
+    ];
+    if (empty.isNotEmpty) {
+      setState(() {
+        _message =
+            'Preencha todos os campos antes de salvar. Campo vazio não vira zero. Faltando: ${empty.join(', ')}.';
+      });
+      return;
+    }
     final patch = <String, Object?>{
       for (final field in rewardFields)
         field.id: int.tryParse(_fields[field.id]!.text.trim()) ?? 0,
@@ -837,6 +1312,18 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
   }
 
   Future<void> _savePassport() async {
+    final empty = [
+      for (final field in passportRuleFields)
+        if (int.tryParse(_passportInputs[field.id]!.text.trim()) == null)
+          field.label,
+    ];
+    if (empty.isNotEmpty) {
+      setState(() {
+        _passportMessage =
+            'Preencha todos os campos antes de salvar. Faltando: ${empty.join(', ')}.';
+      });
+      return;
+    }
     final patch = <String, Object?>{
       'passport_enabled': _passportOn,
       for (final field in passportRuleFields)
@@ -866,10 +1353,7 @@ const passportRuleFields = <PassportRuleField>[
   PassportRuleField(id: 'passport_rooms_5', label: 'Salas do primeiro marco'),
   PassportRuleField(id: 'passport_points_5', label: 'Pontos do primeiro marco'),
   PassportRuleField(id: 'passport_rooms_10', label: 'Salas do segundo marco'),
-  PassportRuleField(
-    id: 'passport_points_10',
-    label: 'Pontos do segundo marco',
-  ),
+  PassportRuleField(id: 'passport_points_10', label: 'Pontos do segundo marco'),
   PassportRuleField(id: 'passport_rooms_25', label: 'Salas do terceiro marco'),
   PassportRuleField(
     id: 'passport_points_25',
@@ -892,7 +1376,9 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
   EarningsReport? _report;
   ScapeLiability? _liability;
   String? _liabilityError;
+  String? _reportError;
   String _period = 'tudo';
+  bool _includeTest = false;
 
   @override
   void initState() {
@@ -904,9 +1390,17 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
     final now = DateTime.now().toUtc();
     DateTime? from;
     if (_period == '30') from = now.subtract(const Duration(days: 30));
-    if (_period == 'mes') from = DateTime.utc(now.year, now.month);
+    // "Este mês" começa à meia-noite de Brasília, não à meia-noite UTC.
+    if (_period == 'mes') from = brasiliaMonthStartUtc(now);
     final api = ref.read(adminApiProvider);
-    final report = await api.earnings(from: from);
+    final EarningsReport report;
+    try {
+      report = await api.earnings(from: from, includeTest: _includeTest);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _reportError = adminErrorText(error));
+      return;
+    }
     ScapeLiability? liability;
     String? liabilityError;
     try {
@@ -917,6 +1411,7 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
     if (!mounted) return;
     setState(() {
       _report = report;
+      _reportError = null;
       _liability = liability;
       _liabilityError = liabilityError;
     });
@@ -930,7 +1425,10 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
       key: const Key('admin-ganhos'),
       title: 'Ganhos',
       child: report == null
-          ? const Text('Carregando ganhos…')
+          ? Text(
+              _reportError ?? 'Carregando ganhos…',
+              key: const Key('admin-ganhos-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -950,6 +1448,15 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                           _load();
                         },
                       ),
+                    FilterChip(
+                      key: const Key('admin-ganhos-teste'),
+                      label: const Text('Mostrar teste'),
+                      selected: _includeTest,
+                      onSelected: (value) {
+                        setState(() => _includeTest = value);
+                        _load();
+                      },
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -975,6 +1482,11 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                           '${report.openPoints} · ${reais(report.openPointsCents)}',
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Subsídio ${reais(report.rewardsSubsidyCents)} · pontos usados ${reais(report.rewardsPointsCents)}. O total usa o maior dos dois, para não contar o mesmo valor duas vezes.',
+                  key: const Key('admin-recompensas-partes'),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -1043,6 +1555,7 @@ class DestaquesPage extends ConsumerStatefulWidget {
 
 class _DestaquesPageState extends ConsumerState<DestaquesPage> {
   HighlightsBoard? _board;
+  String? _message;
   final _ranks = <String, TextEditingController>{};
 
   @override
@@ -1060,7 +1573,14 @@ class _DestaquesPageState extends ConsumerState<DestaquesPage> {
   }
 
   Future<void> _load() async {
-    final board = await ref.read(adminApiProvider).highlights();
+    final HighlightsBoard board;
+    try {
+      board = await ref.read(adminApiProvider).highlights();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
     if (!mounted) return;
     setState(() => _board = board);
   }
@@ -1072,13 +1592,18 @@ class _DestaquesPageState extends ConsumerState<DestaquesPage> {
       key: const Key('admin-destaques'),
       title: 'Destaques',
       child: board == null
-          ? const Text('Carregando destaques…')
+          ? Text(
+              _message ?? 'Carregando destaques…',
+              key: const Key('admin-destaques-aviso'),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
                   'O número menor aparece antes na home do jogador. Vazio tira o item da seleção.',
                 ),
+                if (_message != null)
+                  Text(_message!, key: const Key('admin-destaques-aviso')),
                 _block('Casas', 'venue', board.venues),
                 _block('Salas', 'room', board.rooms),
                 _block('Carrossel de novidades', 'news', board.news),
@@ -1131,9 +1656,24 @@ class _DestaquesPageState extends ConsumerState<DestaquesPage> {
 
   Future<void> _save(String kind, String id) async {
     final raw = _ranks[id]?.text.trim() ?? '';
-    await ref
-        .read(adminApiProvider)
-        .setHighlight(kind, id, raw.isEmpty ? null : int.tryParse(raw));
+    final rank = raw.isEmpty ? null : int.tryParse(raw);
+    if (raw.isNotEmpty && (rank == null || rank < 1)) {
+      // Antes, um texto inválido virava "sem número" e tirava o item.
+      setState(() {
+        _message =
+            'A ordem é um número inteiro a partir de 1. Vazio tira o item.';
+      });
+      return;
+    }
+    try {
+      await ref.read(adminApiProvider).setHighlight(kind, id, rank);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _message = 'Ordem gravada.');
     await _load();
   }
 }
@@ -1146,7 +1686,16 @@ class AuditoriaPage extends ConsumerStatefulWidget {
 }
 
 class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
-  List<AuditRow> _rows = const [];
+  final _action = TextEditingController();
+  final _actor = TextEditingController();
+  final _from = TextEditingController();
+  final _to = TextEditingController();
+  JsonPage _rows = const JsonPage(total: 0, rows: []);
+  JsonPage _commission = const JsonPage(total: 0, rows: []);
+  JsonPage _rules = const JsonPage(total: 0, rows: []);
+  int _offset = 0;
+  String? _error;
+  bool _loaded = false;
 
   @override
   void initState() {
@@ -1154,10 +1703,45 @@ class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _action.dispose();
+    _actor.dispose();
+    _from.dispose();
+    _to.dispose();
+    super.dispose();
+  }
+
+  DateTime? _day(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return null;
+    return DateTime.tryParse(text)?.toUtc();
+  }
+
   Future<void> _load() async {
-    final rows = await ref.read(adminApiProvider).audit();
-    if (!mounted) return;
-    setState(() => _rows = rows);
+    final api = ref.read(adminApiProvider);
+    try {
+      final rows = await api.searchAudit(
+        action: _action.text,
+        actor: _actor.text,
+        from: _day(_from.text),
+        to: _day(_to.text),
+        offset: _offset,
+      );
+      final commission = await api.commissionHistory();
+      final rules = await api.ruleHistory();
+      if (!mounted) return;
+      setState(() {
+        _rows = rows;
+        _commission = commission;
+        _rules = rules;
+        _error = null;
+        _loaded = true;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = adminErrorText(error));
+    }
   }
 
   @override
@@ -1170,18 +1754,257 @@ class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
         children: [
           const Text('Quem fez, quando, e o antes e o depois.'),
           const SizedBox(height: 12),
-          if (_rows.isEmpty) const Text('Nenhuma ação ainda.'),
-          for (final row in _rows)
+          TextField(
+            key: const Key('admin-auditoria-acao'),
+            controller: _action,
+            decoration: const InputDecoration(labelText: 'Ação'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          TextField(
+            key: const Key('admin-auditoria-admin'),
+            controller: _actor,
+            decoration: const InputDecoration(labelText: 'Admin'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          TextField(
+            controller: _from,
+            decoration: const InputDecoration(labelText: 'De (AAAA-MM-DD)'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          TextField(
+            controller: _to,
+            decoration: const InputDecoration(labelText: 'Até (AAAA-MM-DD)'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          if (_error != null)
+            Text(_error!, key: const Key('admin-auditoria-aviso')),
+          if (_error == null && !_loaded) const Text('Carregando auditoria…'),
+          if (_error == null && _loaded && _rows.rows.isEmpty)
+            const Text('Nenhuma ação ainda.'),
+          if (_error == null && _loaded)
+            Text('${_rows.total} ações neste recorte.'),
+          for (final row in _rows.rows)
             Card(
               child: ListTile(
-                title: Text('${row.action} · ${row.targetTable}'),
+                title: Text('${row['action']} · ${row['target_table']}'),
                 subtitle: Text(
-                  '${whenLabel(row.createdAt)} · ${row.targetId}\nantes ${row.before}\ndepois ${row.after}',
+                  '${whenLabel(DateTime.tryParse('${row['created_at']}'))}'
+                  '${_who(row)} · ${row['target_id']}\n'
+                  'antes ${row['before']}\ndepois ${row['after']}',
                 ),
               ),
             ),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _offset == 0
+                    ? null
+                    : () {
+                        setState(
+                          () => _offset = (_offset - 40).clamp(0, _offset),
+                        );
+                        _load();
+                      },
+                child: const Text('Anterior'),
+              ),
+              TextButton(
+                onPressed: _offset + _rows.rows.length >= _rows.total
+                    ? null
+                    : () {
+                        setState(() => _offset += 40);
+                        _load();
+                      },
+                child: const Text('Próxima'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Histórico de comissão',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (_commission.rows.isEmpty)
+            const Text('Nenhuma mudança de comissão.'),
+          for (final row in _commission.rows)
+            Text(
+              '${row['venue_name']}: ${row['before_bps']} → ${row['after_bps']} bps'
+              '${_who(row)}',
+              key: const Key('admin-comissao-historico'),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            'Histórico de regras',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const Text(
+            'Inclui o que entrou por migration ou SQL direto, sem sessão de admin.',
+          ),
+          if (_rules.rows.isEmpty) const Text('Nenhuma mudança de regra.'),
+          for (final row in _rules.rows)
+            Text(
+              '${row['table_name']} · ${row['operation']}'
+              '${_who(row).isEmpty ? ' · SQL direto' : _who(row)}',
+              key: const Key('admin-regra-historico'),
+            ),
         ],
       ),
+    );
+  }
+
+  String _who(Map<String, Object?> row) {
+    final name = '${row['actor_name'] ?? ''}'.trim();
+    if (name.isNotEmpty) return ' · $name';
+    final id = '${row['actor_id'] ?? ''}'.trim();
+    if (id.isEmpty) return '';
+    return ' · ${id.length > 8 ? id.substring(0, 8) : id}';
+  }
+}
+
+class CheckoutDesk extends ConsumerStatefulWidget {
+  const CheckoutDesk({super.key});
+
+  @override
+  ConsumerState<CheckoutDesk> createState() => _CheckoutDeskState();
+}
+
+class _CheckoutDeskState extends ConsumerState<CheckoutDesk> {
+  final _max = TextEditingController();
+  final _pix = TextEditingController();
+  final _card = TextEditingController();
+  final _bps = TextEditingController();
+  bool _reads = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _max.dispose();
+    _pix.dispose();
+    _card.dispose();
+    _bps.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final settings = await ref.read(adminApiProvider).checkoutSettings();
+      if (!mounted) return;
+      setState(() {
+        _max.text = '${settings.maxInterestFree}';
+        _pix.text = '${settings.pixFeeCents}';
+        _card.text = '${settings.cardFeeCents}';
+        _bps.text = '${settings.cardFeeBps}';
+        _reads = settings.chargeReadsConfig;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+    }
+  }
+
+  Future<void> _save() async {
+    final max = int.tryParse(_max.text.trim());
+    final pix = int.tryParse(_pix.text.trim());
+    final card = int.tryParse(_card.text.trim());
+    final bps = int.tryParse(_bps.text.trim());
+    if (max == null || pix == null || card == null || bps == null) {
+      setState(() => _message = 'Preencha os quatro números.');
+      return;
+    }
+    final okWord = await confirmTyped(
+      context,
+      title: 'CONFIG',
+      body: 'As taxas de recibo passam a valer na hora. O limite de parcelas fica guardado; a cobrança ainda lê o limite no código dela.',
+      word: 'CONFIG',
+    );
+    if (!okWord || !mounted) return;
+    try {
+      await ref
+          .read(adminApiProvider)
+          .saveCheckout(
+            confirm: 'CONFIG',
+            maxInterestFree: max,
+            pixFeeCents: pix,
+            cardFeeCents: card,
+            cardFeeBps: bps,
+          );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _message = 'Configuração gravada.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('admin-checkout'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Parcelas e taxas de recibo',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        Text(
+          _reads ? 'A cobrança já lê este limite.' : 'A regra vigente continua no código da cobrança: até 3x sem juros e 4x ou mais recusado. Este campo guarda o número (padrão 3) para a função passar a lê-lo. Este painel não altera essa função.',
+          key: const Key('admin-checkout-aviso'),
+        ),
+        TextField(
+          key: const Key('admin-checkout-parcelas'),
+          controller: _max,
+          decoration: const InputDecoration(labelText: 'Parcelas sem juros'),
+          keyboardType: TextInputType.number,
+        ),
+        TextField(
+          controller: _pix,
+          decoration: const InputDecoration(
+            labelText: 'Taxa do recibo no Pix, em centavos',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        TextField(
+          controller: _card,
+          decoration: const InputDecoration(
+            labelText: 'Taxa fixa do recibo no cartão, em centavos',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        TextField(
+          controller: _bps,
+          decoration: const InputDecoration(
+            labelText: 'Taxa percentual do recibo no cartão, em bps',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton(
+            key: const Key('admin-checkout-gravar'),
+            onPressed: _save,
+            child: const Text('Gravar parcelas e taxas'),
+          ),
+        ),
+        if (_message != null) Text(_message!),
+      ],
     );
   }
 }

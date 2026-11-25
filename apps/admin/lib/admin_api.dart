@@ -37,6 +37,31 @@ abstract class AdminApi {
     DateTime? from,
     DateTime? to,
     String? venueId,
+    bool includeTest = false,
+  });
+  Future<PlayerPage> searchPlayers({
+    String? query,
+    bool includeTest = false,
+    int limit = 40,
+    int offset = 0,
+  });
+  Future<JsonPage> searchAudit({
+    String? action,
+    String? actor,
+    DateTime? from,
+    DateTime? to,
+    int limit = 40,
+    int offset = 0,
+  });
+  Future<JsonPage> commissionHistory({int limit = 40, int offset = 0});
+  Future<JsonPage> ruleHistory({String? table, int limit = 40, int offset = 0});
+  Future<CheckoutSettings> checkoutSettings();
+  Future<void> saveCheckout({
+    required String confirm,
+    required int maxInterestFree,
+    required int pixFeeCents,
+    required int cardFeeCents,
+    required int cardFeeBps,
   });
   Future<ScapeLiability> scapeLiability();
   Future<HighlightsBoard> highlights();
@@ -75,10 +100,7 @@ class AdminWho {
 }
 
 class VenueBoard {
-  const VenueBoard({
-    required this.platformBps,
-    required this.houses,
-  });
+  const VenueBoard({required this.platformBps, required this.houses});
   final int platformBps;
   final List<VenueRow> houses;
 }
@@ -281,6 +303,8 @@ class EarningsReport {
     required this.pagbankFeeRows,
     required this.byVenue,
     required this.openComponents,
+    this.rewardsSubsidyCents = 0,
+    this.rewardsPointsCents = 0,
   });
   final int grossCommissionCents;
   final int rewardsRedeemedCents;
@@ -293,6 +317,35 @@ class EarningsReport {
   final int pagbankFeeRows;
   final List<VenueEarnings> byVenue;
   final List<OpenComponent> openComponents;
+  final int rewardsSubsidyCents;
+  final int rewardsPointsCents;
+}
+
+class PlayerPage {
+  const PlayerPage({required this.total, required this.rows});
+  final int total;
+  final List<PlayerRow> rows;
+}
+
+class JsonPage {
+  const JsonPage({required this.total, required this.rows});
+  final int total;
+  final List<Map<String, Object?>> rows;
+}
+
+class CheckoutSettings {
+  const CheckoutSettings({
+    required this.maxInterestFree,
+    required this.pixFeeCents,
+    required this.cardFeeCents,
+    required this.cardFeeBps,
+    required this.chargeReadsConfig,
+  });
+  final int maxInterestFree;
+  final int pixFeeCents;
+  final int cardFeeCents;
+  final int cardFeeBps;
+  final bool chargeReadsConfig;
 }
 
 class VenueEarnings {
@@ -509,6 +562,8 @@ class DivergenceBoard {
 
 class AuditRow {
   const AuditRow({
+    this.actorId = '',
+    this.actorName = '',
     required this.action,
     required this.targetTable,
     required this.targetId,
@@ -516,6 +571,8 @@ class AuditRow {
     required this.before,
     required this.after,
   });
+  final String actorId;
+  final String actorName;
   final String action;
   final String targetTable;
   final String targetId;
@@ -544,10 +601,7 @@ class SupabaseAdminApi implements AdminApi {
   @override
   Future<VenueBoard> venues({String? status, String? query}) async {
     final row = _map(
-      await _rpc('admin_list_venues', {
-        'p_status': status,
-        'p_query': query,
-      }),
+      await _rpc('admin_list_venues', {'p_status': status, 'p_query': query}),
     );
     return VenueBoard(
       platformBps: _int(row['platform_bps']),
@@ -637,13 +691,13 @@ class SupabaseAdminApi implements AdminApi {
   }
 
   @override
-  Future<VenueProfile> updateVenue(String id, Map<String, Object?> patch) async {
+  Future<VenueProfile> updateVenue(
+    String id,
+    Map<String, Object?> patch,
+  ) async {
     return _venue(
       _map(
-        await _rpc('admin_update_venue', {
-          'p_venue_id': id,
-          'p_patch': patch,
-        }),
+        await _rpc('admin_update_venue', {'p_venue_id': id, 'p_patch': patch}),
       ),
     );
   }
@@ -701,7 +755,7 @@ class SupabaseAdminApi implements AdminApi {
       ],
       reservations: [
         for (final item in _list(row['reservations']))
-          '${_text(item['room_name'])} · ${_text(item['venue_name'])} · ${_text(item['payment_status'])}',
+          '${_text(item['room_name'])} · ${_text(item['venue_name'])} · ${whenLabel(DateTime.tryParse(_text(item['starts_at'])))} · ${_text(item['payment_status'])}',
       ],
       entries: [
         for (final item in _list(row['entries']))
@@ -760,9 +814,7 @@ class SupabaseAdminApi implements AdminApi {
     Map<String, Object?> patch,
   ) async {
     try {
-      return _map(
-        await _rpc('admin_save_reward_settings', {'p_patch': patch}),
-      );
+      return _map(await _rpc('admin_save_reward_settings', {'p_patch': patch}));
     } on PostgrestException catch (error) {
       throw AdminRejected(error.message);
     }
@@ -796,12 +848,14 @@ class SupabaseAdminApi implements AdminApi {
     DateTime? from,
     DateTime? to,
     String? venueId,
+    bool includeTest = false,
   }) async {
     final row = _map(
-      await _rpc('admin_earnings', {
+      await _rpc('admin_earnings_report', {
         'p_from': from?.toUtc().toIso8601String(),
         'p_to': to?.toUtc().toIso8601String(),
         'p_venue_id': venueId,
+        'p_include_test': includeTest,
       }),
     );
     return _earnings(row);
@@ -823,6 +877,8 @@ class SupabaseAdminApi implements AdminApi {
       pendingPoints: _int(row['pending_points']),
       pagbankFeeCents: _intOrNull(row['provider_fee_cents']),
       pagbankFeeRows: _int(row['pagbank_fee_rows']),
+      rewardsSubsidyCents: _int(row['rewards_subsidy_cents']),
+      rewardsPointsCents: _int(row['rewards_points_cents']),
       byVenue: [
         for (final item in _list(row['by_venue']))
           VenueEarnings(
@@ -880,17 +936,154 @@ class SupabaseAdminApi implements AdminApi {
 
   @override
   Future<List<AuditRow>> audit() async {
+    final page = await searchAudit();
     return [
-      for (final item in _list(await _rpc('admin_audit', {'p_limit': 40})))
+      for (final item in page.rows)
         AuditRow(
+          actorId: _text(item['actor_id']),
+          actorName: _text(item['actor_name']),
           action: _text(item['action']),
           targetTable: _text(item['target_table']),
           targetId: _text(item['target_id']),
           createdAt: DateTime.tryParse(_text(item['created_at'])),
-          before: '${item['before_state'] ?? ''}',
-          after: '${item['after_state'] ?? ''}',
+          before: _text(item['before']),
+          after: _text(item['after']),
         ),
     ];
+  }
+
+  JsonPage _jsonPage(dynamic raw) {
+    final row = _map(raw);
+    return JsonPage(
+      total: _int(row['total']),
+      rows: [
+        for (final item in _list(row['rows'])) Map<String, Object?>.from(item),
+      ],
+    );
+  }
+
+  @override
+  Future<PlayerPage> searchPlayers({
+    String? query,
+    bool includeTest = false,
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final page = _jsonPage(
+      await _rpc('admin_search_players', {
+        'p_query': query,
+        'p_include_test': includeTest,
+        'p_limit': limit,
+        'p_offset': offset,
+      }),
+    );
+    return PlayerPage(
+      total: page.total,
+      rows: [
+        for (final item in page.rows)
+          PlayerRow(
+            id: _text(item['id']),
+            name: _text(item['display_name']),
+            email: _text(item['email']),
+            suspended: item['suspended'] == true,
+          ),
+      ],
+    );
+  }
+
+  @override
+  Future<JsonPage> searchAudit({
+    String? action,
+    String? actor,
+    DateTime? from,
+    DateTime? to,
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final page = _jsonPage(
+      await _rpc('admin_search_audit', {
+        'p_action': action,
+        'p_actor': actor,
+        'p_from': from?.toUtc().toIso8601String(),
+        'p_to': to?.toUtc().toIso8601String(),
+        'p_limit': limit,
+        'p_offset': offset,
+      }),
+    );
+    return JsonPage(
+      total: page.total,
+      rows: [
+        for (final item in page.rows)
+          {
+            'actor_id': _text(item['actor_id']),
+            'actor_name': _text(item['actor_name']),
+            'action': _text(item['action']),
+            'target_table': _text(item['target_table']),
+            'target_id': _text(item['target_id']),
+            'created_at': _text(item['created_at']),
+            'before': '${item['before_state'] ?? ''}',
+            'after': '${item['after_state'] ?? ''}',
+          },
+      ],
+    );
+  }
+
+  @override
+  Future<JsonPage> commissionHistory({int limit = 40, int offset = 0}) async {
+    return _jsonPage(
+      await _rpc('admin_commission_history', {
+        'p_limit': limit,
+        'p_offset': offset,
+      }),
+    );
+  }
+
+  @override
+  Future<JsonPage> ruleHistory({
+    String? table,
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    return _jsonPage(
+      await _rpc('admin_rule_history', {
+        'p_table': table,
+        'p_limit': limit,
+        'p_offset': offset,
+      }),
+    );
+  }
+
+  @override
+  Future<CheckoutSettings> checkoutSettings() async {
+    final row = _map(await _rpc('admin_checkout_settings'));
+    return CheckoutSettings(
+      maxInterestFree: _int(row['max_interest_free_installments']),
+      pixFeeCents: _int(row['pix_receipt_fee_cents']),
+      cardFeeCents: _int(row['card_receipt_fee_cents']),
+      cardFeeBps: _int(row['card_receipt_fee_bps']),
+      chargeReadsConfig: row['charge_function_reads_config'] == true,
+    );
+  }
+
+  @override
+  Future<void> saveCheckout({
+    required String confirm,
+    required int maxInterestFree,
+    required int pixFeeCents,
+    required int cardFeeCents,
+    required int cardFeeBps,
+  }) async {
+    try {
+      await _rpc('admin_save_checkout', {
+        'p_confirm': confirm,
+        'p_max_interest_free': maxInterestFree,
+        'p_pix_receipt_fee_cents': pixFeeCents,
+        'p_card_receipt_fee_cents': cardFeeCents,
+        'p_card_receipt_fee_bps': cardFeeBps,
+      });
+    } on PostgrestException catch (error) {
+      throw AdminRejected(error.message);
+    }
   }
 
   @override
@@ -921,11 +1114,15 @@ class SupabaseAdminApi implements AdminApi {
     String email,
     String phone,
   ) async {
-    await _rpc('admin_set_venue_contacts', {
-      'p_venue_id': venueId,
-      'p_email': email,
-      'p_phone': phone,
-    });
+    try {
+      await _rpc('admin_set_venue_contacts', {
+        'p_venue_id': venueId,
+        'p_email': email,
+        'p_phone': phone,
+      });
+    } on PostgrestException catch (error) {
+      throw AdminRejected(error.message);
+    }
   }
 
   @override
@@ -996,10 +1193,12 @@ class SupabaseAdminApi implements AdminApi {
     required DateTime from,
     required DateTime to,
   }) async {
-    final row = _map(await _rpc('admin_platform_cac_report', {
-      'p_from': _isoDay(from),
-      'p_to': _isoDay(to),
-    }));
+    final row = _map(
+      await _rpc('admin_platform_cac_report', {
+        'p_from': _isoDay(from),
+        'p_to': _isoDay(to),
+      }),
+    );
     return PlatformCacReport(
       assumedCents: _int(row['assumed_cents']),
       paidCents: _int(row['paid_cents']),
@@ -1088,10 +1287,15 @@ class SupabaseAdminApi implements AdminApi {
 
   @override
   Future<String?> provisionWallet(String venueId) async {
-    final response = await _client.functions.invoke(
-      'provision-venue-wallet',
-      body: {'venue_id': venueId, 'surface': 'admin'},
-    );
+    final FunctionResponse response;
+    try {
+      response = await _client.functions.invoke(
+        'provision-venue-wallet',
+        body: {'venue_id': venueId, 'surface': 'admin'},
+      );
+    } on FunctionException {
+      return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
+    }
     final data = response.data;
     if (data is Map && data['error'] != null) {
       return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
@@ -1184,7 +1388,9 @@ class MemoryAdminApi implements AdminApi {
           activeReferrals: 6,
           referredBy: 'NINJA01',
           referralsMade: const ['active · player'],
-          reservations: const ['O Cofre · Ninja Escape · paid'],
+          reservations: const [
+            'O Cofre · Ninja Escape · 01/12/2027 18:00 · paid',
+          ],
           entries: const ['accrual 100 pts · c2c · livre'],
         ),
       ],
@@ -1280,22 +1486,30 @@ class MemoryAdminApi implements AdminApi {
     String? status,
     bool? suspended,
     bool? hasWallet,
+    String? name,
     String? neighborhood,
+    String? streetAddress,
+    String? addressNumber,
+    String? postalCode,
+    String? phone,
+    String? category,
+    String? badge,
+    String? cityId,
     int? commissionBps,
     bool? commissionOverride,
     List<NamedRank>? rooms,
   }) {
     return VenueProfile(
       id: house.id,
-      name: house.name,
-      cityId: house.cityId,
+      name: name ?? house.name,
+      cityId: cityId ?? house.cityId,
       neighborhood: neighborhood ?? house.neighborhood,
-      streetAddress: house.streetAddress,
-      addressNumber: house.addressNumber,
-      postalCode: house.postalCode,
-      phone: house.phone,
-      category: house.category,
-      badge: house.badge,
+      streetAddress: streetAddress ?? house.streetAddress,
+      addressNumber: addressNumber ?? house.addressNumber,
+      postalCode: postalCode ?? house.postalCode,
+      phone: phone ?? house.phone,
+      category: category ?? house.category,
+      badge: badge ?? house.badge,
       status: status ?? house.status,
       suspended: suspended ?? house.suspended,
       hasWallet: hasWallet ?? house.hasWallet,
@@ -1367,7 +1581,15 @@ class MemoryAdminApi implements AdminApi {
     final house = await venue(id);
     final next = _copy(
       house,
+      name: patch['name'] as String? ?? house.name,
       neighborhood: patch['neighborhood'] as String? ?? house.neighborhood,
+      streetAddress: patch['street_address'] as String? ?? house.streetAddress,
+      addressNumber: patch['address_number'] as String? ?? house.addressNumber,
+      postalCode: patch['postal_code'] as String? ?? house.postalCode,
+      phone: patch['phone'] as String? ?? house.phone,
+      category: patch['category'] as String? ?? house.category,
+      badge: patch['badge'] as String? ?? house.badge,
+      cityId: patch['city_id'] as String? ?? house.cityId,
     );
     _replace(next);
     _note('update_venue', id, '$patch');
@@ -1383,9 +1605,7 @@ class MemoryAdminApi implements AdminApi {
       platformBps = bps;
     } else {
       final house = await venue(venueId);
-      _replace(
-        _copy(house, commissionBps: bps, commissionOverride: true),
-      );
+      _replace(_copy(house, commissionBps: bps, commissionOverride: true));
     }
     _note('set_commission', venueId ?? 'platform', '$bps');
   }
@@ -1447,9 +1667,7 @@ class MemoryAdminApi implements AdminApi {
     String? venueId,
     required String decision,
   }) async {
-    queue.removeWhere(
-      (row) => row.userId == userId && row.venueId == venueId,
-    );
+    queue.removeWhere((row) => row.userId == userId && row.venueId == venueId);
     _note('decide_referral_account', userId ?? venueId ?? '', decision);
   }
 
@@ -1496,10 +1714,13 @@ class MemoryAdminApi implements AdminApi {
     DateTime? from,
     DateTime? to,
     String? venueId,
+    bool includeTest = false,
   }) async {
     return EarningsReport(
       grossCommissionCents: 25000,
-      rewardsRedeemedCents: 1800,
+      rewardsRedeemedCents: 1000,
+      rewardsSubsidyCents: 1000,
+      rewardsPointsCents: 800,
       cashbackIssuedCents: 900,
       cashbackPlatformCents: 400,
       openPoints: 1800,
@@ -1515,7 +1736,7 @@ class MemoryAdminApi implements AdminApi {
               venueId: house.id,
               name: house.name,
               grossCommissionCents: 25000,
-              rewardsRedeemedCents: 1800,
+              rewardsRedeemedCents: 1000,
               cashbackIssuedCents: 900,
               openDebtCents: house.id == 'casa-ninja' ? 5000 : 0,
             ),
@@ -1556,9 +1777,7 @@ class MemoryAdminApi implements AdminApi {
               rank: house.id == 'casa-ninja' ? 0 : null,
             ),
       ],
-      rooms: [
-        for (final house in houses) ...house.rooms,
-      ],
+      rooms: [for (final house in houses) ...house.rooms],
       news: const [
         NamedRank(
           id: 'noticia-1',
@@ -1577,6 +1796,125 @@ class MemoryAdminApi implements AdminApi {
 
   @override
   Future<List<AuditRow>> audit() async => List.of(audits.reversed);
+
+  @override
+  Future<PlayerPage> searchPlayers({
+    String? query,
+    bool includeTest = false,
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final rows = await players(query);
+    final page = rows.skip(offset).take(limit).toList();
+    return PlayerPage(total: rows.length, rows: page);
+  }
+
+  @override
+  Future<JsonPage> searchAudit({
+    String? action,
+    String? actor,
+    DateTime? from,
+    DateTime? to,
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final needle = (action ?? '').trim().toLowerCase();
+    final who = (actor ?? '').trim().toLowerCase();
+    final kept = [
+      for (final row in audits.reversed)
+        if ((needle.isEmpty || row.action.toLowerCase().contains(needle)) &&
+            (who.isEmpty ||
+                row.actorName.toLowerCase().contains(who) ||
+                row.actorId.toLowerCase().contains(who)))
+          {
+            'actor_id': row.actorId,
+            'actor_name': row.actorName,
+            'action': row.action,
+            'target_table': row.targetTable,
+            'target_id': row.targetId,
+            'created_at': row.createdAt?.toIso8601String() ?? '',
+            'before': row.before,
+            'after': row.after,
+          },
+    ];
+    return JsonPage(
+      total: kept.length,
+      rows: kept.skip(offset).take(limit).toList(),
+    );
+  }
+
+  @override
+  Future<JsonPage> commissionHistory({int limit = 40, int offset = 0}) async {
+    final rows = [
+      {
+        'venue_name': 'plataforma',
+        'before_bps': 1000,
+        'after_bps': platformBps,
+        'actor_name': 'Nícolas',
+        'created_at': '2026-11-09T12:00:00Z',
+      },
+    ];
+    return JsonPage(
+      total: rows.length,
+      rows: rows.skip(offset).take(limit).toList(),
+    );
+  }
+
+  @override
+  Future<JsonPage> ruleHistory({
+    String? table,
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final rows = [
+      {
+        'table_name': 'admin_checkout_config',
+        'operation': 'INSERT',
+        'actor_name': '',
+        'actor_id': '',
+        'created_at': '2026-11-25T12:00:00Z',
+        'after_state': {'max_interest_free_installments': 3},
+      },
+    ];
+    final kept = [
+      for (final row in rows)
+        if (table == null || table.isEmpty || row['table_name'] == table) row,
+    ];
+    return JsonPage(
+      total: kept.length,
+      rows: kept.skip(offset).take(limit).toList(),
+    );
+  }
+
+  CheckoutSettings _checkout = const CheckoutSettings(
+    maxInterestFree: 3,
+    pixFeeCents: 199,
+    cardFeeCents: 49,
+    cardFeeBps: 299,
+    chargeReadsConfig: false,
+  );
+
+  @override
+  Future<CheckoutSettings> checkoutSettings() async => _checkout;
+
+  @override
+  Future<void> saveCheckout({
+    required String confirm,
+    required int maxInterestFree,
+    required int pixFeeCents,
+    required int cardFeeCents,
+    required int cardFeeBps,
+  }) async {
+    if (confirm != 'CONFIG') throw const AdminRejected('confirmacao');
+    _checkout = CheckoutSettings(
+      maxInterestFree: maxInterestFree,
+      pixFeeCents: pixFeeCents,
+      cardFeeCents: cardFeeCents,
+      cardFeeBps: cardFeeBps,
+      chargeReadsConfig: false,
+    );
+    _note('save_checkout', '1', '$maxInterestFree');
+  }
 
   @override
   Future<String?> provisionWallet(String venueId) async {
@@ -1604,7 +1942,11 @@ class MemoryAdminApi implements AdminApi {
     String phone,
   ) async {
     await venue(venueId);
-    _note('set_venue_contacts', venueId, '${email.isNotEmpty}:${phone.isNotEmpty}');
+    _note(
+      'set_venue_contacts',
+      venueId,
+      '${email.isNotEmpty}:${phone.isNotEmpty}',
+    );
   }
 
   bool payoutsEnabled = false;
@@ -1663,11 +2005,7 @@ class MemoryAdminApi implements AdminApi {
   @override
   Future<bool> setVenuePayoutsEnabled(bool enabled) async {
     payoutsEnabled = enabled;
-    _note(
-      'set_venue_payouts_enabled',
-      '1',
-      'enabled:$enabled',
-    );
+    _note('set_venue_payouts_enabled', '1', 'enabled:$enabled');
     return enabled;
   }
 

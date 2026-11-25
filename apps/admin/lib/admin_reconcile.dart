@@ -58,7 +58,9 @@ class _ConciliacaoPageState extends ConsumerState<ConciliacaoPage> {
               '${whenLabel(board.startedAt)} · ${board.paymentCount} cobranças · ${board.transferCount} transferências · ${board.divergenceCount} divergências',
             ),
             if (board.truncated)
-              const Text('A lista do PagBank veio incompleta. Ausências não foram marcadas.'),
+              const Text(
+                'A lista do PagBank veio incompleta. Ausências não foram marcadas.',
+              ),
             const SizedBox(height: 12),
             if (board.rows.isEmpty)
               const Text('Nenhuma divergência nesta execução.')
@@ -110,6 +112,7 @@ String _statusLabel(String status) {
     _ => int.tryParse(status) != null ? status : 'desconhecido',
   };
 }
+
 String _detail(DivergenceRow row) {
   final parts = <String>[
     if (row.providerRef.isNotEmpty) row.providerRef,

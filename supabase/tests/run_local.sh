@@ -140,3 +140,15 @@ echo "refund fee ok"
 # supabase/migrations/20261125163530_pagbank_trigger_search_path.sql
 run -f "$root/tests/pagbank_trigger_search_path.sql"
 echo "pagbank trigger search_path ok"
+# supabase/migrations/20261125164000_admin_operations.sql
+run -f "$root/tests/admin_operations.sql"
+echo "admin operations ok"
+# supabase/migrations/20261125165000_admin_money.sql
+run -f "$root/tests/admin_money.sql"
+echo "admin money ok"
+# supabase/migrations/20261125166000_admin_people.sql
+run -f "$root/tests/admin_people.sql"
+echo "admin people ok"
+# supabase/migrations/20261125167000_admin_reports.sql
+run -f "$root/tests/admin_reports.sql"
+echo "admin reports ok"

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch_admin/admin_api.dart';
 import 'package:scapematch_admin/admin_format.dart';
+import 'package:scapematch_admin/admin_money.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 
 class PagamentosPage extends ConsumerStatefulWidget {
@@ -27,7 +28,8 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
   Future<void> _load() async {
     try {
       final api = ref.read(adminApiProvider);
-      final now = DateTime.now();
+      // O mês do CAC é o de Brasília, não o do aparelho.
+      final now = brasiliaWall(DateTime.now());
       final board = await api.payments();
       final cac = await api.platformCac(
         from: DateTime(now.year, now.month, 1),
@@ -51,7 +53,9 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(next ? 'Ligar saques automáticos' : 'Desligar saques automáticos'),
+        title: Text(
+          next ? 'Ligar saques automáticos' : 'Desligar saques automáticos',
+        ),
         content: Text(
           next
               ? 'A flag do banco liga, mas o código continua sem transferir. O valor fica disponível na conta PagBank da casa.'
@@ -223,9 +227,22 @@ class _PagamentosPageState extends ConsumerState<PagamentosPage> {
             ),
             const SizedBox(height: 16),
             _CacReport(report: _cac),
-            _Lines(title: 'Cobranças', rows: board.charges, empty: 'Nenhuma cobrança recente.'),
-            _Lines(title: 'Estornos', rows: board.refunds, empty: 'Nenhum estorno recente.'),
-            _Lines(title: 'Saques', rows: board.withdrawals, empty: 'Nenhum saque recente.'),
+            const MoneyDesk(),
+            _Lines(
+              title: 'Cobranças',
+              rows: board.charges,
+              empty: 'Nenhuma cobrança recente.',
+            ),
+            _Lines(
+              title: 'Estornos',
+              rows: board.refunds,
+              empty: 'Nenhum estorno recente.',
+            ),
+            _Lines(
+              title: 'Saques',
+              rows: board.withdrawals,
+              empty: 'Nenhum saque recente.',
+            ),
             const SizedBox(height: 16),
             const Text('Erros do webhook'),
             const SizedBox(height: 8),
@@ -255,7 +272,9 @@ String _signupLine(PagbankSignupSettings? signup) {
   if (signup.heldOff) {
     return 'Desligada pelo admin. Religar devolve o envio pelo servidor.';
   }
-  final probe = signup.lastProbeCode.isEmpty ? '' : ' Última checagem: ${signup.lastProbeCode}.';
+  final probe = signup.lastProbeCode.isEmpty
+      ? ''
+      : ' Última checagem: ${signup.lastProbeCode}.';
   return 'Desligada. A casa cria a conta na página do PagBank.$probe';
 }
 
@@ -317,11 +336,7 @@ class _HealthRow extends StatelessWidget {
 }
 
 class _Lines extends StatelessWidget {
-  const _Lines({
-    required this.title,
-    required this.rows,
-    required this.empty,
-  });
+  const _Lines({required this.title, required this.rows, required this.empty});
 
   final String title;
   final List<PaymentLine> rows;

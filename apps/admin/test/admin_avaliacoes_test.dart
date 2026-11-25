@@ -19,9 +19,8 @@ void main() {
     await loader.load();
     final icons = _fontDir();
     if (icons == null) return;
-    final iconBytes = File(
-      '$icons/MaterialIcons-Regular.otf',
-    ).readAsBytesSync();
+    final iconBytes = File('$icons/MaterialIcons-Regular.otf')
+        .readAsBytesSync();
     final iconData = ByteData.sublistView(Uint8List.fromList(iconBytes));
     final iconLoader = FontLoader('MaterialIcons')
       ..addFont(Future<ByteData>.value(iconData));
