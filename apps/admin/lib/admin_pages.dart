@@ -717,6 +717,9 @@ class JogadoresPage extends ConsumerStatefulWidget {
 class _JogadoresPageState extends ConsumerState<JogadoresPage> {
   final _query = TextEditingController();
   List<PlayerRow> _players = const [];
+  int _total = 0;
+  int _offset = 0;
+  bool _includeTest = false;
   List<ReviewRow> _queue = const [];
   String? _error;
 
@@ -735,11 +738,16 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
   Future<void> _load() async {
     final api = ref.read(adminApiProvider);
     try {
-      final players = await api.players(_query.text);
+      final players = await api.searchPlayers(
+        query: _query.text,
+        includeTest: _includeTest,
+        offset: _offset,
+      );
       final queue = await api.referralQueue();
       if (!mounted) return;
       setState(() {
-        _players = players;
+        _players = players.rows;
+        _total = players.total;
         _queue = queue;
         _error = null;
       });
@@ -792,10 +800,28 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
             decoration: const InputDecoration(
               labelText: 'Nome, e-mail ou usuário',
             ),
-            onSubmitted: (_) => _load(),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          FilterChip(
+            label: const Text('Mostrar teste'),
+            selected: _includeTest,
+            onSelected: (value) {
+              setState(() {
+                _includeTest = value;
+                _offset = 0;
+              });
+              _load();
+            },
           ),
           const SizedBox(height: 8),
           if (_error != null) Text(_error!),
+          Text(
+            '$_total jogadores neste recorte.',
+            key: const Key('admin-jogadores-total'),
+          ),
           for (final player in _players)
             Card(
               child: ListTile(
@@ -807,6 +833,31 @@ class _JogadoresPageState extends ConsumerState<JogadoresPage> {
                     ref.read(adminPlaceProvider.notifier).open(player.id),
               ),
             ),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _offset == 0
+                    ? null
+                    : () {
+                        setState(
+                          () => _offset = (_offset - 40).clamp(0, _offset),
+                        );
+                        _load();
+                      },
+                child: const Text('Anterior'),
+              ),
+              TextButton(
+                key: const Key('admin-jogadores-proxima'),
+                onPressed: _offset + _players.length >= _total
+                    ? null
+                    : () {
+                        setState(() => _offset += 40);
+                        _load();
+                      },
+                child: const Text('Próxima'),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1223,6 +1274,8 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
                   Text(
                     '${whenLabel(DateTime.tryParse('${row['created_at'] ?? ''}'))} · alteração registrada',
                   ),
+                const SizedBox(height: 24),
+                const CheckoutDesk(),
               ],
             ),
     );
@@ -1325,6 +1378,7 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
   String? _liabilityError;
   String? _reportError;
   String _period = 'tudo';
+  bool _includeTest = false;
 
   @override
   void initState() {
@@ -1341,7 +1395,7 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
     final api = ref.read(adminApiProvider);
     final EarningsReport report;
     try {
-      report = await api.earnings(from: from);
+      report = await api.earnings(from: from, includeTest: _includeTest);
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _reportError = adminErrorText(error));
@@ -1394,6 +1448,15 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                           _load();
                         },
                       ),
+                    FilterChip(
+                      key: const Key('admin-ganhos-teste'),
+                      label: const Text('Mostrar teste'),
+                      selected: _includeTest,
+                      onSelected: (value) {
+                        setState(() => _includeTest = value);
+                        _load();
+                      },
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -1419,6 +1482,11 @@ class _GanhosPageState extends ConsumerState<GanhosPage> {
                           '${report.openPoints} · ${reais(report.openPointsCents)}',
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Subsídio ${reais(report.rewardsSubsidyCents)} · pontos usados ${reais(report.rewardsPointsCents)}. O total usa o maior dos dois, para não contar o mesmo valor duas vezes.',
+                  key: const Key('admin-recompensas-partes'),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -1618,7 +1686,14 @@ class AuditoriaPage extends ConsumerStatefulWidget {
 }
 
 class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
-  List<AuditRow> _rows = const [];
+  final _action = TextEditingController();
+  final _actor = TextEditingController();
+  final _from = TextEditingController();
+  final _to = TextEditingController();
+  JsonPage _rows = const JsonPage(total: 0, rows: []);
+  JsonPage _commission = const JsonPage(total: 0, rows: []);
+  JsonPage _rules = const JsonPage(total: 0, rows: []);
+  int _offset = 0;
   String? _error;
   bool _loaded = false;
 
@@ -1628,21 +1703,45 @@ class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _action.dispose();
+    _actor.dispose();
+    _from.dispose();
+    _to.dispose();
+    super.dispose();
+  }
+
+  DateTime? _day(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return null;
+    return DateTime.tryParse(text)?.toUtc();
+  }
+
   Future<void> _load() async {
-    final List<AuditRow> rows;
+    final api = ref.read(adminApiProvider);
     try {
-      rows = await ref.read(adminApiProvider).audit();
+      final rows = await api.searchAudit(
+        action: _action.text,
+        actor: _actor.text,
+        from: _day(_from.text),
+        to: _day(_to.text),
+        offset: _offset,
+      );
+      final commission = await api.commissionHistory();
+      final rules = await api.ruleHistory();
+      if (!mounted) return;
+      setState(() {
+        _rows = rows;
+        _commission = commission;
+        _rules = rules;
+        _error = null;
+        _loaded = true;
+      });
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = adminErrorText(error));
-      return;
     }
-    if (!mounted) return;
-    setState(() {
-      _rows = rows;
-      _error = null;
-      _loaded = true;
-    });
   }
 
   @override
@@ -1655,21 +1754,257 @@ class _AuditoriaPageState extends ConsumerState<AuditoriaPage> {
         children: [
           const Text('Quem fez, quando, e o antes e o depois.'),
           const SizedBox(height: 12),
+          TextField(
+            key: const Key('admin-auditoria-acao'),
+            controller: _action,
+            decoration: const InputDecoration(labelText: 'Ação'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          TextField(
+            key: const Key('admin-auditoria-admin'),
+            controller: _actor,
+            decoration: const InputDecoration(labelText: 'Admin'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          TextField(
+            controller: _from,
+            decoration: const InputDecoration(labelText: 'De (AAAA-MM-DD)'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
+          TextField(
+            controller: _to,
+            decoration: const InputDecoration(labelText: 'Até (AAAA-MM-DD)'),
+            onSubmitted: (_) {
+              _offset = 0;
+              _load();
+            },
+          ),
           if (_error != null)
             Text(_error!, key: const Key('admin-auditoria-aviso')),
           if (_error == null && !_loaded) const Text('Carregando auditoria…'),
-          if (_loaded && _rows.isEmpty) const Text('Nenhuma ação ainda.'),
-          for (final row in _rows)
+          if (_error == null && _loaded && _rows.rows.isEmpty)
+            const Text('Nenhuma ação ainda.'),
+          if (_error == null && _loaded)
+            Text('${_rows.total} ações neste recorte.'),
+          for (final row in _rows.rows)
             Card(
               child: ListTile(
-                title: Text('${row.action} · ${row.targetTable}'),
+                title: Text('${row['action']} · ${row['target_table']}'),
                 subtitle: Text(
-                  '${whenLabel(row.createdAt)}${row.actorId.isEmpty ? '' : ' · por ${row.actorId.length > 8 ? row.actorId.substring(0, 8) : row.actorId}'} · ${row.targetId}\nantes ${row.before}\ndepois ${row.after}',
+                  '${whenLabel(DateTime.tryParse('${row['created_at']}'))}'
+                  '${_who(row)} · ${row['target_id']}\n'
+                  'antes ${row['before']}\ndepois ${row['after']}',
                 ),
               ),
             ),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _offset == 0
+                    ? null
+                    : () {
+                        setState(
+                          () => _offset = (_offset - 40).clamp(0, _offset),
+                        );
+                        _load();
+                      },
+                child: const Text('Anterior'),
+              ),
+              TextButton(
+                onPressed: _offset + _rows.rows.length >= _rows.total
+                    ? null
+                    : () {
+                        setState(() => _offset += 40);
+                        _load();
+                      },
+                child: const Text('Próxima'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Histórico de comissão',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (_commission.rows.isEmpty)
+            const Text('Nenhuma mudança de comissão.'),
+          for (final row in _commission.rows)
+            Text(
+              '${row['venue_name']}: ${row['before_bps']} → ${row['after_bps']} bps'
+              '${_who(row)}',
+              key: const Key('admin-comissao-historico'),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            'Histórico de regras',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const Text(
+            'Inclui o que entrou por migration ou SQL direto, sem sessão de admin.',
+          ),
+          if (_rules.rows.isEmpty) const Text('Nenhuma mudança de regra.'),
+          for (final row in _rules.rows)
+            Text(
+              '${row['table_name']} · ${row['operation']}'
+              '${_who(row).isEmpty ? ' · SQL direto' : _who(row)}',
+              key: const Key('admin-regra-historico'),
+            ),
         ],
       ),
+    );
+  }
+
+  String _who(Map<String, Object?> row) {
+    final name = '${row['actor_name'] ?? ''}'.trim();
+    if (name.isNotEmpty) return ' · $name';
+    final id = '${row['actor_id'] ?? ''}'.trim();
+    if (id.isEmpty) return '';
+    return ' · ${id.length > 8 ? id.substring(0, 8) : id}';
+  }
+}
+
+class CheckoutDesk extends ConsumerStatefulWidget {
+  const CheckoutDesk({super.key});
+
+  @override
+  ConsumerState<CheckoutDesk> createState() => _CheckoutDeskState();
+}
+
+class _CheckoutDeskState extends ConsumerState<CheckoutDesk> {
+  final _max = TextEditingController();
+  final _pix = TextEditingController();
+  final _card = TextEditingController();
+  final _bps = TextEditingController();
+  bool _reads = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _max.dispose();
+    _pix.dispose();
+    _card.dispose();
+    _bps.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final settings = await ref.read(adminApiProvider).checkoutSettings();
+      if (!mounted) return;
+      setState(() {
+        _max.text = '${settings.maxInterestFree}';
+        _pix.text = '${settings.pixFeeCents}';
+        _card.text = '${settings.cardFeeCents}';
+        _bps.text = '${settings.cardFeeBps}';
+        _reads = settings.chargeReadsConfig;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+    }
+  }
+
+  Future<void> _save() async {
+    final max = int.tryParse(_max.text.trim());
+    final pix = int.tryParse(_pix.text.trim());
+    final card = int.tryParse(_card.text.trim());
+    final bps = int.tryParse(_bps.text.trim());
+    if (max == null || pix == null || card == null || bps == null) {
+      setState(() => _message = 'Preencha os quatro números.');
+      return;
+    }
+    final okWord = await confirmTyped(
+      context,
+      title: 'CONFIG',
+      body: 'As taxas de recibo passam a valer na hora. O limite de parcelas fica guardado; a cobrança ainda lê o limite no código dela.',
+      word: 'CONFIG',
+    );
+    if (!okWord || !mounted) return;
+    try {
+      await ref
+          .read(adminApiProvider)
+          .saveCheckout(
+            confirm: 'CONFIG',
+            maxInterestFree: max,
+            pixFeeCents: pix,
+            cardFeeCents: card,
+            cardFeeBps: bps,
+          );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _message = adminErrorText(error));
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _message = 'Configuração gravada.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('admin-checkout'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Parcelas e taxas de recibo',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        Text(
+          _reads ? 'A cobrança já lê este limite.' : 'A regra vigente continua no código da cobrança: até 3x sem juros e 4x ou mais recusado. Este campo guarda o número (padrão 3) para a função passar a lê-lo. Este painel não altera essa função.',
+          key: const Key('admin-checkout-aviso'),
+        ),
+        TextField(
+          key: const Key('admin-checkout-parcelas'),
+          controller: _max,
+          decoration: const InputDecoration(labelText: 'Parcelas sem juros'),
+          keyboardType: TextInputType.number,
+        ),
+        TextField(
+          controller: _pix,
+          decoration: const InputDecoration(
+            labelText: 'Taxa do recibo no Pix, em centavos',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        TextField(
+          controller: _card,
+          decoration: const InputDecoration(
+            labelText: 'Taxa fixa do recibo no cartão, em centavos',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        TextField(
+          controller: _bps,
+          decoration: const InputDecoration(
+            labelText: 'Taxa percentual do recibo no cartão, em bps',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton(
+            key: const Key('admin-checkout-gravar'),
+            onPressed: _save,
+            child: const Text('Gravar parcelas e taxas'),
+          ),
+        ),
+        if (_message != null) Text(_message!),
+      ],
     );
   }
 }

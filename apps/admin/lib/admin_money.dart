@@ -49,7 +49,11 @@ class MoneyPage {
 }
 
 class MoneyMove {
-  const MoneyMove({required this.groupId, this.amountCents, this.groupReady = false});
+  const MoneyMove({
+    required this.groupId,
+    this.amountCents,
+    this.groupReady = false,
+  });
   final String groupId;
   final int? amountCents;
   final bool groupReady;
@@ -121,7 +125,9 @@ class SupabaseAdminMoneyApi implements AdminMoneyApi {
     final row = raw is Map ? raw : const <String, dynamic>{};
     final rows = row['rows'];
     return MoneyPage(
-      total: row['total'] is int ? row['total'] as int : int.tryParse('${row['total']}') ?? 0,
+      total: row['total'] is int
+          ? row['total'] as int
+          : int.tryParse('${row['total']}') ?? 0,
       rows: [
         for (final item in rows is List ? rows : const [])
           if (item is Map) Map<String, Object?>.from(item),
@@ -136,13 +142,15 @@ class SupabaseAdminMoneyApi implements AdminMoneyApi {
     bool includeTest = false,
     int limit = 40,
     int offset = 0,
-  }) async => _page(await _rpc('admin_search_charges', {
-    'p_query': query,
-    'p_status': status,
-    'p_include_test': includeTest,
-    'p_limit': limit,
-    'p_offset': offset,
-  }));
+  }) async => _page(
+    await _rpc('admin_search_charges', {
+      'p_query': query,
+      'p_status': status,
+      'p_include_test': includeTest,
+      'p_limit': limit,
+      'p_offset': offset,
+    }),
+  );
 
   @override
   Future<MoneyPage> refunds({
@@ -151,13 +159,15 @@ class SupabaseAdminMoneyApi implements AdminMoneyApi {
     bool includeTest = false,
     int limit = 40,
     int offset = 0,
-  }) async => _page(await _rpc('admin_search_refund_queue', {
-    'p_query': query,
-    'p_status': status,
-    'p_include_test': includeTest,
-    'p_limit': limit,
-    'p_offset': offset,
-  }));
+  }) async => _page(
+    await _rpc('admin_search_refund_queue', {
+      'p_query': query,
+      'p_status': status,
+      'p_include_test': includeTest,
+      'p_limit': limit,
+      'p_offset': offset,
+    }),
+  );
 
   @override
   Future<MoneyPage> withdrawals({
@@ -166,13 +176,15 @@ class SupabaseAdminMoneyApi implements AdminMoneyApi {
     bool includeTest = false,
     int limit = 40,
     int offset = 0,
-  }) async => _page(await _rpc('admin_search_withdrawals', {
-    'p_query': query,
-    'p_status': status,
-    'p_include_test': includeTest,
-    'p_limit': limit,
-    'p_offset': offset,
-  }));
+  }) async => _page(
+    await _rpc('admin_search_withdrawals', {
+      'p_query': query,
+      'p_status': status,
+      'p_include_test': includeTest,
+      'p_limit': limit,
+      'p_offset': offset,
+    }),
+  );
 
   @override
   Future<MoneyCharge> charge(String id) async {
@@ -215,33 +227,43 @@ class SupabaseAdminMoneyApi implements AdminMoneyApi {
   }
 
   @override
-  Future<MoneyMove> refundCharge(String id, String confirm, {int? amountCents}) async {
-    return _move(await _rpc('admin_refund_charge', {
-      'p_charge_id': id,
-      'p_confirm': confirm,
-      'p_amount_cents': amountCents,
-    }));
+  Future<MoneyMove> refundCharge(
+    String id,
+    String confirm, {
+    int? amountCents,
+  }) async {
+    return _move(
+      await _rpc('admin_refund_charge', {
+        'p_charge_id': id,
+        'p_confirm': confirm,
+        'p_amount_cents': amountCents,
+      }),
+    );
   }
 
   @override
   Future<MoneyMove> reopenCustody(String id, String confirm) async {
-    return _move(await _rpc('admin_reopen_custody', {
-      'p_charge_id': id,
-      'p_confirm': confirm,
-    }));
+    return _move(
+      await _rpc('admin_reopen_custody', {
+        'p_charge_id': id,
+        'p_confirm': confirm,
+      }),
+    );
   }
 
   @override
   Future<MoneyMove> reopenCac(String id, String confirm) async {
-    return _move(await _rpc('admin_reopen_cac', {
-      'p_charge_id': id,
-      'p_confirm': confirm,
-    }));
+    return _move(
+      await _rpc('admin_reopen_cac', {'p_charge_id': id, 'p_confirm': confirm}),
+    );
   }
 
   @override
   Future<void> settle(String groupId) async {
-    await _client.functions.invoke('settle-charges', body: {'group_id': groupId});
+    await _client.functions.invoke(
+      'settle-charges',
+      body: {'group_id': groupId},
+    );
   }
 
   @override
@@ -265,15 +287,25 @@ class MemoryAdminMoneyApi implements AdminMoneyApi {
   bool custodyReset = false;
   bool cacReset = false;
 
-  MoneyPage _filter(List<Map<String, Object?>> rows, String? query) {
+  MoneyPage _filter(
+    List<Map<String, Object?>> rows,
+    String? query, {
+    int offset = 0,
+    int limit = 40,
+  }) {
     final needle = (query ?? '').trim().toLowerCase();
     final kept = [
       for (final row in rows)
         if (needle.isEmpty ||
-            '${row['venue_name']} ${row['player_name']}'.toLowerCase().contains(needle))
+            '${row['venue_name']} ${row['player_name']}'.toLowerCase().contains(
+              needle,
+            ))
           row,
     ];
-    return MoneyPage(total: kept.length, rows: kept);
+    return MoneyPage(
+      total: kept.length,
+      rows: kept.skip(offset).take(limit).toList(),
+    );
   }
 
   @override
@@ -283,7 +315,7 @@ class MemoryAdminMoneyApi implements AdminMoneyApi {
     bool includeTest = false,
     int limit = 40,
     int offset = 0,
-  }) async => _filter(chargeRows, query);
+  }) async => _filter(chargeRows, query, offset: offset, limit: limit);
 
   @override
   Future<MoneyPage> refunds({
@@ -292,7 +324,7 @@ class MemoryAdminMoneyApi implements AdminMoneyApi {
     bool includeTest = false,
     int limit = 40,
     int offset = 0,
-  }) async => _filter(refundRows, query);
+  }) async => _filter(refundRows, query, offset: offset, limit: limit);
 
   @override
   Future<MoneyPage> withdrawals({
@@ -331,8 +363,14 @@ class MemoryAdminMoneyApi implements AdminMoneyApi {
   }
 
   @override
-  Future<MoneyMove> refundCharge(String id, String confirm, {int? amountCents}) async {
-    if (confirm != 'REEMBOLSAR') throw const AdminRejected('confirmacao invalida');
+  Future<MoneyMove> refundCharge(
+    String id,
+    String confirm, {
+    int? amountCents,
+  }) async {
+    if (confirm != 'REEMBOLSAR') {
+      throw const AdminRejected('confirmacao invalida');
+    }
     if (amountCents != null && amountCents != 12000) {
       throw const AdminRejected('reembolso parcial sem fila');
     }
@@ -356,7 +394,9 @@ class MemoryAdminMoneyApi implements AdminMoneyApi {
 
   @override
   Future<MoneyMove> reopenCac(String id, String confirm) async {
-    if (confirm != 'REPROCESSAR') throw const AdminRejected('confirmacao invalida');
+    if (confirm != 'REPROCESSAR') {
+      throw const AdminRejected('confirmacao invalida');
+    }
     cacReset = true;
     return const MoneyMove(groupId: 'grupo-caixa');
   }
@@ -382,6 +422,9 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
   final _partial = TextEditingController();
   MoneyPage? _charges;
   MoneyPage? _refunds;
+  MoneyPage? _withdrawals;
+  int _chargeOffset = 0;
+  int _refundOffset = 0;
   MoneyCharge? _charge;
   CacFlag? _flag;
   String? _message;
@@ -406,13 +449,22 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
       final charges = await api.charges(
         query: _query.text,
         includeTest: _includeTest,
+        offset: _chargeOffset,
       );
-      final refunds = await api.refunds(includeTest: _includeTest);
+      final refunds = await api.refunds(
+        includeTest: _includeTest,
+        offset: _refundOffset,
+      );
+      final withdrawals = await api.withdrawals(
+        query: _query.text,
+        includeTest: _includeTest,
+      );
       final flag = await api.cacFlag();
       if (!mounted) return;
       setState(() {
         _charges = charges;
         _refunds = refunds;
+        _withdrawals = withdrawals;
         _flag = flag;
       });
     } on Object catch (error) {
@@ -432,7 +484,10 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
     }
   }
 
-  Future<void> _typed(String word, Future<MoneyMove> Function(String word) action) async {
+  Future<void> _typed(
+    String word,
+    Future<MoneyMove> Function(String word) action,
+  ) async {
     final ok = await confirmTyped(
       context,
       title: word,
@@ -489,8 +544,13 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
         TextField(
           key: const Key('admin-dinheiro-busca'),
           controller: _query,
-          decoration: const InputDecoration(labelText: 'Busca por casa ou jogador'),
-          onSubmitted: (_) => _load(),
+          decoration: const InputDecoration(
+            labelText: 'Busca por casa ou jogador',
+          ),
+          onSubmitted: (_) {
+            _chargeOffset = 0;
+            _load();
+          },
         ),
         FilterChip(
           label: const Text('Mostrar teste'),
@@ -500,7 +560,8 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
             _load();
           },
         ),
-        if (_message != null) Text(_message!, key: const Key('admin-dinheiro-aviso')),
+        if (_message != null)
+          Text(_message!, key: const Key('admin-dinheiro-aviso')),
         if (charges == null)
           const Text('Carregando cobranças.')
         else if (charges.rows.isEmpty)
@@ -515,13 +576,39 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
               ),
               onTap: () => _open('${row['id']}'),
             ),
+        if (charges != null && charges.total > 40)
+          Row(
+            children: [
+              Text('${charges.rows.length} de ${charges.total}'),
+              TextButton(
+                onPressed: _chargeOffset == 0
+                    ? null
+                    : () {
+                        setState(() => _chargeOffset -= 40);
+                        _load();
+                      },
+                child: const Text('Anterior'),
+              ),
+              TextButton(
+                onPressed: _chargeOffset + charges.rows.length >= charges.total
+                    ? null
+                    : () {
+                        setState(() => _chargeOffset += 40);
+                        _load();
+                      },
+                child: const Text('Próxima'),
+              ),
+            ],
+          ),
         if (charge != null) ...[
           const SizedBox(height: 8),
           Text(
             '${charge.playerName} · ${charge.roomName} · ${whenLabel(charge.startsAt)}',
             key: const Key('admin-cobranca'),
           ),
-          Text('Casa ${reais(charge.houseCents)} · juros ${reais(charge.interestCents)}'),
+          Text(
+            'Casa ${reais(charge.houseCents)} · juros ${reais(charge.interestCents)}',
+          ),
           Text(
             '1ª sessão ${reais(charge.discountCents)} · pontos ${charge.points} · subsídio ${reais(charge.subsidyCents)}',
           ),
@@ -551,7 +638,9 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
                 key: const Key('admin-liberar-custodia'),
                 onPressed: () => _typed(
                   'LIBERAR',
-                  (word) => ref.read(adminMoneyProvider).reopenCustody(charge.id, word),
+                  (word) => ref
+                      .read(adminMoneyProvider)
+                      .reopenCustody(charge.id, word),
                 ),
                 child: const Text('Liberar custódia'),
               ),
@@ -559,11 +648,9 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
                 key: const Key('admin-reembolsar'),
                 onPressed: () => _typed('REEMBOLSAR', (word) {
                   final typed = int.tryParse(_partial.text.trim());
-                  return ref.read(adminMoneyProvider).refundCharge(
-                    charge.id,
-                    word,
-                    amountCents: typed,
-                  );
+                  return ref
+                      .read(adminMoneyProvider)
+                      .refundCharge(charge.id, word, amountCents: typed);
                 }),
                 child: const Text('Reembolsar'),
               ),
@@ -571,7 +658,8 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
                 key: const Key('admin-reprocessar-cac'),
                 onPressed: () => _typed(
                   'REPROCESSAR',
-                  (word) => ref.read(adminMoneyProvider).reopenCac(charge.id, word),
+                  (word) =>
+                      ref.read(adminMoneyProvider).reopenCac(charge.id, word),
                 ),
                 child: const Text('Reprocessar CAC'),
               ),
@@ -587,6 +675,25 @@ class _MoneyDeskState extends ConsumerState<MoneyDesk> {
             Text(
               '${row['player_name']} · ${row['action']} · ${row['status']} · ${reais(_cents(row['amount_cents']))}',
               key: const Key('admin-fila-reembolso'),
+            ),
+        if (_refunds != null && _refunds!.total > 40)
+          TextButton(
+            onPressed: _refundOffset + _refunds!.rows.length >= _refunds!.total
+                ? null
+                : () {
+                    setState(() => _refundOffset += 40);
+                    _load();
+                  },
+            child: const Text('Próxima da fila'),
+          ),
+        const SizedBox(height: 8),
+        const Text('Saques'),
+        if (_withdrawals == null || _withdrawals!.rows.isEmpty)
+          const Text('Nenhum saque neste recorte.')
+        else
+          for (final row in _withdrawals!.rows)
+            Text(
+              '${row['venue_name']} · ${row['status']} · ${reais(_cents(row['amount_cents']))}',
             ),
       ],
     );
