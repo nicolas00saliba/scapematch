@@ -127,3 +127,6 @@ echo "test account duplicate exception ok"
 # supabase/migrations/20261124230000_first_session_discount.sql
 run -f "$root/tests/first_session_discount.sql"
 echo "first session discount ok"
+# supabase/migrations/20261125120000_pagbank_trigger_search_path.sql
+run -f "$root/tests/pagbank_trigger_search_path.sql"
+echo "pagbank trigger search_path ok"
