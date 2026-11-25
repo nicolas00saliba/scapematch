@@ -50,7 +50,7 @@ O cadastro da conta da casa está em [pagbank-cadastro.md](pagbank-cadastro.md).
 
 Não aplicar isto daqui. O dono aprova.
 
-1. Migrations no projeto `eujlhicairvksvmssruz`, nesta ordem: `20261123190000_pagbank.sql` e `20261123230000_venue_ready_without_bank.sql`. As duas só substituem funções e acrescentam. Não apagam coluna nem tabela. A segunda tira `venue_bank_accounts` de `venue_finance_ready` e de `list_due_venue_payouts`.
+1. Migrations no projeto `eujlhicairvksvmssruz`, nesta ordem: `20261124124058_pagbank.sql` e `20261124124107_venue_ready_without_bank.sql`. As duas só substituem funções e acrescentam. Não apagam coluna nem tabela. A segunda tira `venue_bank_accounts` de `venue_finance_ready` e de `list_due_venue_payouts`.
 2. Segredos acima.
 3. As 17 funções do mesmo commit: `pagbank-webhook`, `pagbank-transfer-webhook`, `pagbank-connect`, `create-charge`, `settle-charges`, `tokenize-card`, `provision-venue-wallet`, `venue-payouts`, `payments-readiness`, `reconcile-payments`, `ledger-reconcile`, `cancel-house-group`, `configure-venue-fiscal`, `schedule-venue-withdrawals`, `venue-documents`, `invoice-document`, `venue-claim`. `invoice-document` importa `_shared/pagbank_client_error.ts` e `_shared/http.ts`. `venue-claim` importa `_shared/http.ts` e `_shared/venue_claim.ts`.
 4. Não depende do painel. Cada pedido já manda `notification_urls` para `pagbank-webhook`, e `reconcile-payments` relê o Pix pendente. Só então despublicar `asaas-webhook` e `asaas-transfer-webhook`.
@@ -104,4 +104,4 @@ Migrations históricas que continuam com o nome antigo, porque reescrevê-las qu
 - `20261113194000_company_type_guard.sql`
 - `20261113200000_venue_claim_official.sql`
 
-E a própria `20261123190000_pagbank.sql`.
+E a própria `20261124124058_pagbank.sql`.
