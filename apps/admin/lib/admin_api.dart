@@ -697,7 +697,7 @@ class SupabaseAdminApi implements AdminApi {
       ],
       reservations: [
         for (final item in _list(row['reservations']))
-          '${_text(item['room_name'])} · ${_text(item['venue_name'])} · ${_text(item['payment_status'])}',
+          '${_text(item['room_name'])} · ${_text(item['venue_name'])} · ${whenLabel(DateTime.tryParse(_text(item['starts_at'])))} · ${_text(item['payment_status'])}',
       ],
       entries: [
         for (final item in _list(row['entries']))
@@ -1190,7 +1190,7 @@ class MemoryAdminApi implements AdminApi {
           activeReferrals: 6,
           referredBy: 'NINJA01',
           referralsMade: const ['active · player'],
-          reservations: const ['O Cofre · Ninja Escape · paid'],
+          reservations: const ['O Cofre · Ninja Escape · 01/12/2027 18:00 · paid'],
           entries: const ['accrual 100 pts · c2c · livre'],
         ),
       ],
@@ -1286,22 +1286,30 @@ class MemoryAdminApi implements AdminApi {
     String? status,
     bool? suspended,
     bool? hasWallet,
+    String? name,
     String? neighborhood,
+    String? streetAddress,
+    String? addressNumber,
+    String? postalCode,
+    String? phone,
+    String? category,
+    String? badge,
+    String? cityId,
     int? commissionBps,
     bool? commissionOverride,
     List<NamedRank>? rooms,
   }) {
     return VenueProfile(
       id: house.id,
-      name: house.name,
-      cityId: house.cityId,
+      name: name ?? house.name,
+      cityId: cityId ?? house.cityId,
       neighborhood: neighborhood ?? house.neighborhood,
-      streetAddress: house.streetAddress,
-      addressNumber: house.addressNumber,
-      postalCode: house.postalCode,
-      phone: house.phone,
-      category: house.category,
-      badge: house.badge,
+      streetAddress: streetAddress ?? house.streetAddress,
+      addressNumber: addressNumber ?? house.addressNumber,
+      postalCode: postalCode ?? house.postalCode,
+      phone: phone ?? house.phone,
+      category: category ?? house.category,
+      badge: badge ?? house.badge,
       status: status ?? house.status,
       suspended: suspended ?? house.suspended,
       hasWallet: hasWallet ?? house.hasWallet,
@@ -1373,7 +1381,15 @@ class MemoryAdminApi implements AdminApi {
     final house = await venue(id);
     final next = _copy(
       house,
+      name: patch['name'] as String? ?? house.name,
       neighborhood: patch['neighborhood'] as String? ?? house.neighborhood,
+      streetAddress: patch['street_address'] as String? ?? house.streetAddress,
+      addressNumber: patch['address_number'] as String? ?? house.addressNumber,
+      postalCode: patch['postal_code'] as String? ?? house.postalCode,
+      phone: patch['phone'] as String? ?? house.phone,
+      category: patch['category'] as String? ?? house.category,
+      badge: patch['badge'] as String? ?? house.badge,
+      cityId: patch['city_id'] as String? ?? house.cityId,
     );
     _replace(next);
     _note('update_venue', id, '$patch');
