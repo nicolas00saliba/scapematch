@@ -558,7 +558,10 @@ Deno.test("sem chave da subconta não consulta transferência", async () => {
   void response;
 });
 
-function consultStore(charges: Record<string, unknown>[]) {
+function consultStore(
+  charges: Record<string, unknown>[],
+  saved?: { rows: Array<Record<string, string>> },
+) {
   const calls: string[] = [];
   return {
     calls,
@@ -571,9 +574,9 @@ function consultStore(charges: Record<string, unknown>[]) {
         });
       }
       if (name === "record_payment_divergences") {
+        if (saved) saved.rows = args.p_rows as Array<Record<string, string>>;
         return Promise.resolve({ data: "run-1", error: null });
       }
-      void args;
       return Promise.resolve({ data: null, error: { message: "inesperado" } });
     },
   };
@@ -679,8 +682,9 @@ Deno.test("consulta pedido e cobrança por id, com o header da doc", async () =>
   assert(store.calls.includes("record_payment_divergences"));
 });
 
-Deno.test("406 na consulta do pedido alerta sem gravar divergência nem vazar o token", async () => {
-  const store = consultStore([localCharge("ORDE_RECUSADO", "paid", 8000)]);
+Deno.test("406 na consulta do pedido alerta, grava a falha e não vaza o token", async () => {
+  const saved: { rows: Array<Record<string, string>> } = { rows: [] };
+  const store = consultStore([localCharge("ORDE_RECUSADO", "paid", 8000)], saved);
   let status = 0;
   let body = "";
   const logs = await withLogs(async () => {
@@ -702,14 +706,19 @@ Deno.test("406 na consulta do pedido alerta sem gravar divergência nem vazar o 
     body = await response.text();
   });
   assertEquals(status, 502);
-  assertEquals(JSON.parse(body), { error: "pagbank_unavailable" });
+  const parsed = JSON.parse(body);
+  assertEquals(parsed.error, "pagbank_unavailable");
+  assertEquals(parsed.failures, 1);
   assert(!body.includes("chave-de-teste"));
   assert(logs.some((line) =>
     line.includes("ledger-reconcile") && line.includes("406") &&
     line.includes("pagbank_unavailable")
   ));
   assert(logs.every((line) => !line.includes("chave-de-teste")));
-  assert(!store.calls.includes("record_payment_divergences"));
+  assert(store.calls.includes("record_payment_divergences"));
+  assert(saved.rows.some((row) =>
+    row.providerRef === "ORDE_RECUSADO" && row.actual === "406"
+  ));
 });
 
 Deno.test("404 de uma cobrança segue para a próxima e registra ausência", async () => {
@@ -746,8 +755,15 @@ Deno.test("404 de uma cobrança segue para a próxima e registra ausência", asy
   assert(store.calls.includes("record_payment_divergences"));
 });
 
-Deno.test("timeout da consulta responde 502 com motivo, sem segredo", async () => {
-  const store = consultStore([localCharge("ORDE_LENTO", "paid", 8000)]);
+Deno.test("406 numa cobrança segue para a próxima, grava a falha e alerta", async () => {
+  const saved: { rows: Array<{ kind: string; providerRef: string; actual: string }> } = {
+    rows: [],
+  };
+  const store = consultStore([
+    localCharge("ORDE_RECUSADO", "paid", 8000),
+    localCharge("ORDE_OK", "pending", 1500),
+  ], saved);
+  const seen: string[] = [];
   let body = "";
   const logs = await withLogs(async () => {
     const response = await handleLedgerReconcile(
@@ -757,8 +773,75 @@ Deno.test("timeout da consulta responde 502 com motivo, sem segredo", async () =
       }),
       {
         env: envFor("segredo-cron"),
-        fetchFn: () =>
-          Promise.reject(new DOMException("The signal has been aborted", "TimeoutError")),
+        fetchFn: (input) => {
+          const url = String(input);
+          seen.push(url);
+          if (url.endsWith("/orders/ORDE_RECUSADO")) {
+            return Promise.resolve(
+              new Response("Not Acceptable chave-de-teste", { status: 406 }),
+            );
+          }
+          return Promise.resolve(
+            new Response(JSON.stringify(paidOrder("ORDE_OK", "CHAR_OK", 1500)), {
+              status: 200,
+            }),
+          );
+        },
+        store,
+      },
+    );
+    assertEquals(response.status, 502);
+    body = await response.text();
+  });
+  const parsed = JSON.parse(body);
+  assertEquals(parsed.error, "pagbank_unavailable");
+  assertEquals(parsed.failures, 1);
+  assert(parsed.divergences >= 1);
+  assert(!body.includes("chave-de-teste"));
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_RECUSADO")));
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_OK")));
+  assert(saved.rows.some((row) =>
+    row.providerRef === "ORDE_RECUSADO" && row.actual === "406"
+  ));
+  assert(saved.rows.some((row) =>
+    row.kind === "charge_status" && row.providerRef === "ORDE_OK"
+  ));
+  assert(logs.some((line) =>
+    line.includes("ledger-reconcile") && line.includes("406")
+  ));
+  assert(logs.every((line) => !line.includes("chave-de-teste")));
+});
+
+Deno.test("timeout numa cobrança segue para a próxima e alerta sem segredo", async () => {
+  const saved: { rows: Array<Record<string, string>> } = { rows: [] };
+  const store = consultStore([
+    localCharge("ORDE_LENTO", "paid", 8000),
+    localCharge("ORDE_OK", "paid", 1500),
+  ], saved);
+  const seen: string[] = [];
+  let body = "";
+  const logs = await withLogs(async () => {
+    const response = await handleLedgerReconcile(
+      new Request("https://example.test/ledger", {
+        method: "POST",
+        headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+      }),
+      {
+        env: envFor("segredo-cron"),
+        fetchFn: (input) => {
+          const url = String(input);
+          seen.push(url);
+          if (url.endsWith("/orders/ORDE_LENTO")) {
+            return Promise.reject(
+              new DOMException("The signal has been aborted", "TimeoutError"),
+            );
+          }
+          return Promise.resolve(
+            new Response(JSON.stringify(paidOrder("ORDE_OK", "CHAR_OK", 1500)), {
+              status: 200,
+            }),
+          );
+        },
         store,
       },
     );
@@ -766,10 +849,17 @@ Deno.test("timeout da consulta responde 502 com motivo, sem segredo", async () =
     body = await response.text();
   });
   assert(!body.includes("chave-de-teste"));
-  assertEquals(JSON.parse(body).error, "pagbank_unavailable");
+  const parsed = JSON.parse(body);
+  assertEquals(parsed.error, "pagbank_unavailable");
+  assertEquals(parsed.failures, 1);
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_LENTO")));
+  assert(seen.some((url) => url.endsWith("/orders/ORDE_OK")));
   assert(logs.some((line) => line.includes("408") && line.includes("ledger-reconcile")));
   assert(logs.every((line) => !line.includes("chave-de-teste")));
-  assert(!store.calls.includes("record_payment_divergences"));
+  assert(store.calls.includes("record_payment_divergences"));
+  assert(saved.rows.some((row) =>
+    row.providerRef === "ORDE_LENTO" && row.actual === "408"
+  ));
 });
 
 Deno.test("paginação local consulta todas as cobranças, sem offset de data", async () => {

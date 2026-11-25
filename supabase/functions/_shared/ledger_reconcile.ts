@@ -486,6 +486,15 @@ export async function handleLedgerReconcile(
       uncheckedChargeRefs: payments.unchecked,
       uncheckedWithdrawalIds: transfers.unchecked,
     });
+    for (const failure of payments.failures) {
+      divergences.push(row(
+        "charge_status_unknown",
+        failure.ref,
+        failure.localId,
+        failure.localStatus,
+        String(failure.status),
+      ));
+    }
     const saved = await store.rpc("record_payment_divergences", {
       p_payment_count: payments.rows.length,
       p_transfer_count: transfers.rows.length,
@@ -495,6 +504,13 @@ export async function handleLedgerReconcile(
     if (saved.error) {
       logInternalError("ledger-reconcile", new Error("divergencias"));
       return json({ error: "indisponivel" }, 500);
+    }
+    if (payments.failures.length > 0) {
+      return json({
+        error: "pagbank_unavailable",
+        failures: payments.failures.length,
+        divergences: divergences.length,
+      }, 502);
     }
     return json({ ok: true, divergences: divergences.length });
   } catch (error) {
@@ -509,6 +525,13 @@ export async function handleLedgerReconcile(
 
 const consultPageSize = 50;
 
+type ChargeFailure = {
+  ref: string;
+  localId: string;
+  localStatus: string;
+  status: number;
+};
+
 async function consultCharges(
   client: PagBankProvider,
   charges: LocalCharge[],
@@ -516,9 +539,11 @@ async function consultCharges(
   rows: RemotePayment[];
   truncated: boolean;
   unchecked: Set<string>;
+  failures: ChargeFailure[];
 }> {
   const rows: RemotePayment[] = [];
   const unchecked = new Set<string>();
+  const failures: ChargeFailure[] = [];
   for (let index = 0; index < charges.length; index += consultPageSize) {
     const page = charges.slice(index, index + consultPageSize);
     for (const charge of page) {
@@ -544,11 +569,23 @@ async function consultCharges(
         else rows.push(parsed);
       } catch (error) {
         if (providerStatus(error) === 404) continue;
+        const status = providerStatus(error);
+        if (status != null && isProviderFailure(error)) {
+          logCaught("ledger-reconcile", error);
+          unchecked.add(ref);
+          failures.push({
+            ref,
+            localId: charge.id,
+            localStatus: charge.status,
+            status,
+          });
+          continue;
+        }
         throw error;
       }
     }
   }
-  return { rows, truncated: false, unchecked };
+  return { rows, truncated: false, unchecked, failures };
 }
 
 async function readSubaccountTransfers(
@@ -677,6 +714,8 @@ function chargeForRef(
     if (found && typeof found === "object") {
       return found as Record<string, unknown>;
     }
+    if (body.id === ref) return body;
+    return null;
   }
   const first = charges.find((item) => !!item && typeof item === "object");
   if (first && typeof first === "object") return first as Record<string, unknown>;

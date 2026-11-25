@@ -379,17 +379,24 @@ Deno.test("timeout no poll registra 408 sem o token", async () => {
   assert(logs.every((line) => !line.includes("pb-token-secret")));
 });
 
-Deno.test("poll pagina as pendentes de 20 em 20", async () => {
+Deno.test("poll pagina por cursor e não pula pendente que andou na fila", async () => {
   const rows = Array.from({ length: 21 }, (_, index) => ({
     ...pending,
     id: `44444444-4444-4444-8444-${String(index).padStart(12, "0")}`,
     provider_ref: `ORDE_${index}`,
+    created_at: index >= 19
+      ? "2026-11-01T00:19:00.000Z"
+      : `2026-11-01T00:${String(index).padStart(2, "0")}:00.000Z`,
   }));
-  const ranges: number[] = [];
+  const pendingRows = rows.map((row) => ({ ...row }));
   const urls: string[] = [];
+  const filters: string[] = [];
+  const ranges: number[] = [];
   const chain = (table: string) => {
-    let start = 0;
-    let end = 0;
+    let cursor = "";
+    let pageLimit = pendingRows.length;
+    let start = -1;
+    let end = -1;
     const self = {
       select() {
         return self;
@@ -406,6 +413,15 @@ Deno.test("poll pagina as pendentes de 20 em 20", async () => {
       order() {
         return self;
       },
+      limit(count: number) {
+        pageLimit = count;
+        return self;
+      },
+      or(filter: string) {
+        cursor = filter;
+        if (table === "payment_charges") filters.push(filter);
+        return self;
+      },
       range(from: number, to: number) {
         start = from;
         end = to;
@@ -416,7 +432,21 @@ Deno.test("poll pagina as pendentes de 20 em 20", async () => {
         return Promise.resolve({ data: null, error: null });
       },
       then(resolve: (value: unknown) => void) {
-        const data = table === "payment_charges" ? rows.slice(start, end + 1) : [];
+        const sorted = pendingRows
+          .filter((row) => row.status === "pending")
+          .sort((left, right) =>
+            left.created_at === right.created_at
+              ? left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+              : left.created_at < right.created_at ? -1 : 1
+          );
+        const window = start >= 0
+          ? sorted.slice(start, end + 1)
+          : (cursor ? sorted.filter((row) => pastCursor(cursor, row)) : sorted)
+            .slice(0, pageLimit);
+        start = -1;
+        end = -1;
+        cursor = "";
+        const data = table === "payment_charges" ? window : [];
         resolve({ data, error: null, count: data.length });
       },
     };
@@ -433,6 +463,10 @@ Deno.test("poll pagina as pendentes de 20 em 20", async () => {
     pagbankProductionBaseUrl,
     (url: string) => {
       urls.push(url);
+      if (url.endsWith("/orders/ORDE_0")) {
+        const row = pendingRows.find((item) => item.provider_ref === "ORDE_0");
+        if (row) row.status = "paid";
+      }
       return Promise.resolve(new Response(JSON.stringify({
         id: "ORDE_PAGINA",
         charges: [{
@@ -449,7 +483,25 @@ Deno.test("poll pagina as pendentes de 20 em 20", async () => {
     { get: () => undefined },
   );
   assertEquals(applied, 0);
-  assertEquals(ranges, [0, 20]);
+  assertEquals(ranges, []);
   assertEquals(urls.length, 21);
   assert(urls.every((url) => url.includes("/orders/ORDE_")));
+  assertEquals(filters.length, 1);
+  assert(filters[0].includes("2026-11-01T00:19:00.000Z"));
+  assert(filters[0].includes(rows[19].id));
+  assert(filters[0].includes("id.gt"));
 });
+
+function pastCursor(
+  filter: string,
+  row: { created_at: string; id: string },
+): boolean {
+  const match = filter.match(
+    /created_at\.gt\.(?:"([^"]+)"|([^,]+)),and\(created_at\.eq\.(?:"([^"]+)"|([^,]+)),id\.gt\.(?:"([^"]+)"|([^)]+))\)/,
+  );
+  if (!match) return false;
+  const createdAt = match[1] ?? match[2];
+  const id = match[5] ?? match[6];
+  if (row.created_at > createdAt) return true;
+  return row.created_at === createdAt && row.id > id;
+}

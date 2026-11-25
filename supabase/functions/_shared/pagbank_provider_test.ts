@@ -744,3 +744,42 @@ Deno.test("consulta recusada, ausente ou lenta vira status PagBank", async () =>
     "PagBank 408: timeout",
   );
 });
+
+Deno.test("CHAR_ em pedido com duas cobranças devolve a do id", async () => {
+  const order = {
+    orders: [{
+      id: "ORDE_DUPLO",
+      charges: [
+        {
+          id: "CHAR_RECUSADA",
+          status: "DECLINED",
+          amount: { value: 1000, currency: "BRL" },
+          payment_method: { type: "CREDIT_CARD" },
+        },
+        {
+          id: "CHAR_APROVADA",
+          status: "PAID",
+          amount: { value: 2500, currency: "BRL" },
+          payment_method: { type: "CREDIT_CARD" },
+        },
+      ],
+    }],
+  };
+  const client = provider(() =>
+    Promise.resolve(new Response(JSON.stringify(order), { status: 200 }))
+  );
+  const paid = await client.readPayment("CHAR_APROVADA");
+  assertEquals(paid.id, "CHAR_APROVADA");
+  assertEquals(paid.status, "PAID");
+  assertEquals((paid.amount as { value: number }).value, 2500);
+  const view = await client.getPayment("CHAR_APROVADA");
+  assertEquals(view.id, "CHAR_APROVADA");
+  assertEquals(view.status, "CONFIRMED");
+  const declined = await client.getPayment("CHAR_RECUSADA");
+  assertEquals(declined.status, "CANCELED");
+  await assertRejects(
+    () => client.getPayment("CHAR_FORA"),
+    Error,
+    "PagBank 404",
+  );
+});

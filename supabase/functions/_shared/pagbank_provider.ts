@@ -768,7 +768,10 @@ export class PagBankProvider {
 
   getPayment(paymentId: string): Promise<PaymentView> {
     return this.readPayment(paymentId).then((body) => {
-      const normalized = normalizeCharge(body);
+      const normalized = normalizeSelected(
+        body,
+        paymentId.startsWith("CHAR_") ? paymentId : "",
+      );
       const id = paymentId.startsWith("CHAR_")
         ? paymentId
         : persistedPaymentId(body, normalized);
@@ -1145,27 +1148,34 @@ function isTimeoutError(error: unknown): boolean {
   return name === "TimeoutError" || name === "AbortError";
 }
 
-/// A busca por charge_id devolve `{ orders: [...] }`. Um charge solto (teste
-/// ou resposta já aberta) também serve. Sem o CHAR_ pedido, é 404.
+/// A busca por charge_id devolve `{ orders: [...] }`. A resposta é só a
+/// cobrança cujo id foi pedido. A primeira do array pode ser uma tentativa
+/// recusada. Sem esse CHAR_, é 404.
 export function orderContainingCharge(
   body: Record<string, unknown>,
   chargeId: string,
 ): Record<string, unknown> {
-  if (Array.isArray(body.orders)) {
-    for (const item of body.orders) {
-      if (!item || typeof item !== "object") continue;
-      const order = item as Record<string, unknown>;
-      const charges = Array.isArray(order.charges) ? order.charges : [];
-      const found = charges.some((charge) =>
-        !!charge && typeof charge === "object" &&
-        (charge as { id?: unknown }).id === chargeId
-      );
-      if (found) return order;
-    }
-    throw new Error("PagBank 404: cobrança ausente");
+  const sources = Array.isArray(body.orders) ? body.orders : [body];
+  for (const item of sources) {
+    if (!item || typeof item !== "object") continue;
+    const found = findCharge(item as Record<string, unknown>, chargeId);
+    if (found) return found;
   }
-  if (body.id === chargeId || Array.isArray(body.charges)) return body;
   throw new Error("PagBank 404: cobrança ausente");
+}
+
+function findCharge(
+  body: Record<string, unknown>,
+  chargeId: string,
+): Record<string, unknown> | null {
+  const charges = Array.isArray(body.charges) ? body.charges : [];
+  for (const item of charges) {
+    if (!item || typeof item !== "object") continue;
+    const charge = item as Record<string, unknown>;
+    if (charge.id === chargeId) return charge;
+  }
+  if (body.id === chargeId) return body;
+  return null;
 }
 
 function redactOutbound(text: string, apiKey: string): string {
@@ -1261,7 +1271,19 @@ function amountSummary(
 }
 
 function normalizeCharge(body: Record<string, unknown>): Record<string, unknown> {
-  const charge = Array.isArray(body.charges) ? firstCharge(body) : body;
+  return normalizeSelected(body, "");
+}
+
+function normalizeSelected(
+  body: Record<string, unknown>,
+  chargeId: string,
+): Record<string, unknown> {
+  const charge = chargeId.startsWith("CHAR_")
+    ? findCharge(body, chargeId)
+    : Array.isArray(body.charges)
+    ? firstCharge(body)
+    : body;
+  if (!charge) throw new Error("PagBank 404: cobrança ausente");
   const method = charge.payment_method;
   const type = method && typeof method === "object"
     ? String((method as { type?: unknown }).type ?? "")

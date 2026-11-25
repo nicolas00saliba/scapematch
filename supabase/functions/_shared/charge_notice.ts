@@ -151,7 +151,9 @@ const pendingChargePageSize = 20;
 const pendingChargeMaxPages = 5;
 
 /// Pix e pedidos ainda pendentes. O webhook é o caminho normal.
-/// Isto cobre o aviso que não chegou. Páginas de 20, da mais antiga.
+/// Isto cobre o aviso que não chegou. Páginas de 20, da mais antiga,
+/// pelo par (created_at, id). Offset em status=pending pula a cobrança
+/// que entra no lugar de outra que saiu de pendente durante a rodada.
 export async function pollPendingPagBankCharges(
   admin: Admin,
   pagbank: PagBankProvider,
@@ -159,9 +161,9 @@ export async function pollPendingPagBankCharges(
 ): Promise<number> {
   if (typeof admin?.from !== "function") return 0;
   let applied = 0;
+  let cursor: { createdAt: string; id: string } | null = null;
   for (let page = 0; page < pendingChargeMaxPages; page++) {
-    const from = page * pendingChargePageSize;
-    const { data, error } = await admin
+    let query = admin
       .from("payment_charges")
       .select(
         "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at, refund_requested_at, created_at",
@@ -169,7 +171,10 @@ export async function pollPendingPagBankCharges(
       .eq("status", "pending")
       .not("provider_ref", "is", null)
       .order("created_at", { ascending: true })
-      .range(from, from + pendingChargePageSize - 1);
+      .order("id", { ascending: true })
+      .limit(pendingChargePageSize);
+    if (cursor) query = query.or(pendingCursorFilter(cursor));
+    const { data, error } = await query;
     if (error || !Array.isArray(data) || data.length === 0) break;
     for (const row of data) {
       const charge = row as NoticeCharge;
@@ -210,6 +215,11 @@ export async function pollPendingPagBankCharges(
       }
     }
     if (data.length < pendingChargePageSize) break;
+    const last = data[data.length - 1] as { created_at?: unknown; id?: unknown };
+    const createdAt = typeof last?.created_at === "string" ? last.created_at : "";
+    const id = typeof last?.id === "string" ? last.id : "";
+    if (createdAt === "" || id === "") break;
+    cursor = { createdAt, id };
     if (page === pendingChargeMaxPages - 1) {
       console.error(JSON.stringify({
         scope: "pending_charge_poll",
@@ -218,6 +228,17 @@ export async function pollPendingPagBankCharges(
     }
   }
   return applied;
+}
+
+function pendingCursorFilter(cursor: { createdAt: string; id: string }): string {
+  const createdAt = postgrestLiteral(cursor.createdAt);
+  const id = postgrestLiteral(cursor.id);
+  return `created_at.gt.${createdAt},and(created_at.eq.${createdAt},id.gt.${id})`;
+}
+
+function postgrestLiteral(value: string): string {
+  if (/^[A-Za-z0-9_-]+$/.test(value)) return value;
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
 async function groupIsClosed(admin: Admin, groupId: string): Promise<boolean> {
