@@ -154,7 +154,7 @@ echo "admin people ok"
 # supabase/migrations/20261125182833_admin_reports.sql
 run -f "$root/tests/admin_reports.sql"
 echo "admin reports ok"
-# supabase/migrations/20261125183000_custody_after_session.sql
+# supabase/migrations/20261125201906_custody_after_session.sql
 run -f "$root/tests/custody_after_session.sql"
 echo "custody after session ok"
 run -f "$root/tests/eliminar_provedor_antigo.sql"
