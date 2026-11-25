@@ -127,6 +127,16 @@ echo "test account duplicate exception ok"
 # supabase/migrations/20261124230000_first_session_discount.sql
 run -f "$root/tests/first_session_discount.sql"
 echo "first session discount ok"
+# supabase/migrations/20261125150000_reward_audit_20261125.sql
+run -f "$root/tests/reward_audit_20261125.sql"
+echo "reward audit 20261125 ok"
+run -f "$root/tests/venue_open_schedule.sql"
+echo "venue open schedule ok"
+run -f "$root/tests/paid_seat_count.sql"
+echo "paid seat count ok"
+bash "$root/tests/paid_seat_race.sh"
+run -f "$root/tests/refund_fee.sql"
+echo "refund fee ok"
 # supabase/migrations/20261125120000_pagbank_trigger_search_path.sql
 run -f "$root/tests/pagbank_trigger_search_path.sql"
 echo "pagbank trigger search_path ok"

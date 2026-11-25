@@ -17,7 +17,7 @@ import 'package:scapematch/providers/repositories.dart';
 
 import 'support/pump_app.dart';
 
-/// Prints do mapa com o filtro RPG. O CI pula este teste.
+/// Prints do mapa com o filtro de escape room. O CI pula este teste.
 void main() {
   testWidgets('saves the filtered map at 1440 and 390', (tester) async {
     if (Platform.environment['SCAPEMATCH_MAP_FILTER_SHOTS'] != '1') {
@@ -55,9 +55,11 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         await tester.pumpAndSettle();
         await tester.ensureVisible(
-          find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)),
+          find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)),
         );
-        await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+        await tester.tap(
+          find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)),
+        );
         await tester.pumpAndSettle();
         await tester.pump(const Duration(milliseconds: 300));
         final missing = [
@@ -197,8 +199,8 @@ Future<void> _capture(
   String name,
   Size expected,
 ) async {
-  expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-rpg')), findsOneWidget);
-  expect(find.text('RPG'), findsWidgets);
+  expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsOneWidget);
+  expect(find.text('Escape'), findsWidgets);
   final boundary = tester.renderObject(
     find.byKey(AppKeys.appFrame),
   ) as RenderRepaintBoundary;

@@ -1,16 +1,25 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
+import 'package:scapematch/features/groups/domain/participant.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
+import 'package:scapematch/features/groups/presentation/create_group_view_model.dart';
 import 'package:scapematch/features/groups/presentation/group_messages.dart';
 import 'package:scapematch/providers/repositories.dart';
 
+import 'support/pick_open_slot.dart';
 import 'support/pump_app.dart';
 import 'support/sample_clock.dart';
 
@@ -31,11 +40,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(GroupMessages.joinedBanner), findsOneWidget);
-    expect(find.byKey(AppKeys.confirmAttendance), findsOneWidget);
+    expect(find.byKey(AppKeys.confirmAttendance), findsNothing);
+    expect(find.byKey(AppKeys.payMyShare), findsOneWidget);
     expect(find.byKey(AppKeys.deleteGroup), findsNothing);
 
-    await tester.tap(find.byKey(AppKeys.confirmAttendance));
-    await tester.pumpAndSettle();
+    await _pay(tester);
 
     expect(_text(tester, AppKeys.confirmedCount), '2 presenças confirmadas');
     expect(find.textContaining('Você'), findsWidgets);
@@ -79,7 +88,7 @@ void main() {
     );
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '2 jogadores · mín. 4 · máx. 4');
+    expect(_spotSummary(tester), '1 jogador · mín. 4 · máx. 4');
     await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
@@ -118,6 +127,67 @@ void main() {
     );
   });
 
+  testWidgets('paid leave shows the exact refund before confirming', (
+    tester,
+  ) async {
+    final clock = FixedClock(sampleNow);
+    final database = loadSampleDatabase();
+    final index = database.groups.indexWhere(
+      (item) => item.id == SampleIds.groupSpCoberturaOpen,
+    );
+    final group = database.groups[index];
+    database.groups[index] = group.copyWith(
+      participants: [
+        ...group.participants,
+        const Participant(
+          id: 'ptc-taxa',
+          userId: 'user-local',
+          displayName: 'Você',
+          isCreator: false,
+          isLocalUser: true,
+          payment: PaymentStatus.paid,
+        ),
+      ],
+    );
+    final refundCents = group.priceCents - 199;
+    await _loadFonts();
+
+    await pumpScapeMatch(
+      tester,
+      viewport: const Size(390, 844),
+      overrides: [
+        clockProvider.overrideWithValue(clock),
+        fakeDatabaseProvider.overrideWithValue(database),
+      ],
+    );
+    await _openGroup(
+      tester,
+      SampleIds.saoPaulo,
+      SampleIds.groupSpCoberturaOpen,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(AppKeys.leaveGroup),
+      300,
+      scrollable: verticalScrollable,
+    );
+    await tester.tap(find.byKey(AppKeys.leaveGroup));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(GroupMessages.leaveRefundAmount(refundCents)),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('A taxa de pagamento não é devolvida'),
+      findsOneWidget,
+    );
+    await _shotDialog(tester, 'desmarcar-valor-exato-celular');
+
+    await tester.tap(find.text(GroupMessages.keepSeatAction));
+    await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.leaveGroup), findsOneWidget);
+  });
+
   testWidgets('leaving inside two hours warns that there is no refund', (
     tester,
   ) async {
@@ -125,13 +195,15 @@ void main() {
     await pumpScapeMatch(
       tester,
       overrides: [
-        clockProvider.overrideWithValue(FixedClock(DateTime(2026, 11, 3, 17, 30))),
+        clockProvider.overrideWithValue(
+          FixedClock(DateTime(2026, 11, 3, 17, 30)),
+        ),
       ],
     );
     await _openGroup(tester, SampleIds.saoPaulo, SampleIds.groupSpMetroAlmost);
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
+    expect(_spotSummary(tester), '5 jogadores · mín. 2 · máx. 6');
     await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
@@ -183,12 +255,12 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.housePoaRedencao);
     await _pick(tester, 'room', SampleIds.roomPoaEstufa);
-    await _pick(tester, 'slot', SampleIds.slotPoaEstufaFree);
+    await pickOpenSlot(tester, SampleIds.slotPoaEstufaFree);
     await tester.tap(find.byKey(AppKeys.createSubmit));
     await tester.pumpAndSettle();
 
     expect(find.text(GroupMessages.joinedBanner), findsOneWidget);
-    expect(_spotSummary(tester), '1 jogador · mín. 2 · máx. 3');
+    expect(_spotSummary(tester), '0 jogadores · mín. 2 · máx. 3');
     expect(find.byKey(AppKeys.deleteGroup), findsOneWidget);
     expect(find.byKey(AppKeys.leaveGroup), findsNothing);
     await _pay(tester);
@@ -244,7 +316,7 @@ void main() {
     await tester.pumpAndSettle();
     await _pick(tester, 'house', SampleIds.houseSpLiberdade);
     await _pick(tester, 'room', SampleIds.roomSpIzakaya);
-    await _pick(tester, 'slot', SampleIds.slotSpIzakayaOverlap);
+    await pickOpenSlot(tester, SampleIds.slotSpIzakayaOverlap);
     await tester.tap(find.byKey(AppKeys.createSubmit));
     await tester.pumpAndSettle();
 
@@ -268,17 +340,14 @@ void main() {
 
     await _pick(tester, 'house', SampleIds.houseSpAugusta);
     await _pick(tester, 'room', SampleIds.roomSpMetro);
-    await _pick(tester, 'slot', SampleIds.slotSpMetroPast);
-    final startedScroll = find.descendant(
-      of: find.byType(CreateGroupScreen),
-      matching: find.byType(Scrollable),
+    final open = ProviderScope.containerOf(
+      tester.element(find.byType(CreateGroupScreen)),
+    ).read(createGroupViewModelProvider);
+    expect(
+      open.openSlots.any((item) => item.slot.id == SampleIds.slotSpMetroPast),
+      isFalse,
     );
-    await tester.scrollUntilVisible(
-      find.text(GroupMessages.alreadyStartedHint),
-      200,
-      scrollable: startedScroll,
-    );
-    expect(find.text(GroupMessages.alreadyStartedHint), findsOneWidget);
+    expect(find.text(GroupMessages.alreadyStartedHint), findsNothing);
     expect(_submitEnabled(tester), isFalse);
   });
 
@@ -412,6 +481,73 @@ Future<void> _pick(WidgetTester tester, String field, String id) async {
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(AppKeys.option(id)));
   await tester.pumpAndSettle();
+}
+
+Future<void> _loadFonts() async {
+  final dir = _fontDir();
+  if (dir == null) {
+    return;
+  }
+  Future<ByteData> bytes(String name) async {
+    final data = File('$dir/$name').readAsBytesSync();
+    return ByteData.view(Uint8List.fromList(data).buffer);
+  }
+
+  final roboto = FontLoader('Roboto')
+    ..addFont(bytes('Roboto-Regular.ttf'))
+    ..addFont(bytes('Roboto-Medium.ttf'))
+    ..addFont(bytes('Roboto-Bold.ttf'));
+  final icons = FontLoader('MaterialIcons')
+    ..addFont(bytes('MaterialIcons-Regular.otf'));
+  await roboto.load();
+  await icons.load();
+}
+
+String? _fontDir() {
+  var dir = File(Platform.resolvedExecutable).parent;
+  for (var i = 0; i < 8; i++) {
+    final candidate = '${dir.path}/artifacts/material_fonts';
+    if (File('$candidate/Roboto-Regular.ttf').existsSync()) {
+      return candidate;
+    }
+    final parent = dir.parent;
+    if (parent.path == dir.path) {
+      break;
+    }
+    dir = parent;
+  }
+  return null;
+}
+
+Future<void> _shotDialog(WidgetTester tester, String name) async {
+  final dir = Directory('/opt/cursor/artifacts');
+  if (!dir.existsSync()) {
+    return;
+  }
+  await tester.pump();
+  final image = await tester.runAsync(() async {
+    var node = tester.renderObject(find.byType(MaterialApp).first);
+    while (node.parent != null) {
+      node = node.parent!;
+    }
+    final layer = node.debugLayer;
+    if (layer is! OffsetLayer) {
+      return null;
+    }
+    return layer.toImage(node.paintBounds, pixelRatio: 2);
+  });
+  if (image == null) {
+    return;
+  }
+  final bytes = await tester.runAsync(
+    () => image.toByteData(format: ui.ImageByteFormat.png),
+  );
+  if (bytes == null) {
+    image.dispose();
+    return;
+  }
+  File('${dir.path}/$name.png').writeAsBytesSync(bytes.buffer.asUint8List());
+  image.dispose();
 }
 
 String _spotSummary(WidgetTester tester) {

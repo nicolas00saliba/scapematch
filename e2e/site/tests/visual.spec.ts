@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const paginas = [
   ['inicio', '/'],
+  ['o-que-e', '/o-que-e-escape-room'],
   ['como-funciona', '/como-funciona'],
   ['para-casas', '/para-casas'],
   ['vantagens', '/vantagens'],

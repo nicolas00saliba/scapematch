@@ -216,52 +216,28 @@ Deno.test("cartão até 3x não manda juro e nasce sem captura", async () => {
   assertEquals((charge.amount as { value: number }).value, 20000);
 });
 
-Deno.test("4x soma o juro cotado e não aumenta a casa", async () => {
+Deno.test("4x é recusado antes de cotar juro ou autorizar", async () => {
   const calls: string[] = [];
   const fetchFn = (url: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
-    if (url.includes("/charges/fees/calculate")) {
-      return Promise.resolve(new Response(JSON.stringify({
-        payment_methods: {
-          credit_card: {
-            visa: {
-              installment_plans: [{
-                installments: 4,
-                interest_free: false,
-                amount: {
-                  value: 20640,
-                  fees: { buyer: { interest: { total: 640, installments: 1 } } },
-                },
-              }],
-            },
-          },
-        },
-      }), { status: 200 }));
-    }
-    if ((init?.method ?? "GET") === "POST") {
-      const posted = JSON.parse(String(init?.body));
-      const charge = posted.charges[0];
-      assertEquals(charge.amount.value, 20640);
-      assertEquals(charge.amount.fees.buyer.interest.total, 640);
-      assertEquals(charge.splits.receivers[0].amount.value, 15000);
-      assertEquals(charge.splits.receivers[1].amount.value, 5640);
-      return Promise.resolve(new Response(JSON.stringify({
-        charges: [{ id: "CHAR_4", status: "AUTHORIZED", splits: { id: "SPLI_4" } }],
-      }), { status: 200 }));
-    }
     return Promise.resolve(new Response("não", { status: 500 }));
   };
-  await provider(fetchFn).authorizeCard({
-    customer: "PB_CUS_1",
-    value: 200,
-    dueDate: "2026-11-07",
-    description: "EscapeMatch",
-    externalReference: "card-4",
-    split: { walletId: venue, fixedValue: 150 },
-    creditCardToken: "CARD_1",
-    installments: 4,
-  });
-  assert(calls.some((call) => call.includes("/charges/fees/calculate")));
+  await assertRejects(
+    () =>
+      provider(fetchFn).authorizeCard({
+        customer: "PB_CUS_1",
+        value: 200,
+        dueDate: "2026-11-07",
+        description: "EscapeMatch",
+        externalReference: "card-4",
+        split: { walletId: venue, fixedValue: 150 },
+        creditCardToken: "CARD_1",
+        installments: 4,
+      }),
+    Error,
+    "parcelas",
+  );
+  assertEquals(calls, []);
 });
 
 Deno.test("captura, estorno e custódia usam os caminhos da PagBank", async () => {
@@ -412,7 +388,10 @@ Deno.test("confirmação solta a custódia; sem confirmação estorna o Pix e ca
       return Promise.resolve(new Response("", { status: 200 }));
     }
     if ((init?.method ?? "GET") === "GET") {
-      const id = url.split("/").filter(Boolean).pop() ?? "CHAR_1";
+      const parsed = new URL(url);
+      const id = parsed.searchParams.get("charge_id") ??
+        parsed.pathname.split("/").filter(Boolean).pop() ??
+        "CHAR_1";
       return Promise.resolve(new Response(JSON.stringify({
         id,
         status: "PAID",
@@ -649,21 +628,135 @@ Deno.test("a cotação de parcelas sai de uma consulta só", async () => {
   const client = provider(fetchFn);
   const plans = await client.quoteCardPlans(20_000);
   assertEquals(quotes, 1);
+  assertEquals(plans.length, 3);
   assertEquals(plans[0].enabled, true);
   assertEquals(plans[2].amountCents, 20_000);
   assertEquals(plans[2].merchantAbsorbsInterest, true);
-  assertEquals(plans[3].amountCents, 20_640);
-  assertEquals(plans[3].enabled, true);
-  assertEquals(plans[4].enabled, false);
+  assertEquals(plans.every((item) => item.merchantAbsorbsInterest), true);
   const small = await client.quoteCardPlans(10_000);
   assertEquals(quotes, 2);
   assertEquals(
     small.filter((item) => item.enabled).map((item) => item.installments),
-    [1, 2, 3, 4],
+    [1, 2, 3],
   );
   assertEquals(small[1].merchantAbsorbsInterest, true);
-  assertEquals(small[3].amountCents, 10_640);
-  const checked = await client.cardPlan(20_000, 4);
-  assertEquals(checked.amountCents, 20_640);
-  assertEquals(quotes, 3);
+  await assertRejects(
+    () => client.cardPlan(20_000, 4),
+    Error,
+    "parcelas",
+  );
+  assertEquals(quotes, 2);
+});
+
+Deno.test("CHAR_ é consultado em GET /orders?charge_id e escolhe o pedido certo", async () => {
+  const urls: string[] = [];
+  const client = provider((url, init) => {
+    urls.push(`${init?.method ?? "GET"} ${url}`);
+    const headers = new Headers(init?.headers);
+    assertEquals(init?.method, "GET");
+    assertEquals(headers.get("Accept"), "application/json");
+    assertEquals(headers.get("Content-Type"), null);
+    assert(headers.get("Authorization")?.startsWith("Bearer "));
+    return Promise.resolve(new Response(JSON.stringify({
+      orders: [
+        {
+          id: "ORDE_OUTRO",
+          charges: [{
+            id: "CHAR_OUTRO",
+            status: "WAITING",
+            amount: { value: 100 },
+            payment_method: { type: "PIX" },
+          }],
+        },
+        {
+          id: "ORDE_CERTO",
+          charges: [{
+            id: "CHAR_CERTO",
+            status: "PAID",
+            amount: { value: 500 },
+            payment_method: { type: "PIX" },
+          }],
+        },
+      ],
+    }), { status: 200 }));
+  });
+  const view = await client.getPayment("CHAR_CERTO");
+  assertEquals(view.id, "CHAR_CERTO");
+  assertEquals(view.status, "CONFIRMED");
+  assert(urls[0].includes("/orders?charge_id=CHAR_CERTO"));
+  assert(!urls[0].includes("/charges/CHAR_CERTO"));
+});
+
+Deno.test("consulta recusada, ausente ou lenta vira status PagBank", async () => {
+  const refused = provider(() =>
+    Promise.resolve(new Response("Not Acceptable", { status: 406 }))
+  );
+  await assertRejects(
+    () => refused.getPayment("CHAR_RECUSADO"),
+    Error,
+    "PagBank 406",
+  );
+  const missing = provider(() =>
+    Promise.resolve(new Response("não", { status: 404 }))
+  );
+  await assertRejects(
+    () => missing.getPayment("ORDE_SUMIU"),
+    Error,
+    "PagBank 404",
+  );
+  const empty = provider(() =>
+    Promise.resolve(new Response(JSON.stringify({ orders: [] }), { status: 200 }))
+  );
+  await assertRejects(
+    () => empty.getPayment("CHAR_VAZIO"),
+    Error,
+    "PagBank 404",
+  );
+  const slow = provider(() =>
+    Promise.reject(new DOMException("The signal has been aborted", "TimeoutError"))
+  );
+  await assertRejects(
+    () => slow.getPayment("ORDE_LENTO"),
+    Error,
+    "PagBank 408: timeout",
+  );
+});
+
+Deno.test("CHAR_ em pedido com duas cobranças devolve a do id", async () => {
+  const order = {
+    orders: [{
+      id: "ORDE_DUPLO",
+      charges: [
+        {
+          id: "CHAR_RECUSADA",
+          status: "DECLINED",
+          amount: { value: 1000, currency: "BRL" },
+          payment_method: { type: "CREDIT_CARD" },
+        },
+        {
+          id: "CHAR_APROVADA",
+          status: "PAID",
+          amount: { value: 2500, currency: "BRL" },
+          payment_method: { type: "CREDIT_CARD" },
+        },
+      ],
+    }],
+  };
+  const client = provider(() =>
+    Promise.resolve(new Response(JSON.stringify(order), { status: 200 }))
+  );
+  const paid = await client.readPayment("CHAR_APROVADA");
+  assertEquals(paid.id, "CHAR_APROVADA");
+  assertEquals(paid.status, "PAID");
+  assertEquals((paid.amount as { value: number }).value, 2500);
+  const view = await client.getPayment("CHAR_APROVADA");
+  assertEquals(view.id, "CHAR_APROVADA");
+  assertEquals(view.status, "CONFIRMED");
+  const declined = await client.getPayment("CHAR_RECUSADA");
+  assertEquals(declined.status, "CANCELED");
+  await assertRejects(
+    () => client.getPayment("CHAR_FORA"),
+    Error,
+    "PagBank 404",
+  );
 });

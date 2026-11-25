@@ -21,56 +21,39 @@ void main() {
   ) async {
     await _openNear(tester, const Size(390, 844));
 
+    expect(GameTypes.choices.map((choice) => choice.id), [
+      GameTypes.all,
+      GameTypes.escapeRoom,
+    ]);
     for (final choice in GameTypes.choices) {
       expect(find.text(choice.shortLabel), findsWidgets);
     }
     expect(_chip(tester, 'Todos').selected, isTrue);
     expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsOneWidget);
-    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-rpg')), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(AppKeys.nearbyCard('grp-cwb-porao-rpg')),
-      200,
-      scrollable: find.descendant(
-        of: find.byKey(AppKeys.mapSheet),
-        matching: find.byType(Scrollable),
-      ),
-    );
-    expect(find.byKey(AppKeys.nearbyCard('grp-cwb-porao-rpg')), findsOneWidget);
+    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-quase')), findsOneWidget);
 
     final map = tester.getRect(find.byType(FlutterMap));
     final bar = tester.getRect(find.byKey(AppKeys.gameTypeChipBar));
     expect(map.contains(bar.center), isTrue);
     expect(bar.top, lessThan(map.top + 24));
     expect(bar.width, lessThan(390));
-
-    final scroll = _chipScroll(tester);
-    expect(scroll.position.maxScrollExtent, greaterThan(0));
-    scroll.position.jumpTo(scroll.position.maxScrollExtent);
-    await tester.pumpAndSettle();
-    expect(find.text('Imersivo'), findsWidgets);
     expect(
-      tester.getRect(find.widgetWithText(ChoiceChip, 'Imersivo')).right,
+      tester.getRect(find.widgetWithText(ChoiceChip, 'Escape')).right,
       lessThanOrEqualTo(bar.right + 1),
     );
 
-    await tester.ensureVisible(
-      find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)),
-    );
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)));
     await tester.pumpAndSettle();
 
-    expect(_chip(tester, 'RPG').selected, isTrue);
+    expect(_chip(tester, 'Escape').selected, isTrue);
     expect(_chip(tester, 'Todos').selected, isFalse);
-    expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsNothing);
-    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-rpg')), findsOneWidget);
-    expect(find.byKey(AppKeys.nearbyCard('grp-cwb-porao-rpg')), findsOneWidget);
-    expect(find.byKey(AppKeys.nearbyCard('grp-curitiba-near-0')), findsNothing);
-    expect(find.text('Mesa de RPG no porão'), findsWidgets);
+    expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsOneWidget);
+    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-quase')), findsOneWidget);
     expect(
       ProviderScope.containerOf(
         tester.element(find.byKey(AppKeys.gameTypeChipBar)),
       ).read(selectedGameTypeIdProvider),
-      GameTypes.rpg,
+      GameTypes.escapeRoom,
     );
 
     await tester.tap(find.byKey(AppKeys.homeTab));
@@ -78,7 +61,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(AppKeys.gameTypeSelector),
-        matching: find.text('RPG'),
+        matching: find.text('Escape'),
       ),
       findsOneWidget,
     );
@@ -90,14 +73,13 @@ void main() {
     await _openNear(
       tester,
       const Size(1440, 900),
-      savedGameTypeId: GameTypes.rpg,
+      savedGameTypeId: GameTypes.escapeRoom,
     );
 
-    expect(_chip(tester, 'RPG').selected, isTrue);
-    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-rpg')), findsOneWidget);
-    expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsNothing);
-    expect(find.byKey(AppKeys.nearbyCard('grp-cwb-porao-rpg')), findsOneWidget);
-    expect(find.text('Mesa de RPG no porão'), findsWidgets);
+    expect(_chip(tester, 'Escape').selected, isTrue);
+    expect(_chip(tester, 'Todos').selected, isFalse);
+    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-quase')), findsOneWidget);
+    expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsOneWidget);
 
     final map = tester.getRect(find.byType(FlutterMap));
     final bar = tester.getRect(find.byKey(AppKeys.gameTypeChipBar));
@@ -105,33 +87,16 @@ void main() {
     expect(bar.left, greaterThan(300));
     expect(find.byKey(AppKeys.gameTypeChipBar), findsOneWidget);
 
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.boardGame)));
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.all)));
     await tester.pumpAndSettle();
-    expect(_chip(tester, 'Tabuleiro').selected, isTrue);
-    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-rpg')), findsNothing);
-    expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsNothing);
-    expect(find.byKey(AppKeys.nearEmpty), findsOneWidget);
-
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)));
-    await tester.pumpAndSettle();
+    expect(_chip(tester, 'Todos').selected, isTrue);
     expect(find.byKey(AppKeys.mapPin('grp-curitiba-near-0')), findsOneWidget);
-    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-rpg')), findsNothing);
-    expect(_chip(tester, 'Escape').selected, isTrue);
+    expect(find.byKey(AppKeys.mapPin('grp-cwb-porao-quase')), findsOneWidget);
   });
 }
 
 ChoiceChip _chip(WidgetTester tester, String label) {
   return tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label));
-}
-
-ScrollableState _chipScroll(WidgetTester tester) {
-  final scroll = find.descendant(
-    of: find.byKey(AppKeys.gameTypeChipBar),
-    matching: find.byWidgetPredicate(
-      (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
-    ),
-  );
-  return tester.state<ScrollableState>(scroll);
 }
 
 Future<void> _openNear(

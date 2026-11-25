@@ -109,6 +109,7 @@ enum ConfirmAttendanceFailureReason {
   notMember,
   groupCancelled,
   sessionEnded,
+  paymentRequired,
 }
 
 sealed class LeaveGroupResult {

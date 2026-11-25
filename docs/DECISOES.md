@@ -1,5 +1,12 @@
 # Decisões provisórias
 
+## Auditoria de recompensas em 25/11/2026
+
+- **Data:** 2026-11-25
+- **Decisão:** o indicador (jogador ou casa que indica jogador) e o cashback recebem a taxa cheia. O que não cabe na comissão fica em `platform_cac_transfers.assumed_cents`, sem transferência enquanto `PAGBANK_CAC_TRANSFERS` estiver desligada. A casa da reserva fica com a parte exata: o que o caixa não cobre entra em `free_slot_topup_cents` e no `amount_cents` do CAC. Casa que indica casa (5%) só deixa de ganhar na reserva cujo desconto aplicado é o de 20% com código. O de 10% paga. Pontos cobrem até 100% do que o jogador pagaria depois do desconto, sem mínimo. O teto configurável `redeem_max_bps` continua valendo e já está em 10000. A flag `backed_full_slot_enabled` permanece desligada; o caminho desligado é que abre esse teto. Fraude continua no teto antigo da comissão. Com a flag ligada, pontos sem lastro continuam no teto da comissão. Bronze é 0% com zero indicados ativos, 1% do 1º ao 4º, 2,5% do 5º ao 7º e 5% a partir do 8º. Cartão é no máximo 3x sem juros. 4x ou mais é recusado.
+- **Onde está no código:** `supabase/migrations/20261125150000_reward_audit_20261125.sql`, `private.book_platform_cac`, `private.subsidy_quote`, `private.quote_redemption`, `public.settle_points_covered_charge`, `public.player_payable_cents`, `supabase/functions/create-charge` e `supabase/functions/_shared/pagbank_rules.ts`. O timestamp 20261125120000 ficou com o PR #181.
+- **Como trocar depois:** a migration não foi aplicada no remoto e nenhuma função foi publicada. Não ligar `backed_full_slot_enabled` nem `PAGBANK_CAC_TRANSFERS` por causa desta decisão. O PR #179 continua separado: ele só troca a taxa exibida no Admin para `referrer_c2c_bps`.
+
 ## A primeira sessão é 20% com código e 10% sem
 
 - **Data:** 2026-11-24
@@ -17,7 +24,7 @@
 ## Regras de pontos e indicação em 24/11/2026
 
 - **Data:** 2026-11-24
-- **Decisão:** horário vazio não dobra cashback nem indicação. Jogador que indica jogador ganha 1% desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8. Sem indicado ativo, a taxa é zero. Ativo continua sendo atribuição `active` com cobrança paga do sujeito dentro de `tier_active_days` (90). Jogador que indica casa e casa que indica jogador ficam em 5%, sem nível. Casa que indica casa continua em 5%. 100 pontos = R$ 1. Não há mínimo de 1.000 pontos nem teto de 30%. A flag `backed_full_slot_enabled` continua desligada, como em produção; ligar a vaga inteira em pontos é uma decisão separada. O desconto de 20% da primeira reserva permanece mesmo quando passa da comissão. Quando desconto, pontos e indicações passam da comissão, a casa fica com o valor cheio e a conta PagBank da EscapeMatch cobre o que o split não alcança. Esse complemento não vira crédito em `free_slot_topups`. A execução da transferência fica desligada até `PAGBANK_CAC_TRANSFERS=on`.
+- **Decisão:** a seção de 25/11 substitui o teto da comissão, o corte do resgate acima dela e a grade de 4x a 12x. O restante desta seção continua valendo. Horário vazio não dobra cashback nem indicação. Jogador que indica jogador ganha 1% desde o primeiro indicado ativo, 2,5% a partir de 5 e 5% a partir de 8. Sem indicado ativo, a taxa é zero. Ativo continua sendo atribuição `active` com cobrança paga do sujeito dentro de `tier_active_days` (90). Jogador que indica casa e casa que indica jogador ficam em 5%, sem nível. Casa que indica casa continua em 5%. 100 pontos = R$ 1. Não há mínimo de 1.000 pontos nem teto de 30%. A flag `backed_full_slot_enabled` continua desligada, como em produção; ligar a vaga inteira em pontos é uma decisão separada. O desconto de 20% da primeira reserva permanece mesmo quando passa da comissão. Quando desconto, pontos e indicações passam da comissão, a casa fica com o valor cheio e a conta PagBank da EscapeMatch cobre o que o split não alcança. Esse complemento não vira crédito em `free_slot_topups`. A execução da transferência fica desligada até `PAGBANK_CAC_TRANSFERS=on`.
 - **Onde está no código:** migrations `20261124195000_reward_rules_20261124.sql` e `20261124200000_platform_cac.sql`, `private.book_platform_cac`, `supabase/functions/_shared/platform_cac.ts`, o painel de pagamentos do Admin e o seletor de pagamento do app.
 - **Como trocar depois:** as migrations não foram aplicadas no remoto e nenhuma função foi publicada. Sem a carteira `PAGBANK_POINTS_RESERVE_ACCOUNT_ID`, o resgate acima da comissão é cortado. A vaga inteira em pontos só passa a valer se o Nícolas ligar `backed_full_slot_enabled`. A transferência P2P só sai depois do certificado, da liberação comercial e de `PAGBANK_CAC_TRANSFERS=on`.
 
@@ -198,13 +205,29 @@
 - **Onde está no código:** `AbsencePolicy`, `AbsenceBook` e o botão Marcar falta no Parceiro. O aviso padrão é 1 e o bloqueio é 3.
 - **Como trocar depois:** outra política entra no construtor de `AbsencePolicy`. A tela do Parceiro chama `markAbsent`.
 
-## O EscapeMatch começa em escape room e abre outras categorias
+## O produto é escape room
 
-- **Data:** 2026-11-03
-- **Decisão:** escape room continua a categoria principal e o destaque. Jogos de tabuleiro, laser tag e jogos de tiro com laser entram como categorias preparadas, com filtro e ícone. Os textos não dizem que o EscapeMatch é só escape room.
-- **Motivo:** o produto começa nas salas e já deixa o caminho para os outros jogos.
-- **Onde está no código:** esta decisão fica registrada agora. O filtro e os ícones entram no PR das categorias.
-- **Como trocar depois:** uma categoria nova entra na lista de tipos de jogo.
+- **Data:** 2026-11-25
+- **Decisão:** o foco é escape room. O seletor oferece Todos e Escape room. O catálogo de exemplo, as notícias e o cadastro da casa não oferecem outro tipo. O site não anuncia outra modalidade.
+- **Motivo:** o Nícolas decidiu, em 25/11/2026, que por enquanto o produto é só escape room.
+- **Onde está no código:** `GameTypes.choices`, `VenueDraft.categories` e o texto do site em `apps/site`.
+- **Como trocar depois:** outra lista no app entra em `GameTypes.choices`. O check do banco não muda neste registro.
+
+## O site fala do Brasil
+
+- **Data:** 2026-11-25
+- **Decisão:** a mensagem principal do site é escape room no Brasil. O selo, os títulos, a definição, o FAQ, o `llms.txt` e o `areaServed` dizem Brasil. O app está começando com as primeiras casas e vai crescer. O site não lista casa, cidade nova nem número de cobertura. `/escape-room-curitiba` e os guias de Curitiba continuam como páginas dessa cidade. O endereço da empresa e o Meetup Escape Room Curitiba continuam em Curitiba.
+- **Motivo:** o Nícolas pediu, em 25/11/2026, para tirar o foco do site em Curitiba.
+- **Onde está no código:** `apps/site/src/data/seo.ts`, a home, `o-que-e-escape-room.astro` e `tool/check_site.py`.
+- **Como trocar depois:** outra área atendida entra em `organizacao.areaServed`. As páginas de cidade ficam.
+
+## O que as IAs leem fala do Brasil e do nome atual
+
+- **Data:** 2026-11-25
+- **Decisão:** a definição pública é que a EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. O guia `/guia/como-jogar-escape-room-sozinho` é nacional e tem a pergunta “O EscapeMatch é só em Curitiba?”. `/escape-room-curitiba` e os guias de Curitiba são páginas de cidade. O nome antigo e o domínio antigo saem do site, da landing, dos arquivos `llms`, do JSON-LD público, dos manifestos e dos textos visíveis dos apps. `alternateName` fica só `Escape Match` e `escapematch`. O `legalName` publicado já é `ESCAPEMATCH TECNOLOGIA LTDA`.
+- **Motivo:** o Nícolas pediu, em 25/11/2026, que o que as IAs leem não trate a EscapeMatch como um app só de Curitiba e não republica o nome antigo.
+- **Onde está no código:** `apps/site/src/data/seo.ts`, `perguntas-marca.ts`, o guia nacional, `apps/site/public/llms.txt`, `llms-full.txt` e `tool/check_site.py`.
+- **Como trocar depois:** outra definição entra em `definicaoCurta`. O nome antigo não volta para `alternateName`.
 
 ## O site institucional fica separado do app
 
@@ -402,7 +425,7 @@
 
 - **Data:** 2026-10-31
 - **Decisão:** a tela “Encontre pessoas para jogar” usa Pexels 17368156 (Matheus Bertelli): cerca de dez adultos num fliperama, rostos visíveis, em ambiente interno. O enquadramento fica no centro. O corte do celular e o da largura 1280 ainda mostram o grupo, com o texto embaixo no degradê. A foto do Jenga saiu. A festa (Pexels 20826894) também saiu.
-- **Motivo:** o fliperama é diversão presencial em grupo e continua com mais de cinco rostos nos dois cortes. A festa tinha gente junta, sem o lugar da brincadeira. O karaokê (Pexels 29298514) tem a placa e a alegria, com poucos rostos nítidos no corte largo. O boliche (Pexels 7429776) enquadra bem e para em quatro pessoas. O laser tag (Pexels 31107755) tem muita gente, com máscara e crianças. Nenhuma candidata era uma escape room com grupo.
+- **Motivo:** o fliperama é diversão presencial em grupo e continua com mais de cinco rostos nos dois cortes. A festa tinha gente junta, sem o lugar da brincadeira. O karaokê (Pexels 29298514) tem a placa e a alegria, com poucos rostos nítidos no corte largo. A foto Pexels 7429776 enquadra bem e para em quatro pessoas. A foto Pexels 31107755 tem muita gente, com máscara e crianças. Nenhuma candidata era uma escape room com grupo.
 - **Onde está no código:** `OnboardingScreen` e `docs/CREDITOS_IMAGENS.md`.
 - **Como trocar depois:** outra foto entra em `assets/images/onboarding/encontrar.jpg` e no crédito.
 
@@ -467,8 +490,8 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Tipo de jogo no topo
 
 - **Data:** 2026-10-28
-- **Decisão:** ao lado da cidade há um seletor de tipo de jogo: Todos, Escape room, RPG, Jogos de tabuleiro, Laser tag e Imersivo. A escolha fica no aparelho, na chave `selected_game_type`, do mesmo jeito que a cidade. Ela filtra a janela de grupos, o carrossel de novidades e o carrossel de salas. O catálogo de exemplo segue em maior parte escape room. Curitiba tem, além disso, uma sala e uma notícia de cada um dos outros tipos, para o filtro mostrar um resultado. Nas outras cidades o filtro desses tipos fica vazio até existir uma fonte real. Os grupos extras de Curitiba incluem escape room, RPG, tabuleiro, laser tag e imersivo, com nome da atividade (não o da sala de escape). No seletor fechado os rótulos são Todos, Escape, RPG, Tabuleiro, Laser e Imersivo; a folha mantém o nome completo. A cidade é que encolhe com reticências, para o jogo não cortar.
-- **Motivo:** o dono quer o mesmo filtro na janela de grupos e nas salas, e notícias dos outros gêneros no carrossel.
+- **Decisão:** ao lado da cidade há um seletor de tipo de jogo: Todos e Escape room. A escolha fica no aparelho, na chave `selected_game_type`, do mesmo jeito que a cidade. Ela filtra a janela de grupos, o carrossel de novidades e o carrossel de salas. O catálogo de exemplo é escape room. No seletor fechado os rótulos são Todos e Escape; a folha mantém o nome completo. A cidade é que encolhe com reticências, para o jogo não cortar.
+- **Motivo:** o dono quer o mesmo filtro na janela de grupos e nas salas. Em 25/11/2026 a lista ficou só com escape room.
 - **Onde está no código:** `GameTypeSelector`, `SelectedGameTypeStore`, `filterGroupsByGameType`, `filterNewsByGameType` e `filterRoomsByGameType`. O `main` lê o store antes do primeiro frame. O tipo da sala é `EscapeRoom.gameType`. O da notícia é `NewsItem.gameType`.
 - **Como trocar depois:** uma fonte real preenche o mesmo id. Mudar a lista é editar `GameTypes.choices`.
 
@@ -627,8 +650,8 @@ Decisões do dono do produto que o código segue agora. Cada uma pode mudar. A d
 ## Novidades com gênero
 
 - **Data:** 2026-10-28
-- **Decisão:** o cartão de novidade da Home mostra título, resumo curto, etiqueta de gênero e data. A data é o relativo que o app já usava (“há 2 h”) mais o dia e o mês (“27 out”). O gênero usa o mesmo id do seletor de jogo. O chip mostra o nome completo (Escape room, RPG, Jogos de tabuleiro, Laser tag, Imersivo). Há uma notícia fictícia de cada gênero em Curitiba, além das dez de escape room que já existiam. As outras cidades continuam só com escape room. A tela “Ver tudo” segue filtrando por cidade e pela categoria (novas salas, horários, promoções, eventos), não pelo tipo de jogo. Uma fonte real preenche o mesmo `NewsItem`, inclusive `gameType`.
-- **Motivo:** o dono pediu notícias do escape room, do RPG e dos outros gêneros, com cara de que podem vir de fora depois.
+- **Decisão:** o cartão de novidade da Home mostra título, resumo curto, etiqueta de gênero e data. A data é o relativo que o app já usava (“há 2 h”) mais o dia e o mês (“27 out”). O gênero usa o mesmo id do seletor de jogo. O chip mostra o nome completo, Escape room. As notícias de exemplo são escape room. A tela “Ver tudo” segue filtrando por cidade e pela categoria (novas salas, horários, promoções, eventos), não pelo tipo de jogo. Uma fonte real preenche o mesmo `NewsItem`, inclusive `gameType`.
+- **Motivo:** o dono pediu a etiqueta de gênero e a data no cartão.
 - **Onde está no código:** `NewsItem.gameType`, `buildSampleNews`, `homeNewsProvider` e `_NewsStripCard`.
 - **Como trocar depois:** apontar `newsRepositoryProvider` para a fonte real. Se “Ver tudo” também passar a respeitar o jogo, o filtro entra em `NewsFeedViewModel`.
 

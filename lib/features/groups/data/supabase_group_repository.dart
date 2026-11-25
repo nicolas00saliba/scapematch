@@ -402,6 +402,34 @@ class SupabaseGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<int?> previewLeaveRefund(
+    String groupId, {
+    required String userId,
+  }) async {
+    if (userId.isEmpty) {
+      return null;
+    }
+    try {
+      final data = await client.rpc(
+        'preview_member_refund',
+        params: {'p_group_id': groupId},
+      );
+      if (data == null) {
+        return null;
+      }
+      if (data is int) {
+        return data;
+      }
+      if (data is num) {
+        return data.round();
+      }
+      return int.tryParse('$data');
+    } on PostgrestException {
+      return null;
+    }
+  }
+
+  @override
   Future<CloseGroupResult> closeWithFewer(
     String groupId, {
     required String userId,

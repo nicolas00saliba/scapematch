@@ -69,6 +69,9 @@ function scopeAdmin(input: {
         limit() {
           return q;
         },
+        range() {
+          return q;
+        },
         update() {
           return q;
         },

@@ -3,8 +3,12 @@ import 'package:scapematch/features/catalog/data/catalog_repository.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/feature_order.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/open_schedule.dart';
+import 'package:scapematch/features/catalog/domain/open_slot.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
+import 'package:scapematch/features/groups/domain/group.dart';
 
 class FakeCatalogRepository implements CatalogRepository {
   FakeCatalogRepository(
@@ -31,11 +35,10 @@ class FakeCatalogRepository implements CatalogRepository {
   Future<List<EscapeRoom>> listRoomsByHouse(String houseId) async {
     await _pause();
     final rooms =
-        _database.rooms.where((room) => room.houseId == houseId).toList()
-          ..sort(
-            (a, b) =>
-                compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name),
-          );
+        _database.rooms.where((room) => room.houseId == houseId).toList()..sort(
+          (a, b) =>
+              compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name),
+        );
     return rooms;
   }
 
@@ -51,21 +54,54 @@ class FakeCatalogRepository implements CatalogRepository {
   }
 
   @override
+  Future<List<OpenSlot>> listOpenSlots(
+    String houseId, {
+    required DateTime now,
+  }) async {
+    await _pause();
+    final roomIds = <String>{
+      for (final room in _database.rooms)
+        if (room.houseId == houseId) room.id,
+    };
+    return bookableSlots(
+      slots: [
+        for (final slot in _database.slots)
+          if (roomIds.contains(slot.roomId)) slot,
+      ],
+      occupancy: [
+        for (final group in _database.groups)
+          if (roomIds.contains(group.roomId))
+            SlotOccupancy(
+              slotId: group.slotId,
+              roomId: group.roomId,
+              startsAt: group.startsAt,
+              cancelled: group.isCancelled,
+              groupId: group.id,
+              totalSpots: group.totalSpots,
+              paidSpots: _paidSeats(group),
+            ),
+      ],
+      now: now,
+    );
+  }
+
+  @override
   Future<List<RoomListing>> listRoomsByCity(String cityId) async {
     await _pause();
-    final listings = <RoomListing>[
-      for (final house in _database.houses)
-        if (house.cityId == cityId)
-          for (final room in _database.rooms)
-            if (room.houseId == house.id) _listing(room, house),
-    ]..sort(
-      (a, b) => compareFeatured(
-        a.room.featuredRank,
-        b.room.featuredRank,
-        a.room.name,
-        b.room.name,
-      ),
-    );
+    final listings =
+        <RoomListing>[
+          for (final house in _database.houses)
+            if (house.cityId == cityId)
+              for (final room in _database.rooms)
+                if (room.houseId == house.id) _listing(room, house),
+        ]..sort(
+          (a, b) => compareFeatured(
+            a.room.featuredRank,
+            b.room.featuredRank,
+            a.room.name,
+            b.room.name,
+          ),
+        );
     return listings;
   }
 
@@ -128,4 +164,16 @@ class FakeCatalogRepository implements CatalogRepository {
     }
     return Future<void>.delayed(latency);
   }
+}
+
+int _paidSeats(Group group) {
+  var paid = 0;
+  for (final person in group.participants) {
+    if (!person.occupiesSeat) continue;
+    if (person.payment == PaymentStatus.paid ||
+        person.payment == PaymentStatus.reserved) {
+      paid += 1;
+    }
+  }
+  return paid;
 }

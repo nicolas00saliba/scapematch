@@ -12,16 +12,15 @@ import 'package:scapematch/features/payments/presentation/installment_grid.dart'
 import 'package:scapematch/features/payments/presentation/installment_summary.dart';
 
 void main() {
-  test('R\$ 100 libera até 3x e a cotação libera o restante', () {
+  test('R\$ 100 libera só até 3x sem juros', () {
     final open = cardInstallmentOptions(
       principalCents: 10000,
       interestCentsByCount: {
         for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
       },
     );
-    expect(open.every((item) => item.enabled), isTrue);
-    expect(open[2].interestFree, isTrue);
-    expect(open[3].showsTotal, isTrue);
+    expect(open, hasLength(3));
+    expect(open.every((item) => item.enabled && item.interestFree), isTrue);
 
     final quoted = cardInstallmentOptions(principalCents: 14999);
     expect(quoted.where((item) => item.enabled).map((item) => item.count), [
@@ -29,7 +28,7 @@ void main() {
       2,
       3,
     ]);
-    expect(quoted[3].disabledReason, 'Cotação indisponível');
+    expect(quoted, hasLength(3));
   });
 
   test('parcela abaixo de R\$ 5 fica desabilitada', () {
@@ -44,9 +43,7 @@ void main() {
     expect(exact[2].enabled, isFalse);
   });
 
-  testWidgets('a grade marca sem juros até 3x e o total a partir de 4x', (
-    tester,
-  ) async {
+  testWidgets('a grade marca 1x a 3x sem juros', (tester) async {
     var selected = 1;
     final options = cardInstallmentOptions(
       principalCents: 20000,
@@ -61,17 +58,14 @@ void main() {
     );
 
     expect(find.text('sem juros'), findsNWidgets(3));
-    expect(find.text('com juros'), findsNWidgets(2));
+    expect(find.text('com juros'), findsNothing);
     final free = tester.widget<Text>(find.text('sem juros').first);
-    final paid = tester.widget<Text>(find.text('com juros').first);
     expect(free.style?.color, const Color(0xFFFFFFFF));
     expect(free.style?.fontWeight, FontWeight.w800);
-    expect(free.style?.fontSize, greaterThan(paid.style?.fontSize ?? 0));
-    expect(find.textContaining('206,40'), findsOneWidget);
-    expect(find.textContaining('51,60'), findsOneWidget);
+    expect(find.textContaining('206,40'), findsNothing);
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('parcela-4')));
+    await tester.tap(find.byKey(const ValueKey('parcela-3')));
     await tester.pumpWidget(
       _host(
         selected: selected,
@@ -79,7 +73,7 @@ void main() {
         onSelect: (count) => selected = count,
       ),
     );
-    expect(selected, 4);
+    expect(selected, 3);
 
     final semantics = tester.getSemantics(
       find.byKey(const ValueKey('parcela-1')),
@@ -104,8 +98,8 @@ void main() {
         onSelect: (_) {},
       ),
     );
-    expect(find.text('parcela mínima de R\$ 5'), findsNWidgets(11));
-    await tester.tap(find.byKey(const ValueKey('parcela-4')));
+    expect(find.text('parcela mínima de R\$ 5'), findsNWidgets(2));
+    await tester.tap(find.byKey(const ValueKey('parcela-3')));
     await tester.pump();
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
   });
@@ -119,9 +113,9 @@ void main() {
         for (var count = 4; count <= 12; count++) count: 160 * (count - 3),
       },
     );
-    expect(options.every((item) => item.enabled), isTrue);
+    expect(options, hasLength(3));
+    expect(options.every((item) => item.enabled && item.interestFree), isTrue);
     expect(options[2].interestFree, isTrue);
-    expect(options[3].showsTotal, isTrue);
     final photo = File('test/fixtures/sala-acerto-de-contas.jpeg')
         .readAsBytesSync();
     await _shot(

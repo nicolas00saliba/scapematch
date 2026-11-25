@@ -2,6 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:scapematch/core/supabase/row_values.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/time/clock.dart';
+import 'package:scapematch/core/time/region_time.dart';
 import 'package:scapematch/features/catalog/data/supabase_catalog_repository.dart';
 import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
@@ -13,7 +14,6 @@ import 'package:scapematch/features/catalog/presentation/room_labels.dart';
 import 'package:scapematch/features/groups/data/supabase_group_repository.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group.dart';
-import 'package:scapematch/features/groups/domain/group_rules.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_repository.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
@@ -406,7 +406,9 @@ class SupabasePartnerRepository implements PartnerDesk {
         .from('room_sessions')
         .insert({
           'room_id': roomId,
-          'starts_at': startsAt.toUtc().toIso8601String(),
+          'starts_at': RegionTime.current
+              .toUtcInstant(startsAt)
+              .toIso8601String(),
           'availability': 'partner_grid',
         })
         .select('id, room_id, starts_at')
@@ -456,9 +458,6 @@ class SupabasePartnerRepository implements PartnerDesk {
     }
     final now = clock.now();
     if (!startsAt.isAfter(now)) return 'Esse horário já passou.';
-    if (GroupRules.tooCloseToCreate(startsAt: startsAt, now: now)) {
-      return 'Falta menos de 1 h. Escolha outro horário.';
-    }
     final taken = await scapeSupabase
         .from('room_sessions')
         .select('id')

@@ -1,6 +1,6 @@
 // Aplica o status que o webhook ou a consulta periódica viram no PagBank.
 
-import { logCaught } from "./pagbank_client_error.ts";
+import { logCaught, providerStatus } from "./pagbank_client_error.ts";
 import { PagBankProvider } from "./pagbank_provider.ts";
 import { releasePaidIfClosed } from "./custody_release.ts";
 import { bandConfirmed } from "./group_band.ts";
@@ -147,55 +147,98 @@ function pixPastExpiration(
   return Number.isFinite(at) && at <= now;
 }
 
+const pendingChargePageSize = 20;
+const pendingChargeMaxPages = 5;
+
 /// Pix e pedidos ainda pendentes. O webhook é o caminho normal.
-/// Isto cobre o aviso que não chegou.
+/// Isto cobre o aviso que não chegou. Páginas de 20, da mais antiga,
+/// pelo par (created_at, id). Offset em status=pending pula a cobrança
+/// que entra no lugar de outra que saiu de pendente durante a rodada.
 export async function pollPendingPagBankCharges(
   admin: Admin,
   pagbank: PagBankProvider,
   env: EnvLike,
 ): Promise<number> {
   if (typeof admin?.from !== "function") return 0;
-  const { data, error } = await admin
-    .from("payment_charges")
-    .select(
-      "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at, refund_requested_at, created_at",
-    )
-    .eq("status", "pending")
-    .not("provider_ref", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(20);
-  if (error || !Array.isArray(data)) return 0;
   let applied = 0;
-  for (const row of data) {
-    const charge = row as NoticeCharge;
-    const ref = (charge.provider_ref ?? "").trim();
-    if (!ref) continue;
-    try {
-      const remote = await pagbank.getPayment(ref);
-      if (pixPastExpiration(charge, remote, Date.now())) {
-        const expired = await applyPaymentTransition(
-          admin,
-          charge.id,
-          "cancelled",
-          false,
-        );
-        if (expired.status !== charge.status) applied += 1;
+  let cursor: { createdAt: string; id: string } | null = null;
+  for (let page = 0; page < pendingChargeMaxPages; page++) {
+    let query = admin
+      .from("payment_charges")
+      .select(
+        "id, group_id, user_id, venue_id, amount_cents, commission_bps, status, billing_type, provider_ref, provider_split_id, custody_released_at, refund_requested_at, created_at",
+      )
+      .eq("status", "pending")
+      .not("provider_ref", "is", null)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(pendingChargePageSize);
+    if (cursor) query = query.or(pendingCursorFilter(cursor));
+    const { data, error } = await query;
+    if (error || !Array.isArray(data) || data.length === 0) break;
+    for (const row of data) {
+      const charge = row as NoticeCharge;
+      const ref = (charge.provider_ref ?? "").trim();
+      if (!ref) continue;
+      if (!ref.startsWith("ORDE_") && !ref.startsWith("CHAR_")) {
+        console.error(JSON.stringify({
+          scope: "pending_charge_poll",
+          code: "ref_invalida",
+          prefix: ref.slice(0, 4),
+        }));
         continue;
       }
-      const before = charge.status;
-      const status = await applyPagBankNotice({
-        admin,
-        env,
-        pagbank,
-        charge,
-        paymentStatus: remote.status,
-      });
-      if (status && status !== before) applied += 1;
-    } catch (error) {
-      logCaught("pending_charge_poll", error);
+      try {
+        const remote = await pagbank.getPayment(ref);
+        if (pixPastExpiration(charge, remote, Date.now())) {
+          const expired = await applyPaymentTransition(
+            admin,
+            charge.id,
+            "cancelled",
+            false,
+          );
+          if (expired.status !== charge.status) applied += 1;
+          continue;
+        }
+        const before = charge.status;
+        const status = await applyPagBankNotice({
+          admin,
+          env,
+          pagbank,
+          charge,
+          paymentStatus: remote.status,
+        });
+        if (status && status !== before) applied += 1;
+      } catch (error) {
+        if (providerStatus(error) === 404) continue;
+        logCaught("pending_charge_poll", error);
+      }
+    }
+    if (data.length < pendingChargePageSize) break;
+    const last = data[data.length - 1] as { created_at?: unknown; id?: unknown };
+    const createdAt = typeof last?.created_at === "string" ? last.created_at : "";
+    const id = typeof last?.id === "string" ? last.id : "";
+    if (createdAt === "" || id === "") break;
+    cursor = { createdAt, id };
+    if (page === pendingChargeMaxPages - 1) {
+      console.error(JSON.stringify({
+        scope: "pending_charge_poll",
+        code: "pagina_cheia",
+      }));
     }
   }
   return applied;
+}
+
+function pendingCursorFilter(cursor: { createdAt: string; id: string }): string {
+  const createdAt = postgrestLiteral(cursor.createdAt);
+  const id = postgrestLiteral(cursor.id);
+  return `created_at.gt.${createdAt},and(created_at.eq.${createdAt},id.gt.${id})`;
+}
+
+function postgrestLiteral(value: string): string {
+  if (/^[A-Za-z0-9_-]+$/.test(value)) return value;
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
 async function groupIsClosed(admin: Admin, groupId: string): Promise<boolean> {

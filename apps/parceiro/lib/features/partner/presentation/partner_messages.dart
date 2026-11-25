@@ -120,7 +120,7 @@ abstract final class PartnerMessages {
   static const slotRemoveFailed = 'Não foi possível remover o horário.';
 
   static String removeSlotBody(String when) {
-    return 'Remover $when? O horário sai da busca, da sala e da reserva.';
+    return 'Remover $when? O horário sai do app. Quem já pagou recebe o estorno integral, porque a casa cancelou.';
   }
 
   static const markAbsence = 'Marcar falta';
@@ -183,6 +183,7 @@ abstract final class PartnerMessages {
     };
     return 'Este $label já tem um perfil. Reivindicar liga a sua conta a essa casa e mantém fotos, salas e avaliações. Não abre outra casa.';
   }
+
   static const claimOfferButton = 'Reivindicar';
   static const claimCodeTitle = 'Código da casa';
   static const claimCodeBody =
@@ -208,7 +209,8 @@ abstract final class PartnerMessages {
   static const claimStepWait = 'Aguardando a subconta';
   static const claimStepUnknown = 'Não foi possível consultar';
   static const claimProvision = 'Conectar conta PagBank';
-  static const claimProvisionDone = 'Continue na PagBank para autorizar a casa.';
+  static const claimProvisionDone =
+      'Continue na PagBank para autorizar a casa.';
   static const claimConnectOpened =
       'Continue na PagBank para ligar a casa. Ela só recebe depois do Connect.';
   static const claimBankHint =

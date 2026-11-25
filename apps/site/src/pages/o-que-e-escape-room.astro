@@ -1,0 +1,91 @@
+---
+import Base from '../layouts/Base.astro';
+import CtaBlock from '../components/CtaBlock.astro';
+import { definicao, faqPage, primeirasCasas, textoAtualizado } from '../data/seo';
+import { modificadoOQueE, publicadoOQueE } from '../../scripts/lastmod.mjs';
+
+const descricao =
+  'Escape room é uma sala presencial: o grupo resolve os desafios juntos antes do tempo acabar. No EscapeMatch você entra num grupo e paga só a sua vaga.';
+
+const respostas = [
+  {
+    pergunta: 'O que é um escape room?',
+    resposta:
+      'Um escape room é uma sala presencial. O grupo entra e resolve os desafios juntos para sair antes do tempo acabar. A casa monta a sala e conduz a sessão. Não é um jogo de celular.',
+  },
+  {
+    pergunta: 'Como funciona a sessão?',
+    resposta:
+      'Vocês se encontram na casa, no horário marcado. A casa explica e conduz a sessão. O grupo resolve os desafios junto, e o tempo corre até a saída ou até o relógio acabar.',
+  },
+  {
+    pergunta: 'Quantas pessoas costumam jogar?',
+    resposta:
+      'A sessão costuma ser em grupo. A casa define o mínimo e quantas pessoas cabem. Sala para uma pessoa existe, e é menos comum. O site não fixa esse número: ele aparece na sala, no app. Se duas pessoas ainda não bastam para o mínimo, o app completa com quem também chegou sozinho.',
+  },
+  {
+    pergunta: 'Quanto tempo dura?',
+    resposta:
+      'O tempo é o da sala, e o relógio faz parte do jogo. Na maioria das casas, a sessão dura cerca de uma hora. Não há uma duração única da EscapeMatch: a duração de cada sala está no app.',
+  },
+  {
+    pergunta: 'Quais são os tipos de sala?',
+    resposta:
+      'As salas mudam de tema. Terror, mistério e aventura são os mais comuns: um susto, um enigma ou uma missão. A casa escolhe o tema. No app, cada sala mostra o dela.',
+  },
+  {
+    pergunta: 'O que saber na primeira vez?',
+    resposta:
+      'Não precisa ter jogado antes. Chegue no horário, siga as regras da casa e tenha respeito com todos. Nada de discriminação ou assédio. A casa explica e conduz a sessão.',
+  },
+  {
+    pergunta: 'Dá para jogar sozinho ou montar grupo pela EscapeMatch?',
+    resposta:
+      `Dá. Sozinho, você escolhe a sala e o horário, entra num grupo e paga só a sua vaga. Quem já tem turma escolhe a mesma sala e, se faltar gente, o app completa as vagas. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. ${primeirasCasas}`,
+  },
+];
+
+const direta = respostas[0];
+const artigo = {
+  headline: direta.pergunta,
+  datePublished: publicadoOQueE,
+  dateModified: modificadoOQueE,
+};
+---
+
+<Base
+  title="O que é escape room | EscapeMatch"
+  description={descricao}
+  path="/o-que-e-escape-room"
+  ogImage="/assets/og/home.png"
+  jsonLd={faqPage(respostas)}
+  artigo={artigo}
+>
+  <header class="miolo pagina-topo">
+    <h1>{direta.pergunta}</h1>
+    <p class="resposta-direta">{direta.resposta}</p>
+    <p class="definicao-marca">{definicao}</p>
+    <p class="versao">{textoAtualizado(artigo.dateModified)}</p>
+  </header>
+  <article class="miolo pagina leitura">
+    {respostas.slice(1).map((item) => (
+      <section>
+        <h2>{item.pergunta}</h2>
+        <p>{item.resposta}</p>
+      </section>
+    ))}
+    <section>
+      <h2>Onde seguir</h2>
+      <p>
+        A primeira sala está em <a href="/guia/primeira-vez-em-escape-room">primeira vez em escape room</a>.
+        Chegar sem turma está em <a href="/guia/como-jogar-escape-room-sozinho">como jogar escape room sozinho</a>.
+        Quem já tem gente está em <a href="/guia/como-achar-grupo-escape-room">onde achar grupo</a>.
+        O app está em <a href="/app">Baixar o app</a>.
+      </p>
+    </section>
+  </article>
+  <CtaBlock
+    titulo="Ver salas no app"
+    acoes={[{ rotulo: 'Ver salas no app', href: 'https://app.escapematch.com.br/', externo: true }]}
+  />
+</Base>

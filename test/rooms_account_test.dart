@@ -101,7 +101,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(CreateGroupScreen),
-        matching: find.text('Escolha o horário'),
+        matching: find.text('Escolha a data para ver os horários.'),
       ),
       findsOneWidget,
     );

@@ -250,26 +250,48 @@ select set_config(
 );
 set local role authenticated;
 
+select public.remove_room_session('f6222222-2222-4222-8222-222222222222');
+select public.remove_room_session('f6333333-3333-4333-8333-333333333333');
+select public.remove_room_session('f6444444-4444-4444-8444-444444444444');
+
 do $$
 declare
-  v_id text;
+  v_reason text;
+  v_refund text;
+  v_attendance text;
 begin
-  foreach v_id in array array[
-    'f6222222-2222-4222-8222-222222222222',
-    'f6333333-3333-4333-8333-333333333333',
-    'f6444444-4444-4444-8444-444444444444'
-  ]
-  loop
-    begin
-      perform public.remove_room_session(v_id::uuid);
-      raise exception 'removeu horário com reserva %', v_id;
-    exception
-      when raise_exception then
-        if sqlerrm <> 'Esse horário já tem reserva' then
-          raise;
-        end if;
-    end;
-  end loop;
+  select attendance, refund_status, refund_reason
+    into v_attendance, v_refund, v_reason
+  from public.group_members
+  where group_id = 'f7222222-2222-4222-8222-222222222222';
+  if v_attendance <> 'cancelled'
+    or v_refund <> 'refund_pending'
+    or v_reason <> 'organizer_cancelled_event'
+  then
+    raise exception 'pago não levou estorno integral % % %',
+      v_attendance, v_refund, v_reason;
+  end if;
+
+  select attendance, refund_status
+    into v_attendance, v_refund
+  from public.group_members
+  where group_id = 'f7111111-1111-4111-8111-111111111111';
+  if v_attendance <> 'cancelled' or v_refund <> 'none' then
+    raise exception 'pendente sem cobrança não só saiu % %', v_attendance, v_refund;
+  end if;
+
+  if (
+    select cancelled_at from public.groups
+    where id = 'f7222222-2222-4222-8222-222222222222'
+  ) is null then
+    raise exception 'grupo pago não foi cancelado';
+  end if;
+  if (
+    select cancelled_at from public.room_sessions
+    where id = 'f6333333-3333-4333-8333-333333333333'
+  ) is null then
+    raise exception 'horário pago não saiu da grade';
+  end if;
 end $$;
 
 select public.remove_room_session('f6111111-1111-4111-8111-111111111111');

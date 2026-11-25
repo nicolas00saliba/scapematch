@@ -1,9 +1,11 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/core/data/fake_database.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/features/catalog/data/fake_catalog_repository.dart';
 import 'package:scapematch/features/cities/data/fake_city_repository.dart';
 import 'package:scapematch/features/groups/data/fake_group_repository.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/create_group_request.dart';
 import 'package:scapematch/features/groups/domain/game_type.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
@@ -125,25 +127,13 @@ void main() {
     );
   });
 
-  test('Curitiba groups cover every game type with a matching name', () {
+  test('Curitiba sample groups are escape room and almost full', () {
     final curitiba = database.groups.where(
       (group) => group.cityId == SampleIds.curitiba,
     );
-    expect(
-      curitiba.map((group) => group.gameType).toSet(),
-      containsAll([
-        GameTypes.escapeRoom,
-        GameTypes.rpg,
-        GameTypes.boardGame,
-        GameTypes.laserTag,
-        GameTypes.immersive,
-      ]),
-    );
-    final rpg = curitiba.singleWhere(
-      (group) => group.gameType == GameTypes.rpg,
-    );
-    expect(rpg.roomName, 'Mesa de RPG no porão');
-    expect(rpg.roomName, isNot(contains('Porão sem Luz')));
+    expect(curitiba.map((group) => group.gameType).toSet(), {
+      GameTypes.escapeRoom,
+    });
     expect(
       curitiba.where((group) => group.isAlmostFull).length,
       greaterThanOrEqualTo(8),
@@ -234,8 +224,16 @@ void main() {
 
     expect(result, isA<JoinSuccess>());
     final joined = (result as JoinSuccess).group;
-    expect(joined.filledSpots, 6);
-    expect(joined.isFull, isTrue);
+    expect(joined.filledSpots, 5);
+    expect(joined.isFull, isFalse);
+    final paid = await groups.payShare(
+      SampleIds.groupSpMetroAlmost,
+      userId: 'user-local',
+      kind: PaymentMethodKind.pix,
+    );
+    final seated = (paid as PayShareSuccess).group;
+    expect(seated.filledSpots, 6);
+    expect(seated.isFull, isTrue);
     expect(joined.joinedByMe, isTrue);
     expect(joined.participants.last.displayName, 'Você');
 
@@ -289,7 +287,8 @@ void main() {
       final group = (result as CreateGroupSuccess).group;
       expect(group.cityId, SampleIds.portoAlegre);
       expect(group.roomId, SampleIds.roomPoaEstufa);
-      expect(group.filledSpots, 1);
+      expect(group.filledSpots, 0);
+      expect(group.participants.single.payment, PaymentStatus.pending);
       expect(group.totalSpots, 4);
       expect(group.roomCapacity, 4);
       expect(group.joinedByMe, isTrue);

@@ -321,7 +321,7 @@ jobs:
           grep -F -q 'Ninguém pra jogar?<br>Agora tem.' apps/landing/index.html
           grep -F -q 'EscapeMatch — Ninguém pra jogar? Agora tem.' apps/landing/index.html
           grep -F -q 'og:title" content="EscapeMatch — Ninguém pra jogar? Agora tem."' apps/landing/index.html
-          grep -F -q 'Escape rooms, jogos de tabuleiro, laser tag e muito mais!' apps/landing/index.html
+          grep -F -q 'Escape room no Brasil.' apps/landing/index.html
           if grep -F -q 'Escape room agora' apps/landing/index.html; then
             echo 'O eyebrow antigo ainda está na landing.'
             exit 1

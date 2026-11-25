@@ -1,3 +1,4 @@
+import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/groups/domain/attendance.dart';
 import 'package:scapematch/features/groups/domain/group_outcomes.dart';
 import 'package:scapematch/features/groups/domain/group_phase.dart';
@@ -42,12 +43,14 @@ abstract final class GroupMessages {
 
   static const simulatedPixNotice = 'Pix simulado. O código abaixo não cobra.';
 
-  static const livePixHint = 'O código Pix vem do PagBank quando você confirma.';
+  static const livePixHint =
+      'O código Pix vem do PagBank quando você confirma.';
 
   static const livePixNotice =
       'O Pix é pago agora. Se o grupo não confirmar, o valor volta.';
 
-  static const livePixReady = 'Pix do PagBank. Escaneie o QR ou copie o código.';
+  static const livePixReady =
+      'Pix do PagBank. Escaneie o QR ou copie o código.';
 
   static const simulatePayment = 'Simular pagamento';
 
@@ -109,8 +112,7 @@ abstract final class GroupMessages {
 
   static String payMyShare(String price) => 'Pagar minha parte ($price)';
 
-  static const houseCannotReceive =
-      'A casa ainda não pode receber';
+  static const houseCannotReceive = 'A casa ainda não pode receber';
 
   static const yourSharePending = 'Sua parte está pendente';
   static const yourShareReserved =
@@ -198,8 +200,7 @@ abstract final class GroupMessages {
         'O total de vagas ficou abaixo do mínimo da sala.',
       CreateGroupFailureReason.unknownSelection =>
         'Confira cidade, casa, sala e horário.',
-      CreateGroupFailureReason.duplicateSession =>
-        'Já existe um grupo nessa sala nesse horário. Escolha outro horário.',
+      CreateGroupFailureReason.duplicateSession => 'Já existe um grupo nessa sala nesse horário. Entre nele e pague a sua parte.',
       CreateGroupFailureReason.alreadyStarted =>
         'Esse horário já passou. Escolha um horário que ainda não começou.',
       CreateGroupFailureReason.tooCloseToStart => tooCloseToStart,
@@ -244,8 +245,11 @@ abstract final class GroupMessages {
 
   static String get leaveWithRefundTitle => 'Sair do grupo?';
 
-  static String get leaveWithRefundBody =>
-      'Faltam $_hours horas ou mais para o início. Se você sair agora, o pagamento volta integralmente e a vaga fica livre.';
+  static String leaveRefundAmount(int cents) =>
+      'Você recebe ${formatPrice(cents)}. A taxa de pagamento não é devolvida. A vaga fica livre.';
+
+  static const leaveRefundUnknown =
+      'Não foi possível calcular o valor agora. A taxa de pagamento não é devolvida. A vaga fica livre.';
 
   static String get leaveWithoutRefundTitle => 'Sair sem reembolso?';
 
@@ -305,7 +309,7 @@ abstract final class GroupMessages {
   static String removeTitle(String name) => 'Remover $name?';
 
   static String removeBody(String name) =>
-      'Remover $name cancela a vaga dessa pessoa. O reembolso é integral, porque a saída foi decisão do organizador.';
+      'Remover $name cancela a vaga dessa pessoa. O valor devolvido é o pago menos a taxa de pagamento.';
 
   static const removeAction = 'Remover';
 

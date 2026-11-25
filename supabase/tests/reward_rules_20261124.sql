@@ -447,7 +447,7 @@ begin
     select status || ':' || amount_cents::text || ':' || assumed_cents::text
     from public.platform_cac_transfers
     where payment_charge_id = (v_reserved ->> 'id')::uuid
-  ) is distinct from 'pending:1000:1000' then
+  ) is distinct from 'pending:1000:1080' then
     raise exception 'o pagamento nao lançou o CAC da plataforma';
   end if;
   update public.payment_charges

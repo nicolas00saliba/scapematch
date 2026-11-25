@@ -7,6 +7,7 @@ import 'package:scapematch/features/groups/data/fake_group_repository.dart';
 import 'package:scapematch/features/groups/presentation/create_group_screen.dart';
 import 'package:scapematch/providers/repositories.dart';
 
+import 'support/pick_open_slot.dart';
 import 'support/pump_app.dart';
 import 'support/sample_clock.dart';
 
@@ -75,7 +76,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
 
-    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
+    expect(_spotSummary(tester), '5 jogadores · mín. 2 · máx. 6');
     expect(find.text('Você está neste grupo'), findsOneWidget);
     expect(find.text('Entrar no grupo'), findsNothing);
 
@@ -91,7 +92,7 @@ void main() {
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
     );
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
+    expect(_spotSummary(tester), '5 jogadores · mín. 2 · máx. 6');
     expect(find.text('Entrar no grupo'), findsNothing);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
@@ -186,10 +187,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.option(SampleIds.roomSpMetro)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(AppKeys.selectionField('slot')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.option(SampleIds.slotSpMetroSun)));
-    await tester.pumpAndSettle();
+    await pickOpenSlot(tester, SampleIds.slotSpMetroSun);
 
     expect(find.textContaining('2–6 jogadores'), findsOneWidget);
     expect(_submitEnabled(tester), isTrue);
@@ -241,15 +239,7 @@ void main() {
     expect(_extraSpots(tester), '4');
     expect(find.byKey(AppKeys.capacityError), findsNothing);
 
-    await tester.scrollUntilVisible(
-      find.byKey(AppKeys.selectionField('slot')),
-      -200,
-      scrollable: formScroll,
-    );
-    await tester.tap(find.byKey(AppKeys.selectionField('slot')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.option(SampleIds.slotSpCoberturaFri)));
-    await tester.pumpAndSettle();
+    await pickFirstOpenSlotOfRoom(tester, SampleIds.roomSpCobertura);
 
     expect(_submitEnabled(tester), isTrue);
   });

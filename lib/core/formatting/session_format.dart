@@ -1,5 +1,12 @@
 import 'package:intl/intl.dart';
 
+/// "Sáb, 7 de nov", sem a hora. O dia já é o calendário da casa.
+String formatOpenDay(DateTime day) {
+  final raw = DateFormat("EEE, d 'de' MMM", 'pt_BR').format(day);
+  if (raw.isEmpty) return raw;
+  return raw[0].toUpperCase() + raw.substring(1);
+}
+
 /// Example: "Sáb, 7 de nov · 18:30".
 String formatSession(DateTime dateTime) {
   final raw = DateFormat("EEE, d 'de' MMM '·' HH:mm", 'pt_BR').format(dateTime);
