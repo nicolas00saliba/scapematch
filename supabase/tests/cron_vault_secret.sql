@@ -48,7 +48,7 @@ begin
   if v_secret is distinct from 'segredo-cron-nao-vazar' then
     raise exception 'service_role não leu o segredo de saque';
   end if;
-  if public.cron_vault_secret('asaas_subaccount_key') is not null then
+  if public.cron_vault_secret('pagbank_token_key') is not null then
     raise exception 'a função leu outro item do vault';
   end if;
   if public.cron_vault_secret('ledger_reconcile_secret') is not null then

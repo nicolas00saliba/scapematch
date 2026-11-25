@@ -51,7 +51,7 @@ Não aplicar isto daqui. O dono aprova.
 1. Migrations no projeto `eujlhicairvksvmssruz`, nesta ordem: `20261123190000_pagbank.sql` e `20261123230000_venue_ready_without_bank.sql`. As duas só substituem funções e acrescentam. Não apagam coluna nem tabela. A segunda tira `venue_bank_accounts` de `venue_finance_ready` e de `list_due_venue_payouts`.
 2. Segredos acima.
 3. As 17 funções do mesmo commit: `pagbank-webhook`, `pagbank-transfer-webhook`, `pagbank-connect`, `create-charge`, `settle-charges`, `tokenize-card`, `provision-venue-wallet`, `venue-payouts`, `payments-readiness`, `reconcile-payments`, `ledger-reconcile`, `cancel-house-group`, `configure-venue-fiscal`, `schedule-venue-withdrawals`, `venue-documents`, `invoice-document`, `venue-claim`. `invoice-document` importa `_shared/pagbank_client_error.ts` e `_shared/http.ts`. `venue-claim` importa `_shared/http.ts` e `_shared/venue_claim.ts`.
-4. Não depende do painel. Cada pedido já manda `notification_urls` para `pagbank-webhook`, e `reconcile-payments` relê o Pix pendente. Só então despublicar `asaas-webhook` e `asaas-transfer-webhook`.
+4. Não depende do painel. Cada pedido já manda `notification_urls` para `pagbank-webhook`, e `reconcile-payments` relê o Pix pendente. Se ainda houver webhook de outro provedor publicado, despublicar antes de aplicar a migration que apaga as colunas espelho.
 
 ## Connect da casa
 
@@ -68,38 +68,8 @@ O access token é renovado quando falta menos de dois minutos para vencer, e de 
 5. Cartão de R$ 5 em 1x. Sem juros no pagador.
 6. Cartão de qualquer valor: 3x sem juros do pagador; 4x mostra o juro cotado. Parcela abaixo de R$ 5 fica desabilitada.
 
-## Colunas antigas
+## Colunas
 
-A migration nova ainda cita os nomes antigos. Depois do Connect, o gatilho espelha a conta PagBank na coluna antiga, para o SQL que ainda a lê. Ela não copia id nem chave do Asaas para a PagBank. Casa que já existia fica desligada até passar pelo Connect. Um drop fica para uma migration seguinte, depois que produção estiver estável na PagBank. Não entra neste PR.
+`20261125230000_eliminar_provedor_antigo.sql` tira as colunas espelho, os gatilhos que copiavam a conta PagBank para elas e o item antigo do Vault. A função nova é `private.pagbank_token_key()`. O valor cifrado dos tokens não muda. Cobrança antiga com outro `provider` continua no livro. Casa que já existia fica sem `pagbank_account_id` até passar pelo Connect.
 
-O harness local e o teste do allowlist do Vault continuam plantando o segredo `asaas_subaccount_key`. A migration `20261105220000` lê esse nome. Renomeá-lo no teste faria a cadeia histórica falhar.
-
-Migrations históricas que continuam com o nome antigo, porque reescrevê-las quebra a cadeia:
-
-- `20261104120000_init.sql`
-- `20261104120100_helpers.sql`
-- `20261104120400_asaas.sql`
-- `20261104120500_privacy.sql`
-- `20261104120600_fiscal_terms.sql`
-- `20261105113000_private_security_definer.sql`
-- `20261105140000_saved_cards.sql`
-- `20261105160000_card_token_crypto.sql`
-- `20261105190000_wallet_commission_payout.sql`
-- `20261105191000_player_cpf.sql`
-- `20261105210000_ledger_charge_kind_direction.sql`
-- `20261105220000_subaccount_key_wallet.sql`
-- `20261108140000_scape_points.sql`
-- `20261108200000_split_fixed_value.sql`
-- `20261109120000_rewards_rules.sql`
-- `20261109160000_admin_console.sql`
-- `20261111162429_admin_aal2_remaining.sql`
-- `20261112133908_20261111183000_free_slot_points.sql`
-- `20261112182929_venue_withdrawals.sql`
-- `20261112182936_venue_payout_corrections.sql`
-- `20261113170000_admin_payments.sql`
-- `20261113190000_ledger_reconcile.sql`
-- `20261113193000_customer_company_type.sql`
-- `20261113194000_company_type_guard.sql`
-- `20261113200000_venue_claim_official.sql`
-
-E a própria `20261123190000_pagbank.sql`.
+O harness local ainda planta o item antigo antes da cadeia, porque `20261105220000` lê esse nome na hora em que roda. A migration nova copia e apaga. O teste do allowlist do cron consulta `pagbank_token_key` e continua recebendo nulo.

@@ -67,7 +67,7 @@ Deno.test("sem header válido o pedido não leva remoteIp", async () => {
             creditCardToken: "tok_card_1",
             creditCardNumber: "1111",
             creditCardBrand: "VISA",
-            id: "pay_card",
+            id: "CHAR_CARD",
             status: "AUTHORIZED",
           }),
           { status: 200 },

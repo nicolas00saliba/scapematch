@@ -7,7 +7,7 @@ import 'package:scapematch/features/payments/domain/live_charge.dart';
 
 void main() {
   test('o Pix da cobrança usa o copia-e-cola devolvido', () {
-    const payload = '000201ASAAS.PIX.REAL';
+    const payload = '000201PAGBANK.PIX.REAL';
     final charge = LiveCharge.fromBody({
       'charge_id': 'ch-1',
       'status': 'pending',
