@@ -64,6 +64,22 @@ function providerFor(
   const fetchFn = (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     calls.push(`${method} ${url}`);
+    if (method === "GET" && url.includes("charge_id=")) {
+      const chargeId = new URL(url).searchParams.get("charge_id");
+      const payment = payments.find((item) => item.id === chargeId);
+      if (!payment) {
+        return Promise.resolve(new Response("não", { status: 404 }));
+      }
+      const cents = typeof payment.value === "number"
+        ? Math.round(payment.value * 100)
+        : 10000;
+      return Promise.resolve(
+        new Response(JSON.stringify({
+          ...payment,
+          amount: payment.amount ?? { value: cents, currency: "BRL" },
+        }), { status: 200 }),
+      );
+    }
     if (method === "GET" && (url.includes("externalReference=") || url.includes("reference_id="))) {
       const params = new URL(url).searchParams;
       const reference = params.get("reference_id") ?? params.get("externalReference");
@@ -164,13 +180,13 @@ Deno.test("pré-autorização vencida sai com refund, Pix pendente com DELETE", 
     adminFor(work, rpc),
     providerFor(http, [
       {
-        id: "pay_card",
+        id: "CHAR_CARD",
         status: "AUTHORIZED",
         billingType: "CREDIT_CARD",
         externalReference: "idem-card-1",
       },
       {
-        id: "pay_pix",
+        id: "CHAR_PIX",
         status: "PENDING",
         billingType: "PIX",
         externalReference: "pix:g:u",
@@ -185,16 +201,16 @@ Deno.test("pré-autorização vencida sai com refund, Pix pendente com DELETE", 
   ));
   assert(
     http.some((call) =>
-      call === "POST https://sandbox.api.pagseguro.com/charges/pay_card/cancel"
+      call === "POST https://sandbox.api.pagseguro.com/charges/CHAR_CARD/cancel"
     ),
   );
   assert(
     http.some((call) =>
-      call.startsWith("POST ") && call.endsWith("/charges/pay_pix/cancel")
+      call.startsWith("POST ") && call.endsWith("/charges/CHAR_PIX/cancel")
     ),
   );
   assertEquals(
-    http.some((call) => call.includes("DELETE") && call.includes("pay_card")),
+    http.some((call) => call.includes("DELETE") && call.includes("CHAR_CARD")),
     false,
   );
 });
@@ -202,7 +218,7 @@ Deno.test("pré-autorização vencida sai com refund, Pix pendente com DELETE", 
 Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async () => {
   const orphan = {
     id: "88888888-8888-8888-8888-888888888888",
-    provider_ref: "pay_orfao",
+    provider_ref: "CHAR_ORFAO",
     charge_id: "44444444-4444-4444-4444-444444444444",
     attempt_id: attemptId,
     billing_type: "CREDIT_CARD",
@@ -214,13 +230,13 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
     adminFor({ creating: [], orphans: [orphan] }, okCalls),
     providerFor(okHttp, [
       {
-        id: "pay_orfao",
+        id: "CHAR_ORFAO",
         status: "CONFIRMED",
         billingType: "CREDIT_CARD",
         externalReference: "idem-card-1",
       },
       {
-        id: "pay_vivo",
+        id: "CHAR_VIVO",
         status: "CONFIRMED",
         billingType: "CREDIT_CARD",
         externalReference: "idem-card-1",
@@ -233,18 +249,18 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
     false,
   );
   assertEquals(
-    okHttp.some((call) => call.includes("/charges/pay_vivo")),
+    okHttp.some((call) => call.includes("/charges/CHAR_VIVO")),
     false,
   );
   assert(
     okHttp.some((call) =>
-      call === "POST https://sandbox.api.pagseguro.com/charges/pay_orfao/cancel"
+      call === "POST https://sandbox.api.pagseguro.com/charges/CHAR_ORFAO/cancel"
     ),
   );
   const transition = okCalls.find((call) =>
     call.name === "settle_orphan_charge"
   );
-  assertEquals(transition?.args.p_provider_ref, "pay_orfao");
+  assertEquals(transition?.args.p_provider_ref, "CHAR_ORFAO");
   assertEquals(transition?.args.p_attempt_id, attemptId);
   assertEquals(transition?.args.p_next_status, "refunded");
   assert(okCalls.some((call) =>
@@ -257,7 +273,7 @@ Deno.test("órfão usa só o provider_ref e ignora outro pagamento vivo", async 
   const fail = await reconcilePayments(
     adminFor({ creating: [], orphans: [orphan] }, failCalls),
     providerFor([], [{
-      id: "pay_orfao",
+      id: "CHAR_ORFAO",
       status: "CONFIRMED",
       billingType: "CREDIT_CARD",
       externalReference: "idem-card-1",
@@ -279,7 +295,7 @@ Deno.test("lease vencido depois da retomada não cancela no PagBank", async () =
         creating: [creatingCard],
         orphans: [{
           id: "88888888-8888-8888-8888-888888888888",
-          provider_ref: "pay_orfao",
+          provider_ref: "CHAR_ORFAO",
           charge_id: creatingCard.charge_id,
           attempt_id: attemptId,
           billing_type: "CREDIT_CARD",
@@ -291,13 +307,13 @@ Deno.test("lease vencido depois da retomada não cancela no PagBank", async () =
     ),
     providerFor(http, [
       {
-        id: "pay_card",
+        id: "CHAR_CARD",
         status: "AUTHORIZED",
         billingType: "CREDIT_CARD",
         externalReference: "idem-card-1",
       },
       {
-        id: "pay_orfao",
+        id: "CHAR_ORFAO",
         status: "CONFIRMED",
         billingType: "CREDIT_CARD",
       },
@@ -318,13 +334,13 @@ Deno.test("lease vencido depois da retomada não cancela no PagBank", async () =
 Deno.test("erro ou attempt divergente não marca o órfão como resolvido", async () => {
   const orphan = {
     id: "88888888-8888-8888-8888-888888888888",
-    provider_ref: "pay_orfao",
+    provider_ref: "CHAR_ORFAO",
     charge_id: "44444444-4444-4444-4444-444444444444",
     attempt_id: attemptId,
     billing_type: "CREDIT_CARD",
   };
   const payment = [{
-    id: "pay_orfao",
+    id: "CHAR_ORFAO",
     status: "REFUNDED",
     billingType: "CREDIT_CARD",
   }];
@@ -359,7 +375,7 @@ Deno.test("órfão já estornado no PagBank só marca resolvido", async () => {
       creating: [],
       orphans: [{
         id: "99999999-9999-9999-9999-999999999999",
-        provider_ref: "pay_gone",
+        provider_ref: "CHAR_GONE",
         charge_id: null,
         attempt_id: null,
         billing_type: "CREDIT_CARD",
@@ -368,7 +384,7 @@ Deno.test("órfão já estornado no PagBank só marca resolvido", async () => {
     providerFor(http, []),
   );
   assertEquals(result.resolved, 1);
-  assert(http.some((call) => call.includes("/charges/pay_gone")));
+  assert(http.some((call) => call.includes("charge_id=CHAR_GONE")));
   assertEquals(http.some((call) => call.includes("externalReference=")), false);
   assertEquals(http.some((call) => call.includes("/cancel")), false);
   assert(calls.some((call) => call.name === "mark_orphan_resolved"));
@@ -383,7 +399,7 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
         creating: [],
         orphans: [{
           id: "99999999-9999-9999-9999-999999999999",
-          provider_ref: "pay_refunded",
+          provider_ref: "CHAR_REFUNDED",
           charge_id: chargeId,
           attempt_id: attemptId,
           billing_type: "CREDIT_CARD",
@@ -392,12 +408,12 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
       refundedCalls,
     ),
     providerFor([], [{
-      id: "pay_refunded",
+      id: "CHAR_REFUNDED",
       status: "REFUNDED",
       billingType: "CREDIT_CARD",
       externalReference: "idem-card-1",
     }, {
-      id: "pay_vivo",
+      id: "CHAR_VIVO",
       status: "CONFIRMED",
       billingType: "CREDIT_CARD",
       externalReference: "idem-card-1",
@@ -408,7 +424,7 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
     call.name === "settle_orphan_charge" &&
     call.args.p_next_status === "refunded" &&
     call.args.p_attempt_id === attemptId &&
-    call.args.p_provider_ref === "pay_refunded"
+    call.args.p_provider_ref === "CHAR_REFUNDED"
   );
   const refundedMark = refundedCalls.findIndex((call) =>
     call.name === "mark_orphan_resolved"
@@ -423,7 +439,7 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
         creating: [],
         orphans: [{
           id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          provider_ref: "pay_deleted",
+          provider_ref: "CHAR_DELETED",
           charge_id: chargeId,
           attempt_id: attemptId,
           billing_type: "CREDIT_CARD",
@@ -441,7 +457,7 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
   const missingTransition = missingCalls.findIndex((call) =>
     call.name === "settle_orphan_charge" &&
     call.args.p_next_status === "cancelled" &&
-    call.args.p_provider_ref === "pay_deleted"
+    call.args.p_provider_ref === "CHAR_DELETED"
   );
   const missingMark = missingCalls.findIndex((call) =>
     call.name === "mark_orphan_resolved"
@@ -455,7 +471,7 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
         creating: [],
         orphans: [{
           id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-          provider_ref: "pay_refunded",
+          provider_ref: "CHAR_REFUNDED",
           charge_id: chargeId,
           attempt_id: attemptId,
           billing_type: "CREDIT_CARD",
@@ -465,7 +481,7 @@ Deno.test("órfão já liquidado solta a cobrança presa antes de resolver", asy
       "skip",
     ),
     providerFor([], [{
-      id: "pay_refunded",
+      id: "CHAR_REFUNDED",
       status: "REFUNDED",
       billingType: "CREDIT_CARD",
     }]),
@@ -487,7 +503,7 @@ Deno.test("órfão Pix deleted:true e PENDING solta o QR", async () => {
         creating: [],
         orphans: [{
           id: "99999999-9999-4999-8999-999999999999",
-          provider_ref: "pay_pix",
+          provider_ref: "CHAR_PIX",
           charge_id: "44444444-4444-4444-8444-444444444444",
           attempt_id: attemptId,
           billing_type: "PIX",
@@ -497,7 +513,7 @@ Deno.test("órfão Pix deleted:true e PENDING solta o QR", async () => {
       calls,
     ),
     providerFor(http, [{
-      id: "pay_pix",
+      id: "CHAR_PIX",
       status: "PENDING",
       billingType: "PIX",
       deleted: true,

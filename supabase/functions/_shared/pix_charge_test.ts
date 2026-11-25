@@ -26,7 +26,7 @@ Deno.test("Pix pendente sem QR pede nova busca e não outra cobrança", () => {
     pixNeedsQr({
       status: "pending",
       billing_type: "PIX",
-      provider_ref: "pay_1",
+      provider_ref: "CHAR_1",
       qr_code: null,
     }),
     true,
@@ -35,7 +35,7 @@ Deno.test("Pix pendente sem QR pede nova busca e não outra cobrança", () => {
     pixNeedsQr({
       status: "pending",
       billing_type: "PIX",
-      provider_ref: "pay_1",
+      provider_ref: "CHAR_1",
       qr_code: "000201",
     }),
     false,
@@ -44,7 +44,7 @@ Deno.test("Pix pendente sem QR pede nova busca e não outra cobrança", () => {
     pixNeedsQr({
       status: "refunded",
       billing_type: "PIX",
-      provider_ref: "pay_1",
+      provider_ref: "CHAR_1",
       qr_code: null,
     }),
     false,
@@ -53,7 +53,7 @@ Deno.test("Pix pendente sem QR pede nova busca e não outra cobrança", () => {
     pixNeedsQr({
       status: "paid",
       billing_type: "PIX",
-      provider_ref: "pay_1",
+      provider_ref: "CHAR_1",
       qr_code: null,
     }),
     false,
@@ -157,7 +157,7 @@ Deno.test("reserva não cria de novo nem sobrescreve provider_ref", () => {
   assertEquals(
     pixReservationAction({
       inserted: false,
-      providerRef: "pay_1",
+      providerRef: "CHAR_1",
       billingType: "PIX",
       leaseExpired: true,
     }),
@@ -184,7 +184,7 @@ Deno.test("reserva não cria de novo nem sobrescreve provider_ref", () => {
   assertEquals(
     pixReservationAction({
       inserted: false,
-      providerRef: "pay_card",
+      providerRef: "CHAR_CARD",
       billingType: "CREDIT_CARD",
     }),
     "refuse",
@@ -224,7 +224,7 @@ Deno.test("Pix pendente pede cancelamento; a ordem fica na cobrança", () => {
     cardSwitchDecision({
       billingType: "PIX",
       status: "pending",
-      providerRef: "pay_1",
+      providerRef: "CHAR_1",
     }),
     "cancel_pix",
   );
@@ -232,7 +232,7 @@ Deno.test("Pix pendente pede cancelamento; a ordem fica na cobrança", () => {
     cardSwitchDecision({
       billingType: "PIX",
       status: "paid",
-      providerRef: "pay_1",
+      providerRef: "CHAR_1",
     }),
     "refuse",
   );
@@ -267,7 +267,7 @@ Deno.test("Pix pendente pede cancelamento; a ordem fica na cobrança", () => {
     cardSwitchBlock({
       billingType: "PIX",
       status: "paid",
-      providerRef: "pay_1",
+      providerRef: "CHAR_1",
     }),
     "pix_em_aberto",
   );

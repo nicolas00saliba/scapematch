@@ -347,7 +347,6 @@ do $$
 declare
   v_document text;
   v_pagbank text;
-  v_wallet text;
 begin
   if exists (
     select 1 from public.profiles
@@ -372,16 +371,9 @@ begin
   from pg_indexes
   where schemaname = 'public'
     and indexname = 'venues_pagbank_account_real_uidx';
-  select indexdef into v_wallet
-  from pg_indexes
-  where schemaname = 'public'
-    and indexname = 'venues_asaas_wallet_real_uidx';
   if v_pagbank is null
     or v_pagbank not ilike '%unique%'
     or v_pagbank not ilike '%not is_test%'
-    or v_wallet is null
-    or v_wallet not ilike '%unique%'
-    or v_wallet not ilike '%not is_test%'
   then
     raise exception 'índice PagBank afrouxou casa real';
   end if;
@@ -408,10 +400,6 @@ do $$
 begin
   if (
     select pagbank_account_id from public.venues
-    where id = 'f1b33333-3333-4333-8333-333333333333'
-  ) is distinct from 'ACCO_compartilhada'
-  or (
-    select asaas_wallet_id from public.venues
     where id = 'f1b33333-3333-4333-8333-333333333333'
   ) is distinct from 'ACCO_compartilhada'
   then
