@@ -224,8 +224,9 @@ void main() {
   });
 }
 
-/// O chip já pode estar montado logo abaixo da dobra. `scrollUntilVisible`
-/// para nesse caso e o `ensureVisible` só aplica o salto no frame seguinte.
+/// O chip do horário reservado já está montado, logo abaixo da dobra.
+/// `scrollUntilVisible` vê o elemento e só salta o scroll. Sem um frame,
+/// o toque ainda lê a posição antiga e o diálogo não abre.
 Future<void> _bringIntoView(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(
     finder,
