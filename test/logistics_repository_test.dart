@@ -77,12 +77,16 @@ void main() {
       participantName: 'Você',
     );
     final entered = joined as JoinSuccess;
-    expect(entered.group.filledSpots, before.filledSpots + 1);
+    expect(entered.group.filledSpots, before.filledSpots);
     expect(
       entered.group.participantForUser('user-local')!.payment,
       PaymentStatus.pending,
     );
     await _pay(groups, SampleIds.groupSpMetroAlmost, 'user-local');
+    expect(
+      (await groups.getById(SampleIds.groupSpMetroAlmost))!.filledSpots,
+      before.filledSpots + 1,
+    );
 
     final left = await groups.leave(
       SampleIds.groupSpMetroAlmost,
@@ -111,8 +115,9 @@ void main() {
       markAsLocalUser: false,
     );
     expect(takenBySomeoneElse, isA<JoinSuccess>());
+    await _pay(groups, SampleIds.groupSpMetroAlmost, 'user-other');
     expect(
-      (takenBySomeoneElse as JoinSuccess).group.filledSpots,
+      (await groups.getById(SampleIds.groupSpMetroAlmost))!.filledSpots,
       before.filledSpots + 1,
     );
   });
@@ -266,7 +271,7 @@ void main() {
     final still = await groups.getById(group.id);
     expect(still!.isCancelled, isFalse);
     expect(still.participantForUser('user-bia')!.occupiesSeat, isTrue);
-    expect(still.filledSpots, 2);
+    expect(still.filledSpots, 0);
 
     _shift(database, group.id, sampleNow.subtract(const Duration(hours: 3)));
     final ended = await groups.deleteGroup(group.id, userId: 'user-ana');
@@ -302,6 +307,7 @@ void main() {
       ),
     );
     final group = (created as CreateGroupSuccess).group;
+    await _pay(groups, group.id, 'user-ana');
     final guest = await groups.join(
       group.id,
       participantUserId: 'user-bia',
@@ -330,7 +336,9 @@ void main() {
       markAsLocalUser: false,
     );
     expect(replacement, isA<JoinSuccess>());
-    expect((replacement as JoinSuccess).group.filledSpots, 2);
+    expect((replacement as JoinSuccess).group.filledSpots, 1);
+    await _pay(groups, group.id, 'user-caio');
+    expect((await groups.getById(group.id))!.filledSpots, 2);
   });
 
   test('the same person cannot sit in two overlapping groups', () async {
@@ -461,8 +469,53 @@ void main() {
       final group = (paid as PayShareSuccess).group;
       expect(group.participantForUser('user-local')!.isConfirmed, isTrue);
       expect(group.confirmedCount, before + 1);
+      expect(group.filledSpots, joined.group.filledSpots + 1);
     },
   );
+
+  test('the second payment of the last seat is refunded', () async {
+    final index = database.groups.indexWhere(
+      (group) => group.id == SampleIds.groupSpCoberturaOpen,
+    );
+    final current = database.groups[index];
+    database.groups[index] = current.copyWith(
+      totalSpots: current.filledSpots + 1,
+    );
+    final first = await groups.join(
+      SampleIds.groupSpCoberturaOpen,
+      participantUserId: 'user-local',
+      participantName: 'Você',
+    );
+    final second = await groups.join(
+      SampleIds.groupSpCoberturaOpen,
+      participantUserId: 'user-other',
+      participantName: 'Outro',
+      markAsLocalUser: false,
+    );
+    expect(first, isA<JoinSuccess>());
+    expect(second, isA<JoinSuccess>());
+    expect((second as JoinSuccess).group.filledSpots, current.filledSpots);
+    final winner = await groups.payShare(
+      SampleIds.groupSpCoberturaOpen,
+      userId: 'user-local',
+      kind: PaymentMethodKind.pix,
+    );
+    expect(winner, isA<PayShareSuccess>());
+    final loserPay = await groups.payShare(
+      SampleIds.groupSpCoberturaOpen,
+      userId: 'user-other',
+      kind: PaymentMethodKind.pix,
+    );
+    expect(
+      (loserPay as PayShareFailure).reason,
+      PayShareFailureReason.unavailable,
+    );
+    final loser = database.groups[index].participantForUser('user-other');
+    expect(loser!.attendance, AttendanceStatus.cancelled);
+    expect(loser.refund, RefundStatus.refundPending);
+    expect(loser.refundReason, RefundReason.groupDidNotClose);
+    expect(database.groups[index].filledSpots, current.filledSpots + 1);
+  });
 
   test('the creator can edit the size and the note inside the room', () async {
     final created = await groups.create(

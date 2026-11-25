@@ -76,7 +76,7 @@ void main() {
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
 
-    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
+    expect(_spotSummary(tester), '5 jogadores · mín. 2 · máx. 6');
     expect(find.text('Você está neste grupo'), findsOneWidget);
     expect(find.text('Entrar no grupo'), findsNothing);
 
@@ -92,7 +92,7 @@ void main() {
       find.byKey(AppKeys.groupCard(SampleIds.groupSpMetroAlmost)),
     );
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
+    expect(_spotSummary(tester), '5 jogadores · mín. 2 · máx. 6');
     expect(find.text('Entrar no grupo'), findsNothing);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();

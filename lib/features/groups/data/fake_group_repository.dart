@@ -212,20 +212,18 @@ class FakeGroupRepository implements GroupRepository {
     if (current.openSeats <= held) {
       return const JoinFailure(JoinFailureReason.seatReserved);
     }
-    final updated = await _confirmIfReady(
-      current.copyWith(
-        filledSpots: current.filledSpots + 1,
-        participants: [
-          ...current.participants,
-          Participant(
-            id: _database.nextParticipantId(),
-            userId: participantUserId,
-            displayName: participantName,
-            isCreator: false,
-            isLocalUser: markAsLocalUser,
-          ),
-        ],
+    final people = [
+      ...current.participants,
+      Participant(
+        id: _database.nextParticipantId(),
+        userId: participantUserId,
+        displayName: participantName,
+        isCreator: false,
+        isLocalUser: markAsLocalUser,
       ),
+    ];
+    final updated = await _confirmIfReady(
+      current.copyWith(filledSpots: _occupied(people), participants: people),
     );
     _database.groups[index] = updated;
     board.removeWaitlist(groupId, participantUserId);
@@ -506,17 +504,57 @@ class FakeGroupRepository implements GroupRepository {
         settled.status != ShareStatus.paid) {
       return const PayShareFailure(PayShareFailureReason.notSeated);
     }
+    final payment = settled.status == ShareStatus.paid
+        ? PaymentStatus.paid
+        : PaymentStatus.reserved;
+    final others = [
+      for (final person in current.participants)
+        if (person.id != member.id &&
+            person.occupiesSeat &&
+            (person.payment == PaymentStatus.paid ||
+                person.payment == PaymentStatus.reserved))
+          person,
+    ].length;
+    if (others >= current.totalSpots) {
+      if (settled.status == ShareStatus.paid) {
+        await payments.refundShare(
+          reservationId: current.id,
+          shareId: settled.id,
+          idempotencyKey: 'refund-full-${settled.id}',
+        );
+      } else {
+        await payments.releaseShare(
+          reservationId: current.id,
+          shareId: settled.id,
+          idempotencyKey: 'release-full-${settled.id}',
+        );
+      }
+      final lost = member.copyWith(
+        attendance: AttendanceStatus.cancelled,
+        payment: payment,
+        refund: RefundStatus.refundPending,
+        refundReason: RefundReason.groupDidNotClose,
+      );
+      final people = [
+        for (final person in current.participants)
+          if (person.id == member.id) lost else person,
+      ];
+      _database.groups[index] = current.copyWith(
+        participants: people,
+        filledSpots: _occupied(people),
+      );
+      return const PayShareFailure(PayShareFailureReason.unavailable);
+    }
     var updated = _replaceMember(
       current,
       member.copyWith(
-        payment: settled.status == ShareStatus.paid
-            ? PaymentStatus.paid
-            : PaymentStatus.reserved,
+        payment: payment,
         attendance: member.attendance == AttendanceStatus.joined
             ? AttendanceStatus.confirmed
             : member.attendance,
       ),
     );
+    updated = updated.copyWith(filledSpots: _occupied(updated.participants));
     updated = await _confirmIfReady(updated);
     _database.groups[index] = updated;
     return PayShareSuccess(updated);
@@ -691,11 +729,11 @@ class FakeGroupRepository implements GroupRepository {
       difficulty: room.difficulty,
       slotId: slot.id,
       startsAt: slot.startsAt,
-      filledSpots: seated.length,
+      filledSpots: _occupied(seated),
       totalSpots: maximumPlayers,
       priceCents: room.priceCents,
       minimumSpots: minimumPlayers,
-      confirmedAt: seated.length >= minimumPlayers ? now : null,
+      confirmedAt: _occupied(seated) >= minimumPlayers ? now : null,
       cancelWindow: room.cancelWindow,
       streetAddress: house.streetAddress,
       coverAsset: roomCategoryImage(room.category),
@@ -1418,7 +1456,14 @@ class FakeGroupRepository implements GroupRepository {
   }
 
   int _occupied(List<Participant> people) {
-    return people.where((person) => person.occupiesSeat).length;
+    return people
+        .where(
+          (person) =>
+              person.occupiesSeat &&
+              (person.payment == PaymentStatus.paid ||
+                  person.payment == PaymentStatus.reserved),
+        )
+        .length;
   }
 
   Group? _find(String id) {

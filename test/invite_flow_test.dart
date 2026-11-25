@@ -1,3 +1,4 @@
+import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -156,6 +157,14 @@ void main() {
         participantName: 'Pessoa $guard',
       );
       expect(joined, isA<JoinSuccess>());
+      expect(
+        await groups.payShare(
+          id,
+          userId: 'fill-$guard',
+          kind: PaymentMethodKind.pix,
+        ),
+        isA<PayShareSuccess>(),
+      );
       guard += 1;
     }
     expect((await groups.getById(id))!.isFull, isTrue);

@@ -82,7 +82,7 @@ void main() {
     );
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '2 jogadores · mín. 4 · máx. 4');
+    expect(_spotSummary(tester), '1 jogador · mín. 4 · máx. 4');
     await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
@@ -136,7 +136,7 @@ void main() {
     await _openGroup(tester, SampleIds.saoPaulo, SampleIds.groupSpMetroAlmost);
     await tester.tap(find.byKey(AppKeys.joinButton));
     await tester.pumpAndSettle();
-    expect(_spotSummary(tester), '6 jogadores · mín. 2 · máx. 6');
+    expect(_spotSummary(tester), '5 jogadores · mín. 2 · máx. 6');
     await _pay(tester);
 
     await tester.tap(find.byKey(AppKeys.leaveGroup));
@@ -193,7 +193,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(GroupMessages.joinedBanner), findsOneWidget);
-    expect(_spotSummary(tester), '1 jogador · mín. 2 · máx. 3');
+    expect(_spotSummary(tester), '0 jogadores · mín. 2 · máx. 3');
     expect(find.byKey(AppKeys.deleteGroup), findsOneWidget);
     expect(find.byKey(AppKeys.leaveGroup), findsNothing);
     await _pay(tester);

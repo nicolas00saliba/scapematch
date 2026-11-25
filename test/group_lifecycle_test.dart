@@ -600,6 +600,12 @@ void main() {
       markAsLocalUser: false,
     );
     expect(filled, isA<JoinSuccess>());
+    final paidSeat = await groups.payShare(
+      SampleIds.groupCwbCofreAlmost,
+      userId: 'user-fill',
+      kind: PaymentMethodKind.pix,
+    );
+    expect(paidSeat, isA<PayShareSuccess>());
     expect(
       await groups.joinWaitlist(
         groupId: SampleIds.groupCwbCofreAlmost,
@@ -653,6 +659,12 @@ void main() {
       (accepted as JoinSuccess).group.participantForUser('user-bia'),
       isNotNull,
     );
+    final biaPaid = await groups.payShare(
+      SampleIds.groupCwbCofreAlmost,
+      userId: 'user-bia',
+      kind: PaymentMethodKind.pix,
+    );
+    expect(biaPaid, isA<PayShareSuccess>());
 
     expect(
       await groups.joinWaitlist(

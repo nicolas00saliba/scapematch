@@ -42,7 +42,7 @@ void main() {
     expect(find.text('Ana Teste'), findsWidgets);
     expect(find.text('Você'), findsNothing);
     expect(find.text('Você está neste grupo'), findsOneWidget);
-    expect(find.text('1 jogador · mín. 2 · máx. 3'), findsWidgets);
+    expect(find.text('0 jogadores · mín. 2 · máx. 3'), findsWidgets);
     expect(find.byType(CreateGroupScreen), findsNothing);
 
     await tester.tap(find.byType(BackButton));
@@ -54,11 +54,11 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('1 jogador · mín. 2 · máx. 3'),
+      find.text('0 jogadores · mín. 2 · máx. 3'),
       300,
       scrollable: verticalScrollable,
     );
-    expect(find.text('1 jogador · mín. 2 · máx. 3'), findsWidgets);
+    expect(find.text('0 jogadores · mín. 2 · máx. 3'), findsWidgets);
     expect(find.text('A Estufa'), findsWidgets);
   });
 
