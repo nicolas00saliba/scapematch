@@ -127,3 +127,8 @@ echo "test account duplicate exception ok"
 # supabase/migrations/20261124230000_first_session_discount.sql
 run -f "$root/tests/first_session_discount.sql"
 echo "first session discount ok"
+run -f "$root/tests/referral_code_edges.sql"
+echo "referral code edges ok"
+# supabase/migrations/20261125100000_admin_player_tier_rate.sql
+run -f "$root/tests/admin_player_tier_rate.sql"
+echo "admin player tier rate ok"

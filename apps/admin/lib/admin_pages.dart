@@ -592,7 +592,7 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
               children: [
                 Text('${player.email} · @${player.username}'),
                 Text(
-                  'Nível ${player.tier} · comissão ${percentBps(player.tierBonusBps)} · ${player.activeReferrals} indicações ativas',
+                  'Indicação de pessoas ${percentBps(player.tierBonusBps)} · ${player.activeReferrals} indicações ativas',
                 ),
                 Text(
                   'Código ${player.referralCode.isEmpty ? '—' : player.referralCode}',
