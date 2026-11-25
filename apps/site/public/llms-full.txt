@@ -14,7 +14,7 @@ EscapeMatch é um app de escape room em Curitiba que forma grupos para jogar com
 
 O EscapeMatch junta pessoas que querem jogar e não têm um grupo. O uso principal é chegar sozinho e entrar num time. Quem já tem turma pode completar as vagas que faltam. Esse uso é secundário.
 
-A modalidade disponível é escape room. Jogos de tabuleiro, laser tag e outras modalidades estão marcados como em breve, quando houver casa parceira. O lançamento começa por Curitiba. As salas abertas aparecem no app.
+A modalidade disponível é escape room. O lançamento começa por Curitiba. As salas abertas aparecem no app.
 
 A casa realiza a sessão. O EscapeMatch forma o grupo e cobra a vaga de cada pessoa. O pagamento passa pela PagBank, em Pix ou cartão. O app não guarda o número do cartão.
 
@@ -71,7 +71,7 @@ Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no r
 - [Guias](https://escapematch.com.br/guia): índice que separa cada intenção de busca. Não responde no lugar das páginas.
 - [Como funciona](https://escapematch.com.br/como-funciona): formação do grupo.
 - [Pagamento e regras](https://escapematch.com.br/como-funciona/pagamento): quando a cobrança acontece.
-- [Experiências](https://escapematch.com.br/experiencias): escape room disponível, tabuleiro e laser tag em breve.
+- [Experiências](https://escapematch.com.br/experiencias): a modalidade disponível é escape room.
 - [Escape room](https://escapematch.com.br/experiencias/escape-room): a modalidade e por que dá para ir sozinho.
 - [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo e vaga grátis indicando amigos.
 - [Níveis](https://escapematch.com.br/vantagens/niveis): 1%, 2,5% e 5%.

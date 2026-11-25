@@ -136,7 +136,7 @@ GUIAS_MARCA = (
     "/guia/primeira-vez-em-escape-room",
     "/sobre",
 )
-SELO = "Escape room agora. Jogos de tabuleiro e laser tag em breve."
+SELO = "Escape room em Curitiba."
 CHAVE_INDEXNOW = re.compile(r"^[0-9a-f]{32}\.txt$")
 TOKEN_BUSCADOR = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 TOKEN_BLOQUEADO = re.compile(
@@ -314,6 +314,26 @@ def arquivo_google_ok(path: pathlib.Path, texto: str) -> bool:
     return texto.strip() == f"google-site-verification: {path.name}"
 
 
+EXPANSAO_FORA = (
+    "laser tag",
+    "jogos de tabuleiro",
+    "outras modalidades",
+    "paintball",
+    "boliche",
+)
+
+
+def recusar_expansao() -> None:
+    """O site público não anuncia outro jogo além de escape room."""
+    for path in DIST.rglob("*"):
+        if path.suffix not in {".html", ".txt"}:
+            continue
+        texto = path.read_text(errors="replace").lower()
+        for termo in EXPANSAO_FORA:
+            if termo in texto:
+                falha(f"{path.relative_to(DIST)} ainda cita outro jogo")
+
+
 def main() -> None:
     if not DIST.is_dir():
         falha("dist ausente. Rode o build em apps/site.")
@@ -331,11 +351,12 @@ def main() -> None:
     if SELO not in home:
         falha("texto do selo ausente")
     if "muito mais!" in home:
-        falha("o selo ainda anuncia tabuleiro e laser tag como disponíveis")
+        falha("o selo antigo voltou")
     if DEFINICAO_VISIVEL not in home:
         falha("a home não mostra a definição canônica")
     if home.find("<h1>") > home.find("hero-badge"):
         falha("o selo ficou antes do título")
+    recusar_expansao()
 
     vistos = set()
     for rota in ROTAS:
@@ -910,7 +931,7 @@ def main() -> None:
         "O jogo confirma quando o grupo bate o mínimo. "
         "Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. "
         "A primeira cidade disponível é Curitiba. Por enquanto, o app só confirma grupo lá. "
-        "Escape room é o que está disponível. Jogos de tabuleiro e laser tag estão em breve. "
+        "Escape room é o que está disponível. "
         "O site não lista casas parceiras, endereço nem preço.",
     )
     artigos_como = [bloco for bloco in blocos_ld(como_jogar) if bloco.get("@type") == "Article"]

@@ -385,51 +385,6 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     70,
     Difficulty.medium,
   );
-  final mesaRpg = _room(
-    'room-cwb-mesa',
-    batel,
-    'Mesa longa do Batel',
-    'Uma campanha que cabe numa noite',
-    RoomCategory.adventure,
-    6,
-    180,
-    Difficulty.medium,
-    gameType: GameTypes.rpg,
-  );
-  final tabuleiro = _room(
-    'room-cwb-tabuleiro',
-    ruaXv,
-    'Clube de tabuleiro da XV',
-    'Caixas abertas até o último ônibus',
-    RoomCategory.mystery,
-    8,
-    120,
-    Difficulty.easy,
-    gameType: GameTypes.boardGame,
-  );
-  final arenaLaser = _room(
-    'room-cwb-arena',
-    batel,
-    'Arena laser do Parque',
-    'Coletes que acendem no escuro',
-    RoomCategory.scienceFiction,
-    10,
-    30,
-    Difficulty.easy,
-    gameType: GameTypes.laserTag,
-  );
-  final camara = _room(
-    'room-cwb-camara',
-    batel,
-    'Câmara imersiva do Parque',
-    'A sala inteira entra na história',
-    RoomCategory.egypt,
-    8,
-    90,
-    Difficulty.medium,
-    gameType: GameTypes.immersive,
-  );
-
   final slotCofreSat = schedule.soonSlot('slot-cwb-cofre-sat', cofre.id);
   final slotCofreSun = schedule.free('slot-cwb-cofre-sun', cofre.id, 0);
   final slotLabSat = schedule.free('slot-cwb-lab-sat', laboratorio.id, 0);
@@ -510,14 +465,6 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
   );
   final slotArmario = schedule.free('slot-poa-armario-free', armario.id, 3);
   final slotBonde = schedule.free('slot-poa-bonde-free', bonde.id, 3);
-  final slotMesa = schedule.free('slot-cwb-mesa-free', mesaRpg.id, 4);
-  final slotTabuleiro = schedule.free(
-    'slot-cwb-tabuleiro-free',
-    tabuleiro.id,
-    4,
-  );
-  final slotArena = schedule.free('slot-cwb-arena-free', arenaLaser.id, 4);
-  final slotCamara = schedule.free('slot-cwb-camara-free', camara.id, 4);
   // Grupos extras de Curitiba, em horários redondos da casa.
   // Rua XV fica com sexta e sábado mais cheios; o Batel ocupa o meio da semana.
   final slotLabQuase = schedule.spreadSlot(
@@ -626,53 +573,44 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
     ),
     _group(
       now: now,
-      id: 'grp-cwb-tumba-imersivo',
+      id: 'grp-cwb-tumba-quase',
       city: curitiba,
       house: batel,
       room: tumba,
       slot: slotTumbaQuase,
       totalSpots: 6,
       names: ['Quim', 'Rita', 'Sara', 'Téo', 'Uma'],
-      gameType: GameTypes.immersive,
-      roomName: 'Ritual imersivo da tumba',
     ),
     _group(
       now: now,
-      id: 'grp-cwb-trilha-laser',
+      id: 'grp-cwb-trilha-quase',
       city: curitiba,
       house: batel,
       room: trilha,
       slot: slotTrilhaQuase,
       totalSpots: 6,
       names: ['Vini', 'Wanda', 'Xande', 'Yara'],
-      gameType: GameTypes.laserTag,
-      roomName: 'Arena laser da trilha',
     ),
     _group(
       now: now,
-      id: 'grp-cwb-porao-rpg',
+      id: 'grp-cwb-porao-quase',
       city: curitiba,
       house: ruaXv,
       room: poraoXv,
       slot: slotPoraoQuase,
       totalSpots: 5,
       names: ['Zeca', 'Aline', 'Bruno', 'Cris'],
-      gameType: GameTypes.rpg,
-      roomName: 'Mesa de RPG no porão',
-      // Igual ao total, para o grupo seguir se formando e o mapa ter pino de RPG.
       minimumSpots: 5,
     ),
     _group(
       now: now,
-      id: 'grp-cwb-satelite-tabuleiro',
+      id: 'grp-cwb-satelite-quase',
       city: curitiba,
       house: batel,
       room: satelite,
       slot: slotSateliteQuase,
       totalSpots: 6,
       names: ['Dani', 'Elio', 'Fran', 'Guto', 'Hélio'],
-      gameType: GameTypes.boardGame,
-      roomName: 'Noite de tabuleiro no Batel',
     ),
     _group(
       now: now,
@@ -835,10 +773,6 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       minaAberta,
       armario,
       bonde,
-      mesaRpg,
-      tabuleiro,
-      arenaLaser,
-      camara,
       ...nearby.rooms,
     ],
     slots: _padRoomSlots(schedule, [
@@ -884,10 +818,6 @@ FakeDatabase buildSampleDatabase({required DateTime now}) {
       slotMinaAberta,
       slotArmario,
       slotBonde,
-      slotMesa,
-      slotTabuleiro,
-      slotArena,
-      slotCamara,
       slotLabQuase,
       slotSotaoQuase,
       slotNaveQuase,

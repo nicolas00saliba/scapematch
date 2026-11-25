@@ -48,7 +48,7 @@ double newsCarouselCardHeight(BuildContext context, double cardWidth) {
   final scaler = MediaQuery.textScalerOf(context);
   final contentWidth = math.max(40.0, cardWidth - 24);
   final chip = _lineHeight(
-    'Jogos de tabuleiro',
+    'Escape room',
     _chipStyle(theme),
     scaler,
     contentWidth,

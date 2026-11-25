@@ -89,11 +89,5 @@ class VenueDraft {
     'ASSOCIATION': 'Associação',
   };
 
-  static const categories = <String, String>{
-    'escape-room': 'Escape room',
-    'rpg': 'RPG',
-    'board-game': 'Jogos de tabuleiro',
-    'laser-tag': 'Laser tag',
-    'immersive': 'Imersivo',
-  };
+  static const categories = <String, String>{'escape-room': 'Escape room'};
 }

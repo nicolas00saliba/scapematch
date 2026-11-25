@@ -31,7 +31,7 @@ export const oQueE: PerguntaMarca = {
 export const eJogo: PerguntaMarca = {
   pergunta: 'O EscapeMatch é um jogo?',
   resposta:
-    'Não. O EscapeMatch não é um jogo de celular nem um modo de jogo de tiro. É um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. A sessão é presencial. Você chega sozinho, entra num grupo e paga só a sua vaga. Jogos de tabuleiro e laser tag ainda não estão disponíveis.',
+    'Não. O EscapeMatch não é um jogo de celular nem um modo de jogo de tiro. É um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. A sessão é presencial. Você chega sozinho, entra num grupo e paga só a sua vaga.',
 };
 
 export const antigoScapeMatch: PerguntaMarca = {
