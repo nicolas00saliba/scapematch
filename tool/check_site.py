@@ -19,6 +19,7 @@ ROTAS = [
     "/como-funciona/pagamento",
     "/experiencias",
     "/experiencias/escape-room",
+    "/o-que-e-escape-room",
     "/guia",
     "/guia/como-jogar-escape-room-sozinho",
     "/guia/escape-room-sozinho",
@@ -73,42 +74,33 @@ SAME_AS = [INSTAGRAM, MEETUP]
 ORG_ID = "https://escapematch.com.br/#organization"
 SITE_ID = "https://escapematch.com.br/#website"
 APP_ID = "https://app.escapematch.com.br/#app"
-PREFIXO_HOME = "EscapeMatch — app de escape room em Curitiba"
+PREFIXO_HOME = "EscapeMatch — app para jogar escape room sozinho no Brasil"
 TITULO_HOME = PREFIXO_HOME
 DEFINICAO = (
-    "EscapeMatch é um app de escape room em Curitiba que forma grupos "
-    "para jogar com pessoas desconhecidas."
+    "EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil."
 )
 DEFINICAO_VISIVEL = (
     DEFINICAO + " Você chega sozinho, entra num grupo e paga só a sua vaga. "
     "Não é um modo de jogo de tiro nem um jogo de celular."
 )
 DESCRICAO_MARCA = (
-    "App que forma grupos para jogar escape room em Curitiba com pessoas desconhecidas."
+    "App para achar grupo e jogar escape room sozinho no Brasil."
 )
-NOMES_ALTERNATIVOS = ["Escape Match", "escapematch", "ScapeMatch", "Scape Match"]
+NOMES_ALTERNATIVOS = ["Escape Match", "escapematch"]
 HOME_DESCRICAO = (
-    "EscapeMatch — app de escape room em Curitiba que forma grupos para jogar "
-    "com pessoas desconhecidas. Você chega sozinho e paga só a sua vaga."
+    "EscapeMatch — app para jogar escape room sozinho no Brasil. "
+    "Você chega sozinho, entra num grupo e paga só a sua vaga."
 )
-FRASE_NOME = (
-    "O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
-    "É o mesmo aplicativo, só o nome mudou."
-)
+NOME_ANTIGO = re.compile(r"ScapeMatch|Scape Match")
 REFORCO_PRESENCIAL = "Não é um jogo de celular nem um jogo de quebra-cabeça ou match-3."
 FRASE_TIRO = (
     "Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, "
     "são outra coisa."
 )
-RESPOSTA_ANTIGO = (
-    "Sim. O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
-    "É o mesmo aplicativo, só o nome mudou."
-)
 RESPOSTA_QUEBRA = (
     "Não. O jogo acontece presencialmente na casa de escape room. "
     "O app só forma o grupo e cobra a vaga quando o grupo confirma."
 )
-PERGUNTA_ANTIGO = "O EscapeMatch é o antigo ScapeMatch?"
 PERGUNTA_QUEBRA = "O EscapeMatch é um jogo de quebra-cabeça de celular?"
 PERGUNTA_TIRO = "O EscapeMatch é um modo de jogo de tiro?"
 PERGUNTA_PLAY = "O EscapeMatch é o jogo Escape Match da Google Play?"
@@ -120,10 +112,6 @@ FRASE_PLAY = (
 # A regra do pagamento: se o grupo não confirma, o Pix é estornado e o
 # cartão não é capturado. "Nada é cobrado" contradiz o Pix já pago.
 PAGAMENTO_PROIBIDO = ("nada é cobrado", "cobrança só acontece", "só cobra quando")
-LINHA_NOME_ANTIGO = (
-    "O EscapeMatch se chamava ScapeMatch até novembro de 2026. "
-    "Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles."
-)
 GUIAS_MARCA = (
     "/guia/como-jogar-escape-room-sozinho",
     "/guia/escape-room-sozinho",
@@ -136,7 +124,8 @@ GUIAS_MARCA = (
     "/guia/primeira-vez-em-escape-room",
     "/sobre",
 )
-SELO = "Escape room agora. Jogos de tabuleiro e laser tag em breve."
+SELO = "Escape room no Brasil."
+PRIMEIRAS_CASAS = "O app está começando com as primeiras casas e vai crescer."
 CHAVE_INDEXNOW = re.compile(r"^[0-9a-f]{32}\.txt$")
 TOKEN_BUSCADOR = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 TOKEN_BLOQUEADO = re.compile(
@@ -314,6 +303,26 @@ def arquivo_google_ok(path: pathlib.Path, texto: str) -> bool:
     return texto.strip() == f"google-site-verification: {path.name}"
 
 
+EXPANSAO_FORA = (
+    "laser tag",
+    "jogos de tabuleiro",
+    "outras modalidades",
+    "paintball",
+    "boliche",
+)
+
+
+def recusar_expansao() -> None:
+    """O site público não anuncia outro jogo além de escape room."""
+    for path in DIST.rglob("*"):
+        if path.suffix not in {".html", ".txt"}:
+            continue
+        texto = path.read_text(errors="replace").lower()
+        for termo in EXPANSAO_FORA:
+            if termo in texto:
+                falha(f"{path.relative_to(DIST)} ainda cita outro jogo")
+
+
 def main() -> None:
     if not DIST.is_dir():
         falha("dist ausente. Rode o build em apps/site.")
@@ -330,12 +339,15 @@ def main() -> None:
         falha("selo sem a classe hero-badge")
     if SELO not in home:
         falha("texto do selo ausente")
+    if "Escape room em Curitiba." in home:
+        falha("o selo da home ainda é Curitiba")
     if "muito mais!" in home:
-        falha("o selo ainda anuncia tabuleiro e laser tag como disponíveis")
+        falha("o selo antigo voltou")
     if DEFINICAO_VISIVEL not in home:
         falha("a home não mostra a definição canônica")
     if home.find("<h1>") > home.find("hero-badge"):
         falha("o selo ficou antes do título")
+    recusar_expansao()
 
     vistos = set()
     for rota in ROTAS:
@@ -371,6 +383,8 @@ def main() -> None:
             falha(f"{rota} noindex={noindex}")
         if DOMINIO_ANTIGO.search(texto):
             falha(f"{rota} cita o domínio antigo")
+        if NOME_ANTIGO.search(texto):
+            falha(f"{rota} cita o nome antigo")
         if re.search(r"divid\w* a reserva", texto, re.I):
             falha(f"{rota} usa a promessa antiga")
         coladas = palavras_coladas(texto)
@@ -587,15 +601,10 @@ def main() -> None:
     ):
         falha("foundingLocation sem Curitiba/PR/BR")
     area = org.get("areaServed") or {}
-    endereco_area = area.get("address") or {}
-    if (
-        area.get("@type") != "City"
-        or area.get("name") != "Curitiba"
-        or endereco_area.get("addressLocality") != "Curitiba"
-        or endereco_area.get("addressRegion") != "PR"
-        or endereco_area.get("addressCountry") != "BR"
-    ):
-        falha("areaServed sem Curitiba/PR/BR")
+    if area.get("@type") != "Country" or area.get("name") != "Brasil" or "address" in area:
+        falha("areaServed da marca não é o Brasil")
+    if any(bloco.get("@type") == "WebApplication" and (bloco.get("areaServed") or {}).get("name") != "Brasil" for bloco in blocos_ld(home_html)):
+        falha("areaServed do app não é o Brasil")
     if any(campo in org for campo in ("telephone", "award", "duns")):
         falha("Organization com dado que o repositório não publica")
     sites = [bloco for bloco in blocos_ld(home_html) if bloco.get("@type") == "WebSite"]
@@ -652,7 +661,7 @@ def main() -> None:
         falha("definição canônica ausente no guia ou no sobre")
     sobre_html = arquivo("/sobre").read_text()
     if not re.search(
-        r'<p class="hero-apoio">EscapeMatch é um app de escape room em Curitiba que',
+        r'<p class="hero-apoio">EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil',
         sobre_html,
     ):
         falha("a primeira frase do sobre não define a marca")
@@ -667,8 +676,10 @@ def main() -> None:
     for rota in GUIAS_MARCA:
         html_marca = arquivo(rota).read_text()
         if rota == "/sobre":
-            if FRASE_NOME not in html_marca or REFORCO_PRESENCIAL not in html_marca:
-                falha("sobre sem a frase do nome antigo ou o reforço presencial")
+            if NOME_ANTIGO.search(html_marca):
+                falha("sobre ainda cita o nome antigo")
+            if REFORCO_PRESENCIAL not in html_marca:
+                falha("sobre sem o reforço presencial")
             if FRASE_TIRO not in html_marca or 'href="/sobre"' not in arquivo("/").read_text():
                 falha("sobre sem a diferença para o modo de tiro, ou a home sem o link")
             if FRASE_PLAY not in html_marca or PERGUNTA_PLAY not in html_marca:
@@ -680,8 +691,7 @@ def main() -> None:
         for campo in ("author", "publisher"):
             if (paginas[0].get(campo) or {}).get("@id") != ORG_ID:
                 falha(f"{rota} sem {campo} da Organization")
-        exigir_faq(html_marca, rota, (PERGUNTA_ANTIGO, PERGUNTA_QUEBRA, PERGUNTA_TIRO))
-        exigir_resposta(html_marca, rota, PERGUNTA_ANTIGO, RESPOSTA_ANTIGO)
+        exigir_faq(html_marca, rota, (PERGUNTA_QUEBRA, PERGUNTA_TIRO))
         exigir_resposta(html_marca, rota, PERGUNTA_QUEBRA, RESPOSTA_QUEBRA)
     exigir_faq(
         guia,
@@ -733,6 +743,7 @@ def main() -> None:
             "Onde achar gente para jogar escape room?",
             "Não tenho ninguém pra jogar escape room. Consigo ir?",
             "Como entrar num grupo aberto e pagar só a minha vaga?",
+            "O EscapeMatch é só em Curitiba?",
             "O que é o EscapeMatch?",
         ),
         "/guia/escape-room-com-desconhecidos": (
@@ -756,7 +767,7 @@ def main() -> None:
             "Como entrar em comunidades de jogadores?",
             "A casa pode me colocar com outras pessoas?",
             "Como a EscapeMatch junta o grupo?",
-            "Funciona fora de Curitiba?",
+            "O app já cobre o Brasil todo?",
             "Jogar escape room sem ninguém é a mesma coisa que jogar sozinho no computador?",
             "É seguro jogar com desconhecidos?",
             "Quanto custa a vaga?",
@@ -793,18 +804,21 @@ def main() -> None:
         falha("trilha de quem não tem ninguém divergiu")
     if "https://www.escapersbr.com/" not in sem_ninguem or "https://www.meetup.com/escaperoomcuritiba/" not in sem_ninguem:
         falha("a página de quem não tem ninguém saiu sem Escapers BR ou Meetup")
-    if "Por enquanto, só em Curitiba." not in sem_ninguem:
-        falha("a página de quem não tem ninguém não limita a cidade")
+    if PRIMEIRAS_CASAS not in sem_ninguem:
+        falha("a página de quem não tem ninguém não diz que o app começa com as primeiras casas")
+    if "Por enquanto, só em Curitiba." in sem_ninguem:
+        falha("a página de quem não tem ninguém ainda limita o app a Curitiba")
     resposta_direta = (
         "Não ter ninguém pra jogar escape room não te impede de ir à sessão presencial. "
         "Dá para entrar numa comunidade de jogadores, perguntar se a casa completa a sala com outras pessoas, "
-        "ou usar um app que forma o grupo. Em Curitiba, o EscapeMatch junta quem chegou sozinho na mesma sala "
-        "e no mesmo horário; você paga só a sua vaga, a cobrança é confirmada quando o grupo bate o mínimo e, "
+        "ou usar um app que forma o grupo. No EscapeMatch, você escolhe a sala e o horário, entra no grupo "
+        "e paga só a sua vaga; a cobrança é confirmada quando o grupo bate o mínimo e, "
         "se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado. "
+        f"{PRIMEIRAS_CASAS} "
         "Isso não é jogo de celular, simulador online nem kit para montar em casa."
     )
     descricao_sem_ninguem = (
-        "Não tenho ninguém pra jogar escape room? Em Curitiba o EscapeMatch forma o grupo presencial: "
+        "Não tenho ninguém pra jogar escape room? O EscapeMatch forma o grupo presencial: "
         "sala e horário, paga só a vaga. Não é virtual nem kit em casa."
     )
     if f'<meta name="description" content="{descricao_sem_ninguem}">' not in sem_ninguem:
@@ -885,21 +899,23 @@ def main() -> None:
     if 'aria-current="page">Como jogar escape room sozinho</span>' not in como_jogar:
         falha("trilha de como jogar sozinho divergiu")
     descricao_como_jogar = (
-        "Como jogar escape room sozinho: sala para uma pessoa, amigos, comunidade ou grupo aberto. "
-        "No EscapeMatch você paga só a sua vaga."
+        "Como jogar escape room sozinho no Brasil. O EscapeMatch é o app para achar o grupo. "
+        "Você paga só a sua vaga."
     )
     if f'<meta name="description" content="{descricao_como_jogar}">' not in como_jogar:
         falha("descrição de como jogar sozinho divergiu")
     if len(descricao_como_jogar) > 155:
         falha(f"descrição de como jogar sozinho com {len(descricao_como_jogar)} caracteres")
-    if "Atualizado em 20/11/2026" not in como_jogar:
+    if "Atualizado em 25/11/2026" not in como_jogar:
         falha("a data visível de como jogar sozinho divergiu")
     if "https://www.escapersbr.com/" not in como_jogar or "https://www.meetup.com/escaperoomcuritiba/" not in como_jogar:
         falha("como jogar sozinho saiu sem Escapers BR ou Meetup")
     if "Asaas" in como_jogar.split("<footer", 1)[0]:
         falha("o guia de como jogar sozinho cita Asaas")
-    if "Por enquanto, o app só confirma grupo lá." not in como_jogar:
-        falha("como jogar sozinho não limita a cidade disponível")
+    if PRIMEIRAS_CASAS not in como_jogar:
+        falha("como jogar sozinho não diz que o app começa com as primeiras casas")
+    if "Por enquanto, o app só confirma grupo lá." in como_jogar:
+        falha("como jogar sozinho ainda limita o app a Curitiba")
     exigir_resposta(
         como_jogar,
         "/guia/como-jogar-escape-room-sozinho",
@@ -909,8 +925,8 @@ def main() -> None:
         "Cada pessoa paga só a própria vaga, o preço da sala por pessoa, mostrado no app. "
         "O jogo confirma quando o grupo bate o mínimo. "
         "Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. "
-        "A primeira cidade disponível é Curitiba. Por enquanto, o app só confirma grupo lá. "
-        "Escape room é o que está disponível. Jogos de tabuleiro e laser tag estão em breve. "
+        f"{PRIMEIRAS_CASAS} "
+        "Escape room é o que está disponível. "
         "O site não lista casas parceiras, endereço nem preço.",
     )
     artigos_como = [bloco for bloco in blocos_ld(como_jogar) if bloco.get("@type") == "Article"]
@@ -920,7 +936,7 @@ def main() -> None:
         falha("headline de como jogar sozinho divergiu")
     if artigos_como[0].get("datePublished") != "2026-11-20T00:00:00-03:00":
         falha("datePublished de como jogar sozinho divergiu")
-    if artigos_como[0].get("dateModified") != "2026-11-20T00:00:00-03:00":
+    if artigos_como[0].get("dateModified") != "2026-11-25T00:00:00-03:00":
         falha("dateModified de como jogar sozinho divergiu")
     for rota in (
         "/",
@@ -999,8 +1015,8 @@ def main() -> None:
             falha(f"{nome} sem a diferença para os jogos da Google Play")
         if any(t in texto.lower() for t in PAGAMENTO_PROIBIDO):
             falha(f"{nome} diz que nada é cobrado; o certo é Pix estornado e cartão não capturado")
-        if LINHA_NOME_ANTIGO not in texto:
-            falha(f"{nome} sem o nome antigo")
+        if NOME_ANTIGO.search(texto) or DOMINIO_ANTIGO.search(texto):
+            falha(f"{nome} cita o nome ou o domínio antigo")
         if INSTAGRAM not in texto or MEETUP not in texto:
             falha(f"{nome} sem o Instagram oficial ou o Meetup")
         if "Não há perfil oficial de Instagram" in texto:

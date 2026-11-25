@@ -9,6 +9,10 @@ export const modificadoGuiaSemNinguem = '2026-11-20T00:00:00-03:00';
 
 export const publicadoGuiaComoJogarSozinho = '2026-11-20T00:00:00-03:00';
 export const modificadoGuiaComoJogarSozinho = '2026-11-20T00:00:00-03:00';
+export const modificadoGuiaNacional = '2026-11-25T00:00:00-03:00';
+
+export const publicadoOQueE = '2026-11-25T00:00:00-03:00';
+export const modificadoOQueE = '2026-11-25T00:00:00-03:00';
 
 const ajuda = '2026-11-13T09:32:15-03:00';
 const programas = '2026-11-11T15:10:53-03:00';
@@ -19,8 +23,9 @@ export const lastmodPorRota = {
   '/como-funciona/pagamento': '2026-11-24T12:00:00-03:00',
   '/experiencias': modificadoGuiaComoJogarSozinho,
   '/experiencias/escape-room': modificadoGuiaComoJogarSozinho,
+  '/o-que-e-escape-room': modificadoOQueE,
   '/guia': modificadoGuiaComoJogarSozinho,
-  '/guia/como-jogar-escape-room-sozinho': modificadoGuiaComoJogarSozinho,
+  '/guia/como-jogar-escape-room-sozinho': modificadoGuiaNacional,
   '/guia/escape-room-sozinho': modificadoGuiaComoJogarSozinho,
   '/guia/escape-room-sozinho-curitiba': modificadoGuiaComoJogarSozinho,
   '/guia/como-achar-grupo-escape-room': modificadoGuiaComoJogarSozinho,

@@ -1,5 +1,6 @@
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
+import 'package:scapematch/features/catalog/domain/open_slot.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 
@@ -13,6 +14,11 @@ abstract class CatalogRepository {
   Future<List<EscapeHouse>> listHousesByCity(String cityId);
   Future<List<EscapeRoom>> listRoomsByHouse(String houseId);
   Future<List<TimeSlot>> listSlotsByRoom(String roomId);
+
+  /// Horários em que ainda dá para criar um grupo nesta casa.
+  ///
+  /// [now] vale para a demonstração. No banco, o relógio é o do servidor.
+  Future<List<OpenSlot>> listOpenSlots(String houseId, {required DateTime now});
 
   /// Salas da cidade, com o nome da casa e da cidade já copiados.
   Future<List<RoomListing>> listRoomsByCity(String cityId);

@@ -6,6 +6,8 @@ import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/room_category.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
+import 'package:scapematch/features/catalog/domain/open_schedule.dart';
+import 'package:scapematch/features/catalog/domain/open_slot.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,21 +35,60 @@ class SupabaseCatalogRepository implements CatalogRepository {
   @override
   Future<List<EscapeHouse>> listHousesByCity(String cityId) async {
     final snap = await _load();
-    final houses = [
-      for (final house in snap.houses.values)
-        if (house.cityId == cityId) house,
-    ]..sort((a, b) => compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name));
+    final houses =
+        [
+          for (final house in snap.houses.values)
+            if (house.cityId == cityId) house,
+        ]..sort(
+          (a, b) =>
+              compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name),
+        );
     return houses;
   }
 
   @override
   Future<List<EscapeRoom>> listRoomsByHouse(String houseId) async {
     final snap = await _load();
-    final rooms = [
-      for (final room in snap.rooms.values)
-        if (room.houseId == houseId) room,
-    ]..sort((a, b) => compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name));
+    final rooms =
+        [
+          for (final room in snap.rooms.values)
+            if (room.houseId == houseId) room,
+        ]..sort(
+          (a, b) =>
+              compareFeatured(a.featuredRank, b.featuredRank, a.name, b.name),
+        );
     return rooms;
+  }
+
+  @override
+  Future<List<OpenSlot>> listOpenSlots(
+    String houseId, {
+    required DateTime now,
+  }) async {
+    // O filtro de passado, reserva e sessão removida é o do banco.
+    final raw = await _client.rpc(
+      'venue_open_slots',
+      params: {'p_venue_id': houseId},
+    );
+    if (raw is! List) return const [];
+    return [
+      for (final row in raw)
+        if (row is Map)
+          OpenSlot(
+            slot: TimeSlot(
+              id: row['session_id'] as String,
+              roomId: row['room_id'] as String,
+              startsAt: dateTimeOf(row['starts_at'])!,
+            ),
+            day: calendarDayFromText(row['day'].toString()),
+            timeLabel: row['starts_hm'] as String,
+            nearStart: row['near_start'] == true,
+            openGroupId: row['group_id'] as String?,
+            spotsLeft: row['spots_left'] == null
+                ? null
+                : (row['spots_left'] as num).toInt(),
+          ),
+    ];
   }
 
   @override
@@ -63,17 +104,19 @@ class SupabaseCatalogRepository implements CatalogRepository {
   @override
   Future<List<RoomListing>> listRoomsByCity(String cityId) async {
     final snap = await _load();
-    final listings = [
-      for (final room in snap.rooms.values)
-        if (snap.houses[room.houseId]?.cityId == cityId) snap.listing(room.id)!,
-    ]..sort(
-      (a, b) => compareFeatured(
-        a.room.featuredRank,
-        b.room.featuredRank,
-        a.room.name,
-        b.room.name,
-      ),
-    );
+    final listings =
+        [
+          for (final room in snap.rooms.values)
+            if (snap.houses[room.houseId]?.cityId == cityId)
+              snap.listing(room.id)!,
+        ]..sort(
+          (a, b) => compareFeatured(
+            a.room.featuredRank,
+            b.room.featuredRank,
+            a.room.name,
+            b.room.name,
+          ),
+        );
     return listings;
   }
 

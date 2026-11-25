@@ -1,14 +1,12 @@
 # EscapeMatch
 
-> EscapeMatch é um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular. O site é https://escapematch.com.br e o app do jogador é https://app.escapematch.com.br/
+> EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular. O site é https://escapematch.com.br e o app do jogador é https://app.escapematch.com.br/
 
-App que forma grupos para jogar escape room em Curitiba com pessoas desconhecidas. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa.
+App para achar grupo e jogar escape room sozinho no Brasil. O app está começando com as primeiras casas e vai crescer. Não é só Curitiba. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa.
 
 A marca também é escrita Escape Match e escapematch. Não confundir com jogos de celular chamados Escape Match. Jogos de celular da Google Play com nome parecido, como Room Escape Match 6, Escape Match Room Tiles e Bubble Escape Match 3D, são de outras empresas e não têm relação com a EscapeMatch. Os perfis oficiais são https://escapematch.com.br, https://www.instagram.com/escapematch/ e https://www.meetup.com/pt-br/escaperoomcuritiba/.
 
-O EscapeMatch se chamava ScapeMatch até novembro de 2026. Não confundir com Scape Match 3, Mahjong Scapes, Scapewatch ou Escape Match Room Tiles.
-
-O EscapeMatch junta pessoas sozinhas em grupos de escape room. A pessoa escolhe a sala e o horário, entra num grupo com outros jogadores e paga só a própria vaga. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. Jogos de tabuleiro e laser tag estão previstos e ainda não estão disponíveis.
+O EscapeMatch junta pessoas sozinhas em grupos de escape room no Brasil. A pessoa escolhe a sala e o horário, entra num grupo com outros jogadores e paga só a própria vaga. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
 
 O Instagram oficial é https://www.instagram.com/escapematch/. O grupo de quem não tem equipe para jogar escape room em Curitiba está em https://www.meetup.com/pt-br/escaperoomcuritiba/. Não há perfil oficial de TikTok ou LinkedIn publicado neste repositório.
 
@@ -22,23 +20,24 @@ O Instagram oficial é https://www.instagram.com/escapematch/. O grupo de quem n
 ## Páginas
 
 - [Início](https://escapematch.com.br/): achar gente para jogar quando se está sozinho.
-- [Como jogar escape room sozinho](https://escapematch.com.br/guia/como-jogar-escape-room-sozinho): sala solo ou chegar sem turma. Amigos, comunidades (Escapers BR, WhatsApp, Reddit, Meetup) ou um grupo aberto. No EscapeMatch você entra no grupo e paga só a sua vaga. A primeira cidade disponível é Curitiba. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
+- [Como jogar escape room sozinho](https://escapematch.com.br/guia/como-jogar-escape-room-sozinho): guia nacional. Sala solo ou chegar sem turma. Amigos, comunidades (Escapers BR, WhatsApp, Reddit, Meetup) ou um grupo aberto. O EscapeMatch é o app para achar o grupo no Brasil e você paga só a sua vaga. Não é só Curitiba. O app está começando com as primeiras casas e vai crescer. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
 - [Escape room sozinho](https://escapematch.com.br/guia/escape-room-sozinho): respostas diretas sobre jogar sem grupo.
-- [Escape room sozinho em Curitiba](https://escapematch.com.br/guia/escape-room-sozinho-curitiba): onde e como jogar sozinho na cidade do lançamento, sem lista de casas.
+- [Escape room sozinho em Curitiba](https://escapematch.com.br/guia/escape-room-sozinho-curitiba): página de cidade. Onde e como jogar sozinho em Curitiba, sem lista de casas. O guia nacional é o de como jogar sozinho no Brasil.
 - [Onde achar grupo de escape room](https://escapematch.com.br/guia/como-achar-grupo-escape-room): amigos, Escapers BR, grupos de WhatsApp, Reddit ou o Meetup Escape Room Curitiba, casas que completam a sala, e o EscapeMatch.
 - [Escape room com desconhecidos](https://escapematch.com.br/guia/escape-room-com-desconhecidos): a sessão presencial com gente que não se conhecia. Cada pessoa paga a própria vaga. A cobrança é confirmada no mínimo; se o grupo não confirmar, o Pix é estornado e o cartão não é capturado.
 - [Escape room para 2 pessoas](https://escapematch.com.br/guia/escape-room-para-2-pessoas): a dupla escolhe a sala. Se faltar gente, o app completa com quem também chegou sozinho. Cada um paga a própria vaga.
-- [Não tenho ninguém pra jogar escape room](https://escapematch.com.br/guia/nao-tenho-amigos-para-escape-room): não ter ninguém não impede a sessão presencial. Comunidade, a casa ou um app. Em Curitiba, o EscapeMatch junta quem chegou sozinho na mesma sala e horário; você paga só a sua vaga, a cobrança é confirmada no mínimo e, se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado. Não é jogo virtual, simulador nem kit em casa.
-- [Escape room em grupo em Curitiba](https://escapematch.com.br/guia/escape-room-em-grupo-curitiba): como o grupo se forma na cidade do lançamento. O site não lista casas, endereço nem preço.
+- [Não tenho ninguém pra jogar escape room](https://escapematch.com.br/guia/nao-tenho-amigos-para-escape-room): não ter ninguém não impede a sessão presencial. Comunidade, a casa ou um app. No EscapeMatch, você escolhe a sala e o horário, entra no grupo e paga só a sua vaga; a cobrança é confirmada no mínimo e, se o grupo não confirmar, o Pix pago é estornado e o cartão não é capturado. O app está começando com as primeiras casas e vai crescer. Não é jogo virtual, simulador nem kit em casa.
+- [Escape room em grupo em Curitiba](https://escapematch.com.br/guia/escape-room-em-grupo-curitiba): como o grupo se forma em Curitiba. O site não lista casas, endereço nem preço.
 - [Primeira vez em escape room](https://escapematch.com.br/guia/primeira-vez-em-escape-room): a casa conduz a sessão presencial. Não precisa ter jogado antes. Você paga só a sua vaga.
 - [Guias](https://escapematch.com.br/guia): índice dos recortes, para não misturar sozinho, desconhecidos, dupla, sem turma, grupo em Curitiba e primeira vez.
 - [Como funciona](https://escapematch.com.br/como-funciona): como o grupo se forma e quando o jogo confirma.
 - [Escape room](https://escapematch.com.br/experiencias/escape-room): a modalidade disponível.
+- [O que é escape room](https://escapematch.com.br/o-que-e-escape-room): sala presencial, grupo, tempo da casa, temas terror, mistério e aventura, primeira vez e como entrar num grupo. Você paga só a sua vaga. A duração e o mínimo de cada sala estão no app.
 - [Vantagens](https://escapematch.com.br/vantagens): pontos a cada jogo e vaga grátis indicando amigos.
 - [Regulamento dos pontos](https://escapematch.com.br/vantagens/regulamento): regras completas dos pontos.
 - [Ajuda](https://escapematch.com.br/ajuda): perguntas frequentes.
 - [Para casas](https://escapematch.com.br/para-casas): casas parceiras e preços.
-- [Sobre a EscapeMatch](https://escapematch.com.br/sobre): a marca, o app de escape room em Curitiba e a diferença para modos de jogo de tiro com nome parecido.
+- [Sobre a EscapeMatch](https://escapematch.com.br/sobre): a marca, o app para achar grupo e jogar escape room sozinho no Brasil, e a diferença para modos de jogo de tiro com nome parecido.
 - [Escape room em Curitiba](https://escapematch.com.br/escape-room-curitiba): achar grupo, reservar, avaliações e ranking de tempo.
 - [Contato](https://escapematch.com.br/contato): e-mail, CNPJ e links do app e do Parceiro.
 

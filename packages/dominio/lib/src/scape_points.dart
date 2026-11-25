@@ -415,19 +415,30 @@ String? _deviceReview(int cluster, ReferralRates rates) {
   return 'em_revisao';
 }
 
-/// Recompensas de um nível. O cashback do pagador sai primeiro, da comissão
-/// que sobrou depois dos pontos e do desconto de primeira reserva. Depois
-/// vem a indicação do jogador e a da casa. O B2B não entra na reserva que
-/// levou esse desconto. O líquido da casa não entra nessa conta.
+bool _codedDiscountBlocksB2b(SpendRewardInput input, ReferralRates rates) {
+  final discount = input.firstBookingDiscountCents;
+  if (discount <= 0) return false;
+  final coded = commissionCents(input.grossCents, rates.firstBookingDiscountBps);
+  final organic = commissionCents(
+    input.grossCents,
+    rates.organicFirstBookingDiscountBps,
+  );
+  if (discount == organic && discount != coded) return false;
+  return true;
+}
+
+/// Recompensas de um nível. Cashback e indicação saem pela taxa cheia.
+/// O que não cabe na comissão vira CAC no banco. O B2B sai só na reserva
+/// com o desconto de 20% (código). O de 10% paga. O líquido da casa não
+/// entra nessa conta.
 List<RewardLine> quoteReferralRewards(
   SpendRewardInput input, {
   ReferralRates rates = ReferralRates.official,
 }) {
   _requirePointValue(rates.pointValueCents);
   final gross = input.grossCents;
-  final commission = commissionCents(gross, input.commissionBps);
-  var pool = commission - input.subsidyCents - input.firstBookingDiscountCents;
-  if (pool < 0) pool = 0;
+  // A taxa não encolhe para caber na comissão.
+  const pool = 1000000000;
   final lines = <RewardLine>[];
 
   final paid = gross - input.subsidyCents;
@@ -446,7 +457,6 @@ List<RewardLine> quoteReferralRewards(
         payee: RewardPayee.playerPoints,
       ),
     );
-    pool -= cash.cents;
   }
 
   final player = input.fraudReason == null ? input.playerReferrer : null;
@@ -473,7 +483,6 @@ List<RewardLine> quoteReferralRewards(
               reviewStatus: playerReview,
             ),
           );
-          pool -= cents;
         }
       }
     } else if (!input.playerReferrerCpfMissing) {
@@ -493,7 +502,6 @@ List<RewardLine> quoteReferralRewards(
             reviewStatus: playerReview,
           ),
         );
-        pool -= taken.cents;
       }
     }
   }
@@ -528,7 +536,7 @@ List<RewardLine> quoteReferralRewards(
           );
         }
       }
-    } else if (input.firstBookingDiscountCents <= 0) {
+    } else if (!_codedDiscountBlocksB2b(input, rates)) {
       final cents = _takeCents(gross, rates.b2bBps, pool);
       if (cents > 0) {
         lines.add(
@@ -612,13 +620,20 @@ PointSubsidyQuote quotePointSubsidy({
   final extensionOff = !rates.backedFullSlotEnabled || backedFraudHold;
   if (extensionOff) {
     final reason = !rates.backedFullSlotEnabled ? null : 'antifraud';
+    final ceiling = backedFraudHold
+        ? classicCeiling
+        : _openMaxPoints(
+            grossCents: grossCents,
+            availablePoints: availablePoints,
+            rates: rates,
+          );
     return _classicQuote(
       grossCents: grossCents,
       commission: commission,
       houseNet: houseNet,
       requestedPoints: requestedPoints,
       availablePoints: availablePoints,
-      maxPoints: classicCeiling,
+      maxPoints: ceiling,
       unbackedPool: unbackedPool,
       rates: rates,
       limitReason: reason,
@@ -691,6 +706,23 @@ PointSubsidyQuote quotePointSubsidy({
   );
 }
 
+int _openMaxPoints({
+  required int grossCents,
+  required int availablePoints,
+  required ReferralRates rates,
+}) {
+  final percentCap = commissionCents(grossCents, rates.redeemMaxBps);
+  final cap = percentCap < grossCents
+      ? (percentCap < 0 ? 0 : percentCap)
+      : grossCents;
+  var maxPoints = pointsFromCents(cap, rates.pointValueCents);
+  if (availablePoints < rates.redeemMinPoints ||
+      maxPoints < rates.redeemMinPoints) {
+    maxPoints = 0;
+  }
+  return maxPoints;
+}
+
 int _classicMaxPoints({
   required int grossCents,
   required int commission,
@@ -736,6 +768,7 @@ PointSubsidyQuote _classicQuote({
   final backedSpend = points - unbackedSpend;
   final subsidy = centsFromPoints(points, rates.pointValueCents);
   final charged = grossCents - subsidy;
+  final topup = houseNet > charged ? houseNet - charged : 0;
   return PointSubsidyQuote(
     grossCents: grossCents,
     chargedCents: charged,
@@ -743,7 +776,7 @@ PointSubsidyQuote _classicQuote({
     points: points,
     houseNetCents: houseNet,
     commissionCents: commission,
-    splitPercent: subsidy == 0
+    splitPercent: subsidy == 0 || charged <= 0 || topup > 0
         ? null
         : subsidizedHouseSplitPercent(
             houseNetCents: houseNet,
@@ -752,6 +785,8 @@ PointSubsidyQuote _classicQuote({
     maxPoints: maxPoints,
     backedPoints: backedSpend,
     unbackedPoints: unbackedSpend,
+    topupCents: topup,
+    pointsOnly: charged == 0 && subsidy > 0,
     limitReason: limitReason,
   );
 }

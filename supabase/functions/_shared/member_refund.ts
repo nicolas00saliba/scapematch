@@ -3,9 +3,10 @@
 // refunded no membro só depois da transição da cobrança.
 //
 // HELD: não solta a custódia. O cancelamento devolve o saldo retido.
-// Custódia já liberada: o mesmo estorno, pelo total cobrado (com juros),
-// desfaz a parte da casa e a da EscapeMatch na PagBank. Sem transferência
-// extra. Falha da PagBank deixa a fila aberta.
+// Custódia já liberada: o estorno usa o valor da fila. Esse valor já
+// descontou a taxa PagBank da cobrança. Sem a fila, vale o total cobrado.
+// Valor zero não chama a PagBank: um cancelamento sem valor devolveria
+// a cobrança inteira. Falha da PagBank deixa a fila aberta.
 
 import { logCaught } from "./pagbank_client_error.ts";
 import { captureAmountCents } from "./pagbank_rules.ts";
@@ -40,6 +41,7 @@ type QueueRow = {
   group_id: string;
   user_id: string;
   action: string;
+  amount_cents?: number | null;
   status: string;
   attempts: number;
   lease_until?: string | null;
@@ -145,7 +147,9 @@ async function refundOne(
     if (kind !== "refunded" && kind !== "cancelled" && !leaseOpen(row)) {
       return false;
     }
-    const next = await moveRemote(pagbank, charge, ref, remote.status);
+    const cents = queuedCents(row, charge);
+    if (cents <= 0) return false;
+    const next = await moveRemote(pagbank, charge, ref, remote.status, cents);
     if (!next) return false;
     const transition = await applyPaymentTransition(admin, charge.id, next, false);
     if (transition.status !== "refunded" && transition.status !== "cancelled") {
@@ -173,17 +177,25 @@ async function refundOne(
   }
 }
 
+function queuedCents(row: QueueRow, charge: Charge): number {
+  const queued = row.amount_cents;
+  if (typeof queued === "number" && Number.isInteger(queued) && queued >= 0) {
+    return queued;
+  }
+  return captureAmountCents(charge);
+}
+
 /// null = a PagBank ainda não confirmou. Não marca refunded.
 async function moveRemote(
   pagbank: RefundClient,
   charge: Charge,
   ref: string,
   remoteStatus: string,
+  cents: number,
 ): Promise<"refunded" | "cancelled" | null> {
   const kind = remoteKind(remoteStatus);
   if (kind === "refunded") return "refunded";
   if (kind === "cancelled") return "cancelled";
-  const cents = captureAmountCents(charge);
   if (kind === "paid") {
     const refunded = await pagbank.refund(ref, cents);
     return remoteKind(refunded.status) === "refunded" ? "refunded" : null;

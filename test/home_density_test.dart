@@ -155,7 +155,7 @@ void main() {
       1,
     );
     final chip = _textHeight(
-      'Jogos de tabuleiro',
+      'Escape room',
       theme.textTheme.labelMedium!.copyWith(
         color: theme.colorScheme.primary,
         fontWeight: FontWeight.w800,
@@ -474,12 +474,14 @@ void main() {
     tester,
   ) async {
     final source = curitibaSampleGroups();
-    final porao = source.firstWhere((group) => group.id == 'grp-cwb-porao-rpg');
-    final rpg = liveClosing(porao, missing: 1);
+    final porao = source.firstWhere(
+      (group) => group.id == 'grp-cwb-porao-quase',
+    );
+    final closing = liveClosing(porao, missing: 1);
     await pumpScapeMatch(
       tester,
       overrides: fixedGroups([
-        rpg,
+        closing,
         for (var index = 1; index < 5; index++) liveClosing(source[index]),
         source[5],
       ]),
@@ -512,24 +514,27 @@ void main() {
 
     await tester.tap(find.byKey(AppKeys.gameTypeSelector));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(AppKeys.groupCard('grp-cwb-porao-quase')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'O Porão sem Luz');
     await tester.pumpAndSettle();
 
-    expect(find.byKey(AppKeys.groupCard('grp-cwb-porao-rpg')), findsOneWidget);
-    expect(find.text('Mesa de RPG no porão'), findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byKey(AppKeys.groupWindow),
-        matching: find.text('O Porão sem Luz'),
-      ),
-      findsNothing,
+      find.byKey(AppKeys.groupCard('grp-cwb-porao-quase')),
+      findsOneWidget,
     );
+    expect(find.text('O Porão sem Luz'), findsWidgets);
     expect(
       find.byKey(AppKeys.groupCard(SampleIds.groupCwbCofreAlmost)),
       findsNothing,
     );
     final cardHeight = tester
-        .getSize(find.byKey(AppKeys.groupCard('grp-cwb-porao-rpg')))
+        .getSize(find.byKey(AppKeys.groupCard('grp-cwb-porao-quase')))
         .height;
     expect(
       tester.getSize(find.byKey(AppKeys.groupWindow)).height,
@@ -570,35 +575,33 @@ void main() {
     await pumpScapeMatch(tester);
     await tester.tap(find.byKey(AppKeys.gameTypeSelector));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('Mesa longa do Batel'),
+      find.byKey(AppKeys.newsFeed),
       400,
       scrollable: verticalScrollable,
     );
-    expect(find.text('Mesa longa do Batel'), findsOneWidget);
-    expect(find.text('O Cofre do Café'), findsNothing);
-    expect(find.text('Clube de tabuleiro da XV'), findsNothing);
-
-    await tester.scrollUntilVisible(
-      find.text('Mesa nova: o porão abre campanha às quintas'),
-      400,
-      scrollable: verticalScrollable,
-    );
-    expect(
-      find.text('Mesa nova: o porão abre campanha às quintas'),
-      findsOneWidget,
-    );
-    expect(find.text('Sala nova: A Biblioteca Proibida'), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(AppKeys.newsFeed),
-        matching: find.text('RPG'),
+        matching: find.text('Escape room'),
       ),
       findsWidgets,
     );
+    await _scrollNews(
+      tester,
+      find.byKey(AppKeys.newsCard(SampleNewsIds.cwbBiblioteca)),
+    );
+    expect(find.text('Sala nova: A Biblioteca Proibida'), findsWidgets);
+
+    await tester.scrollUntilVisible(
+      find.byKey(AppKeys.roomsCarousel),
+      400,
+      scrollable: verticalScrollable,
+    );
+    expect(find.text('O Cofre do Café'), findsWidgets);
   });
 }
 

@@ -60,7 +60,7 @@ Deno.test("comissão menor que uma taxa hipotética não reduz a casa", () => {
   assertEquals(split.primaryCents, 150);
 });
 
-Deno.test("3x não manda juro do comprador; 4x soma o juro cotado", () => {
+Deno.test("3x não manda juro do comprador; 4x é recusado", () => {
   const free = installmentCharge({
     principalCents: 20_000,
     installments: 3,
@@ -70,48 +70,40 @@ Deno.test("3x não manda juro do comprador; 4x soma o juro cotado", () => {
   assertEquals(free.amountCents, 20_000);
   assertEquals(free.buyerInterestCents, 0);
   assertEquals(chargeAmountBody(free).fees, undefined);
-
-  const paid = installmentCharge({
-    principalCents: 20_000,
-    installments: 4,
-    buyerInterestCents: 640,
-  });
-  assertEquals(paid.merchantAbsorbsInterest, false);
-  assertEquals(paid.amountCents, 20_640);
-  const amount = chargeAmountBody(paid);
-  assertEquals(amount.value, 20_640);
-  assertEquals(
-    (amount.fees as { buyer: { interest: { total: number; installments: number } } })
-      .buyer.interest,
-    { total: 640, installments: 1 },
+  assertThrows(
+    () =>
+      installmentCharge({
+        principalCents: 20_000,
+        installments: 4,
+        buyerInterestCents: 640,
+      }),
+    Error,
+    "parcelas",
   );
 });
 
-Deno.test("a grade habilita 1x a 3x sem juro e 4x só com a cotação", () => {
+Deno.test("a grade habilita só 1x a 3x sem juro", () => {
   const below = installmentMenu({ principalCents: 14_999 });
-  assertEquals(below.length, 12);
+  assertEquals(below.length, 3);
   assertEquals(below[0].enabled, true);
   assertEquals(below[0].amountCents, 14_999);
   assertEquals(below[1].enabled, true);
   assertEquals(below[2].merchantAbsorbsInterest, true);
   assertEquals(below.filter((item) => item.enabled).length, 3);
-  assertEquals(below[3].enabled, false);
 
   const open = installmentMenu({
     principalCents: 20_000,
     interestByCount: { 4: 640 },
   });
+  assertEquals(open.length, 3);
   assertEquals(open[2].installments, 3);
   assertEquals(open[2].merchantAbsorbsInterest, true);
   assertEquals(open[2].amountCents, 20_000);
   assertEquals(open[2].enabled, true);
-  assertEquals(open[3].installments, 4);
-  assertEquals(open[3].amountCents, 20_640);
-  assertEquals(open[3].enabled, true);
-  assertEquals(open[4].enabled, false);
+  assertEquals(open.every((item) => item.merchantAbsorbsInterest), true);
 });
 
-Deno.test("4x exige o total cotado e a cotação fica entre R$ 1 e R$ 5.000", () => {
+Deno.test("4x não tem total aceito e a cotação fica entre R$ 1 e R$ 5.000", () => {
   assertEquals(quoteAmountInRange(100), true);
   assertEquals(quoteAmountInRange(500_000), true);
   assertEquals(quoteAmountInRange(99), false);
@@ -122,7 +114,7 @@ Deno.test("4x exige o total cotado e a cotação fica entre R$ 1 e R$ 5.000", ()
       expectedCents: 20_640,
       chargedCents: 20_640,
     }),
-    true,
+    false,
   );
   assertEquals(
     quotedTotalAccepted({

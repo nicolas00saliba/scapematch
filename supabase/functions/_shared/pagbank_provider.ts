@@ -679,12 +679,13 @@ export class PagBankProvider {
     principalCents: number,
     installments: number,
   ): Promise<number> {
+    if (installments > maxInstallments) throw new Error("parcelas");
     if (installments <= interestFreeInstallments) return 0;
     const query = new URLSearchParams({
       payment_methods: "CREDIT_CARD",
       value: String(principalCents),
-      max_installments: "12",
-      max_installments_no_interest: "3",
+      max_installments: String(maxInstallments),
+      max_installments_no_interest: String(interestFreeInstallments),
     });
     const body = await this.#send(
       `/charges/fees/calculate?${query}`,
@@ -701,7 +702,7 @@ export class PagBankProvider {
     return interest;
   }
 
-  /// Uma consulta de taxas vira a grade de 1x a 12x.
+  /// Uma consulta de taxas vira a grade de 1x a 3x.
   async quoteCardPlans(principalCents: number): Promise<InstallmentOption[]> {
     if (!Number.isInteger(principalCents) || principalCents <= 0) {
       throw new Error("valor");
@@ -735,6 +736,7 @@ export class PagBankProvider {
     installments = 1,
   ): Promise<InstallmentCharge> {
     const count = Number.isInteger(installments) ? installments : 1;
+    if (count > maxInstallments) return Promise.reject(new Error("parcelas"));
     if (count <= interestFreeInstallments) {
       return Promise.resolve(
         installmentCharge({ principalCents, installments: count }),
@@ -749,8 +751,17 @@ export class PagBankProvider {
     );
   }
 
-  /// CHAR_ vai em /charges. ORDE_ vai em /orders, como a doc de consulta do pedido.
+  /// ORDE_ é GET /orders/{id}. CHAR_ é GET /orders?charge_id=, a consulta
+  /// por parâmetro da API de Pedidos. GET /charges/{id} e GET /charges com
+  /// dateCreated/paymentDate não são essa API: o gateway não entrega o
+  /// pedido e a doc trata 406 como método que o recurso não aceita.
   readPayment(paymentId: string): Promise<Record<string, unknown>> {
+    if (paymentId.startsWith("CHAR_")) {
+      const query = new URLSearchParams({ charge_id: paymentId });
+      return this.#send(`/orders?${query}`, undefined, "GET").then((body) =>
+        orderContainingCharge(body, paymentId)
+      );
+    }
     const path = paymentId.startsWith("ORDE_")
       ? `/orders/${encodeURIComponent(paymentId)}`
       : `/charges/${encodeURIComponent(paymentId)}`;
@@ -759,9 +770,15 @@ export class PagBankProvider {
 
   getPayment(paymentId: string): Promise<PaymentView> {
     return this.readPayment(paymentId).then((body) => {
-      const normalized = normalizeCharge(body);
+      const normalized = normalizeSelected(
+        body,
+        paymentId.startsWith("CHAR_") ? paymentId : "",
+      );
+      const id = paymentId.startsWith("CHAR_")
+        ? paymentId
+        : persistedPaymentId(body, normalized);
       return {
-        id: persistedPaymentId(body, normalized),
+        id,
         status: stringField(normalized, "status"),
         billingType: stringField(normalized, "billingType"),
         deleted: normalized.deleted === true,
@@ -1095,7 +1112,13 @@ export class PagBankProvider {
       headers["Content-Type"] = "application/json";
       init.body = JSON.stringify(payload ?? {});
     }
-    const response = await this.fetchFn(`${this.baseUrl}${path}`, init);
+    let response: Response;
+    try {
+      response = await this.fetchFn(`${this.baseUrl}${path}`, init);
+    } catch (error) {
+      if (isTimeoutError(error)) throw new Error("PagBank 408: timeout");
+      throw error;
+    }
     if (
       response.status === 401 &&
       allowRefresh &&
@@ -1119,6 +1142,42 @@ export class PagBankProvider {
       throw new Error("Resposta da PagBank inválida");
     }
   }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: unknown }).name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+/// A busca por charge_id devolve `{ orders: [...] }`. A resposta é só a
+/// cobrança cujo id foi pedido. A primeira do array pode ser uma tentativa
+/// recusada. Sem esse CHAR_, é 404.
+export function orderContainingCharge(
+  body: Record<string, unknown>,
+  chargeId: string,
+): Record<string, unknown> {
+  const sources = Array.isArray(body.orders) ? body.orders : [body];
+  for (const item of sources) {
+    if (!item || typeof item !== "object") continue;
+    const found = findCharge(item as Record<string, unknown>, chargeId);
+    if (found) return found;
+  }
+  throw new Error("PagBank 404: cobrança ausente");
+}
+
+function findCharge(
+  body: Record<string, unknown>,
+  chargeId: string,
+): Record<string, unknown> | null {
+  const charges = Array.isArray(body.charges) ? body.charges : [];
+  for (const item of charges) {
+    if (!item || typeof item !== "object") continue;
+    const charge = item as Record<string, unknown>;
+    if (charge.id === chargeId) return charge;
+  }
+  if (body.id === chargeId) return body;
+  return null;
 }
 
 function redactOutbound(text: string, apiKey: string): string {
@@ -1214,7 +1273,19 @@ function amountSummary(
 }
 
 function normalizeCharge(body: Record<string, unknown>): Record<string, unknown> {
-  const charge = Array.isArray(body.charges) ? firstCharge(body) : body;
+  return normalizeSelected(body, "");
+}
+
+function normalizeSelected(
+  body: Record<string, unknown>,
+  chargeId: string,
+): Record<string, unknown> {
+  const charge = chargeId.startsWith("CHAR_")
+    ? findCharge(body, chargeId)
+    : Array.isArray(body.charges)
+    ? firstCharge(body)
+    : body;
+  if (!charge) throw new Error("PagBank 404: cobrança ausente");
   const method = charge.payment_method;
   const type = method && typeof method === "object"
     ? String((method as { type?: unknown }).type ?? "")

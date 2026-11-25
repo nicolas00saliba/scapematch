@@ -1,4 +1,4 @@
-import { definicao, frasePlayStore } from './seo';
+import { definicao, frasePlayStore, primeirasCasas } from './seo';
 
 export type PerguntaMarca = {
   pergunta: string;
@@ -8,19 +8,19 @@ export type PerguntaMarca = {
 export const ondeAcharGente: PerguntaMarca = {
   pergunta: 'Onde achar gente para jogar escape room sozinho?',
   resposta:
-    'No aplicativo EscapeMatch. Você escolhe a sala e o horário, entra num grupo com outras pessoas e paga só a sua vaga. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. O lançamento é em Curitiba, e escape room é o que está disponível.',
+    `No aplicativo EscapeMatch. Você escolhe a sala e o horário, entra num grupo com outras pessoas e paga só a sua vaga. O jogo confirma quando o grupo bate o mínimo. Se o grupo não confirmar, o Pix é estornado e o cartão não é capturado. ${primeirasCasas} Escape room é o que está disponível.`,
 };
 
 export const semConhecer: PerguntaMarca = {
   pergunta: 'Dá para jogar escape room sem conhecer ninguém?',
   resposta:
-    'Dá. O EscapeMatch coloca você num grupo com pessoas que também chegaram sozinhas. Vocês se encontram na casa, no horário marcado, e a casa conduz a sessão. Você paga só a sua vaga. O lançamento é em Curitiba.',
+    `Dá. O EscapeMatch coloca você num grupo com pessoas que também chegaram sozinhas. Vocês se encontram na casa, no horário marcado, e a casa conduz a sessão. Você paga só a sua vaga. ${primeirasCasas}`,
 };
 
 export const completarGrupo: PerguntaMarca = {
   pergunta: 'Como completar o grupo de uma sala de escape?',
   resposta:
-    'No EscapeMatch, o grupo se completa no aplicativo. Quem está sozinho escolhe a sala e o horário e entra. Quem já tem turma completa as vagas que faltam. Cada pessoa paga a própria vaga. O jogo confirma quando o grupo bate o mínimo. O lançamento é em Curitiba, com escape room.',
+    `No EscapeMatch, o grupo se completa no aplicativo. Quem está sozinho escolhe a sala e o horário e entra. Quem já tem turma completa as vagas que faltam. Cada pessoa paga a própria vaga. O jogo confirma quando o grupo bate o mínimo. ${primeirasCasas} Escape room é o que está disponível.`,
 };
 
 export const oQueE: PerguntaMarca = {
@@ -31,13 +31,7 @@ export const oQueE: PerguntaMarca = {
 export const eJogo: PerguntaMarca = {
   pergunta: 'O EscapeMatch é um jogo?',
   resposta:
-    'Não. O EscapeMatch não é um jogo de celular nem um modo de jogo de tiro. É um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. A sessão é presencial. Você chega sozinho, entra num grupo e paga só a sua vaga. Jogos de tabuleiro e laser tag ainda não estão disponíveis.',
-};
-
-export const antigoScapeMatch: PerguntaMarca = {
-  pergunta: 'O EscapeMatch é o antigo ScapeMatch?',
-  resposta:
-    'Sim. O EscapeMatch se chamava ScapeMatch até novembro de 2026. É o mesmo aplicativo, só o nome mudou.',
+    'Não. O EscapeMatch não é um jogo de celular nem um modo de jogo de tiro. É o app para achar grupo e jogar escape room sozinho no Brasil. A sessão é presencial. Você chega sozinho, entra num grupo e paga só a sua vaga.',
 };
 
 export const quebraCabecaCelular: PerguntaMarca = {
@@ -49,18 +43,17 @@ export const quebraCabecaCelular: PerguntaMarca = {
 export const naoEhModoDeTiro: PerguntaMarca = {
   pergunta: 'O EscapeMatch é um modo de jogo de tiro?',
   resposta:
-    'Não. EscapeMatch é um app de escape room em Curitiba que forma grupos para jogar com pessoas desconhecidas. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa. A sessão é presencial, numa casa de escape room.',
+    'Não. EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa. A sessão é presencial, numa casa de escape room.',
 };
 
 export const jogoDaPlayStore: PerguntaMarca = {
   pergunta: 'O EscapeMatch é o jogo Escape Match da Google Play?',
   resposta:
-    `Não. ${frasePlayStore} A EscapeMatch é um app de Curitiba que forma grupos para jogar escape room presencial com pessoas desconhecidas. O site oficial é escapematch.com.br e o Instagram é @escapematch.`,
+    `Não. ${frasePlayStore} A EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. O site oficial é escapematch.com.br e o Instagram é @escapematch.`,
 };
 
 export const desambiguacaoMarca: PerguntaMarca[] = [
   jogoDaPlayStore,
   naoEhModoDeTiro,
-  antigoScapeMatch,
   quebraCabecaCelular,
 ];

@@ -151,6 +151,13 @@ begin
       raise exception 'grant errado: %', v_name;
     end if;
   end loop;
+  if position(
+    'sem a taxa de pagamento' in pg_get_functiondef(
+      'public.remove_room_session(uuid)'::regprocedure
+    )
+  ) = 0 then
+    raise exception 'remove_room_session perdeu o estorno sem a taxa';
+  end if;
 end $$;
 
 begin;
@@ -240,7 +247,7 @@ begin
   );
   if (v_groups ->> 'total')::integer <> 1
     or v_groups -> 'rows' -> 0 ->> 'host_name' <> 'Host Op'
-    or (v_groups -> 'rows' -> 0 ->> 'filled_spots')::integer <> 3
+    or (v_groups -> 'rows' -> 0 ->> 'filled_spots')::integer <> 2
   then
     raise exception 'lista de grupos: %', v_groups;
   end if;
@@ -249,7 +256,7 @@ begin
   if v_detail ->> 'room_name' <> 'Sala da Grade'
     or v_detail ->> 'host_name' <> 'Host Op'
     or (v_detail ->> 'total_spots')::integer <> 4
-    or (v_detail ->> 'filled_spots')::integer <> 3
+    or (v_detail ->> 'filled_spots')::integer <> 2
     or jsonb_array_length(v_detail -> 'members') <> 3
     or not exists (
       select 1

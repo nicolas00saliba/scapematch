@@ -27,6 +27,7 @@ import 'package:scapematch_parceiro/features/partner/presentation/venue_referral
 import 'package:scapematch_parceiro/features/partner/presentation/partner_invoices_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_ranking_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_reviews_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/new_slot_sheet.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_money.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
@@ -1134,7 +1135,8 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
   }
 
   Future<void> _addSlot() async {
-    final startsAt = _nextOpening(widget.now);
+    final startsAt = await showNewSlotSheet(context, now: widget.now);
+    if (startsAt == null || !mounted) return;
     await ref
         .read(partnerRepositoryProvider)
         .addSlot(roomId: widget.room.id, startsAt: startsAt);
@@ -1304,22 +1306,6 @@ class _RoomEditorState extends ConsumerState<_RoomEditor> {
       ),
     );
   }
-}
-
-DateTime _nextOpening(DateTime now) {
-  const hours = <(int, int)>[(14, 0), (16, 30), (19, 0), (21, 0)];
-  var day = DateTime(now.year, now.month, now.day);
-  final earliest = now.add(const Duration(hours: 2));
-  for (var i = 0; i < 14; i++) {
-    for (final (hour, minute) in hours) {
-      final candidate = DateTime(day.year, day.month, day.day, hour, minute);
-      if (candidate.isAfter(earliest)) {
-        return candidate;
-      }
-    }
-    day = day.add(const Duration(days: 1));
-  }
-  return earliest;
 }
 
 void _snack(BuildContext context, String message) {

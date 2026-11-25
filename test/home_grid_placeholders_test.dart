@@ -147,7 +147,7 @@ void main() {
       liveClosing(source[0], missing: 1),
       liveClosing(source[1], missing: 2),
       liveClosing(source[2], missing: 1),
-      liveClosing(source[3], missing: 2, gameType: GameTypes.rpg),
+      liveClosing(source[3], missing: 2),
     ];
     final ignored = liveClosing(source[4], missing: 4);
     await pumpScapeMatch(tester, overrides: fixedGroups([...live, ignored]));
@@ -162,10 +162,10 @@ void main() {
 
     await tester.tap(find.byKey(AppKeys.gameTypeSelector));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)));
     await tester.pumpAndSettle();
 
-    expect(_cards, findsOneWidget);
+    expect(_cards, findsNWidgets(4));
     expect(find.byKey(AppKeys.groupCard(live[3].id)), findsOneWidget);
     expect(_slots, findsNothing);
     expect(find.byKey(AppKeys.groupWindow), findsOneWidget);
@@ -209,6 +209,13 @@ void main() {
     );
     expect(find.text(homeGridPartnerMessage), findsOneWidget);
     expect(find.text(homeGridInviteMessage), findsOneWidget);
+
+    await tester.tap(find.byKey(AppKeys.gameTypeSelector));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Novas salas de Escape room'), findsWidgets);
+    expect(_slots, findsNWidgets(12));
     expect(find.textContaining('Ainda não há grupos'), findsNothing);
     _expectSameRow(tester, 0, 3);
     expect(
@@ -267,22 +274,18 @@ void main() {
   testWidgets('filtering the desktop grid still fills the holes', (
     tester,
   ) async {
-    final groups = [
-      for (final group in curitibaSampleGroups().take(3))
-        group.copyWith(gameType: GameTypes.escapeRoom),
-    ];
+    final groups = curitibaSampleGroups().take(3).toList();
     await pumpScapeMatch(tester, overrides: fixedGroups(groups));
     await _desktop(tester, const Size(1440, 900));
     expect(_cards, findsNWidgets(3));
 
     await tester.tap(find.byKey(AppKeys.gameTypeSelector));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.rpg)));
+    await tester.tap(find.byKey(AppKeys.gameTypeOption(GameTypes.escapeRoom)));
     await tester.pumpAndSettle();
 
-    expect(_cards, findsNothing);
-    expect(_slots, findsNWidgets(12));
-    expect(find.textContaining('Novas salas de RPG'), findsWidgets);
+    expect(_cards, findsNWidgets(3));
+    expect(_slots, findsNWidgets(9));
   });
 
   testWidgets('a desktop slot invites friends and opens the partner app', (

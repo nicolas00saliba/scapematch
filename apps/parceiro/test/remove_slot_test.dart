@@ -154,11 +154,7 @@ void main() {
     expect(find.byKey(PartnerKeys.partnerRemoveSlot(free.id)), findsNothing);
 
     final heldIcon = find.byKey(PartnerKeys.partnerRemoveSlotIcon(held.slotId));
-    await tester.scrollUntilVisible(
-      heldIcon,
-      400,
-      scrollable: verticalScrollable,
-    );
+    await _bringIntoView(tester, heldIcon);
     await tester.tap(heldIcon);
     await tester.pumpAndSettle();
     expect(find.text(formatSession(held.startsAt)), findsWidgets);
@@ -212,11 +208,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final heldIcon = find.byKey(PartnerKeys.partnerRemoveSlotIcon(held.slotId));
-    await tester.scrollUntilVisible(
-      heldIcon,
-      400,
-      scrollable: verticalScrollable,
-    );
+    await _bringIntoView(tester, heldIcon);
     await tester.tap(heldIcon);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(PartnerKeys.confirmRemoveSlot));
@@ -230,6 +222,19 @@ void main() {
       find.text(PartnerMessages.slotHasReservation),
     );
   });
+}
+
+/// O chip do horário reservado já está montado, logo abaixo da dobra.
+/// `scrollUntilVisible` vê o elemento e só salta o scroll. Sem um frame,
+/// o toque ainda lê a posição antiga e o diálogo não abre.
+Future<void> _bringIntoView(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    400,
+    scrollable: verticalScrollable,
+  );
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
 }
 
 bool _holdsSeat(Participant participant) {

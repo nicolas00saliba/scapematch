@@ -259,8 +259,8 @@ begin
     into v_filled
   from public.groups_with_counts g
   join created_group c on c.id = g.id;
-  if v_members <> 2 or v_filled <> 2 then
-    raise exception 'criar/entrar: membros % preenchidas %', v_members, v_filled;
+  if v_members <> 2 or v_filled <> 0 then
+    raise exception 'criar/entrar sem pagar: membros % preenchidas %', v_members, v_filled;
   end if;
 end $$;
 

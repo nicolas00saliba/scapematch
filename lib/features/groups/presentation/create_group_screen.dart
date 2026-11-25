@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
@@ -11,7 +10,8 @@ import 'package:scapematch/features/catalog/domain/difficulty.dart';
 import 'package:scapematch/features/catalog/domain/escape_house.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
 import 'package:scapematch/features/catalog/domain/player_range.dart';
-import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/catalog/presentation/open_day_block.dart';
+import 'package:scapematch/features/catalog/presentation/open_slot_block.dart';
 import 'package:scapematch/features/cities/presentation/city_selector.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/features/groups/domain/group_rules.dart';
@@ -52,7 +52,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     final theme = Theme.of(context);
     final capacityMessage = _capacityMessage(state);
     final started = state.slotHasStarted(now);
-    final tooClose = state.slotTooClose(now);
+    final joining = state.selectedOpening?.openGroupId != null;
 
     return AppScaffold(
       desktopMaxWidth: 720,
@@ -106,17 +106,31 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             onTap: () => _pickRoom(state),
           ),
           const SizedBox(height: 12),
-          _SelectionField(
-            fieldKey: AppKeys.selectionField('slot'),
-            label: 'Horário',
-            value: state.slot == null
+          OpenDayBlock(
+            days: state.openDays,
+            selected: state.selectedDay,
+            loading: state.loadingOptions && state.houseId != null,
+            emptyMessage: state.scheduleError
+                ? 'Não foi possível carregar os horários desta casa.'
+                : state.houseId == null
+                ? 'Escolha a casa primeiro.'
+                : 'Esta casa não tem dia com horário livre.',
+            onSelected: state.houseId == null || state.loadingOptions
                 ? null
-                : formatSession(state.slot!.startsAt),
-            hint: state.roomId == null
-                ? 'Escolha a sala primeiro'
-                : 'Escolha o horário',
-            enabled: state.roomId != null && state.slots.isNotEmpty,
-            onTap: () => _pickSlot(state),
+                : (day) => ref
+                      .read(createGroupViewModelProvider.notifier)
+                      .selectDay(day),
+          ),
+          const SizedBox(height: 12),
+          OpenSlotBlock(
+            day: state.selectedDay,
+            openings: state.openingsForSelectedDay,
+            selectedSlotId: state.slotId,
+            onSelected: state.selectedDay == null
+                ? null
+                : (opening) => ref
+                      .read(createGroupViewModelProvider.notifier)
+                      .selectSlot(opening.slot.id),
           ),
           const SizedBox(height: 20),
           Text(
@@ -248,18 +262,6 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
             ),
           ],
-          if (tooClose) ...[
-            const SizedBox(height: 8),
-            Text(
-              GroupMessages.tooCloseToStart,
-              key: AppKeys.createFailure,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-              ),
-            ),
-          ],
           if (state.failure != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -283,7 +285,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                 height: 22,
                 child: CircularProgressIndicator(strokeWidth: 2.4),
               )
-            : const Text('Criar grupo'),
+            : Text(joining ? 'Pagar e entrar' : 'Criar grupo'),
       ),
     );
   }
@@ -332,20 +334,6 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       return;
     }
     await ref.read(createGroupViewModelProvider.notifier).selectRoom(room.id);
-  }
-
-  Future<void> _pickSlot(CreateGroupState state) async {
-    final slot = await showOptionSheet<TimeSlot>(
-      context: context,
-      title: 'Horário',
-      options: state.slots,
-      idOf: (slot) => slot.id,
-      labelOf: (slot) => formatSession(slot.startsAt),
-    );
-    if (slot == null || !mounted) {
-      return;
-    }
-    ref.read(createGroupViewModelProvider.notifier).selectSlot(slot.id);
   }
 
   Future<void> _submit() async {

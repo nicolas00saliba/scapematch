@@ -105,6 +105,15 @@ set local role authenticated;
 select public.join_group(id) from band_group;
 reset role;
 
+update public.group_members
+set payment_status = 'paid'
+where group_id = (select id from band_group)
+  and user_id in (
+    'c2222222-2222-2222-2222-222222222222',
+    'c3333333-3333-3333-3333-333333333333',
+    'c4444444-4444-4444-4444-444444444444'
+  );
+
 do $$
 declare
   v_group uuid;
@@ -121,6 +130,11 @@ select set_config('request.jwt.claim.sub', 'c5555555-5555-5555-5555-555555555555
 set local role authenticated;
 select public.join_group(id) from band_group;
 reset role;
+
+update public.group_members
+set payment_status = 'paid'
+where group_id = (select id from band_group)
+  and user_id = 'c5555555-5555-5555-5555-555555555555';
 
 do $$
 declare
@@ -145,6 +159,11 @@ set local role authenticated;
 select public.join_group(id) from band_group;
 reset role;
 
+update public.group_members
+set payment_status = 'reserved'
+where group_id = (select id from band_group)
+  and user_id = 'c6666666-6666-6666-6666-666666666666';
+
 do $$
 declare
   v_group uuid;
@@ -161,6 +180,11 @@ select set_config('request.jwt.claim.sub', 'c7777777-7777-7777-7777-777777777777
 set local role authenticated;
 select public.join_group(id) from band_group;
 reset role;
+
+update public.group_members
+set payment_status = 'paid'
+where group_id = (select id from band_group)
+  and user_id = 'c7777777-7777-7777-7777-777777777777';
 
 do $$
 declare
@@ -331,6 +355,15 @@ select set_config('request.jwt.claim.sub', 'c5555555-5555-5555-5555-555555555555
 set local role authenticated;
 select public.join_group(id) from band_open;
 reset role;
+update public.group_members
+set payment_status = 'paid'
+where group_id = (select id from band_open)
+  and user_id in (
+    'c2222222-2222-2222-2222-222222222222',
+    'c3333333-3333-3333-3333-333333333333',
+    'c4444444-4444-4444-4444-444444444444',
+    'c5555555-5555-5555-5555-555555555555'
+  );
 update public.groups
 set closes_at = timestamptz '2020-01-01 00:00:00+00'
 where id = (select id from band_open);
@@ -338,6 +371,10 @@ select set_config('request.jwt.claim.sub', 'c6666666-6666-6666-6666-666666666666
 set local role authenticated;
 select public.join_group(id) from band_open;
 reset role;
+update public.group_members
+set payment_status = 'paid'
+where group_id = (select id from band_open)
+  and user_id = 'c6666666-6666-6666-6666-666666666666';
 do $$
 declare
   v_group uuid;

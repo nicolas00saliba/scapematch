@@ -127,12 +127,19 @@ function deviceReview(
   return "em_revisao";
 }
 
+function codedDiscountBlocksB2b(input: SpendRewardInput): boolean {
+  const discount = input.firstBookingDiscountCents ?? 0;
+  if (discount <= 0) return false;
+  const coded = commissionCents(input.grossCents, officialFirstBookingDiscountBps);
+  const organic = commissionCents(input.grossCents, 1000);
+  if (discount === organic && discount !== coded) return false;
+  return true;
+}
+
 export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
   const pointValue = input.pointValueCents ?? officialPointValueCents;
-  const commission = commissionCents(input.grossCents, input.commissionBps);
-  let pool = commission - (input.subsidyCents ?? 0) -
-    (input.firstBookingDiscountCents ?? 0);
-  if (pool < 0) pool = 0;
+  // A taxa não encolhe para caber na comissão. O que faltar é CAC no banco.
+  const pool = 1_000_000_000;
   const lines: RewardLine[] = [];
   const paid = input.grossCents - (input.subsidyCents ?? 0);
   const cash = takePoints(
@@ -148,7 +155,6 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
       points: cash.points,
       payee: "player_points",
     });
-    pool -= cash.cents;
   }
   const player = input.fraudReason ? null : input.playerReferrer;
   const playerReview = deviceReview(input.playerDeviceCluster, input);
@@ -173,7 +179,6 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
             payee: "venue_credit",
             ...(playerReview ? { reviewStatus: playerReview } : {}),
           });
-          pool -= cents;
         }
       }
     } else if (!input.playerReferrerCpfMissing) {
@@ -191,7 +196,6 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
           payee: "player_points",
           ...(playerReview ? { reviewStatus: playerReview } : {}),
         });
-        pool -= taken.cents;
       }
     }
   }
@@ -225,7 +229,7 @@ export function quoteReferralRewards(input: SpendRewardInput): RewardLine[] {
           });
         }
       }
-    } else if ((input.firstBookingDiscountCents ?? 0) <= 0) {
+    } else if (!codedDiscountBlocksB2b(input)) {
       const cents = takeCents(input.grossCents, input.b2bBps ?? officialB2bBps, pool);
       if (cents > 0) {
         lines.push({
@@ -331,13 +335,22 @@ export function quotePointSubsidy(input: {
     const reason = input.backedFullSlotEnabled !== true
       ? null
       : "antifraud" as const;
+    const ceiling = input.backedFraudHold === true
+      ? classicCeiling
+      : openMaxPoints(
+        input.grossCents,
+        input.availablePoints,
+        pointValue,
+        minPoints,
+        maxBps,
+      );
     return classicQuote({
       grossCents: input.grossCents,
       commission,
       houseNet,
       requestedPoints: input.requestedPoints,
       availablePoints: input.availablePoints,
-      maxPoints: classicCeiling,
+      maxPoints: ceiling,
       unbackedPool,
       minPoints,
       pointValue,
@@ -405,6 +418,20 @@ export function quotePointSubsidy(input: {
   };
 }
 
+function openMaxPoints(
+  grossCents: number,
+  availablePoints: number,
+  pointValue: number,
+  minPoints: number,
+  maxBps: number,
+): number {
+  const percentCap = commissionCents(grossCents, maxBps);
+  const maxSubsidy = Math.min(grossCents, Math.max(percentCap, 0));
+  let maxPoints = Math.floor(maxSubsidy / pointValue);
+  if (availablePoints < minPoints || maxPoints < minPoints) maxPoints = 0;
+  return maxPoints;
+}
+
 function classicMaxPoints(
   grossCents: number,
   commission: number,
@@ -441,6 +468,7 @@ function classicQuote(input: {
   const unbackedSpend = Math.max(0, Math.min(points, input.unbackedPool));
   const subsidy = points * input.pointValue;
   const charged = input.grossCents - subsidy;
+  const topup = Math.max(input.houseNet - charged, 0);
   return {
     grossCents: input.grossCents,
     chargedCents: charged,
@@ -448,12 +476,12 @@ function classicQuote(input: {
     points,
     houseNetCents: input.houseNet,
     commissionCents: input.commission,
-    splitPercent: subsidy === 0 ? null : subsidizedHouseSplitPercent(input.houseNet, charged),
+    splitPercent: splitFor(input.houseNet, charged, subsidy, topup),
     maxPoints: input.maxPoints,
     backedPoints: points - unbackedSpend,
     unbackedPoints: unbackedSpend,
-    topupCents: 0,
-    pointsOnly: false,
+    topupCents: topup,
+    pointsOnly: charged === 0 && subsidy > 0,
     limitReason: input.limitReason,
   };
 }

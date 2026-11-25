@@ -496,7 +496,12 @@ export async function createCharge(
         }
         throw error;
       }
-      amountCents = reserved.amount_cents || amountCents;
+      amountCents = reservedAmountCents(reserved.amount_cents, amountCents);
+      if (amountCents === 0 && pointsRedeemed > 0) {
+        holdOpen = false;
+        const settled = await settlePointsCovered(admin, reserved.id, billingType);
+        return json(settled.body, settled.httpStatus);
+      }
       if (reserved.house_fixed_cents >= 0) {
         split.fixedValue = fixedReaisFromCents(reserved.house_fixed_cents);
       } else {
@@ -798,6 +803,55 @@ export async function createCharge(
       if (decision === "refuse") {
         return json({ error: cardSwitchBlock(switchInput) }, 409);
       }
+      if (
+        pointsRedeemed > 0 &&
+        decision === "proceed" &&
+        !existing?.provider_ref
+      ) {
+        const payable = await playerPayableCents(
+          admin,
+          groupId,
+          user.id,
+          pointsRedeemed,
+        );
+        if (payable === 0) {
+          let reservedCovered;
+          try {
+            reservedCovered = await reserveCardCharge(admin, {
+              groupId,
+              userId: user.id,
+              venueId: venue.id as string,
+              amountCents,
+              idempotencyKey,
+              walletId: venue.pagbank_account_id as string,
+              commissionBps,
+              grossCents: grossForReserve,
+              subsidyCents,
+              pointsRedeemed,
+              splitPercent,
+            });
+          } catch (error) {
+            if (isSerializationConflict(error)) {
+              return json({ error: "pagamento em andamento" }, 409);
+            }
+            throw error;
+          }
+          const coveredNow = reservedAmountCents(
+            reservedCovered.amount_cents,
+            amountCents,
+          );
+          if (coveredNow === 0) {
+            holdOpen = false;
+            const settled = await settlePointsCovered(
+              admin,
+              reservedCovered.id,
+              billingType,
+            );
+            return json(settled.body, settled.httpStatus);
+          }
+          amountCents = coveredNow;
+        }
+      }
       const remoteIp = clientIp(req) ?? undefined;
       const storedFixed = numberOrNull(existing?.house_fixed_cents);
       const previewGross = grossForReserve ?? amountCents;
@@ -960,9 +1014,23 @@ export async function createCharge(
           }
           throw error;
         }
+        const coveredCard = reservedAmountCents(
+          reservedCard.amount_cents,
+          amountCents,
+        );
+        if (coveredCard === 0 && pointsRedeemed > 0) {
+          await loseCard(reservedCard.id, reservedCard.attempt_id);
+          holdOpen = false;
+          const settled = await settlePointsCovered(
+            admin,
+            reservedCard.id,
+            billingType,
+          );
+          return json(settled.body, settled.httpStatus);
+        }
         const aligned = await alignCardSplit(
           reservedCard.house_fixed_cents,
-          reservedCard.amount_cents || amountCents,
+          coveredCard,
           reservedCard.id,
           reservedCard.attempt_id,
         );
@@ -973,7 +1041,7 @@ export async function createCharge(
           reservedCard.house_fixed_cents,
           reservedCard.id,
         );
-        amountCents = reservedCard.amount_cents || amountCents;
+        amountCents = reservedAmountCents(reservedCard.amount_cents, amountCents);
         holdOpen = false;
         cardChargeId = reservedCard.id;
         await noteCardPayer(admin, user.id, savedCardId, cardChargeId);
@@ -1028,16 +1096,23 @@ export async function createCharge(
             throw error;
           }
           holdOpen = false;
+          const coveredAgain = reservedAmountCents(again.amount_cents, amountCents);
+          if (coveredAgain === 0 && pointsRedeemed > 0) {
+            await loseCard(again.id, again.attempt_id);
+            holdOpen = false;
+            const settled = await settlePointsCovered(admin, again.id, billingType);
+            return json(settled.body, settled.httpStatus);
+          }
           const alignedAgain = await alignCardSplit(
             again.house_fixed_cents,
-            again.amount_cents || amountCents,
+            coveredAgain,
             again.id,
             again.attempt_id,
           );
           if (alignedAgain === "valor_parcelas") {
             return json({ error: "valor_parcelas" }, 409);
           }
-          amountCents = again.amount_cents || amountCents;
+          amountCents = reservedAmountCents(again.amount_cents, amountCents);
           await noteCardPayer(admin, user.id, savedCardId, again.id);
           if (!again.inserted || !again.attempt_id) {
             await loseCard(again.id || reservedCard.id, again.attempt_id);
@@ -1556,6 +1631,58 @@ async function filledSpots(
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
   return count ?? 0;
+}
+
+function reservedAmountCents(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+  return fallback;
+}
+
+async function playerPayableCents(
+  admin: ChargeDb,
+  groupId: string,
+  userId: string,
+  points: number,
+): Promise<number | null> {
+  const quoted = await admin.rpc("player_payable_cents", {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_points: points,
+  });
+  if (quoted.error || typeof quoted.data !== "number") return null;
+  return quoted.data;
+}
+
+async function settlePointsCovered(
+  admin: ChargeDb,
+  chargeId: string,
+  billingType: string,
+): Promise<{ body: Record<string, unknown>; httpStatus: number }> {
+  const settled = await admin.rpc("settle_points_covered_charge", {
+    p_charge_id: chargeId,
+  });
+  if (settled.error || !settled.data || typeof settled.data !== "object") {
+    throw new Error("erro");
+  }
+  const row = settled.data as Record<string, unknown>;
+  const status = typeof row.status === "string" ? row.status : "";
+  if (!status) throw new Error("erro");
+  const paid = status === "paid";
+  return {
+    httpStatus: paid ? 200 : 409,
+    body: {
+      charge_id: chargeId,
+      status,
+      provider_ref: null,
+      qr_code: "",
+      qr_code_base64: null,
+      billing_type: billingType,
+      amount_cents: numberOrNull(row.amount_cents) ?? 0,
+      points_only: paid && row.points_only === true,
+    },
+  };
 }
 
 function requestedPoints(value: unknown): number {
