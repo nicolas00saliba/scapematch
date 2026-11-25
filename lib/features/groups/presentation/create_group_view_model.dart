@@ -68,8 +68,12 @@ class CreateGroupState {
   EscapeRoom? get room => _byId(rooms, roomId, (room) => room.id);
 
   TimeSlot? get slot {
+    return selectedOpening?.slot;
+  }
+
+  OpenSlot? get selectedOpening {
     for (final opening in openSlots) {
-      if (opening.slot.id == slotId) return opening.slot;
+      if (opening.slot.id == slotId) return opening;
     }
     return null;
   }
@@ -115,17 +119,8 @@ class CreateGroupState {
     return hasRequiredSelections &&
         sizeValidation == GroupSizeValidation.valid &&
         !started &&
-        !slotTooClose(now) &&
         !submitting &&
         !loadingOptions;
-  }
-
-  bool slotTooClose(DateTime now) {
-    final selected = slot;
-    if (selected == null) {
-      return false;
-    }
-    return GroupRules.tooCloseToCreate(startsAt: selected.startsAt, now: now);
   }
 
   bool slotHasStarted(DateTime now) {
@@ -442,6 +437,30 @@ class CreateGroupViewModel extends Notifier<CreateGroupState> {
       return null;
     }
     state = state.copyWith(submitting: true, clearFailure: true);
+    final existing = state.selectedOpening?.openGroupId;
+    if (existing != null) {
+      final joined = await ref
+          .read(groupRepositoryProvider)
+          .join(
+            existing,
+            participantUserId: user.id,
+            participantName: user.displayName,
+          );
+      if (!ref.mounted) return null;
+      switch (joined) {
+        case JoinSuccess(:final group):
+          state = state.copyWith(submitting: false);
+          ref.invalidate(findGroupsViewModelProvider);
+          ref.invalidate(myGroupsViewModelProvider);
+          return group;
+        case JoinFailure():
+          state = state.copyWith(
+            submitting: false,
+            failure: CreateGroupFailureReason.duplicateSession,
+          );
+          return null;
+      }
+    }
     final crewId = state.crewId;
     final companions = crewId == null
         ? const <PartyCompanion>[]

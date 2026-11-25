@@ -13,7 +13,8 @@ enum ScheduleAvailability {
   /// Product name: grade do parceiro.
   partnerGrid,
 
-  /// Somebody suggested a time. The house has not confirmed it.
+  /// Nome antigo. Não é rascunho: sessão com hora marcada já entra
+  /// no app do jogador, no mesmo instante em que a casa grava.
   /// Product name: horário proposto.
   proposed,
 

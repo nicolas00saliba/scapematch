@@ -52,7 +52,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     final theme = Theme.of(context);
     final capacityMessage = _capacityMessage(state);
     final started = state.slotHasStarted(now);
-    final tooClose = state.slotTooClose(now);
+    final joining = state.selectedOpening?.openGroupId != null;
 
     return AppScaffold(
       desktopMaxWidth: 720,
@@ -262,18 +262,6 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
             ),
           ],
-          if (tooClose) ...[
-            const SizedBox(height: 8),
-            Text(
-              GroupMessages.tooCloseToStart,
-              key: AppKeys.createFailure,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-              ),
-            ),
-          ],
           if (state.failure != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -297,7 +285,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                 height: 22,
                 child: CircularProgressIndicator(strokeWidth: 2.4),
               )
-            : const Text('Criar grupo'),
+            : Text(joining ? 'Pagar e entrar' : 'Criar grupo'),
       ),
     );
   }

@@ -42,12 +42,14 @@ abstract final class GroupMessages {
 
   static const simulatedPixNotice = 'Pix simulado. O código abaixo não cobra.';
 
-  static const livePixHint = 'O código Pix vem do PagBank quando você confirma.';
+  static const livePixHint =
+      'O código Pix vem do PagBank quando você confirma.';
 
   static const livePixNotice =
       'O Pix é pago agora. Se o grupo não confirmar, o valor volta.';
 
-  static const livePixReady = 'Pix do PagBank. Escaneie o QR ou copie o código.';
+  static const livePixReady =
+      'Pix do PagBank. Escaneie o QR ou copie o código.';
 
   static const simulatePayment = 'Simular pagamento';
 
@@ -109,8 +111,7 @@ abstract final class GroupMessages {
 
   static String payMyShare(String price) => 'Pagar minha parte ($price)';
 
-  static const houseCannotReceive =
-      'A casa ainda não pode receber';
+  static const houseCannotReceive = 'A casa ainda não pode receber';
 
   static const yourSharePending = 'Sua parte está pendente';
   static const yourShareReserved =
@@ -198,8 +199,7 @@ abstract final class GroupMessages {
         'O total de vagas ficou abaixo do mínimo da sala.',
       CreateGroupFailureReason.unknownSelection =>
         'Confira cidade, casa, sala e horário.',
-      CreateGroupFailureReason.duplicateSession =>
-        'Já existe um grupo nessa sala nesse horário. Escolha outro horário.',
+      CreateGroupFailureReason.duplicateSession => 'Já existe um grupo nessa sala nesse horário. Entre nele e pague a sua parte.',
       CreateGroupFailureReason.alreadyStarted =>
         'Esse horário já passou. Escolha um horário que ainda não começou.',
       CreateGroupFailureReason.tooCloseToStart => tooCloseToStart,

@@ -1,16 +1,21 @@
--- Só datas e horários livres. Exclui passado, a janela de 1 h,
--- reservado (grupo ativo) e removido (cancelled_at). Grupo cancelado
--- devolve o horário. O dia é America/Sao_Paulo. Anon lê a casa
--- aprovada e não lê casa pendente nem casa de teste.
+-- Só datas e horários com vaga paga. Exclui passado, removido e
+-- grupo lotado. A última hora entra com near_start. proposed com hora
+-- entra. Grupo cancelado devolve o horário. O dia é America/Sao_Paulo.
 
 \set ON_ERROR_STOP on
 
 insert into auth.users (id, email, raw_user_meta_data)
-values (
-  'a1e11111-1111-4111-8111-111111111111',
-  'dono-agenda@example.com',
-  '{"display_name":"Dono Agenda"}'
-);
+values
+  (
+    'a1e11111-1111-4111-8111-111111111111',
+    'dono-agenda@example.com',
+    '{"display_name":"Dono Agenda"}'
+  ),
+  (
+    'a1e12222-2222-4222-8222-222222222222',
+    'pago-agenda@example.com',
+    '{"display_name":"Pago Agenda"}'
+  );
 
 insert into public.venues (
   id, owner_id, city_id, name, neighborhood, street_address, address_number,
@@ -182,6 +187,24 @@ values
     'a1e54444-4444-4444-8444-444444444444',
     timestamptz '2027-07-02 17:00:00+00',
     'partner_grid'
+  ),
+  (
+    'a1e6dddd-dddd-4ddd-8ddd-dddddddddddd',
+    'a1e51111-1111-4111-8111-111111111111',
+    timestamptz '2027-06-20 17:00:00+00',
+    'proposed'
+  ),
+  (
+    'a1e6eeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    'a1e52222-2222-4222-8222-222222222222',
+    timestamptz '2027-06-19 17:00:00+00',
+    'partner_grid'
+  ),
+  (
+    'a1e6ffff-ffff-4fff-8fff-ffffffffffff',
+    'a1e51111-1111-4111-8111-111111111111',
+    pg_catalog.now() + interval '20 minutes',
+    'partner_grid'
   );
 
 update public.room_sessions
@@ -199,7 +222,7 @@ insert into public.groups (
     'a1e51111-1111-4111-8111-111111111111',
     'a1e63333-3333-4333-8333-333333333333',
     timestamptz '2027-06-16 17:00:00+00',
-    4, 2, 9000,
+    2, 2, 9000,
     'a1e11111-1111-4111-8111-111111111111',
     null
   ),
@@ -213,6 +236,45 @@ insert into public.groups (
     4, 2, 9000,
     'a1e11111-1111-4111-8111-111111111111',
     pg_catalog.now()
+  ),
+  (
+    'a1e73333-3333-4333-8333-333333333333',
+    'curitiba',
+    'a1e41111-1111-4111-8111-111111111111',
+    'a1e52222-2222-4222-8222-222222222222',
+    'a1e6eeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    timestamptz '2027-06-19 17:00:00+00',
+    4, 2, 9000,
+    'a1e11111-1111-4111-8111-111111111111',
+    null
+  );
+
+insert into public.group_members (
+  group_id, user_id, display_name, is_creator, attendance, payment_status
+) values
+  (
+    'a1e71111-1111-4111-8111-111111111111',
+    'a1e11111-1111-4111-8111-111111111111',
+    'Dono Agenda',
+    true,
+    'confirmed',
+    'paid'
+  ),
+  (
+    'a1e71111-1111-4111-8111-111111111111',
+    'a1e12222-2222-4222-8222-222222222222',
+    'Pago Agenda',
+    false,
+    'confirmed',
+    'paid'
+  ),
+  (
+    'a1e73333-3333-4333-8333-333333333333',
+    'a1e11111-1111-4111-8111-111111111111',
+    'Dono Agenda',
+    true,
+    'confirmed',
+    'paid'
   );
 
 do $$
@@ -250,7 +312,13 @@ begin
     raise exception 'faltou o dia 15/06, dias %', v_days;
   end if;
   if '2027-06-16' = any (v_days) then
-    raise exception 'dia só com reserva entrou na lista %', v_days;
+    raise exception 'dia lotado entrou na lista %', v_days;
+  end if;
+  if not ('2027-06-19' = any (v_days)) then
+    raise exception 'dia com vaga paga sobrando ficou de fora %', v_days;
+  end if;
+  if not ('2027-06-20' = any (v_days)) then
+    raise exception 'proposed com hora não publicou %', v_days;
   end if;
   if '2027-06-17' = any (v_days) then
     raise exception 'dia só com horário removido entrou na lista %', v_days;
@@ -287,11 +355,46 @@ begin
       'a1e63333-3333-4333-8333-333333333333',
       'a1e64444-4444-4444-8444-444444444444',
       'a1e66666-6666-4666-8666-666666666666',
-      'a1e67777-7777-4777-8777-777777777777',
       'a1e6aaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     )
   ) then
-    raise exception 'reservado, removido, passado, janela de 1 h ou sem hora entrou';
+    raise exception 'lotado, removido, passado ou sem hora entrou';
+  end if;
+
+  if not exists (
+    select 1
+    from public.venue_open_slots('a1e41111-1111-4111-8111-111111111111')
+    where session_id = 'a1e67777-7777-4777-8777-777777777777'
+      and near_start
+  ) then
+    raise exception '1 h exata não apareceu como perto do início';
+  end if;
+
+  if exists (
+    select 1
+    from public.venue_open_slots('a1e41111-1111-4111-8111-111111111111')
+    where session_id = 'a1e68888-8888-4888-8888-888888888888'
+      and near_start
+  ) then
+    raise exception '61 minutos foi marcado como perto do início';
+  end if;
+
+  if not exists (
+    select 1
+    from public.venue_open_slots('a1e41111-1111-4111-8111-111111111111')
+    where session_id = 'a1e6eeee-eeee-4eee-8eee-eeeeeeeeeeee'
+      and group_id = 'a1e73333-3333-4333-8333-333333333333'
+      and spots_left = 3
+  ) then
+    raise exception 'vaga paga sobrando não voltou com o grupo';
+  end if;
+
+  if not exists (
+    select 1
+    from public.venue_open_slots('a1e41111-1111-4111-8111-111111111111')
+    where session_id = 'a1e6dddd-dddd-4ddd-8ddd-dddddddddddd'
+  ) then
+    raise exception 'proposed com hora ficou de fora';
   end if;
 
   if not exists (
@@ -320,6 +423,36 @@ begin
     raise exception 'venue_open_days divergiu dos horários';
   end if;
 end $$;
+
+begin;
+select set_config(
+  'request.jwt.claim.sub',
+  'a1e11111-1111-4111-8111-111111111111',
+  true
+);
+set local role authenticated;
+
+do $$
+declare
+  v_id uuid;
+  v_closes timestamptz;
+  v_starts timestamptz;
+begin
+  v_id := public.create_group(
+    'a1e6ffff-ffff-4fff-8fff-ffffffffffff',
+    2,
+    '',
+    2
+  );
+  select closes_at, starts_at into v_closes, v_starts
+  from public.groups
+  where id = v_id;
+  if v_closes is distinct from v_starts then
+    raise exception 'menos de 1 h não usou o início como prazo % %', v_closes, v_starts;
+  end if;
+end $$;
+
+rollback;
 
 set role anon;
 

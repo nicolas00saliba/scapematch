@@ -191,6 +191,8 @@ abstract final class AppKeys {
   static Key openDay(int year, int month, int day) =>
       Key('open-day-$year-$month-$day');
   static Key openSlot(String id) => Key('open-slot-$id');
+  static Key openSlotInfo(String id) => Key('open-slot-info-$id');
+  static const openSlotHint = Key('open-slot-hint');
   static Key openRoom(String roomId) => Key('open-room-$roomId');
   static Key roomCarousel(String category) => Key('room-carousel-$category');
   static Key roomCard(String id) => Key('room-card-$id');

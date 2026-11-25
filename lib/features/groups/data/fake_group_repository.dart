@@ -173,7 +173,8 @@ class FakeGroupRepository implements GroupRepository {
     if (current.isCancelled) {
       return const JoinFailure(JoinFailureReason.groupCancelled);
     }
-    if (current.confirmedAt == null && !now.isBefore(current.closesAtResolved)) {
+    if (current.confirmedAt == null &&
+        !now.isBefore(current.closesAtResolved)) {
       return const JoinFailure(JoinFailureReason.deadlinePassed);
     }
     if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
@@ -311,10 +312,7 @@ class FakeGroupRepository implements GroupRepository {
       }
     }
     final updated = await _confirmIfReady(
-      current.copyWith(
-        participants: people,
-        filledSpots: _occupied(people),
-      ),
+      current.copyWith(participants: people, filledSpots: _occupied(people)),
     );
     _database.groups[index] = updated;
     return JoinSuccess(updated);
@@ -331,7 +329,8 @@ class FakeGroupRepository implements GroupRepository {
     if (current.isCancelled) {
       return const JoinFailure(JoinFailureReason.groupCancelled);
     }
-    if (current.confirmedAt == null && !now.isBefore(current.closesAtResolved)) {
+    if (current.confirmedAt == null &&
+        !now.isBefore(current.closesAtResolved)) {
       return const JoinFailure(JoinFailureReason.deadlinePassed);
     }
     if (GroupRules.hasEnded(endsAt: current.endsAt, now: now)) {
@@ -425,9 +424,7 @@ class FakeGroupRepository implements GroupRepository {
   Future<List<CardInstallmentOption>> quoteCardInstallments(
     int principalCents,
   ) {
-    return Future.value(
-      cardInstallmentOptions(principalCents: principalCents),
-    );
+    return Future.value(cardInstallmentOptions(principalCents: principalCents));
   }
 
   @override
@@ -515,6 +512,9 @@ class FakeGroupRepository implements GroupRepository {
         payment: settled.status == ShareStatus.paid
             ? PaymentStatus.paid
             : PaymentStatus.reserved,
+        attendance: member.attendance == AttendanceStatus.joined
+            ? AttendanceStatus.confirmed
+            : member.attendance,
       ),
     );
     updated = await _confirmIfReady(updated);
@@ -598,9 +598,6 @@ class FakeGroupRepository implements GroupRepository {
     final now = clock.now();
     if (GroupRules.hasStarted(startsAt: slot.startsAt, now: now)) {
       return const CreateGroupFailure(CreateGroupFailureReason.alreadyStarted);
-    }
-    if (GroupRules.tooCloseToCreate(startsAt: slot.startsAt, now: now)) {
-      return const CreateGroupFailure(CreateGroupFailureReason.tooCloseToStart);
     }
 
     final taken = GroupRules.roomAndTimeTaken(
@@ -731,6 +728,12 @@ class FakeGroupRepository implements GroupRepository {
       case _SeatProblem(:final kind):
         return ConfirmAttendanceFailure(_confirmProblem(kind));
       case _SeatFound(:final index, :final group, :final member):
+        if (member.payment != PaymentStatus.paid &&
+            member.payment != PaymentStatus.reserved) {
+          return const ConfirmAttendanceFailure(
+            ConfirmAttendanceFailureReason.paymentRequired,
+          );
+        }
         final updated = _replaceMember(
           group,
           member.copyWith(attendance: AttendanceStatus.confirmed),

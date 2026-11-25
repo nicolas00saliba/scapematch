@@ -879,32 +879,24 @@ void main() {
     expect(find.text('Sala do Cofre perto do prazo'), findsNothing);
   });
 
-  test('creating a group inside the last hour is refused', () async {
+  test('creating a group inside the last hour is allowed', () async {
     final now = sampleNow;
     final inside = await _createAt(
       now,
       now.add(const Duration(minutes: 40)),
       'slot-inside-hour',
     );
-    expect(inside, isA<CreateGroupFailure>());
-    expect(
-      (inside as CreateGroupFailure).reason,
-      CreateGroupFailureReason.tooCloseToStart,
-    );
-    expect(
-      GroupMessages.createFailure(CreateGroupFailureReason.tooCloseToStart),
-      contains('1 h'),
-    );
+    final soon = (inside as CreateGroupSuccess).group;
+    expect(soon.isCancelled, isFalse);
+    expect(soon.closesAt, soon.startsAt);
 
     final exact = await _createAt(
       now,
       now.add(const Duration(hours: 1)),
       'slot-exact-hour',
     );
-    expect(
-      (exact as CreateGroupFailure).reason,
-      CreateGroupFailureReason.tooCloseToStart,
-    );
+    final onTheHour = (exact as CreateGroupSuccess).group;
+    expect(onTheHour.closesAt, onTheHour.startsAt);
 
     final ok = await _createAt(
       now,

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/data/sample_ids.dart';
+import 'package:scapematch/core/time/region_time.dart';
 import 'package:scapematch/core/time/clock.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/features/catalog/domain/escape_room.dart';
@@ -29,7 +30,7 @@ import 'support/sample_clock.dart';
 void main() {
   final now = DateTime(2026, 11, 24, 15);
 
-  test('só entram horários livres, futuros e fora da janela de 1 h', () {
+  test('entra a última hora e a vaga some só quando as pagas enchem', () {
     final free = TimeSlot(
       id: 'livre',
       roomId: 'sala-a',
@@ -76,6 +77,9 @@ void main() {
           roomId: reserved.roomId,
           startsAt: reserved.startsAt,
           cancelled: false,
+          groupId: 'cheio',
+          totalSpots: 2,
+          paidSpots: 2,
         ),
         SlotOccupancy(
           slotId: 'grupo-cancelado',
@@ -88,16 +92,45 @@ void main() {
           roomId: sameInstant.roomId,
           startsAt: sameInstant.startsAt,
           cancelled: false,
+          groupId: 'aberto',
+          totalSpots: 4,
+          paidSpots: 1,
         ),
       ],
     );
 
-    expect(open.map((item) => item.slot.id), ['em-61', 'livre']);
+    expect(open.map((item) => item.slot.id), [
+      'perto',
+      'em-61',
+      'livre',
+      'outro-id',
+    ]);
+    expect(open.first.nearStart, isTrue);
+    expect(open.first.timeLabel, '16:00');
+    expect(open[1].nearStart, isFalse);
+    final partial = open.last;
+    expect(partial.openGroupId, 'aberto');
+    expect(partial.spotsLeft, 3);
     expect(openDaysOf(open), [
       calendarDay(soon.startsAt),
       calendarDay(free.startsAt),
+      calendarDay(sameInstant.startsAt),
     ]);
-    expect(open.first.timeLabel, '16:01');
+    expect(open[1].timeLabel, '16:01');
+  });
+
+  test('a hora de parede de Curitiba é UTC menos 3', () {
+    final utc = RegionTime.current.toUtcInstant(DateTime(2026, 11, 24, 14, 30));
+    expect(utc, DateTime.utc(2026, 11, 24, 17, 30));
+    expect(RegionTime.current.hourMinute(utc), '14:30');
+    expect(
+      RegionTime.current.calendarDay(DateTime.utc(2027, 6, 15, 2, 30)),
+      DateTime(2027, 6, 14),
+    );
+    expect(
+      RegionTime.current.hourMinute(DateTime.utc(2027, 6, 15, 2, 30)),
+      '23:30',
+    );
   });
 
   testWidgets('o bloco de data mostra só os dias recebidos', (tester) async {
@@ -204,6 +237,46 @@ void main() {
     expect(picked?.slot.id, 'b-19');
   });
 
+  testWidgets('horário perto do início fica vermelho e explica o reembolso', (
+    tester,
+  ) async {
+    await tester.runAsync(_loadFonts);
+    final day = DateTime(2026, 11, 24);
+    final alfa = _room('sala-a', 'Sala Alfa');
+    final near = OpenSlot(
+      slot: TimeSlot(
+        id: 'perto',
+        roomId: alfa.id,
+        startsAt: DateTime(2026, 11, 24, 15, 40),
+      ),
+      day: day,
+      timeLabel: '15:40',
+      nearStart: true,
+    );
+    await tester.binding.setSurfaceSize(const Size(412, 915));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pump(
+      tester,
+      OpenSlotBlock(
+        day: day,
+        openings: [
+          RoomOpenings(room: alfa, slots: [near]),
+        ],
+        selectedSlotId: null,
+        onSelected: (_) {},
+      ),
+    );
+    expect(find.byKey(AppKeys.openSlotInfo('perto')), findsOneWidget);
+    expect(find.text('15:40'), findsOneWidget);
+    await _shot(tester, 'reserva-perto-celular');
+
+    await tester.tap(find.byKey(AppKeys.openSlotInfo('perto')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.openSlotHint), findsOneWidget);
+    expect(find.textContaining('pode não ter reembolso'), findsOneWidget);
+    await _shotRoot(tester, 'reserva-perto-aviso-celular');
+  });
+
   testWidgets('a casa de exemplo esconde passado e horário reservado', (
     tester,
   ) async {
@@ -246,12 +319,12 @@ void main() {
     final context = tester.element(find.byType(CreateGroupScreen));
     final state = ProviderScope.containerOf(context)
         .read(createGroupViewModelProvider);
-    expect(
-      state.openSlots.any(
-        (item) => item.slot.id == SampleIds.slotPoaEstufaTaken,
-      ),
-      isFalse,
+    final taken = state.openSlots.where(
+      (item) => item.slot.id == SampleIds.slotPoaEstufaTaken,
     );
+    expect(taken, hasLength(1));
+    expect(taken.single.spotsLeft, 1);
+    expect(taken.single.openGroupId, 'grp-poa-estufa-almost');
     expect(
       state.openSlots.any(
         (item) => item.slot.id == SampleIds.slotPoaEstufaFree,
@@ -317,6 +390,38 @@ void main() {
     await _shot(tester, 'reserva-horarios-celular');
     expect(find.byKey(AppKeys.openSlots), findsOneWidget);
   });
+
+  testWidgets('salva a entrada paga no celular', (tester) async {
+    await tester.runAsync(_loadFonts);
+    await pumpScapeMatch(
+      tester,
+      viewport: const Size(412, 915),
+      overrides: [clockProvider.overrideWithValue(FixedClock(sampleNow))],
+    );
+    await tester.tap(find.byKey(AppKeys.citySelector).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.cityOption(SampleIds.saoPaulo)));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(AppKeys.groupSearch), 'Cobertura');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
+      300,
+      scrollable: verticalScrollable,
+    );
+    await tester.tap(
+      find.byKey(AppKeys.groupCard(SampleIds.groupSpCoberturaOpen)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AppKeys.joinButton));
+    await tester.pumpAndSettle();
+    expect(find.byKey(AppKeys.confirmAttendance), findsNothing);
+    expect(find.byKey(AppKeys.payMyShare), findsOneWidget);
+    expect(find.textContaining('Pague para entrar'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await _shotRoot(tester, 'reserva-entrada-paga-celular');
+  });
 }
 
 EscapeRoom _room(String id, String name) {
@@ -359,6 +464,28 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
       ),
     ),
   );
+}
+
+Future<void> _shotRoot(WidgetTester tester, String name) async {
+  final dir = Directory('/opt/cursor/artifacts');
+  if (!dir.existsSync()) return;
+  await tester.pump();
+  final image = await tester.runAsync(() async {
+    var node = tester.renderObject(find.byType(MaterialApp).first);
+    while (node.parent != null) {
+      node = node.parent!;
+    }
+    final layer = node.debugLayer;
+    if (layer is! OffsetLayer) return null;
+    return layer.toImage(node.paintBounds, pixelRatio: 1);
+  });
+  if (image == null) return;
+  final bytes = await tester.runAsync(
+    () => image.toByteData(format: ui.ImageByteFormat.png),
+  );
+  if (bytes == null) return;
+  File('${dir.path}/$name.png').writeAsBytesSync(bytes.buffer.asUint8List());
+  image.dispose();
 }
 
 Future<void> _shot(WidgetTester tester, String name) async {

@@ -68,13 +68,29 @@ class OpenSlotBlock extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     for (final slot in openings[index].slots)
-                      ChoiceChip(
-                        key: AppKeys.openSlot(slot.slot.id),
-                        label: Text(slot.timeLabel),
-                        selected: slot.slot.id == selectedSlotId,
-                        onSelected: onSelected == null
-                            ? null
-                            : (_) => onSelected!(slot),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _SlotChip(
+                            slot: slot,
+                            selected: slot.slot.id == selectedSlotId,
+                            onSelected: onSelected == null
+                                ? null
+                                : () => onSelected!(slot),
+                          ),
+                          if (slot.nearStart)
+                            IconButton(
+                              key: AppKeys.openSlotInfo(slot.slot.id),
+                              tooltip: 'Sem reembolso se cancelar',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _warnNearStart(context),
+                              icon: Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: scheme.error,
+                              ),
+                            ),
+                        ],
                       ),
                   ],
                 ),
@@ -84,4 +100,57 @@ class OpenSlotBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SlotChip extends StatelessWidget {
+  const _SlotChip({
+    required this.slot,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final OpenSlot slot;
+  final bool selected;
+  final VoidCallback? onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final near = slot.nearStart;
+    return ChoiceChip(
+      key: AppKeys.openSlot(slot.slot.id),
+      label: Text(slot.timeLabel),
+      selected: selected,
+      onSelected: onSelected == null ? null : (_) => onSelected!(),
+      showCheckmark: !near,
+      side: near ? BorderSide(color: scheme.error, width: 1.4) : null,
+      labelStyle: TextStyle(
+        color: near ? scheme.error : null,
+        fontWeight: FontWeight.w700,
+      ),
+      color: near ? WidgetStatePropertyAll(scheme.errorContainer) : null,
+    );
+  }
+}
+
+void _warnNearStart(BuildContext context) {
+  final theme = Theme.of(context);
+  showDialog<void>(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        key: AppKeys.openSlotHint,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 260),
+            child: Text(
+              'Reservar neste horário pode não ter reembolso se você cancelar.',
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }

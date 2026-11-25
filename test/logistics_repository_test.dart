@@ -436,21 +436,33 @@ void main() {
     },
   );
 
-  test('confirming attendance is stored and counted', () async {
-    final joined = await groups.join(
-      SampleIds.groupSpCoberturaOpen,
-      participantUserId: 'user-local',
-      participantName: 'Você',
-    );
-    final before = (joined as JoinSuccess).group.confirmedCount;
-    final confirmed = await groups.confirmAttendance(
-      SampleIds.groupSpCoberturaOpen,
-      userId: 'user-local',
-    );
-    final group = (confirmed as ConfirmAttendanceSuccess).group;
-    expect(group.participantForUser('user-local')!.isConfirmed, isTrue);
-    expect(group.confirmedCount, before + 1);
-  });
+  test(
+    'paying confirms the seat and confirming without pay does not',
+    () async {
+      final joined = await groups.join(
+        SampleIds.groupSpCoberturaOpen,
+        participantUserId: 'user-local',
+        participantName: 'Você',
+      );
+      final before = (joined as JoinSuccess).group.confirmedCount;
+      final blocked = await groups.confirmAttendance(
+        SampleIds.groupSpCoberturaOpen,
+        userId: 'user-local',
+      );
+      expect(
+        (blocked as ConfirmAttendanceFailure).reason,
+        ConfirmAttendanceFailureReason.paymentRequired,
+      );
+      final paid = await groups.payShare(
+        SampleIds.groupSpCoberturaOpen,
+        userId: 'user-local',
+        kind: PaymentMethodKind.pix,
+      );
+      final group = (paid as PayShareSuccess).group;
+      expect(group.participantForUser('user-local')!.isConfirmed, isTrue);
+      expect(group.confirmedCount, before + 1);
+    },
+  );
 
   test('the creator can edit the size and the note inside the room', () async {
     final created = await groups.create(

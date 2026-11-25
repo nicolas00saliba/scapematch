@@ -7,6 +7,8 @@ import 'package:scapematch/features/catalog/domain/open_schedule.dart';
 import 'package:scapematch/features/catalog/domain/open_slot.dart';
 import 'package:scapematch/features/catalog/domain/room_listing.dart';
 import 'package:scapematch/features/catalog/domain/time_slot.dart';
+import 'package:scapematch/features/groups/domain/attendance.dart';
+import 'package:scapematch/features/groups/domain/group.dart';
 
 class FakeCatalogRepository implements CatalogRepository {
   FakeCatalogRepository(
@@ -74,6 +76,9 @@ class FakeCatalogRepository implements CatalogRepository {
               roomId: group.roomId,
               startsAt: group.startsAt,
               cancelled: group.isCancelled,
+              groupId: group.id,
+              totalSpots: group.totalSpots,
+              paidSpots: _paidSeats(group),
             ),
       ],
       now: now,
@@ -159,4 +164,16 @@ class FakeCatalogRepository implements CatalogRepository {
     }
     return Future<void>.delayed(latency);
   }
+}
+
+int _paidSeats(Group group) {
+  var paid = 0;
+  for (final person in group.participants) {
+    if (!person.occupiesSeat) continue;
+    if (person.payment == PaymentStatus.paid ||
+        person.payment == PaymentStatus.reserved) {
+      paid += 1;
+    }
+  }
+  return paid;
 }

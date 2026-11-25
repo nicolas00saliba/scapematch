@@ -34,11 +34,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(GroupMessages.joinedBanner), findsOneWidget);
-    expect(find.byKey(AppKeys.confirmAttendance), findsOneWidget);
+    expect(find.byKey(AppKeys.confirmAttendance), findsNothing);
+    expect(find.byKey(AppKeys.payMyShare), findsOneWidget);
     expect(find.byKey(AppKeys.deleteGroup), findsNothing);
 
-    await tester.tap(find.byKey(AppKeys.confirmAttendance));
-    await tester.pumpAndSettle();
+    await _pay(tester);
 
     expect(_text(tester, AppKeys.confirmedCount), '2 presenças confirmadas');
     expect(find.textContaining('Você'), findsWidgets);

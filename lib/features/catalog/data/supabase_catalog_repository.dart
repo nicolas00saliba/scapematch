@@ -82,6 +82,11 @@ class SupabaseCatalogRepository implements CatalogRepository {
             ),
             day: calendarDayFromText(row['day'].toString()),
             timeLabel: row['starts_hm'] as String,
+            nearStart: row['near_start'] == true,
+            openGroupId: row['group_id'] as String?,
+            spotsLeft: row['spots_left'] == null
+                ? null
+                : (row['spots_left'] as num).toInt(),
           ),
     ];
   }
