@@ -23,9 +23,9 @@ export function installmentParcelTooSmall(
   return count > 1 && amountCents < minInstallmentParcelCents * count;
 }
 
-/// Até 3x a EscapeMatch absorve o juro. Da 4ª à 12ª o juro vai para o jogador.
+/// No máximo 3x, sempre sem juros. 4x ou mais é recusado.
 export const interestFreeInstallments = 3;
-export const maxInstallments = 12;
+export const maxInstallments = 3;
 
 /// Faixa da cotação de parcelas. Abaixo de R$ 1 e acima de R$ 5.000
 /// a consulta nem sai para a PagBank.
@@ -50,7 +50,7 @@ export function quoteAmountInRange(cents: number): boolean {
     cents <= maxQuoteAmountCents;
 }
 
-/// De 4x em diante o cliente tem de confirmar o total cotado.
+/// Acima de 3x não há total aceito. Até 3x o cliente não precisa confirmar juro.
 export function quotedTotalAccepted(input: {
   installments: number;
   expectedCents: number | undefined;
@@ -58,6 +58,7 @@ export function quotedTotalAccepted(input: {
 }): boolean {
   const count = input.installments;
   const expected = input.expectedCents;
+  if (!Number.isInteger(count) || count > maxInstallments) return false;
   if (count > interestFreeInstallments) {
     if (typeof expected !== "number" || !Number.isInteger(expected)) {
       return false;
@@ -200,8 +201,7 @@ export type InstallmentCharge = {
 
 export type InstallmentOption = InstallmentCharge & { enabled: boolean };
 
-/// Grade de 1x a 12x. 2x ou mais só habilita com parcela de pelo menos R$ 5.
-/// De 4x a 12x também precisa do juro cotado do comprador.
+/// Grade de 1x a 3x, sem juros. 2x e 3x só habilitam com parcela de pelo menos R$ 5.
 export function installmentMenu(input: {
   principalCents: number;
   interestByCount?: Readonly<Record<number, number>>;

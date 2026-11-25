@@ -216,52 +216,28 @@ Deno.test("cartão até 3x não manda juro e nasce sem captura", async () => {
   assertEquals((charge.amount as { value: number }).value, 20000);
 });
 
-Deno.test("4x soma o juro cotado e não aumenta a casa", async () => {
+Deno.test("4x é recusado antes de cotar juro ou autorizar", async () => {
   const calls: string[] = [];
   const fetchFn = (url: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
-    if (url.includes("/charges/fees/calculate")) {
-      return Promise.resolve(new Response(JSON.stringify({
-        payment_methods: {
-          credit_card: {
-            visa: {
-              installment_plans: [{
-                installments: 4,
-                interest_free: false,
-                amount: {
-                  value: 20640,
-                  fees: { buyer: { interest: { total: 640, installments: 1 } } },
-                },
-              }],
-            },
-          },
-        },
-      }), { status: 200 }));
-    }
-    if ((init?.method ?? "GET") === "POST") {
-      const posted = JSON.parse(String(init?.body));
-      const charge = posted.charges[0];
-      assertEquals(charge.amount.value, 20640);
-      assertEquals(charge.amount.fees.buyer.interest.total, 640);
-      assertEquals(charge.splits.receivers[0].amount.value, 15000);
-      assertEquals(charge.splits.receivers[1].amount.value, 5640);
-      return Promise.resolve(new Response(JSON.stringify({
-        charges: [{ id: "CHAR_4", status: "AUTHORIZED", splits: { id: "SPLI_4" } }],
-      }), { status: 200 }));
-    }
     return Promise.resolve(new Response("não", { status: 500 }));
   };
-  await provider(fetchFn).authorizeCard({
-    customer: "PB_CUS_1",
-    value: 200,
-    dueDate: "2026-11-07",
-    description: "EscapeMatch",
-    externalReference: "card-4",
-    split: { walletId: venue, fixedValue: 150 },
-    creditCardToken: "CARD_1",
-    installments: 4,
-  });
-  assert(calls.some((call) => call.includes("/charges/fees/calculate")));
+  await assertRejects(
+    () =>
+      provider(fetchFn).authorizeCard({
+        customer: "PB_CUS_1",
+        value: 200,
+        dueDate: "2026-11-07",
+        description: "EscapeMatch",
+        externalReference: "card-4",
+        split: { walletId: venue, fixedValue: 150 },
+        creditCardToken: "CARD_1",
+        installments: 4,
+      }),
+    Error,
+    "parcelas",
+  );
+  assertEquals(calls, []);
 });
 
 Deno.test("captura, estorno e custódia usam os caminhos da PagBank", async () => {
@@ -649,21 +625,22 @@ Deno.test("a cotação de parcelas sai de uma consulta só", async () => {
   const client = provider(fetchFn);
   const plans = await client.quoteCardPlans(20_000);
   assertEquals(quotes, 1);
+  assertEquals(plans.length, 3);
   assertEquals(plans[0].enabled, true);
   assertEquals(plans[2].amountCents, 20_000);
   assertEquals(plans[2].merchantAbsorbsInterest, true);
-  assertEquals(plans[3].amountCents, 20_640);
-  assertEquals(plans[3].enabled, true);
-  assertEquals(plans[4].enabled, false);
+  assertEquals(plans.every((item) => item.merchantAbsorbsInterest), true);
   const small = await client.quoteCardPlans(10_000);
   assertEquals(quotes, 2);
   assertEquals(
     small.filter((item) => item.enabled).map((item) => item.installments),
-    [1, 2, 3, 4],
+    [1, 2, 3],
   );
   assertEquals(small[1].merchantAbsorbsInterest, true);
-  assertEquals(small[3].amountCents, 10_640);
-  const checked = await client.cardPlan(20_000, 4);
-  assertEquals(checked.amountCents, 20_640);
-  assertEquals(quotes, 3);
+  await assertRejects(
+    () => client.cardPlan(20_000, 4),
+    Error,
+    "parcelas",
+  );
+  assertEquals(quotes, 2);
 });

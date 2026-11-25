@@ -679,12 +679,13 @@ export class PagBankProvider {
     principalCents: number,
     installments: number,
   ): Promise<number> {
+    if (installments > maxInstallments) throw new Error("parcelas");
     if (installments <= interestFreeInstallments) return 0;
     const query = new URLSearchParams({
       payment_methods: "CREDIT_CARD",
       value: String(principalCents),
-      max_installments: "12",
-      max_installments_no_interest: "3",
+      max_installments: String(maxInstallments),
+      max_installments_no_interest: String(interestFreeInstallments),
     });
     const body = await this.#send(
       `/charges/fees/calculate?${query}`,
@@ -701,7 +702,7 @@ export class PagBankProvider {
     return interest;
   }
 
-  /// Uma consulta de taxas vira a grade de 1x a 12x.
+  /// Uma consulta de taxas vira a grade de 1x a 3x.
   async quoteCardPlans(principalCents: number): Promise<InstallmentOption[]> {
     if (!Number.isInteger(principalCents) || principalCents <= 0) {
       throw new Error("valor");
@@ -735,6 +736,7 @@ export class PagBankProvider {
     installments = 1,
   ): Promise<InstallmentCharge> {
     const count = Number.isInteger(installments) ? installments : 1;
+    if (count > maxInstallments) return Promise.reject(new Error("parcelas"));
     if (count <= interestFreeInstallments) {
       return Promise.resolve(
         installmentCharge({ principalCents, installments: count }),
