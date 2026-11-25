@@ -88,7 +88,7 @@ alter default privileges in schema public
 -- O Postgres do CI não traz a extensão vault. Este substituto só existe
 -- no teste. A migração histórica 20261105220000 exige o item
 -- asaas_subaccount_key no momento em que ela roda. A migração
--- 20261125230000 copia o mesmo valor para pagbank_token_key e apaga
+-- 20261125200103 copia o mesmo valor para pagbank_token_key e apaga
 -- o item antigo, sem recifrar. O valor plantado abaixo é só de teste.
 create schema if not exists vault;
 
