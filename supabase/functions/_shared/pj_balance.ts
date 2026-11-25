@@ -11,7 +11,7 @@ export function shouldAlertLowBalance(
   availableCents: number,
   limitCents: number,
 ): boolean {
-  if (!Number.isInteger(availableCents) || availableCents < 0) return false;
+  if (!Number.isInteger(availableCents)) return false;
   if (!Number.isInteger(limitCents) || limitCents < 0) return false;
   return availableCents < limitCents;
 }

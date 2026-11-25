@@ -86,7 +86,8 @@ begin
     or (
       (v_group.closes_at is null or v_group.closes_at > p_now)
       and v_filled >= v_group.minimum_spots
-    );
+    )
+    or private.minimum_reached_on_time(v_group.id);
 
   return v_confirmed;
 end;
@@ -169,14 +170,69 @@ security definer
 set search_path = ''
 as $$
   select p_available_cents is not null
-    and p_available_cents >= 0
     and p_available_cents < public.low_balance_alert_cents();
 $$;
 
 comment on function public.pj_balance_alert_due(bigint) is
-  'True quando o saldo disponível da conta PJ está abaixo do limite. No limite, não alerta.';
+  'True quando o saldo disponível da conta PJ está abaixo do limite, inclusive negativo. No limite, não alerta.';
 
 revoke all on function public.pj_balance_alert_due(bigint)
   from public, anon, authenticated;
 grant execute on function public.pj_balance_alert_due(bigint)
   to service_role;
+
+-- O integrante que completou o mínimo entrou até o closes_at.
+-- Sem essa prova, o prazo vencido continua sem confirmação.
+create or replace function private.minimum_reached_on_time(p_group_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.groups g
+    join lateral (
+      select m.joined_at
+      from public.group_members m
+      where m.group_id = g.id
+        and m.attendance <> 'cancelled'
+      order by m.joined_at, m.id
+      offset case when g.minimum_spots > 1 then g.minimum_spots - 1 else 0 end
+      limit 1
+    ) nth on true
+    where g.id = p_group_id
+      and g.minimum_spots > 0
+      and g.closes_at is not null
+      and nth.joined_at <= g.closes_at
+  );
+$$;
+
+revoke all on function private.minimum_reached_on_time(uuid)
+  from public, anon, authenticated, service_role;
+
+create or replace function public.expire_unconfirmed_groups()
+returns setof uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return query
+  update public.groups
+  set cancelled_at = pg_catalog.now(),
+      cancel_reason = 'O grupo não confirmou a tempo'
+  where cancelled_at is null
+    and confirmed_at is null
+    and closed_at is null
+    and closes_at is not null
+    and closes_at <= pg_catalog.now()
+    and not private.minimum_reached_on_time(id)
+  returning id;
+end;
+$$;
+
+revoke all on function public.expire_unconfirmed_groups()
+  from public, anon, authenticated;
+grant execute on function public.expire_unconfirmed_groups() to service_role;

@@ -897,7 +897,7 @@ Deno.test("paginação local consulta todas as cobranças, sem offset de data", 
 });
 
 Deno.test("saldo da conta PJ abaixo do limite alerta e no limite não", async () => {
-  async function run(cents: number): Promise<string[]> {
+  async function run(reais: number): Promise<string[]> {
     const lines: string[] = [];
     const original = console.error;
     console.error = (line?: unknown) => {
@@ -915,7 +915,7 @@ Deno.test("saldo da conta PJ abaixo do limite alerta e no limite não", async ()
             const url = String(input);
             if (url.endsWith("/accounts/balance")) {
               return Promise.resolve(
-                new Response(JSON.stringify({ balance: cents }), { status: 200 }),
+                new Response(JSON.stringify({ balance: reais }), { status: 200 }),
               );
             }
             return Promise.resolve(
@@ -946,21 +946,24 @@ Deno.test("saldo da conta PJ abaixo do limite alerta e no limite não", async ()
       assertEquals(response.status, 200);
       const body = await response.text();
       assert(!body.includes("transfers"));
-      assert(!body.includes(String(cents)));
+      assert(!body.includes(String(reais)));
     } finally {
       console.error = original;
     }
     return lines;
   }
 
-  const low = await run(99_999);
+  const low = await run(999.99);
   assert(low.some((line) =>
     line.includes('"scope":"pagbank-balance"') &&
     line.includes('"code":"low_balance"')
   ));
-  assert(low.every((line) => !line.includes("99999")));
-  const enough = await run(100_000);
+  assert(low.every((line) => !line.includes("999.99") && !line.includes("99999")));
+  const negative = await run(-1.5);
+  assert(negative.some((line) => line.includes('"code":"low_balance"')));
+  assert(negative.every((line) => !line.includes("-1.5") && !line.includes("-150")));
+  const enough = await run(1000);
   assertEquals(enough.some((line) => line.includes("low_balance")), false);
-  const above = await run(100_001);
+  const above = await run(1000.01);
   assertEquals(above.some((line) => line.includes("low_balance")), false);
 });

@@ -32,6 +32,7 @@ function adminFor(options: {
   minimum?: number;
   closesAt?: string;
   startsAt?: string;
+  joinedAt?: string[];
   charges: Charge[];
   claim?: () => boolean;
   member?: string | null;
@@ -45,9 +46,11 @@ function adminFor(options: {
     transitions,
     from(table: string) {
       let head = false;
+      let selected = "";
       const self = {
-        select(_cols: string, opts?: { head?: boolean }) {
+        select(cols: string, opts?: { head?: boolean }) {
           head = Boolean(opts?.head);
+          selected = cols;
           return self;
         },
         eq() {
@@ -96,6 +99,13 @@ function adminFor(options: {
         if (table === "group_members") {
           if (head) {
             return { data: null, error: null, count: options.filled ?? 4 };
+          }
+          if (selected.includes("joined_at")) {
+            return {
+              data: (options.joinedAt ?? []).map((joined_at) => ({ joined_at })),
+              error: null,
+              count: options.joinedAt?.length ?? 0,
+            };
           }
           return {
             data: options.member === null
@@ -347,6 +357,48 @@ Deno.test("prazo vencido sem confirmação cancela e não captura", async () => 
     admin.calls.includes("update:groups"),
     admin.calls.join(","),
   );
+  assert(
+    admin.transitions.some((call) =>
+      call.cancel_reason === "O grupo não confirmou a tempo"
+    ),
+  );
+});
+
+Deno.test("mínimo no prazo sem confirmed_at captura e não cancela", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    confirmed: false,
+    filled: 2,
+    minimum: 2,
+    closesAt: "2026-11-01T12:00:00Z",
+    startsAt: "2099-01-01T00:00:00Z",
+    joinedAt: ["2026-10-01T12:00:00Z", "2026-10-20T12:00:00Z"],
+    charges,
+  });
+  const captures: string[] = [];
+  await settleGroup(admin, provider("AUTHORIZED", captures), groupId);
+  assertEquals(captures.length, 1);
+  assertEquals(
+    admin.transitions.some((call) =>
+      call.cancel_reason === "O grupo não confirmou a tempo"
+    ),
+    false,
+  );
+});
+
+Deno.test("mínimo depois do prazo cancela e não captura", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    confirmed: false,
+    filled: 2,
+    minimum: 2,
+    closesAt: "2026-11-01T12:00:00Z",
+    joinedAt: ["2026-10-01T12:00:00Z", "2026-11-02T12:00:00Z"],
+    charges,
+  });
+  const captures: string[] = [];
+  await settleGroup(admin, provider("AUTHORIZED", captures), groupId);
+  assertEquals(captures.length, 0);
   assert(
     admin.transitions.some((call) =>
       call.cancel_reason === "O grupo não confirmou a tempo"

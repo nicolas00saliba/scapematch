@@ -10,6 +10,7 @@ import {
   pagbankSandboxBaseUrl,
   type PagBankFetch,
 } from "./pagbank_provider.ts";
+import { readAccountBalance } from "./pagbank_transfers.ts";
 
 export const maxCacAttempts = 8;
 
@@ -262,17 +263,18 @@ export function pagbankCacClient(
       const body = await response.json().catch(() => null);
       if (!body || typeof body !== "object") return null;
       const record = body as Record<string, unknown>;
-      if (typeof record.balance === "number" && Number.isFinite(record.balance)) {
-        return Number.isInteger(record.balance)
-          ? record.balance
-          : Math.round(record.balance * 100);
+      try {
+        const read = readAccountBalance(record);
+        if (!read.exact || read.field !== "balance") {
+          console.error(JSON.stringify({
+            scope: "pagbank-balance",
+            code: "balance_shape",
+          }));
+        }
+        return read.cents;
+      } catch (_error) {
+        return null;
       }
-      const amount = record.amount;
-      if (amount && typeof amount === "object") {
-        const value = (amount as { value?: unknown }).value;
-        if (typeof value === "number" && Number.isInteger(value)) return value;
-      }
-      return null;
     },
     async postTransfer(body, idempotencyKey) {
       const response = await fetchFn(`${secure}/transfers`, {

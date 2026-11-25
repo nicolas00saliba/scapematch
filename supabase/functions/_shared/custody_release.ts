@@ -3,7 +3,12 @@
 // A mesma regra está em public.custody_release_due.
 
 import { logCaught } from "./pagbank_client_error.ts";
-import { bandConfirmed } from "./group_band.ts";
+import {
+  bandConfirmed,
+  joinedAtFromRows,
+  minimumReachedOnTime,
+} from "./group_band.ts";
+import { captureOpsAlert } from "./sentry_ops.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -31,6 +36,7 @@ export type SessionClock = {
   sessionCancelledAt: string | null;
   refundRequestedAt: string | null;
   confirmed: boolean;
+  stuckUnconfirmed: boolean;
   status: string | null;
 };
 
@@ -45,7 +51,7 @@ export function custodyReleaseDue(clock: SessionClock, now = Date.now()): boolea
   if (clock.groupCancelledAt) return false;
   if (clock.sessionCancelledAt) return false;
   if (clock.status && blockedStatus.has(clock.status)) return false;
-  if (!clock.confirmed) return false;
+  if (!clock.confirmed || clock.stuckUnconfirmed) return false;
   if (!clock.startsAt) return false;
   const start = Date.parse(clock.startsAt);
   if (!Number.isFinite(start)) return false;
@@ -106,6 +112,10 @@ export async function releaseHeldSplit(
   if (!id || !charge.id || charge.custody_released_at) return false;
   const now = Date.now();
   const clock = await loadSessionClock(admin, charge);
+  if (clock.stuckUnconfirmed) {
+    await alertUnconfirmedHeld();
+    return false;
+  }
   if (!custodyReleaseDue(clock, now)) return false;
   const sql = await sqlAllowsRelease(admin, charge.id, new Date(now).toISOString());
   if (sql === false) return false;
@@ -183,15 +193,20 @@ export async function retryPendingCustodyReleases(
   if (typeof admin?.from !== "function") return 0;
   const data = await dueCustodyCharges(admin);
   let released = 0;
+  let stuck = false;
   for (const row of data) {
     const charge = row as CustodyCharge;
     if (!charge.group_id || charge.refund_requested_at) continue;
     if ((charge.custody_release_attempts ?? 0) >= maxCustodyReleaseAttempts) {
       continue;
     }
-    if (!await groupIsClosed(admin, charge.group_id)) continue;
+    if (!await groupIsClosed(admin, charge.group_id)) {
+      if (await unprovenHeldGroup(admin, charge.group_id)) stuck = true;
+      continue;
+    }
     if (await releaseHeldSplit(admin, pagbank, charge)) released += 1;
   }
+  if (stuck) await alertUnconfirmedHeld();
   return released;
 }
 
@@ -244,7 +259,13 @@ async function groupIsClosed(admin: Admin, groupId: string): Promise<boolean> {
     .select("id", { count: "exact", head: true })
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
-  return bandConfirmed(group, count ?? 0);
+  if (bandConfirmed(group, count ?? 0)) return true;
+  const joined = await memberJoinedAt(admin, groupId);
+  return minimumReachedOnTime(
+    textOrNull(group.closes_at),
+    Number(group.minimum_spots ?? 0),
+    joined ?? [],
+  );
 }
 
 async function loadSessionClock(
@@ -274,6 +295,7 @@ async function loadSessionClock(
     sessionCancelledAt: null,
     refundRequestedAt: refundAt,
     confirmed: false,
+    stuckUnconfirmed: false,
     status,
   };
   if (!groupId || typeof admin?.from !== "function") return empty;
@@ -306,21 +328,66 @@ async function loadSessionClock(
     .select("id", { count: "exact", head: true })
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
+  const joined = await memberJoinedAt(admin, groupId);
+  const closesAt = textOrNull(groupRow.closes_at);
+  const minimum = Number(groupRow.minimum_spots ?? 0);
+  const filled = joined ? joined.length : count ?? 0;
+  const onTime = joined
+    ? minimumReachedOnTime(closesAt, minimum, joined)
+    : false;
+  const confirmed = bandConfirmed({
+    cancelled_at: textOrNull(groupRow.cancelled_at),
+    confirmed_at: textOrNull(groupRow.confirmed_at),
+    closed_at: textOrNull(groupRow.closed_at),
+    closes_at: closesAt,
+    total_spots: Number(groupRow.total_spots ?? 0),
+    minimum_spots: minimum,
+  }, filled) || onTime;
+  const closes = closesAt ? Date.parse(closesAt) : NaN;
+  const deadlinePassed = Number.isFinite(closes) && closes <= Date.now();
   return {
     startsAt: sessionStarts ?? textOrNull(groupRow.starts_at),
     groupCancelledAt: textOrNull(groupRow.cancelled_at),
     sessionCancelledAt: sessionCancelled,
     refundRequestedAt: refundAt,
-    confirmed: bandConfirmed({
-      cancelled_at: textOrNull(groupRow.cancelled_at),
-      confirmed_at: textOrNull(groupRow.confirmed_at),
-      closed_at: textOrNull(groupRow.closed_at),
-      closes_at: textOrNull(groupRow.closes_at),
-      total_spots: Number(groupRow.total_spots ?? 0),
-      minimum_spots: Number(groupRow.minimum_spots ?? 0),
-    }, count ?? 0),
+    confirmed,
+    stuckUnconfirmed: !confirmed &&
+      !textOrNull(groupRow.cancelled_at) &&
+      deadlinePassed &&
+      filled >= minimum &&
+      minimum > 0,
     status,
   };
+}
+
+async function memberJoinedAt(admin: Admin, groupId: string): Promise<string[] | null> {
+  const { data, error } = await admin
+    .from("group_members")
+    .select("joined_at")
+    .eq("group_id", groupId)
+    .neq("attendance", "cancelled");
+  if (error) return null;
+  return joinedAtFromRows(data);
+}
+
+async function unprovenHeldGroup(admin: Admin, groupId: string): Promise<boolean> {
+  const clock = await loadSessionClock(admin, { id: "", group_id: groupId });
+  return clock.stuckUnconfirmed;
+}
+
+async function alertUnconfirmedHeld(): Promise<void> {
+  await captureOpsAlert({
+    get(name: string) {
+      try {
+        return Deno.env.get(name);
+      } catch {
+        return undefined;
+      }
+    },
+  }, fetch, {
+    scope: "pagbank-custody",
+    code: "unconfirmed_held",
+  });
 }
 
 async function sqlAllowsRelease(

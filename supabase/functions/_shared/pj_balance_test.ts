@@ -11,7 +11,8 @@ Deno.test("saldo abaixo do limite alerta e no limite não", () => {
   assertEquals(shouldAlertLowBalance(100_000, 100_000), false);
   assertEquals(shouldAlertLowBalance(100_001, 100_000), false);
   assertEquals(shouldAlertLowBalance(0, 100_000), true);
-  assertEquals(shouldAlertLowBalance(-1, 100_000), false);
+  assertEquals(shouldAlertLowBalance(-1, 100_000), true);
+  assertEquals(shouldAlertLowBalance(-150, 100_000), true);
 });
 
 Deno.test("o alerta de saldo sai sem o valor e não sai acima do limite", async () => {

@@ -166,8 +166,56 @@ begin
     or public.pj_balance_alert_due(49999) is not true
     or public.pj_balance_alert_due(50000) is not false
     or public.pj_balance_alert_due(50001) is not false
+    or public.pj_balance_alert_due(-1) is not true
   then
     raise exception 'alerta com limite editado saiu do combinado %', v_limit;
+  end if;
+end $$;
+
+insert into public.room_sessions (id, room_id, starts_at, availability)
+values
+  ('d8c31000-0000-4000-8000-000000000009', 'd8c30000-0000-4000-8000-000000000001', '2026-11-07 18:00:00+00', 'partner_grid'),
+  ('d8c31000-0000-4000-8000-000000000010', 'd8c30000-0000-4000-8000-000000000001', '2026-11-08 18:00:00+00', 'partner_grid');
+
+insert into public.groups (
+  id, city_id, venue_id, room_id, session_id, starts_at,
+  total_spots, minimum_spots, price_cents, created_by, closes_at
+) values
+  ('d8c40000-0000-4000-8000-000000000009', 'curitiba', 'd8c20000-0000-4000-8000-000000000001', 'd8c30000-0000-4000-8000-000000000001', 'd8c31000-0000-4000-8000-000000000009', '2026-11-07 18:00:00+00', 4, 2, 10000, 'd8c10000-0000-4000-8000-000000000002', '2026-11-01 12:00:00+00'),
+  ('d8c40000-0000-4000-8000-000000000010', 'curitiba', 'd8c20000-0000-4000-8000-000000000001', 'd8c30000-0000-4000-8000-000000000001', 'd8c31000-0000-4000-8000-000000000010', '2026-11-08 18:00:00+00', 4, 2, 10000, 'd8c10000-0000-4000-8000-000000000002', '2026-11-01 12:00:00+00');
+
+insert into public.group_members (group_id, user_id, display_name, joined_at) values
+  ('d8c40000-0000-4000-8000-000000000009', 'd8c10000-0000-4000-8000-000000000001', 'Dono', '2026-10-01 12:00:00+00'),
+  ('d8c40000-0000-4000-8000-000000000009', 'd8c10000-0000-4000-8000-000000000002', 'Jog', '2026-10-20 12:00:00+00'),
+  ('d8c40000-0000-4000-8000-000000000010', 'd8c10000-0000-4000-8000-000000000001', 'Dono', '2026-10-01 12:00:00+00'),
+  ('d8c40000-0000-4000-8000-000000000010', 'd8c10000-0000-4000-8000-000000000002', 'Jog', '2026-11-02 12:00:00+00');
+
+insert into public.payment_charges (
+  id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+  provider, provider_ref, provider_split_id, idempotency_key, wallet_id,
+  commission_bps, paid_at, custody_release_attempts
+) values
+  ('d8c50000-0000-4000-8000-000000000009', 'd8c40000-0000-4000-8000-000000000009', 'd8c10000-0000-4000-8000-000000000002', 'd8c20000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'pagbank', 'CHAR_NO_PRAZO', 'SPLI_NO_PRAZO', 'idem-custodia-no-prazo', 'wal', 1000, '2026-10-20 12:00:00+00', 0),
+  ('d8c50000-0000-4000-8000-000000000010', 'd8c40000-0000-4000-8000-000000000010', 'd8c10000-0000-4000-8000-000000000002', 'd8c20000-0000-4000-8000-000000000001', 10000, 'PIX', 'paid', 'pagbank', 'CHAR_DEPOIS', 'SPLI_DEPOIS', 'idem-custodia-depois', 'wal', 1000, '2026-10-20 12:00:00+00', 0);
+
+do $$
+declare
+  v_now timestamptz := '2026-11-25 15:00:00+00';
+  v_expired uuid;
+begin
+  if public.custody_release_due('d8c50000-0000-4000-8000-000000000009', v_now) is not true then
+    raise exception 'não liberou mínimo atingido antes do prazo sem confirmed_at';
+  end if;
+  if public.custody_release_due('d8c50000-0000-4000-8000-000000000010', v_now) then
+    raise exception 'liberou mínimo atingido depois do prazo';
+  end if;
+  select expire_unconfirmed_groups into v_expired
+  from public.expire_unconfirmed_groups()
+  where expire_unconfirmed_groups = 'd8c40000-0000-4000-8000-000000000010';
+  if v_expired is null
+    or (select cancelled_at from public.groups where id = 'd8c40000-0000-4000-8000-000000000009') is not null
+  then
+    raise exception 'o prazo cancelou o mínimo no horário ou segurou o mínimo atrasado';
   end if;
 end $$;
 

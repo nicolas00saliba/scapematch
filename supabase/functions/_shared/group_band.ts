@@ -40,6 +40,35 @@ export function bandMissed(
   return deadlinePassed(group, now);
 }
 
+/// O integrante que completou o mínimo entrou até o closes_at.
+/// Sem essa prova, prazo vencido continua sem confirmação.
+export function minimumReachedOnTime(
+  closesAt: string | null | undefined,
+  minimumSpots: number,
+  joinedAt: readonly string[],
+): boolean {
+  if (!closesAt || minimumSpots <= 0) return false;
+  const deadline = Date.parse(closesAt);
+  if (!Number.isFinite(deadline)) return false;
+  const times = joinedAt
+    .map((item) => Date.parse(item))
+    .filter((item) => Number.isFinite(item))
+    .sort((left, right) => left - right);
+  const nth = times[minimumSpots - 1];
+  return nth !== undefined && nth <= deadline;
+}
+
+export function joinedAtFromRows(data: unknown): string[] | null {
+  if (!Array.isArray(data)) return null;
+  const times: string[] = [];
+  for (const row of data) {
+    if (!row || typeof row !== "object") continue;
+    const value = (row as { joined_at?: unknown }).joined_at;
+    if (typeof value === "string") times.push(value);
+  }
+  return times;
+}
+
 export function bandSettlement(
   group: BandGroup,
   filled: number,

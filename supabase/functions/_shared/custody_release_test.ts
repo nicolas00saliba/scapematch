@@ -18,6 +18,8 @@ function adminFor(
     sessionId?: string | null;
     session?: { starts_at: string | null; cancelled_at: string | null } | null;
     confirmedAt?: string | null;
+    closesAt?: string;
+    joinedAt?: string[];
   },
 ) {
   const updates: Record<string, unknown>[] = [];
@@ -90,7 +92,7 @@ function adminFor(
                 ? options.confirmedAt
                 : "2026-11-06T10:00:00Z",
               closed_at: null,
-              closes_at: "2099-01-01T00:00:00Z",
+              closes_at: options?.closesAt ?? "2099-01-01T00:00:00Z",
               starts_at: startsAt,
               session_id: sessionId,
               total_spots: 4,
@@ -100,6 +102,14 @@ function adminFor(
           });
         },
         then(resolve: (value: unknown) => void) {
+          if (table === "group_members" && options?.joinedAt) {
+            resolve({
+              data: options.joinedAt.map((joined_at) => ({ joined_at })),
+              error: null,
+              count: options.joinedAt.length,
+            });
+            return;
+          }
           resolve({
             data: table === "payment_charges" ? rows : null,
             error: null,
@@ -233,6 +243,66 @@ Deno.test("grupo cancelado não solta a custódia mesmo depois do horário", asy
   assertEquals(count, 0);
   assertEquals(direct, false);
   assertEquals(releases, []);
+});
+
+Deno.test("mínimo no prazo sem confirmed_at solta a custódia", async () => {
+  const releases: string[] = [];
+  const admin = adminFor([], {
+    confirmedAt: null,
+    closesAt: "2026-11-01T12:00:00Z",
+    joinedAt: ["2026-10-01T12:00:00Z", "2026-10-20T12:00:00Z"],
+  });
+  const ok = await releaseHeldSplit(admin, {
+    releaseCustody: (splitId) => {
+      releases.push(splitId);
+      return Promise.resolve();
+    },
+    accountId: () => "ACCO_PRIMARY",
+  }, {
+    id: chargeId,
+    group_id: groupId,
+    provider_split_id: "SPLI_PRAZO",
+    status: "paid",
+  });
+  assertEquals(ok, true);
+  assertEquals(releases, ["SPLI_PRAZO"]);
+});
+
+Deno.test("mínimo depois do prazo não solta e alerta", async () => {
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (line?: unknown) => {
+    lines.push(String(line ?? ""));
+  };
+  try {
+    const releases: string[] = [];
+    const admin = adminFor([], {
+      confirmedAt: null,
+      closesAt: "2026-11-01T12:00:00Z",
+      joinedAt: ["2026-10-01T12:00:00Z", "2026-11-02T12:00:00Z"],
+    });
+    const ok = await releaseHeldSplit(admin, {
+      releaseCustody: (splitId) => {
+        releases.push(splitId);
+        return Promise.resolve();
+      },
+      accountId: () => "ACCO_PRIMARY",
+    }, {
+      id: chargeId,
+      group_id: groupId,
+      provider_split_id: "SPLI_TARDE",
+      status: "paid",
+    });
+    assertEquals(ok, false);
+    assertEquals(releases, []);
+    assertEquals(admin.updates.length, 0);
+    assert(lines.some((line) =>
+      line.includes('"scope":"pagbank-custody"') &&
+      line.includes('"code":"unconfirmed_held"')
+    ));
+  } finally {
+    console.error = original;
+  }
 });
 
 Deno.test("sessão cancelada não solta a custódia", async () => {

@@ -44,8 +44,43 @@ export type EnvLike = { get(name: string): string | undefined };
 const day = /^\d{4}-\d{2}-\d{2}$/;
 
 export function reaisToCents(value: number): number {
+  return parseReaisDecimal(value).cents;
+}
+
+/// Reais em decimal viram centavos. `exact` é falso quando sobra fração de centavo.
+export function parseReaisDecimal(value: number): { cents: number; exact: boolean } {
   if (!Number.isFinite(value)) throw new Error("valor");
-  return Math.round(value * 100);
+  const sign = value < 0 ? -1 : 1;
+  const scaled = Math.abs(value) * 100;
+  const cents = Math.round(scaled);
+  if (!Number.isSafeInteger(cents)) throw new Error("valor");
+  return {
+    cents: sign * cents,
+    exact: Math.abs(scaled - cents) <= 1e-6,
+  };
+}
+
+export type AccountBalance = {
+  cents: number;
+  exact: boolean;
+  field: "balance" | "amount";
+};
+
+/// GET /accounts/balance. A doc pública não fixa a unidade; o valor é sempre reais.
+export function readAccountBalance(body: Record<string, unknown>): AccountBalance {
+  if (typeof body.balance === "number" && Number.isFinite(body.balance)) {
+    const parsed = parseReaisDecimal(body.balance);
+    return { cents: parsed.cents, exact: parsed.exact, field: "balance" };
+  }
+  const amount = body.amount;
+  if (amount && typeof amount === "object") {
+    const value = (amount as { value?: unknown }).value;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const parsed = parseReaisDecimal(value);
+      return { cents: parsed.cents, exact: parsed.exact, field: "amount" };
+    }
+  }
+  throw new Error("Resposta da PagBank sem balance");
 }
 
 export function centsToReais(cents: number): number {
@@ -53,11 +88,7 @@ export function centsToReais(cents: number): number {
 }
 
 export function balanceCents(body: Record<string, unknown>): number {
-  const value = body.balance;
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("Resposta do PagBank sem balance");
-  }
-  return reaisToCents(value);
+  return readAccountBalance(body).cents;
 }
 
 export function isPointsReserve(
