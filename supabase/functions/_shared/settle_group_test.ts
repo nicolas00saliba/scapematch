@@ -31,6 +31,8 @@ function adminFor(options: {
   total?: number;
   minimum?: number;
   closesAt?: string;
+  startsAt?: string;
+  joinedAt?: string[];
   charges: Charge[];
   claim?: () => boolean;
   member?: string | null;
@@ -44,9 +46,11 @@ function adminFor(options: {
     transitions,
     from(table: string) {
       let head = false;
+      let selected = "";
       const self = {
-        select(_cols: string, opts?: { head?: boolean }) {
+        select(cols: string, opts?: { head?: boolean }) {
           head = Boolean(opts?.head);
+          selected = cols;
           return self;
         },
         eq() {
@@ -84,7 +88,7 @@ function adminFor(options: {
               confirmed_at: options.confirmed ? "2026-11-06T10:00:00Z" : null,
               closed_at: options.closed ? "2026-11-06T10:00:00Z" : null,
               closes_at: options.closesAt ?? "2026-11-07T10:00:00Z",
-              starts_at: "2020-01-01T00:00:00Z",
+              starts_at: options.startsAt ?? "2020-01-01T00:00:00Z",
               total_spots: options.total ?? 4,
               minimum_spots: options.minimum ?? 2,
             },
@@ -95,6 +99,13 @@ function adminFor(options: {
         if (table === "group_members") {
           if (head) {
             return { data: null, error: null, count: options.filled ?? 4 };
+          }
+          if (selected.includes("joined_at")) {
+            return {
+              data: (options.joinedAt ?? []).map((joined_at) => ({ joined_at })),
+              error: null,
+              count: options.joinedAt?.length ?? 0,
+            };
           }
           return {
             data: options.member === null
@@ -353,6 +364,48 @@ Deno.test("prazo vencido sem confirmação cancela e não captura", async () => 
   );
 });
 
+Deno.test("mínimo no prazo sem confirmed_at captura e não cancela", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    confirmed: false,
+    filled: 2,
+    minimum: 2,
+    closesAt: "2026-11-01T12:00:00Z",
+    startsAt: "2099-01-01T00:00:00Z",
+    joinedAt: ["2026-10-01T12:00:00Z", "2026-10-20T12:00:00Z"],
+    charges,
+  });
+  const captures: string[] = [];
+  await settleGroup(admin, provider("AUTHORIZED", captures), groupId);
+  assertEquals(captures.length, 1);
+  assertEquals(
+    admin.transitions.some((call) =>
+      call.cancel_reason === "O grupo não confirmou a tempo"
+    ),
+    false,
+  );
+});
+
+Deno.test("mínimo depois do prazo cancela e não captura", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    confirmed: false,
+    filled: 2,
+    minimum: 2,
+    closesAt: "2026-11-01T12:00:00Z",
+    joinedAt: ["2026-10-01T12:00:00Z", "2026-11-02T12:00:00Z"],
+    charges,
+  });
+  const captures: string[] = [];
+  await settleGroup(admin, provider("AUTHORIZED", captures), groupId);
+  assertEquals(captures.length, 0);
+  assert(
+    admin.transitions.some((call) =>
+      call.cancel_reason === "O grupo não confirmou a tempo"
+    ),
+  );
+});
+
 Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
   const charges = [{
     ...card(),
@@ -385,6 +438,45 @@ Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
   await settleGroup(admin, pagbank, groupId);
   assertEquals(releases.length, 1);
   assert(releases[0].includes("/splits/SPLI_PIX/custody/release"));
+});
+
+Deno.test("grupo confirmado captura e segura a custódia antes do horário", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    confirmed: true,
+    startsAt: "2099-01-01T00:00:00Z",
+    charges,
+  });
+  const calls: string[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${url}`);
+    if (method === "GET") {
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "CHAR_CARD",
+        status: "AUTHORIZED",
+        billingType: "CREDIT_CARD",
+      }), { status: 200 }));
+    }
+    if (url.includes("/capture")) {
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "CHAR_CARD",
+        status: "PAID",
+      }), { status: 200 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
+    fetchFn,
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
+  );
+  await settleGroup(admin, pagbank, groupId);
+  assertEquals(charges[0].status, "paid");
+  assert(calls.some((call) => call.includes("/capture")));
+  assertEquals(calls.some((call) => call.includes("/custody/release")), false);
 });
 
 Deno.test("grupo confirmado captura mesmo sem lotar", async () => {

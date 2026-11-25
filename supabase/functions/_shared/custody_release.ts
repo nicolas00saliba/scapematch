@@ -1,9 +1,14 @@
-// Solta a custódia HELD depois que o horário da sessão passou.
-// Antes disso o escape ainda não aconteceu e o repasse fica retido.
-// Falha fica na cobrança e o cron tenta de novo.
+// Solta a custódia HELD quando a sessão já começou.
+// Confirmação e captura continuam antes. Falha fica na cobrança e o cron tenta de novo.
+// A mesma regra está em public.custody_release_due.
 
 import { logCaught } from "./pagbank_client_error.ts";
-import { bandConfirmed } from "./group_band.ts";
+import {
+  bandConfirmed,
+  joinedAtFromRows,
+  minimumReachedOnTime,
+} from "./group_band.ts";
+import { captureOpsAlert } from "./sentry_ops.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -17,6 +22,7 @@ export type CustodyCharge = {
   id: string;
   group_id?: string | null;
   venue_id?: string | null;
+  status?: string | null;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
   refund_requested_at?: string | null;
@@ -24,8 +30,33 @@ export type CustodyCharge = {
   created_at?: string | null;
 };
 
+export type SessionClock = {
+  startsAt: string | null;
+  groupCancelledAt: string | null;
+  sessionCancelledAt: string | null;
+  refundRequestedAt: string | null;
+  confirmed: boolean;
+  stuckUnconfirmed: boolean;
+  status: string | null;
+};
+
 /// Depois disto o cron para e o log custody_release_exhausted alerta.
 export const maxCustodyReleaseAttempts = 8;
+
+const blockedStatus = new Set(["refunded", "cancelled", "failed"]);
+
+/// now >= início da sessão, grupo confirmado, sem cancelamento e sem estorno.
+export function custodyReleaseDue(clock: SessionClock, now = Date.now()): boolean {
+  if (clock.refundRequestedAt) return false;
+  if (clock.groupCancelledAt) return false;
+  if (clock.sessionCancelledAt) return false;
+  if (clock.status && blockedStatus.has(clock.status)) return false;
+  if (!clock.confirmed || clock.stuckUnconfirmed) return false;
+  if (!clock.startsAt) return false;
+  const start = Date.parse(clock.startsAt);
+  if (!Number.isFinite(start)) return false;
+  return now >= start;
+}
 
 export async function rememberSplitId(
   admin: Admin,
@@ -40,8 +71,7 @@ export async function rememberSplitId(
   if (error) logCaught("custody-release", error);
 }
 
-/// Cartão capturado com o grupo já confirmado solta a custódia.
-/// Sem confirmação, só grava o splitId para o acerto soltar depois.
+/// Cartão capturado com o grupo já confirmado. A custódia espera a sessão.
 export async function finishCapturedCard(input: {
   admin: Admin;
   pagbank: CustodyClient;
@@ -57,7 +87,7 @@ export async function finishCapturedCard(input: {
   });
 }
 
-/// Pix pago com o grupo já confirmado. Grupo aberto continua em custódia.
+/// Pix pago com o grupo já confirmado. Antes da sessão continua em custódia.
 export async function releasePaidIfClosed(input: {
   admin: Admin;
   pagbank: CustodyClient;
@@ -69,40 +99,26 @@ export async function releasePaidIfClosed(input: {
   await releaseHeldSplit(input.admin, input.pagbank, input.charge);
 }
 
-/// O horário da sessão já chegou. Sem data, não solta.
-async function sessionHasPassed(
-  admin: Admin,
-  charge: CustodyCharge,
-): Promise<boolean> {
-  if (typeof admin?.from !== "function" || !charge.id) return false;
-  let groupId = typeof charge.group_id === "string" ? charge.group_id : "";
-  if (!groupId) {
-    const { data } = await admin
-      .from("payment_charges")
-      .select("group_id")
-      .eq("id", charge.id)
-      .maybeSingle();
-    groupId = typeof data?.group_id === "string" ? data.group_id : "";
-  }
-  if (!groupId) return false;
-  const { data: group } = await admin
-    .from("groups")
-    .select("starts_at")
-    .eq("id", groupId)
-    .maybeSingle();
-  const starts = typeof group?.starts_at === "string" ? Date.parse(group.starts_at) : NaN;
-  return Number.isFinite(starts) && starts <= Date.now();
-}
-
 export async function releaseHeldSplit(
   admin: Admin,
   pagbank: CustodyClient,
   charge: CustodyCharge,
 ): Promise<boolean> {
   if (charge.refund_requested_at) return false;
+  if ((charge.custody_release_attempts ?? 0) >= maxCustodyReleaseAttempts) {
+    return false;
+  }
   const id = (charge.provider_split_id ?? "").trim();
   if (!id || !charge.id || charge.custody_released_at) return false;
-  if (!await sessionHasPassed(admin, charge)) return false;
+  const now = Date.now();
+  const clock = await loadSessionClock(admin, charge);
+  if (clock.stuckUnconfirmed) {
+    await alertUnconfirmedHeld();
+    return false;
+  }
+  if (!custodyReleaseDue(clock, now)) return false;
+  const sql = await sqlAllowsRelease(admin, charge.id, new Date(now).toISOString());
+  if (sql === false) return false;
   try {
     const accounts = await custodyAccountIds(admin, pagbank, charge);
     if (accounts.length === 0) throw new Error("custodia_recebedores");
@@ -141,7 +157,8 @@ async function custodyAccountIds(
       .select("venue_id")
       .eq("id", charge.id)
       .maybeSingle();
-    venueId = typeof data?.venue_id === "string" ? data.venue_id : "";
+    const row = recordOf(data);
+    venueId = typeof row?.venue_id === "string" ? row.venue_id : "";
   }
   const { data: venue } = await admin
     .from("venues")
@@ -168,19 +185,51 @@ function nextCustodyAttempt(current: number | null | undefined): number {
   return value + 1;
 }
 
-/// Cobrança paga, com split, ainda sem custódia solta. O cron chama isto.
+/// Cobrança paga, com split, sessão já iniciada, ainda sem custódia solta.
 export async function retryPendingCustodyReleases(
   admin: Admin,
   pagbank: CustodyClient,
 ): Promise<number> {
   if (typeof admin?.from !== "function") return 0;
+  const data = await dueCustodyCharges(admin);
+  let released = 0;
+  let stuck = false;
+  for (const row of data) {
+    const charge = row as CustodyCharge;
+    if (!charge.group_id || charge.refund_requested_at) continue;
+    if ((charge.custody_release_attempts ?? 0) >= maxCustodyReleaseAttempts) {
+      continue;
+    }
+    if (!await groupIsClosed(admin, charge.group_id)) {
+      if (await unprovenHeldGroup(admin, charge.group_id)) stuck = true;
+      continue;
+    }
+    if (await releaseHeldSplit(admin, pagbank, charge)) released += 1;
+  }
+  if (stuck) await alertUnconfirmedHeld();
+  return released;
+}
+
+async function dueCustodyCharges(admin: Admin): Promise<unknown[]> {
+  if (typeof admin.rpc === "function") {
+    try {
+      const listed = await admin.rpc("list_due_custody_releases", {
+        p_limit: 40,
+      });
+      if (!listed?.error && Array.isArray(listed.data)) return listed.data;
+    } catch (_error) {
+      // Sem a função, a consulta abaixo aplica o mesmo horário.
+    }
+  }
+  const now = new Date().toISOString();
   const { data, error } = await admin
     .from("payment_charges")
     .select(
-      "id, group_id, provider_split_id, status, custody_released_at, custody_release_attempts, refund_requested_at, created_at, groups!inner(confirmed_at, closed_at, cancelled_at)",
+      "id, group_id, venue_id, provider_split_id, status, custody_released_at, custody_release_attempts, refund_requested_at, created_at, groups!inner(confirmed_at, closed_at, cancelled_at, starts_at, session_id)",
     )
     .eq("status", "paid")
     .is("custody_released_at", null)
+    .is("refund_requested_at", null)
     .not("provider_split_id", "is", null)
     .or(
       `custody_release_attempts.is.null,custody_release_attempts.lt.${maxCustodyReleaseAttempts}`,
@@ -188,20 +237,12 @@ export async function retryPendingCustodyReleases(
     .or("confirmed_at.not.is.null,closed_at.not.is.null", {
       referencedTable: "groups",
     })
+    .or("cancelled_at.is.null", { referencedTable: "groups" })
+    .or(`starts_at.lte."${now}"`, { referencedTable: "groups" })
     .order("created_at", { ascending: true })
     .limit(40);
-  if (error || !Array.isArray(data)) return 0;
-  let released = 0;
-  for (const row of data) {
-    const charge = row as CustodyCharge & { group_id?: string };
-    if (!charge.group_id || charge.refund_requested_at) continue;
-    if ((charge.custody_release_attempts ?? 0) >= maxCustodyReleaseAttempts) {
-      continue;
-    }
-    if (!await groupIsClosed(admin, charge.group_id)) continue;
-    if (await releaseHeldSplit(admin, pagbank, charge)) released += 1;
-  }
-  return released;
+  if (error || !Array.isArray(data)) return [];
+  return data;
 }
 
 async function groupIsClosed(admin: Admin, groupId: string): Promise<boolean> {
@@ -218,5 +259,161 @@ async function groupIsClosed(admin: Admin, groupId: string): Promise<boolean> {
     .select("id", { count: "exact", head: true })
     .eq("group_id", groupId)
     .neq("attendance", "cancelled");
-  return bandConfirmed(group, count ?? 0);
+  if (bandConfirmed(group, count ?? 0)) return true;
+  const joined = await memberJoinedAt(admin, groupId);
+  return minimumReachedOnTime(
+    textOrNull(group.closes_at),
+    Number(group.minimum_spots ?? 0),
+    joined ?? [],
+  );
+}
+
+async function loadSessionClock(
+  admin: Admin,
+  charge: CustodyCharge,
+): Promise<SessionClock> {
+  let groupId = textOrNull(charge.group_id) ?? "";
+  let refundAt = textOrNull(charge.refund_requested_at);
+  let status = textOrNull(charge.status);
+  if (charge.id && typeof admin?.from === "function") {
+    const { data } = await admin
+      .from("payment_charges")
+      .select("group_id, refund_requested_at, status")
+      .eq("id", charge.id)
+      .maybeSingle();
+    const fresh = recordOf(data);
+    if (fresh) {
+      if (!groupId) groupId = textOrNull(fresh.group_id) ?? "";
+      refundAt = refundAt ?? textOrNull(fresh.refund_requested_at);
+      const freshStatus = textOrNull(fresh.status);
+      if (freshStatus) status = freshStatus;
+    }
+  }
+  const empty: SessionClock = {
+    startsAt: null,
+    groupCancelledAt: null,
+    sessionCancelledAt: null,
+    refundRequestedAt: refundAt,
+    confirmed: false,
+    stuckUnconfirmed: false,
+    status,
+  };
+  if (!groupId || typeof admin?.from !== "function") return empty;
+  const { data: group } = await admin
+    .from("groups")
+    .select(
+      "starts_at, cancelled_at, confirmed_at, closed_at, closes_at, total_spots, minimum_spots, session_id",
+    )
+    .eq("id", groupId)
+    .maybeSingle();
+  const groupRow = recordOf(group);
+  if (!groupRow) return empty;
+  let sessionStarts: string | null = null;
+  let sessionCancelled: string | null = null;
+  const sessionId = textOrNull(groupRow.session_id);
+  if (sessionId) {
+    const { data: session } = await admin
+      .from("room_sessions")
+      .select("starts_at, cancelled_at")
+      .eq("id", sessionId)
+      .maybeSingle();
+    const sessionRow = recordOf(session);
+    if (sessionRow) {
+      sessionStarts = textOrNull(sessionRow.starts_at);
+      sessionCancelled = textOrNull(sessionRow.cancelled_at);
+    }
+  }
+  const { count } = await admin
+    .from("group_members")
+    .select("id", { count: "exact", head: true })
+    .eq("group_id", groupId)
+    .neq("attendance", "cancelled");
+  const joined = await memberJoinedAt(admin, groupId);
+  const closesAt = textOrNull(groupRow.closes_at);
+  const minimum = Number(groupRow.minimum_spots ?? 0);
+  const filled = joined ? joined.length : count ?? 0;
+  const onTime = joined
+    ? minimumReachedOnTime(closesAt, minimum, joined)
+    : false;
+  const confirmed = bandConfirmed({
+    cancelled_at: textOrNull(groupRow.cancelled_at),
+    confirmed_at: textOrNull(groupRow.confirmed_at),
+    closed_at: textOrNull(groupRow.closed_at),
+    closes_at: closesAt,
+    total_spots: Number(groupRow.total_spots ?? 0),
+    minimum_spots: minimum,
+  }, filled) || onTime;
+  const closes = closesAt ? Date.parse(closesAt) : NaN;
+  const deadlinePassed = Number.isFinite(closes) && closes <= Date.now();
+  return {
+    startsAt: sessionStarts ?? textOrNull(groupRow.starts_at),
+    groupCancelledAt: textOrNull(groupRow.cancelled_at),
+    sessionCancelledAt: sessionCancelled,
+    refundRequestedAt: refundAt,
+    confirmed,
+    stuckUnconfirmed: !confirmed &&
+      !textOrNull(groupRow.cancelled_at) &&
+      deadlinePassed &&
+      filled >= minimum &&
+      minimum > 0,
+    status,
+  };
+}
+
+async function memberJoinedAt(admin: Admin, groupId: string): Promise<string[] | null> {
+  const { data, error } = await admin
+    .from("group_members")
+    .select("joined_at")
+    .eq("group_id", groupId)
+    .neq("attendance", "cancelled");
+  if (error) return null;
+  return joinedAtFromRows(data);
+}
+
+async function unprovenHeldGroup(admin: Admin, groupId: string): Promise<boolean> {
+  const clock = await loadSessionClock(admin, { id: "", group_id: groupId });
+  return clock.stuckUnconfirmed;
+}
+
+async function alertUnconfirmedHeld(): Promise<void> {
+  await captureOpsAlert({
+    get(name: string) {
+      try {
+        return Deno.env.get(name);
+      } catch {
+        return undefined;
+      }
+    },
+  }, fetch, {
+    scope: "pagbank-custody",
+    code: "unconfirmed_held",
+  });
+}
+
+async function sqlAllowsRelease(
+  admin: Admin,
+  chargeId: string,
+  nowIso: string,
+): Promise<boolean | null> {
+  if (typeof admin?.rpc !== "function") return null;
+  try {
+    const result = await admin.rpc("custody_release_due", {
+      p_charge_id: chargeId,
+      p_now: nowIso,
+    });
+    if (result?.error) return null;
+    if (result?.data === true || result?.data === false) return result.data;
+    return null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function recordOf(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function textOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
 }

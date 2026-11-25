@@ -373,7 +373,7 @@ Deno.test("sem env a conciliação aceita o segredo do vault", async () => {
     },
   );
   assertEquals(ok.status, 200);
-  assertEquals(seen.length, 0);
+  assertEquals(seen, ["https://api.pagseguro.com/accounts/balance"]);
   assertEquals(calls.filter((name) => name === "cron_vault_secret").length, 1);
   const body = await ok.json();
   assert(!JSON.stringify(body).includes("segredo-vault"));
@@ -502,6 +502,7 @@ Deno.test("a conciliação consulta a subconta e o dia de São Paulo", async () 
     "ledger_reconcile_snapshot",
     "read_venue_provider_key",
     "record_payment_divergences",
+    "low_balance_alert_cents",
   ]);
 });
 
@@ -888,8 +889,81 @@ Deno.test("paginação local consulta todas as cobranças, sem offset de data", 
     },
   );
   assertEquals(response.status, 200);
-  assertEquals(seen.length, 51);
-  assert(seen.every((url) => url.includes("/orders/ORDE_")));
+  const orders = seen.filter((url) => url.includes("/orders/ORDE_"));
+  assertEquals(orders.length, 51);
+  assert(seen.some((url) => url.endsWith("/accounts/balance")));
   assert(seen.every((url) => !url.includes("offset=") && !url.includes("dateCreated")));
   assert(store.calls.includes("record_payment_divergences"));
+});
+
+Deno.test("saldo da conta PJ abaixo do limite alerta e no limite não", async () => {
+  async function run(reais: number): Promise<string[]> {
+    const lines: string[] = [];
+    const original = console.error;
+    console.error = (line?: unknown) => {
+      lines.push(String(line ?? ""));
+    };
+    try {
+      const response = await handleLedgerReconcile(
+        new Request("https://example.test/ledger", {
+          method: "POST",
+          headers: { "x-ledger-reconcile-secret": "segredo-cron" },
+        }),
+        {
+          env: envFor("segredo-cron"),
+          fetchFn: (input) => {
+            const url = String(input);
+            if (url.endsWith("/accounts/balance")) {
+              return Promise.resolve(
+                new Response(JSON.stringify({ balance: reais }), { status: 200 }),
+              );
+            }
+            return Promise.resolve(
+              new Response(JSON.stringify({ data: [], hasMore: false }), {
+                status: 200,
+              }),
+            );
+          },
+          store: {
+            rpc(name: string) {
+              if (name === "ledger_reconcile_snapshot") {
+                return Promise.resolve({
+                  data: { charges: [], withdrawals: [], capped: false },
+                  error: null,
+                });
+              }
+              if (name === "record_payment_divergences") {
+                return Promise.resolve({ data: "run-saldo", error: null });
+              }
+              if (name === "low_balance_alert_cents") {
+                return Promise.resolve({ data: 100_000, error: null });
+              }
+              return Promise.resolve({ data: null, error: { message: "inesperado" } });
+            },
+          },
+        },
+      );
+      assertEquals(response.status, 200);
+      const body = await response.text();
+      assert(!body.includes("transfers"));
+      assert(!body.includes(String(reais)));
+    } finally {
+      console.error = original;
+    }
+    return lines;
+  }
+
+  const low = await run(999.99);
+  assert(low.some((line) =>
+    line.includes('"scope":"pagbank-balance"') &&
+    line.includes('"code":"low_balance"')
+  ));
+  assert(low.every((line) => !line.includes("999.99") && !line.includes("99999")));
+  const negative = await run(-1.5);
+  assert(negative.some((line) => line.includes('"code":"low_balance"')));
+  assert(negative.every((line) => !line.includes("-1.5") && !line.includes("-150")));
+  const enough = await run(1000);
+  assertEquals(enough.some((line) => line.includes("low_balance")), false);
+  const above = await run(1000.01);
+  assertEquals(above.some((line) => line.includes("low_balance")), false);
 });

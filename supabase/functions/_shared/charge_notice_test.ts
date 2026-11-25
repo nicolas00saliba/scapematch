@@ -8,7 +8,7 @@ import {
 const chargeId = "44444444-4444-4444-8444-444444444444";
 const groupId = "11111111-1111-4111-8111-111111111111";
 
-function adminFor(rows: Record<string, unknown>[]) {
+function adminFor(rows: Record<string, unknown>[], startsAt = "2020-01-01T00:00:00Z") {
   const calls: { fn: string; args: Record<string, unknown> }[] = [];
   const chain = (table: string) => {
     const self = {
@@ -50,7 +50,7 @@ function adminFor(rows: Record<string, unknown>[]) {
               confirmed_at: "2026-11-06T10:00:00Z",
               closed_at: null,
               closes_at: "2099-01-01T00:00:00Z",
-              starts_at: "2020-01-01T00:00:00Z",
+              starts_at: startsAt,
               total_spots: 4,
               minimum_spots: 2,
             },
@@ -197,6 +197,41 @@ Deno.test("webhook casa o pedido e o split sai do charge pago", async () => {
   assertEquals(applied, 1);
   assert(urls.some((url) => url.includes("/orders/ORDE_PIX")));
   assert(urls.some((url) => url.includes("/splits/SPLI_PAGO/custody/release")));
+});
+
+Deno.test("Pix pago antes do horário não solta a custódia", async () => {
+  const urls: string[] = [];
+  const paid = {
+    id: "ORDE_PIX",
+    charges: [{
+      id: "CHAR_PIX",
+      status: "PAID",
+      amount: { value: 500 },
+      payment_method: { type: "PIX" },
+      splits: { id: "SPLI_CEDO" },
+    }],
+  };
+  const pagbank = new PagBankProvider(
+    "pb-token-secret",
+    pagbankProductionBaseUrl,
+    (url: string, init?: RequestInit) => {
+      urls.push(`${init?.method ?? "GET"} ${url}`);
+      return Promise.resolve(
+        new Response(JSON.stringify(paid), { status: 200 }),
+      );
+    },
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
+  );
+  const row = { ...pending, provider_ref: "ORDE_PIX", provider_split_id: null };
+  const admin = adminFor([row], "2099-01-01T00:00:00Z");
+  const applied = await pollPendingPagBankCharges(
+    admin,
+    pagbank,
+    { get: () => undefined },
+  );
+  assertEquals(applied, 1);
+  assertEquals(urls.some((url) => url.includes("/custody/release")), false);
 });
 
 Deno.test("Pix vencido sai da fila como cancelado", async () => {

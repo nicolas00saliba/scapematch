@@ -8,7 +8,13 @@ import {
   creditLedger,
 } from "./ledger.ts";
 import { syncPayerDocument } from "./payer_document.ts";
-import { bandConfirmed, bandMissed, bandSettlement } from "./group_band.ts";
+import {
+  bandConfirmed,
+  bandMissed,
+  bandSettlement,
+  joinedAtFromRows,
+  minimumReachedOnTime,
+} from "./group_band.ts";
 import { releaseCancelledCharges } from "./release_charges.ts";
 import { captureAmountCents } from "./pagbank_rules.ts";
 
@@ -91,7 +97,14 @@ export async function settleGroup(
   if (!group) return;
   const row = group as GroupRow;
   const filled = await filledSpots(admin, groupId);
-  const decision = bandSettlement(row, filled);
+  let decision = bandSettlement(row, filled);
+  if (
+    decision === "release" &&
+    !row.cancelled_at &&
+    await groupReachedMinimumOnTime(admin, groupId, row)
+  ) {
+    decision = "capture";
+  }
   if (decision === "release") {
     if (bandMissed(row, filled)) {
       await admin
@@ -182,6 +195,22 @@ export async function settleAuthorizedCards(
       logCaught("settle-charges", error);
     }
   }
+}
+
+async function groupReachedMinimumOnTime(
+  admin: Admin,
+  groupId: string,
+  group: GroupRow,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("group_members")
+    .select("joined_at")
+    .eq("group_id", groupId)
+    .neq("attendance", "cancelled");
+  if (error) return false;
+  const joined = joinedAtFromRows(data);
+  if (!joined) return false;
+  return minimumReachedOnTime(group.closes_at, group.minimum_spots, joined);
 }
 
 async function captureAuthorizedCard(

@@ -23,6 +23,7 @@ import {
   findTransferInList,
   parseTransfer,
   parseWebhookList,
+  readAccountBalance,
   transferPayload,
   type TransferRequest,
   type TransferResult,
@@ -298,6 +299,13 @@ export function pickReusablePix(rows: unknown[]): PixPaymentRef | null {
 
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function warnBalanceShape(): void {
+  console.error(JSON.stringify({
+    scope: "pagbank-balance",
+    code: "balance_shape",
+  }));
 }
 
 export class PagBankProvider {
@@ -650,7 +658,7 @@ export class PagBankProvider {
     }));
   }
 
-  /// Solta a custódia HELD depois que o grupo confirma.
+  /// Solta a custódia HELD depois que a sessão começou.
   releaseCustody(
     splitId: string,
     accountIds: string[],
@@ -788,19 +796,12 @@ export class PagBankProvider {
     });
   }
 
-  /// Saldo em centavos. A PagBank devolve `balance` ou `amount.value`.
+  /// Saldo em centavos. GET /accounts/balance vem em reais decimais.
   financeBalanceCents(): Promise<number> {
     return this.#send("/accounts/balance", undefined, "GET").then((body) => {
-      if (typeof body.balance === "number") {
-        if (!Number.isInteger(body.balance)) return Math.round(body.balance * 100);
-        return Math.round(body.balance);
-      }
-      const amount = body.amount;
-      if (amount && typeof amount === "object") {
-        const value = (amount as { value?: unknown }).value;
-        if (typeof value === "number") return Math.round(value);
-      }
-      throw new Error("Resposta da PagBank sem balance");
+      const read = readAccountBalance(body);
+      if (!read.exact || read.field !== "balance") warnBalanceShape();
+      return read.cents;
     });
   }
 

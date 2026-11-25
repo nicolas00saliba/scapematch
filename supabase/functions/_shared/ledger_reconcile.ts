@@ -3,6 +3,11 @@
 // e cada id vai em GET /orders/{ORDE_} ou GET /orders?charge_id={CHAR_}.
 
 import { PagBankProvider, pagbankApiBaseUrl } from "./pagbank_provider.ts";
+import {
+  alertLowPjBalance,
+  defaultLowBalanceAlertCents,
+  lowBalanceLimit,
+} from "./pj_balance.ts";
 import { bindJson, corsHeadersFor, type EnvLike } from "./http.ts";
 import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
 import {
@@ -505,6 +510,7 @@ export async function handleLedgerReconcile(
       logInternalError("ledger-reconcile", new Error("divergencias"));
       return json({ error: "indisponivel" }, 500);
     }
+    await warnLowPjBalance(client, store, deps);
     if (payments.failures.length > 0) {
       return json({
         error: "pagbank_unavailable",
@@ -524,6 +530,45 @@ export async function handleLedgerReconcile(
 }
 
 const consultPageSize = 50;
+
+/// Uma vez por dia, no cron das 08:30 em Brasília. Não transfere.
+async function warnLowPjBalance(
+  client: PagBankProvider,
+  store: Store,
+  deps: LedgerDeps,
+): Promise<void> {
+  const fetchFn = deps.fetchFn ?? fetch;
+  let limit = defaultLowBalanceAlertCents;
+  try {
+    const listed = await store.rpc("low_balance_alert_cents", {});
+    if (!listed.error) limit = lowBalanceLimit(listed.data);
+  } catch (_error) {
+    limit = defaultLowBalanceAlertCents;
+  }
+  let available: number;
+  try {
+    available = await client.financeBalanceCents();
+  } catch (error) {
+    logCaught("ledger-reconcile", error);
+    return;
+  }
+  if (!Number.isInteger(available)) return;
+  try {
+    await alertLowPjBalance({
+      env: deps.env,
+      fetchFn: async (url, init) => {
+        const response = await fetchFn(url, init);
+        return { ok: response.ok };
+      },
+      availableCents: available,
+      limitCents: limit,
+    });
+  } catch (error) {
+    logCaught("ledger-reconcile", error);
+  }
+}
+
+
 
 type ChargeFailure = {
   ref: string;

@@ -186,7 +186,7 @@ Deno.test("renova o access antes de vencer e no 401", async () => {
     return next.accessToken;
   });
   const balance = await venueClient.financeBalanceCents();
-  assertEquals(balance, 1000);
+  assertEquals(balance, 100_000);
   assert(callsHttp.some((call) => call.includes("/oauth2/token")));
   assert(callsHttp.filter((call) => call.includes("/accounts/balance")).length >= 1);
 });

@@ -1,5 +1,12 @@
 # Decisões provisórias
 
+## A custódia sai depois que a sessão começa
+
+- **Data:** 2026-11-25
+- **Decisão:** a captura do cartão e a confirmação do grupo (mínimo de jogadores) continuam no mesmo ponto. O dinheiro da casa e da EscapeMatch só sai da custódia HELD quando `now()` alcança o `starts_at` da sessão. Se o grupo aponta para `room_sessions`, vale o horário da sessão; sem horário na sessão, vale `groups.starts_at`. Grupo cancelado, sessão cancelada ou cobrança com estorno pedido não liberam, mesmo depois do horário. O cron `reconcile-payments` (5 minutos) e o `settle-charges` repetem a liberação, no máximo 8 falhas. O botão do Admin que zera essas tentativas (`admin_reopen_custody`) continua olhando `groups.starts_at`; a liberação automática usa o relógio da sessão. Uma tentativa antes do horário não conta. A PagBank, sem `release.scheduled`, libera sozinha em 90 dias: o estorno de uma sessão cancelada precisa concluir na PagBank antes disso. O estorno parcial (valor pago menos a taxa PagBank, no Pix e no cartão capturado; autorização não capturada cancelada por inteiro) e o bloqueio de reembolso nas 2 horas anteriores ao início não mudam. O saldo disponível da conta PJ é lido uma vez por dia no `ledger-reconcile` (08:30 em Brasília) com o mesmo `GET /accounts/balance`, sempre em reais decimais. Abaixo de `platform_settings.low_balance_alert_cents` (padrão 100000 centavos), inclusive saldo negativo, sai o alerta `pagbank-balance` / `low_balance`. No limite, não. Grupo que bateu o mínimo até o `closes_at` sem gravar `confirmed_at` conta como confirmado na liberação e não é cancelado pelo prazo. Sem essa prova de `joined_at`, o cron não libera e alerta `pagbank-custody` / `unconfirmed_held`. Não há tela no Admin para esse número. `PAGBANK_CAC_TRANSFERS` continua desligada.
+- **Onde está no código:** `supabase/migrations/20261125183000_custody_after_session.sql`, `supabase/functions/_shared/custody_release.ts`, `supabase/functions/_shared/pj_balance.ts`, `supabase/functions/_shared/ledger_reconcile.ts`.
+- **Como trocar depois:** a migration não foi aplicada no remoto e nenhuma função foi publicada. Não ligar `PAGBANK_CAC_TRANSFERS` por causa desta decisão.
+
 ## Eliminação total do Asaas em 25/11/2026
 
 - **Data:** 2026-11-25
