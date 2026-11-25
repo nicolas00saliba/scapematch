@@ -50,6 +50,7 @@ function adminFor(rows: Record<string, unknown>[]) {
               confirmed_at: "2026-11-06T10:00:00Z",
               closed_at: null,
               closes_at: "2099-01-01T00:00:00Z",
+              starts_at: "2020-01-01T00:00:00Z",
               total_spots: 4,
               minimum_spots: 2,
             },

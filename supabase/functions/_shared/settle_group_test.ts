@@ -84,6 +84,7 @@ function adminFor(options: {
               confirmed_at: options.confirmed ? "2026-11-06T10:00:00Z" : null,
               closed_at: options.closed ? "2026-11-06T10:00:00Z" : null,
               closes_at: options.closesAt ?? "2026-11-07T10:00:00Z",
+              starts_at: "2020-01-01T00:00:00Z",
               total_spots: options.total ?? 4,
               minimum_spots: options.minimum ?? 2,
             },

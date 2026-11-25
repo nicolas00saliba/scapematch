@@ -1,4 +1,5 @@
-// Solta a custódia HELD depois que o grupo confirma.
+// Solta a custódia HELD depois que o horário da sessão passou.
+// Antes disso o escape ainda não aconteceu e o repasse fica retido.
 // Falha fica na cobrança e o cron tenta de novo.
 
 import { logCaught } from "./pagbank_client_error.ts";
@@ -14,6 +15,7 @@ export type CustodyClient = {
 
 export type CustodyCharge = {
   id: string;
+  group_id?: string | null;
   venue_id?: string | null;
   provider_split_id?: string | null;
   custody_released_at?: string | null;
@@ -67,6 +69,31 @@ export async function releasePaidIfClosed(input: {
   await releaseHeldSplit(input.admin, input.pagbank, input.charge);
 }
 
+/// O horário da sessão já chegou. Sem data, não solta.
+async function sessionHasPassed(
+  admin: Admin,
+  charge: CustodyCharge,
+): Promise<boolean> {
+  if (typeof admin?.from !== "function" || !charge.id) return false;
+  let groupId = typeof charge.group_id === "string" ? charge.group_id : "";
+  if (!groupId) {
+    const { data } = await admin
+      .from("payment_charges")
+      .select("group_id")
+      .eq("id", charge.id)
+      .maybeSingle();
+    groupId = typeof data?.group_id === "string" ? data.group_id : "";
+  }
+  if (!groupId) return false;
+  const { data: group } = await admin
+    .from("groups")
+    .select("starts_at")
+    .eq("id", groupId)
+    .maybeSingle();
+  const starts = typeof group?.starts_at === "string" ? Date.parse(group.starts_at) : NaN;
+  return Number.isFinite(starts) && starts <= Date.now();
+}
+
 export async function releaseHeldSplit(
   admin: Admin,
   pagbank: CustodyClient,
@@ -75,6 +102,7 @@ export async function releaseHeldSplit(
   if (charge.refund_requested_at) return false;
   const id = (charge.provider_split_id ?? "").trim();
   if (!id || !charge.id || charge.custody_released_at) return false;
+  if (!await sessionHasPassed(admin, charge)) return false;
   try {
     const accounts = await custodyAccountIds(admin, pagbank, charge);
     if (accounts.length === 0) throw new Error("custodia_recebedores");

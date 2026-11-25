@@ -2,6 +2,8 @@
 -- Não cria integração. Liberar e reprocessar só zeram a tentativa;
 -- quem fala com a PagBank continua sendo settle-charges.
 -- Reembolso parcial não existe na fila (sem coluna de valor).
+-- Reembolso do Admin só é recusado a menos de 2h do início.
+-- Custódia só reabre depois que o horário da sessão passou.
 
 create or replace function public.admin_payments_board()
 returns jsonb
@@ -567,6 +569,7 @@ declare
   v_actor uuid := private.admin_require();
   v_charge public.payment_charges%rowtype;
   v_member_id uuid;
+  v_starts timestamptz;
   v_full integer;
   v_queued boolean;
 begin
@@ -586,6 +589,28 @@ begin
   end;
   if p_amount_cents is not null and p_amount_cents is distinct from v_full then
     raise exception 'reembolso parcial sem fila' using errcode = '22023';
+  end if;
+  -- Segundo clique: a fila já existe. Não grava outra auditoria.
+  if exists (
+    select 1
+    from public.member_refund_queue
+    where charge_id = p_charge_id
+  ) then
+    return pg_catalog.jsonb_build_object(
+      'charge_id', p_charge_id,
+      'group_id', v_charge.group_id,
+      'queued', true,
+      'amount_cents', v_full
+    );
+  end if;
+  select starts_at into v_starts
+  from public.groups
+  where id = v_charge.group_id;
+  if v_starts is null then
+    raise exception 'grupo nao encontrado' using errcode = 'P0002';
+  end if;
+  if v_starts - pg_catalog.now() < interval '2 hours' then
+    raise exception 'reembolso a menos de 2h do inicio' using errcode = 'P0001';
   end if;
   select id into v_member_id
   from public.group_members
@@ -631,6 +656,7 @@ as $$
 declare
   v_actor uuid := private.admin_require();
   v_charge public.payment_charges%rowtype;
+  v_starts timestamptz;
   v_ready boolean;
 begin
   if p_confirm is distinct from 'LIBERAR' then
@@ -653,6 +679,12 @@ begin
     or v_charge.provider_split_id is null
   then
     raise exception 'sem custodia' using errcode = 'P0001';
+  end if;
+  select starts_at into v_starts
+  from public.groups
+  where id = v_charge.group_id;
+  if v_starts is null or v_starts > pg_catalog.now() then
+    raise exception 'custodia antes do horario da sessao' using errcode = 'P0001';
   end if;
   update public.payment_charges
   set custody_release_attempts = 0,

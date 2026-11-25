@@ -1,5 +1,6 @@
 -- Admin de dinheiro. Anon e sessão sem aal2 não passam.
--- Liberar custódia só zera a tentativa. Reembolso parcial não entra na fila.
+-- Liberar custódia só zera a tentativa, e só depois do horário.
+-- Reembolso parcial não entra na fila. A menos de 2h do início, também não.
 
 \set ON_ERROR_STOP on
 
@@ -7,7 +8,8 @@ insert into auth.users (id, email, raw_user_meta_data)
 values
   ('1a111111-1111-4111-8111-111111111111', 'money-admin@example.com', '{"display_name":"Admin Dinheiro"}'),
   ('1a222222-2222-4222-8222-222222222222', 'money-player@example.com', '{"display_name":"Ana Dinheiro"}'),
-  ('1a333333-3333-4333-8333-333333333333', 'money-test@example.com', '{"display_name":"Conta Teste"}');
+  ('1a333333-3333-4333-8333-333333333333', 'money-test@example.com', '{"display_name":"Conta Teste"}'),
+  ('1a444444-4444-4444-8444-444444444444', 'money-bia@example.com', '{"display_name":"Bia Horario"}');
 
 insert into public.admins (user_id)
 values ('1a111111-1111-4111-8111-111111111111');
@@ -34,6 +36,13 @@ insert into public.venues (
     'curitiba', 'Casa Teste Dinheiro', 'Centro', 'Rua do Ensaio', '9',
     '80010020', -25.43, -49.27, 4000, 'cnpj', '19000000000793', '4191000793',
     'approved', true
+  ),
+  (
+    '1b333333-3333-4333-8333-333333333333',
+    '1a444444-4444-4444-8444-444444444444',
+    'curitiba', 'Casa Horario', 'Centro', 'Rua do Relogio', '10',
+    '80010030', -25.43, -49.27, 4000, 'cnpj', '19000000000804', '4191000804',
+    'approved', false
   );
 
 insert into public.rooms (
@@ -49,12 +58,19 @@ insert into public.rooms (
     '1c222222-2222-4222-8222-222222222222',
     '1b222222-2222-4222-8222-222222222222',
     'Sala de Ensaio', '', 6, 2, 60, 'medium', 10000
+  ),
+  (
+    '1c333333-3333-4333-8333-333333333333',
+    '1b333333-3333-4333-8333-333333333333',
+    'Sala do Relogio', '', 6, 2, 60, 'medium', 10000
   );
 
 insert into public.room_sessions (id, room_id, starts_at, availability)
 values
   ('1d111111-1111-4111-8111-111111111111', '1c111111-1111-4111-8111-111111111111', '2027-12-10 18:00:00+00', 'partner_grid'),
-  ('1d222222-2222-4222-8222-222222222222', '1c222222-2222-4222-8222-222222222222', '2027-12-10 19:00:00+00', 'partner_grid');
+  ('1d222222-2222-4222-8222-222222222222', '1c222222-2222-4222-8222-222222222222', '2027-12-10 19:00:00+00', 'partner_grid'),
+  ('1d333333-3333-4333-8333-333333333333', '1c333333-3333-4333-8333-333333333333', pg_catalog.now() - interval '1 day', 'partner_grid'),
+  ('1d444444-4444-4444-8444-444444444444', '1c333333-3333-4333-8333-333333333333', pg_catalog.now() + interval '30 minutes', 'partner_grid');
 
 insert into public.groups (
   id, city_id, venue_id, room_id, session_id, starts_at,
@@ -75,12 +91,33 @@ insert into public.groups (
     '1d222222-2222-4222-8222-222222222222',
     '2027-12-10 19:00:00+00', 6, 2, 10000,
     '1a333333-3333-4333-8333-333333333333'
+  ),
+  (
+    '1e333333-3333-4333-8333-333333333333', 'curitiba',
+    '1b333333-3333-4333-8333-333333333333',
+    '1c333333-3333-4333-8333-333333333333',
+    '1d333333-3333-4333-8333-333333333333',
+    pg_catalog.now() - interval '1 day', 6, 2, 10000,
+    '1a444444-4444-4444-8444-444444444444'
+  ),
+  (
+    '1e444444-4444-4444-8444-444444444444', 'curitiba',
+    '1b333333-3333-4333-8333-333333333333',
+    '1c333333-3333-4333-8333-333333333333',
+    '1d444444-4444-4444-8444-444444444444',
+    pg_catalog.now() + interval '30 minutes', 6, 2, 10000,
+    '1a444444-4444-4444-8444-444444444444'
   );
 
 update public.groups
 set closed_at = timestamptz '2027-12-10 18:10:00+00',
     confirmed_at = timestamptz '2027-12-10 18:10:00+00'
 where id = '1e111111-1111-4111-8111-111111111111';
+
+update public.groups
+set closed_at = pg_catalog.now() - interval '1 day',
+    confirmed_at = pg_catalog.now() - interval '1 day'
+where id = '1e333333-3333-4333-8333-333333333333';
 
 insert into public.group_members (
   id, group_id, user_id, display_name, is_creator, payment_status
@@ -96,6 +133,18 @@ insert into public.group_members (
     '1e222222-2222-4222-8222-222222222222',
     '1a333333-3333-4333-8333-333333333333',
     'Conta Teste', true, 'paid'
+  ),
+  (
+    '1f333333-3333-4333-8333-333333333333',
+    '1e333333-3333-4333-8333-333333333333',
+    '1a444444-4444-4444-8444-444444444444',
+    'Bia Horario', true, 'paid'
+  ),
+  (
+    '1f444444-4444-4444-8444-444444444444',
+    '1e444444-4444-4444-8444-444444444444',
+    '1a444444-4444-4444-8444-444444444444',
+    'Bia Horario', true, 'paid'
   );
 
 insert into public.payment_charges (
@@ -123,6 +172,26 @@ insert into public.payment_charges (
     10000, null, 10000, 0, 0, 0, 0, 8000,
     'PIX', 'paid',
     'idem-dinheiro-teste', 'pay_teste', 'spl_teste', 2500,
+    0, null
+  ),
+  (
+    '1c333333-3333-4333-8333-333333333333',
+    '1e333333-3333-4333-8333-333333333333',
+    '1a444444-4444-4444-8444-444444444444',
+    '1b333333-3333-4333-8333-333333333333',
+    10000, null, 10000, 0, 0, 0, 0, 8000,
+    'PIX', 'paid',
+    'idem-dinheiro-passada', 'pay_passada', 'spl_passada', 2500,
+    4, pg_catalog.now() - interval '2 hours'
+  ),
+  (
+    '1c344444-4444-4444-8444-444444444444',
+    '1e444444-4444-4444-8444-444444444444',
+    '1a444444-4444-4444-8444-444444444444',
+    '1b333333-3333-4333-8333-333333333333',
+    10000, null, 10000, 0, 0, 0, 0, 8000,
+    'PIX', 'paid',
+    'idem-dinheiro-perto', 'pay_perto', 'spl_perto', 2500,
     0, null
   );
 
@@ -268,8 +337,20 @@ begin
       end if;
   end;
 
+  begin
+    perform public.admin_reopen_custody(
+      '1c311111-1111-4111-8111-111111111111', 'LIBERAR'
+    );
+    raise exception 'custodia saiu antes da sessao';
+  exception
+    when sqlstate 'P0001' then
+      if sqlerrm not like '%custodia antes do horario%' then
+        raise;
+      end if;
+  end;
+
   v_open := public.admin_reopen_custody(
-    '1c311111-1111-4111-8111-111111111111', 'LIBERAR'
+    '1c333333-3333-4333-8333-333333333333', 'LIBERAR'
   );
   if v_open ->> 'group_ready' <> 'true'
     or (v_open ->> 'attempts')::integer <> 0
@@ -285,11 +366,22 @@ begin
     where id = '1c311111-1111-4111-8111-111111111111'
       and (
         custody_released_at is not null
+        or custody_release_attempts <> 8
+        or custody_release_failed_at is null
+      )
+  ) then
+    raise exception 'custodia futura foi mexida';
+  end if;
+  if exists (
+    select 1 from public.payment_charges
+    where id = '1c333333-3333-4333-8333-333333333333'
+      and (
+        custody_released_at is not null
         or custody_release_attempts <> 0
         or custody_release_failed_at is not null
       )
   ) then
-    raise exception 'custodia foi marcada liberada ou a tentativa nao zerou';
+    raise exception 'custodia da sessao passada nao reabriu';
   end if;
 end $$;
 rollback;
@@ -314,7 +406,22 @@ begin
       null;
   end;
 
+  begin
+    perform public.admin_refund_charge(
+      '1c344444-4444-4444-8444-444444444444', 'REEMBOLSAR'
+    );
+    raise exception 'reembolso perto do inicio passou';
+  exception
+    when sqlstate 'P0001' then
+      if sqlerrm not like '%menos de 2h%' then
+        raise;
+      end if;
+  end;
+
   v_refund := public.admin_refund_charge(
+    '1c311111-1111-4111-8111-111111111111', 'REEMBOLSAR'
+  );
+  perform public.admin_refund_charge(
     '1c311111-1111-4111-8111-111111111111', 'REEMBOLSAR'
   );
   if v_refund ->> 'queued' <> 'true'
@@ -357,6 +464,19 @@ begin
       and status = 'queued'
   ) then
     raise exception 'fila nao recebeu o estorno integral';
+  end if;
+  if exists (
+    select 1 from public.member_refund_queue
+    where charge_id = '1c344444-4444-4444-8444-444444444444'
+  ) then
+    raise exception 'reembolso perto do inicio entrou na fila';
+  end if;
+  if (
+    select count(*) from public.admin_audit_log
+    where action = 'refund_charge'
+      and target_id = '1c311111-1111-4111-8111-111111111111'
+  ) <> 1 then
+    raise exception 'segundo reembolso gravou outra auditoria';
   end if;
   if not exists (
     select 1 from public.platform_cac_transfers

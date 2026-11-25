@@ -10,7 +10,10 @@ import {
 const chargeId = "44444444-4444-4444-8444-444444444444";
 const groupId = "11111111-1111-4111-8111-111111111111";
 
-function adminFor(rows: Record<string, unknown>[]) {
+function adminFor(
+  rows: Record<string, unknown>[],
+  startsAt = "2020-01-01T00:00:00Z",
+) {
   const updates: Record<string, unknown>[] = [];
   return {
     updates,
@@ -55,6 +58,7 @@ function adminFor(rows: Record<string, unknown>[]) {
             return Promise.resolve({
               data: rows[0] ?? {
                 venue_id: "33333333-3333-4333-8333-333333333333",
+                group_id: groupId,
               },
               error: null,
             });
@@ -65,6 +69,7 @@ function adminFor(rows: Record<string, unknown>[]) {
               confirmed_at: "2026-11-06T10:00:00Z",
               closed_at: null,
               closes_at: "2099-01-01T00:00:00Z",
+              starts_at: startsAt,
               total_spots: 4,
               minimum_spots: 2,
             },
@@ -184,6 +189,24 @@ Deno.test("o cron repete a custódia que falhou", async () => {
   });
   assertEquals(count, 1);
   assertEquals(releases, ["SPLI_RETRY"]);
+});
+
+Deno.test("custódia não sai antes do horário da sessão", async () => {
+  const releases: string[] = [];
+  const admin = adminFor([], "2099-01-01T00:00:00Z");
+  const ok = await releaseHeldSplit(admin, {
+    releaseCustody: (splitId) => {
+      releases.push(splitId);
+      return Promise.resolve();
+    },
+    accountId: () => "ACCO_PRIMARY",
+  }, {
+    id: chargeId,
+    provider_split_id: "SPLI_CEDO",
+  });
+  assertEquals(ok, false);
+  assertEquals(releases, []);
+  assertEquals(admin.updates.length, 0);
 });
 
 Deno.test("a custódia para depois do limite e alerta", async () => {
