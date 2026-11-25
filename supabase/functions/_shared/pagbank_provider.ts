@@ -650,7 +650,7 @@ export class PagBankProvider {
     }));
   }
 
-  /// Solta a custódia HELD depois que o grupo confirma.
+  /// Solta a custódia HELD depois que a sessão começou.
   releaseCustody(
     splitId: string,
     accountIds: string[],

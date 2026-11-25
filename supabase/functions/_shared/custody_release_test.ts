@@ -10,8 +10,19 @@ import {
 const chargeId = "44444444-4444-4444-8444-444444444444";
 const groupId = "11111111-1111-4111-8111-111111111111";
 
-function adminFor(rows: Record<string, unknown>[]) {
+function adminFor(
+  rows: Record<string, unknown>[],
+  clock?: {
+    startsAt?: string;
+    cancelledAt?: string | null;
+    sessionId?: string | null;
+    session?: { starts_at: string | null; cancelled_at: string | null } | null;
+    confirmedAt?: string | null;
+  },
+) {
   const updates: Record<string, unknown>[] = [];
+  const startsAt = clock?.startsAt ?? "2020-01-01T00:00:00Z";
+  const sessionId = clock?.sessionId ?? null;
   return {
     updates,
     from(table: string) {
@@ -35,6 +46,9 @@ function adminFor(rows: Record<string, unknown>[]) {
         neq() {
           return self;
         },
+        lte() {
+          return self;
+        },
         limit() {
           return self;
         },
@@ -54,17 +68,30 @@ function adminFor(rows: Record<string, unknown>[]) {
           if (table === "payment_charges") {
             return Promise.resolve({
               data: rows[0] ?? {
+                id: chargeId,
+                group_id: groupId,
                 venue_id: "33333333-3333-4333-8333-333333333333",
+                status: "paid",
               },
+              error: null,
+            });
+          }
+          if (table === "room_sessions") {
+            return Promise.resolve({
+              data: clock?.session ?? null,
               error: null,
             });
           }
           return Promise.resolve({
             data: {
-              cancelled_at: null,
-              confirmed_at: "2026-11-06T10:00:00Z",
+              cancelled_at: clock?.cancelledAt ?? null,
+              confirmed_at: clock && "confirmedAt" in clock
+                ? clock.confirmedAt
+                : "2026-11-06T10:00:00Z",
               closed_at: null,
               closes_at: "2099-01-01T00:00:00Z",
+              starts_at: startsAt,
+              session_id: sessionId,
               total_spots: 4,
               minimum_spots: 2,
             },
@@ -84,7 +111,7 @@ function adminFor(rows: Record<string, unknown>[]) {
   };
 }
 
-Deno.test("cartão capturado com o grupo confirmado solta a custódia", async () => {
+Deno.test("cartão capturado depois do horário solta a custódia", async () => {
   const releases: string[] = [];
   const admin = adminFor([]);
   await finishCapturedCard({
@@ -139,7 +166,100 @@ Deno.test("falha ao soltar a custódia fica registrada para o cron", async () =>
   }
 });
 
-Deno.test("Pix pago depois da confirmação solta a custódia e o aberto não", async () => {
+Deno.test("antes do horário a custódia fica retida e o split fica gravado", async () => {
+  const releases: string[] = [];
+  const admin = adminFor([], { startsAt: "2099-01-01T00:00:00Z" });
+  const client = {
+    releaseCustody: (splitId: string) => {
+      releases.push(splitId);
+      return Promise.resolve();
+    },
+    accountId: () => "ACCO_PRIMARY",
+  };
+  await finishCapturedCard({
+    admin,
+    pagbank: client,
+    chargeId,
+    splitId: "SPLI_CARD",
+    paid: true,
+  });
+  await releasePaidIfClosed({
+    admin,
+    pagbank: client,
+    charge: { id: chargeId, group_id: groupId, provider_split_id: "SPLI_PIX" },
+    groupClosed: true,
+  });
+  const waiting = adminFor([{
+    id: chargeId,
+    group_id: groupId,
+    provider_split_id: "SPLI_WAIT",
+    status: "paid",
+    custody_released_at: null,
+  }], { startsAt: "2099-01-01T00:00:00Z" });
+  const count = await retryPendingCustodyReleases(waiting, client);
+  assertEquals(releases, []);
+  assertEquals(count, 0);
+  assertEquals(admin.updates[0].provider_split_id, "SPLI_CARD");
+  assertEquals(
+    admin.updates.some((item) => "custody_release_attempts" in item),
+    false,
+  );
+});
+
+Deno.test("grupo cancelado não solta a custódia mesmo depois do horário", async () => {
+  const releases: string[] = [];
+  const admin = adminFor([{
+    id: chargeId,
+    group_id: groupId,
+    provider_split_id: "SPLI_CANCEL",
+    status: "paid",
+    custody_released_at: null,
+  }], { cancelledAt: "2026-11-06T11:00:00Z" });
+  const client = {
+    releaseCustody: (splitId: string) => {
+      releases.push(splitId);
+      return Promise.resolve();
+    },
+    accountId: () => "ACCO_PRIMARY",
+  };
+  const count = await retryPendingCustodyReleases(admin, client);
+  const direct = await releaseHeldSplit(admin, client, {
+    id: chargeId,
+    group_id: groupId,
+    provider_split_id: "SPLI_CANCEL",
+    status: "paid",
+  });
+  assertEquals(count, 0);
+  assertEquals(direct, false);
+  assertEquals(releases, []);
+});
+
+Deno.test("sessão cancelada não solta a custódia", async () => {
+  const releases: string[] = [];
+  const admin = adminFor([], {
+    sessionId: "55555555-5555-4555-8555-555555555555",
+    session: {
+      starts_at: "2020-01-01T00:00:00Z",
+      cancelled_at: "2020-01-01T01:00:00Z",
+    },
+  });
+  const ok = await releaseHeldSplit(admin, {
+    releaseCustody: (splitId) => {
+      releases.push(splitId);
+      return Promise.resolve();
+    },
+    accountId: () => "ACCO_PRIMARY",
+  }, {
+    id: chargeId,
+    group_id: groupId,
+    provider_split_id: "SPLI_SESSAO",
+    status: "paid",
+  });
+  assertEquals(ok, false);
+  assertEquals(releases, []);
+});
+
+Deno.test("Pix pago depois da confirmação e do horário solta a custódia e o aberto não", async () => {
   const releases: string[] = [];
   const client = {
     releaseCustody: (splitId: string) => {

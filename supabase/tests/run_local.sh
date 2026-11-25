@@ -143,3 +143,6 @@ echo "pagbank trigger search_path ok"
 # supabase/migrations/20261125164000_admin_operations.sql
 run -f "$root/tests/admin_operations.sql"
 echo "admin operations ok"
+# supabase/migrations/20261125183000_custody_after_session.sql
+run -f "$root/tests/custody_after_session.sql"
+echo "custody after session ok"

@@ -31,6 +31,7 @@ function adminFor(options: {
   total?: number;
   minimum?: number;
   closesAt?: string;
+  startsAt?: string;
   charges: Charge[];
   claim?: () => boolean;
   member?: string | null;
@@ -84,6 +85,7 @@ function adminFor(options: {
               confirmed_at: options.confirmed ? "2026-11-06T10:00:00Z" : null,
               closed_at: options.closed ? "2026-11-06T10:00:00Z" : null,
               closes_at: options.closesAt ?? "2026-11-07T10:00:00Z",
+              starts_at: options.startsAt ?? "2020-01-01T00:00:00Z",
               total_spots: options.total ?? 4,
               minimum_spots: options.minimum ?? 2,
             },
@@ -384,6 +386,45 @@ Deno.test("Pix já pago no grupo confirmado solta a custódia", async () => {
   await settleGroup(admin, pagbank, groupId);
   assertEquals(releases.length, 1);
   assert(releases[0].includes("/splits/SPLI_PIX/custody/release"));
+});
+
+Deno.test("grupo confirmado captura e segura a custódia antes do horário", async () => {
+  const charges = [card()];
+  const admin = adminFor({
+    confirmed: true,
+    startsAt: "2099-01-01T00:00:00Z",
+    charges,
+  });
+  const calls: string[] = [];
+  const fetchFn = (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${url}`);
+    if (method === "GET") {
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "pay_card",
+        status: "AUTHORIZED",
+        billingType: "CREDIT_CARD",
+      }), { status: 200 }));
+    }
+    if (url.includes("/capture")) {
+      return Promise.resolve(new Response(JSON.stringify({
+        id: "pay_card",
+        status: "PAID",
+      }), { status: 200 }));
+    }
+    return Promise.resolve(new Response("não", { status: 500 }));
+  };
+  const pagbank = new PagBankProvider(
+    "pagbank-secret-key",
+    "https://sandbox.api.pagseguro.com",
+    fetchFn,
+    () => Promise.resolve(),
+    "ACCO_PRIMARY",
+  );
+  await settleGroup(admin, pagbank, groupId);
+  assertEquals(charges[0].status, "paid");
+  assert(calls.some((call) => call.includes("/capture")));
+  assertEquals(calls.some((call) => call.includes("/custody/release")), false);
 });
 
 Deno.test("grupo confirmado captura mesmo sem lotar", async () => {
