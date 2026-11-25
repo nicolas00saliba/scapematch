@@ -1190,6 +1190,7 @@ set search_path = ''
 as $$
 declare
   v_charge public.payment_charges%rowtype;
+  v_provider text;
 begin
   if auth.uid() is not null then
     raise exception 'forbidden' using errcode = '42501';
@@ -1212,16 +1213,51 @@ begin
   if v_charge.amount_cents <> 0 or v_charge.subsidy_cents <= 0 then
     raise exception 'pontos_incompletos' using errcode = '22023';
   end if;
+  -- Cancelada, expirada (failed) ou já estornada não anda para paid.
+  -- O provider só muda no mesmo passo em que a transição é permitida.
+  if v_charge.status not in ('creating', 'pending', 'authorized')
+    or not private.payment_status_allowed(v_charge.status, 'paid')
+  then
+    return pg_catalog.jsonb_build_object(
+      'id', v_charge.id,
+      'status', v_charge.status,
+      'amount_cents', v_charge.amount_cents,
+      'points_only', false,
+      'applied', false
+    );
+  end if;
+  v_provider := v_charge.provider;
   update public.payment_charges
   set provider = 'points'
-  where id = v_charge.id;
+  where id = v_charge.id
+    and status = v_charge.status
+    and private.payment_status_allowed(status, 'paid');
+  if not found then
+    select * into v_charge
+    from public.payment_charges
+    where id = p_charge_id;
+    return pg_catalog.jsonb_build_object(
+      'id', v_charge.id,
+      'status', v_charge.status,
+      'amount_cents', v_charge.amount_cents,
+      'points_only', false,
+      'applied', false
+    );
+  end if;
   perform private.apply_payment_transition(v_charge.id, 'paid', true);
   select * into v_charge from public.payment_charges where id = p_charge_id;
+  if v_charge.status is distinct from 'paid' then
+    update public.payment_charges
+    set provider = v_provider
+    where id = v_charge.id;
+    select * into v_charge from public.payment_charges where id = p_charge_id;
+  end if;
   return pg_catalog.jsonb_build_object(
     'id', v_charge.id,
     'status', v_charge.status,
     'amount_cents', v_charge.amount_cents,
-    'points_only', true,
+    'points_only', v_charge.status = 'paid',
+    'applied', v_charge.status = 'paid',
     'topup_cents', v_charge.free_slot_topup_cents
   );
 end;
@@ -1230,3 +1266,40 @@ $$;
 revoke all on function public.settle_points_covered_charge(uuid)
   from public, anon, authenticated;
 grant execute on function public.settle_points_covered_charge(uuid) to service_role;
+
+-- Quanto o jogador ainda paga depois do desconto e dos pontos.
+-- O create-charge lê isso antes de autorizar o cartão.
+create or replace function public.player_payable_cents(
+  p_group_id uuid,
+  p_user_id uuid,
+  p_points integer
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_group public.groups%rowtype;
+  v_bps integer;
+  v_quote jsonb;
+begin
+  if auth.uid() is not null then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  select * into v_group from public.groups where id = p_group_id;
+  if v_group.id is null then
+    return null;
+  end if;
+  v_bps := public.commission_bps_for_venue(v_group.venue_id);
+  v_quote := private.quote_redemption(
+    p_user_id, v_group.venue_id, v_group.price_cents, v_bps, p_points
+  );
+  return coalesce((v_quote ->> 'charged_cents')::integer, 0);
+end;
+$$;
+
+revoke all on function public.player_payable_cents(uuid, uuid, integer)
+  from public, anon, authenticated;
+grant execute on function public.player_payable_cents(uuid, uuid, integer)
+  to service_role;

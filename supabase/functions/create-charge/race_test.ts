@@ -49,6 +49,9 @@ type Store = {
   quoteOk?: boolean;
   reserveAmountCents?: number;
   reserveHouseFixedCents?: number;
+  heldChargedCents?: number;
+  playerPayableCents?: number;
+  settleStatus?: string;
   failChargedTotal?: boolean;
   detachMissing?: boolean;
   releaseExpiredError?: boolean;
@@ -282,6 +285,48 @@ function adminFor(store: Store) {
           // A corrida não resgata. A regra de verdade está em cap_point_redemption no SQL.
           return { data: Number(args.p_points ?? 0), error: null };
         }
+        if (name === "hold_point_redemption") {
+          const points = Number(args.p_points ?? 0);
+          const gross = Number(args.p_gross ?? 0);
+          const charged = store.heldChargedCents ?? Math.max(gross - points, 0);
+          return {
+            data: {
+              points,
+              charged_cents: charged,
+              subsidy_cents: points,
+              gross_cents: gross,
+              house_net_cents: 7500,
+              split_percent: null,
+              points_only: false,
+              held: points > 0,
+            },
+            error: null,
+          };
+        }
+        if (name === "player_payable_cents") {
+          if (typeof store.playerPayableCents !== "number") {
+            return { data: null, error: { code: "42883" } };
+          }
+          return { data: store.playerPayableCents, error: null };
+        }
+        if (name === "settle_points_covered_charge") {
+          const row = byId(String(args.p_charge_id));
+          const status = store.settleStatus ??
+            (row && ["creating", "pending", "authorized"].includes(row.status)
+              ? "paid"
+              : row?.status ?? "failed");
+          if (row && status === "paid") row.status = "paid";
+          return {
+            data: {
+              id: row?.id ?? args.p_charge_id,
+              status,
+              amount_cents: 0,
+              points_only: status === "paid",
+              applied: status === "paid",
+            },
+            error: null,
+          };
+        }
         if (name === "load_owned_card") {
           return {
             data: {
@@ -294,7 +339,15 @@ function adminFor(store: Store) {
           };
         }
         if (name === "reserve_pix_charge") {
-          return { data: reserve("PIX", args), error: null };
+          return {
+            data: {
+              ...reserve("PIX", args),
+              ...(typeof store.reserveAmountCents === "number"
+                ? { amount_cents: store.reserveAmountCents }
+                : {}),
+            },
+            error: null,
+          };
         }
         if (name === "reserve_card_charge") {
           return {
@@ -1324,4 +1377,84 @@ Deno.test("cotação acima do teto do usuário responde 429", async () => {
     store.calls.some((call) => call.includes("fees/calculate")),
     false,
   );
+});
+
+function pointsRequest(billing: string, key: string): Request {
+  return new Request("https://example.test/create-charge", {
+    method: "POST",
+    body: JSON.stringify({
+      group_id: groupId,
+      billing_type: billing,
+      idempotency_key: key,
+      saved_card_id: cardId,
+      points: 8000,
+    }),
+  });
+}
+
+Deno.test("pontos que cobrem a reserva não autorizam o cartão", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 2000;
+  store.playerPayableCents = 0;
+  store.reserveAmountCents = 0;
+  const response = await createCharge(
+    pointsRequest("CREDIT_CARD", "idem-pontos-cheios"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "paid");
+  assertEquals(body.points_only, true);
+  assertEquals(store.payments, []);
+  assertEquals(store.money, []);
+});
+
+Deno.test("corrida que zera depois da autorização ainda estorna o cartão", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 10000;
+  store.playerPayableCents = 10000;
+  store.reserveAmountCents = 0;
+  const response = await createCharge(
+    pointsRequest("CREDIT_CARD", "idem-pontos-corrida"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 200);
+  assertEquals(body.status, "paid");
+  assert(store.payments.length > 0);
+  assert(
+    store.payments.some((item) =>
+      item.status === "DELETED" || item.status === "REFUNDED"
+    ),
+  );
+});
+
+Deno.test("liquidação recusada devolve o status da cobrança cancelada", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 2000;
+  store.reserveAmountCents = 0;
+  store.settleStatus = "cancelled";
+  const response = await createCharge(
+    pointsRequest("PIX", "idem-pontos-cancelada"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 409);
+  assertEquals(body.status, "cancelled");
+  assertEquals(body.points_only, false);
+});
+
+Deno.test("liquidação recusada devolve o status da cobrança expirada", async () => {
+  const store = makeStore();
+  store.heldChargedCents = 2000;
+  store.reserveAmountCents = 0;
+  store.settleStatus = "failed";
+  const response = await createCharge(
+    pointsRequest("PIX", "idem-pontos-expirada"),
+    chargeRuntime(store, providerFor(store, {})),
+  );
+  const body = await response.json();
+  assertEquals(response.status, 409);
+  assertEquals(body.status, "failed");
+  assertEquals(body.points_only, false);
 });

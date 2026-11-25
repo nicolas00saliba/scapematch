@@ -499,7 +499,8 @@ export async function createCharge(
       amountCents = reservedAmountCents(reserved.amount_cents, amountCents);
       if (amountCents === 0 && pointsRedeemed > 0) {
         holdOpen = false;
-        return json(await settlePointsCovered(admin, reserved.id, billingType));
+        const settled = await settlePointsCovered(admin, reserved.id, billingType);
+        return json(settled.body, settled.httpStatus);
       }
       if (reserved.house_fixed_cents >= 0) {
         split.fixedValue = fixedReaisFromCents(reserved.house_fixed_cents);
@@ -802,6 +803,55 @@ export async function createCharge(
       if (decision === "refuse") {
         return json({ error: cardSwitchBlock(switchInput) }, 409);
       }
+      if (
+        pointsRedeemed > 0 &&
+        decision === "proceed" &&
+        !existing?.provider_ref
+      ) {
+        const payable = await playerPayableCents(
+          admin,
+          groupId,
+          user.id,
+          pointsRedeemed,
+        );
+        if (payable === 0) {
+          let reservedCovered;
+          try {
+            reservedCovered = await reserveCardCharge(admin, {
+              groupId,
+              userId: user.id,
+              venueId: venue.id as string,
+              amountCents,
+              idempotencyKey,
+              walletId: venue.pagbank_account_id as string,
+              commissionBps,
+              grossCents: grossForReserve,
+              subsidyCents,
+              pointsRedeemed,
+              splitPercent,
+            });
+          } catch (error) {
+            if (isSerializationConflict(error)) {
+              return json({ error: "pagamento em andamento" }, 409);
+            }
+            throw error;
+          }
+          const coveredNow = reservedAmountCents(
+            reservedCovered.amount_cents,
+            amountCents,
+          );
+          if (coveredNow === 0) {
+            holdOpen = false;
+            const settled = await settlePointsCovered(
+              admin,
+              reservedCovered.id,
+              billingType,
+            );
+            return json(settled.body, settled.httpStatus);
+          }
+          amountCents = coveredNow;
+        }
+      }
       const remoteIp = clientIp(req) ?? undefined;
       const storedFixed = numberOrNull(existing?.house_fixed_cents);
       const previewGross = grossForReserve ?? amountCents;
@@ -971,7 +1021,12 @@ export async function createCharge(
         if (coveredCard === 0 && pointsRedeemed > 0) {
           await loseCard(reservedCard.id, reservedCard.attempt_id);
           holdOpen = false;
-          return json(await settlePointsCovered(admin, reservedCard.id, billingType));
+          const settled = await settlePointsCovered(
+            admin,
+            reservedCard.id,
+            billingType,
+          );
+          return json(settled.body, settled.httpStatus);
         }
         const aligned = await alignCardSplit(
           reservedCard.house_fixed_cents,
@@ -1045,7 +1100,8 @@ export async function createCharge(
           if (coveredAgain === 0 && pointsRedeemed > 0) {
             await loseCard(again.id, again.attempt_id);
             holdOpen = false;
-            return json(await settlePointsCovered(admin, again.id, billingType));
+            const settled = await settlePointsCovered(admin, again.id, billingType);
+            return json(settled.body, settled.httpStatus);
           }
           const alignedAgain = await alignCardSplit(
             again.house_fixed_cents,
@@ -1584,24 +1640,48 @@ function reservedAmountCents(value: unknown, fallback: number): number {
   return fallback;
 }
 
+async function playerPayableCents(
+  admin: ChargeDb,
+  groupId: string,
+  userId: string,
+  points: number,
+): Promise<number | null> {
+  const quoted = await admin.rpc("player_payable_cents", {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_points: points,
+  });
+  if (quoted.error || typeof quoted.data !== "number") return null;
+  return quoted.data;
+}
+
 async function settlePointsCovered(
   admin: ChargeDb,
   chargeId: string,
   billingType: string,
-): Promise<Record<string, unknown>> {
+): Promise<{ body: Record<string, unknown>; httpStatus: number }> {
   const settled = await admin.rpc("settle_points_covered_charge", {
     p_charge_id: chargeId,
   });
-  if (settled.error || !settled.data) throw new Error("erro");
+  if (settled.error || !settled.data || typeof settled.data !== "object") {
+    throw new Error("erro");
+  }
+  const row = settled.data as Record<string, unknown>;
+  const status = typeof row.status === "string" ? row.status : "";
+  if (!status) throw new Error("erro");
+  const paid = status === "paid";
   return {
-    charge_id: chargeId,
-    status: "paid",
-    provider_ref: null,
-    qr_code: "",
-    qr_code_base64: null,
-    billing_type: billingType,
-    amount_cents: 0,
-    points_only: true,
+    httpStatus: paid ? 200 : 409,
+    body: {
+      charge_id: chargeId,
+      status,
+      provider_ref: null,
+      qr_code: "",
+      qr_code_base64: null,
+      billing_type: billingType,
+      amount_cents: numberOrNull(row.amount_cents) ?? 0,
+      points_only: paid && row.points_only === true,
+    },
   };
 }
 

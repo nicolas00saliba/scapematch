@@ -452,6 +452,77 @@ begin
   then
     raise exception 'a classificacao do B2B misturou 10%% e 20%%';
   end if;
+
+  v_buyer := 'a2570000-0000-4000-8000-000000000005';
+  v_group := 'a2560015-0000-4000-8000-000000000001';
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    v_group, 'curitiba', v_venue, v_room, v_session,
+    '2027-12-26 18:00:00+00', 4, 2, 10000, v_owner
+  );
+  if public.player_payable_cents(v_group, v_buyer, 20000) <> 0
+    or public.player_payable_cents(v_group, v_buyer, 100) <> 7900
+  then
+    raise exception 'o valor a pagar com pontos nao saiu antes do cartao';
+  end if;
+
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    provider, subsidy_cents, gross_amount_cents, points_redeemed,
+    idempotency_key, wallet_id, commission_bps
+  ) values (
+    'a2550015-0000-4000-8000-000000000001',
+    v_group, v_buyer, v_venue, 0, 'CREDIT_CARD', 'cancelled',
+    'points', 10000, 10000, 10000,
+    'idem-audit-cancelada', 'wal-audit', 2500
+  );
+  v_quote := public.settle_points_covered_charge(
+    'a2550015-0000-4000-8000-000000000001'
+  );
+  if (v_quote ->> 'status') is distinct from 'cancelled'
+    or coalesce((v_quote ->> 'applied')::boolean, true)
+    or (
+      select status || ':' || provider
+      from public.payment_charges
+      where id = 'a2550015-0000-4000-8000-000000000001'
+    ) is distinct from 'cancelled:points'
+  then
+    raise exception 'cobranca cancelada foi liquidada em pontos %', v_quote;
+  end if;
+
+  v_group := 'a2560016-0000-4000-8000-000000000001';
+  insert into public.groups (
+    id, city_id, venue_id, room_id, session_id, starts_at,
+    total_spots, minimum_spots, price_cents, created_by
+  ) values (
+    v_group, 'curitiba', v_venue, v_room, v_session,
+    '2027-12-27 18:00:00+00', 4, 2, 10000, v_owner
+  );
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    provider, subsidy_cents, gross_amount_cents, points_redeemed,
+    idempotency_key, wallet_id, commission_bps
+  ) values (
+    'a2550016-0000-4000-8000-000000000001',
+    v_group, v_buyer, v_venue, 0, 'CREDIT_CARD', 'failed',
+    'points', 10000, 10000, 10000,
+    'idem-audit-expirada', 'wal-audit', 2500
+  );
+  v_quote := public.settle_points_covered_charge(
+    'a2550016-0000-4000-8000-000000000001'
+  );
+  if (v_quote ->> 'status') is distinct from 'failed'
+    or coalesce((v_quote ->> 'applied')::boolean, true)
+    or (
+      select status || ':' || provider
+      from public.payment_charges
+      where id = 'a2550016-0000-4000-8000-000000000001'
+    ) is distinct from 'failed:points'
+  then
+    raise exception 'cobranca expirada foi liquidada em pontos %', v_quote;
+  end if;
 end;
 $$;
 
