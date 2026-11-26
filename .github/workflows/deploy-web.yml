@@ -85,6 +85,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/app-root $(bash tool/sentry_defines.sh app production)
           bash tool/install_cleanup_service_worker.sh build/app-root
+          bash tool/stamp_web_build.sh build/app-root
           bash tool/stamp_web_manifest.sh build/app-root player real
           bash tool/mark_real_web_copy.sh build/app-root player
           bash tool/check_web_service_worker.sh build/app-root player
@@ -101,6 +102,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/parceiro-root $(bash ../../tool/sentry_defines.sh parceiro production)
           bash ../../tool/install_cleanup_service_worker.sh build/parceiro-root
+          bash ../../tool/stamp_web_build.sh build/parceiro-root
           bash ../../tool/stamp_web_manifest.sh build/parceiro-root partner real
           bash ../../tool/mark_real_web_copy.sh build/parceiro-root partner
           bash ../../tool/check_web_service_worker.sh build/parceiro-root partner
@@ -117,6 +119,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=real --pwa-strategy=none -o build/admin-root $(bash ../../tool/sentry_defines.sh admin production)
           bash ../../tool/install_cleanup_service_worker.sh build/admin-root
+          bash ../../tool/stamp_web_build.sh build/admin-root
           bash ../../tool/stamp_web_manifest.sh build/admin-root admin real
           bash ../../tool/mark_real_web_copy.sh build/admin-root admin
           bash ../../tool/check_web_service_worker.sh build/admin-root admin
@@ -132,6 +135,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/demo-player $(bash tool/sentry_defines.sh app demo)
           bash tool/install_cleanup_service_worker.sh build/demo-player
+          bash tool/stamp_web_build.sh build/demo-player
           bash tool/stamp_web_manifest.sh build/demo-player player demo
           bash tool/check_web_service_worker.sh build/demo-player player
           bash tool/check_web_manifest.sh build/demo-player player demo
@@ -144,6 +148,7 @@ jobs:
         run: |
           flutter build web --release --base-href / --dart-define=APP_MODE=demo --pwa-strategy=none -o build/parceiro-demo-root $(bash ../../tool/sentry_defines.sh parceiro demo)
           bash ../../tool/install_cleanup_service_worker.sh build/parceiro-demo-root
+          bash ../../tool/stamp_web_build.sh build/parceiro-demo-root
           bash ../../tool/stamp_web_manifest.sh build/parceiro-demo-root partner demo
           bash ../../tool/check_web_service_worker.sh build/parceiro-demo-root partner
           bash ../../tool/check_web_manifest.sh build/parceiro-demo-root partner demo
