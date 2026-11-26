@@ -7,6 +7,7 @@ import { completePagbankConnect } from "../_shared/pagbank_connect.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
+import { revokeConnectTokens } from "../_shared/pagbank_revoke.ts";
 import {
   conflictBody,
   conflictFromRpc,
@@ -96,7 +97,18 @@ Deno.serve(async (req) => {
         });
         if (!error) return;
         const conflict = conflictFromRpc(error);
-        if (conflict) throw conflict;
+        if (conflict) {
+          // Conexão recusada: o token novo nunca foi guardado e não será
+          // usado. Revoga no PagBank, sem atrapalhar o 409.
+          if (
+            conflict.code === "pagbank_account_exists" ||
+            conflict.code === "pagbank_account_in_use" ||
+            conflict.code === "pagbank_account_mismatch"
+          ) {
+            await revokeRefused(clientId, clientSecret, tokens);
+          }
+          throw conflict;
+        }
         throw new Error("erro");
       },
     });
@@ -110,3 +122,25 @@ Deno.serve(async (req) => {
     return json(failure.body, failure.status);
   }
 });
+
+async function revokeRefused(
+  clientId: string,
+  clientSecret: string,
+  tokens: { accessToken: string; refreshToken: string },
+): Promise<void> {
+  try {
+    const provider = PagBankProvider.fromEnv(Deno.env);
+    const result = await revokeConnectTokens(
+      (call) =>
+        provider.revokeConnectToken({ clientId, clientSecret, ...call }),
+      tokens,
+    );
+    if (result.failed > 0) {
+      console.warn(
+        `pagbank-connect: revogacao do token recusado falhou em ${result.failed} de ${result.attempted}`,
+      );
+    }
+  } catch (_error) {
+    console.warn("pagbank-connect: revogacao indisponivel");
+  }
+}

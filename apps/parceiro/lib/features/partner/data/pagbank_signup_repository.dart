@@ -52,7 +52,7 @@ class MemoryPagbankServer {
   /// O retorno do PagBank Connect. Conta diferente da atual é recusada.
   void link({
     required String accountId,
-    String holder = 'Casa de Teste',
+    String houseName = 'Casa de Teste',
     String? documentKind = 'cnpj',
     String? documentMasked = '**.***.***/****-81',
   }) {
@@ -63,7 +63,7 @@ class MemoryPagbankServer {
     _accountId = accountId;
     account = PagbankAccountView(
       connected: true,
-      holder: holder,
+      houseName: houseName,
       accountLast4: accountId.substring(accountId.length - 4),
       documentKind: documentKind,
       documentMasked: documentMasked,
@@ -134,7 +134,7 @@ class MemoryPagbankSignupRepository implements PagbankSignupRepository {
     if (!current.connected) return current;
     return PagbankAccountView(
       connected: true,
-      holder: current.holder,
+      houseName: current.houseName,
       bank: current.bank,
       accountLast4: current.accountLast4,
       documentKind: current.documentKind,
@@ -269,6 +269,8 @@ PagbankSignupCreated _created(Object? data) {
 
 String signupErrorCode(String message) {
   for (final code in const [
+    'pagbank_account_in_use',
+    'pagbank_account_changed',
     'pagbank_account_exists',
     'pagbank_account_mismatch',
     'pagbank_in_flight',

@@ -1,6 +1,9 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
+  accountChangedMessage,
+  accountInUseMessage,
   bindingAlertCode,
+  chargeBindingBlocked,
   bindingBlocksMoney,
   conflictBody,
   conflictFromRpc,
@@ -122,4 +125,46 @@ Deno.test("reserva simulada: sem conta a casa não recebe; com conta o repasse v
     false,
   );
   assertEquals(receivers.length, 2);
+});
+
+Deno.test("cobrança nova: só passa com conta conferida (falha fechada)", async () => {
+  const rpc = (result: () => unknown) => ({
+    rpc: () => Promise.resolve(result() as { data: unknown; error: unknown }),
+  });
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: { state: "ok" }, error: null })), "v"),
+    false,
+  );
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: { state: "ambiguous" }, error: null })), "v"),
+    true,
+  );
+  // erro na checagem, resposta vazia ou lixo: bloqueia
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: null, error: { code: "XX" } })), "v"),
+    true,
+  );
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: null, error: null })), "v"),
+    true,
+  );
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: "x", error: null })), "v"),
+    true,
+  );
+  assertEquals(
+    await chargeBindingBlocked({
+      rpc: () => Promise.reject(new Error("rede")),
+    }, "v"),
+    true,
+  );
+});
+
+Deno.test("conflitos novos: conta em uso e conta mudou viram 409 com texto próprio", () => {
+  const inUse = conflictFromRpc({ code: "PB409", message: "pagbank_account_in_use" });
+  assertEquals(inUse?.code, "pagbank_account_in_use");
+  assertEquals(inUse?.message409, accountInUseMessage);
+  const changed = conflictFromRpc({ message: "pagbank_account_changed" });
+  assertEquals(changed?.code, "pagbank_account_changed");
+  assertEquals(changed?.message409, accountChangedMessage);
 });

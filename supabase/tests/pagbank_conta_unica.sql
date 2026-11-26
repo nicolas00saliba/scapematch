@@ -89,7 +89,7 @@ begin
     raise exception 'os dois logins não veem a mesma conta: % / %', v_phone, v_laptop;
   end if;
   if v_phone ->> 'connected' <> 'true'
-    or v_phone ->> 'holder' <> 'Casa Unica'
+    or v_phone ->> 'house_name' <> 'Casa Unica'
     or v_phone ->> 'bank' <> 'PagBank'
     or v_phone ->> 'account_last4' <> '13CA'
     or v_phone ->> 'document_masked' <> '**.***.***/****-95'
@@ -381,4 +381,169 @@ begin
   then
     raise exception 'grant da leitura da conta saiu errado';
   end if;
+end $$;
+
+-- 9. A mesma conta não liga a duas casas reais (409). Casa de teste fica de fora.
+insert into auth.users (id, email, raw_user_meta_data)
+values
+  ('d1000001-0000-4000-8000-000000000004', 'unica-dono2@example.com', '{"display_name":"Dono Dois"}');
+
+insert into public.venues (
+  id, owner_id, city_id, name, neighborhood, street_address, address_number,
+  postal_code, latitude, longitude, income_value, document_kind,
+  document_number, phone, status
+) values (
+  'd2000001-0000-4000-8000-000000000002',
+  'd1000001-0000-4000-8000-000000000004',
+  'curitiba', 'Casa Dois', 'Centro', 'Rua Dois', '22', '80010022',
+  -25.43, -49.27, 5000, 'cnpj', '45723174000110', '41900001120', 'approved'
+);
+
+do $$
+declare
+  v_two constant uuid := 'd2000001-0000-4000-8000-000000000002';
+  v_msg text;
+  v_ok boolean := false;
+begin
+  begin
+    perform public.connect_venue_pagbank(
+      v_two, 'd1000001-0000-4000-8000-000000000004',
+      'ACCO_BBBBBBBB-0000-4000-8000-000000009999', 'acc-6', 'ref-6',
+      now() + interval '1 hour'
+    );
+  exception when sqlstate 'PB409' then
+    get stacked diagnostics v_msg = message_text;
+    v_ok := v_msg = 'pagbank_account_in_use';
+  end;
+  if not v_ok then raise exception 'a mesma conta ligou a duas casas'; end if;
+  if (select pagbank_account_id from public.venues where id = v_two) is not null
+    or exists (select 1 from public.venue_pagbank_tokens where venue_id = v_two)
+  then
+    raise exception 'a recusa deixou rastro na segunda casa';
+  end if;
+end $$;
+
+-- 10. Casa sem split ou já liquidada não trava o desconectar; com split e
+-- custódia aberta trava; reserva aberta trava. O trigger recusa reserva
+-- com a conta velha (corrida com o disconnect).
+do $$
+declare
+  v_venue constant uuid := 'd2000001-0000-4000-8000-000000000001';
+  v_owner constant uuid := 'd1000001-0000-4000-8000-000000000001';
+  v_wallet constant text := 'ACCO_BBBBBBBB-0000-4000-8000-000000009999';
+  v_ok boolean;
+  v_msg text;
+begin
+  set local session_replication_role = replica;
+  alter table public.payment_charges enable always trigger charge_wallet_matches_venue;
+
+  -- paga sem split: não conta
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, commission_bps, wallet_id, paid_at
+  ) values (
+    'd4000001-0000-4000-8000-000000000001', gen_random_uuid(), gen_random_uuid(),
+    v_venue, 5000, 'PIX', 'paid', 'unica-sem-split', 2500, v_wallet, now()
+  );
+  -- paga com split, mas já liquidada: não conta
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, commission_bps, wallet_id, paid_at, provider_split_id,
+    custody_released_at
+  ) values (
+    'd4000001-0000-4000-8000-000000000002', gen_random_uuid(), gen_random_uuid(),
+    v_venue, 5000, 'PIX', 'paid', 'unica-liquidada', 2500, v_wallet, now(),
+    'SPLI_X', now()
+  );
+  -- pendente velha: não conta
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, commission_bps, wallet_id, created_at
+  ) values (
+    'd4000001-0000-4000-8000-000000000003', gen_random_uuid(), gen_random_uuid(),
+    v_venue, 5000, 'PIX', 'pending', 'unica-velha', 2500, v_wallet,
+    now() - interval '3 days'
+  );
+  if private.venue_pagbank_in_flight(v_venue) <> 0 then
+    raise exception 'cobrança sem split, liquidada ou velha trava a troca: %',
+      private.venue_pagbank_in_flight(v_venue);
+  end if;
+
+  -- paga com split e custódia aberta: conta
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, commission_bps, wallet_id, paid_at, provider_split_id
+  ) values (
+    'd4000001-0000-4000-8000-000000000004', gen_random_uuid(), gen_random_uuid(),
+    v_venue, 5000, 'PIX', 'paid', 'unica-aberta', 2500, v_wallet, now(),
+    'SPLI_Y'
+  );
+  if private.venue_pagbank_in_flight(v_venue) <> 1 then
+    raise exception 'custódia aberta devia contar';
+  end if;
+  v_ok := false;
+  begin
+    perform public.disconnect_venue_pagbank(v_venue, v_owner, false);
+  exception when sqlstate 'PB409' then
+    v_ok := sqlerrm = 'pagbank_in_flight';
+  end;
+  if not v_ok then raise exception 'desconectou com custódia aberta'; end if;
+  update public.payment_charges
+  set custody_released_at = now()
+  where id = 'd4000001-0000-4000-8000-000000000004';
+
+  -- reserva com a conta velha é recusada, a com a conta atual passa
+  v_ok := false;
+  begin
+    insert into public.payment_charges (
+      group_id, user_id, venue_id, amount_cents, billing_type, status,
+      idempotency_key, commission_bps, wallet_id
+    ) values (
+      gen_random_uuid(), gen_random_uuid(), v_venue, 5000, 'PIX', 'creating',
+      'unica-conta-velha', 2500, 'ACCO_AAAAAAAA-0000-4000-8000-0000000013CA'
+    );
+  exception when sqlstate 'PB409' then
+    get stacked diagnostics v_msg = message_text;
+    v_ok := v_msg = 'pagbank_account_changed';
+  end;
+  if not v_ok then raise exception 'reserva com a conta velha foi aceita'; end if;
+
+  insert into public.payment_charges (
+    id, group_id, user_id, venue_id, amount_cents, billing_type, status,
+    idempotency_key, commission_bps, wallet_id
+  ) values (
+    'd4000001-0000-4000-8000-000000000005', gen_random_uuid(), gen_random_uuid(),
+    v_venue, 5000, 'PIX', 'creating', 'unica-conta-atual', 2500, v_wallet
+  );
+  if private.venue_pagbank_in_flight(v_venue) <> 1 then
+    raise exception 'reserva aberta devia contar';
+  end if;
+  v_ok := false;
+  begin
+    perform public.disconnect_venue_pagbank(v_venue, v_owner, false);
+  exception when sqlstate 'PB409' then
+    v_ok := sqlerrm = 'pagbank_in_flight';
+  end;
+  if not v_ok then raise exception 'desconectou com reserva aberta'; end if;
+  update public.payment_charges set status = 'cancelled'
+  where id = 'd4000001-0000-4000-8000-000000000005';
+
+  -- desconectado: reserva com qualquer conta é recusada
+  perform public.disconnect_venue_pagbank(v_venue, v_owner, false);
+  v_ok := false;
+  begin
+    insert into public.payment_charges (
+      group_id, user_id, venue_id, amount_cents, billing_type, status,
+      idempotency_key, commission_bps, wallet_id
+    ) values (
+      gen_random_uuid(), gen_random_uuid(), v_venue, 5000, 'PIX', 'creating',
+      'unica-sem-conta', 2500, v_wallet
+    );
+  exception when sqlstate 'PB409' then
+    v_ok := true;
+  end;
+  if not v_ok then raise exception 'reserva em casa sem conta foi aceita'; end if;
+
+  alter table public.payment_charges enable trigger charge_wallet_matches_venue;
+  set local session_replication_role = origin;
 end $$;

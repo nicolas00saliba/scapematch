@@ -5,7 +5,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// A casa já tem outra conta PagBank no servidor (409). A conta é da casa,
 /// não do aparelho: só se troca desconectando a atual.
 class PagbankConnectConflict implements Exception {
-  const PagbankConnectConflict();
+  const PagbankConnectConflict([this.message]);
+
+  /// Texto do servidor (conta já tem outra, conta de outra casa...). Sem ele,
+  /// vale a mensagem padrão.
+  final String? message;
 }
 
 const pagbankConnectConflictMessage =
@@ -22,7 +26,13 @@ Future<bool> completePagbankConnectCall(PagbankConnectReturn hit) async {
     final data = response.data;
     return data is Map && data['linked'] == true;
   } on FunctionException catch (error) {
-    if (error.status == 409) throw const PagbankConnectConflict();
+    if (error.status == 409) {
+      final details = error.details;
+      final text = details is Map ? details['message'] : null;
+      throw PagbankConnectConflict(
+        text is String && text.trim().isNotEmpty ? text.trim() : null,
+      );
+    }
     rethrow;
   }
 }

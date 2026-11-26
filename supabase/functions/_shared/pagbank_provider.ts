@@ -417,6 +417,29 @@ export class PagBankProvider {
     }));
   }
 
+  /// Revoga um token do Connect no PagBank (POST /oauth2/revoke). O
+  /// Authorization leva o token de acesso da casa; X_CLIENT_* identificam o
+  /// app. Lança se o PagBank recusar: quem chama decide se isso para o fluxo.
+  async revokeConnectToken(input: {
+    clientId: string;
+    clientSecret: string;
+    bearerToken: string;
+    token: string;
+    hint: "access_token" | "refresh_token";
+  }): Promise<void> {
+    await this.#send(
+      "/oauth2/revoke",
+      { token_type_hint: input.hint, token: input.token },
+      "POST",
+      {
+        Authorization: `Bearer ${input.bearerToken}`,
+        X_CLIENT_ID: input.clientId,
+        X_CLIENT_SECRET: input.clientSecret,
+      },
+      false,
+    );
+  }
+
   refreshConnectToken(input: {
     clientId: string;
     clientSecret: string;

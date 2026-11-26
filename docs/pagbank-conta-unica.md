@@ -9,9 +9,38 @@ mesma conta pelo RPC `venue_pagbank_account_view`.
 
 - Uma conta por casa. Conectar outra conta com uma já ligada devolve **409**
   (`pagbank_account_exists`) e não muda nada.
+- A mesma conta não liga a duas casas reais. Conectar uma conta que já é de
+  outra casa devolve **409** (`pagbank_account_in_use`) e não grava nada. Vale
+  também para duas conexões ao mesmo tempo (o índice único
+  `venues_pagbank_account_real_uidx` decide). Casas de teste ficam de fora.
+- A mesma conta não liga a duas casas reais. Conectar uma conta que já é de
+  outra casa devolve **409** (`pagbank_account_in_use`) e não grava nada. Vale
+  também para duas conexões ao mesmo tempo (o índice único
+  `venues_pagbank_account_real_uidx` decide). Casas de teste ficam de fora.
 - Trocar de conta é desconectar (`pagbank-disconnect`) e conectar de novo, com
   confirmação na tela. A desconexão recusa (409 `pagbank_in_flight`) se houver
-  saque pendente ou cobrança a caminho para a conta atual.
+  saque pendente ou cobrança a caminho para a conta atual. "A caminho" é:
+  reserva `creating` ou `pending` com menos de 1 dia, `authorized` com menos de
+  7 dias, ou `paid` **com split**, custódia ainda não solta, sem estorno e sem
+  estorno pedido. Cobrança paga sem split, já liquidada, estornada ou velha
+  não trava a troca.
+- Desconectar e reservar não se atropelam. A reserva (`payment_charges` com
+  status `creating` e conta `ACCO_...`) lê a casa com `FOR SHARE` e é
+  recusada com 409 (`pagbank_account_changed`) se a conta mudou ou saiu; o
+  disconnect trava a casa com `FOR UPDATE`. Nenhum split sai para a conta
+  antiga depois do disconnect.
+- A criação de cobrança falha fechada: erro ou resposta ilegível na checagem
+  da conta também devolvem 409 e não cobram.
+- Ao desconectar, e ao recusar uma conexão (409), as funções revogam no
+  PagBank o token que a casa deixa de usar (`POST /oauth2/revoke`), em melhor
+  esforço: se o PagBank recusar, só registram um aviso sem token, e o fluxo
+  segue. O script SQL da Ninja não consegue chamar a API: o token dela é
+  apagado sem revogar. Quem quiser cortar o acesso de verdade revoga no app do
+  PagBank.
+- A tela mostra o nome da casa, o banco (PagBank), o final da conta e o
+  CPF/CNPJ **da casa** (cadastro do EscapeMatch, mascarado). O PagBank só
+  devolve o id da conta na conexão, então não há "titular" verificado e a tela
+  não usa esse rótulo.
 - Conectar a mesma conta de novo só renova o token (botão "Renovar
   autorização").
 - O token guarda a conta a que pertence (`venue_pagbank_tokens.account_id`). Se
@@ -31,7 +60,8 @@ Só com o ok do Nícolas, passo a passo.
 
 1. Merge do PR. Merge não aplica nada no banco.
 2. `supabase/ops/20261126_desativar_pagbank_ninja.sql`: desconecta a Ninja
-   (conta final 13CA) e grava o histórico na auditoria.
+   (conta final 13CA) e grava o histórico na auditoria (só os 4 últimos
+   dígitos, nunca a conta inteira).
 3. Migration `20261126170000_pagbank_conta_unica.sql`. Ela falha, sem alterar
    nada, se achar conta repetida entre casas ou token sem conta na casa.
 4. Functions, todas do mesmo commit (as que importam os módulos alterados):
@@ -44,8 +74,9 @@ Só com o ok do Nícolas, passo a passo.
 6. O dono conecta a conta pelo Parceiro (Saques > Entrar com PagBank). Conferir
    a tela e rodar o roteiro abaixo.
 
-A migration antes das functions: as functions novas chamam RPCs que a migration
-cria. A desativação antes da migration: a casa fica sem conta e sem token, e a
+**A migration vem antes das functions**: as functions novas chamam RPCs que a
+migration cria (`connect_venue_pagbank`, `disconnect_venue_pagbank`,
+`venue_pagbank_binding`), e a trava de reserva também mora nela. A desativação antes da migration: a casa fica sem conta e sem token, e a
 migration não encontra nada para recusar.
 
 ## Roteiro: reserva simulada (sem cobrança real)

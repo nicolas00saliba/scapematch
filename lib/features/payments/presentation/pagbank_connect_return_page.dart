@@ -24,6 +24,7 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
   bool _busy = true;
   bool _linked = false;
   bool _conflict = false;
+  String? _conflictText;
 
   @override
   void initState() {
@@ -34,9 +35,11 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
   Future<void> _run() async {
     var linked = false;
     var conflict = false;
+    String? conflictText;
     try {
       linked = await widget.complete(widget.hit);
-    } on PagbankConnectConflict {
+    } on PagbankConnectConflict catch (error) {
+      conflictText = error.message;
       conflict = true;
     } on Object {
       linked = false;
@@ -46,6 +49,7 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
       _busy = false;
       _linked = linked;
       _conflict = conflict;
+      _conflictText = conflictText;
     });
     if (linked) widget.onDone();
   }
@@ -57,7 +61,7 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
         : _linked
         ? 'A casa está ligada à PagBank.'
         : _conflict
-        ? pagbankConnectConflictMessage
+        ? (_conflictText ?? pagbankConnectConflictMessage)
         : 'Não foi possível ligar a casa. Peça um link novo.';
     return Scaffold(
       body: Center(

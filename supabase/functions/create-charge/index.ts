@@ -50,7 +50,7 @@ import {
   releaseReservationOnError,
 } from "../_shared/pix_charge.ts";
 import { clientIp } from "../_shared/client_ip.ts";
-import { parseBinding } from "../_shared/pagbank_binding.ts";
+import { chargeBindingBlocked } from "../_shared/pagbank_binding.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
 import { syncPayerDocument } from "../_shared/payer_document.ts";
 import { splitMatchesSubsidy } from "../_shared/scape_points.ts";
@@ -96,6 +96,8 @@ type ChargeBody = {
 
 type ChargeUser = { id: string; email?: string | null };
 
+const accountChangedMessage =
+  "A conta PagBank da casa mudou agora. Tente reservar de novo.";
 const accountAmbiguousMessage =
   "A conta PagBank desta casa está em conferência. Tente de novo mais tarde.";
 
@@ -308,13 +310,9 @@ export async function createCharge(
       return json({ error: financeBlockedMessage }, 409);
     }
     // Conta da casa e token de contas diferentes: não cria cobrança nova.
-    const bindingCheck = await admin.rpc("venue_pagbank_binding", {
-      p_venue_id: group.venue_id,
-    });
-    if (
-      !bindingCheck?.error &&
-      parseBinding(bindingCheck?.data).state === "ambiguous"
-    ) {
+    // Falha fechada: erro na checagem ou resposta ilegível também param.
+    const bindingBlocked = await chargeBindingBlocked(admin, group.venue_id);
+    if (bindingBlocked) {
       return json({ error: accountAmbiguousMessage }, 409);
     }
 
@@ -1276,6 +1274,10 @@ export async function createCharge(
   } catch (error) {
     if (error instanceof SplitExceedsNetError) {
       return json({ error: "split_excede_liquido" }, 422);
+    }
+    if (error instanceof DbRpcError && error.code === "PB409") {
+      // A conta PagBank da casa mudou entre a leitura e a reserva.
+      return json({ error: accountChangedMessage }, 409);
     }
     const failure = clientFailure(error, "create-charge");
     return json({

@@ -87,4 +87,22 @@ void main() {
     expect(find.text(pagbankConnectConflictMessage), findsOneWidget);
     expect(find.text('Continuar'), findsOneWidget);
   });
+
+  testWidgets('conta de outra casa mostra o texto que o servidor mandou', (
+    tester,
+  ) async {
+    const text = 'Esta conta PagBank já está ligada a outra casa.';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PagbankConnectReturnPage(
+          hit: const PagbankConnectReturn(code: 'code-1', state: 'state-1'),
+          complete: (_) async => throw const PagbankConnectConflict(text),
+          onDone: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text(text), findsOneWidget);
+    expect(find.text(pagbankConnectConflictMessage), findsNothing);
+  });
 }

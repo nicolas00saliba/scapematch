@@ -12,12 +12,22 @@ export const accountExistsMessage =
 export const inFlightMessage =
   "Há dinheiro a caminho para a conta atual. Espere cair e tente trocar de novo.";
 
+export const accountInUseMessage =
+  "Esta conta PagBank já está ligada a outra casa. Conecte uma conta que seja desta casa ou fale com o suporte.";
+
+export const accountChangedMessage =
+  "A conta PagBank da casa mudou agora. Tente de novo.";
+
 export type ConflictCode =
+  | "pagbank_account_in_use"
+  | "pagbank_account_changed"
   | "pagbank_account_exists"
   | "pagbank_account_mismatch"
   | "pagbank_in_flight";
 
 const conflictCodes: ConflictCode[] = [
+  "pagbank_account_in_use",
+  "pagbank_account_changed",
   "pagbank_account_exists",
   "pagbank_account_mismatch",
   "pagbank_in_flight",
@@ -33,9 +43,16 @@ export class PagbankAccountConflict extends Error {
   }
 
   get message409(): string {
-    return this.code === "pagbank_in_flight"
-      ? inFlightMessage
-      : accountExistsMessage;
+    switch (this.code) {
+      case "pagbank_in_flight":
+        return inFlightMessage;
+      case "pagbank_account_in_use":
+        return accountInUseMessage;
+      case "pagbank_account_changed":
+        return accountChangedMessage;
+      default:
+        return accountExistsMessage;
+    }
   }
 }
 
@@ -97,4 +114,26 @@ export function bindingAlertCode(binding: Binding): string {
   return binding.reason === "tokens_without_account"
     ? "token_sem_conta"
     : "conta_ambigua";
+}
+
+/// Porta da cobrança nova. Bloqueia quando a conta é ambígua, quando a
+/// resposta não dá para ler e quando a própria checagem falha (fail closed).
+export async function chargeBindingBlocked(
+  admin: {
+    rpc(name: string, args: Record<string, unknown>): PromiseLike<{
+      data: unknown;
+      error: unknown;
+    }>;
+  },
+  venueId: string,
+): Promise<boolean> {
+  try {
+    const check = await admin.rpc("venue_pagbank_binding", {
+      p_venue_id: venueId,
+    });
+    if (!check || check.error) return true;
+    return bindingBlocksMoney(parseBinding(check.data));
+  } catch (_error) {
+    return true;
+  }
 }

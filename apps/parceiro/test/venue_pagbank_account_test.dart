@@ -32,7 +32,7 @@ void main() {
   test('o JSON do servidor vira conta mascarada e sem conta vira nenhuma', () {
     final view = PagbankAccountView.fromJson({
       'connected': true,
-      'holder': 'Ninja Escape Room',
+      'house_name': 'Ninja Escape Room',
       'bank': 'PagBank',
       'account_last4': '13CA',
       'document_kind': 'cnpj',
@@ -40,7 +40,8 @@ void main() {
       'can_disconnect': false,
     });
     expect(view.connected, isTrue);
-    expect(view.documentLabel, 'CNPJ');
+    expect(view.documentLabel, 'CNPJ da casa');
+    expect(view.houseName, 'Ninja Escape Room');
     expect(view.documentMasked, '**.***.***/****-95');
     expect(view.canDisconnect, isFalse);
     expect(PagbankAccountView.fromJson({'connected': false}).connected, isFalse);
@@ -175,6 +176,34 @@ void main() {
     expect(
       pagbankSignupMessage(signupErrorCode('pagbank_in_flight')),
       PartnerMessages.pagbankSwapBusy,
+    );
+  });
+
+  test('não há rótulo de titular: o PagBank só devolve o id da conta', () {
+    expect(PartnerMessages.pagbankAccountHouse, 'Casa');
+    final old = PagbankAccountView.fromJson({
+      'connected': true,
+      'holder': 'Nome Qualquer',
+      'account_last4': '13CA',
+    });
+    expect(old.houseName, '');
+    expect(
+      PagbankAccountView.fromJson({
+        'connected': true,
+        'document_kind': 'cpf',
+      }).documentLabel,
+      'CPF da casa',
+    );
+  });
+
+  test('conta de outra casa e conta que mudou têm mensagem própria', () {
+    expect(
+      signupErrorCode('pagbank_account_in_use'),
+      'pagbank_account_in_use',
+    );
+    expect(
+      signupErrorCode('pagbank_account_changed'),
+      'pagbank_account_changed',
     );
   });
 }

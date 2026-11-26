@@ -151,12 +151,13 @@ as $$
 declare
   v_account text := pg_catalog.btrim(coalesce(p_account_id, ''));
   v_current text;
+  v_test boolean;
 begin
   if p_venue_id is null or p_actor is null or v_account = '' then
     raise exception 'conta' using errcode = '22023';
   end if;
-  select v.pagbank_account_id
-    into v_current
+  select v.pagbank_account_id, v.is_test
+    into v_current, v_test
   from public.venues v
   where v.id = p_venue_id
   for update;
@@ -172,10 +173,30 @@ begin
             detail = pg_catalog.format('conta atual ...%s', right(v_current, 4));
   end if;
 
-  update public.venues
-  set pagbank_account_id = v_account
-  where id = p_venue_id
-    and pagbank_account_id is distinct from v_account;
+  -- A mesma conta não liga a duas casas reais. Casa de teste fica de fora,
+  -- como no índice venues_pagbank_account_real_uidx.
+  if not v_test and exists (
+    select 1
+    from public.venues o
+    where o.pagbank_account_id = v_account
+      and o.id <> p_venue_id
+      and not o.is_test
+  ) then
+    raise exception 'pagbank_account_in_use'
+      using errcode = 'PB409',
+            detail = 'essa conta PagBank já está ligada a outra casa';
+  end if;
+  begin
+    update public.venues
+    set pagbank_account_id = v_account
+    where id = p_venue_id
+      and pagbank_account_id is distinct from v_account;
+  exception when unique_violation then
+    -- duas casas conectando a mesma conta ao mesmo tempo
+    raise exception 'pagbank_account_in_use'
+      using errcode = 'PB409',
+            detail = 'essa conta PagBank já está ligada a outra casa';
+  end;
 
   perform public.store_venue_pagbank_tokens(
     p_venue_id, p_access_token, p_refresh_token, p_expires_at
@@ -224,11 +245,19 @@ as $$
     from public.payment_charges c
     where c.venue_id = p_venue_id
       and (
-        c.status in ('creating', 'pending', 'authorized')
+        -- reserva ou cobrança aberta recente: o split ainda vai para a conta
+        (c.status in ('creating', 'pending')
+          and c.created_at > pg_catalog.now() - interval '1 day')
+        or (c.status = 'authorized'
+          and c.created_at > pg_catalog.now() - interval '7 days')
+        -- paga, com split e custódia ainda não solta. Sem split ou já
+        -- liquidada, estornada ou com estorno pedido não conta.
         or (
           c.status = 'paid'
+          and c.provider_split_id is not null
           and c.custody_released_at is null
           and c.refunded_at is null
+          and c.refund_requested_at is null
         )
       )
   )::integer;
@@ -421,7 +450,7 @@ begin
 
   return pg_catalog.jsonb_build_object(
     'connected', true,
-    'holder', v.name,
+    'house_name', v.name,
     'bank', 'PagBank',
     'account_last4', right(v.pagbank_account_id, 4),
     'document_kind', v.document_kind,
@@ -438,3 +467,51 @@ revoke all on function public.venue_pagbank_account_view(uuid)
   from public, anon;
 grant execute on function public.venue_pagbank_account_view(uuid)
   to authenticated, service_role;
+
+-- Só a reserva nova (status creating) com id de conta PagBank é conferida; cobrança histórica ou
+-- inserida por outro caminho não muda de comportamento.
+-- Corrida entre desconectar e reservar: a cobrança nasce com a conta que a
+-- casa tem NESTE instante. O FOR SHARE espera o FOR UPDATE do disconnect; se
+-- a conta mudou ou saiu, a reserva falha com 409 em vez de apontar o split
+-- para a conta antiga. E o disconnect, que conta as cobranças depois do lock,
+-- vê a reserva já gravada.
+create or replace function private.charge_wallet_matches_venue()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_account text;
+begin
+  if new.status is distinct from 'creating'
+    or new.venue_id is null
+    or new.wallet_id is null
+    -- só id de conta PagBank (ACCO_...); outro formato não é conferido
+    or new.wallet_id not like 'ACCO\_%'
+  then
+    return new;
+  end if;
+  select v.pagbank_account_id
+    into v_account
+  from public.venues v
+  where v.id = new.venue_id
+  for share;
+  if v_account is distinct from new.wallet_id then
+    raise exception 'pagbank_account_changed'
+      using errcode = 'PB409',
+            detail = 'a conta PagBank da casa mudou durante a reserva';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.charge_wallet_matches_venue()
+  from public, anon, authenticated, service_role;
+
+drop trigger if exists charge_wallet_matches_venue on public.payment_charges;
+create trigger charge_wallet_matches_venue
+  before insert on public.payment_charges
+  for each row
+  when (new.status = 'creating')
+  execute function private.charge_wallet_matches_venue();

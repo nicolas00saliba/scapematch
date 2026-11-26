@@ -808,8 +808,8 @@ class _ConnectedAccount extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final rows = <(String, String)>[
-      if (account.holder.isNotEmpty)
-        (PartnerMessages.pagbankAccountHolder, account.holder),
+      if (account.houseName.isNotEmpty)
+        (PartnerMessages.pagbankAccountHouse, account.houseName),
       (PartnerMessages.pagbankAccountBank, account.bank),
       if (account.accountLast4.isNotEmpty)
         (PartnerMessages.pagbankAccountEnding, account.accountLast4),
@@ -1193,6 +1193,8 @@ String pagbankSignupMessage(String code) {
       'A PagBank pediu para concluir a conta pelo e-mail informado.',
     'pagbank_unavailable' || 'pagbank_resposta' || 'pagbank_connect' =>
       'A PagBank não concluiu o cadastro. Tente de novo em instantes.',
+    'pagbank_account_in_use' => PartnerMessages.pagbankAccountInUse,
+    'pagbank_account_changed' => PartnerMessages.pagbankAccountChanged,
     'pagbank_account_exists' ||
     'pagbank_account_mismatch' => PartnerMessages.pagbankAccountExists,
     'pagbank_in_flight' => PartnerMessages.pagbankSwapBusy,

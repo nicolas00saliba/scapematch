@@ -5,9 +5,12 @@
 -- O que faz, numa transação só:
 --   * confere que a casa é a Ninja e que a conta ligada termina em 13CA;
 --   * recusa se houver saque pendente ou cobrança a caminho para a conta;
---   * grava o histórico em admin_audit_log (conta inteira só aqui, tabela de
---     admin; o ator é o único admin) antes de soltar a casa;
+--   * grava o histórico em admin_audit_log (só os 4 últimos dígitos da conta;
+--     o ator é o único admin) antes de soltar a casa;
 --   * apaga o token (segredo) e zera venues.pagbank_account_id.
+-- O token é apagado aqui sem ser revogado no PagBank (SQL não chama a API).
+-- Para revogar de fato, use o app do PagBank (Integrações) ou, depois do
+-- deploy, desconecte pela função pagbank-disconnect, que revoga na API.
 -- Não apaga a casa, cobranças, saques nem auditoria. Rodar de novo, com a casa
 -- já sem conta, não faz nada.
 --
@@ -62,9 +65,19 @@ begin
       where w.venue_id = v_venue and w.status = 'pending')
     + (select pg_catalog.count(*) from public.payment_charges c
       where c.venue_id = v_venue
-        and (c.status in ('creating', 'pending', 'authorized')
-          or (c.status = 'paid' and c.custody_released_at is null
-              and c.refunded_at is null)))
+        and (
+          (c.status in ('creating', 'pending')
+            and c.created_at > pg_catalog.now() - interval '1 day')
+          or (c.status = 'authorized'
+            and c.created_at > pg_catalog.now() - interval '7 days')
+          -- mesma regra de private.venue_pagbank_in_flight: paga sem split,
+          -- liquidada ou estornada não conta
+          or (c.status = 'paid'
+            and c.provider_split_id is not null
+            and c.custody_released_at is null
+            and c.refunded_at is null
+            and c.refund_requested_at is null)
+        ))
     into v_busy;
   if v_busy > 0 then
     raise exception 'há % item(ns) a caminho para a conta atual; nada foi feito', v_busy;
@@ -78,7 +91,6 @@ begin
     'venues',
     v_venue::text,
     pg_catalog.jsonb_build_object(
-      'account_id', v_account,
       'account_last4', right(v_account, 4),
       'motivo', 'duas contas conectadas na mesma casa; decisão do dono do EscapeMatch'
     ),
