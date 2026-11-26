@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/theme.dart';
+import 'package:scapematch/features/cities/presentation/municipality_picker.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_registry.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_board.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_duplicate.dart';
@@ -165,22 +166,13 @@ class _PartnerVenueSignupScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: PartnerKeys.venueCity,
-                    initialValue: _cityId,
-                    decoration: const InputDecoration(
-                      labelText: PartnerMessages.venueCity,
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      for (final city in venueCities)
-                        DropdownMenuItem(value: city.$1, child: Text(city.$2)),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _cityId = value);
-                      }
-                    },
+                  MunicipalityPicker(
+                    cityId: _cityId,
+                    cityFieldKey: PartnerKeys.venueCity,
+                    stateFieldKey: PartnerKeys.venueState,
+                    cityLabel: PartnerMessages.venueCity,
+                    stateLabel: PartnerMessages.venueState,
+                    onChanged: (value) => setState(() => _cityId = value),
                   ),
                   const SizedBox(height: 12),
                   Row(

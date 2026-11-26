@@ -13,7 +13,8 @@ class City {
   final String stateName;
 }
 
-/// As cinco cidades do seletor. O banco tem as mesmas.
+/// As cinco cidades do seletor e do banco inicial.
+/// O catálogo completo dos municípios está em brazilianMunicipalities.
 const knownCities = <City>[
   City(id: 'curitiba', name: 'Curitiba', stateCode: 'PR', stateName: 'Paraná'),
   City(

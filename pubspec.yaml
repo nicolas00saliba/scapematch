@@ -79,6 +79,7 @@ flutter:
 
   assets:
     - assets/experience/example_house.json
+    - assets/geo/municipios_ibge_v1.json
     - assets/images/news/
     - assets/images/rooms/
     - assets/images/rooms/gallery/

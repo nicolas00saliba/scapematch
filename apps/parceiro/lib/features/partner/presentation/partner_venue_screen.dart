@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
-import 'package:scapematch/features/cities/domain/city.dart';
+import 'package:scapematch/features/cities/presentation/municipality_picker.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
-import 'package:scapematch/providers/repositories.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_documents_repository.dart';
@@ -40,7 +39,6 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
   String _companyType = 'LIMITED';
   String _category = 'escape-room';
   String? _cityId = 'curitiba';
-  List<City> _cities = knownCities;
   String? _error;
   var _busy = false;
   var _accepted = false;
@@ -49,20 +47,6 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
   ClaimableVenue? _claim;
   var _claiming = false;
   final _claims = const VenueClaimClient();
-
-  @override
-  void initState() {
-    super.initState();
-    if (!scapeUsesLiveBackend) return;
-    Future<void>(() async {
-      final cities = await ref.read(cityRepositoryProvider).listCities();
-      if (!mounted || cities.isEmpty) return;
-      setState(() {
-        _cities = cities;
-        _cityId ??= cities.first.id;
-      });
-    });
-  }
 
   @override
   void dispose() {
@@ -227,19 +211,10 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            key: ValueKey('venue-city-$_cityId'),
-            initialValue: _cities.any((city) => city.id == _cityId)
-                ? _cityId
-                : null,
-            decoration: const InputDecoration(
-              labelText: 'Cidade',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              for (final city in _cities)
-                DropdownMenuItem(value: city.id, child: Text(city.name)),
-            ],
+          MunicipalityPicker(
+            cityId: _cityId,
+            cityLabel: 'Cidade',
+            stateLabel: 'Estado',
             onChanged: (value) => setState(() => _cityId = value),
           ),
           const SizedBox(height: 12),

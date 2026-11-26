@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/features/cities/data/brazilian_municipalities.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -68,51 +69,12 @@ class CitySelector extends ConsumerWidget {
     final picked = await showModalBottomSheet<City>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: cities.length > citySearchThreshold,
       builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  'Escolha a cidade',
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    for (final city in cities)
-                      Semantics(
-                        button: true,
-                        identifier: 'city-option-${city.id}',
-                        label: '${city.name}, ${city.stateName}',
-                        excludeSemantics: true,
-                        child: ListTile(
-                          key: AppKeys.cityOption(city.id),
-                          title: Text(city.name),
-                          subtitle: Text(city.stateName),
-                          trailing: city.id == selectedId
-                              ? Icon(
-                                  Icons.check,
-                                  color: Theme.of(context).colorScheme.primary,
-                                )
-                              : null,
-                          onTap: () => Navigator.pop(context, city),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
+        return _CityPickerSheet(cities: cities, selectedId: selectedId);
       },
     );
+
     if (picked == null || !context.mounted) {
       return;
     }
@@ -122,6 +84,100 @@ class CitySelector extends ConsumerWidget {
     } else {
       ref.read(selectedCityIdProvider.notifier).select(picked.id);
     }
+  }
+}
+
+class _CityPickerSheet extends StatefulWidget {
+  const _CityPickerSheet({required this.cities, required this.selectedId});
+
+  final List<City> cities;
+  final String selectedId;
+
+  @override
+  State<_CityPickerSheet> createState() => _CityPickerSheetState();
+}
+
+class _CityPickerSheetState extends State<_CityPickerSheet> {
+  final _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final searchable = widget.cities.length > citySearchThreshold;
+    final visible = searchable
+        ? searchCities(cities: widget.cities, query: _query.text, limit: 80)
+        : widget.cities;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Escolha a cidade',
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (searchable)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: TextField(
+                  controller: _query,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Buscar cidade',
+                    hintText: 'Digite o nome, com ou sem acento',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  if (visible.isEmpty)
+                    const ListTile(title: Text('Nenhuma cidade encontrada.')),
+                  for (final city in visible)
+                    Semantics(
+                      button: true,
+                      identifier: 'city-option-${city.id}',
+                      label: '${city.name}, ${city.stateName}',
+                      excludeSemantics: true,
+                      child: ListTile(
+                        key: AppKeys.cityOption(city.id),
+                        title: Text(city.name),
+                        subtitle: Text(city.stateName),
+                        trailing: city.id == widget.selectedId
+                            ? Icon(
+                                Icons.check,
+                                color: Theme.of(context).colorScheme.primary,
+                              )
+                            : null,
+                        onTap: () => Navigator.pop(context, city),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
