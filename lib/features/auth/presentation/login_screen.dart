@@ -64,7 +64,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = true;
       _error = null;
     });
-    final error = await ref.read(authSessionProvider.notifier).signInWithGoogle();
+    final error = await ref
+        .read(authSessionProvider.notifier)
+        .signInWithGoogle();
     if (!mounted) return;
     if (error != null) {
       setState(() {

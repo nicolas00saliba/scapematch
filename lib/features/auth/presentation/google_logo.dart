@@ -62,9 +62,10 @@ class _GoogleLogoPainter extends CustomPainter {
 /// Lê M, L, H, V, C, S e Z. O "G" usa curva suave (`s`).
 Path pathFromSvg(String data) {
   final path = Path();
-  final tokens = RegExp(
-    r'[MmLlHhVvCcSsZz]|-?\d*\.?\d+(?:e-?\d+)?',
-  ).allMatches(data).map((match) => match.group(0)!).toList();
+  final tokens = RegExp(r'[MmLlHhVvCcSsZz]|-?\d*\.?\d+(?:e-?\d+)?')
+      .allMatches(data)
+      .map((match) => match.group(0)!)
+      .toList();
   var index = 0;
   String? command;
   var currentX = 0.0;

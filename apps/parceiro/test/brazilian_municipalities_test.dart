@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch/features/cities/data/brazilian_municipalities.dart';
+import 'package:scapematch_parceiro/features/partner/domain/brazilian_municipalities.dart';
 
 void main() {
   test(

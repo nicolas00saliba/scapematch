@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/theme.dart';
-import 'package:scapematch/features/cities/presentation/municipality_picker.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/municipality_picker.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_registry.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_board.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_duplicate.dart';

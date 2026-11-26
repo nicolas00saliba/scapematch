@@ -1,4 +1,4 @@
-import 'package:scapematch/features/cities/data/brazilian_municipalities.dart';
+import 'package:scapematch_parceiro/features/partner/domain/brazilian_municipalities.dart';
 
 // Normalização e comparação de casas. Espelha a migration
 // 20261104130000_venue_duplicates: só dígitos no documento, nome sem

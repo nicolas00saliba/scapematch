@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
-import 'package:scapematch/features/cities/data/brazilian_municipalities.dart';
+import 'package:scapematch/features/cities/domain/city_search.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch/features/cities/presentation/cities_provider.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';

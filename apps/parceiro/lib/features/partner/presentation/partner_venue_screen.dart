@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
-import 'package:scapematch/features/cities/presentation/municipality_picker.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/municipality_picker.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';

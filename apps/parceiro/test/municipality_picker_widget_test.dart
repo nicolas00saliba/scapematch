@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scapematch/features/cities/presentation/municipality_picker.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/municipality_picker.dart';
 
 void main() {
   testWidgets('escolhe a cidade pelo estado e pela busca sem acento', (

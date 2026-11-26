@@ -315,9 +315,7 @@ CurrentUser currentUserFromAuth(User user) {
 bool googleOnlyUser(User user) {
   final identities = user.identities;
   if (identities != null && identities.isNotEmpty) {
-    return googleOnlyProviders(
-      identities.map((identity) => identity.provider),
-    );
+    return googleOnlyProviders(identities.map((identity) => identity.provider));
   }
   final provider = user.appMetadata['provider'];
   if (provider is String && provider.isNotEmpty) {

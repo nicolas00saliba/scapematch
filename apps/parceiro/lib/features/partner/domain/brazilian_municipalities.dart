@@ -1,4 +1,5 @@
 import 'package:scapematch/features/cities/domain/city.dart';
+import 'package:scapematch/features/cities/domain/city_search.dart';
 
 part 'municipios_ibge_v1.g.dart';
 
@@ -64,13 +65,6 @@ const brazilianStates = <BrazilianState>[
   BrazilianState(code: 'TO', name: 'Tocantins'),
 ];
 
-/// A lista completa cabe no seletor com busca; abaixo disso o app
-/// mantém o dropdown curto (as cinco cidades atuais).
-const citySearchThreshold = 12;
-
-const _accentFrom = 'áàâãäåéèêëíìîïóòôõöúùûüçñý';
-const _accentTo = 'aaaaaaeeeeiiiiooooouuuucny';
-
 final Map<String, BrazilianMunicipality> _byId = {
   for (final city in municipiosIbgeV1) city.id: city,
 };
@@ -80,25 +74,6 @@ BrazilianMunicipality? municipalityById(String? id) {
     return null;
   }
   return _byId[id];
-}
-
-/// Remove acentos e pontuação para a busca e a resolução do id.
-String foldMunicipalityQuery(String value) {
-  final buffer = StringBuffer();
-  for (final rune in value.runes) {
-    final char = String.fromCharCode(rune);
-    final lower = char.toLowerCase();
-    if (lower == "'" || lower == '’' || lower == '`' || lower == '´') {
-      continue;
-    }
-    final index = _accentFrom.indexOf(lower);
-    buffer.write(index >= 0 ? _accentTo[index] : lower);
-  }
-  return buffer.toString().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
-}
-
-String compactMunicipalityQuery(String value) {
-  return foldMunicipalityQuery(value).replaceAll(' ', '');
 }
 
 final Map<String, String> _foldedName = {
@@ -145,47 +120,6 @@ List<BrazilianMunicipality> searchMunicipalities({
         packed.startsWith(compact) ||
         name.contains(folded) ||
         packed.contains(compact);
-    if (!matched) {
-      continue;
-    }
-    if (name == folded ||
-        packed == compact ||
-        name.startsWith(folded) ||
-        packed.startsWith(compact)) {
-      prefix.add(city);
-    } else {
-      contains.add(city);
-    }
-    if (prefix.length + contains.length >= limit * 2) {
-      break;
-    }
-  }
-  return [...prefix, ...contains].take(limit).toList(growable: false);
-}
-
-List<City> searchCities({
-  required List<City> cities,
-  String? stateCode,
-  String query = '',
-  int limit = 80,
-}) {
-  Iterable<City> pool = cities;
-  if (stateCode != null && stateCode.isNotEmpty) {
-    final code = stateCode.toUpperCase();
-    pool = pool.where((city) => city.stateCode == code);
-  }
-  final folded = foldMunicipalityQuery(query);
-  final compact = compactMunicipalityQuery(query);
-  final list = pool.toList(growable: false);
-  if (folded.isEmpty) {
-    return list.length <= limit ? list : list.sublist(0, limit);
-  }
-  final prefix = <City>[];
-  final contains = <City>[];
-  for (final city in list) {
-    final name = foldMunicipalityQuery(city.name);
-    final packed = compactMunicipalityQuery(city.name);
-    final matched = name.contains(folded) || packed.contains(compact);
     if (!matched) {
       continue;
     }

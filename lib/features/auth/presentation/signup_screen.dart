@@ -15,7 +15,7 @@ import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/features/auth/presentation/signup_success_view.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
-import 'package:scapematch/features/cities/presentation/municipality_picker.dart';
+import 'package:scapematch/features/cities/presentation/searchable_city_field.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';

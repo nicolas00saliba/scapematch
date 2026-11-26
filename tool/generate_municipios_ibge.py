@@ -18,8 +18,8 @@ Uso (na raiz do repositório):
 
 Saídas:
 
-  assets/geo/municipios_ibge_v1.json
-  lib/features/cities/data/municipios_ibge_v1.g.dart
+  tool/data/municipios_ibge_v1.json
+  apps/parceiro/lib/features/partner/domain/municipios_ibge_v1.g.dart
   supabase/migrations/20261126221500_brazilian_municipalities.sql
 """
 
@@ -38,8 +38,8 @@ COORDS_URL = (
     "https://raw.githubusercontent.com/kelvins/municipios-brasileiros/"
     "main/json/municipios.json"
 )
-ASSET_PATH = ROOT / "assets/geo/municipios_ibge_v1.json"
-DART_PATH = ROOT / "lib/features/cities/data/municipios_ibge_v1.g.dart"
+ASSET_PATH = ROOT / "tool/data/municipios_ibge_v1.json"
+DART_PATH = ROOT / "apps/parceiro/lib/features/partner/domain/municipios_ibge_v1.g.dart"
 SQL_PATH = ROOT / "supabase/migrations/20261126221500_brazilian_municipalities.sql"
 
 # Ids já usados em venues, grupos, convites e no seletor do app.
