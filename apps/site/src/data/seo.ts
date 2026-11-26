@@ -4,8 +4,10 @@
 // A nota de casa e de sala sai por aggregateRatingLd, e só com o mínimo.
 // O app não leva aggregateRating nem review: não há avaliação publicada.
 // O aplicativo é um PWA (navegador, Chrome no Android, Safari no iPhone).
-// Não há ficha de loja neste repositório, então o tipo é WebApplication,
-// subtipo de SoftwareApplication. MobileApplication não entra.
+// O tipo principal é SoftwareApplication, com WebApplication porque a
+// sessão começa no navegador. MobileApplication não entra: não há ficha
+// de loja neste repositório. legalName e taxID ficam fora do schema;
+// a razão social e o CNPJ permanecem só no texto visível de /contato.
 
 export { aggregateRatingLd } from './avaliacoes.ts';
 export type { NotaPublica } from './avaliacoes.ts';
@@ -39,7 +41,7 @@ export const descricaoMarca =
 export const tituloHome = 'EscapeMatch — app para jogar escape room sozinho no Brasil';
 
 export const descricaoHome =
-  'EscapeMatch — app para jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga.';
+  'EscapeMatch — app para jogar escape room sozinho no Brasil. Ache pessoas, entre num grupo e pague só a sua vaga.';
 
 export const tituloSobre = 'Sobre a EscapeMatch — escape room no Brasil';
 
@@ -73,9 +75,12 @@ export const organizacao = {
   '@type': 'Organization',
   '@id': idOrganizacao,
   name: 'EscapeMatch',
-  legalName: 'ESCAPEMATCH TECNOLOGIA LTDA',
-  taxID: '70.100.608/0001-73',
   alternateName: nomesAlternativos,
+  brand: {
+    '@type': 'Brand',
+    name: 'EscapeMatch',
+    logo: `${origem}/assets/logo-512.png`,
+  },
   url: `${origem}/`,
   // PNG quadrado de 512 px. O Google pede, no logo da Organization,
   // pelo menos 112 px, em formato que o Google Imagens rastreia, e
@@ -127,7 +132,7 @@ export const website = {
 
 export const aplicativo = {
   '@context': 'https://schema.org',
-  '@type': 'WebApplication',
+  '@type': ['SoftwareApplication', 'WebApplication'],
   '@id': idAplicativo,
   name: 'EscapeMatch',
   alternateName: nomesAlternativos,
@@ -136,7 +141,10 @@ export const aplicativo = {
   operatingSystem: 'Web, Android, iOS',
   inLanguage: 'pt-BR',
   description: definicao,
-  disambiguatingDescription: frasePlayStore,
+  // Os nomes dos jogos parecidos ficam só aqui, não em alternateName:
+  // alternateName diria que a EscapeMatch é esses jogos.
+  disambiguatingDescription:
+    `${descricaoMarca} A sessão é presencial, numa casa de escape room. Não é um jogo de celular de quebra-cabeça ou match-3 nem um modo de jogo de tiro com nome parecido. ${frasePlayStore}`,
   areaServed: {
     '@type': 'Country',
     name: 'Brasil',
@@ -186,7 +194,7 @@ export function paginaLd(
     description,
     inLanguage: 'pt-BR',
     isPartOf: { '@id': idWebsite },
-    about: { '@id': idOrganizacao },
+    about: { '@id': idAplicativo },
     publisher: { '@id': idOrganizacao },
     author: { '@id': idOrganizacao },
   };
@@ -209,10 +217,12 @@ export function grafoDaPagina(entrada: {
   const extra = entrada.extra
     ? (Array.isArray(entrada.extra) ? entrada.extra : [entrada.extra])
     : [];
+  // O app vem primeiro: a entidade principal da marca é o aplicativo,
+  // não o cadastro da empresa.
   return [
+    aplicativo,
     organizacao,
     website,
-    aplicativo,
     paginaLd(entrada.path, entrada.title, entrada.description, entrada.artigo),
     ...extra,
   ];
