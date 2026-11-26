@@ -352,7 +352,14 @@ class _BalanceSection extends ConsumerWidget {
         const SizedBox(height: 16),
         EmptySlotCard(venueId: snapshot.house.id),
         const SizedBox(height: 16),
-        VenuePagbankBalanceCard(balance: balance),
+        VenuePagbankBalanceCard(
+          balance: balance,
+          onRefresh: snapshot.house.receivesPayments
+              ? () => ref.invalidate(
+                  venuePagbankBalanceProvider(snapshot.house.id),
+                )
+              : null,
+        ),
         Text(
           PartnerMessages.reservationsLedgerTitle,
           key: PartnerKeys.reservationsLedger,

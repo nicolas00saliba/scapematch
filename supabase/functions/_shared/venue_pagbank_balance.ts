@@ -34,6 +34,32 @@ export type VenuePagbankBalanceDeps = {
   refresh(refreshToken: string): Promise<RefreshedAccess>;
 };
 
+/// `read_venue_pagbank_tokens` devolve `returns table`: o PostgREST entrega uma
+/// lista com uma linha, não um objeto. Ler como objeto fazia toda casa
+/// conectada virar "unlinked". Aceita as duas formas.
+export function accessFromRpc(data: unknown): VenueAccess | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  const value = row as {
+    access_token?: unknown;
+    refresh_token?: unknown;
+    access_expires_at?: unknown;
+  };
+  const accessToken = typeof value.access_token === "string"
+    ? value.access_token.trim()
+    : "";
+  if (!accessToken) return null;
+  return {
+    accessToken,
+    refreshToken: typeof value.refresh_token === "string"
+      ? value.refresh_token.trim()
+      : "",
+    expiresAt: typeof value.access_expires_at === "string"
+      ? value.access_expires_at
+      : null,
+  };
+}
+
 type BalanceRead = {
   status: number;
   body: Record<string, unknown> | null;
@@ -66,7 +92,7 @@ export async function handleVenuePagbankBalance(
     return json(balance);
   } catch (_error) {
     logBalance("internal");
-    return json({ status: "unavailable", code: "pagbank_balance_unavailable" });
+    return json(unavailable("error"));
   }
 }
 
@@ -94,7 +120,7 @@ async function loadVenueBalance(
     }
   } catch (_error) {
     logBalance("refresh_failed");
-    return unavailable();
+    return unavailable("error");
   }
 
   const base = pagbankApiBaseUrl(deps.env);
@@ -112,16 +138,16 @@ async function loadVenueBalance(
       read = await getBalance(url, access, deps.fetchFn ?? fetch);
     } catch (_error) {
       logBalance("refresh_failed");
-      return unavailable();
+      return unavailable("error");
     }
   }
   if (read.status === 401 || read.status === 403 || read.status === 404) {
     logBalance("pagbank_balance_unavailable", read.status);
-    return unavailable();
+    return unavailable("forbidden");
   }
   if (read.status !== 200 || !read.body) {
     logBalance("pagbank_balance_unavailable", read.status);
-    return unavailable();
+    return unavailable("error");
   }
   try {
     const parsed = readSellerBalance(read.body);
@@ -131,15 +157,22 @@ async function loadVenueBalance(
       available_cents: parsed.availableCents,
       blocked_cents: parsed.blockedCents,
       held_cents: parsed.heldCents,
+      read_at: new Date(nowMs).toISOString(),
     };
   } catch (_error) {
     logBalance("balance_shape", 200);
-    return unavailable();
+    return unavailable("error");
   }
 }
 
-function unavailable(): Record<string, unknown> {
-  return { status: "unavailable", code: "pagbank_balance_unavailable" };
+/// `forbidden`: a PagBank negou a consulta (401, 403 ou 404 depois de renovar).
+/// `error`: falha de rede, formato ou token. Nunca vai número junto.
+function unavailable(reason: "forbidden" | "error"): Record<string, unknown> {
+  return {
+    status: "unavailable",
+    code: "pagbank_balance_unavailable",
+    reason,
+  };
 }
 
 async function remember(
