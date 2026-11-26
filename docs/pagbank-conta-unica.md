@@ -17,8 +17,8 @@ mesma conta pelo RPC `venue_pagbank_account_view`.
   outra casa devolve **409** (`pagbank_account_in_use`) e não grava nada. Vale
   também para duas conexões ao mesmo tempo (o índice único
   `venues_pagbank_account_real_uidx` decide). Casas de teste ficam de fora.
-- Trocar de conta é desconectar (`pagbank-disconnect`) e conectar de novo, com
-  confirmação na tela. A desconexão recusa (409 `pagbank_in_flight`) se houver
+- Trocar de conta é o Admin desconectar (`pagbank-disconnect`) e o dono
+  conectar de novo. A desconexão recusa (409 `pagbank_in_flight`) se houver
   saque pendente ou cobrança a caminho para a conta atual. "A caminho" é:
   reserva `creating` ou `pending` com menos de 1 dia, `authorized` com menos de
   7 dias, ou `paid` **com split**, custódia ainda não solta, sem estorno e sem
@@ -49,8 +49,13 @@ mesma conta pelo RPC `venue_pagbank_account_view`.
   liberação de custódia (`settle-charges`) e a criação de cobrança param e
   alertam (`pagbank-payout` / `pagbank-custody`, códigos `conta_ambigua`,
   `token_sem_conta`, `conta_ilegivel`). Não escolhem conta.
-- Dono ou Admin (MFA) desconecta. Para restringir ao Admin, troque
-  `ownerMayDisconnect` para `false` em `_shared/pagbank_binding.ts`.
+- **Só o Admin (com MFA) desconecta** (decisão do Nícolas, 26/11 16:20 BRT):
+  `ownerMayDisconnect = false` em `_shared/pagbank_binding.ts`, espelhado em
+  `partnerOwnerMayDisconnect` no Parceiro. O dono não vê botão de trocar; a
+  tela diz "Para trocar a conta PagBank, fale com o suporte". A função
+  `pagbank-disconnect` devolve 403 ao dono antes de ler token ou chamar o RPC.
+  O Admin ainda não tem botão: a troca é chamando `pagbank-disconnect` com a
+  sessão do Admin (MFA) ou com um script SQL como o da Ninja.
 - Auditoria em `admin_audit_log` (`connect_pagbank`, `disconnect_pagbank`), só
   com os 4 últimos caracteres da conta.
 

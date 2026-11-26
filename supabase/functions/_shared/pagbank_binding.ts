@@ -2,9 +2,9 @@
 /// O repasse confere a ligação entre a conta da casa e o token guardado e,
 /// se achar ambiguidade, para e alerta. Não escolhe conta.
 
-/// Quem pode desconectar. true: dono (com confirmação na tela) e Admin.
-/// false: só o Admin. A função pagbank-disconnect lê esta constante.
-export const ownerMayDisconnect = true;
+/// Quem pode desconectar. false (decisão do Nícolas, 26/11): só o Admin com
+/// MFA. true: dono (com confirmação na tela) e Admin. A função pagbank-disconnect lê esta constante.
+export const ownerMayDisconnect = false;
 
 export const accountExistsMessage =
   "Esta casa já tem uma conta PagBank conectada. Para trocar, desconecte a atual e conecte de novo.";

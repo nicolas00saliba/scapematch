@@ -79,8 +79,23 @@ Deno.test("o alerta separa conta ambígua, token sem conta e ilegível", () => {
   }
 });
 
-Deno.test("o dono pode desconectar com confirmação", () => {
-  assertEquals(ownerMayDisconnect, true);
+Deno.test("só o Admin desconecta, e o Parceiro segue a mesma regra", async () => {
+  assertEquals(ownerMayDisconnect, false);
+  const card = await Deno.readTextFile(
+    new URL(
+      "../../../apps/parceiro/lib/features/partner/presentation/venue_pagbank_signup_card.dart",
+      import.meta.url,
+    ),
+  );
+  assert(card.includes(`const partnerOwnerMayDisconnect = ${ownerMayDisconnect};`));
+  const fn = await Deno.readTextFile(
+    new URL("../pagbank-disconnect/index.ts", import.meta.url),
+  );
+  // a recusa ao dono vem antes de ler o token ou chamar o RPC
+  const gate = fn.indexOf("!isAdmin && !ownerMayDisconnect");
+  assert(gate > 0);
+  assert(gate < fn.indexOf("read_venue_pagbank_tokens"));
+  assert(gate < fn.indexOf("disconnect_venue_pagbank"));
 });
 
 // Reserva simulada: nenhuma cobrança, nenhuma chamada à PagBank. Só mostra que

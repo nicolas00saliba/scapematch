@@ -380,6 +380,8 @@ abstract final class PartnerMessages {
   static const pagbankAccountOne =
       'A casa tem uma conta PagBank só. Ela vale em qualquer aparelho que entrar nesta conta.';
   static const pagbankSwap = 'Trocar conta PagBank';
+  static const pagbankSwapSupport =
+      'Para trocar a conta PagBank, fale com o suporte do EscapeMatch. A troca é feita pelo Admin, com confirmação.';
   static const pagbankRenew = 'Renovar autorização';
   static const pagbankSwapTitle = 'Trocar a conta PagBank?';
   static String pagbankSwapBody(String last4) =>

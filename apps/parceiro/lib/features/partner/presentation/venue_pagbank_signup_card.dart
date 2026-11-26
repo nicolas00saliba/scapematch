@@ -9,6 +9,10 @@ import 'package:scapematch_parceiro/partner_keys.dart';
 
 /// Conta PagBank da casa. Sem conta, duas escolhas. O formulário só entra
 /// no caminho de criar conta quando a API de Cadastro está liberada.
+/// Espelha `ownerMayDisconnect` em `supabase/functions/_shared/pagbank_binding.ts`.
+/// false: só o Admin desconecta; o dono vê como pedir a troca ao suporte.
+const partnerOwnerMayDisconnect = false;
+
 class VenuePagbankSignupCard extends ConsumerStatefulWidget {
   const VenuePagbankSignupCard({
     super.key,
@@ -17,9 +21,11 @@ class VenuePagbankSignupCard extends ConsumerStatefulWidget {
     this.today,
     this.receivesPayments = false,
     this.inReview = false,
+    this.ownerMayDisconnect = partnerOwnerMayDisconnect,
   });
 
   final String venueId;
+  final bool ownerMayDisconnect;
   final void Function(Uri uri)? onOpen;
   final DateTime Function()? today;
   final bool receivesPayments;
@@ -437,6 +443,7 @@ class _VenuePagbankSignupCardState
                   _ConnectedAccount(
                     account: _account,
                     busy: _busy,
+                    allowSwap: widget.ownerMayDisconnect,
                     onSwap: _swap,
                     onRenew: () => _connect(reconnect: true),
                   ),
@@ -795,12 +802,14 @@ class _ConnectedAccount extends StatelessWidget {
   const _ConnectedAccount({
     required this.account,
     required this.busy,
+    required this.allowSwap,
     required this.onSwap,
     required this.onRenew,
   });
 
   final PagbankAccountView account;
   final bool busy;
+  final bool allowSwap;
   final VoidCallback onSwap;
   final VoidCallback onRenew;
 
@@ -866,15 +875,22 @@ class _ConnectedAccount extends StatelessWidget {
           child: const Text(PartnerMessages.pagbankRenew),
         ),
         const SizedBox(height: 8),
-        OutlinedButton(
-          key: PartnerKeys.pagbankAccountSwap,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
+        if (!allowSwap)
+          Text(
+            PartnerMessages.pagbankSwapSupport,
+            key: PartnerKeys.pagbankAccountSwapSupport,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+          )
+        else
+          OutlinedButton(
+            key: PartnerKeys.pagbankAccountSwap,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            onPressed: busy || !account.canDisconnect ? null : onSwap,
+            child: const Text(PartnerMessages.pagbankSwap),
           ),
-          onPressed: busy || !account.canDisconnect ? null : onSwap,
-          child: const Text(PartnerMessages.pagbankSwap),
-        ),
-        if (!account.canDisconnect) ...[
+        if (allowSwap && !account.canDisconnect) ...[
           const SizedBox(height: 8),
           Text(
             PartnerMessages.pagbankSwapBusy,

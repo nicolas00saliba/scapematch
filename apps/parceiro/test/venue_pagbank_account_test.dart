@@ -86,12 +86,28 @@ void main() {
     },
   );
 
+  testWidgets('o dono não vê botão de desconectar: troca é com o suporte', (
+    tester,
+  ) async {
+    expect(partnerOwnerMayDisconnect, isFalse);
+    final server = MemoryPagbankServer()..link(accountId: _account);
+    final repo = MemoryPagbankSignupRepository(server: server);
+    await _pump(tester, repo);
+    expect(find.byKey(PartnerKeys.pagbankAccountCard), findsOneWidget);
+    expect(find.byKey(PartnerKeys.pagbankAccountSwap), findsNothing);
+    expect(find.text(PartnerMessages.pagbankSwap), findsNothing);
+    expect(find.byKey(PartnerKeys.pagbankAccountSwapSupport), findsOneWidget);
+    expect(find.textContaining('fale com o suporte'), findsOneWidget);
+    expect(find.byKey(PartnerKeys.pagbankAccountRenew), findsOneWidget);
+    expect(server.account.connected, isTrue);
+  });
+
   testWidgets('trocar de conta pede confirmação e só depois desconecta', (
     tester,
   ) async {
     final server = MemoryPagbankServer()..link(accountId: _account);
     final repo = MemoryPagbankSignupRepository(server: server);
-    await _pump(tester, repo);
+    await _pump(tester, repo, ownerMayDisconnect: true);
 
     await tester.tap(find.byKey(PartnerKeys.pagbankAccountSwap));
     await tester.pumpAndSettle();
@@ -125,7 +141,7 @@ void main() {
       ..moneyInFlight = true
       ..link(accountId: _account);
     final repo = MemoryPagbankSignupRepository(server: server);
-    await _pump(tester, repo);
+    await _pump(tester, repo, ownerMayDisconnect: true);
 
     final swap = tester.widget<OutlinedButton>(
       find.byKey(PartnerKeys.pagbankAccountSwap),
@@ -213,6 +229,7 @@ Future<void> _pump(
   MemoryPagbankSignupRepository repo, {
   bool receivesPayments = true,
   List<Uri>? opened,
+  bool ownerMayDisconnect = false,
 }) async {
   tester.view.physicalSize = const Size(500, 2600);
   tester.view.devicePixelRatio = 1;
@@ -231,6 +248,7 @@ Future<void> _pump(
                 venueId: 'casa',
                 onOpen: opened?.add,
                 receivesPayments: receivesPayments,
+                ownerMayDisconnect: ownerMayDisconnect,
               ),
             ],
           ),
