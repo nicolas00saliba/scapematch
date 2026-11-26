@@ -60,7 +60,7 @@ const perguntas = [
     <div class="miolo">
       <div class="publico-botoes" role="tablist" aria-label="Escolha o seu caminho">
         <button type="button" role="tab" id="tab-jogar" aria-controls="painel-jogar" aria-selected="true">Quero jogar</button>
-        <button type="button" role="tab" id="tab-cliente" aria-controls="painel-cliente" aria-selected="false" tabindex="-1">Já jogo com a gente</button>
+        <button type="button" role="tab" id="tab-cliente" aria-controls="painel-cliente" aria-selected="false" tabindex="-1">Já jogou com a gente?</button>
         <button type="button" role="tab" id="tab-casa" aria-controls="painel-casa" aria-selected="false" tabindex="-1">Tenho uma casa</button>
       </div>
 
@@ -158,24 +158,6 @@ const perguntas = [
         {cartoes.map((programa) => <ProgramCard programa={programa} />)}
       </div>
       <DescontoPontos curto />
-    </div>
-  </section>
-
-  <section class="secao">
-    <div class="miolo">
-      <div class="secao-topo">
-        <h2>O que dá para jogar</h2>
-        <a href="/experiencias">Experiências</a>
-      </div>
-      <div class="modalidades">
-        <a class="modalidade" href="/experiencias/escape-room">
-          <div>
-            <h3>Escape room</h3>
-            <p>A modalidade disponível. Entre num grupo e pague só a sua vaga.</p>
-          </div>
-          <span class="etiqueta">Disponível</span>
-        </a>
-      </div>
     </div>
   </section>
 

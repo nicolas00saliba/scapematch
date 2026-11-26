@@ -12,6 +12,8 @@ export interface CasaParceira {
   nome: string;
   largura: number;
   altura: number;
+  // Site oficial da casa: o logo no carrossel abre este endereço.
+  site: string;
   // Origem do arquivo, para quem for atualizar o logo.
   fonte: string;
 }
@@ -22,6 +24,7 @@ export const casasParceiras: CasaParceira[] = [
     nome: 'Ninja Escape Room',
     largura: 503,
     altura: 192,
+    site: 'https://ninjaescaperoom.com.br/',
     // Versão branca do logo completo (símbolo e nome) do site da casa, em PNG de
     // 1600 px sobre azul chapado. O azul foi tirado pelo canal vermelho (o logo é
     // branco puro, então o alpha sai exato). A versão azul e dourada some no escuro.
@@ -32,6 +35,7 @@ export const casasParceiras: CasaParceira[] = [
     nome: 'Puzzle Room Escape Game',
     largura: 225,
     altura: 224,
+    site: 'https://cwb.puzzleroom.com.br/',
     fonte: 'https://www.puzzleroom.com.br/wp-content/uploads/2019/09/Logo-Manual-PRB-final-20193x.png',
   },
   {
@@ -39,6 +43,7 @@ export const casasParceiras: CasaParceira[] = [
     nome: 'Synapse Escape Room',
     largura: 420,
     altura: 112,
+    site: 'https://synapseescaperoom.com.br/',
     // Maior arquivo que o site da casa publica (logo@2x do cabeçalho, 430x159).
     fonte: 'https://synapseescaperoom.com.br/assets/img/logo@2x.png',
   },
@@ -47,6 +52,7 @@ export const casasParceiras: CasaParceira[] = [
     nome: 'Fábrica Escape Room',
     largura: 340,
     altura: 256,
+    site: 'https://fabricaescape.com.br/',
     fonte: 'https://drive.google.com/uc?export=download&id=1cXuM0gUizWfikK7YI3f9ue-fgf8GEHxJ',
   },
   {
@@ -54,6 +60,17 @@ export const casasParceiras: CasaParceira[] = [
     nome: 'Minos Escape Room',
     largura: 666,
     altura: 216,
+    site: 'https://www.minosescaperoom.com.br/',
     fonte: 'https://static.wixstatic.com/media/8d75bb_fea6786118d5421fb3589705c857facf~mv2.png',
+  },
+  {
+    id: 'escapemaster',
+    nome: 'Escape Master',
+    largura: 180,
+    altura: 68,
+    site: 'https://escapemaster.com.br/',
+    // Maior logo que o site da casa publica (logomarca.png do cabeçalho, 180x70),
+    // gravado sem reescala. Cubo amarelo e letras brancas, feito para fundo escuro.
+    fonte: 'https://escapemaster.com.br/imagens/logomarca.png',
   },
 ];

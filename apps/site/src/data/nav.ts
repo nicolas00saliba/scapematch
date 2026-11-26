@@ -73,7 +73,7 @@ export const rodape: Coluna[] = [
     ],
   },
   {
-    titulo: 'Já jogo com a gente',
+    titulo: 'Já jogou com a gente?',
     links: [
       { rotulo: 'Entrar', href: 'https://app.escapematch.com.br/', externo: true },
       { rotulo: 'Vantagens', href: '/vantagens' },
