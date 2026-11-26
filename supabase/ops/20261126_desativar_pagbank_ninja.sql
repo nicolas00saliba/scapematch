@@ -1,6 +1,6 @@
 -- DESATIVAÇÃO DA CONTA PAGBANK DA NINJA ESCAPE ROOM. NÃO É MIGRATION.
 -- Roda uma vez, à mão, com o ok do Nícolas, ANTES da migration
--- 20261126170000_pagbank_conta_unica.sql e antes de publicar as functions.
+-- 20261126194154_pagbank_conta_unica.sql e antes de publicar as functions.
 --
 -- O que faz, numa transação só:
 --   * confere que a casa é a Ninja e que a conta ligada termina em 13CA;

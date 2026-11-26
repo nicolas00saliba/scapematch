@@ -67,7 +67,7 @@ Só com o ok do Nícolas, passo a passo.
 2. `supabase/ops/20261126_desativar_pagbank_ninja.sql`: desconecta a Ninja
    (conta final 13CA) e grava o histórico na auditoria (só os 4 últimos
    dígitos, nunca a conta inteira).
-3. Migration `20261126170000_pagbank_conta_unica.sql`. Ela falha, sem alterar
+3. Migration `20261126194154_pagbank_conta_unica.sql`. Ela falha, sem alterar
    nada, se achar conta repetida entre casas ou token sem conta na casa.
 4. Functions, todas do mesmo commit (as que importam os módulos alterados):
    `pagbank-connect`, `pagbank-disconnect` (nova), `provision-venue-wallet`,
