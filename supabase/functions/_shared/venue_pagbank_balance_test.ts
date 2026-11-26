@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { readSellerBalance } from "./pagbank_transfers.ts";
 import {
+  accessFromRpc,
   handleVenuePagbankBalance,
   type VenueAccess,
   type VenuePagbankBalanceDeps,
@@ -70,6 +71,7 @@ Deno.test("403, 401 e 404 não inventam saldo e não logam o token", async () =>
     const body = await result.json();
     assertEquals(body.status, "unavailable");
     assertEquals(body.code, "pagbank_balance_unavailable");
+    assertEquals(body.reason, "forbidden");
     assertEquals("available_cents" in body, false);
     assertEquals(seen[0], `Bearer ${access}`);
     assertEquals(seen.length, status === 401 ? 2 : 1);
@@ -117,6 +119,7 @@ Deno.test("o 401 renova o token da casa e repete o saldo", async () => {
     available_cents: 2000,
     blocked_cents: 300,
     held_cents: null,
+    read_at: new Date(1_700_000_000_000).toISOString(),
   });
   assertEquals(auths, [`Bearer ${access}`, "Bearer access-novo"]);
   assertEquals(stored[0]?.accessToken, "access-novo");
@@ -215,3 +218,38 @@ function call(input: {
     console.error = original;
   });
 }
+
+Deno.test("o RPC de tokens devolve lista de uma linha e isso conta como conectada", () => {
+  const row = {
+    access_token: " access-da-casa ",
+    refresh_token: "refresh-da-casa",
+    access_expires_at: "2027-11-26T17:46:36.330Z",
+  };
+  const expected = {
+    accessToken: access,
+    refreshToken: refresh,
+    expiresAt: "2027-11-26T17:46:36.330Z",
+  };
+  assertEquals(accessFromRpc([row]), expected);
+  assertEquals(accessFromRpc(row), expected);
+  assertEquals(accessFromRpc([]), null);
+  assertEquals(accessFromRpc(null), null);
+  assertEquals(accessFromRpc([{ access_token: "  " }]), null);
+  assertEquals(accessFromRpc([{ access_token: null }]), null);
+});
+
+Deno.test("saldo ok traz o horário da leitura e nunca vem do livro", async () => {
+  const result = await call({
+    fetchFn: () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ balances: [{ type: "AVAILABLE", amount: 7.9 }] }),
+          { status: 200 },
+        ),
+      ),
+  });
+  const body = await result.json();
+  assertEquals(body.status, "ok");
+  assertEquals(body.available_cents, 790);
+  assertEquals(body.read_at, new Date(1_700_000_000_000).toISOString());
+});

@@ -96,11 +96,19 @@ abstract final class PartnerMessages {
   static const pagbankBalanceTitle = 'Saldo do PagBank';
   static const pagbankBalanceAvailable = 'Disponível';
   static const pagbankBalanceBlocked = 'Bloqueado';
-  static const pagbankBalanceHeld = 'Retido';
+  static const pagbankBalanceHeld = 'A receber (retido)';
   static const pagbankBalanceUnavailable =
       'Saldo do PagBank ainda indisponível';
   static const pagbankBalanceUnavailableBody =
-      'A consulta de saldo ainda não foi liberada pela PagBank.';
+      'A consulta de saldo ainda não foi liberada pela PagBank. Não mostramos número até ela responder.';
+  static const pagbankBalanceFailed = 'Não foi possível ler o saldo do PagBank';
+  static const pagbankBalanceFailedBody =
+      'A PagBank não respondeu agora. Toque em Atualizar para tentar de novo. Não mostramos número até ela responder.';
+  static const pagbankBalanceUnlinked = 'Conta PagBank não conectada';
+  static const pagbankBalanceUnlinkedBody =
+      'Conecte a conta PagBank da casa para ver aqui o saldo real, igual ao do app do PagBank.';
+  static const pagbankBalanceRefresh = 'Atualizar';
+  static const pagbankBalanceLastRead = 'Última leitura';
   static const reservationsLedgerTitle = 'Reservas no EscapeMatch';
   static const reservationsLedgerEstimated =
       'Estimativa. Não é o saldo da conta PagBank.';
