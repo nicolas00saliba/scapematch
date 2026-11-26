@@ -178,6 +178,7 @@ abstract final class PartnerMessages {
   static const checkVenue = 'Verificar';
   static const venueName = 'Nome da casa';
   static const venueCity = 'Cidade';
+  static const venueState = 'Estado';
   static const venuePostalCode = 'CEP';
   static const venueNumber = 'Número';
   static const venueDocument = 'CPF ou CNPJ';

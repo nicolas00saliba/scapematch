@@ -21,6 +21,11 @@ void main() {
     expect(normalizeVenueName('Quest S.A.'), 'quest');
     expect(resolveVenueCity('Curitiba'), 'curitiba');
     expect(resolveVenueCity('São Paulo'), 'sao-paulo');
+    expect(resolveVenueCity('Londrina'), 'londrina-pr');
+    expect(resolveVenueCity('campinas-sp'), 'campinas-sp');
+    expect(resolveVenueCity('Bom Jesus'), isNull);
+    expect(resolveVenueCity('Bom Jesus, PI'), 'bom-jesus-pi');
+    expect(venueCityLabel('curitiba'), 'Curitiba — PR');
     expect(
       trigramSimilarity('ninja', 'ninja centro'),
       closeTo(0.461538, 0.0001),

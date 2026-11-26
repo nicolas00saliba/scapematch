@@ -163,3 +163,6 @@ echo "eliminar provedor antigo ok"
 run -f "$root/tests/pagbank_conta_unica.sql"
 echo "pagbank conta unica ok"
 bash "$root/tests/pagbank_disconnect_race.sh"
+# supabase/migrations/20261126223756_brazilian_municipalities.sql
+run -f "$root/tests/brazilian_municipalities.sql"
+echo "brazilian municipalities ok"

@@ -29,6 +29,7 @@ abstract final class PartnerKeys {
   static const partnerApprove = Key('partner-approve');
   static const venueName = Key('venue-name');
   static const venueCity = Key('venue-city');
+  static const venueState = Key('venue-state');
   static const venuePostalCode = Key('venue-postal-code');
   static const venueNumber = Key('venue-number');
   static const venueDocument = Key('venue-document');

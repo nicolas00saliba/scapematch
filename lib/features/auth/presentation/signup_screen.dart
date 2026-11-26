@@ -15,6 +15,7 @@ import 'package:scapematch/features/auth/presentation/auth_return.dart';
 import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/features/auth/presentation/signup_success_view.dart';
 import 'package:scapematch/features/cities/domain/city.dart';
+import 'package:scapematch/features/cities/presentation/searchable_city_field.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
@@ -307,22 +308,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              key: ValueKey('signup-city-${_cities.length}-$_cityId'),
-              initialValue: _cities.any((city) => city.id == _cityId)
-                  ? _cityId
-                  : null,
-              decoration: const InputDecoration(
-                labelText: 'Cidade',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                for (final city in _cities)
-                  DropdownMenuItem(value: city.id, child: Text(city.name)),
-              ],
-              onChanged: _busy
-                  ? null
-                  : (value) => setState(() => _cityId = value),
+            SearchableCityFormField(
+              fieldKey: ValueKey('signup-city-${_cities.length}-$_cityId'),
+              cities: _cities,
+              cityId: _cityId,
+              labelText: 'Cidade',
+              enabled: !_busy,
+              onChanged: (value) => setState(() => _cityId = value),
             ),
             const SizedBox(height: 12),
             TextField(

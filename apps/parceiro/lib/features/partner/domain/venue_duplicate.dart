@@ -1,14 +1,8 @@
+import 'package:scapematch_parceiro/features/partner/domain/brazilian_municipalities.dart';
+
 // Normalização e comparação de casas. Espelha a migration
 // 20261104130000_venue_duplicates: só dígitos no documento, nome sem
 // acento e sem sufixo, e a similaridade de trigrama do pg_trgm.
-
-const venueCities = <(String id, String name)>[
-  ('curitiba', 'Curitiba'),
-  ('sao-paulo', 'São Paulo'),
-  ('rio-de-janeiro', 'Rio de Janeiro'),
-  ('belo-horizonte', 'Belo Horizonte'),
-  ('porto-alegre', 'Porto Alegre'),
-];
 
 const venueConflictDocument = 'documento';
 const venueConflictAddress = 'endereço';
@@ -80,32 +74,11 @@ String normalizeVenueName(String name) {
   return value.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
-String? resolveVenueCity(String input) {
-  final raw = input.trim().toLowerCase();
-  if (raw.isEmpty) {
-    return null;
-  }
-  for (final city in venueCities) {
-    if (city.$1 == raw) {
-      return city.$1;
-    }
-  }
-  final folded = unaccent(raw).toLowerCase();
-  for (final city in venueCities) {
-    if (unaccent(city.$2).toLowerCase() == folded) {
-      return city.$1;
-    }
-  }
-  return null;
-}
+String? resolveVenueCity(String input) => resolveMunicipalityId(input);
 
 String venueCityLabel(String cityId) {
-  for (final city in venueCities) {
-    if (city.$1 == cityId) {
-      return city.$2;
-    }
-  }
-  return cityId;
+  final city = municipalityById(cityId);
+  return city?.label ?? cityId;
 }
 
 double trigramSimilarity(String left, String right) {

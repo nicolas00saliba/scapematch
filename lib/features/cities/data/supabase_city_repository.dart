@@ -7,10 +7,13 @@ class SupabaseCityRepository implements CityRepository {
 
   final SupabaseClient _client;
 
+  /// Só as cidades com casa aprovada e não suspensa. O filtro é do servidor
+  /// (view cities_with_active_venues): public.cities tem os 5571 municípios
+  /// e a API corta a leitura em 1000 linhas.
   @override
   Future<List<City>> listCities() async {
     final rows = await _client
-        .from('cities')
+        .from('cities_with_active_venues')
         .select('id, name, state_code, state_name')
         .order('name');
     return [
