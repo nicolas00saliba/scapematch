@@ -83,6 +83,7 @@ DEFINICAO_VISIVEL = (
     DEFINICAO + " Você chega sozinho, entra num grupo e paga só a sua vaga."
 )
 FRASE_REMOVIDA = "Não é um modo de jogo de tiro nem um jogo de celular."
+FAIXA_REMOVIDA = "Começando por Curitiba"
 DESCRICAO_MARCA = (
     "App para achar grupo e jogar escape room sozinho no Brasil."
 )
@@ -360,6 +361,8 @@ def main() -> None:
         falha("o selo antigo voltou")
     if FRASE_REMOVIDA in home:
         falha("home ainda tem a frase removida")
+    if FAIXA_REMOVIDA in home or "faixa-marca" in home:
+        falha("a faixa Começando por Curitiba ainda está na home")
     if DEFINICAO_VISIVEL not in home:
         falha("a home não mostra a definição canônica")
     if home.find("<h1>") > home.find("hero-badge"):
