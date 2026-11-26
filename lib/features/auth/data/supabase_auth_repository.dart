@@ -1,10 +1,9 @@
 import 'package:dominio/dominio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:scapematch/features/account/domain/current_user.dart';
-import 'package:scapematch/core/web/document_base.dart';
 import 'package:scapematch/core/device/install_id.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
-import 'package:scapematch/features/auth/data/auth_return_url.dart';
+import 'package:scapematch/features/auth/data/auth_redirect.dart';
 import 'package:scapematch/features/auth/data/google_oauth.dart';
 import 'package:scapematch/features/auth/data/google_oauth_flow.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
@@ -286,11 +285,7 @@ class SupabaseAuthRepository implements AuthRepository {
     return '${date.year}-$month-$day';
   }
 
-  static String? _webRedirect() {
-    final href = documentBaseHref();
-    if (href == null) return null;
-    return authReturnUrl(Uri.base, href);
-  }
+  static String? _webRedirect() => webAuthRedirect();
 }
 
 CurrentUser currentUserFromAuth(User user) {
@@ -315,9 +310,7 @@ CurrentUser currentUserFromAuth(User user) {
 bool googleOnlyUser(User user) {
   final identities = user.identities;
   if (identities != null && identities.isNotEmpty) {
-    return googleOnlyProviders(
-      identities.map((identity) => identity.provider),
-    );
+    return googleOnlyProviders(identities.map((identity) => identity.provider));
   }
   final provider = user.appMetadata['provider'];
   if (provider is String && provider.isNotEmpty) {

@@ -6,6 +6,7 @@ import 'package:scapematch/app/retry.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/auth/data/google_oauth.dart';
+import 'package:scapematch/features/auth/data/password_recovery.dart';
 import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 import 'package:scapematch/app/url_strategy.dart';
 import 'package:scapematch/features/scape_points/data/reward_rules_store.dart';
@@ -19,7 +20,12 @@ Future<void> main() => iniciarSentry(_abrirApp);
 
 Future<void> _abrirApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final openingUri = Uri.base;
   await bootScapeBackend();
+  if (scapeUsesLiveBackend) {
+    notePasswordRecoveryLink(openingUri);
+    watchPasswordRecovery(scapeSupabase.auth);
+  }
   pendingGoogleAuthNotice = googleAuthNoticeFromUri(Uri.base);
   pendingPagbankConnectReturn = PagbankConnectReturn.fromUri(Uri.base);
   configureUrlStrategy();

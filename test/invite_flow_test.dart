@@ -95,6 +95,7 @@ void main() {
       'ana@exemplo.invalid',
     );
     await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await tester.enterText(find.byKey(AppKeys.signupConfirmPassword), 'senha');
     await _acceptAdultTerms(tester);
     await tester.tap(find.byKey(AppKeys.signupSubmit));
     await tester.pumpAndSettle();
@@ -177,6 +178,7 @@ void main() {
       'bia@exemplo.invalid',
     );
     await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await tester.enterText(find.byKey(AppKeys.signupConfirmPassword), 'senha');
     await _acceptAdultTerms(tester);
     await tester.tap(find.byKey(AppKeys.signupSubmit));
     await tester.pumpAndSettle();
@@ -317,6 +319,7 @@ void main() {
       'ana.reload@exemplo.invalid',
     );
     await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await tester.enterText(find.byKey(AppKeys.signupConfirmPassword), 'senha');
     await _acceptAdultTerms(tester);
     await tester.tap(find.byKey(AppKeys.signupSubmit));
     await tester.pumpAndSettle();

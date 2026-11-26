@@ -1,6 +1,21 @@
 import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Aviso depois do pedido. Não diz se o endereço tem conta.
+const passwordResetSentMessage =
+    'Se o e-mail tiver conta, o link já foi enviado.';
+
+/// A demonstração não chama o Auth. A frase é a mesma do login de exemplo.
+const passwordResetDemoMessage = 'Neste exemplo o link não é enviado.';
+
+/// Erro do Auth que entregaria se o e-mail existe. Vira o aviso neutro.
+bool passwordResetHidesAccount(Object error) {
+  final text = error.toString().toLowerCase();
+  return text.contains('user not found') ||
+      text.contains('email not found') ||
+      text.contains('no user');
+}
+
 /// Traduz o erro do Supabase Auth para a frase que a tela mostra.
 String authErrorMessage(Object error, {required String fallback}) {
   final raw = switch (error) {

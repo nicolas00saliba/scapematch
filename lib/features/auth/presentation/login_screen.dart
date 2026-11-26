@@ -6,9 +6,12 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/password_field.dart';
+import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/google_oauth.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/auth_return.dart';
+import 'package:scapematch/features/auth/presentation/password_reset_dialog.dart';
 import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/features/groups/presentation/invite_join.dart';
 
@@ -64,7 +67,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = true;
       _error = null;
     });
-    final error = await ref.read(authSessionProvider.notifier).signInWithGoogle();
+    final error = await ref
+        .read(authSessionProvider.notifier)
+        .signInWithGoogle();
     if (!mounted) return;
     if (error != null) {
       setState(() {
@@ -90,77 +95,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _forgot() async {
-    final email = TextEditingController(text: _email.text.trim());
-    final sent = await showDialog<bool>(
+    final sent = await showPasswordResetDialog(
       context: context,
-      builder: (context) {
-        var busy = false;
-        String? error;
-        return StatefulBuilder(
-          builder: (context, setLocal) {
-            return AlertDialog(
-              title: const Text('Nova senha'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Enviamos um link se este e-mail tiver conta.'),
-                  const SizedBox(height: 12),
-                  TextField(
-                    key: AppKeys.resetEmail,
-                    controller: email,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'E-mail',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  if (error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(error!),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: busy ? null : () => Navigator.pop(context, false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  key: AppKeys.resetSubmit,
-                  onPressed: busy
-                      ? null
-                      : () async {
-                          setLocal(() {
-                            busy = true;
-                            error = null;
-                          });
-                          final failure = await ref
-                              .read(authSessionProvider.notifier)
-                              .requestPasswordReset(email: email.text);
-                          if (!context.mounted) return;
-                          if (failure != null) {
-                            setLocal(() {
-                              busy = false;
-                              error = failure;
-                            });
-                            return;
-                          }
-                          Navigator.pop(context, true);
-                        },
-                  child: const Text('Enviar'),
-                ),
-              ],
-            );
-          },
-        );
+      initialEmail: _email.text.trim(),
+      emailKey: AppKeys.resetEmail,
+      submitKey: AppKeys.resetSubmit,
+      requestReset: (email) {
+        return ref
+            .read(authSessionProvider.notifier)
+            .requestPasswordReset(email: email);
       },
     );
-    email.dispose();
-    if (sent == true && mounted) {
+    if (sent && mounted) {
       setState(() {
         _error = scapeUsesLiveBackend
-            ? 'Se o e-mail tiver conta, o link já foi enviado.'
-            : 'Neste exemplo o link não é enviado.';
+            ? passwordResetSentMessage
+            : passwordResetDemoMessage;
       });
     }
   }
@@ -212,14 +162,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            key: AppKeys.loginPassword,
+          PasswordField(
+            fieldKey: AppKeys.loginPassword,
             controller: _password,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Senha',
-              border: OutlineInputBorder(),
-            ),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
           ),
           if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
           const SizedBox(height: 16),

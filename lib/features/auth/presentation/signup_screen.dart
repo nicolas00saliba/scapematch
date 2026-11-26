@@ -8,6 +8,7 @@ import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/scape_back_button.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/password_field.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/domain/signup_result.dart';
 import 'package:scapematch/features/auth/presentation/auth_controller.dart';
@@ -36,6 +37,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirm = TextEditingController();
   final _referral = TextEditingController();
   final _phone = TextEditingController();
   final _day = TextEditingController();
@@ -60,6 +62,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       ..onTap = () => context.push('/legal/privacidade');
     _refundLink = TapGestureRecognizer()
       ..onTap = () => context.push('/legal/reembolso');
+    _password.addListener(_onSecretChanged);
+    _confirm.addListener(_onSecretChanged);
     _cityId = ref.read(selectedCityIdProvider);
     if (!scapeUsesLiveBackend) return;
     Future<void>(() async {
@@ -73,7 +77,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   void dispose() {
     _name.dispose();
     _email.dispose();
+    _password.removeListener(_onSecretChanged);
+    _confirm.removeListener(_onSecretChanged);
     _password.dispose();
+    _confirm.dispose();
     _referral.dispose();
     _phone.dispose();
     _day.dispose();
@@ -84,6 +91,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _refundLink.dispose();
     super.dispose();
   }
+
+  void _onSecretChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool get _passwordsMatch =>
+      _password.text.isNotEmpty && _password.text == _confirm.text;
 
   DateTime? _birthDate() {
     final day = int.tryParse(_day.text.trim());
@@ -156,6 +170,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         setState(() => _error = rule);
         return;
       }
+    }
+    if (_password.text != _confirm.text) {
+      setState(() => _error = passwordMismatchMessage);
+      return;
     }
     if (scapeUsesLiveBackend && (_cityId == null || _cityId!.isEmpty)) {
       setState(() => _error = 'Escolha a cidade.');
@@ -375,18 +393,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            TextField(
-              key: AppKeys.signupPassword,
+            PasswordField(
+              fieldKey: AppKeys.signupPassword,
               controller: _password,
-              obscureText: true,
+              helperText: scapeUsesLiveBackend
+                  ? 'Pelo menos 8 caracteres, com letras e números.'
+                  : null,
               autofillHints: const [AutofillHints.newPassword],
-              decoration: InputDecoration(
-                labelText: 'Senha',
-                helperText: scapeUsesLiveBackend
-                    ? 'Pelo menos 8 caracteres, com letras e números.'
-                    : null,
-                border: const OutlineInputBorder(),
-              ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            PasswordField(
+              fieldKey: AppKeys.signupConfirmPassword,
+              controller: _confirm,
+              labelText: 'Confirmar senha',
+              errorText:
+                  _confirm.text.isNotEmpty && _confirm.text != _password.text
+                  ? passwordMismatchMessage
+                  : null,
+              autofillHints: const [AutofillHints.newPassword],
             ),
             const SizedBox(height: 12),
             TextField(
@@ -440,7 +465,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             const SizedBox(height: 16),
             FilledButton(
               key: AppKeys.signupSubmit,
-              onPressed: _busy ? null : _submit,
+              onPressed: _busy || !_passwordsMatch ? null : _submit,
               child: const Text('Criar conta'),
             ),
           ],

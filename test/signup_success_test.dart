@@ -222,6 +222,7 @@ Future<void> _fillPlayer(WidgetTester tester, String email) async {
   await tester.enterText(find.byKey(AppKeys.signupName), 'Ana');
   await tester.enterText(find.byKey(AppKeys.signupEmail), email);
   await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+  await tester.enterText(find.byKey(AppKeys.signupConfirmPassword), 'senha');
   await tester.enterText(find.byKey(AppKeys.signupBirthDay), '1');
   await tester.enterText(find.byKey(AppKeys.signupBirthMonth), '1');
   await tester.enterText(find.byKey(AppKeys.signupBirthYear), '1990');

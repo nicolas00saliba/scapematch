@@ -7,6 +7,9 @@ import 'package:http/http.dart' as http;
 const passwordRuleMessage =
     'A senha precisa de pelo menos 8 caracteres, com letras e números.';
 
+/// Frase quando a confirmação não repete a senha.
+const passwordMismatchMessage = 'As senhas não conferem.';
+
 /// Frase quando a senha aparece na lista do Have I Been Pwned.
 const leakedPasswordMessage =
     'Essa senha apareceu em vazamentos. Escolha outra.';

@@ -83,6 +83,10 @@ abstract final class AppKeys {
   static const signupName = Key('signup-name');
   static const signupEmail = Key('signup-email');
   static const signupPassword = Key('signup-password');
+  static const signupConfirmPassword = Key('signup-confirm-password');
+  static const newPassword = Key('new-password');
+  static const confirmNewPassword = Key('confirm-new-password');
+  static const newPasswordSubmit = Key('new-password-submit');
   static const signupCity = Key('signup-city');
   static const signupSubmit = Key('signup-submit');
   static const signupSuccess = Key('signup-success');

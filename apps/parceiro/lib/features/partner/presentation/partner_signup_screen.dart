@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/password_field.dart';
 import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/domain/signup_result.dart';
@@ -41,6 +42,7 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirm = TextEditingController();
   late final TapGestureRecognizer _termsTap;
   late final TapGestureRecognizer _privacyTap;
   late final TapGestureRecognizer _refundTap;
@@ -63,13 +65,25 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
     _refundTap = TapGestureRecognizer()
       ..onTap = () =>
           _open(LegalDocuments.refundTitle, LegalDocuments.refundBody);
+    _password.addListener(_onSecretChanged);
+    _confirm.addListener(_onSecretChanged);
   }
+
+  void _onSecretChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool get _passwordsMatch =>
+      _password.text.isNotEmpty && _password.text == _confirm.text;
 
   @override
   void dispose() {
     _name.dispose();
     _email.dispose();
+    _password.removeListener(_onSecretChanged);
+    _confirm.removeListener(_onSecretChanged);
     _password.dispose();
+    _confirm.dispose();
     _termsTap.dispose();
     _privacyTap.dispose();
     _refundTap.dispose();
@@ -120,6 +134,10 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
     final rule = passwordRuleError(_password.text);
     if (rule != null) {
       setState(() => _error = rule);
+      return;
+    }
+    if (_password.text != _confirm.text) {
+      setState(() => _error = passwordMismatchMessage);
       return;
     }
     if (!_accepted) {
@@ -232,16 +250,23 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            key: PartnerKeys.partnerSignupPassword,
+          PasswordField(
+            fieldKey: PartnerKeys.partnerSignupPassword,
             controller: _password,
-            obscureText: true,
+            helperText: 'Pelo menos 8 caracteres, com letras e números.',
             autofillHints: const [AutofillHints.newPassword],
-            decoration: const InputDecoration(
-              labelText: 'Senha',
-              helperText: 'Pelo menos 8 caracteres, com letras e números.',
-              border: OutlineInputBorder(),
-            ),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 12),
+          PasswordField(
+            fieldKey: PartnerKeys.partnerSignupConfirmPassword,
+            controller: _confirm,
+            labelText: 'Confirmar senha',
+            errorText:
+                _confirm.text.isNotEmpty && _confirm.text != _password.text
+                ? passwordMismatchMessage
+                : null,
+            autofillHints: const [AutofillHints.newPassword],
           ),
           const SizedBox(height: 8),
           CheckboxListTile(
@@ -296,7 +321,7 @@ class _PartnerSignupScreenState extends ConsumerState<PartnerSignupScreen> {
           const SizedBox(height: 16),
           FilledButton(
             key: PartnerKeys.partnerSubmit,
-            onPressed: _busy ? null : _submit,
+            onPressed: _busy || !_passwordsMatch ? null : _submit,
             child: const Text('Criar conta'),
           ),
         ],

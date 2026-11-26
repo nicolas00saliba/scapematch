@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/formatting/money_format.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
-import 'package:scapematch/features/auth/data/auth_messages.dart';
-import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch/features/auth/presentation/password_change_dialog.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_password_reset.dart';
 import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
 import 'package:scapematch/core/ui/window_class.dart';
@@ -193,18 +191,8 @@ void _leave(WidgetRef ref) {
   ref.read(partnerSessionProvider.notifier).signOut();
 }
 
-Future<String?> _changePartnerPassword(String password) async {
-  final rejected = await rejectPassword(password);
-  if (rejected != null) return rejected;
-  try {
-    await scapeSupabase.auth.updateUser(UserAttributes(password: password));
-    return null;
-  } on Object catch (error) {
-    return authErrorMessage(
-      error,
-      fallback: 'Não foi possível trocar a senha. Tente de novo.',
-    );
-  }
+Future<String?> _changePartnerPassword(String password) {
+  return updatePartnerPassword(password);
 }
 
 class _PartnerRail extends ConsumerWidget {

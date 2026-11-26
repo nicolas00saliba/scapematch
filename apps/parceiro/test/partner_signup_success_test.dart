@@ -52,6 +52,10 @@ void main() {
       find.byKey(PartnerKeys.partnerSignupPassword),
       'Casa1234',
     );
+    await tester.enterText(
+      find.byKey(PartnerKeys.partnerSignupConfirmPassword),
+      'Casa1234',
+    );
     await tester.ensureVisible(find.byKey(PartnerKeys.partnerSignupTerms));
     await tester.tap(find.byKey(PartnerKeys.partnerSignupTerms));
     await tester.pump();

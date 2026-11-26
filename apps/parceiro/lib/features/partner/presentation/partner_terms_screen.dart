@@ -2,6 +2,7 @@ import 'package:dominio/dominio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
+import 'package:scapematch/core/ui/password_field.dart';
 import 'package:scapematch/features/legal/legal_documents.dart';
 import 'package:scapematch/features/scape_points/presentation/reward_rules_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_legal.dart';
@@ -12,8 +13,7 @@ class PartnerTermsScreen extends ConsumerStatefulWidget {
   const PartnerTermsScreen({super.key});
 
   @override
-  ConsumerState<PartnerTermsScreen> createState() =>
-      _PartnerTermsScreenState();
+  ConsumerState<PartnerTermsScreen> createState() => _PartnerTermsScreenState();
 }
 
 class _PartnerTermsScreenState extends ConsumerState<PartnerTermsScreen> {
@@ -37,7 +37,8 @@ class _PartnerTermsScreenState extends ConsumerState<PartnerTermsScreen> {
     final email = _email.text.trim();
     if (name.length < 2 || !email.contains('@') || _password.text.length < 4) {
       setState(() {
-        _error = 'Preencha o nome da casa, um e-mail e uma senha de 4 caracteres.';
+        _error =
+            'Preencha o nome da casa, um e-mail e uma senha de 4 caracteres.';
       });
       return;
     }
@@ -46,10 +47,9 @@ class _PartnerTermsScreenState extends ConsumerState<PartnerTermsScreen> {
       return;
     }
     final when = DateTime.now();
-    ref.read(partnerAcceptanceProvider.notifier).record(
-      userId: email.toLowerCase(),
-      at: when,
-    );
+    ref
+        .read(partnerAcceptanceProvider.notifier)
+        .record(userId: email.toLowerCase(), at: when);
     setState(() {
       _error = null;
       _recorded = [
@@ -110,14 +110,9 @@ class _PartnerTermsScreenState extends ConsumerState<PartnerTermsScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            key: PartnerKeys.partnerSignupPassword,
+          PasswordField(
+            fieldKey: PartnerKeys.partnerSignupPassword,
             controller: _password,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Senha',
-              border: OutlineInputBorder(),
-            ),
           ),
           const SizedBox(height: 8),
           CheckboxListTile(
