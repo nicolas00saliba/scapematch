@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
 import { PagBankProvider, pagbankProductionBaseUrl } from "./pagbank_provider.ts";
+import { PagbankAccountConflict } from "./pagbank_binding.ts";
 import {
   completePagbankConnect,
   connectRedirectUri,
@@ -66,8 +67,7 @@ Deno.test("code sem state válido não troca token", async () => {
             accountId: "ACCO_1",
           });
         },
-        saveAccount: () => Promise.resolve(),
-        saveTokens: () => Promise.resolve(),
+        link: () => Promise.resolve(),
       }),
     Error,
     "state",
@@ -103,11 +103,8 @@ Deno.test("o retorno grava o refresh token e não devolve o access", async () =>
         accountId: "ACCO_CASA",
       });
     },
-    saveAccount: (_venueId, accountId) => {
+    link: (_venueId, accountId, tokens) => {
       accounts.push(accountId);
-      return Promise.resolve();
-    },
-    saveTokens: (_venueId, tokens) => {
       saved.push({ refresh: tokens.refreshToken, expires: tokens.expiresAt });
       return Promise.resolve();
     },
@@ -194,4 +191,44 @@ Deno.test("renova o access antes de vencer e no 401", async () => {
   assertEquals(balance, 100_000);
   assert(callsHttp.some((call) => call.includes("/oauth2/token")));
   assert(callsHttp.filter((call) => call.includes("/accounts/balance")).length >= 1);
+});
+
+Deno.test("segunda conta na mesma casa é recusada e nada é gravado fora do link", async () => {
+  const linked: string[] = [];
+  let existing: string | null = "ACCO_PRIMEIRA";
+  const attempt = (account: string) =>
+    completePagbankConnect({
+      userId: user,
+      code: "code-2",
+      state,
+      consume: () =>
+        Promise.resolve({
+          venueId: venue,
+          redirectUri: "https://parceiro.escapematch.com.br/pagbank/retorno",
+        }),
+      exchange: () =>
+        Promise.resolve({
+          accessToken: "a",
+          refreshToken: "r",
+          expiresIn: 60,
+          accountId: account,
+        }),
+      link: (_venueId, accountId) => {
+        if (existing && existing !== accountId) {
+          throw new PagbankAccountConflict("pagbank_account_exists");
+        }
+        existing = accountId;
+        linked.push(accountId);
+        return Promise.resolve();
+      },
+    });
+  await assertRejects(
+    () => attempt("ACCO_SEGUNDA"),
+    PagbankAccountConflict,
+    "pagbank_account_exists",
+  );
+  assertEquals(linked, []);
+  assertEquals(existing, "ACCO_PRIMEIRA");
+  await attempt("ACCO_PRIMEIRA");
+  assertEquals(linked, ["ACCO_PRIMEIRA"]);
 });

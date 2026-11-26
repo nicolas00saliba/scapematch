@@ -32,12 +32,54 @@ abstract class PagbankSignupRepository {
 
   Future<PagbankSignupCreated> create(String venueId, PagbankSignupDraft draft);
 
-  Future<Uri> connect(String venueId);
+  /// [reconnect] só renova a autorização da conta que já está ligada.
+  Future<Uri> connect(String venueId, {bool reconnect = false});
+
+  /// A conta da casa, lida do servidor a cada abertura.
+  Future<PagbankAccountView> account(String venueId);
+
+  /// Único caminho para trocar de conta: desconectar e conectar de novo.
+  Future<void> disconnect(String venueId);
+}
+
+/// O que o servidor guarda por casa. Dois repositórios com o mesmo servidor
+/// são dois aparelhos ou logins da mesma casa.
+class MemoryPagbankServer {
+  PagbankAccountView account = PagbankAccountView.none;
+  String? _accountId;
+  bool moneyInFlight = false;
+
+  /// O retorno do PagBank Connect. Conta diferente da atual é recusada.
+  void link({
+    required String accountId,
+    String holder = 'Casa de Teste',
+    String? documentKind = 'cnpj',
+    String? documentMasked = '**.***.***/****-81',
+  }) {
+    final current = _accountId;
+    if (current != null && current != accountId) {
+      throw const PagbankSignupException('pagbank_account_exists');
+    }
+    _accountId = accountId;
+    account = PagbankAccountView(
+      connected: true,
+      holder: holder,
+      accountLast4: accountId.substring(accountId.length - 4),
+      documentKind: documentKind,
+      documentMasked: documentMasked,
+      canDisconnect: !moneyInFlight,
+    );
+  }
 }
 
 class MemoryPagbankSignupRepository implements PagbankSignupRepository {
-  MemoryPagbankSignupRepository({this.apiEnabled = false, this.signup});
+  MemoryPagbankSignupRepository({
+    this.apiEnabled = false,
+    this.signup,
+    MemoryPagbankServer? server,
+  }) : server = server ?? MemoryPagbankServer();
 
+  final MemoryPagbankServer server;
   bool apiEnabled;
   PagbankSignupRow? signup;
   final List<String> guides = [];
@@ -79,7 +121,36 @@ class MemoryPagbankSignupRepository implements PagbankSignupRepository {
   }
 
   @override
-  Future<Uri> connect(String venueId) async => connectUri;
+  Future<Uri> connect(String venueId, {bool reconnect = false}) async {
+    if (server.account.connected && !reconnect) {
+      throw const PagbankSignupException('pagbank_account_exists');
+    }
+    return connectUri;
+  }
+
+  @override
+  Future<PagbankAccountView> account(String venueId) async {
+    final current = server.account;
+    if (!current.connected) return current;
+    return PagbankAccountView(
+      connected: true,
+      holder: current.holder,
+      bank: current.bank,
+      accountLast4: current.accountLast4,
+      documentKind: current.documentKind,
+      documentMasked: current.documentMasked,
+      canDisconnect: !server.moneyInFlight,
+    );
+  }
+
+  @override
+  Future<void> disconnect(String venueId) async {
+    if (server.moneyInFlight) {
+      throw const PagbankSignupException('pagbank_in_flight');
+    }
+    server.account = PagbankAccountView.none;
+    server._accountId = null;
+  }
 }
 
 class SupabasePagbankSignupRepository implements PagbankSignupRepository {
@@ -133,11 +204,43 @@ class SupabasePagbankSignupRepository implements PagbankSignupRepository {
   }
 
   @override
-  Future<Uri> connect(String venueId) async {
+  Future<PagbankAccountView> account(String venueId) async {
+    try {
+      final raw = await scapeSupabase.rpc(
+        'venue_pagbank_account_view',
+        params: {'p_venue_id': venueId},
+      );
+      return PagbankAccountView.fromJson(raw);
+    } on PostgrestException catch (error) {
+      throw PagbankSignupException(signupErrorCode(error.message));
+    }
+  }
+
+  @override
+  Future<void> disconnect(String venueId) async {
+    try {
+      final response = await scapeSupabase.functions.invoke(
+        'pagbank-disconnect',
+        body: {'venue_id': venueId},
+      );
+      final data = response.data;
+      if (data is Map && data['error'] != null) {
+        throw PagbankSignupException(signupErrorCode('${data['error']}'));
+      }
+      if (data is! Map || data['disconnected'] != true) {
+        throw const PagbankSignupException('erro');
+      }
+    } on FunctionException catch (error) {
+      throw PagbankSignupException(signupErrorCode('${error.details ?? ''}'));
+    }
+  }
+
+  @override
+  Future<Uri> connect(String venueId, {bool reconnect = false}) async {
     try {
       final response = await scapeSupabase.functions.invoke(
         'provision-venue-wallet',
-        body: {'venue_id': venueId},
+        body: {'venue_id': venueId, if (reconnect) 'reconnect': true},
       );
       final data = response.data;
       final url = data is Map ? data['connect_url'] : null;
@@ -166,6 +269,9 @@ PagbankSignupCreated _created(Object? data) {
 
 String signupErrorCode(String message) {
   for (final code in const [
+    'pagbank_account_exists',
+    'pagbank_account_mismatch',
+    'pagbank_in_flight',
     'api_indisponivel',
     'modo_api',
     'conta_existente',

@@ -439,3 +439,74 @@ Deno.test("create-charge e o webhook usam a liberação da custódia", async () 
   assert(settle.includes("retryPendingCustodyReleases"));
   assert(reconcile.includes("retryPendingCustodyReleases"));
 });
+
+Deno.test("conta ambígua entre casa e token: a custódia não solta e não gasta tentativa", async () => {
+  const original = console.error;
+  const logs: string[] = [];
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    for (
+      const binding of [
+        { state: "ambiguous", reason: "tokens_other_account" },
+        "ilegivel",
+      ]
+    ) {
+      const releases: string[] = [];
+      const admin = Object.assign(adminFor([]), {
+        rpc(fn: string) {
+          if (fn === "venue_pagbank_binding") {
+            return Promise.resolve({ data: binding, error: null });
+          }
+          return Promise.resolve({ data: true, error: null });
+        },
+      });
+      const released = await releaseHeldSplit(admin, {
+        releaseCustody: (splitId: string) => {
+          releases.push(splitId);
+          return Promise.resolve();
+        },
+        accountId: () => "ACCO_PRIMARY",
+      }, {
+        id: chargeId,
+        group_id: groupId,
+        venue_id: "33333333-3333-4333-8333-333333333333",
+        provider_split_id: "SPLI_X",
+      });
+      assertEquals(released, false);
+      assertEquals(releases, []);
+      assertEquals(admin.updates, []);
+    }
+    assert(logs.some((line) => line.includes("conta_ambigua")));
+    assert(logs.some((line) => line.includes("conta_ilegivel")));
+  } finally {
+    console.error = original;
+  }
+});
+
+Deno.test("conta única conferida solta a custódia", async () => {
+  const releases: string[] = [];
+  const admin = Object.assign(adminFor([]), {
+    rpc(fn: string) {
+      if (fn === "venue_pagbank_binding") {
+        return Promise.resolve({ data: { state: "ok" }, error: null });
+      }
+      return Promise.resolve({ data: true, error: null });
+    },
+  });
+  const released = await releaseHeldSplit(admin, {
+    releaseCustody: (splitId: string, accounts: string[]) => {
+      releases.push(`${splitId}:${accounts[0]}`);
+      return Promise.resolve();
+    },
+    accountId: () => "ACCO_PRIMARY",
+  }, {
+    id: chargeId,
+    group_id: groupId,
+    venue_id: "33333333-3333-4333-8333-333333333333",
+    provider_split_id: "SPLI_X",
+  });
+  assertEquals(released, true);
+  assertEquals(releases, ["SPLI_X:ACCO_VENUE"]);
+});

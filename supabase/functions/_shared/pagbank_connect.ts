@@ -36,9 +36,11 @@ export async function completePagbankConnect(input: {
     expiresIn: number;
     accountId: string;
   }>;
-  saveAccount: (venueId: string, accountId: string) => Promise<void>;
-  saveTokens: (
+  /// Grava conta e token numa transação só. Recusa com
+  /// PagbankAccountConflict se a casa já tem outra conta PagBank.
+  link: (
     venueId: string,
+    accountId: string,
     tokens: {
       accessToken: string;
       refreshToken: string;
@@ -53,8 +55,7 @@ export async function completePagbankConnect(input: {
   }
   const exchanged = await input.exchange(input.code, session.redirectUri);
   const now = input.nowMs ?? Date.now();
-  await input.saveAccount(session.venueId, exchanged.accountId);
-  await input.saveTokens(session.venueId, {
+  await input.link(session.venueId, exchanged.accountId, {
     accessToken: exchanged.accessToken,
     refreshToken: exchanged.refreshToken,
     expiresAt: exchanged.expiresIn > 0

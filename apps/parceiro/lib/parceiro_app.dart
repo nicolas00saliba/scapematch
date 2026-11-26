@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/splash_gate.dart';
-import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/features/payments/data/pagbank_connect_client.dart';
 import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 import 'package:scapematch/features/payments/presentation/pagbank_connect_return_page.dart';
 import 'package:scapematch/app/theme.dart';
@@ -36,14 +36,7 @@ class _ParceiroHomeState extends State<_ParceiroHome> {
     if (hit == null) return const PartnerScreen();
     return PagbankConnectReturnPage(
       hit: hit,
-      complete: (item) async {
-        final response = await scapeSupabase.functions.invoke(
-          'pagbank-connect',
-          body: {'code': item.code, 'state': item.state},
-        );
-        final data = response.data;
-        return data is Map && data['linked'] == true;
-      },
+      complete: completePagbankConnectCall,
       onDone: () => setState(() => _hit = null),
     );
   }

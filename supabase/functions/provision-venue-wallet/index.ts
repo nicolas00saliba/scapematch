@@ -7,6 +7,7 @@ import { connectRedirectUri } from "../_shared/pagbank_connect.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
+import { accountExistsMessage } from "../_shared/pagbank_binding.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -37,13 +38,14 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({})) as {
       venue_id?: string;
       surface?: string;
+      reconnect?: boolean;
     };
     const venueId = (body.venue_id ?? "").trim();
     if (!venueId) return json({ error: "venue_id" }, 400);
 
     const { data: venue, error } = await admin
       .from("venues")
-      .select("id, owner_id, status")
+      .select("id, owner_id, status, pagbank_account_id")
       .eq("id", venueId)
       .maybeSingle();
     if (error || !venue) return json({ error: "erro" }, 400);
@@ -51,6 +53,16 @@ Deno.serve(async (req) => {
       return json({ error: "not admin" }, 403);
     }
     if (venue.status !== "approved") return json({ error: "casa" }, 400);
+    // A conta fica na casa, no servidor. Com conta conectada o link só sai
+    // para renovar a autorização; outra conta é recusada de novo na volta.
+    const hasAccount = typeof venue.pagbank_account_id === "string" &&
+      venue.pagbank_account_id.trim() !== "";
+    if (hasAccount && body.reconnect !== true) {
+      return json({
+        error: "pagbank_account_exists",
+        message: accountExistsMessage,
+      }, 409);
+    }
 
     const clientId = (Deno.env.get("PAGBANK_CONNECT_CLIENT_ID") ?? "").trim();
     const redirect = connectRedirectUri({

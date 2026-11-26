@@ -7,6 +7,11 @@ import { completePagbankConnect } from "../_shared/pagbank_connect.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
+import {
+  conflictBody,
+  conflictFromRpc,
+  PagbankAccountConflict,
+} from "../_shared/pagbank_binding.ts";
 
 Deno.serve(async (req) => {
   const json = bindJson(req);
@@ -80,25 +85,26 @@ Deno.serve(async (req) => {
           code: authCode,
           redirectUri,
         }),
-      saveAccount: async (venueId, accountId) => {
-        const { error } = await admin
-          .from("venues")
-          .update({ pagbank_account_id: accountId })
-          .eq("id", venueId);
-        if (error) throw new Error("erro");
-      },
-      saveTokens: async (venueId, tokens) => {
-        const { error } = await admin.rpc("store_venue_pagbank_tokens", {
+      link: async (venueId, accountId, tokens) => {
+        const { error } = await admin.rpc("connect_venue_pagbank", {
           p_venue_id: venueId,
+          p_actor: userId,
+          p_account_id: accountId,
           p_access_token: tokens.accessToken,
           p_refresh_token: tokens.refreshToken,
           p_expires_at: tokens.expiresAt,
         });
-        if (error) throw new Error("erro");
+        if (!error) return;
+        const conflict = conflictFromRpc(error);
+        if (conflict) throw conflict;
+        throw new Error("erro");
       },
     });
     return json({ venue_id: done.venueId, linked: true });
   } catch (error) {
+    if (error instanceof PagbankAccountConflict) {
+      return json(conflictBody(error), 409);
+    }
     logCaught("pagbank-connect", error);
     const failure = clientFailure(error, "pagbank-connect");
     return json(failure.body, failure.status);

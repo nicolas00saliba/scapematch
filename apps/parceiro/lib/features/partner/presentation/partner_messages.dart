@@ -374,6 +374,22 @@ abstract final class PartnerMessages {
   static const pagbankCreateTitle = 'Criar conta PagBank';
   static const pagbankCreateManualBody =
       'A casa cria a conta na página oficial do PagBank. Depois volte e entre com PagBank para conectar.';
+  static const pagbankAccountHolder = 'Titular';
+  static const pagbankAccountBank = 'Banco';
+  static const pagbankAccountEnding = 'Conta final';
+  static const pagbankAccountOne =
+      'A casa tem uma conta PagBank só. Ela vale em qualquer aparelho que entrar nesta conta.';
+  static const pagbankSwap = 'Trocar conta PagBank';
+  static const pagbankRenew = 'Renovar autorização';
+  static const pagbankSwapTitle = 'Trocar a conta PagBank?';
+  static String pagbankSwapBody(String last4) =>
+      'Vamos desconectar a conta final $last4. Até conectar outra, a casa não recebe reservas novas. Só dá para trocar se não houver dinheiro a caminho.';
+  static const pagbankSwapCancel = 'Cancelar';
+  static const pagbankSwapConfirm = 'Desconectar';
+  static const pagbankSwapBusy =
+      'Há dinheiro a caminho para esta conta. Espere cair para trocar.';
+  static const pagbankAccountExists =
+      'Esta casa já tem uma conta PagBank conectada. Para trocar, desconecte a atual e conecte de novo.';
   static const pagbankConnectedTitle = 'Conta PagBank conectada';
   static const pagbankConnectedBody =
       'O dinheiro das reservas cai na conta PagBank da casa.';

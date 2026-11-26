@@ -57,6 +57,12 @@ class _VenuePagbankSignupCardState
   PagbankSignupRow? _row;
   String? _error;
   String? _accountId;
+  // Vem do servidor a cada abertura. Nada disto é guardado no aparelho.
+  var _account = PagbankAccountView.none;
+  var _released = false;
+
+  bool get _paying =>
+      (widget.receivesPayments || _account.connected) && !_released;
 
   @override
   void initState() {
@@ -70,6 +76,9 @@ class _VenuePagbankSignupCardState
     final changed =
         oldWidget.receivesPayments != widget.receivesPayments ||
         oldWidget.inReview != widget.inReview;
+    if (oldWidget.receivesPayments != widget.receivesPayments) {
+      _released = false;
+    }
     if (!changed || _loading) return;
     if (_phase == _SignupPhase.choices ||
         _phase == _SignupPhase.connected ||
@@ -103,13 +112,14 @@ class _VenuePagbankSignupCardState
 
   Future<void> _load() async {
     try {
-      final view = await ref
-          .read(pagbankSignupRepositoryProvider)
-          .load(widget.venueId);
+      final repo = ref.read(pagbankSignupRepositoryProvider);
+      final view = await repo.load(widget.venueId);
+      final account = await repo.account(widget.venueId);
       if (!mounted) return;
       setState(() {
         _loading = false;
         _api = view.apiEnabled;
+        _account = account;
         _applyRow(view.signup);
       });
     } on PagbankSignupException catch (error) {
@@ -124,23 +134,23 @@ class _VenuePagbankSignupCardState
 
   void _applyRow(PagbankSignupRow? row) {
     _row = row;
-    if (row?.accountId != null && !widget.receivesPayments) {
+    if (row?.accountId != null && !_paying) {
       _accountId = row!.accountId;
       _phase = _SignupPhase.activation;
       return;
     }
-    if (row?.accountStatus == 'exists' && !widget.receivesPayments) {
+    if (row?.accountStatus == 'exists' && !_paying) {
       _phase = _SignupPhase.exists;
       return;
     }
     if (!_api &&
         row?.accountStatus == 'guided' &&
-        !widget.receivesPayments &&
+        !_paying &&
         !widget.inReview) {
       _phase = _SignupPhase.manual;
       return;
     }
-    if (widget.receivesPayments) {
+    if (_paying) {
       _phase = _SignupPhase.connected;
       return;
     }
@@ -182,7 +192,7 @@ class _VenuePagbankSignupCardState
         return;
       }
       _step = 0;
-      if (widget.receivesPayments) {
+      if (_paying) {
         _phase = _SignupPhase.connected;
       } else if (widget.inReview) {
         _phase = _SignupPhase.review;
@@ -297,7 +307,7 @@ class _VenuePagbankSignupCardState
     }
   }
 
-  Future<void> _connect() async {
+  Future<void> _connect({bool reconnect = false}) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -305,10 +315,55 @@ class _VenuePagbankSignupCardState
     try {
       final uri = await ref
           .read(pagbankSignupRepositoryProvider)
-          .connect(widget.venueId);
+          .connect(widget.venueId, reconnect: reconnect);
       if (!mounted) return;
       setState(() => _busy = false);
       (widget.onOpen ?? launchPagbankConnect)(uri);
+    } on PagbankSignupException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = pagbankSignupMessage(error.code);
+      });
+    }
+  }
+
+  Future<void> _swap() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(PartnerMessages.pagbankSwapTitle),
+        content: Text(PartnerMessages.pagbankSwapBody(_account.accountLast4)),
+        actions: [
+          TextButton(
+            key: PartnerKeys.pagbankAccountSwapCancel,
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(PartnerMessages.pagbankSwapCancel),
+          ),
+          FilledButton(
+            key: PartnerKeys.pagbankAccountSwapConfirm,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(PartnerMessages.pagbankSwapConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(pagbankSignupRepositoryProvider)
+          .disconnect(widget.venueId);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _released = true;
+        _account = PagbankAccountView.none;
+        _phase = _SignupPhase.choices;
+      });
     } on PagbankSignupException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -367,12 +422,26 @@ class _VenuePagbankSignupCardState
               onConnect: _connect,
             ),
             _SignupPhase.exists => _Exists(busy: _busy, onConnect: _connect),
-            _SignupPhase.connected => const _StatusNote(
-              noteKey: PartnerKeys.pagbankSignupConnected,
-              icon: Icons.check_circle,
-              tone: _NoteTone.success,
-              title: PartnerMessages.pagbankConnectedTitle,
-              body: PartnerMessages.pagbankConnectedBody,
+            _SignupPhase.connected => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _StatusNote(
+                  noteKey: PartnerKeys.pagbankSignupConnected,
+                  icon: Icons.check_circle,
+                  tone: _NoteTone.success,
+                  title: PartnerMessages.pagbankConnectedTitle,
+                  body: PartnerMessages.pagbankConnectedBody,
+                ),
+                if (_account.connected) ...[
+                  const SizedBox(height: 12),
+                  _ConnectedAccount(
+                    account: _account,
+                    busy: _busy,
+                    onSwap: _swap,
+                    onRenew: () => _connect(reconnect: true),
+                  ),
+                ],
+              ],
             ),
             _SignupPhase.review => const _StatusNote(
               noteKey: PartnerKeys.pagbankSignupReview,
@@ -722,6 +791,101 @@ class _ConnectScreen extends StatelessWidget {
   }
 }
 
+class _ConnectedAccount extends StatelessWidget {
+  const _ConnectedAccount({
+    required this.account,
+    required this.busy,
+    required this.onSwap,
+    required this.onRenew,
+  });
+
+  final PagbankAccountView account;
+  final bool busy;
+  final VoidCallback onSwap;
+  final VoidCallback onRenew;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rows = <(String, String)>[
+      if (account.holder.isNotEmpty)
+        (PartnerMessages.pagbankAccountHolder, account.holder),
+      (PartnerMessages.pagbankAccountBank, account.bank),
+      if (account.accountLast4.isNotEmpty)
+        (PartnerMessages.pagbankAccountEnding, account.accountLast4),
+      if (account.documentMasked != null)
+        (account.documentLabel, account.documentMasked!),
+    ];
+    return Column(
+      key: PartnerKeys.pagbankAccountCard,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (label, value) in rows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Semantics(
+              label: '$label: $value',
+              child: ExcludeSemantics(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 104,
+                      child: Text(
+                        label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        value,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 4),
+        Text(
+          PartnerMessages.pagbankAccountOne,
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          key: PartnerKeys.pagbankAccountRenew,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
+          onPressed: busy ? null : onRenew,
+          child: const Text(PartnerMessages.pagbankRenew),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          key: PartnerKeys.pagbankAccountSwap,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
+          onPressed: busy || !account.canDisconnect ? null : onSwap,
+          child: const Text(PartnerMessages.pagbankSwap),
+        ),
+        if (!account.canDisconnect) ...[
+          const SizedBox(height: 8),
+          Text(
+            PartnerMessages.pagbankSwapBusy,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _CreateOfficial extends StatelessWidget {
   const _CreateOfficial({
     required this.busy,
@@ -1029,6 +1193,9 @@ String pagbankSignupMessage(String code) {
       'A PagBank pediu para concluir a conta pelo e-mail informado.',
     'pagbank_unavailable' || 'pagbank_resposta' || 'pagbank_connect' =>
       'A PagBank não concluiu o cadastro. Tente de novo em instantes.',
+    'pagbank_account_exists' ||
+    'pagbank_account_mismatch' => PartnerMessages.pagbankAccountExists,
+    'pagbank_in_flight' => PartnerMessages.pagbankSwapBusy,
     'ip' => 'Não foi possível registrar o aceite dos termos.',
     'connect' => 'Não foi possível abrir o PagBank Connect.',
     _ => 'Não foi possível cadastrar a conta agora.',

@@ -50,6 +50,7 @@ import {
   releaseReservationOnError,
 } from "../_shared/pix_charge.ts";
 import { clientIp } from "../_shared/client_ip.ts";
+import { parseBinding } from "../_shared/pagbank_binding.ts";
 import { commissionBpsForVenue } from "../_shared/commission_rate.ts";
 import { syncPayerDocument } from "../_shared/payer_document.ts";
 import { splitMatchesSubsidy } from "../_shared/scape_points.ts";
@@ -94,6 +95,9 @@ type ChargeBody = {
 };
 
 type ChargeUser = { id: string; email?: string | null };
+
+const accountAmbiguousMessage =
+  "A conta PagBank desta casa está em conferência. Tente de novo mais tarde.";
 
 function thrownText(error: unknown): string {
   if (!(error instanceof Error)) return "";
@@ -302,6 +306,16 @@ export async function createCharge(
     );
     if (readyError || ready !== true) {
       return json({ error: financeBlockedMessage }, 409);
+    }
+    // Conta da casa e token de contas diferentes: não cria cobrança nova.
+    const bindingCheck = await admin.rpc("venue_pagbank_binding", {
+      p_venue_id: group.venue_id,
+    });
+    if (
+      !bindingCheck?.error &&
+      parseBinding(bindingCheck?.data).state === "ambiguous"
+    ) {
+      return json({ error: accountAmbiguousMessage }, 409);
     }
 
     const pagbank = deps?.pagbank ?? PagBankProvider.fromEnv(Deno.env);

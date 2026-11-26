@@ -1293,10 +1293,14 @@ class SupabaseAdminApi implements AdminApi {
         'provision-venue-wallet',
         body: {'venue_id': venueId, 'surface': 'admin'},
       );
-    } on FunctionException {
+    } on FunctionException catch (error) {
+      if (error.status == 409) return _accountExists;
       return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
     }
     final data = response.data;
+    if (data is Map && data['error'] == 'pagbank_account_exists') {
+      return _accountExists;
+    }
     if (data is Map && data['error'] != null) {
       return 'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
     }
@@ -1305,6 +1309,9 @@ class SupabaseAdminApi implements AdminApi {
     return null;
   }
 }
+
+const _accountExists =
+    'A casa já tem uma conta PagBank conectada. Para trocar, desconecte a atual antes.';
 
 class MemoryAdminApi implements AdminApi {
   MemoryAdminApi()

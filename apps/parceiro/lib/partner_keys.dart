@@ -225,4 +225,9 @@ abstract final class PartnerKeys {
   static const pagbankSignupOfficial = Key('pagbank-signup-official');
   static const pagbankSignupConnect = Key('pagbank-signup-connect');
   static const pagbankSignupActivation = Key('pagbank-signup-activation');
+  static const pagbankAccountCard = Key('pagbank-account-card');
+  static const pagbankAccountSwap = Key('pagbank-account-swap');
+  static const pagbankAccountRenew = Key('pagbank-account-renew');
+  static const pagbankAccountSwapConfirm = Key('pagbank-account-swap-confirm');
+  static const pagbankAccountSwapCancel = Key('pagbank-account-swap-cancel');
 }

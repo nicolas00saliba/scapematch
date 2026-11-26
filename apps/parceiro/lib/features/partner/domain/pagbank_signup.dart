@@ -434,3 +434,48 @@ class PagbankSignupView {
     );
   }
 }
+
+/// A conta PagBank que o servidor guarda para a casa. Vem sempre do servidor,
+/// por qualquer aparelho ou sessão: nada dela fica no aparelho. Documento e
+/// conta já chegam mascarados.
+class PagbankAccountView {
+  const PagbankAccountView({
+    required this.connected,
+    this.holder = '',
+    this.bank = 'PagBank',
+    this.accountLast4 = '',
+    this.documentKind,
+    this.documentMasked,
+    this.canDisconnect = true,
+  });
+
+  static const none = PagbankAccountView(connected: false);
+
+  final bool connected;
+  final String holder;
+  final String bank;
+  final String accountLast4;
+  final String? documentKind;
+  final String? documentMasked;
+  final bool canDisconnect;
+
+  String get documentLabel => documentKind == 'cnpj' ? 'CNPJ' : 'CPF';
+
+  static PagbankAccountView fromJson(Object? value) {
+    if (value is! Map || value['connected'] != true) return none;
+    String? text(Object? raw) {
+      final item = raw?.toString().trim() ?? '';
+      return item.isEmpty ? null : item;
+    }
+
+    return PagbankAccountView(
+      connected: true,
+      holder: text(value['holder']) ?? '',
+      bank: text(value['bank']) ?? 'PagBank',
+      accountLast4: text(value['account_last4']) ?? '',
+      documentKind: text(value['document_kind']),
+      documentMasked: text(value['document_masked']),
+      canDisconnect: value['can_disconnect'] != false,
+    );
+  }
+}
