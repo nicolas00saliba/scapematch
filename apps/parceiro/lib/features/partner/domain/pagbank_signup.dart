@@ -204,6 +204,51 @@ class PagbankSignupDraft {
     required bool termsAccepted,
     DateTime? today,
   }) {
+    return stepIssue(
+      step: 2,
+      documentKind: documentKind,
+      documentNumber: documentNumber,
+      companyName: companyName,
+      postalCode: postalCode,
+      street: street,
+      number: number,
+      complement: complement,
+      locality: locality,
+      city: city,
+      regionCode: regionCode,
+      responsibleName: responsibleName,
+      responsibleCpf: responsibleCpf,
+      birthDate: birthDate,
+      phone: phone,
+      email: email,
+      businessCategory: businessCategory,
+      termsAccepted: termsAccepted,
+      today: today,
+    );
+  }
+
+  /// Passo 0: documento. Passo 1: nome e contato. Passo 2: endereço e termos.
+  static String? stepIssue({
+    required int step,
+    required String documentKind,
+    required String documentNumber,
+    required String companyName,
+    required String postalCode,
+    required String street,
+    required String number,
+    required String complement,
+    required String locality,
+    required String city,
+    required String regionCode,
+    required String responsibleName,
+    required String responsibleCpf,
+    required String birthDate,
+    required String phone,
+    required String email,
+    required String? businessCategory,
+    required bool termsAccepted,
+    DateTime? today,
+  }) {
     final kind = documentKind == 'cnpj' ? 'cnpj' : documentKind;
     if (kind != 'cpf' && kind != 'cnpj') return 'documento';
     final document = digits(documentNumber);
@@ -212,10 +257,31 @@ class PagbankSignupDraft {
     if (kind == 'cnpj' && !cpfOk(digits(responsibleCpf))) {
       return 'cpf_responsavel';
     }
+    if (step <= 0) return null;
+
     final company = collapse(companyName);
     final minName = kind == 'cnpj' ? 3 : 2;
     final maxName = kind == 'cnpj' ? 144 : 80;
     if (company.length < minName || company.length > maxName) return 'razao';
+    final person = collapse(responsibleName);
+    if (person.length < 2 || person.length > 50) return 'responsavel';
+    if (!adultBirth(birthDate.trim(), today ?? DateTime.now().toUtc())) {
+      return 'nascimento';
+    }
+    if (!RegExp(r'^([1-9][0-9])9[0-9]{8}$').hasMatch(digits(phone))) {
+      return 'celular';
+    }
+    final mail = email.trim().toLowerCase();
+    if (mail.length > 60 ||
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(mail)) {
+      return 'email';
+    }
+    if (businessCategory == null ||
+        !pagbankBusinessCategoryLabels.containsKey(businessCategory)) {
+      return 'categoria';
+    }
+    if (step <= 1) return null;
+
     final region = regionCode.trim().toUpperCase();
     if (collapse(street).isEmpty ||
         collapse(street).length > 150 ||
@@ -230,31 +296,39 @@ class PagbankSignupDraft {
         digits(postalCode).length != 8) {
       return 'endereco';
     }
-    final person = collapse(responsibleName);
-    if (person.length < 2 || person.length > 50) return 'responsavel';
-    if (!adultBirth(birthDate.trim(), today ?? DateTime.now().toUtc())) {
-      return 'nascimento';
-    }
-    if (!RegExp(r'^([1-9][0-9])9[0-9]{8}$').hasMatch(digits(phone))) {
-      return 'celular';
-    }
-    final mail = email.trim().toLowerCase();
-    if (mail.length > 60 || !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(mail)) {
-      return 'email';
-    }
-    if (businessCategory == null ||
-        !pagbankBusinessCategoryLabels.containsKey(businessCategory)) {
-      return 'categoria';
-    }
     if (!termsAccepted) return 'termos';
     return null;
   }
 }
 
 const brazilianRegions = {
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS',
-  'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC',
-  'SP', 'SE', 'TO',
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
 };
 
 String digits(String value) => value.replaceAll(RegExp(r'\D'), '');

@@ -15,6 +15,7 @@ import 'package:scapematch_parceiro/features/partner/data/venue_payout_repositor
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/commission_admin_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_home_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
@@ -141,7 +142,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Conta de recebimento pendente'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(PartnerKeys.payoutPending)).height,
+      greaterThanOrEqualTo(48),
+    );
     await _capture(tester, find.byType(PartnerHome), 'parceiro-sem-subconta');
+
+    await tester.tap(find.byKey(PartnerKeys.payoutPending));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PartnerKeys.withdrawals), findsOneWidget);
+    expect(find.text(PartnerMessages.pagbankHaveAccount), findsOneWidget);
+    expect(find.byKey(PartnerKeys.pagbankSignupForm), findsNothing);
 
     await tester.pumpWidget(
       ProviderScope(

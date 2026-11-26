@@ -183,7 +183,16 @@ abstract final class PartnerKeys {
   static const venueDocumentUpload = Key('venue-document-upload');
   static const venueDocumentRefresh = Key('venue-document-refresh');
   static const pagbankSignup = Key('pagbank-signup');
+  static const pagbankSignupChoices = Key('pagbank-signup-choices');
+  static const pagbankHaveAccount = Key('pagbank-have-account');
+  static const pagbankNoAccount = Key('pagbank-no-account');
   static const pagbankSignupForm = Key('pagbank-signup-form');
+  static const pagbankSignupBack = Key('pagbank-signup-back');
+  static const pagbankSignupContinue = Key('pagbank-signup-continue');
+  static const pagbankSignupProgress = Key('pagbank-signup-progress');
+  static const pagbankSignupEnter = Key('pagbank-signup-enter');
+  static const pagbankSignupConnected = Key('pagbank-signup-connected');
+  static const pagbankSignupReview = Key('pagbank-signup-review');
   static const pagbankSignupCpf = Key('pagbank-signup-cpf');
   static const pagbankSignupCnpj = Key('pagbank-signup-cnpj');
   static const pagbankSignupDocument = Key('pagbank-signup-document');

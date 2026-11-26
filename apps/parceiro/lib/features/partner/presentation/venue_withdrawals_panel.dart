@@ -19,11 +19,13 @@ class VenueWithdrawalsPanel extends ConsumerStatefulWidget {
     required this.venueId,
     this.email,
     this.onOpenPagBank,
+    this.receivesPayments = false,
   });
 
   final String venueId;
   final String? email;
   final void Function(Uri uri)? onOpenPagBank;
+  final bool receivesPayments;
 
   static final pagBankUri = Uri.parse(PartnerMessages.receivePagBankUrl);
 
@@ -133,6 +135,13 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
         VenuePagbankSignupCard(
           venueId: widget.venueId,
           onOpen: widget.onOpenPagBank,
+          receivesPayments:
+              widget.receivesPayments ||
+              (_documents.known && _documents.approved),
+          inReview:
+              _documents.known &&
+              !_documents.approved &&
+              !widget.receivesPayments,
         ),
         const SizedBox(height: 28),
         Text(

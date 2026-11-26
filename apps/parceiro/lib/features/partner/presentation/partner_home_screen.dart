@@ -398,7 +398,12 @@ class _WithdrawalsSection extends StatelessWidget {
     final wide = isScapeDesktop(context);
     return ListView(
       padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 20, wide ? 32 : 16, 32),
-      children: [VenueWithdrawalsPanel(venueId: snapshot.house.id)],
+      children: [
+        VenueWithdrawalsPanel(
+          venueId: snapshot.house.id,
+          receivesPayments: snapshot.house.receivesPayments,
+        ),
+      ],
     );
   }
 }

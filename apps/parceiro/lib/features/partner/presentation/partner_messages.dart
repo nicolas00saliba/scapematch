@@ -348,9 +348,28 @@ abstract final class PartnerMessages {
   static const documentsBlockWithdraw =
       'A conta PagBank ainda não está aprovada. Sem essa aprovação o dinheiro não cai na conta da casa.';
   static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
-  static const pagbankSignupTitle = 'Cadastrar para receber pagamentos';
-  static const pagbankSignupManualBody =
-      'Preencha para conferir os dados. Eles não são enviados ao PagBank nem ficam salvos. A casa cria a conta na página oficial e depois conecta.';
+  static const pagbankChoicesTitle = 'Receber na conta PagBank';
+  static const pagbankChoicesBody =
+      'O dinheiro das reservas cai na conta PagBank da casa.';
+  static const pagbankHaveAccount = 'Já tenho conta PagBank';
+  static const pagbankHaveAccountHint = 'Entrar com PagBank';
+  static const pagbankNoAccount = 'Ainda não tenho conta';
+  static const pagbankNoAccountHint = 'Criar conta PagBank';
+  static const pagbankConnectTitle = 'Entrar com PagBank';
+  static const pagbankConnectBody =
+      'Autorize a casa na PagBank. O dinheiro das reservas cai nessa conta.';
+  static const pagbankCreateTitle = 'Criar conta PagBank';
+  static const pagbankCreateManualBody =
+      'A casa cria a conta na página oficial do PagBank. Depois volte e entre com PagBank para conectar.';
+  static const pagbankConnectedTitle = 'Conta PagBank conectada';
+  static const pagbankConnectedBody =
+      'O dinheiro das reservas cai na conta PagBank da casa.';
+  static const pagbankReviewTitle = 'Conta PagBank em análise';
+  static const pagbankReviewBody =
+      'A PagBank ainda está conferindo a conta. O dinheiro das reservas cai nela depois da aprovação.';
+  static const pagbankSignupBack = 'Voltar';
+  static const pagbankSignupContinue = 'Continuar';
+  static String pagbankSignupStep(int step) => 'Passo $step de 3';
   static const pagbankSignupApiBody =
       'Os dados seguem para a PagBank pelo servidor. O EscapeMatch não guarda CPF, CNPJ, endereço nem contato.';
   static const pagbankSignupLoading = 'Carregando o cadastro';
@@ -358,7 +377,6 @@ abstract final class PartnerMessages {
       'Li e aceito os termos de uso e a política de privacidade do PagBank.';
   static const pagbankSignupTermsLink = 'Termos de uso';
   static const pagbankSignupPrivacyLink = 'Política de privacidade';
-  static const pagbankSignupSubmitManual = 'Continuar';
   static const pagbankSignupSubmitApi = 'Cadastrar conta PagBank';
   static const pagbankSignupOpenOfficial = 'Criar conta no PagBank';
   static const pagbankSignupConnect = 'Conectar conta PagBank';
