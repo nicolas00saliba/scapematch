@@ -87,6 +87,12 @@ abstract final class PartnerKeys {
   static const savePlatformCommission = Key('save-platform-commission');
   static Key retryVenueWallet(String id) => Key('retry-venue-wallet-$id');
   static Key saveVenueCommission(String id) => Key('save-venue-commission-$id');
+  static const pagbankBalance = Key('pagbank-balance');
+  static const pagbankBalanceAvailable = Key('pagbank-balance-available');
+  static const pagbankBalanceBlocked = Key('pagbank-balance-blocked');
+  static const pagbankBalanceHeld = Key('pagbank-balance-held');
+  static const pagbankBalanceUnavailable = Key('pagbank-balance-unavailable');
+  static const reservationsLedger = Key('reservations-ledger');
   static const partnerNet = Key('partner-net');
   static const partnerGross = Key('partner-gross');
   static const partnerCommission = Key('partner-commission');

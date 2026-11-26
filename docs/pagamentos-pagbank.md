@@ -57,7 +57,9 @@ Não aplicar isto daqui. O dono aprova.
 
 ## Connect da casa
 
-`provision-venue-wallet` devolve `connect_url`. A casa autoriza em `https://connect.pagbank.com.br/oauth2/authorize` com os escopos `payments.read payments.create payments.refund accounts.read`. O `state` é aleatório, vale 10 minutos, só serve uma vez e fica preso ao usuário que pediu o link. O Parceiro e o Admin leem `code` e `state` em `/pagbank/retorno` e chamam `pagbank-connect`. A função confere o state, grava `pagbank_account_id` e cifra o access token e o refresh token. Não cria subconta. Casa que já tinha carteira antiga fica sem conta PagBank até passar por esse fluxo.
+`provision-venue-wallet` devolve `connect_url`. A casa autoriza em `https://connect.pagbank.com.br/oauth2/authorize` com os escopos `payments.read payments.create payments.refund accounts.read`. O `state` é aleatório, vale 10 minutos, só serve uma vez e fica preso ao usuário que pediu o link. O Parceiro e o Admin leem `code` e `state` em `/pagbank/retorno` e chamam `pagbank-connect`. A função confere o state, grava `pagbank_account_id` e cifra o access token e o refresh token. `receives_payments` passa a valer nesse momento. Não cria subconta. Casa que já tinha carteira antiga fica sem conta PagBank até passar por esse fluxo.
+
+O saldo que o Parceiro mostra é o da conta conectada: `venue-pagbank-balance` chama `GET /accounts/balance` com o access token da casa, no servidor. A resposta pode trazer disponível, bloqueado e retido. 401, 403 e 404 (a consulta ainda não liberada na homologação) não devolvem número. A tela avisa que o saldo PagBank está indisponível e mostra o livro como estimativa, em "Reservas no EscapeMatch". Publicar `venue-pagbank-balance`. O pedido de escopo não muda: a [autorização Connect](https://developer.pagbank.com.br/docs/connect-authorization) lista `accounts.read` para os dados da conta do vendedor e não tem escopo separado de saldo. `payments.read`, `payments.create` e `payments.refund` continuam os das cobranças.
 
 O access token é renovado quando falta menos de dois minutos para vencer, e de novo se a PagBank responde 401.
 

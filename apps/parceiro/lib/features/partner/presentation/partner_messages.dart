@@ -89,8 +89,21 @@ abstract final class PartnerMessages {
   static const noSessions = 'Nada neste dia.';
   static const noShows = 'Faltas';
   static const balanceTitle = 'Saldo da casa';
+  static const balanceIntro =
+      'O saldo da conta PagBank da casa fica aqui. As reservas do EscapeMatch ficam no livro, separadas.';
   static const balanceBody =
       'O líquido é o que fica com a casa depois da comissão. O valor reservado só entra quando o grupo confirma.';
+  static const pagbankBalanceTitle = 'Saldo do PagBank';
+  static const pagbankBalanceAvailable = 'Disponível';
+  static const pagbankBalanceBlocked = 'Bloqueado';
+  static const pagbankBalanceHeld = 'Retido';
+  static const pagbankBalanceUnavailable =
+      'Saldo do PagBank ainda indisponível';
+  static const pagbankBalanceUnavailableBody =
+      'A consulta de saldo ainda não foi liberada pela PagBank.';
+  static const reservationsLedgerTitle = 'Reservas no EscapeMatch';
+  static const reservationsLedgerEstimated =
+      'Estimativa. Não é o saldo da conta PagBank.';
   static const netLabel = 'Líquido';
   static const grossLabel = 'Bruto';
   static const commissionLabel = 'Comissão';

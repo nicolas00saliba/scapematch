@@ -308,7 +308,7 @@ class _VenuePagbankSignupCardState
           .connect(widget.venueId);
       if (!mounted) return;
       setState(() => _busy = false);
-      (widget.onOpen ?? launchExternalUrl)(uri);
+      (widget.onOpen ?? launchPagbankConnect)(uri);
     } on PagbankSignupException catch (error) {
       if (!mounted) return;
       setState(() {

@@ -77,6 +77,7 @@ Deno.test("code sem state válido não troca token", async () => {
 
 Deno.test("o retorno grava o refresh token e não devolve o access", async () => {
   const saved: { refresh: string; expires: string | null }[] = [];
+  const accounts: string[] = [];
   const done = await completePagbankConnect({
     userId: user,
     code: "code-1",
@@ -102,13 +103,17 @@ Deno.test("o retorno grava o refresh token e não devolve o access", async () =>
         accountId: "ACCO_CASA",
       });
     },
-    saveAccount: () => Promise.resolve(),
+    saveAccount: (_venueId, accountId) => {
+      accounts.push(accountId);
+      return Promise.resolve();
+    },
     saveTokens: (_venueId, tokens) => {
       saved.push({ refresh: tokens.refreshToken, expires: tokens.expiresAt });
       return Promise.resolve();
     },
   });
   assertEquals(done.venueId, venue);
+  assertEquals(accounts, ["ACCO_CASA"]);
   assertEquals(saved[0].refresh, "refresh-secreto");
   assert(saved[0].expires);
   assertEquals(JSON.stringify(done).includes("access-secreto"), false);

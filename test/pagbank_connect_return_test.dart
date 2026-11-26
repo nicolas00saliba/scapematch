@@ -30,6 +30,7 @@ void main() {
 
   testWidgets('a página troca o code e o state uma vez', (tester) async {
     final seen = <PagbankConnectReturn>[];
+    var done = 0;
     await tester.pumpWidget(
       MaterialApp(
         home: PagbankConnectReturnPage(
@@ -38,7 +39,7 @@ void main() {
             seen.add(hit);
             return true;
           },
-          onDone: () {},
+          onDone: () => done += 1,
         ),
       ),
     );
@@ -47,6 +48,23 @@ void main() {
     expect(seen, hasLength(1));
     expect(seen.single.code, 'code-1');
     expect(seen.single.state, 'state-1');
+    expect(done, 1);
     expect(find.text('A casa está ligada à PagBank.'), findsOneWidget);
+  });
+
+  testWidgets('falha no retorno não segue sozinha', (tester) async {
+    var done = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PagbankConnectReturnPage(
+          hit: const PagbankConnectReturn(code: 'code-1', state: 'state-1'),
+          complete: (_) async => false,
+          onDone: () => done += 1,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(done, 0);
+    expect(find.text('Continuar'), findsOneWidget);
   });
 }

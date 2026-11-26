@@ -20,6 +20,8 @@ import 'package:scapematch_parceiro/features/partner/data/partner_repository.dar
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_statement.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_agenda_screen.dart';
+import 'package:scapematch_parceiro/features/partner/data/venue_pagbank_balance.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/venue_pagbank_balance_card.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_payout_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_withdrawals_panel.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/empty_slot_card.dart';
@@ -314,14 +316,19 @@ class _PartnerTabs extends ConsumerWidget {
   }
 }
 
-class _BalanceSection extends StatelessWidget {
+class _BalanceSection extends ConsumerWidget {
   const _BalanceSection({required this.snapshot});
 
   final PartnerSnapshot snapshot;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final balance = snapshot.house.receivesPayments
+        ? ref.watch(venuePagbankBalanceProvider(snapshot.house.id))
+        : const AsyncData<VenuePagbankBalance>(VenuePagbankBalance.absent());
+    final estimate = pagbankBalanceIsEstimate(balance);
     final wide = isScapeDesktop(context);
+    final theme = Theme.of(context);
     return ListView(
       padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 20, wide ? 32 : 16, 32),
       children: [
@@ -329,13 +336,14 @@ class _BalanceSection extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           PartnerMessages.balanceTitle,
-          style: Theme.of(context).textTheme.headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w800),
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
-          PartnerMessages.balanceBody,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.35),
+          PartnerMessages.balanceIntro,
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
         ),
         const SizedBox(height: 8),
         const _OpenWithdrawalsLink(),
@@ -343,6 +351,27 @@ class _BalanceSection extends StatelessWidget {
         const VenueReferralCode(),
         const SizedBox(height: 16),
         EmptySlotCard(venueId: snapshot.house.id),
+        const SizedBox(height: 16),
+        VenuePagbankBalanceCard(balance: balance),
+        Text(
+          PartnerMessages.reservationsLedgerTitle,
+          key: PartnerKeys.reservationsLedger,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (estimate) ...[
+          const SizedBox(height: 6),
+          Text(
+            PartnerMessages.reservationsLedgerEstimated,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+          ),
+        ],
+        const SizedBox(height: 6),
+        Text(
+          PartnerMessages.balanceBody,
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+        ),
         const SizedBox(height: 16),
         _MoneyGrid(snapshot: snapshot),
         const SizedBox(height: 24),
