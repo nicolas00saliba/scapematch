@@ -12,7 +12,8 @@ const googlePopupBlockedMessage =
 const googleProviderOffMessage =
     'A entrada com Google ainda não está disponível.';
 
-const googleExampleMessage = 'Neste exemplo a entrada com Google não conecta.';
+const googleExampleMessage =
+    'Neste exemplo a entrada com Google não conecta.';
 
 const googleGenericMessage =
     'Não foi possível entrar com o Google. Tente de novo.';
