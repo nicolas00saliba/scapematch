@@ -1,6 +1,6 @@
 # EscapeMatch
 
-> EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
+> EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga. O site público é https://escapematch.com.br, o app do jogador é https://app.escapematch.com.br/ e a área da casa é https://parceiro.escapematch.com.br/. Todo o texto público do site está em português do Brasil.
 
 Este arquivo descreve o que o site e as regras publicadas afirmam. App para achar grupo e jogar escape room sozinho no Brasil. O app está começando com as primeiras casas e vai crescer. Não é só Curitiba. O Instagram oficial é https://www.instagram.com/escapematch/. O grupo de quem não tem equipe para jogar escape room em Curitiba está em https://www.meetup.com/pt-br/escaperoomcuritiba/. Não há perfil oficial de TikTok ou LinkedIn publicado no repositório. A EscapeMatch foi fundada por Nícolas R. Saliba, organizador do Meetup Escape Room Curitiba.
 
@@ -8,7 +8,7 @@ A marca também é escrita Escape Match e escapematch. Não confundir com jogos 
 
 ## O que é
 
-EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular. App para achar grupo e jogar escape room sozinho no Brasil.
+EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga. App para achar grupo e jogar escape room sozinho no Brasil.
 
 O EscapeMatch junta pessoas que querem jogar e não têm um grupo. O uso principal é chegar sozinho e entrar num time. Quem já tem turma pode completar as vagas que faltam. Esse uso é secundário.
 
