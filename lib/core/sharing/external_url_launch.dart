@@ -16,3 +16,17 @@ Future<bool> launchExternalUrl(Uri uri) async {
     return false;
   }
 }
+
+/// OAuth da PagBank na mesma aba. O retorno em `/pagbank/retorno`
+/// grava a conta e abre o painel já ligado, sem outro passo.
+Future<bool> launchPagbankConnect(Uri uri) async {
+  try {
+    return await launchUrl(
+      uri,
+      mode: LaunchMode.platformDefault,
+      webOnlyWindowName: '_self',
+    );
+  } catch (_) {
+    return false;
+  }
+}

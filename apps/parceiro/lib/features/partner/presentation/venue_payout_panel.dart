@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_payout_repository.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 /// Status da subconta de cada casa e a nova tentativa de criação.
@@ -98,23 +99,51 @@ class _VenuePayoutPanelState extends ConsumerState<VenuePayoutPanel> {
   }
 }
 
-/// Faixa da casa que ainda não recebe pagamento.
-class PayoutPendingBanner extends StatelessWidget {
+/// Faixa da casa que ainda não recebe pagamento. O toque abre Receber.
+class PayoutPendingBanner extends ConsumerWidget {
   const PayoutPendingBanner({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    return Material(
-      key: PartnerKeys.payoutPending,
-      color: scheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Text(
-          'Conta de recebimento pendente',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: scheme.onErrorContainer,
-            fontWeight: FontWeight.w800,
+    final text = Theme.of(context).textTheme.titleSmall
+        ?.copyWith(color: scheme.onErrorContainer, fontWeight: FontWeight.w800);
+    return Semantics(
+      button: true,
+      label: 'Conta de recebimento pendente. Abre a aba Receber.',
+      child: SizedBox(
+        width: double.infinity,
+        child: Material(
+          key: PartnerKeys.payoutPending,
+          color: scheme.errorContainer,
+          child: InkWell(
+            onTap: () {
+              ref
+                  .read(partnerSectionProvider.notifier)
+                  .select(PartnerSection.withdrawals);
+            },
+            child: ExcludeSemantics(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Conta de recebimento pendente',
+                          style: text,
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: scheme.onErrorContainer),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

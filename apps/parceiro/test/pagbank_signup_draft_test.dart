@@ -99,4 +99,79 @@ void main() {
       'categoria',
     );
   });
+
+  test('cada passo só cobra os campos daquele passo', () {
+    expect(
+      PagbankSignupDraft.stepIssue(
+        step: 0,
+        documentKind: 'cpf',
+        documentNumber: '52998224725',
+        companyName: '',
+        postalCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        locality: '',
+        city: '',
+        regionCode: '',
+        responsibleName: '',
+        responsibleCpf: '',
+        birthDate: '',
+        phone: '',
+        email: '',
+        businessCategory: null,
+        termsAccepted: false,
+        today: clock,
+      ),
+      isNull,
+    );
+    expect(
+      PagbankSignupDraft.stepIssue(
+        step: 1,
+        documentKind: 'cpf',
+        documentNumber: '52998224725',
+        companyName: '',
+        postalCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        locality: '',
+        city: '',
+        regionCode: '',
+        responsibleName: 'Ana Souza',
+        responsibleCpf: '',
+        birthDate: '1991-10-10',
+        phone: '11987654321',
+        email: 'ana@casa.example',
+        businessCategory: 'ENTERTAINMENT',
+        termsAccepted: false,
+        today: clock,
+      ),
+      'razao',
+    );
+    expect(
+      PagbankSignupDraft.stepIssue(
+        step: 2,
+        documentKind: 'cpf',
+        documentNumber: '52998224725',
+        companyName: 'Casa Escape',
+        postalCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        locality: '',
+        city: '',
+        regionCode: '',
+        responsibleName: 'Ana Souza',
+        responsibleCpf: '',
+        birthDate: '1991-10-10',
+        phone: '11987654321',
+        email: 'ana@casa.example',
+        businessCategory: 'ENTERTAINMENT',
+        termsAccepted: true,
+        today: clock,
+      ),
+      'endereco',
+    );
+  });
 }

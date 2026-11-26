@@ -89,8 +89,21 @@ abstract final class PartnerMessages {
   static const noSessions = 'Nada neste dia.';
   static const noShows = 'Faltas';
   static const balanceTitle = 'Saldo da casa';
+  static const balanceIntro =
+      'O saldo da conta PagBank da casa fica aqui. As reservas do EscapeMatch ficam no livro, separadas.';
   static const balanceBody =
       'O líquido é o que fica com a casa depois da comissão. O valor reservado só entra quando o grupo confirma.';
+  static const pagbankBalanceTitle = 'Saldo do PagBank';
+  static const pagbankBalanceAvailable = 'Disponível';
+  static const pagbankBalanceBlocked = 'Bloqueado';
+  static const pagbankBalanceHeld = 'Retido';
+  static const pagbankBalanceUnavailable =
+      'Saldo do PagBank ainda indisponível';
+  static const pagbankBalanceUnavailableBody =
+      'A consulta de saldo ainda não foi liberada pela PagBank.';
+  static const reservationsLedgerTitle = 'Reservas no EscapeMatch';
+  static const reservationsLedgerEstimated =
+      'Estimativa. Não é o saldo da conta PagBank.';
   static const netLabel = 'Líquido';
   static const grossLabel = 'Bruto';
   static const commissionLabel = 'Comissão';
@@ -269,7 +282,7 @@ abstract final class PartnerMessages {
       '1. O valor fica disponível na sua conta PagBank, a mesma ligada pelo Connect.';
   static const receiveStepMenu = '2. Abra o app PagBank para ver o saldo.';
   static const receiveStepDestination =
-      '3. Se quiser mandar para outro banco, faça um Pix manual. Não há saque automático.';
+      '3. No app do PagBank, transfira para qualquer conta, mesmo de outro CPF ou CNPJ.';
   static const receiveStepEnable = '4. O EscapeMatch não transfere esse valor.';
   static const receiveOpenPagBank = 'Abrir o PagBank';
   static const receivePagBankUrl = 'https://pagbank.com.br/';
@@ -348,9 +361,28 @@ abstract final class PartnerMessages {
   static const documentsBlockWithdraw =
       'A conta PagBank ainda não está aprovada. Sem essa aprovação o dinheiro não cai na conta da casa.';
   static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
-  static const pagbankSignupTitle = 'Cadastrar para receber pagamentos';
-  static const pagbankSignupManualBody =
-      'Preencha para conferir os dados. Eles não são enviados ao PagBank nem ficam salvos. A casa cria a conta na página oficial e depois conecta.';
+  static const pagbankChoicesTitle = 'Entre no PagBank para ver seu saldo';
+  static const pagbankChoicesBody =
+      'Os ganhos da sua casa caem direto na sua conta PagBank.';
+  static const pagbankWithdrawHint =
+      'Para sacar, use o app do PagBank e transfira para qualquer conta.';
+  static const pagbankHaveAccount = 'Entrar no PagBank';
+  static const pagbankNoAccount = 'Criar conta PagBank';
+  static const pagbankConnectTitle = 'Entrar com PagBank';
+  static const pagbankConnectBody =
+      'Autorize a casa na PagBank. O dinheiro das reservas cai nessa conta.';
+  static const pagbankCreateTitle = 'Criar conta PagBank';
+  static const pagbankCreateManualBody =
+      'A casa cria a conta na página oficial do PagBank. Depois volte e entre com PagBank para conectar.';
+  static const pagbankConnectedTitle = 'Conta PagBank conectada';
+  static const pagbankConnectedBody =
+      'O dinheiro das reservas cai na conta PagBank da casa.';
+  static const pagbankReviewTitle = 'Conta PagBank em análise';
+  static const pagbankReviewBody =
+      'A PagBank ainda está conferindo a conta. O dinheiro das reservas cai nela depois da aprovação.';
+  static const pagbankSignupBack = 'Voltar';
+  static const pagbankSignupContinue = 'Continuar';
+  static String pagbankSignupStep(int step) => 'Passo $step de 3';
   static const pagbankSignupApiBody =
       'Os dados seguem para a PagBank pelo servidor. O EscapeMatch não guarda CPF, CNPJ, endereço nem contato.';
   static const pagbankSignupLoading = 'Carregando o cadastro';
@@ -358,7 +390,6 @@ abstract final class PartnerMessages {
       'Li e aceito os termos de uso e a política de privacidade do PagBank.';
   static const pagbankSignupTermsLink = 'Termos de uso';
   static const pagbankSignupPrivacyLink = 'Política de privacidade';
-  static const pagbankSignupSubmitManual = 'Continuar';
   static const pagbankSignupSubmitApi = 'Cadastrar conta PagBank';
   static const pagbankSignupOpenOfficial = 'Criar conta no PagBank';
   static const pagbankSignupConnect = 'Conectar conta PagBank';

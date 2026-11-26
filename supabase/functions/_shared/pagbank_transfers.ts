@@ -83,6 +83,90 @@ export function readAccountBalance(body: Record<string, unknown>): AccountBalanc
   throw new Error("Resposta da PagBank sem balance");
 }
 
+export type SellerBalance = {
+  availableCents: number;
+  blockedCents: number | null;
+  heldCents: number | null;
+  exact: boolean;
+};
+
+/// Saldo do vendedor em GET /accounts/balance.
+/// A página pública não lista os campos; lemos os que a resposta trouxer.
+/// Unidade igual à de [readAccountBalance]: real decimal, nunca um número inventado.
+export function readSellerBalance(body: Record<string, unknown>): SellerBalance {
+  const fromList = readBalanceList(body.balances);
+  if (fromList) return fromList;
+  const available = firstMoney(body, [
+    "available",
+    "available_amount",
+    "balance",
+  ]) ?? moneyOf(body.amount);
+  if (!available) throw new Error("Resposta da PagBank sem balance");
+  const blocked = firstMoney(body, ["blocked", "blocked_amount"]);
+  const held = firstMoney(body, [
+    "withheld",
+    "withheld_amount",
+    "waiting_funds",
+    "held",
+    "held_amount",
+  ]);
+  return {
+    availableCents: available.cents,
+    blockedCents: blocked?.cents ?? null,
+    heldCents: held?.cents ?? null,
+    exact: available.exact && (blocked?.exact ?? true) && (held?.exact ?? true),
+  };
+}
+
+function readBalanceList(value: unknown): SellerBalance | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  let available: { cents: number; exact: boolean } | null = null;
+  let blocked: { cents: number; exact: boolean } | null = null;
+  let held: { cents: number; exact: boolean } | null = null;
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const type = String(row.type ?? "").trim().toUpperCase();
+    const money = moneyOf(row.amount ?? row.balance ?? row.value);
+    if (!money) continue;
+    if (type === "AVAILABLE") available = money;
+    else if (type === "BLOCKED") blocked = money;
+    else if (type === "WITHHELD" || type === "WAITING_FUNDS" || type === "HELD") {
+      held = money;
+    }
+  }
+  if (!available) return null;
+  return {
+    availableCents: available.cents,
+    blockedCents: blocked?.cents ?? null,
+    heldCents: held?.cents ?? null,
+    exact: available.exact && (blocked?.exact ?? true) && (held?.exact ?? true),
+  };
+}
+
+function firstMoney(
+  body: Record<string, unknown>,
+  keys: string[],
+): { cents: number; exact: boolean } | null {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    const money = moneyOf(body[key]);
+    if (money) return money;
+  }
+  return null;
+}
+
+function moneyOf(value: unknown): { cents: number; exact: boolean } | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return parseReaisDecimal(value);
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if ("value" in record) return moneyOf(record.value);
+  if ("amount" in record) return moneyOf(record.amount);
+  return null;
+}
+
 export function centsToReais(cents: number): number {
   return Math.round(cents) / 100;
 }

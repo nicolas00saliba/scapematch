@@ -41,6 +41,7 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
       _busy = false;
       _linked = linked;
     });
+    if (linked) widget.onDone();
   }
 
   @override
