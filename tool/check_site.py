@@ -155,6 +155,13 @@ EXTERNOS = {
     "https://www.meetup.com/escaperoomcuritiba/",
     INSTAGRAM,
     MEETUP,
+    # Sites oficiais das casas parceiras (carrossel da home).
+    "https://ninjaescaperoom.com.br/",
+    "https://cwb.puzzleroom.com.br/",
+    "https://synapseescaperoom.com.br/",
+    "https://fabricaescape.com.br/",
+    "https://www.minosescaperoom.com.br/",
+    "https://escapemaster.com.br/",
 }
 
 
@@ -1127,6 +1134,7 @@ CASAS_PARCEIRAS = (
     "Synapse Escape Room",
     "Fábrica Escape Room",
     "Minos Escape Room",
+    "Escape Master",
 )
 
 
@@ -1143,14 +1151,24 @@ def conferir_parceiras() -> None:
     for img in re.findall(r"<img[^>]*parceiras/[^>]*>", home):
         if "width=" not in img or "height=" not in img or 'loading="lazy"' not in img:
             falha(f"logo parceiro sem width/height/lazy: {img[:80]}")
+    links = re.findall(r'<a [^>]*rel="noopener"[^>]*>', home)
+    abertos = [a for a in links if 'target="_blank"' in a and "aria-label=" in a]
+    if len(abertos) != 4 * len(CASAS_PARCEIRAS):
+        falha(f"esperava {4 * len(CASAS_PARCEIRAS)} links de parceiras com target/rel/aria-label, achei {len(abertos)}")
+    if sum('tabindex="-1"' in a for a in abertos) != 3 * len(CASAS_PARCEIRAS):
+        falha("links das cópias do laço precisam de tabindex=-1")
+    for css in (DIST / "_astro").glob("*.css"):
+        if "animation-play-state" in css.read_text():
+            falha(f"{css.name} pausa animação; o carrossel não pode parar no hover")
     pasta = DIST / "assets" / "parceiras"
-    for id_ in ("ninja", "puzzle", "synapse", "fabrica", "minos"):
+    for id_ in ("ninja", "puzzle", "synapse", "fabrica", "minos", "escapemaster"):
         for ext in ("png", "webp"):
             if not (pasta / f"{id_}.{ext}").is_file():
                 falha(f"assets/parceiras/{id_}.{ext} ausente")
-    for id_ in ("ninja", "puzzle", "synapse", "fabrica", "minos"):
+    for id_ in ("ninja", "puzzle", "synapse", "fabrica", "minos", "escapemaster"):
         largura, altura = png_tamanho(pasta / f"{id_}.png")
-        if altura < 112:
+        # A Escape Master só publica 180x70; o piso vale para as demais.
+        if altura < 112 and id_ != "escapemaster":
             falha(f"logo {id_} com altura {altura}px, abaixo de 2x a altura exibida")
 
 

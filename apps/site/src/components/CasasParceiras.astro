@@ -14,17 +14,25 @@ const grupos = [0, 1, 2, 3];
         <ul class="parceiras-grupo" aria-hidden={g === 0 ? undefined : 'true'}>
           {casasParceiras.map((casa) => (
             <li class={`parceira parceira-${casa.id}`}>
-              <picture>
-                <source srcset={`/assets/parceiras/${casa.id}.webp`} type="image/webp" />
-                <img
-                  src={`/assets/parceiras/${casa.id}.png`}
-                  alt={g === 0 ? casa.nome : ''}
-                  width={casa.largura}
-                  height={casa.altura}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </picture>
+              <a
+                href={casa.site}
+                target="_blank"
+                rel="noopener"
+                aria-label={casa.nome}
+                tabindex={g === 0 ? undefined : -1}
+              >
+                <picture>
+                  <source srcset={`/assets/parceiras/${casa.id}.webp`} type="image/webp" />
+                  <img
+                    src={`/assets/parceiras/${casa.id}.png`}
+                    alt={g === 0 ? casa.nome : ''}
+                    width={casa.largura}
+                    height={casa.altura}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
+              </a>
             </li>
           ))}
         </ul>
