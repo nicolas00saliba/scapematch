@@ -87,11 +87,13 @@ begin
 end $$;
 
 -- Só aparece a cidade com casa aprovada e não suspensa, e a view respeita a RLS.
+-- Os testes de corrida anteriores deixam linhas gravadas; por isso a conferência
+-- é por cidade (londrina-pr e campinas-sp), nunca pela contagem total.
 do $$
 declare
   v_owner uuid := 'c3610000-0000-4000-8000-0000000000b1';
-  v_names text;
-  v_count integer;
+  v_venue uuid := 'c3620000-0000-4000-8000-000000000001';
+  v_seen boolean;
 begin
   insert into auth.users (id, email, raw_user_meta_data)
   values (v_owner, 'cidades-dono@example.com', '{"display_name":"Dono"}');
@@ -101,49 +103,52 @@ begin
     postal_code, latitude, longitude, income_value, document_kind,
     document_number, phone, status
   ) values
-    ('c3620000-0000-4000-8000-000000000001', v_owner, 'curitiba', 'Casa Aprovada',
-     'Centro', 'Rua A', '1', '80010020', -25.43, -49.27, 5000, 'cnpj',
-     '61234567000389', '4130002611', 'approved'),
+    (v_venue, v_owner, 'londrina-pr', 'Casa Aprovada',
+     'Centro', 'Rua A', '1', '86010000', -23.30, -51.17, 5000, 'cnpj',
+     '61234567000389', '4330002611', 'approved'),
     ('c3620000-0000-4000-8000-000000000002', v_owner, 'campinas-sp', 'Casa Pendente',
      'Centro', 'Rua B', '2', '13010000', -22.9, -47.06, 5000, 'cnpj',
      '71234567000380', '1930002611', 'pending');
 
-  select count(*) into v_count from public.cities_with_active_venues;
-  if v_count <> 1 then
-    raise exception 'esperava 1 cidade com casa ativa, veio %', v_count;
+  select exists (select 1 from public.cities_with_active_venues where id = 'londrina-pr')
+    into v_seen;
+  if not v_seen then
+    raise exception 'cidade com casa aprovada não apareceu';
+  end if;
+  select exists (select 1 from public.cities_with_active_venues where id = 'campinas-sp')
+    into v_seen;
+  if v_seen then
+    raise exception 'casa pendente abriu a cidade';
   end if;
 
-  update public.venues
-  set suspended_at = now()
-  where id = 'c3620000-0000-4000-8000-000000000001';
-  select count(*) into v_count from public.cities_with_active_venues;
-  if v_count <> 0 then
+  update public.venues set suspended_at = pg_catalog.now() where id = v_venue;
+  select exists (select 1 from public.cities_with_active_venues where id = 'londrina-pr')
+    into v_seen;
+  if v_seen then
     raise exception 'casa suspensa não pode abrir a cidade';
   end if;
-  update public.venues
-  set suspended_at = null
-  where id = 'c3620000-0000-4000-8000-000000000001';
+  update public.venues set suspended_at = null where id = v_venue;
+end $$;
 
-  set local role anon;
-  select string_agg(id, ',') into v_names from public.cities_with_active_venues;
-  reset role;
-  if v_names is distinct from 'curitiba' then
-    raise exception 'anon deveria ver só curitiba, viu %', v_names;
+set local role anon;
+
+do $$
+declare
+  v_seen boolean;
+  v_other integer;
+begin
+  select exists (select 1 from public.cities_with_active_venues where id = 'londrina-pr')
+    into v_seen;
+  if not v_seen then
+    raise exception 'anon não viu a cidade com casa aprovada';
   end if;
-
-  set local role anon;
-  begin
-    perform 1 from public.cities_with_active_venues where id = 'campinas-sp';
-    select count(*) into v_count
-    from public.cities_with_active_venues where id = 'campinas-sp';
-  exception when others then
-    reset role;
-    raise;
-  end;
-  reset role;
-  if v_count <> 0 then
-    raise exception 'casa pendente não abre cidade para o anon';
+  select count(*) into v_other
+  from public.cities_with_active_venues where id = 'campinas-sp';
+  if v_other <> 0 then
+    raise exception 'anon viu cidade só com casa pendente';
   end if;
 end $$;
+
+reset role;
 
 rollback;
