@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:scapematch/features/cities/domain/city.dart';
 import 'package:scapematch_admin/admin_format.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,6 +19,9 @@ abstract class AdminApi {
   Future<ReviewResult> reviewVenue(String id, String decision);
   Future<void> suspendVenue(String id, bool suspended);
   Future<VenueProfile> updateVenue(String id, Map<String, Object?> patch);
+
+  /// Municípios de uma UF, do catálogo do servidor (public.cities).
+  Future<List<City>> cities(String stateCode);
   Future<void> setCommission({String? venueId, required int bps});
   Future<List<PlayerRow>> players(String? query);
   Future<PlayerProfile> player(String id);
@@ -150,10 +154,22 @@ class VenueProfile {
     required this.commissionOverride,
     required this.rooms,
     required this.snapshots,
+    this.cityName = '',
+    this.cityStateCode = '',
+    this.isTest = false,
+    this.officialEmail = '',
+    this.officialPhone = '',
+    this.mergedInto = '',
   });
   final String id;
   final String name;
   final String cityId;
+  final String cityName;
+  final String cityStateCode;
+  final bool isTest;
+  final String officialEmail;
+  final String officialPhone;
+  final String mergedInto;
   final String neighborhood;
   final String streetAddress;
   final String addressNumber;
@@ -631,6 +647,12 @@ class SupabaseAdminApi implements AdminApi {
       id: _text(row['id']),
       name: _text(row['name']),
       cityId: _text(row['city_id']),
+      cityName: _text(row['city_name']),
+      cityStateCode: _text(row['city_state_code']),
+      isTest: row['is_test'] == true,
+      officialEmail: _text(row['official_email']),
+      officialPhone: _text(row['official_phone']),
+      mergedInto: _text(row['merged_into']),
       neighborhood: _text(row['neighborhood']),
       streetAddress: _text(row['street_address']),
       addressNumber: _text(row['address_number']),
@@ -700,6 +722,26 @@ class SupabaseAdminApi implements AdminApi {
         await _rpc('admin_update_venue', {'p_venue_id': id, 'p_patch': patch}),
       ),
     );
+  }
+
+  @override
+  Future<List<City>> cities(String stateCode) async {
+    // Uma UF tem no máximo 853 municípios (MG), abaixo do corte de 1000
+    // linhas da API.
+    final rows = await _client
+        .from('cities')
+        .select('id, name, state_code, state_name')
+        .eq('state_code', stateCode.toUpperCase())
+        .order('name');
+    return [
+      for (final row in rows)
+        City(
+          id: _text(row['id']),
+          name: _text(row['name']),
+          stateCode: _text(row['state_code']),
+          stateName: _text(row['state_name']),
+        ),
+    ];
   }
 
   @override
@@ -1320,6 +1362,8 @@ class MemoryAdminApi implements AdminApi {
           id: 'casa-ninja',
           name: 'Ninja Escape',
           cityId: 'curitiba',
+          cityName: 'Curitiba',
+          cityStateCode: 'PR',
           neighborhood: 'Batel',
           streetAddress: 'Rua do Pinheiro',
           addressNumber: '20',
@@ -1357,6 +1401,8 @@ class MemoryAdminApi implements AdminApi {
           id: 'casa-pendente',
           name: 'Casa da Fila',
           cityId: 'curitiba',
+          cityName: 'Curitiba',
+          cityStateCode: 'PR',
           neighborhood: 'Centro',
           streetAddress: 'Rua da Fila',
           addressNumber: '11',
@@ -1502,6 +1548,12 @@ class MemoryAdminApi implements AdminApi {
     String? category,
     String? badge,
     String? cityId,
+    String? cityName,
+    String? cityStateCode,
+    bool? isTest,
+    String? officialEmail,
+    String? officialPhone,
+    String? mergedInto,
     int? commissionBps,
     bool? commissionOverride,
     List<NamedRank>? rooms,
@@ -1510,6 +1562,15 @@ class MemoryAdminApi implements AdminApi {
       id: house.id,
       name: name ?? house.name,
       cityId: cityId ?? house.cityId,
+      cityName:
+          cityName ?? (cityId == null ? house.cityName : _cityName(cityId)),
+      cityStateCode:
+          cityStateCode ??
+          (cityId == null ? house.cityStateCode : _cityState(cityId)),
+      isTest: isTest ?? house.isTest,
+      officialEmail: officialEmail ?? house.officialEmail,
+      officialPhone: officialPhone ?? house.officialPhone,
+      mergedInto: mergedInto ?? house.mergedInto,
       neighborhood: neighborhood ?? house.neighborhood,
       streetAddress: streetAddress ?? house.streetAddress,
       addressNumber: addressNumber ?? house.addressNumber,
@@ -1535,6 +1596,35 @@ class MemoryAdminApi implements AdminApi {
   void _replace(VenueProfile next) {
     final index = houses.indexWhere((house) => house.id == next.id);
     houses[index] = next;
+  }
+
+  void markTest(String id, bool enabled) {
+    final index = houses.indexWhere((house) => house.id == id);
+    if (index < 0) return;
+    houses[index] = _copy(houses[index], isTest: enabled);
+  }
+
+  void markMerged(String sourceId, String targetId) {
+    final index = houses.indexWhere((house) => house.id == sourceId);
+    if (index < 0) return;
+    if (!houses.any((house) => house.id == targetId)) {
+      throw const AdminRejected('casa de destino nao encontrada');
+    }
+    houses[index] = _copy(
+      houses[index],
+      status: 'merged',
+      mergedInto: targetId,
+    );
+  }
+
+  void markOfficialCommission(String id) {
+    final index = houses.indexWhere((house) => house.id == id);
+    if (index < 0) return;
+    houses[index] = _copy(
+      houses[index],
+      commissionBps: platformBps,
+      commissionOverride: false,
+    );
   }
 
   @override
@@ -1586,21 +1676,93 @@ class MemoryAdminApi implements AdminApi {
     Map<String, Object?> patch,
   ) async {
     final house = await venue(id);
+    final postal = patch['postal_code'] as String? ?? house.postalCode;
+    final phone = patch['phone'] as String? ?? house.phone;
+    final city = patch['city_id'] as String? ?? house.cityId;
+    if (!RegExp(r'^[0-9]{8}$').hasMatch(postal)) {
+      throw const AdminRejected('CEP: 8 números, sem hífen.');
+    }
+    if (!RegExp(r'^[0-9]{10,13}$').hasMatch(phone)) {
+      throw const AdminRejected(
+        'Telefone: de 10 a 13 números, com DDD e sem símbolos.',
+      );
+    }
+    if (_cityName(city).isEmpty) {
+      throw const AdminRejected(
+        'Cidade inválida: escolha uma cidade da lista.',
+      );
+    }
     final next = _copy(
       house,
       name: patch['name'] as String? ?? house.name,
       neighborhood: patch['neighborhood'] as String? ?? house.neighborhood,
       streetAddress: patch['street_address'] as String? ?? house.streetAddress,
       addressNumber: patch['address_number'] as String? ?? house.addressNumber,
-      postalCode: patch['postal_code'] as String? ?? house.postalCode,
-      phone: patch['phone'] as String? ?? house.phone,
+      postalCode: postal,
+      phone: phone,
       category: patch['category'] as String? ?? house.category,
       badge: patch['badge'] as String? ?? house.badge,
-      cityId: patch['city_id'] as String? ?? house.cityId,
+      cityId: city,
     );
     _replace(next);
     _note('update_venue', id, '$patch');
     return next;
+  }
+
+  /// Catálogo mínimo de teste, no formato do servidor ({slug}-{uf}).
+  static const memoryCities = <City>[
+    City(
+      id: 'curitiba',
+      name: 'Curitiba',
+      stateCode: 'PR',
+      stateName: 'Paraná',
+    ),
+    City(
+      id: 'arapoti-pr',
+      name: 'Arapoti',
+      stateCode: 'PR',
+      stateName: 'Paraná',
+    ),
+    City(
+      id: 'londrina-pr',
+      name: 'Londrina',
+      stateCode: 'PR',
+      stateName: 'Paraná',
+    ),
+    City(
+      id: 'sao-paulo',
+      name: 'São Paulo',
+      stateCode: 'SP',
+      stateName: 'São Paulo',
+    ),
+    City(
+      id: 'sao-jose-do-rio-preto-sp',
+      name: 'São José do Rio Preto',
+      stateCode: 'SP',
+      stateName: 'São Paulo',
+    ),
+  ];
+
+  String _cityName(String id) {
+    for (final city in memoryCities) {
+      if (city.id == id) return city.name;
+    }
+    return '';
+  }
+
+  String _cityState(String id) {
+    for (final city in memoryCities) {
+      if (city.id == id) return city.stateCode;
+    }
+    return '';
+  }
+
+  @override
+  Future<List<City>> cities(String stateCode) async {
+    return [
+      for (final city in memoryCities)
+        if (city.stateCode == stateCode.toUpperCase()) city,
+    ];
   }
 
   @override
@@ -1948,7 +2110,14 @@ class MemoryAdminApi implements AdminApi {
     String email,
     String phone,
   ) async {
-    await venue(venueId);
+    final house = await venue(venueId);
+    _replace(
+      _copy(
+        house,
+        officialEmail: email.trim().toLowerCase(),
+        officialPhone: phone.replaceAll(RegExp(r'\D'), ''),
+      ),
+    );
     _note(
       'set_venue_contacts',
       venueId,

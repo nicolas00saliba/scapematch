@@ -31,6 +31,10 @@ class _ConfirmDialog extends StatefulWidget {
 
 class _ConfirmDialogState extends State<_ConfirmDialog> {
   final _controller = TextEditingController();
+  String? _hint;
+
+  bool get _matches =>
+      _controller.text.trim().toUpperCase() == widget.word.toUpperCase();
 
   @override
   void dispose() {
@@ -54,7 +58,18 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
             key: const Key('admin-confirm-word'),
             controller: _controller,
             autofocus: true,
-            decoration: InputDecoration(labelText: widget.word),
+            // O teclado do celular começa em minúscula e corrige palavra:
+            // a confirmação não pode depender disso.
+            textCapitalization: TextCapitalization.characters,
+            autocorrect: false,
+            enableSuggestions: false,
+            onChanged: (_) {
+              if (_hint != null) setState(() => _hint = null);
+            },
+            decoration: InputDecoration(
+              labelText: widget.word,
+              errorText: _hint,
+            ),
           ),
         ],
       ),
@@ -66,7 +81,11 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
         FilledButton(
           key: const Key('admin-confirm-ok'),
           onPressed: () {
-            if (_controller.text.trim() != widget.word) return;
+            if (!_matches) {
+              // Antes o botão não fazia nada e não dizia por quê.
+              setState(() => _hint = 'Digite exatamente ${widget.word}.');
+              return;
+            }
             Navigator.pop(context, true);
           },
           child: const Text('Confirmar'),

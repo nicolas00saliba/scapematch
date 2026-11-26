@@ -166,3 +166,6 @@ bash "$root/tests/pagbank_disconnect_race.sh"
 # supabase/migrations/20261126223756_brazilian_municipalities.sql
 run -f "$root/tests/brazilian_municipalities.sql"
 echo "brazilian municipalities ok"
+# supabase/migrations/20261126223508_admin_casa_campos.sql
+run -f "$root/tests/admin_casa_campos.sql"
+echo "admin casa campos ok"

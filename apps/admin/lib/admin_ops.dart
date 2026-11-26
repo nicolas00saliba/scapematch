@@ -517,6 +517,10 @@ class _OperacaoPageState extends ConsumerState<OperacaoPage> {
     final place = ref.read(adminPlaceProvider);
     if (place.section == AdminSection.operacao && place.id != null) {
       _venueId = place.id;
+      // Vindo da casa ("Salas e sessões"): abre nas salas dela, e inclui
+      // casa de teste, que o filtro padrão esconde e deixava a lista vazia.
+      _tab = 'salas';
+      _includeTest = true;
     }
     _load();
   }
