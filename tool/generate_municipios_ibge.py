@@ -20,7 +20,7 @@ Saídas:
 
   tool/data/municipios_ibge_v1.json
   apps/parceiro/lib/features/partner/domain/municipios_ibge_v1.g.dart
-  supabase/migrations/20261126221500_brazilian_municipalities.sql
+  supabase/migrations/20261126223756_brazilian_municipalities.sql
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ COORDS_URL = (
 )
 ASSET_PATH = ROOT / "tool/data/municipios_ibge_v1.json"
 DART_PATH = ROOT / "apps/parceiro/lib/features/partner/domain/municipios_ibge_v1.g.dart"
-SQL_PATH = ROOT / "supabase/migrations/20261126221500_brazilian_municipalities.sql"
+SQL_PATH = ROOT / "supabase/migrations/20261126223756_brazilian_municipalities.sql"
 
 # Ids já usados em venues, grupos, convites e no seletor do app.
 LEGACY_IDS = {
