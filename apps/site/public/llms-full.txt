@@ -81,7 +81,7 @@ Para a casa, o crédito de indicação fica 30 dias pendente e depois entra no r
 - [Baixar o app](https://escapematch.com.br/app): abrir no navegador ou instalar no celular.
 - [Sobre a EscapeMatch](https://escapematch.com.br/sobre): a marca, o app para achar grupo e jogar escape room sozinho no Brasil, e a diferença para modos de jogo de tiro com nome parecido.
 - [Escape room em Curitiba](https://escapematch.com.br/escape-room-curitiba): como achar grupo, reservar a vaga, avaliar a sala e ver o ranking de tempo. As salas ficam no app.
-- [Contato](https://escapematch.com.br/contato): e-mail, razão social, CNPJ, Curitiba-PR, app e Parceiro.
+- [Contato](https://escapematch.com.br/contato): e-mail de contato e links do app e do Parceiro.
 - [Para casas](https://escapematch.com.br/para-casas): encher horário que ficaria vazio.
 - [Preços para casas](https://escapematch.com.br/para-casas/precos): comissão padrão de 25%.
 - [Termos de uso](https://escapematch.com.br/termos): regras de uso.
