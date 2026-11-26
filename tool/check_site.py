@@ -1143,6 +1143,8 @@ def conferir_parceiras() -> None:
     home = (DIST / "index.html").read_text()
     if 'id="parceiras-titulo"' not in home:
         falha("home sem o carrossel de casas parceiras")
+    if "Já jogo com a gente" in home or "Já jogou com a gente?" not in home:
+        falha("aba da home precisa dizer 'Já jogou com a gente?'")
     if "O que dá para jogar" in home:
         falha("home voltou a ter a seção 'O que dá para jogar'")
     for nome in CASAS_PARCEIRAS:
