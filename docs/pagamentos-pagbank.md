@@ -61,6 +61,8 @@ Não aplicar isto daqui. O dono aprova.
 
 O saldo que o Parceiro mostra é o da conta conectada: `venue-pagbank-balance` chama `GET /accounts/balance` com o access token da casa, no servidor. A resposta pode trazer disponível, bloqueado e retido. 401, 403 e 404 (a consulta ainda não liberada na homologação) não devolvem número. A tela avisa que o saldo PagBank está indisponível e mostra o livro como estimativa, em "Reservas no EscapeMatch". Publicar `venue-pagbank-balance`. O pedido de escopo não muda: a [autorização Connect](https://developer.pagbank.com.br/docs/connect-authorization) lista `accounts.read` para os dados da conta do vendedor e não tem escopo separado de saldo. `payments.read`, `payments.create` e `payments.refund` continuam os das cobranças.
 
+Leitura do token: `read_venue_pagbank_tokens` é `returns table`, então o PostgREST devolve uma lista com uma linha. A função lia isso como objeto e toda casa conectada voltava `unlinked` sem log; o Parceiro escondia o cartão e só mostrava o livro. Agora `accessFromRpc` aceita lista ou objeto. A resposta `ok` traz `read_at` (horário da leitura na PagBank) e a `unavailable` traz `reason`: `forbidden` (401/403/404 depois de renovar) ou `error`. A tela lê a cada abertura (sem cache entre telas), tem o botão Atualizar, mostra "Última leitura" e avisa `Conta PagBank não conectada` quando a função devolve `unlinked`. Nunca mostra número que não veio da PagBank. Para ver o motivo na produção: `venue-pagbank-balance` sem log e resposta de 41 bytes (gzip de `{"status":"unlinked"}`) é esse caso; 403 aparece como `pagbank_balance_unavailable` com `status`.
+
 O access token é renovado quando falta menos de dois minutos para vencer, e de novo se a PagBank responde 401.
 
 ## Primeira cobrança de R$ 5

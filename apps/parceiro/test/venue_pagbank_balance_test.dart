@@ -57,7 +57,7 @@ void main() {
   testWidgets('403 vira aviso e o livro fica como estimativa', (tester) async {
     await _pump(
       tester,
-      const VenuePagbankBalance.unavailable(),
+      const VenuePagbankBalance.unavailable(forbidden: true),
       shot: shots ? 'saldo-pagbank-indisponivel.png' : null,
     );
 
@@ -78,6 +78,67 @@ void main() {
     expect(find.text('R\$ 0,00'), findsNothing);
   });
 
+  testWidgets(
+    'falha que não é permissão não culpa a PagBank nem inventa saldo',
+    (tester) async {
+      await _pump(tester, const VenuePagbankBalance.unavailable());
+
+      expect(find.text(PartnerMessages.pagbankBalanceFailed), findsOneWidget);
+      expect(
+        find.text(PartnerMessages.pagbankBalanceUnavailableBody),
+        findsNothing,
+      );
+      expect(find.byKey(PartnerKeys.pagbankBalanceRefresh), findsOneWidget);
+      expect(find.byKey(PartnerKeys.pagbankBalanceAvailable), findsNothing);
+      expect(
+        find.text(PartnerMessages.reservationsLedgerEstimated),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('conta sem conexão avisa e o livro vira estimativa', (
+    tester,
+  ) async {
+    await _pump(tester, const VenuePagbankBalance.unlinked());
+
+    expect(find.byKey(PartnerKeys.pagbankBalanceUnlinked), findsOneWidget);
+    expect(find.text(PartnerMessages.pagbankBalanceUnlinked), findsOneWidget);
+    expect(find.byKey(PartnerKeys.pagbankBalanceAvailable), findsNothing);
+    expect(
+      find.text(PartnerMessages.reservationsLedgerEstimated),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Atualizar lê a PagBank de novo e mostra o horário da leitura', (
+    tester,
+  ) async {
+    final repo = _CountingRepository([
+      VenuePagbankBalance.live(
+        availableCents: 1000,
+        readAt: DateTime.now().copyWith(hour: 9, minute: 5),
+      ),
+      VenuePagbankBalance.live(
+        availableCents: 2500,
+        readAt: DateTime.now().copyWith(hour: 9, minute: 7),
+      ),
+    ]);
+    await _pump(tester, const VenuePagbankBalance.absent(), repository: repo);
+
+    expect(repo.loads, 1);
+    expect(find.text(formatPrice(1000)), findsOneWidget);
+    expect(find.text('Última leitura: hoje às 09:05'), findsOneWidget);
+
+    await tester.tap(find.byKey(PartnerKeys.pagbankBalanceRefresh));
+    await tester.pumpAndSettle();
+
+    expect(repo.loads, 2);
+    expect(find.text(formatPrice(1000)), findsNothing);
+    expect(find.text(formatPrice(2500)), findsOneWidget);
+    expect(find.text('Última leitura: hoje às 09:07'), findsOneWidget);
+  });
+
   testWidgets('sem consulta PagBank o livro não é chamado de saldo PagBank', (
     tester,
   ) async {
@@ -94,10 +155,25 @@ void main() {
   });
 }
 
+class _CountingRepository implements VenuePagbankBalanceRepository {
+  _CountingRepository(this.values);
+
+  final List<VenuePagbankBalance> values;
+  int loads = 0;
+
+  @override
+  Future<VenuePagbankBalance> load(String venueId) async {
+    final index = loads < values.length ? loads : values.length - 1;
+    loads += 1;
+    return values[index];
+  }
+}
+
 Future<void> _pump(
   WidgetTester tester,
   VenuePagbankBalance balance, {
   String? shot,
+  VenuePagbankBalanceRepository? repository,
 }) async {
   tester.view.physicalSize = const Size(412, 1400);
   tester.view.devicePixelRatio = 1;
@@ -111,7 +187,7 @@ Future<void> _pump(
           MemoryVenueWithdrawalRepository(VenuePayoutSnapshot.sample()),
         ),
         venuePagbankBalanceRepositoryProvider.overrideWithValue(
-          MemoryVenuePagbankBalanceRepository(balance),
+          repository ?? MemoryVenuePagbankBalanceRepository(balance),
         ),
       ],
       child: MaterialApp(

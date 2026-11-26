@@ -92,6 +92,9 @@ abstract final class PartnerKeys {
   static const pagbankBalanceBlocked = Key('pagbank-balance-blocked');
   static const pagbankBalanceHeld = Key('pagbank-balance-held');
   static const pagbankBalanceUnavailable = Key('pagbank-balance-unavailable');
+  static const pagbankBalanceUnlinked = Key('pagbank-balance-unlinked');
+  static const pagbankBalanceRefresh = Key('pagbank-balance-refresh');
+  static const pagbankBalanceReadAt = Key('pagbank-balance-read-at');
   static const reservationsLedger = Key('reservations-ledger');
   static const partnerNet = Key('partner-net');
   static const partnerGross = Key('partner-gross');

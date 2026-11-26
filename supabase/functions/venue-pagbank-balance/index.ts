@@ -3,7 +3,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { adminWithMfa } from "../_shared/admin_session.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
-import { handleVenuePagbankBalance } from "../_shared/venue_pagbank_balance.ts";
+import {
+  accessFromRpc,
+  handleVenuePagbankBalance,
+} from "../_shared/venue_pagbank_balance.ts";
 
 if (import.meta.main) {
   Deno.serve((req) => {
@@ -42,19 +45,8 @@ if (import.meta.main) {
         const { data, error } = await admin.rpc("read_venue_pagbank_tokens", {
           p_venue_id: venueId,
         });
-        if (error || !data || typeof data !== "object") return null;
-        const row = data as {
-          access_token?: string;
-          refresh_token?: string;
-          access_expires_at?: string | null;
-        };
-        const accessToken = (row.access_token ?? "").trim();
-        if (!accessToken) return null;
-        return {
-          accessToken,
-          refreshToken: (row.refresh_token ?? "").trim(),
-          expiresAt: row.access_expires_at ?? null,
-        };
+        if (error) return null;
+        return accessFromRpc(data);
       },
       storeTokens: async (venueId, tokens) => {
         const { error } = await admin.rpc("store_venue_pagbank_tokens", {
