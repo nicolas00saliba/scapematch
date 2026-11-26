@@ -26,6 +26,33 @@ void main() {
       authErrorMessage(Exception('socket'), fallback: 'sem rede'),
       'Sem conexão. Tente de novo.',
     );
+    expect(
+      authErrorMessage(
+        const AuthException('Auth session missing!', code: 'session_missing'),
+        fallback: 'falha',
+      ),
+      passwordRecoverySessionMessage,
+    );
+    expect(
+      authErrorMessage(
+        const AuthException(
+          'Email link is invalid or has expired',
+          code: 'otp_expired',
+        ),
+        fallback: 'falha',
+      ),
+      passwordRecoverySessionMessage,
+    );
+    expect(
+      authErrorMessage(
+        const AuthException(
+          'New password should be different from the old password.',
+          code: 'same_password',
+        ),
+        fallback: 'falha',
+      ),
+      passwordRecoverySameMessage,
+    );
   });
 
   test('group function errors map to the screen reasons', () {

@@ -10,10 +10,14 @@ class PasswordRecoveryGate extends StatefulWidget {
     super.key,
     required this.child,
     required this.savePassword,
+    required this.onCancel,
   });
 
   final Widget child;
   final Future<String?> Function(String password) savePassword;
+
+  /// Encerra a sessão. O aviso de recuperação sai depois, com ou sem sessão.
+  final Future<void> Function() onCancel;
 
   @override
   State<PasswordRecoveryGate> createState() => _PasswordRecoveryGateState();
@@ -42,10 +46,19 @@ class _PasswordRecoveryGateState extends State<PasswordRecoveryGate> {
     return error;
   }
 
+  Future<void> _cancel() async {
+    try {
+      await widget.onCancel();
+    } on Object {
+      // A sessão do link pode já ter caído. O login volta mesmo assim.
+    }
+    passwordRecoverySignal.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!passwordRecoverySignal.pending) return widget.child;
-    return NewPasswordScreen(onSave: _save);
+    return NewPasswordScreen(onSave: _save, onCancel: _cancel);
   }
 }
 
@@ -63,6 +76,7 @@ class PlayerPasswordRecovery extends ConsumerWidget {
             .read(authSessionProvider.notifier)
             .changePassword(password: password);
       },
+      onCancel: () => ref.read(authSessionProvider.notifier).signOut(),
       child: child,
     );
   }

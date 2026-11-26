@@ -7,6 +7,8 @@ import 'package:scapematch/core/ui/app_keys.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/password_recovery.dart';
+import 'package:scapematch/features/auth/presentation/password_recovery_gate.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_password_reset.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_login_screen.dart';
@@ -160,6 +162,48 @@ void main() {
     expect(find.text(passwordResetDemoMessage), findsOneWidget);
     expect(find.text('painel da casa'), findsNothing);
     expect(scapeUsesLiveBackend, isFalse);
+
+    await tester.tap(find.byKey(AppKeys.newPasswordCancel));
+    await tester.pumpAndSettle();
+    expect(find.text('painel da casa'), findsOneWidget);
+    expect(passwordRecoverySignal.pending, isFalse);
+  });
+
+  testWidgets('o Auth recusa a senha nova da casa', (tester) async {
+    addTearDown(passwordRecoverySignal.clear);
+    passwordRecoverySignal.mark();
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: noAutomaticRetry,
+        child: _app(
+          PasswordRecoveryGate(
+            savePassword: (_) async => authErrorMessage(
+              const AuthException(
+                'New password should be different from the old password.',
+                code: 'same_password',
+              ),
+              fallback: 'Não foi possível trocar a senha. Tente de novo.',
+            ),
+            onCancel: () async {},
+            child: const Text('login da casa'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(find.byKey(AppKeys.newPassword), 'Casa1234');
+    await tester.enterText(find.byKey(AppKeys.confirmNewPassword), 'Casa1234');
+    await tester.pump();
+    await tester.tap(find.byKey(AppKeys.newPasswordSubmit));
+    await tester.pumpAndSettle();
+
+    expect(find.text(passwordRecoverySameMessage), findsOneWidget);
+    expect(find.text('login da casa'), findsNothing);
+
+    await tester.tap(find.byKey(AppKeys.newPasswordCancel));
+    await tester.pumpAndSettle();
+    expect(find.text('login da casa'), findsOneWidget);
+    expect(passwordRecoverySignal.pending, isFalse);
   });
 }
 

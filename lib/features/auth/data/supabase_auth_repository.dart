@@ -155,7 +155,7 @@ class SupabaseAuthRepository implements AuthRepository {
   @override
   Future<String?> changePassword({required String password}) async {
     if (_client.auth.currentUser == null) {
-      return 'Entre para trocar a senha.';
+      return passwordRecoverySessionMessage;
     }
     final rejected = await rejectPassword(password);
     if (rejected != null) return rejected;

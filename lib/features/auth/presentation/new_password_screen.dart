@@ -8,9 +8,16 @@ import 'package:scapematch/features/auth/data/password_strength.dart';
 ///
 /// [onSave] devolve a frase de erro, ou nulo quando gravou.
 class NewPasswordScreen extends StatefulWidget {
-  const NewPasswordScreen({super.key, required this.onSave});
+  const NewPasswordScreen({
+    super.key,
+    required this.onSave,
+    required this.onCancel,
+  });
 
   final Future<String?> Function(String password) onSave;
+
+  /// Sai da troca. Quem chama limpa o aviso e encerra a sessão.
+  final Future<void> Function() onCancel;
 
   @override
   State<NewPasswordScreen> createState() => _NewPasswordScreenState();
@@ -74,6 +81,13 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
     }
   }
 
+  Future<void> _cancel() async {
+    setState(() => _busy = true);
+    await widget.onCancel();
+    if (!mounted) return;
+    setState(() => _busy = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
@@ -105,12 +119,25 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
               if (_matches && !_busy) _submit();
             },
           ),
-          if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              key: AppKeys.newPasswordError,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
           const SizedBox(height: 16),
           FilledButton(
             key: AppKeys.newPasswordSubmit,
             onPressed: _busy || !_matches ? null : _submit,
             child: const Text('Salvar senha'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            key: AppKeys.newPasswordCancel,
+            onPressed: _busy ? null : _cancel,
+            child: const Text('Cancelar'),
           ),
         ],
       ),

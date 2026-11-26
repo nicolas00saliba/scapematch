@@ -8,6 +8,7 @@ import 'package:scapematch/features/auth/data/auth_messages.dart';
 import 'package:scapematch/features/auth/data/auth_redirect.dart';
 import 'package:scapematch/features/auth/data/password_recovery.dart';
 import 'package:scapematch/features/auth/data/password_strength.dart';
+import 'package:scapematch/features/auth/presentation/auth_controller.dart';
 import 'package:scapematch/features/auth/presentation/login_screen.dart';
 import 'package:scapematch/features/auth/presentation/new_password_screen.dart';
 import 'package:scapematch/features/auth/presentation/password_change_dialog.dart';
@@ -126,6 +127,7 @@ void main() {
             saved = password;
             return null;
           },
+          onCancel: () async {},
           child: const Text('app do jogador'),
         ),
       ),
@@ -146,6 +148,81 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved, 'senha1234');
     expect(find.text('app do jogador'), findsOneWidget);
+    expect(passwordRecoverySignal.pending, isFalse);
+  });
+
+  testWidgets('o Auth recusa a senha e cancelar volta ao login', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(passwordRecoverySignal.clear);
+    passwordRecoverySignal.mark();
+    var left = false;
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: noAutomaticRetry,
+        child: _app(
+          PasswordRecoveryGate(
+            savePassword: (_) async => authErrorMessage(
+              const AuthException(
+                'Email link is invalid or has expired',
+                code: 'otp_expired',
+              ),
+              fallback: 'Não foi possível trocar a senha. Tente de novo.',
+            ),
+            onCancel: () async => left = true,
+            child: const LoginScreen(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.enterText(find.byKey(AppKeys.newPassword), 'senha1234');
+    await tester.enterText(find.byKey(AppKeys.confirmNewPassword), 'senha1234');
+    await tester.pump();
+    await tester.tap(find.byKey(AppKeys.newPasswordSubmit));
+    await tester.pumpAndSettle();
+
+    expect(find.text(passwordRecoverySessionMessage), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(passwordRecoverySignal.pending, isTrue);
+
+    await tester.tap(find.byKey(AppKeys.newPasswordCancel));
+    await tester.pumpAndSettle();
+    expect(left, isTrue);
+    expect(passwordRecoverySignal.pending, isFalse);
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
+  testWidgets('cancelar encerra a sessão do jogador', (tester) async {
+    addTearDown(passwordRecoverySignal.clear);
+    passwordRecoverySignal.mark();
+    late ProviderContainer container;
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: noAutomaticRetry,
+        child: _app(
+          Builder(
+            builder: (context) {
+              container = ProviderScope.containerOf(context);
+              return const PlayerPasswordRecovery(child: Text('login'));
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(container.read(authSessionProvider), isNotNull);
+
+    await tester.tap(find.byKey(AppKeys.newPasswordCancel));
+    await tester.pumpAndSettle();
+
+    expect(find.text('login'), findsOneWidget);
+    expect(container.read(authSessionProvider), isNull);
     expect(passwordRecoverySignal.pending, isFalse);
   });
 }

@@ -71,6 +71,7 @@ class PartnerPasswordRecovery extends ConsumerWidget {
         }
         return null;
       },
+      onCancel: () => ref.read(partnerSessionProvider.notifier).signOut(),
       child: child,
     );
   }
