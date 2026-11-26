@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch_admin/admin_api.dart';
+import 'package:scapematch_admin/admin_errors.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -195,9 +196,9 @@ class _RankingPageState extends ConsumerState<RankingPage> {
         _rows = rows;
         _error = null;
       });
-    } on AdminRejected catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.message);
+      setState(() => _error = adminErrorText(error));
     }
   }
 
@@ -212,11 +213,11 @@ class _RankingPageState extends ConsumerState<RankingPage> {
         _busy = false;
         _error = null;
       });
-    } on AdminRejected catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = error.message;
+        _error = adminErrorText(error);
       });
     }
   }
@@ -225,9 +226,9 @@ class _RankingPageState extends ConsumerState<RankingPage> {
     try {
       await ref.read(rankingAdminProvider).remove(row.id);
       await _load();
-    } on AdminRejected catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.message);
+      setState(() => _error = adminErrorText(error));
     }
   }
 

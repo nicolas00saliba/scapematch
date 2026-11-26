@@ -114,6 +114,11 @@ class SupabaseAdminPeopleApi implements AdminPeopleApi {
 }
 
 class MemoryAdminPeopleApi implements AdminPeopleApi {
+  MemoryAdminPeopleApi({this.venues});
+
+  /// Quando presente, a casa de teste e a mescla valem também para a leitura
+  /// da casa, como o servidor faz.
+  final MemoryAdminApi? venues;
   bool reopened = false;
   bool playerTest = false;
   bool venueTest = false;
@@ -135,18 +140,22 @@ class MemoryAdminPeopleApi implements AdminPeopleApi {
       playerTest = enabled;
     } else {
       venueTest = enabled;
+      venues?.markTest(id, enabled);
     }
   }
 
   @override
   Future<void> clearCommission(String venueId, String confirm) async {
     if (confirm != 'OFICIAL') throw const AdminRejected('confirmacao invalida');
+    venues?.markOfficialCommission(venueId);
     cleared = true;
   }
 
   @override
   Future<void> mergeVenues(String sourceId, String targetId, String confirm) async {
     if (confirm != 'MESCLAR') throw const AdminRejected('confirmacao invalida');
+    if (sourceId == targetId) throw const AdminRejected('casas invalidas');
+    venues?.markMerged(sourceId, targetId);
     merged = true;
   }
 
