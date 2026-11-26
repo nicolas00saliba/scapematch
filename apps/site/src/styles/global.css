@@ -1642,3 +1642,125 @@ main {
     transition: none;
   }
 }
+
+/* Carrossel de casas parceiras: uma linha, da direita para a esquerda, sem emenda.
+   Faixa escura porque o logo da Fábrica é branco. Sem estilo inline (CSP). */
+.parceiras {
+  --parceiras-h: 4rem;
+  --parceiras-gap: 6.5rem;
+  --parceiras-dur: 32s;
+  margin-top: 4.5rem;
+  background: var(--noite);
+  color: var(--creme);
+  padding: 3.25rem 0 3.5rem;
+  overflow: hidden;
+}
+
+.parceiras-titulo {
+  max-width: none;
+  margin: 0 auto 2.5rem;
+  padding: 0 1.25rem;
+  text-align: center;
+  color: var(--creme);
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+}
+
+.parceiras-janela {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%);
+}
+
+.parceiras-trilha {
+  display: flex;
+  width: max-content;
+  animation: parceiras-correr var(--parceiras-dur) linear infinite;
+  will-change: transform;
+}
+
+.parceiras-janela:hover .parceiras-trilha {
+  animation-play-state: paused;
+}
+
+.parceiras-grupo {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parceira {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin: 0 var(--parceiras-gap) 0 0;
+  padding: 0;
+}
+
+.parceira picture {
+  display: block;
+}
+
+.parceira img {
+  display: block;
+  width: auto;
+  height: calc(var(--parceiras-h) * var(--parceira-escala, 1));
+  max-width: none;
+}
+
+/* Ajuste óptico: logos de proporções diferentes pesam o mesmo no olho. */
+.parceira-ninja { --parceira-escala: 1.05; }
+.parceira-puzzle { --parceira-escala: 1.15; }
+.parceira-synapse { --parceira-escala: 0.85; }
+.parceira-fabrica { --parceira-escala: 1.3; }
+.parceira-minos { --parceira-escala: 1.35; }
+
+@keyframes parceiras-correr {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-25%, 0, 0); }
+}
+
+@media (max-width: 760px) {
+  .parceiras {
+    --parceiras-h: 3rem;
+    --parceiras-gap: 3.5rem;
+    --parceiras-dur: 22s;
+    margin-top: 3rem;
+    padding: 2.5rem 0 2.75rem;
+  }
+
+  .parceiras-titulo {
+    margin-bottom: 1.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parceiras-trilha {
+    width: auto;
+    animation: none;
+    justify-content: center;
+    will-change: auto;
+  }
+
+  .parceiras-grupo[aria-hidden="true"] {
+    display: none;
+  }
+
+  .parceiras-grupo {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem 3rem;
+    padding: 0 1.25rem;
+  }
+
+  .parceira {
+    margin: 0;
+  }
+
+  .parceiras-janela {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
