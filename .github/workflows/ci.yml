@@ -26,6 +26,9 @@ jobs:
       - name: Check web noindex
         run: bash tool/test_check_web_robots.sh
 
+      - name: Check web build version stamp
+        run: bash tool/test_stamp_web_build.sh
+
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -83,6 +86,7 @@ jobs:
       - name: Check admin web install
         run: |
           bash tool/install_cleanup_service_worker.sh apps/admin/build/web
+          bash tool/stamp_web_build.sh apps/admin/build/web
           bash tool/stamp_web_manifest.sh apps/admin/build/web admin real
           bash tool/mark_real_web_copy.sh apps/admin/build/web admin
           bash tool/check_web_service_worker.sh apps/admin/build/web admin
@@ -127,6 +131,7 @@ jobs:
       - name: Install the cleanup service worker
         run: |
           bash tool/install_cleanup_service_worker.sh build/web
+          bash tool/stamp_web_build.sh build/web
           bash tool/stamp_web_manifest.sh build/web player real
           bash tool/mark_real_web_copy.sh build/web player
           bash tool/check_web_service_worker.sh build/web player
@@ -165,6 +170,7 @@ jobs:
       - name: Install the partner cleanup service worker
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/web
+          bash tool/stamp_web_build.sh apps/parceiro/build/web
           bash tool/stamp_web_manifest.sh apps/parceiro/build/web partner real
           bash tool/mark_real_web_copy.sh apps/parceiro/build/web partner
           bash tool/check_web_service_worker.sh apps/parceiro/build/web partner
@@ -199,6 +205,7 @@ jobs:
       - name: Check player demo
         run: |
           bash tool/install_cleanup_service_worker.sh build/player-demo
+          bash tool/stamp_web_build.sh build/player-demo
           bash tool/stamp_web_manifest.sh build/player-demo player demo
           bash tool/check_web_service_worker.sh build/player-demo player
           bash tool/check_web_manifest.sh build/player-demo player demo
@@ -228,6 +235,7 @@ jobs:
       - name: Check partner demo
         run: |
           bash tool/install_cleanup_service_worker.sh apps/parceiro/build/parceiro-demo-root
+          bash tool/stamp_web_build.sh apps/parceiro/build/parceiro-demo-root
           bash tool/stamp_web_manifest.sh apps/parceiro/build/parceiro-demo-root partner demo
           bash tool/check_web_service_worker.sh apps/parceiro/build/parceiro-demo-root partner
           bash tool/check_web_manifest.sh apps/parceiro/build/parceiro-demo-root partner demo
