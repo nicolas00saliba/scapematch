@@ -80,9 +80,9 @@ DEFINICAO = (
     "EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil."
 )
 DEFINICAO_VISIVEL = (
-    DEFINICAO + " Você chega sozinho, entra num grupo e paga só a sua vaga. "
-    "Não é um modo de jogo de tiro nem um jogo de celular."
+    DEFINICAO + " Você chega sozinho, entra num grupo e paga só a sua vaga."
 )
+FRASE_REMOVIDA = "Não é um modo de jogo de tiro nem um jogo de celular."
 DESCRICAO_MARCA = (
     "App para achar grupo e jogar escape room sozinho no Brasil."
 )
@@ -358,6 +358,8 @@ def main() -> None:
         falha("o selo da home ainda é Curitiba")
     if "muito mais!" in home:
         falha("o selo antigo voltou")
+    if FRASE_REMOVIDA in home:
+        falha("home ainda tem a frase removida")
     if DEFINICAO_VISIVEL not in home:
         falha("a home não mostra a definição canônica")
     if home.find("<h1>") > home.find("hero-badge"):
@@ -1032,6 +1034,8 @@ def main() -> None:
         texto = (DIST / nome).read_text()
         if "Curitiba" not in texto or "R$ 0,01" not in texto:
             falha(f"{nome} incompleto")
+        if FRASE_REMOVIDA in texto:
+            falha(f"{nome} ainda tem a frase removida do site")
         if DEFINICAO_VISIVEL not in texto or "Não confundir com jogos de celular chamados Escape Match." not in texto:
             falha(f"{nome} sem a definição ou a desambiguação")
         if FRASE_TIRO not in texto or DESCRICAO_MARCA not in texto:

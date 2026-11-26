@@ -25,7 +25,7 @@ export const primeirasCasas =
   'O app está começando com as primeiras casas e vai crescer.';
 
 export const definicao =
-  `${definicaoCurta} Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular.`;
+  `${definicaoCurta} Você chega sozinho, entra num grupo e paga só a sua vaga.`;
 
 export const jogosParecidos =
   'Room Escape Match 6, Escape Match Room Tiles e Bubble Escape Match 3D';

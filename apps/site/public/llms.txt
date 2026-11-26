@@ -1,6 +1,6 @@
 # EscapeMatch
 
-> EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga. Não é um modo de jogo de tiro nem um jogo de celular. O site é https://escapematch.com.br e o app do jogador é https://app.escapematch.com.br/
+> EscapeMatch é o app para achar grupo e jogar escape room sozinho no Brasil. Você chega sozinho, entra num grupo e paga só a sua vaga. O site é https://escapematch.com.br e o app do jogador é https://app.escapematch.com.br/
 
 App para achar grupo e jogar escape room sozinho no Brasil. O app está começando com as primeiras casas e vai crescer. Não é só Curitiba. Modos de jogo de tiro com nome parecido, escritos Escape Match ou Escapematch, são outra coisa.
 
