@@ -17,7 +17,7 @@ void main() {
     final dir = Directory('/opt/cursor/artifacts')..createSync(recursive: true);
     await tester.runAsync(_loadFonts);
 
-    await _pump(tester, MemoryPagbankSignupRepository(), const Size(390, 560));
+    await _pump(tester, MemoryPagbankSignupRepository(), const Size(390, 720));
     await _shot(tester, dir, 'receber-escolhas.png');
 
     await tester.tap(find.byKey(PartnerKeys.pagbankHaveAccount));

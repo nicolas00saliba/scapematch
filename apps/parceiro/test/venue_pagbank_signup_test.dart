@@ -18,6 +18,7 @@ void main() {
     expect(find.byKey(PartnerKeys.pagbankSignupChoices), findsOneWidget);
     expect(find.text(PartnerMessages.pagbankChoicesTitle), findsOneWidget);
     expect(find.text(PartnerMessages.pagbankChoicesBody), findsOneWidget);
+    expect(find.text(PartnerMessages.pagbankWithdrawHint), findsOneWidget);
     expect(find.text(PartnerMessages.pagbankHaveAccount), findsOneWidget);
     expect(find.text(PartnerMessages.pagbankNoAccount), findsOneWidget);
     expect(find.text('Cadastrar para receber pagamentos'), findsNothing);

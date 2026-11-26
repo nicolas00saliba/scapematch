@@ -582,17 +582,11 @@ class _Choices extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          PartnerMessages.pagbankChoicesBody,
-          style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
-        ),
         const SizedBox(height: 16),
         _ChoiceCard(
           cardKey: PartnerKeys.pagbankHaveAccount,
           icon: Icons.account_balance_wallet_outlined,
           title: PartnerMessages.pagbankHaveAccount,
-          subtitle: PartnerMessages.pagbankHaveAccountHint,
           onTap: onHave,
         ),
         const SizedBox(height: 12),
@@ -600,8 +594,17 @@ class _Choices extends StatelessWidget {
           cardKey: PartnerKeys.pagbankNoAccount,
           icon: Icons.add_business_outlined,
           title: PartnerMessages.pagbankNoAccount,
-          subtitle: PartnerMessages.pagbankNoAccountHint,
           onTap: onCreate,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          PartnerMessages.pagbankChoicesBody,
+          style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          PartnerMessages.pagbankWithdrawHint,
+          style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
         ),
       ],
     );
@@ -613,14 +616,12 @@ class _ChoiceCard extends StatelessWidget {
     required this.cardKey,
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onTap,
   });
 
   final Key cardKey;
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback? onTap;
 
   @override
@@ -634,7 +635,7 @@ class _ChoiceCard extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: onTap != null,
-      label: '$title. $subtitle',
+      label: title,
       child: Material(
         key: cardKey,
         color: scheme.surface,
@@ -663,14 +664,6 @@ class _ChoiceCard extends StatelessWidget {
                             title,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              height: 1.3,
                             ),
                           ),
                         ],

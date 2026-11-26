@@ -282,7 +282,7 @@ abstract final class PartnerMessages {
       '1. O valor fica disponível na sua conta PagBank, a mesma ligada pelo Connect.';
   static const receiveStepMenu = '2. Abra o app PagBank para ver o saldo.';
   static const receiveStepDestination =
-      '3. Se quiser mandar para outro banco, faça um Pix manual. Não há saque automático.';
+      '3. No app do PagBank, transfira para qualquer conta, mesmo de outro CPF ou CNPJ.';
   static const receiveStepEnable = '4. O EscapeMatch não transfere esse valor.';
   static const receiveOpenPagBank = 'Abrir o PagBank';
   static const receivePagBankUrl = 'https://pagbank.com.br/';
@@ -361,13 +361,13 @@ abstract final class PartnerMessages {
   static const documentsBlockWithdraw =
       'A conta PagBank ainda não está aprovada. Sem essa aprovação o dinheiro não cai na conta da casa.';
   static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
-  static const pagbankChoicesTitle = 'Receber na conta PagBank';
+  static const pagbankChoicesTitle = 'Entre no PagBank para ver seu saldo';
   static const pagbankChoicesBody =
-      'O dinheiro das reservas cai na conta PagBank da casa.';
-  static const pagbankHaveAccount = 'Já tenho conta PagBank';
-  static const pagbankHaveAccountHint = 'Entrar com PagBank';
-  static const pagbankNoAccount = 'Ainda não tenho conta';
-  static const pagbankNoAccountHint = 'Criar conta PagBank';
+      'Os ganhos da sua casa caem direto na sua conta PagBank.';
+  static const pagbankWithdrawHint =
+      'Para sacar, use o app do PagBank e transfira para qualquer conta.';
+  static const pagbankHaveAccount = 'Entrar no PagBank';
+  static const pagbankNoAccount = 'Criar conta PagBank';
   static const pagbankConnectTitle = 'Entrar com PagBank';
   static const pagbankConnectBody =
       'Autorize a casa na PagBank. O dinheiro das reservas cai nessa conta.';
