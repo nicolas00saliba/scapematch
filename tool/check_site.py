@@ -1091,6 +1091,7 @@ def main() -> None:
         if "ScapeMatch" in json.dumps(dados_manifesto):
             falha("manifest cita ScapeMatch")
     conferir_icones(robots)
+    conferir_parceiras()
 
     print(f"site ok: {len(ROTAS)} rotas")
 
@@ -1118,6 +1119,39 @@ CAMINHOS_ICONE = (
     "/assets/favicon.svg",
 )
 AGENTES_ICONE = ("Googlebot", "Googlebot-Image", "*")
+
+
+CASAS_PARCEIRAS = (
+    "Ninja Escape Room",
+    "Puzzle Room Escape Game",
+    "Synapse Escape Room",
+    "Fábrica Escape Room",
+    "Minos Escape Room",
+)
+
+
+def conferir_parceiras() -> None:
+    """Carrossel da home: 5 logos com alt, cópias do laço escondidas e arquivos HD."""
+    home = (DIST / "index.html").read_text()
+    if 'id="parceiras-titulo"' not in home:
+        falha("home sem o carrossel de casas parceiras")
+    for nome in CASAS_PARCEIRAS:
+        if f'alt="{nome}"' not in home:
+            falha(f"carrossel sem o logo com alt {nome!r}")
+    if len(re.findall(r'<ul[^>]*aria-hidden="true"', home)) < 3:
+        falha("cópias do carrossel precisam de aria-hidden")
+    for img in re.findall(r"<img[^>]*parceiras/[^>]*>", home):
+        if "width=" not in img or "height=" not in img or 'loading="lazy"' not in img:
+            falha(f"logo parceiro sem width/height/lazy: {img[:80]}")
+    pasta = DIST / "assets" / "parceiras"
+    for id_ in ("ninja", "puzzle", "synapse", "fabrica", "minos"):
+        for ext in ("png", "webp"):
+            if not (pasta / f"{id_}.{ext}").is_file():
+                falha(f"assets/parceiras/{id_}.{ext} ausente")
+    for id_ in ("ninja", "puzzle", "synapse", "fabrica", "minos"):
+        largura, altura = png_tamanho(pasta / f"{id_}.png")
+        if altura < 112:
+            falha(f"logo {id_} com altura {altura}px, abaixo de 2x a altura exibida")
 
 
 def png_tamanho(path: pathlib.Path) -> tuple[int, int]:

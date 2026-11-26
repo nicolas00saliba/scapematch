@@ -1,0 +1,34 @@
+---
+import { casasParceiras } from '../data/parceiras';
+
+// O primeiro grupo é o que o leitor de tela lê. Os outros três só existem para
+// o loop não ter emenda e saem do fluxo quando o movimento está reduzido.
+const grupos = [0, 1, 2, 3];
+---
+
+<section class="parceiras" aria-labelledby="parceiras-titulo">
+  <h2 id="parceiras-titulo" class="parceiras-titulo">Casas parceiras</h2>
+  <div class="parceiras-janela">
+    <div class="parceiras-trilha">
+      {grupos.map((g) => (
+        <ul class="parceiras-grupo" aria-hidden={g === 0 ? undefined : 'true'}>
+          {casasParceiras.map((casa) => (
+            <li class={`parceira parceira-${casa.id}`}>
+              <picture>
+                <source srcset={`/assets/parceiras/${casa.id}.webp`} type="image/webp" />
+                <img
+                  src={`/assets/parceiras/${casa.id}.png`}
+                  alt={g === 0 ? casa.nome : ''}
+                  width={casa.largura}
+                  height={casa.altura}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </picture>
+            </li>
+          ))}
+        </ul>
+      ))}
+    </div>
+  </div>
+</section>
