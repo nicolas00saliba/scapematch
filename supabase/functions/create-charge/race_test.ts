@@ -47,6 +47,8 @@ type Store = {
   member: string;
   closed: boolean;
   quoteOk?: boolean;
+  accountChanged?: boolean;
+  binding?: "ok" | "ambiguous" | "error" | "garbage" | "throws";
   reserveAmountCents?: number;
   reserveHouseFixedCents?: number;
   heldChargedCents?: number;
@@ -278,6 +280,20 @@ function adminFor(store: Store) {
         if (name === "venue_finance_ready") {
           return { data: true, error: null };
         }
+        if (name === "venue_pagbank_binding") {
+          switch (store.binding ?? "ok") {
+            case "ambiguous":
+              return { data: { state: "ambiguous" }, error: null };
+            case "error":
+              return { data: null, error: { code: "XX000", message: "erro" } };
+            case "garbage":
+              return { data: "?", error: null };
+            case "throws":
+              throw new Error("rede");
+            default:
+              return { data: { state: "ok" }, error: null };
+          }
+        }
         if (name === "commission_bps_for_venue") {
           return { data: 1000, error: null };
         }
@@ -336,6 +352,12 @@ function adminFor(store: Store) {
               brand: "VISA",
             },
             error: null,
+          };
+        }
+        if (name === "reserve_pix_charge" && store.accountChanged) {
+          return {
+            data: null,
+            error: { code: "PB409", message: "pagbank_account_changed" },
           };
         }
         if (name === "reserve_pix_charge") {
@@ -1465,4 +1487,28 @@ Deno.test("liquidação recusada devolve o status da cobrança expirada", async 
   assertEquals(response.status, 409);
   assertEquals(body.status, "failed");
   assertEquals(body.points_only, false);
+});
+
+for (const mode of ["ambiguous", "error", "garbage", "throws"] as const) {
+  Deno.test(`conta da casa não conferida (${mode}): 409 e nenhuma cobrança`, async () => {
+    const store = makeStore();
+    store.binding = mode;
+    const runtime = chargeRuntime(store, providerFor(store, {}));
+    const response = await createCharge(request("PIX", `idem-bind-${mode}`), runtime);
+    assertEquals(response.status, 409);
+    assertEquals(store.charges.length, 0);
+    assertEquals(store.payments.length, 0);
+  });
+}
+
+Deno.test("a conta mudou entre a leitura e a reserva: 409 e nada é cobrado", async () => {
+  const store = makeStore();
+  store.accountChanged = true;
+  const runtime = chargeRuntime(store, providerFor(store, {}));
+  const response = await createCharge(request("PIX", "idem-conta-mudou"), runtime);
+  assertEquals(response.status, 409);
+  const body = await response.json();
+  assert(String(body.error).includes("conta PagBank"));
+  assertEquals(store.charges.length, 0);
+  assertEquals(store.payments.length, 0);
 });

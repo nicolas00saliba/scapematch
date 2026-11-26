@@ -9,6 +9,11 @@ import {
   minimumReachedOnTime,
 } from "./group_band.ts";
 import { captureOpsAlert } from "./sentry_ops.ts";
+import {
+  bindingAlertCode,
+  bindingBlocksMoney,
+  parseBinding,
+} from "./pagbank_binding.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -119,6 +124,10 @@ export async function releaseHeldSplit(
   if (!custodyReleaseDue(clock, now)) return false;
   const sql = await sqlAllowsRelease(admin, charge.id, new Date(now).toISOString());
   if (sql === false) return false;
+  // Conta da casa e token têm de ser da mesma conta. Se houver ambiguidade,
+  // a custódia não solta e o alerta sai; o cron tenta de novo depois que
+  // alguém decidir a conta. Não escolhe e não gasta tentativa.
+  if (await bindingStopsRelease(admin, charge)) return false;
   try {
     const accounts = await custodyAccountIds(admin, pagbank, charge);
     if (accounts.length === 0) throw new Error("custodia_recebedores");
@@ -142,6 +151,47 @@ export async function releaseHeldSplit(
     }
     return false;
   }
+}
+
+async function bindingStopsRelease(
+  admin: Admin,
+  charge: CustodyCharge,
+): Promise<boolean> {
+  if (typeof admin?.rpc !== "function") return false;
+  let venueId = (charge.venue_id ?? "").trim();
+  if (!venueId) {
+    try {
+      const { data } = await admin
+        .from("payment_charges")
+        .select("venue_id")
+        .eq("id", charge.id)
+        .maybeSingle();
+      venueId = typeof data?.venue_id === "string" ? data.venue_id : "";
+    } catch {
+      venueId = "";
+    }
+  }
+  if (!venueId) return false;
+  let binding = parseBinding(null);
+  try {
+    const result = await admin.rpc("venue_pagbank_binding", {
+      p_venue_id: venueId,
+    });
+    binding = result?.error ? parseBinding(null) : parseBinding(result?.data);
+  } catch {
+    binding = parseBinding(null);
+  }
+  if (!bindingBlocksMoney(binding)) return false;
+  await captureOpsAlert({
+    get(name: string) {
+      try {
+        return Deno.env.get(name);
+      } catch {
+        return undefined;
+      }
+    },
+  }, fetch, { scope: "pagbank-custody", code: bindingAlertCode(binding) });
+  return true;
 }
 
 /// Casa e EscapeMatch, como no exemplo de POST /splits/{id}/custody/release.

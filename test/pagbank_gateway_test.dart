@@ -59,7 +59,7 @@ void main() {
     final provision = File(
       'supabase/functions/pagbank-connect/index.ts',
     ).readAsStringSync();
-    expect(provision.contains('store_venue_pagbank_tokens'), isTrue);
+    expect(provision.contains('connect_venue_pagbank'), isTrue);
     expect(provision.contains('p_access_token: tokens.accessToken'), isTrue);
     expect(provision.contains('p_refresh_token: tokens.refreshToken'), isTrue);
     expect(

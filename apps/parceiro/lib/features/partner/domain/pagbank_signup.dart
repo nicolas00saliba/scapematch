@@ -434,3 +434,51 @@ class PagbankSignupView {
     );
   }
 }
+
+/// A conta PagBank que o servidor guarda para a casa. Vem sempre do servidor,
+/// por qualquer aparelho ou sessão: nada dela fica no aparelho. Documento e
+/// conta já chegam mascarados. O PagBank só devolve o id da conta na conexão,
+/// então não há titular verificado: a tela mostra o nome e o documento da
+/// CASA, cadastrados aqui, e o final da conta.
+class PagbankAccountView {
+  const PagbankAccountView({
+    required this.connected,
+    this.houseName = '',
+    this.bank = 'PagBank',
+    this.accountLast4 = '',
+    this.documentKind,
+    this.documentMasked,
+    this.canDisconnect = true,
+  });
+
+  static const none = PagbankAccountView(connected: false);
+
+  final bool connected;
+  final String houseName;
+  final String bank;
+  final String accountLast4;
+  final String? documentKind;
+  final String? documentMasked;
+  final bool canDisconnect;
+
+  String get documentLabel =>
+      documentKind == 'cnpj' ? 'CNPJ da casa' : 'CPF da casa';
+
+  static PagbankAccountView fromJson(Object? value) {
+    if (value is! Map || value['connected'] != true) return none;
+    String? text(Object? raw) {
+      final item = raw?.toString().trim() ?? '';
+      return item.isEmpty ? null : item;
+    }
+
+    return PagbankAccountView(
+      connected: true,
+      houseName: text(value['house_name']) ?? '',
+      bank: text(value['bank']) ?? 'PagBank',
+      accountLast4: text(value['account_last4']) ?? '',
+      documentKind: text(value['document_kind']),
+      documentMasked: text(value['document_masked']),
+      canDisconnect: value['can_disconnect'] != false,
+    );
+  }
+}

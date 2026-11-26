@@ -74,6 +74,7 @@ function fake(options?: {
   period?: string;
   stale?: Record<string, unknown>[];
   subaccounts?: Record<string, unknown>[];
+  binding?: unknown;
   webhooks?: {
     id: string;
     url: string;
@@ -142,6 +143,9 @@ function fake(options?: {
         });
       }
       if (fn === "venue_payout_wallet") return Promise.resolve(wallet);
+      if (fn === "venue_pagbank_binding") {
+        return Promise.resolve(options?.binding ?? { state: "ok" });
+      }
       if (fn === "read_venue_pagbank_tokens") {
         return Promise.resolve(options?.tokens ?? null);
       }
@@ -910,4 +914,43 @@ Deno.test("a reconciliacao consulta o pendente antigo e nao cria outra transfere
   );
   assertEquals(reserve.keys, []);
   assert(!reserve.calls.some((call) => call.fn === "apply_transfer_event"));
+});
+
+Deno.test("conta da casa e token de contas diferentes: o repasse para sem ler o token", async () => {
+  for (
+    const binding of [
+      { state: "ambiguous", reason: "tokens_other_account" },
+      { state: "ambiguous", reason: "tokens_without_account" },
+      "ilegivel",
+    ]
+  ) {
+    const gate = fake({ binding });
+    const response = await handleVenuePayouts(
+      post({ action: "snapshot", venue_id: venue }),
+      gate.deps,
+    );
+    const body = await response.json();
+    assertEquals(response.status, 200);
+    assertEquals(body.available_cents, 0);
+    assertEquals(gate.keys, []);
+    assert(
+      gate.calls.some((call) => call.fn === "venue_pagbank_binding"),
+    );
+    assert(
+      !gate.calls.some((call) => call.fn === "read_venue_pagbank_tokens"),
+    );
+    assert(!gate.calls.some((call) => call.fn === "claim_venue_withdrawal"));
+  }
+});
+
+Deno.test("token antigo sem a conta gravada segue; a conta única confere", async () => {
+  for (const state of ["ok", "unverified", "none"]) {
+    const gate = fake({ binding: { state } });
+    const response = await handleVenuePayouts(
+      post({ action: "snapshot", venue_id: venue }),
+      gate.deps,
+    );
+    assertEquals(response.status, 200);
+    assertEquals(gate.keys, [subKey]);
+  }
 });

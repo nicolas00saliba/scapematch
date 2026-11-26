@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scapematch/features/payments/data/pagbank_connect_client.dart';
 import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 import 'package:scapematch/features/payments/presentation/pagbank_connect_return_page.dart';
 
@@ -66,5 +67,42 @@ void main() {
     await tester.pump();
     expect(done, 0);
     expect(find.text('Continuar'), findsOneWidget);
+  });
+
+  testWidgets('segunda conta PagBank na casa mostra a mensagem do 409', (
+    tester,
+  ) async {
+    var done = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PagbankConnectReturnPage(
+          hit: const PagbankConnectReturn(code: 'code-1', state: 'state-1'),
+          complete: (_) async => throw const PagbankConnectConflict(),
+          onDone: () => done += 1,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(done, 0);
+    expect(find.text(pagbankConnectConflictMessage), findsOneWidget);
+    expect(find.text('Continuar'), findsOneWidget);
+  });
+
+  testWidgets('conta de outra casa mostra o texto que o servidor mandou', (
+    tester,
+  ) async {
+    const text = 'Esta conta PagBank já está ligada a outra casa.';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PagbankConnectReturnPage(
+          hit: const PagbankConnectReturn(code: 'code-1', state: 'state-1'),
+          complete: (_) async => throw const PagbankConnectConflict(text),
+          onDone: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text(text), findsOneWidget);
+    expect(find.text(pagbankConnectConflictMessage), findsNothing);
   });
 }

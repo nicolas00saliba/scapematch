@@ -1,0 +1,185 @@
+import { assert, assertEquals } from "jsr:@std/assert@1";
+import {
+  accountChangedMessage,
+  accountInUseMessage,
+  bindingAlertCode,
+  chargeBindingBlocked,
+  bindingBlocksMoney,
+  conflictBody,
+  conflictFromRpc,
+  ownerMayDisconnect,
+  parseBinding,
+} from "./pagbank_binding.ts";
+
+Deno.test("PB409 vira conflito 409 com mensagem clara", () => {
+  const exists = conflictFromRpc({
+    code: "PB409",
+    message: "pagbank_account_exists",
+  });
+  assertEquals(exists?.code, "pagbank_account_exists");
+  assert(conflictBody(exists!).message.includes("desconecte"));
+  const busy = conflictFromRpc({ message: "pagbank_in_flight" });
+  assertEquals(busy?.code, "pagbank_in_flight");
+  assert(conflictBody(busy!).message.includes("a caminho"));
+  assertEquals(
+    conflictFromRpc({ message: "pagbank_account_mismatch" })?.code,
+    "pagbank_account_mismatch",
+  );
+  assertEquals(conflictFromRpc({ code: "PB409", message: "x" })?.code,
+    "pagbank_account_exists");
+  assertEquals(conflictFromRpc({ code: "23505", message: "dup" }), null);
+  assertEquals(conflictFromRpc(null), null);
+});
+
+Deno.test("a conta mascarada não vai na mensagem de conflito", () => {
+  const body = conflictBody(
+    conflictFromRpc({ message: "pagbank_account_exists" })!,
+  );
+  assertEquals(/ACCO_|\.\.\.\w{4}/.test(JSON.stringify(body)), false);
+});
+
+Deno.test("o binding ambíguo ou ilegível bloqueia o dinheiro", () => {
+  for (const raw of [
+    { state: "ambiguous", reason: "tokens_other_account" },
+    { state: "ambiguous", reason: "tokens_without_account" },
+    null,
+    "ok",
+    { state: "outro" },
+    [],
+  ]) {
+    assert(bindingBlocksMoney(parseBinding(raw)), JSON.stringify(raw));
+  }
+  for (const state of ["none", "ok", "unverified"]) {
+    assertEquals(bindingBlocksMoney(parseBinding({ state })), false);
+  }
+  assertEquals(
+    bindingBlocksMoney(parseBinding([{ state: "ok" }])),
+    false,
+  );
+});
+
+Deno.test("o alerta separa conta ambígua, token sem conta e ilegível", () => {
+  assertEquals(
+    bindingAlertCode(parseBinding({
+      state: "ambiguous",
+      reason: "tokens_other_account",
+    })),
+    "conta_ambigua",
+  );
+  assertEquals(
+    bindingAlertCode(parseBinding({
+      state: "ambiguous",
+      reason: "tokens_without_account",
+    })),
+    "token_sem_conta",
+  );
+  assertEquals(bindingAlertCode(parseBinding(null)), "conta_ilegivel");
+  for (const code of ["conta_ambigua", "token_sem_conta", "conta_ilegivel"]) {
+    assert(/^[a-z0-9_]{1,48}$/.test(code));
+  }
+});
+
+Deno.test("só o Admin desconecta, e o Parceiro segue a mesma regra", async () => {
+  assertEquals(ownerMayDisconnect, false);
+  const card = await Deno.readTextFile(
+    new URL(
+      "../../../apps/parceiro/lib/features/partner/presentation/venue_pagbank_signup_card.dart",
+      import.meta.url,
+    ),
+  );
+  assert(card.includes(`const partnerOwnerMayDisconnect = ${ownerMayDisconnect};`));
+  const fn = await Deno.readTextFile(
+    new URL("../pagbank-disconnect/index.ts", import.meta.url),
+  );
+  // a recusa ao dono vem antes de ler o token ou chamar o RPC
+  const gate = fn.indexOf("!isAdmin && !ownerMayDisconnect");
+  assert(gate > 0);
+  assert(gate < fn.indexOf("read_venue_pagbank_tokens"));
+  assert(gate < fn.indexOf("disconnect_venue_pagbank"));
+});
+
+// Reserva simulada: nenhuma cobrança, nenhuma chamada à PagBank. Só mostra que
+// o split de R$ 100,00 aponta para a conta que a casa tem no servidor.
+import { fixedSplit, pagbankSplitBody, venueShareCents } from "./pagbank_rules.ts";
+import { paymentBlock } from "./venue_finance.ts";
+
+Deno.test("reserva simulada: sem conta a casa não recebe; com conta o repasse vai para ela", () => {
+  const primary = "ACCO_PRIMARIA";
+  const chargedCents = 10_000;
+  const venueCents = venueShareCents(chargedCents, 2500);
+  const venue = { status: "approved", pagbank_account_id: null as string | null };
+
+  // Casa desconectada: a cobrança é recusada antes de qualquer split.
+  assert(
+    paymentBlock({ status: venue.status, walletId: venue.pagbank_account_id }) !==
+      null,
+  );
+
+  // Conectou a conta nova: o servidor guarda e o split aponta para ela.
+  venue.pagbank_account_id = "ACCO_NOVA_9999";
+  assertEquals(
+    paymentBlock({ status: venue.status, walletId: venue.pagbank_account_id }),
+    null,
+  );
+  const split = fixedSplit({
+    chargedCents,
+    venueCents,
+    venueAccountId: venue.pagbank_account_id,
+    primaryAccountId: primary,
+  });
+  const receivers = pagbankSplitBody(split).receivers as {
+    account: { id: string };
+    amount: { value: number };
+    reason: string;
+  }[];
+  const house = receivers.find((item) => item.reason === "Repasse da casa");
+  assertEquals(house?.account.id, "ACCO_NOVA_9999");
+  assertEquals(house?.amount.value, 7500);
+  assertEquals(
+    receivers.some((item) => item.account.id === "ACCO_ANTIGA_13CA"),
+    false,
+  );
+  assertEquals(receivers.length, 2);
+});
+
+Deno.test("cobrança nova: só passa com conta conferida (falha fechada)", async () => {
+  const rpc = (result: () => unknown) => ({
+    rpc: () => Promise.resolve(result() as { data: unknown; error: unknown }),
+  });
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: { state: "ok" }, error: null })), "v"),
+    false,
+  );
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: { state: "ambiguous" }, error: null })), "v"),
+    true,
+  );
+  // erro na checagem, resposta vazia ou lixo: bloqueia
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: null, error: { code: "XX" } })), "v"),
+    true,
+  );
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: null, error: null })), "v"),
+    true,
+  );
+  assertEquals(
+    await chargeBindingBlocked(rpc(() => ({ data: "x", error: null })), "v"),
+    true,
+  );
+  assertEquals(
+    await chargeBindingBlocked({
+      rpc: () => Promise.reject(new Error("rede")),
+    }, "v"),
+    true,
+  );
+});
+
+Deno.test("conflitos novos: conta em uso e conta mudou viram 409 com texto próprio", () => {
+  const inUse = conflictFromRpc({ code: "PB409", message: "pagbank_account_in_use" });
+  assertEquals(inUse?.code, "pagbank_account_in_use");
+  assertEquals(inUse?.message409, accountInUseMessage);
+  const changed = conflictFromRpc({ message: "pagbank_account_changed" });
+  assertEquals(changed?.code, "pagbank_account_changed");
+  assertEquals(changed?.message409, accountChangedMessage);
+});

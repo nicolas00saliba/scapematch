@@ -4,6 +4,9 @@ verify_jwt = true
 [functions.pagbank-connect]
 verify_jwt = true
 
+[functions.pagbank-disconnect]
+verify_jwt = true
+
 # O dono manda o JWT. A função lê o token da casa e não o devolve.
 [functions.venue-pagbank-balance]
 verify_jwt = true

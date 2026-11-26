@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:scapematch/features/payments/data/pagbank_connect_client.dart';
 import 'package:scapematch/features/payments/data/pagbank_connect_return.dart';
 
 /// Troca `code` e `state` na função `pagbank-connect` e mostra o resultado.
@@ -22,6 +23,8 @@ class PagbankConnectReturnPage extends StatefulWidget {
 class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
   bool _busy = true;
   bool _linked = false;
+  bool _conflict = false;
+  String? _conflictText;
 
   @override
   void initState() {
@@ -31,8 +34,13 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
 
   Future<void> _run() async {
     var linked = false;
+    var conflict = false;
+    String? conflictText;
     try {
       linked = await widget.complete(widget.hit);
+    } on PagbankConnectConflict catch (error) {
+      conflictText = error.message;
+      conflict = true;
     } on Object {
       linked = false;
     }
@@ -40,6 +48,8 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
     setState(() {
       _busy = false;
       _linked = linked;
+      _conflict = conflict;
+      _conflictText = conflictText;
     });
     if (linked) widget.onDone();
   }
@@ -50,6 +60,8 @@ class _PagbankConnectReturnPageState extends State<PagbankConnectReturnPage> {
         ? 'Ligando a casa à PagBank.'
         : _linked
         ? 'A casa está ligada à PagBank.'
+        : _conflict
+        ? (_conflictText ?? pagbankConnectConflictMessage)
         : 'Não foi possível ligar a casa. Peça um link novo.';
     return Scaffold(
       body: Center(

@@ -159,3 +159,7 @@ run -f "$root/tests/custody_after_session.sql"
 echo "custody after session ok"
 run -f "$root/tests/eliminar_provedor_antigo.sql"
 echo "eliminar provedor antigo ok"
+# supabase/migrations/20261126170000_pagbank_conta_unica.sql
+run -f "$root/tests/pagbank_conta_unica.sql"
+echo "pagbank conta unica ok"
+bash "$root/tests/pagbank_disconnect_race.sh"

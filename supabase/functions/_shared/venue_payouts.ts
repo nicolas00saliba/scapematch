@@ -7,6 +7,12 @@ import {
   PagBankProvider,
   pagbankSignatureMatches,
 } from "./pagbank_provider.ts";
+import {
+  bindingAlertCode,
+  bindingBlocksMoney,
+  parseBinding,
+} from "./pagbank_binding.ts";
+import { captureOpsAlert, type OpsFetch } from "./sentry_ops.ts";
 import { resolveCronSecret, type SecretCache } from "./cron_secret.ts";
 import {
   isPixRejected,
@@ -42,6 +48,7 @@ const knownErrors = [
   "valor",
   "sem subconta",
   "sem conta",
+  "conta ambigua",
   "sem pix",
   "minimo",
   "agenda",
@@ -93,6 +100,7 @@ export type PayoutDeps = {
 type Subaccount =
   | { kind: "ok"; client: TransferClient }
   | { kind: "reserve" }
+  | { kind: "ambiguous" }
   | { kind: "missing" };
 
 export function recentStrongAuth(
@@ -498,6 +506,9 @@ async function sendWithdrawal(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const keys = input.keys ?? await subaccount(deps, input.venueId);
   if (keys.kind === "reserve") return { status: 403, body: { error: "reserva" } };
+  if (keys.kind === "ambiguous") {
+    return { status: 409, body: { error: "conta ambigua" } };
+  }
   if (keys.kind !== "ok") return { status: 403, body: { error: "sem subconta" } };
   const balance = input.balanceCents ?? await keys.client.balanceCents();
   const claimed = record(await deps.store.rpc("claim_venue_withdrawal", {
@@ -594,6 +605,16 @@ async function subaccount(
     p_venue_id: venueId,
   }));
   if (isPointsReserve(deps.env, wallet, "")) return { kind: "reserve" };
+  // Conta da casa e token têm de ser da mesma conta PagBank. Se não forem,
+  // ou se a conferência falhar, o repasse para e alerta. Não escolhe.
+  const binding = await readBinding(deps, venueId);
+  if (bindingBlocksMoney(binding)) {
+    await captureOpsAlert(deps.env, (deps.fetchFn ?? fetch) as OpsFetch, {
+      scope: "pagbank-payout",
+      code: bindingAlertCode(binding),
+    });
+    return { kind: "ambiguous" };
+  }
   const creds = await venueCredentials(deps, venueId);
   if (!creds.access) return { kind: "missing" };
   if (isPointsReserve(deps.env, wallet, creds.access)) return { kind: "reserve" };
@@ -601,6 +622,16 @@ async function subaccount(
     ? () => rotateVenueAccess(deps, venueId, creds.refresh)
     : undefined;
   return { kind: "ok", client: deps.clientFor(creds.access, refresh) };
+}
+
+async function readBinding(deps: PayoutDeps, venueId: string) {
+  try {
+    return parseBinding(
+      await deps.store.rpc("venue_pagbank_binding", { p_venue_id: venueId }),
+    );
+  } catch {
+    return parseBinding(null);
+  }
 }
 
 async function venueCredentials(

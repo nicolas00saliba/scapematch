@@ -143,6 +143,9 @@ function adminFor(options: {
     },
     rpc(name: string, args: Record<string, unknown>) {
       calls.push(name);
+      if (name === "venue_pagbank_binding") {
+        return Promise.resolve({ data: { state: "ok" }, error: null });
+      }
       if (name === "claim_card_capture") {
         const ok = options.claim ? options.claim() : true;
         return Promise.resolve({ data: ok, error: null });

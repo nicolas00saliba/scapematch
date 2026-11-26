@@ -79,6 +79,9 @@ function adminFor(rows: Record<string, unknown>[], startsAt = "2020-01-01T00:00:
     },
     rpc(fn: string, args: Record<string, unknown>) {
       calls.push({ fn, args });
+      if (fn === "venue_pagbank_binding") {
+        return Promise.resolve({ data: { state: "ok" }, error: null });
+      }
       if (fn === "apply_payment_transition") {
         return Promise.resolve({
           data: { status: args.p_next_status ?? "paid" },
