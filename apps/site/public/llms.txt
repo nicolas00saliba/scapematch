@@ -39,6 +39,6 @@ O Instagram oficial é https://www.instagram.com/escapematch/. O grupo de quem n
 - [Para casas](https://escapematch.com.br/para-casas): casas parceiras e preços.
 - [Sobre a EscapeMatch](https://escapematch.com.br/sobre): a marca, o app para achar grupo e jogar escape room sozinho no Brasil, e a diferença para modos de jogo de tiro com nome parecido.
 - [Escape room em Curitiba](https://escapematch.com.br/escape-room-curitiba): achar grupo, reservar, avaliações e ranking de tempo.
-- [Contato](https://escapematch.com.br/contato): e-mail, CNPJ e links do app e do Parceiro.
+- [Contato](https://escapematch.com.br/contato): e-mail de contato e links do app e do Parceiro.
 
 Texto completo: https://escapematch.com.br/llms-full.txt

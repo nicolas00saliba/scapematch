@@ -68,7 +68,7 @@ function idsDefinidos(valor: unknown, acc = new Set<string>()): Set<string> {
   }
   if (valor && typeof valor === 'object') {
     const registro = valor as Record<string, unknown>;
-    if (typeof registro['@id'] === 'string' && typeof registro['@type'] === 'string') {
+    if (typeof registro['@id'] === 'string' && registro['@type'] != null) {
       acc.add(registro['@id']);
     }
     for (const item of Object.values(registro)) idsDefinidos(item, acc);
@@ -80,8 +80,10 @@ test('a Organization tem um @id estável e os fatos já publicados', () => {
   assert.equal(organizacao['@id'], 'https://escapematch.com.br/#organization');
   assert.equal(organizacao['@id'], idOrganizacao);
   assert.equal(organizacao.name, 'EscapeMatch');
-  assert.equal(organizacao.legalName, 'ESCAPEMATCH TECNOLOGIA LTDA');
-  assert.equal(organizacao.taxID, '70.100.608/0001-73');
+  assert.equal('legalName' in organizacao, false);
+  assert.equal('taxID' in organizacao, false);
+  assert.equal(organizacao.brand['@type'], 'Brand');
+  assert.equal(organizacao.brand.name, 'EscapeMatch');
   assert.deepEqual(organizacao.alternateName, ['Escape Match', 'escapematch']);
   assert.deepEqual(nomesAlternativos, organizacao.alternateName);
   assert.equal(organizacao.description, definicaoCurta);
@@ -115,7 +117,7 @@ test('WebSite e WebApplication apontam para a mesma Organization', () => {
   assert.equal(website['@id'], idWebsite);
   assert.equal(website.publisher['@id'], idOrganizacao);
   assert.equal(website.name, 'EscapeMatch');
-  assert.equal(aplicativo['@type'], 'WebApplication');
+  assert.deepEqual(aplicativo['@type'], ['SoftwareApplication', 'WebApplication']);
   assert.equal(aplicativo['@id'], idAplicativo);
   assert.equal(aplicativo.name, 'EscapeMatch');
   assert.equal(aplicativo.provider['@id'], idOrganizacao);
@@ -138,7 +140,8 @@ test('guias e a página sobre publicam author e publisher', () => {
   assert.equal(sobre.author['@id'], idOrganizacao);
   const home = paginaLd('/', tituloHome, descricaoHome);
   assert.equal(home['@type'], 'WebPage');
-  const faq = faqPage([{ pergunta: 'O que é o EscapeMatch?', resposta: definicaoCurta }]);
+  assert.equal(home.about['@id'], idAplicativo);
+  const faq = faqPage([{ pergunta: 'O que é a EscapeMatch?', resposta: definicaoCurta }]);
   assert.equal(faq.publisher['@id'], idOrganizacao);
   assert.equal(faq.author['@id'], idOrganizacao);
 });
@@ -148,14 +151,22 @@ test('o grafo da home fecha as referências e o JSON é válido', () => {
     path: '/',
     title: tituloHome,
     description: descricaoHome,
-    extra: faqPage([{ pergunta: 'O que é o EscapeMatch?', resposta: definicao }]),
+    extra: faqPage([{ pergunta: 'O que é a EscapeMatch?', resposta: definicaoCurta }]),
   });
   const texto = JSON.stringify(blocos);
   const lido = JSON.parse(texto) as unknown[];
   assert.equal(Array.isArray(lido), true);
   assert.equal(texto.includes('streetAddress'), false);
   assert.equal(texto.includes('GameApplication'), false);
+  assert.equal(texto.includes('MobileApplication'), false);
   assert.equal(texto.includes('ScapeMatch'), false);
+  assert.equal(texto.includes('legalName'), false);
+  assert.equal(texto.includes('taxID'), false);
+  assert.equal(texto.includes('70.100.608'), false);
+  assert.equal(texto.includes('ESCAPEMATCH TECNOLOGIA'), false);
+  assert.equal(texto.includes('Room Escape Match 6'), true);
+  assert.equal(texto.includes('Escape Match Room Tiles'), true);
+  assert.deepEqual((lido[0] as { '@type': unknown })['@type'], ['SoftwareApplication', 'WebApplication']);
   assert.equal(texto.includes('"name":"EscapeMatch"'), true);
   const definidos = idsDefinidos(lido);
   for (const id of idsReferenciados(lido)) {

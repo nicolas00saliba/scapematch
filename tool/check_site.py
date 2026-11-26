@@ -89,8 +89,9 @@ DESCRICAO_MARCA = (
 NOMES_ALTERNATIVOS = ["Escape Match", "escapematch"]
 HOME_DESCRICAO = (
     "EscapeMatch — app para jogar escape room sozinho no Brasil. "
-    "Você chega sozinho, entra num grupo e paga só a sua vaga."
+    "Ache pessoas, entre num grupo e pague só a sua vaga."
 )
+PERGUNTA_O_QUE_E = "O que é a EscapeMatch?"
 NOME_ANTIGO = re.compile(r"ScapeMatch|Scape Match")
 REFORCO_PRESENCIAL = "Não é um jogo de celular nem um jogo de quebra-cabeça ou match-3."
 FRASE_TIRO = (
@@ -256,8 +257,15 @@ def blocos_ld(html: str) -> list:
     return saida
 
 
+def e_tipo(bloco: dict, tipo: str) -> bool:
+    valor = bloco.get("@type")
+    if isinstance(valor, list):
+        return tipo in valor
+    return valor == tipo
+
+
 def exigir_faq(html: str, rota: str, perguntas: tuple[str, ...]) -> None:
-    faqs = [bloco for bloco in blocos_ld(html) if bloco.get("@type") == "FAQPage"]
+    faqs = [bloco for bloco in blocos_ld(html) if e_tipo(bloco, "FAQPage")]
     if len(faqs) != 1:
         falha(f"{rota} saiu com {len(faqs)} FAQPage")
     nomes = [item.get("name") for item in faqs[0].get("mainEntity", [])]
@@ -269,7 +277,7 @@ def exigir_faq(html: str, rota: str, perguntas: tuple[str, ...]) -> None:
 
 
 def exigir_resposta(html: str, rota: str, pergunta: str, resposta: str) -> None:
-    faqs = [bloco for bloco in blocos_ld(html) if bloco.get("@type") == "FAQPage"]
+    faqs = [bloco for bloco in blocos_ld(html) if e_tipo(bloco, "FAQPage")]
     if len(faqs) != 1:
         falha(f"{rota} saiu com {len(faqs)} FAQPage")
     for item in faqs[0].get("mainEntity", []):
@@ -514,12 +522,12 @@ def main() -> None:
             if "streetAddress" in texto or "GameApplication" in texto:
                 falha(f"{html.relative_to(DIST)} tem rua ou GameApplication")
             blocos = blocos_ld(texto)
+            if any("legalName" in bloco or "taxID" in bloco for bloco in blocos):
+                falha(f"{html.relative_to(DIST)} publicou legalName ou taxID no schema")
             same = [bloco.get("sameAs") for bloco in blocos if "sameAs" in bloco]
             if any(item != SAME_AS for item in same):
                 falha(f"{html.relative_to(DIST)} tem sameAs fora do Instagram e do Meetup")
-            tem_org = any(
-                bloco.get("@type") == "Organization" and bloco.get("legalName") for bloco in blocos
-            )
+            tem_org = any(e_tipo(bloco, "Organization") for bloco in blocos)
             if tem_org and same != [SAME_AS]:
                 falha(f"{html.relative_to(DIST)} sem o Instagram oficial e o Meetup em sameAs")
         for rota in FORA_DO_BUILD:
@@ -564,19 +572,22 @@ def main() -> None:
         falha("a home saiu sem Organization ou WebSite")
     if '"@type":"FAQPage"' not in home_html:
         falha("a home saiu sem FAQPage")
+    exigir_faq(home_html, "/", (PERGUNTA_O_QUE_E,))
+    exigir_resposta(home_html, "/", PERGUNTA_O_QUE_E, DEFINICAO)
     orgs = [
         bloco
         for bloco in blocos_ld(home_html)
-        if bloco.get("@type") == "Organization" and bloco.get("legalName")
+        if e_tipo(bloco, "Organization")
     ]
     if len(orgs) != 1:
-        falha(f"a home saiu com {len(orgs)} Organization com legalName")
+        falha(f"a home saiu com {len(orgs)} Organization")
     org = orgs[0]
     endereco = org.get("address") or {}
-    if org.get("legalName") != "ESCAPEMATCH TECNOLOGIA LTDA":
-        falha("legalName ausente")
-    if org.get("taxID") != "70.100.608/0001-73":
-        falha("taxID ausente")
+    if "legalName" in org or "taxID" in org:
+        falha("Organization ainda publica legalName ou taxID")
+    marca = org.get("brand") or {}
+    if marca.get("@type") != "Brand" or marca.get("name") != "EscapeMatch":
+        falha("brand da Organization ausente")
     if org.get("alternateName") != NOMES_ALTERNATIVOS:
         falha("alternateName da Organization divergiu")
     if org.get("email") != EMAIL_CONTATO:
@@ -603,11 +614,11 @@ def main() -> None:
     area = org.get("areaServed") or {}
     if area.get("@type") != "Country" or area.get("name") != "Brasil" or "address" in area:
         falha("areaServed da marca não é o Brasil")
-    if any(bloco.get("@type") == "WebApplication" and (bloco.get("areaServed") or {}).get("name") != "Brasil" for bloco in blocos_ld(home_html)):
+    if any(e_tipo(bloco, "WebApplication") and (bloco.get("areaServed") or {}).get("name") != "Brasil" for bloco in blocos_ld(home_html)):
         falha("areaServed do app não é o Brasil")
     if any(campo in org for campo in ("telephone", "award", "duns")):
         falha("Organization com dado que o repositório não publica")
-    sites = [bloco for bloco in blocos_ld(home_html) if bloco.get("@type") == "WebSite"]
+    sites = [bloco for bloco in blocos_ld(home_html) if e_tipo(bloco, "WebSite")]
     if len(sites) != 1 or sites[0].get("@id") != SITE_ID:
         falha("WebSite sem @id estável")
     if (sites[0].get("publisher") or {}).get("@id") != ORG_ID:
@@ -623,9 +634,13 @@ def main() -> None:
     ):
         falha("endereço da Organization divergiu")
     app_html = arquivo("/app").read_text()
-    apps = [bloco for bloco in blocos_ld(app_html) if bloco.get("@type") == "WebApplication"]
+    apps = [bloco for bloco in blocos_ld(app_html) if e_tipo(bloco, "SoftwareApplication")]
     if len(apps) != 1:
-        falha(f"/app saiu com {len(apps)} WebApplication")
+        falha(f"/app saiu com {len(apps)} SoftwareApplication")
+    if apps[0].get("@type") != ["SoftwareApplication", "WebApplication"]:
+        falha("o tipo do app não é SoftwareApplication e WebApplication")
+    if "MobileApplication" in (apps[0].get("@type") or []):
+        falha("o app publicou MobileApplication sem ficha de loja")
     oferta = apps[0].get("offers") or {}
     if apps[0].get("alternateName") != NOMES_ALTERNATIVOS:
         falha("alternateName do WebApplication divergiu")
@@ -644,9 +659,12 @@ def main() -> None:
             falha(f"WebApplication sem {campo} da Organization")
     if DEFINICAO_VISIVEL not in app_html or "O aplicativo é gratuito." not in app_html:
         falha("a página do app não mostra o que o WebApplication afirma")
-    home_apps = [bloco for bloco in blocos_ld(home_html) if bloco.get("@type") == "WebApplication"]
+    home_blocos = blocos_ld(home_html)
+    home_apps = [bloco for bloco in home_blocos if e_tipo(bloco, "SoftwareApplication")]
     if len(home_apps) != 1 or home_apps[0].get("@id") != APP_ID:
-        falha("a home saiu sem o WebApplication da marca")
+        falha("a home saiu sem o SoftwareApplication da marca")
+    if not e_tipo(home_blocos[0], "SoftwareApplication") or home_blocos[0].get("@id") != APP_ID:
+        falha("o grafo da home não começa pelo app")
     if 'rel="preload"' not in home_html or "woff2" not in home_html:
         falha("fonte sem preload")
     como = arquivo("/como-funciona").read_text()
@@ -685,7 +703,7 @@ def main() -> None:
             if FRASE_PLAY not in html_marca or PERGUNTA_PLAY not in html_marca:
                 falha("sobre sem a diferença para os jogos da Google Play")
         tipo_pagina = "AboutPage" if rota == "/sobre" else "Article"
-        paginas = [bloco for bloco in blocos_ld(html_marca) if bloco.get("@type") == tipo_pagina]
+        paginas = [bloco for bloco in blocos_ld(html_marca) if e_tipo(bloco, tipo_pagina)]
         if len(paginas) != 1:
             falha(f"{rota} saiu com {len(paginas)} {tipo_pagina}")
         for campo in ("author", "publisher"):
@@ -699,7 +717,7 @@ def main() -> None:
         (
             "Onde achar gente para jogar escape room sozinho?",
             "Dá para jogar escape room sem conhecer ninguém?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
     )
     guia_curitiba = arquivo("/guia/escape-room-sozinho-curitiba").read_text()
@@ -719,7 +737,7 @@ def main() -> None:
             "Onde jogar escape room sozinho em Curitiba?",
             "Como o EscapeMatch junta o grupo em Curitiba?",
             "O que esperar da sessão?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
     )
     exigir_faq(
@@ -730,7 +748,7 @@ def main() -> None:
             "Grupos de WhatsApp, Reddit ou Meetup servem?",
             "A casa pode completar a sala?",
             "Como o EscapeMatch acha o grupo?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
     )
     if "não lista casas parceiras" not in guia_curitiba.lower():
@@ -744,21 +762,21 @@ def main() -> None:
             "Não tenho ninguém pra jogar escape room. Consigo ir?",
             "Como entrar num grupo aberto e pagar só a minha vaga?",
             "O EscapeMatch é só em Curitiba?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
         "/guia/escape-room-com-desconhecidos": (
             "Dá para jogar escape room com desconhecidos?",
             "Como é a sessão com desconhecidos?",
             "Qual é a regra de convivência?",
             "Quem paga quando o grupo é de desconhecidos?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
         "/guia/escape-room-para-2-pessoas": (
             "Dá para jogar escape room para 2 pessoas?",
             "A dupla paga a sala inteira?",
             "Já somos duas pessoas. Dá para usar o app?",
             "A dupla precisa conhecer o resto do grupo?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
         "/guia/nao-tenho-amigos-para-escape-room": (
             "Não tenho ninguém pra jogar escape room. O que fazer?",
@@ -771,21 +789,21 @@ def main() -> None:
             "Jogar escape room sem ninguém é a mesma coisa que jogar sozinho no computador?",
             "É seguro jogar com desconhecidos?",
             "Quanto custa a vaga?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
         "/guia/escape-room-em-grupo-curitiba": (
             "Como jogar escape room em grupo em Curitiba?",
             "Quem entra nesse grupo?",
             "Quando o grupo em Curitiba confirma?",
             "Onde vejo as salas de grupo em Curitiba?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
         "/guia/primeira-vez-em-escape-room": (
             "Primeira vez em escape room: o que saber?",
             "Preciso ter jogado escape room antes?",
             "O que fazer na hora da sessão?",
             "E se for a primeira vez e o grupo não fechar?",
-            "O que é o EscapeMatch?",
+            "O que é a EscapeMatch?",
         ),
     }
     for rota, perguntas in guias_novos.items():

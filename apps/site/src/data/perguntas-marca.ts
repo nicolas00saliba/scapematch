@@ -1,4 +1,4 @@
-import { definicao, frasePlayStore, primeirasCasas } from './seo';
+import { definicaoCurta, frasePlayStore, primeirasCasas } from './seo';
 
 export type PerguntaMarca = {
   pergunta: string;
@@ -24,8 +24,8 @@ export const completarGrupo: PerguntaMarca = {
 };
 
 export const oQueE: PerguntaMarca = {
-  pergunta: 'O que é o EscapeMatch?',
-  resposta: definicao,
+  pergunta: 'O que é a EscapeMatch?',
+  resposta: definicaoCurta,
 };
 
 export const eJogo: PerguntaMarca = {

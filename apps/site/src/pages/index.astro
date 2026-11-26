@@ -6,10 +6,12 @@ import DescontoPontos from '../components/DescontoPontos.astro';
 import CasasParceiras from '../components/CasasParceiras.astro';
 import { programaPorId } from '../data/programas';
 import { definicao, descricaoHome, faqPage, tituloHome } from '../data/seo';
+import { oQueE } from '../data/perguntas-marca';
 
 const cartoes = ['boas-vindas', 'pontos-de-volta', 'indique-amigos'].map(programaPorId);
 
 const perguntas = [
+  oQueE,
   {
     pergunta: 'Eu pago a reserva inteira?',
     resposta: 'Não. O preço é por pessoa. Você paga só a sua vaga.',
