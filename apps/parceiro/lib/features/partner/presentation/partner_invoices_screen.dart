@@ -10,11 +10,13 @@ import 'package:scapematch/core/formatting/session_format.dart';
 import 'package:scapematch/core/sharing/external_url.dart';
 import 'package:scapematch/core/sharing/save_bytes.dart';
 import 'package:scapematch/core/ui/window_class.dart';
+import 'package:scapematch_parceiro/features/partner/data/fiscal_save_error.dart';
 import 'package:scapematch_parceiro/features/partner/data/fiscal_zip.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_snapshot.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show FunctionException;
 
 class PartnerInvoices extends ConsumerStatefulWidget {
   const PartnerInvoices({super.key, required this.snapshot});
@@ -131,7 +133,9 @@ class _PartnerInvoicesState extends ConsumerState<PartnerInvoices> {
             ),
             FilledButton(
               key: PartnerKeys.invoiceBatch,
-              onPressed: _selected.isEmpty ? null : () => _downloadBatch(visible),
+              onPressed: _selected.isEmpty
+                  ? null
+                  : () => _downloadBatch(visible),
               child: Text(
                 _selected.isEmpty
                     ? 'Baixar em lote'
@@ -212,21 +216,23 @@ class _PartnerInvoicesState extends ConsumerState<PartnerInvoices> {
         );
         if (!mounted) return;
         if (response.status != 200) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Não foi possível gravar os dados fiscais.'),
+          final venues = ref.read(partnerSessionProvider)?.venues ?? const [];
+          _showFiscalFailure(
+            fiscalSaveFailure(
+              FunctionException(
+                status: response.status,
+                details: response.data,
+              ),
+              venues,
             ),
           );
           return;
         }
         ref.invalidate(partnerDeskProvider);
-      } on Object {
+      } on Object catch (error) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Não foi possível gravar os dados fiscais.'),
-          ),
-        );
+        final venues = ref.read(partnerSessionProvider)?.venues ?? const [];
+        _showFiscalFailure(fiscalSaveFailure(error, venues));
         return;
       }
     }
@@ -238,6 +244,25 @@ class _PartnerInvoicesState extends ConsumerState<PartnerInvoices> {
               ? 'Dados fiscais enviados. A função configura a subconta no PagBank.'
               : 'Dados fiscais salvos nesta sessão. No servidor, a função configura a subconta no PagBank.',
         ),
+      ),
+    );
+  }
+
+  void _showFiscalFailure(FiscalSaveFailure failure) {
+    final venue = failure.fiscalVenue;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        key: PartnerKeys.fiscalSaveError,
+        content: Text(failure.message),
+        duration: Duration(seconds: venue == null ? 4 : 10),
+        action: venue == null
+            ? null
+            : SnackBarAction(
+                label: 'Abrir ${venue.cityName ?? venue.name}',
+                onPressed: () => ref
+                    .read(partnerSessionProvider.notifier)
+                    .openVenue(venue.id),
+              ),
       ),
     );
   }
@@ -389,9 +414,8 @@ class _InvoiceTile extends StatelessWidget {
     if (link != null) {
       await Clipboard.setData(ClipboardData(text: link));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Link da nota copiado.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Link da nota copiado.')));
     }
   }
 
@@ -409,9 +433,8 @@ class _InvoiceTile extends StatelessWidget {
     if (link.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: link));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Link da nota copiado.')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Link da nota copiado.')));
   }
 }
 
@@ -450,9 +473,8 @@ class _FiscalForm extends StatelessWidget {
           children: [
             Text(
               'Dados fiscais da casa',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             const Text(
