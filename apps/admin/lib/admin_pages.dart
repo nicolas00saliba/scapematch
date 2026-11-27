@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/features/scape_points/domain/scape_wallet.dart';
@@ -7,6 +6,7 @@ import 'package:scapematch_admin/admin_api.dart';
 import 'package:scapematch_admin/admin_confirm.dart';
 import 'package:scapematch_admin/admin_errors.dart';
 import 'package:scapematch_admin/admin_format.dart';
+import 'package:scapematch_admin/admin_notice.dart';
 import 'package:scapematch_admin/admin_people.dart';
 import 'package:scapematch_admin/admin_place.dart';
 import 'package:scapematch_admin/admin_reward_fields.dart';
@@ -168,542 +168,6 @@ class _CasasPageState extends ConsumerState<CasasPage> {
       return;
     }
     await _load();
-  }
-}
-
-class CasaPage extends ConsumerStatefulWidget {
-  const CasaPage({super.key, required this.id});
-
-  final String id;
-
-  @override
-  ConsumerState<CasaPage> createState() => _CasaPageState();
-}
-
-class _CasaPageState extends ConsumerState<CasaPage> {
-  VenueProfile? _house;
-  String? _message;
-  final _name = TextEditingController();
-  final _neighborhood = TextEditingController();
-  final _street = TextEditingController();
-  final _number = TextEditingController();
-  final _postal = TextEditingController();
-  final _phone = TextEditingController();
-  final _category = TextEditingController();
-  final _badge = TextEditingController();
-  final _city = TextEditingController();
-  final _bps = TextEditingController();
-  final _platform = TextEditingController();
-  final _mergeTarget = TextEditingController();
-  final _officialEmail = TextEditingController();
-  final _officialPhone = TextEditingController();
-  bool _testHouse = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _neighborhood.dispose();
-    _street.dispose();
-    _number.dispose();
-    _postal.dispose();
-    _phone.dispose();
-    _category.dispose();
-    _badge.dispose();
-    _city.dispose();
-    _bps.dispose();
-    _platform.dispose();
-    _mergeTarget.dispose();
-    _officialEmail.dispose();
-    _officialPhone.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    final VenueProfile house;
-    try {
-      house = await ref.read(adminApiProvider).venue(widget.id);
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _message = adminErrorText(error));
-      return;
-    }
-    if (!mounted) return;
-    _name.text = house.name;
-    _neighborhood.text = house.neighborhood;
-    _street.text = house.streetAddress;
-    _number.text = house.addressNumber;
-    _postal.text = house.postalCode;
-    _phone.text = house.phone;
-    _category.text = house.category;
-    _badge.text = house.badge;
-    _city.text = house.cityId;
-    _bps.text = percentInput(house.commissionBps);
-    _platform.text = percentInput(house.platformBps);
-    setState(() => _house = house);
-  }
-
-  /// Roda a ação e mostra o erro na tela, em vez de falhar calado.
-  Future<bool> _attempt(Future<void> Function() action) async {
-    try {
-      await action();
-      return true;
-    } on Object catch (error) {
-      if (!mounted) return false;
-      setState(() => _message = adminErrorText(error));
-      return false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final house = _house;
-    return AdminFrame(
-      key: const Key('admin-casa'),
-      title: house?.name ?? 'Casa',
-      leading: IconButton(
-        tooltip: 'Voltar',
-        onPressed: () => ref.read(adminPlaceProvider.notifier).close(),
-        icon: const Icon(Icons.arrow_back),
-      ),
-      child: house == null
-          ? Text(
-              _message ?? 'Carregando casa…',
-              key: const Key('admin-casa-aviso'),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '${_statusLabelRow(house)} · ${house.cityId} · ${house.ownerName} · ${house.ownerEmail}',
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    key: const Key('admin-casa-operacao'),
-                    onPressed: () => ref
-                        .read(adminPlaceProvider.notifier)
-                        .openSection(AdminSection.operacao, house.id),
-                    child: const Text('Salas e sessões'),
-                  ),
-                ),
-                Text(
-                  '${house.documentKind.toUpperCase()} final ${house.documentLast4} · ${house.phone}',
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (house.status == 'pending') ...[
-                      FilledButton(
-                        key: const Key('admin-aprovar'),
-                        onPressed: () => _review('approved'),
-                        child: const Text('Aprovar'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => _review('rejected'),
-                        child: const Text('Reprovar'),
-                      ),
-                    ],
-                    if (house.status == 'approved')
-                      OutlinedButton(
-                        onPressed: () async {
-                          final ok = await _attempt(
-                            () => ref
-                                .read(adminApiProvider)
-                                .suspendVenue(house.id, !house.suspended),
-                          );
-                          if (ok) await _load();
-                        },
-                        child: Text(house.suspended ? 'Reativar' : 'Suspender'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Comissão desta casa, em percentual. A cobrança já feita guarda o percentual dela.',
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  key: const Key('admin-comissao'),
-                  controller: _bps,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Comissão (%)',
-                    helperText: 'De 0 a 30. Exemplo: 22,5',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
-                    key: const Key('admin-gravar-comissao'),
-                    onPressed: _commission,
-                    child: const Text('Gravar comissão'),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text('Snapshots das reservas'),
-                for (final snap in house.snapshots)
-                  Text(
-                    '${snap.status} · ${percentBps(snap.commissionBps)} · ${snap.id}',
-                  ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Contato oficial da reivindicação. O código vai só para estes campos, não para o que o dono digitar no cadastro.',
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  key: const Key('admin-contato-email'),
-                  controller: _officialEmail,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'E-mail oficial',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  key: const Key('admin-contato-telefone'),
-                  controller: _officialPhone,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Telefone oficial',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
-                    key: const Key('admin-gravar-contato'),
-                    onPressed: _contacts,
-                    child: const Text('Gravar contato oficial'),
-                  ),
-                ),
-                TextField(
-                  key: const Key('admin-casa-nome'),
-                  controller: _name,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                ),
-                TextField(
-                  controller: _street,
-                  decoration: const InputDecoration(labelText: 'Endereço'),
-                ),
-                TextField(
-                  controller: _number,
-                  decoration: const InputDecoration(labelText: 'Número'),
-                ),
-                TextField(
-                  controller: _postal,
-                  decoration: const InputDecoration(labelText: 'CEP'),
-                ),
-                TextField(
-                  controller: _neighborhood,
-                  decoration: const InputDecoration(labelText: 'Bairro'),
-                ),
-                TextField(
-                  controller: _city,
-                  decoration: const InputDecoration(labelText: 'Cidade'),
-                ),
-                TextField(
-                  controller: _phone,
-                  decoration: const InputDecoration(labelText: 'Telefone'),
-                ),
-                TextField(
-                  controller: _category,
-                  decoration: const InputDecoration(labelText: 'Categoria'),
-                ),
-                TextField(
-                  controller: _badge,
-                  decoration: const InputDecoration(labelText: 'Selo'),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
-                    key: const Key('admin-salvar-casa'),
-                    onPressed: () async {
-                      VenueProfile? next;
-                      final ok = await _attempt(() async {
-                        next = await ref.read(adminApiProvider).updateVenue(
-                          house.id,
-                          {
-                            'name': _name.text.trim(),
-                            'street_address': _street.text.trim(),
-                            'address_number': _number.text.trim(),
-                            'postal_code': _postal.text.trim(),
-                            'neighborhood': _neighborhood.text.trim(),
-                            'city_id': _city.text.trim(),
-                            'phone': _phone.text.trim(),
-                            'category': _category.text.trim(),
-                            'badge': _badge.text.trim(),
-                          },
-                        );
-                      });
-                      if (!ok || !mounted || next == null) return;
-                      setState(() {
-                        _house = next;
-                        _message = 'Dados gravados.';
-                      });
-                    },
-                    child: const Text('Salvar dados'),
-                  ),
-                ),
-                if (house.status == 'rejected')
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      key: const Key('admin-reabrir-casa'),
-                      onPressed: () async {
-                        final ok = await _attempt(
-                          () => ref
-                              .read(adminPeopleProvider)
-                              .reopenVenue(house.id),
-                        );
-                        if (ok) await _load();
-                      },
-                      child: const Text('Reabrir casa reprovada'),
-                    ),
-                  ),
-                SwitchListTile(
-                  key: const Key('admin-casa-teste'),
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Casa de teste'),
-                  value: _testHouse,
-                  onChanged: (value) async {
-                    final ok = await _attempt(
-                      () => ref
-                          .read(adminPeopleProvider)
-                          .setTest(kind: 'venue', id: house.id, enabled: value),
-                    );
-                    if (ok && mounted) setState(() => _testHouse = value);
-                  },
-                ),
-                TextField(
-                  key: const Key('admin-mesclar-destino'),
-                  controller: _mergeTarget,
-                  decoration: const InputDecoration(
-                    labelText: 'Id da casa que fica',
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    key: const Key('admin-mesclar'),
-                    onPressed: () async {
-                      final okWord = await confirmTyped(
-                        context,
-                        title: 'MESCLAR',
-                        body: 'As salas, sessões e cobranças passam para a casa que fica. A origem fica marcada como mesclada.',
-                        word: 'MESCLAR',
-                      );
-                      if (!okWord || !mounted) return;
-                      final ok = await _attempt(
-                        () => ref
-                            .read(adminPeopleProvider)
-                            .mergeVenues(
-                              house.id,
-                              _mergeTarget.text.trim(),
-                              'MESCLAR',
-                            ),
-                      );
-                      if (ok && mounted) {
-                        setState(() => _message = 'Casas mescladas.');
-                      }
-                    },
-                    child: const Text('Mesclar nesta casa'),
-                  ),
-                ),
-
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    key: const Key('admin-comissao-oficial'),
-                    onPressed: () async {
-                      final okWord = await confirmTyped(
-                        context,
-                        title: 'OFICIAL',
-                        body: 'Esta casa volta a usar a comissão oficial da plataforma.',
-                        word: 'OFICIAL',
-                      );
-                      if (!okWord || !mounted) return;
-                      final ok = await _attempt(
-                        () => ref
-                            .read(adminPeopleProvider)
-                            .clearCommission(house.id, 'OFICIAL'),
-                      );
-                      if (ok) await _load();
-                    },
-                    child: const Text('Voltar à comissão oficial'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Comissão oficial da plataforma, em percentual. Vale para as casas sem taxa própria.',
-                ),
-                TextField(
-                  key: const Key('admin-comissao-plataforma'),
-                  controller: _platform,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Comissão oficial (%)',
-                    helperText: 'De 0 a 30. Sem atalho.',
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
-                    key: const Key('admin-gravar-plataforma'),
-                    onPressed: () async {
-                      final bps = bpsFromPercent(_platform.text);
-                      if (bps == null) {
-                        setState(
-                          () => _message = 'A comissão fica entre 0% e 30%.',
-                        );
-                        return;
-                      }
-                      final okWord = await confirmTyped(
-                        context,
-                        title: 'COMISSAO',
-                        body:
-                            'A comissão oficial da plataforma passa a ser ${percentBps(bps)}.',
-                        word: 'COMISSAO',
-                      );
-                      if (!okWord || !mounted) return;
-                      final ok = await _attempt(
-                        () =>
-                            ref.read(adminApiProvider).setCommission(bps: bps),
-                      );
-                      if (ok && mounted) {
-                        setState(() => _message = 'Comissão oficial gravada.');
-                      }
-                    },
-                    child: const Text('Gravar comissão oficial'),
-                  ),
-                ),
-
-                if (_message != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_message!, key: const Key('admin-casa-aviso')),
-                ],
-              ],
-            ),
-    );
-  }
-
-  Future<void> _contacts() async {
-    final email = _officialEmail.text.trim();
-    final phone = _officialPhone.text.trim();
-    if (email.isEmpty && phone.isEmpty) {
-      setState(() {
-        _message = 'Informe o e-mail ou o telefone oficial.';
-      });
-      return;
-    }
-    try {
-      await ref
-          .read(adminApiProvider)
-          .setVenueContacts(widget.id, email, phone);
-      if (!mounted) return;
-      setState(() => _message = 'Contato oficial gravado.');
-    } on AdminRejected catch (error) {
-      if (!mounted) return;
-      setState(() => _message = error.message);
-    }
-  }
-
-  Future<void> _commission() async {
-    final bps = bpsFromPercent(_bps.text);
-    if (bps == null) {
-      setState(() {
-        _message =
-            'A comissão fica entre 0% e 30%, com até duas casas decimais.';
-      });
-      return;
-    }
-    final label = percentBps(bps);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Gravar comissão'),
-        content: Text(
-          'A comissão desta casa passa a ser $label. As reservas já feitas não mudam.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            key: const Key('admin-confirmar-comissao'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await ref
-          .read(adminApiProvider)
-          .setCommission(venueId: widget.id, bps: bps);
-    } on AdminRejected catch (error) {
-      if (!mounted) return;
-      setState(() => _message = error.message);
-      return;
-    }
-    await _load();
-    if (!mounted) return;
-    setState(() {
-      _message = 'Comissão gravada em $label. As reservas antigas não mudam.';
-    });
-  }
-
-  Future<void> _review(String decision) async {
-    final api = ref.read(adminApiProvider);
-    final ReviewResult result;
-    try {
-      result = await api.reviewVenue(widget.id, decision);
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _message = adminErrorText(error));
-      return;
-    }
-    String? wallet;
-    if (result.needsSubaccount) {
-      try {
-        wallet = await api.provisionWallet(widget.id);
-      } on Object {
-        wallet =
-            'A casa foi aprovada. A subconta PagBank não saiu nesta tentativa.';
-      }
-      if (wallet != null && wallet.startsWith('https://')) {
-        await launchExternalUrl(Uri.parse(wallet));
-        wallet = 'Continue na PagBank para ligar a casa.';
-      }
-    }
-    await _load();
-    if (!mounted) return;
-    setState(() {
-      _message = result.needsSubaccount
-          ? (wallet ?? 'Aprovada. Abra o PagBank Connect para ligar a casa.')
-          : 'Decisão gravada: ${result.status}.';
-    });
   }
 }
 
@@ -894,6 +358,8 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
   PlayerProfile? _player;
   PlayerLedger? _ledger;
   String? _error;
+  String? _notice;
+  bool _busy = false;
   final _points = TextEditingController();
   final _reason = TextEditingController();
   bool _playerTest = false;
@@ -931,14 +397,43 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
       _player = player;
       _ledger = ledger;
       _playerTest = ledger?.isTest ?? false;
-      _error = null;
     });
+  }
+
+  void _say(String text, {bool error = false}) {
+    if (!mounted) return;
+    setState(() {
+      _error = error ? text : null;
+      _notice = error ? null : text;
+    });
+  }
+
+  /// Roda a ação, relê o jogador e diz na tela o que houve.
+  Future<void> _run(Future<void> Function() action, String done) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      try {
+        await action();
+      } on Object catch (error) {
+        _say(adminErrorText(error), error: true);
+        return;
+      }
+      await _load();
+      _say(done);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _pointsMove(String direction) async {
     final points = int.tryParse(_points.text.trim());
     if (points == null || points < 1 || _reason.text.trim().length < 3) {
-      setState(() => _error = 'Informe os pontos e um motivo.');
+      _say('Informe os pontos e um motivo (3 letras ou mais).', error: true);
       return;
     }
     final okWord = await confirmTyped(
@@ -950,7 +445,7 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
       word: 'PONTOS',
     );
     if (!okWord || !mounted) return;
-    try {
+    await _run(() async {
       await ref
           .read(adminPeopleProvider)
           .adjustPoints(
@@ -960,12 +455,9 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
             reason: _reason.text.trim(),
             confirm: 'PONTOS',
           );
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _error = adminErrorText(error));
-      return;
-    }
-    await _load();
+      _points.clear();
+      _reason.clear();
+    }, direction == 'credit' ? '$points pontos creditados.' : '$points pontos debitados.');
   }
 
   @override
@@ -978,6 +470,17 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
         onPressed: () => ref.read(adminPlaceProvider.notifier).close(),
         icon: const Icon(Icons.arrow_back),
       ),
+      banner: player != null && (_error != null || _notice != null)
+          ? AdminNotice(
+              textKey: const Key('admin-jogador-aviso'),
+              text: _error ?? _notice!,
+              error: _error != null,
+              onClose: () => setState(() {
+                _error = null;
+                _notice = null;
+              }),
+            )
+          : null,
       child: player == null
           ? Text(
               _error ?? 'Carregando jogador…',
@@ -1000,45 +503,40 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
                   Text('Entrou pelo código ${player.referredBy}'),
                 const SizedBox(height: 8),
                 OutlinedButton(
-                  onPressed: () async {
-                    try {
-                      await ref
-                          .read(adminApiProvider)
-                          .suspendPlayer(player.id, !player.suspended);
-                    } on Object catch (error) {
-                      if (!mounted) return;
-                      setState(() => _error = adminErrorText(error));
-                      return;
-                    }
-                    await _load();
-                  },
+                  key: const Key('admin-jogador-suspender'),
+                  onPressed: _busy
+                      ? null
+                      : () => _run(
+                          () => ref
+                              .read(adminApiProvider)
+                              .suspendPlayer(player.id, !player.suspended),
+                          player.suspended
+                              ? 'Conta reativada.'
+                              : 'Conta suspensa.',
+                        ),
                   child: Text(
                     player.suspended ? 'Reativar conta' : 'Suspender conta',
                   ),
                 ),
-                if (_error != null)
-                  Text(_error!, key: const Key('admin-jogador-aviso')),
                 SwitchListTile(
                   key: const Key('admin-jogador-teste'),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Conta de teste'),
                   value: _playerTest,
-                  onChanged: (value) async {
-                    try {
-                      await ref
-                          .read(adminPeopleProvider)
-                          .setTest(
-                            kind: 'player',
-                            id: player.id,
-                            enabled: value,
-                          );
-                    } on Object catch (error) {
-                      if (!mounted) return;
-                      setState(() => _error = adminErrorText(error));
-                      return;
-                    }
-                    if (mounted) setState(() => _playerTest = value);
-                  },
+                  onChanged: _busy
+                      ? null
+                      : (value) => _run(
+                          () => ref
+                              .read(adminPeopleProvider)
+                              .setTest(
+                                kind: 'player',
+                                id: player.id,
+                                enabled: value,
+                              ),
+                          value
+                              ? 'Conta marcada como teste.'
+                              : 'Conta deixou de ser de teste.',
+                        ),
                 ),
                 TextField(
                   key: const Key('admin-pontos'),
@@ -1056,12 +554,12 @@ class _JogadorPageState extends ConsumerState<JogadorPage> {
                   children: [
                     TextButton(
                       key: const Key('admin-pontos-credito'),
-                      onPressed: () => _pointsMove('credit'),
+                      onPressed: _busy ? null : () => _pointsMove('credit'),
                       child: const Text('Creditar'),
                     ),
                     TextButton(
                       key: const Key('admin-pontos-debito'),
-                      onPressed: () => _pointsMove('debit'),
+                      onPressed: _busy ? null : () => _pointsMove('debit'),
                       child: const Text('Debitar'),
                     ),
                   ],
@@ -1301,9 +799,9 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
     };
     try {
       await ref.read(adminApiProvider).saveRewardSettings(patch);
-    } on AdminRejected catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _message = error.message);
+      setState(() => _message = adminErrorText(error));
       return;
     }
     await _load();
@@ -1331,9 +829,9 @@ class _RegrasPageState extends ConsumerState<RegrasPage> {
     };
     try {
       await ref.read(adminApiProvider).savePassportSettings(patch);
-    } on AdminRejected catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _passportMessage = error.message);
+      setState(() => _passportMessage = adminErrorText(error));
       return;
     }
     await _load();
@@ -2015,11 +1513,15 @@ class AdminFrame extends StatelessWidget {
     required this.title,
     required this.child,
     this.leading,
+    this.banner,
   });
 
   final String title;
   final Widget child;
   final Widget? leading;
+
+  /// Aviso que fica fixo acima da rolagem (resultado de um botão).
+  final Widget? banner;
 
   @override
   Widget build(BuildContext context) {
@@ -2028,28 +1530,39 @@ class AdminFrame extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1080),
-        child: ListView(
-          padding: const EdgeInsets.all(24),
+        child: Column(
           children: [
-            if (leading != null || wide)
-              Row(
+            if (banner != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                child: banner,
+              ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(24),
                 children: [
-                  ?leading,
-                  if (wide)
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              color: adminTeal,
-                              fontWeight: FontWeight.w500,
+                  if (leading != null || wide)
+                    Row(
+                      children: [
+                        ?leading,
+                        if (wide)
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(
+                                    color: adminTeal,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
-                      ),
+                          ),
+                      ],
                     ),
+                  if (leading != null || wide) const SizedBox(height: 16),
+                  child,
                 ],
               ),
-            if (leading != null || wide) const SizedBox(height: 16),
-            child,
+            ),
           ],
         ),
       ),
@@ -2085,11 +1598,6 @@ class MetricCard extends StatelessWidget {
 }
 
 String _statusLabel(VenueRow house) {
-  if (house.suspended) return 'suspensa';
-  return _statusWord(house.status);
-}
-
-String _statusLabelRow(VenueProfile house) {
   if (house.suspended) return 'suspensa';
   return _statusWord(house.status);
 }

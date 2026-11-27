@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch_admin/admin_api.dart';
+import 'package:scapematch_admin/admin_errors.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -350,9 +351,9 @@ class _AvaliacoesPageState extends ConsumerState<AvaliacoesPage> {
             ),
           );
       await _load();
-    } on AdminRejected catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.message);
+      setState(() => _error = adminErrorText(error));
     }
   }
 
@@ -366,9 +367,9 @@ class _AvaliacoesPageState extends ConsumerState<AvaliacoesPage> {
         await api.hide(id: comment.id, reason: reason);
       }
       await _load();
-    } on AdminRejected catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.message);
+      setState(() => _error = adminErrorText(error));
     }
   }
 
