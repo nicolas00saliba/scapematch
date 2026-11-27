@@ -9,14 +9,14 @@ mesma conta pelo RPC `venue_pagbank_account_view`.
 
 - Uma conta por casa. Conectar outra conta com uma já ligada devolve **409**
   (`pagbank_account_exists`) e não muda nada.
-- A mesma conta não liga a duas casas reais. Conectar uma conta que já é de
-  outra casa devolve **409** (`pagbank_account_in_use`) e não grava nada. Vale
-  também para duas conexões ao mesmo tempo (o índice único
-  `venues_pagbank_account_real_uidx` decide). Casas de teste ficam de fora.
-- A mesma conta não liga a duas casas reais. Conectar uma conta que já é de
-  outra casa devolve **409** (`pagbank_account_in_use`) e não grava nada. Vale
-  também para duas conexões ao mesmo tempo (o índice único
-  `venues_pagbank_account_real_uidx` decide). Casas de teste ficam de fora.
+- A mesma conta não liga a casas de **donos diferentes**. Conectar uma conta
+  que já é de casa de outro dono devolve **409** (`pagbank_account_in_use`) e
+  não grava nada. Vale também para duas conexões ao mesmo tempo (gatilho
+  `venues_pagbank_account_one_owner`, com trava por conta). Casas de teste
+  ficam de fora.
+- **Mesmo dono, várias cidades (decisão do Nícolas, 27/11):** a mesma conta
+  pode receber por todas as unidades do mesmo dono, inclusive com CNPJs
+  diferentes. Ver "Conta compartilhada entre cidades" abaixo.
 - Trocar de conta é o Admin desconectar (`pagbank-disconnect`) e o dono
   conectar de novo. A desconexão recusa (409 `pagbank_in_flight`) se houver
   saque pendente ou cobrança a caminho para a conta atual. "A caminho" é:
@@ -108,3 +108,28 @@ Demo ou sandbox, com conta de teste:
 4. Faça a reserva de teste (conta PagBank sandbox, nada real). Confira em
    `payment_charges.wallet_id` e no corpo do split enviado ao sandbox que o
    recebedor da casa é a conta conectada no passo 2.
+
+## Conta compartilhada entre cidades (migration 20261127190000)
+
+- A cidade que conectou pelo PagBank guarda o token. Na outra cidade, o dono
+  toca **Usar a conta de <cidade>** (RPCs `my_pagbank_share_sources` e
+  `share_venue_pagbank_account`, que conferem o dono das duas). A outra cidade
+  grava a mesma `pagbank_account_id` e aponta para a origem em
+  `pagbank_token_venue_id`. O token não é copiado: ler e renovar passam pela
+  origem (`private.venue_pagbank_token_venue`), então uma renovação vale para
+  as duas.
+- Split, custódia, repasse e livro-caixa continuam **por cidade**: cada
+  cobrança usa a `pagbank_account_id` da cidade e o saldo interno é da cidade.
+- Desconectar a cidade que usa a conta da outra só solta a ligação e **não
+  revoga** o token no PagBank (`shouldRevokeAfterDisconnect`). A origem não
+  desconecta enquanto outra cidade usa a conta (409
+  `pagbank_account_shared`): solte as outras antes.
+- Conectar um login PagBank próprio numa cidade que usava a conta da outra
+  limpa o ponteiro e passa a guardar o token dela.
+- Riscos em aberto (perguntas para o Nícolas, nada decidido no código):
+  - **Nota fiscal**: a NFS-e da casa é emitida com a chave PagBank da conta
+    (a da origem) mas com documento e `venue_fiscal` da cidade. Com CNPJs
+    diferentes, a nota sairia em nome do CNPJ da cidade por uma conta de outro
+    CNPJ. Precisa de confirmação do contador antes de ligar a emissão.
+  - **Saldo e saque**: o cartão de saldo do PagBank mostra o saldo da conta
+    inteira em cada cidade, e o saque de uma cidade sai do mesmo saldo.

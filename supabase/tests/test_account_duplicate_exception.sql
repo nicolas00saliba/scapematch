@@ -355,27 +355,29 @@ begin
     raise exception 'usuário comum ficou com is_test';
   end if;
 
-  select indexdef into v_document
-  from pg_indexes
-  where schemaname = 'public'
-    and indexname = 'venues_document_digits_active_uidx';
-  if v_document is null
-    or v_document not ilike '%unique%'
-    or v_document not ilike '%not is_test%'
+  -- Desde 20261127190000 o bloqueio entre donos diferentes é feito por
+  -- gatilho com trava, não por índice único (o mesmo dono pode repetir
+  -- documento e conta PagBank entre cidades).
+  v_document := pg_get_functiondef('private.venues_normalize()'::regprocedure);
+  if v_document not ilike '%duplicate document%'
+    or v_document not ilike '%not venue.is_test%'
     or v_document not ilike '%rejected%'
+    or v_document not ilike '%pg_advisory_xact_lock%'
   then
-    raise exception 'índice do documento afrouxou casa real: %', v_document;
+    raise exception 'checagem do documento afrouxou casa real';
   end if;
 
-  select indexdef into v_pagbank
-  from pg_indexes
-  where schemaname = 'public'
-    and indexname = 'venues_pagbank_account_real_uidx';
-  if v_pagbank is null
-    or v_pagbank not ilike '%unique%'
-    or v_pagbank not ilike '%not is_test%'
+  v_pagbank := pg_get_functiondef('private.venues_pagbank_account_one_owner()'::regprocedure);
+  if v_pagbank not ilike '%pagbank_account_in_use%'
+    or v_pagbank not ilike '%not o.is_test%'
+    or not exists (
+      select 1 from pg_trigger
+      where tgrelid = 'public.venues'::regclass
+        and tgname = 'venues_pagbank_account_one_owner'
+        and not tgisinternal
+    )
   then
-    raise exception 'índice PagBank afrouxou casa real';
+    raise exception 'checagem PagBank afrouxou casa real';
   end if;
 
   if pg_get_functiondef('public.find_claimable_venue(text)'::regprocedure)

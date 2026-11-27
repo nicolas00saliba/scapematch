@@ -409,6 +409,8 @@ abstract final class PartnerMessages {
   static const pagbankAccountHouse = 'Casa';
   static const pagbankAccountBank = 'Banco';
   static const pagbankAccountEnding = 'Conta final';
+  static const pagbankSharedFromLabel = 'Mesma conta de';
+  static const pagbankSharedFromUnknown = 'outra cidade da casa';
   static const pagbankAccountOne =
       'A casa tem uma conta PagBank só. Ela vale em qualquer aparelho que entrar nesta conta.';
   static const pagbankSwap = 'Trocar conta PagBank';
@@ -423,7 +425,7 @@ abstract final class PartnerMessages {
   static const pagbankSwapBusy =
       'Há dinheiro a caminho para esta conta. Espere cair para trocar.';
   static const pagbankAccountInUse =
-      'Esta conta PagBank já está ligada a outra casa. Conecte uma conta que seja desta casa ou fale com o suporte.';
+      'Esta conta PagBank já está ligada a casa de outro dono. Conecte uma conta que seja sua ou fale com o suporte.';
   static const pagbankAccountChanged =
       'A conta PagBank da casa mudou agora. Tente de novo.';
   static const pagbankAccountExists =

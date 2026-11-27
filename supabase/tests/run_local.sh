@@ -175,3 +175,6 @@ echo "venue referral code por unidade ok"
 # supabase/migrations/20261127180000_unidades_desativar.sql
 run -f "$root/tests/unidades_desativar.sql"
 echo "unidades desativar ok"
+# supabase/migrations/20261127190000_pagbank_e_documento_por_dono.sql
+run -f "$root/tests/pagbank_e_documento_por_dono.sql"
+echo "pagbank e documento por dono ok"

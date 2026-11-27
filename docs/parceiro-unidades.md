@@ -27,10 +27,9 @@ CNPJs diferentes, e quer administrar tudo no mesmo login.
 
 ## O que não muda
 
-- **Conta PagBank: continua uma por casa, e a mesma conta não liga a duas
-  casas reais** (`docs/pagbank-conta-unica.md`, índice
-  `venues_pagbank_account_real_uidx`). Usar a mesma conta PagBank para as duas
-  unidades da Minos é decisão do Nícolas, ainda não tomada no código.
+- **Conta PagBank**: desde a migration `20261127190000`, a mesma conta pode
+  receber por todas as cidades do mesmo dono (decisão do Nícolas, 27/11). Ver
+  `docs/pagbank-conta-unica.md`.
 - Comissão, reembolso e as demais regras ficam iguais.
 
 ## Cidades como abas (pedido do Nícolas, 27/11)
@@ -55,8 +54,14 @@ CNPJs diferentes, e quer administrar tudo no mesmo login.
 cidades, do ranking e das reservas) e `deactivated_at`. Recusa unidade de
 outro dono, a última cidade ativa, cidade com grupo futuro e cidade com saque
 pendente ou cobrança a caminho (`private.venue_pagbank_in_flight`, a mesma
-regra da troca de conta PagBank). O app pede confirmação. Trazer de volta é
-pelo Admin (tirar a suspensão também limpa `deactivated_at`).
+regra da troca de conta PagBank). O app pede confirmação.
+
+**Reativar** (decisão do Nícolas, 27/11): o dono reativa sozinho em
+**Gerenciar cidades → Cidades removidas** (`reactivate_my_unit`, confere o
+dono). A cidade volta como estava: aprovada volta para o jogador, em análise
+continua em análise (não pula a revisão), e suspensa pelo Admin antes da
+remoção continua suspensa (`deactivated_prev_suspended_at`). O Admin também
+traz de volta tirando a suspensão.
 
 ## Por que uma casa por cidade (e não casa única + tabela de cidades)
 
@@ -68,12 +73,13 @@ disso muda. Casa única com tabela de cidades exigiria mudar a cidade de sala,
 grupo, avaliação, mapa e as funções de criação de grupo e de cobrança, que
 mexem com dinheiro.
 
-O custo deste modelo são duas regras que já existem e não foram mudadas:
+Duas regras foram ajustadas para este modelo (migration `20261127190000`,
+decisões do Nícolas de 27/11):
 
-- **Documento**: o banco não aceita o mesmo CPF/CNPJ em duas casas ativas
-  (`venues_document_digits_active_uidx`). Cada cidade precisa do documento da
-  unidade daquela cidade (é o caso da Minos: CNPJs diferentes). Aceitar o
-  mesmo CNPJ em várias cidades é decisão do Nícolas.
-- **Conta PagBank**: uma por casa, e a mesma conta não liga a duas casas
-  reais. Cada cidade conecta a dela. Centralizar o recebimento de várias
-  cidades numa conta é decisão do Nícolas.
+- **Documento**: o mesmo CPF/CNPJ vale em várias cidades do **mesmo dono**.
+  Entre donos diferentes continua recusado ('duplicate document', gatilho
+  `venues_normalize` com trava por documento, no lugar do índice único
+  `venues_document_digits_active_uidx`).
+- **Conta PagBank**: a mesma conta recebe por várias cidades do mesmo dono
+  ("Usar a conta de <cidade>" em Saques). Entre donos diferentes continua
+  recusado.

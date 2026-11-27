@@ -13,6 +13,7 @@ import {
   conflictBody,
   conflictFromRpc,
   ownerMayDisconnect,
+  shouldRevokeAfterDisconnect,
 } from "../_shared/pagbank_binding.ts";
 
 Deno.serve(async (req) => {
@@ -92,8 +93,10 @@ Deno.serve(async (req) => {
       }
       throw new Error("erro");
     }
-    const row = (data ?? {}) as { disconnected?: boolean };
-    if (row.disconnected === true && tokens) {
+    const row = (data ?? {}) as { disconnected?: boolean; shared?: boolean };
+    // Cidade que usava a conta de outra: o token é da outra cidade e continua
+    // valendo lá. Revogar derrubaria o recebimento da outra.
+    if (shouldRevokeAfterDisconnect(row) && tokens) {
       await revokeAtPagbank(tokens);
     }
     return json({ disconnected: row.disconnected === true });

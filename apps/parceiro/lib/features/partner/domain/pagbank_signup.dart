@@ -449,6 +449,7 @@ class PagbankAccountView {
     this.documentKind,
     this.documentMasked,
     this.canDisconnect = true,
+    this.sharedFrom,
   });
 
   static const none = PagbankAccountView(connected: false);
@@ -460,6 +461,10 @@ class PagbankAccountView {
   final String? documentKind;
   final String? documentMasked;
   final bool canDisconnect;
+
+  /// Nome da cidade (unidade) da mesma casa cuja conta esta usa. Nulo quando
+  /// a conta foi conectada por esta própria cidade.
+  final String? sharedFrom;
 
   String get documentLabel =>
       documentKind == 'cnpj' ? 'CNPJ da casa' : 'CPF da casa';
@@ -479,6 +484,9 @@ class PagbankAccountView {
       documentKind: text(value['document_kind']),
       documentMasked: text(value['document_masked']),
       canDisconnect: value['can_disconnect'] != false,
+      sharedFrom: value['shared'] == true
+          ? (text(value['shared_from']) ?? '')
+          : null,
     );
   }
 }

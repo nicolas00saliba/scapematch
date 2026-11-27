@@ -110,14 +110,17 @@ begin
   ) then
     raise exception 'venue_claims tem política para anon';
   end if;
+  -- Desde 20261127190000: índice comum + gatilho com trava (o mesmo dono
+  -- pode repetir o documento entre cidades; donos diferentes, não).
   if not exists (
     select 1
     from pg_indexes
     where schemaname = 'public'
-      and indexname = 'venues_document_digits_active_uidx'
-      and indexdef ilike '%unique%'
-  ) then
-    raise exception 'falta o índice único do documento';
+      and indexname = 'venues_by_document_digits'
+  ) or pg_get_functiondef('private.venues_normalize()'::regprocedure)
+    not ilike '%duplicate document%'
+  then
+    raise exception 'falta a checagem do documento';
   end if;
   if not exists (
     select 1 from pg_extension where extname = 'pg_trgm'

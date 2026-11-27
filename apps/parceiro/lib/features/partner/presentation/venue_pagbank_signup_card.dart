@@ -824,6 +824,13 @@ class _ConnectedAccount extends StatelessWidget {
         (PartnerMessages.pagbankAccountEnding, account.accountLast4),
       if (account.documentMasked != null)
         (account.documentLabel, account.documentMasked!),
+      if (account.sharedFrom != null)
+        (
+          PartnerMessages.pagbankSharedFromLabel,
+          account.sharedFrom!.isEmpty
+              ? PartnerMessages.pagbankSharedFromUnknown
+              : account.sharedFrom!,
+        ),
     ];
     return Column(
       key: PartnerKeys.pagbankAccountCard,
