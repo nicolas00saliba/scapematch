@@ -1,6 +1,9 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scapematch_parceiro/features/partner/data/fiscal_save_error.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_venue_choice.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FunctionException;
 
 const _curitiba = PartnerVenueOption(
@@ -34,9 +37,9 @@ void main() {
     expect(failure.fiscalVenue?.id, 'v-cwb');
     expect(
       failure.message,
-      'Esta cidade recebe pela conta PagBank de Curitiba (PR) (Minos Curitiba), '
-      'e a nota sai pelo CNPJ dessa conta. Configure a nota fiscal em '
-      'Curitiba (PR) (Minos Curitiba).',
+      'Esta cidade recebe pela conta PagBank de Minos Curitiba, em Curitiba '
+      '(PR), e a nota sai pelo CNPJ dessa conta. Configure a nota fiscal em '
+      'Minos Curitiba, em Curitiba (PR).',
     );
   });
 
@@ -90,6 +93,41 @@ void main() {
     );
   });
 
+  test('rótulo sem parênteses duplos: a cidade já traz a UF', () {
+    final label = fiscalVenueLabel(_curitiba);
+    expect(label, 'Minos Curitiba, em Curitiba (PR)');
+    expect(label.contains(') ('), isFalse);
+  });
+
+  test('Abrir a cidade dona da conta leva às Notas fiscais dela', () async {
+    final container = ProviderContainer(
+      overrides: [partnerSessionProvider.overrideWith(_TwoCities.new)],
+    );
+    addTearDown(container.dispose);
+    container.read(partnerSessionProvider);
+    container
+        .read(partnerSectionProvider.notifier)
+        .select(PartnerSection.invoices);
+    await container
+        .read(partnerSessionProvider.notifier)
+        .openVenue('v-cwb', section: PartnerSection.invoices);
+    expect(container.read(partnerSessionProvider)?.houseId, 'v-cwb');
+    expect(container.read(partnerSectionProvider), PartnerSection.invoices);
+  });
+
+  test('trocar de cidade sem pedir seção continua abrindo o Saldo', () async {
+    final container = ProviderContainer(
+      overrides: [partnerSessionProvider.overrideWith(_TwoCities.new)],
+    );
+    addTearDown(container.dispose);
+    container.read(partnerSessionProvider);
+    container
+        .read(partnerSectionProvider.notifier)
+        .select(PartnerSection.invoices);
+    await container.read(partnerSessionProvider.notifier).openVenue('v-cwb');
+    expect(container.read(partnerSectionProvider), PartnerSection.balance);
+  });
+
   test('rótulo sem cidade usa só o nome', () {
     expect(
       fiscalVenueLabel(
@@ -98,4 +136,14 @@ void main() {
       'Minos',
     );
   });
+}
+
+class _TwoCities extends PartnerSessionController {
+  @override
+  PartnerAccount? build() => const PartnerAccount(
+    email: 'dono@exemplo.invalid',
+    houseId: 'v-ara',
+    houseName: 'Minos Arapoti',
+    venues: [_arapoti, _curitiba],
+  );
 }

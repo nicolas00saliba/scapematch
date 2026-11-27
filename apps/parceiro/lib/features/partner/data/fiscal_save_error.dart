@@ -52,10 +52,11 @@ FiscalSaveFailure fiscalSaveFailure(
   );
 }
 
-/// "Curitiba (Minos Curitiba)", ou só o nome se a cidade não vier.
+/// "Minos Curitiba, em Curitiba (PR)", ou só o nome se a cidade não vier.
+/// O nome da cidade já traz a UF.
 String fiscalVenueLabel(PartnerVenueOption venue) {
   final city = venue.cityName?.trim() ?? '';
-  return city.isEmpty ? venue.name : '$city (${venue.name})';
+  return city.isEmpty ? venue.name : '${venue.name}, em $city';
 }
 
 Map<String, Object?>? _asMap(Object? value) {

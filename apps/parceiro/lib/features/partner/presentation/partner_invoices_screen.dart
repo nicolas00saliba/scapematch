@@ -261,7 +261,7 @@ class _PartnerInvoicesState extends ConsumerState<PartnerInvoices> {
                 label: 'Abrir ${venue.cityName ?? venue.name}',
                 onPressed: () => ref
                     .read(partnerSessionProvider.notifier)
-                    .openVenue(venue.id),
+                    .openVenue(venue.id, section: PartnerSection.invoices),
               ),
       ),
     );
