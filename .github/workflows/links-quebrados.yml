@@ -19,6 +19,22 @@ jobs:
   lychee:
     name: Build e produção
     runs-on: ubuntu-latest
+    env:
+      # Só a checagem de https://escapematch.com.br. O lychee 0.24.2
+      # (padrão da lychee-action v2.9.0) não retenta HTTP 503: entre os
+      # status rejeitados, só o 429 volta a ser pedido. Um 503 curto da
+      # borda encerra o passo na hora, mesmo com --max-retries. A repetição
+      # fica no passo seguinte. 503 não entra em --accept.
+      LYCHEE_ARGS_PRODUCAO: >-
+        --verbose
+        --no-progress
+        --max-retries 4
+        --retry-wait-time 10
+        --max-concurrency 8
+        --timeout 20
+        --accept 200,206,429
+        --exclude '^https://(app|parceiro|parceiro-demo|demo|admin)\.escapematch\.com\.br/.+'
+        'https://escapematch.com.br'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,16 +84,32 @@ jobs:
             --exclude '^https://(app|parceiro|parceiro-demo|demo|admin)\.escapematch\.com\.br/.+'
             'apps/site/dist/**/*.html'
 
+      # continue-on-error: um 503 na primeira passagem não pode fechar o
+      # job antes das tentativas extras. Se elas também falharem, o passo
+      # seguinte sai com erro e o workflow continua vermelho.
       - name: Links de produção
+        id: links_producao
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           fail: true
-          args: >-
-            --verbose
-            --no-progress
-            --max-retries 2
-            --timeout 20
-            --accept 200,206,429
-            --exclude '^https://(app|parceiro|parceiro-demo|demo|admin)\.escapematch\.com\.br/.+'
-            'https://escapematch.com.br'
+          args: ${{ env.LYCHEE_ARGS_PRODUCAO }}
+
+      - name: Repetir produção se a borda falhou
+        if: github.event_name != 'pull_request' && steps.links_producao.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          # O passo anterior já instalou o lychee 0.24.2 e deixou o binário no PATH.
+          # Quatro tentativas extras, 10s entre elas. Não muda o --accept:
+          # 404 e 5xx que continuam no relatório final derrubam o job.
+          for i in 1 2 3 4; do
+            echo "Tentativa extra ${i}/4 em 10s"
+            sleep 10
+            if eval "lychee ${LYCHEE_ARGS_PRODUCAO}"; then
+              echo "Checagem de produção passou na tentativa extra ${i}/4." >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              exit 0
+            fi
+          done
+          echo "Links de produção seguem falhando depois de 4 tentativas extras." >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit 1
