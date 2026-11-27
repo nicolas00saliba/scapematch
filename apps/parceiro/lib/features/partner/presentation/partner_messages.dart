@@ -21,6 +21,11 @@ abstract final class PartnerMessages {
   static const refresh = 'Atualizar';
   static const sendVenue = 'Enviar casa';
   static const anotherVenue = 'Enviar outra casa';
+  static const addUnitTitle = 'Cadastrar outra unidade';
+  static const addUnit = 'Cadastrar outra unidade';
+  static const unitsTooltip = 'Unidades';
+  static const otherUnitsTitle = 'Suas outras unidades';
+  static String openUnit(String name) => 'Abrir $name';
   static const adminTitle = 'Casas para aprovar';
   static const adminEmpty = 'Nenhuma casa pendente.';
   static const approve = 'Aprovar';

@@ -18,7 +18,10 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_sessio
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 class PartnerVenueScreen extends ConsumerStatefulWidget {
-  const PartnerVenueScreen({super.key});
+  const PartnerVenueScreen({super.key, this.addingUnit = false});
+
+  /// Cadastro de outra unidade por quem já tem uma casa no login.
+  final bool addingUnit;
 
   @override
   ConsumerState<PartnerVenueScreen> createState() => _PartnerVenueScreenState();
@@ -120,7 +123,10 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       });
       return;
     }
-    await ref.read(partnerSessionProvider.notifier).reload();
+    final session = ref.read(partnerSessionProvider.notifier);
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
+    await session.reload(venueId: result.venueId);
   }
 
   @override
@@ -186,13 +192,16 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
     return AppScaffold(
       desktopMaxWidth: 640,
       appBar: AppBar(
-        title: const Text('Cadastro da casa'),
+        title: Text(
+          widget.addingUnit ? PartnerMessages.addUnitTitle : 'Cadastro da casa',
+        ),
         actions: [
-          TextButton(
-            onPressed: () =>
-                ref.read(partnerSessionProvider.notifier).signOut(),
-            child: const Text(PartnerMessages.signOut),
-          ),
+          if (!widget.addingUnit)
+            TextButton(
+              onPressed: () =>
+                  ref.read(partnerSessionProvider.notifier).signOut(),
+              child: const Text(PartnerMessages.signOut),
+            ),
         ],
       ),
       body: ListView(

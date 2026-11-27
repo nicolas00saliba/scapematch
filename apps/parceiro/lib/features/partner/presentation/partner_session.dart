@@ -108,9 +108,31 @@ class PartnerSessionController extends Notifier<PartnerAccount?> {
 
   void adopt(PartnerAccount account) => state = account;
 
-  Future<void> reload() async {
+  /// Relê o login. Fica na unidade aberta, salvo [venueId] (por exemplo, a
+  /// unidade que acabou de ser cadastrada).
+  Future<void> reload({String? venueId}) async {
     if (!scapeUsesLiveBackend) return;
-    state = await loadPartnerAccount();
+    final current = state?.houseId;
+    final prefer =
+        venueId ?? (current != null && current.isNotEmpty ? current : null);
+    final account = await loadPartnerAccount(preferVenueId: prefer);
+    state = account;
+    if (account != null && venueId != null && account.houseId == venueId) {
+      await savePartnerVenuePreference(account.userId, venueId);
+    }
+  }
+
+  /// Troca a unidade aberta no painel, sem sair do login.
+  Future<void> openVenue(String venueId) async {
+    final current = state;
+    if (current == null || current.houseId == venueId) return;
+    for (final venue in current.venues) {
+      if (venue.id != venueId) continue;
+      ref.read(partnerSectionProvider.notifier).select(PartnerSection.balance);
+      state = current.openVenue(venue);
+      await savePartnerVenuePreference(current.userId, venueId);
+      return;
+    }
   }
 
   Future<void> signOut() async {

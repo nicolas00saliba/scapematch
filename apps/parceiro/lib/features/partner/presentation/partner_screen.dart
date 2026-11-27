@@ -76,7 +76,12 @@ class _PartnerSignedIn extends ConsumerWidget {
         if (snapshot == null) {
           return const PartnerLoginScreen();
         }
-        return PartnerHome(snapshot: snapshot);
+        // A chave refaz o painel ao trocar de unidade: nada de estado de uma
+        // unidade (saldo, saques, código) fica na tela da outra.
+        return PartnerHome(
+          key: ValueKey('partner-home-${session.houseId}'),
+          snapshot: snapshot,
+        );
       },
     );
   }

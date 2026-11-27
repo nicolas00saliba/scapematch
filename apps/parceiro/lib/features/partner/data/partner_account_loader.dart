@@ -1,6 +1,8 @@
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_venue_choice.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_claim.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 
@@ -12,7 +14,34 @@ const partnerVenueColumns =
     'category, badge, invite_id, status, reviewed_by, reviewed_at, created_at, '
     'receives_payments';
 
-Future<PartnerAccount?> loadPartnerAccount() async {
+/// Chave da unidade aberta por último, por login, só neste aparelho.
+String partnerVenuePreferenceKey(String userId) =>
+    'parceiro.unidade_aberta.$userId';
+
+Future<String?> readPartnerVenuePreference(String userId) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(partnerVenuePreferenceKey(userId));
+  } on Object {
+    return null;
+  }
+}
+
+Future<void> savePartnerVenuePreference(String userId, String venueId) async {
+  if (userId.isEmpty || venueId.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(partnerVenuePreferenceKey(userId), venueId);
+  } on Object {
+    // Sem preferência salva, o painel abre a mais nova aprovada.
+  }
+}
+
+/// Lê todas as unidades do login e abre uma.
+///
+/// [preferVenueId] vence a escolha salva no aparelho. Sem nenhuma das duas,
+/// vale [pickPartnerVenue].
+Future<PartnerAccount?> loadPartnerAccount({String? preferVenueId}) async {
   final user = scapeSupabase.auth.currentUser;
   if (user == null) return null;
   final admin = await scapeSupabase
@@ -20,12 +49,22 @@ Future<PartnerAccount?> loadPartnerAccount() async {
       .select('user_id')
       .eq('user_id', user.id)
       .maybeSingle();
-  final venues = await scapeSupabase
+  final rows = await scapeSupabase
       .from('venues')
       .select(partnerVenueColumns)
       .eq('owner_id', user.id)
       .order('created_at', ascending: false);
-  if (venues.isEmpty) {
+  final venues = [
+    for (final row in rows)
+      PartnerVenueOption(
+        id: row['id'] as String,
+        name: row['name'] as String,
+        status: row['status'] as String?,
+      ),
+  ];
+  final preferred = preferVenueId ?? await readPartnerVenuePreference(user.id);
+  final venue = pickPartnerVenue(venues, preferredId: preferred);
+  if (venue == null) {
     return PartnerAccount(
       email: user.email ?? '',
       houseId: '',
@@ -35,14 +74,14 @@ Future<PartnerAccount?> loadPartnerAccount() async {
       isAdmin: admin != null,
     );
   }
-  final venue = venues.first;
   return PartnerAccount(
     email: user.email ?? '',
-    houseId: venue['id'] as String,
-    houseName: venue['name'] as String,
+    houseId: venue.id,
+    houseName: venue.name,
     userId: user.id,
-    venueStatus: venue['status'] as String?,
+    venueStatus: venue.status,
     isAdmin: admin != null,
+    venues: venues,
   );
 }
 
@@ -53,12 +92,16 @@ class VenueSignupResult {
     this.warnings = const [],
     this.duplicateOf,
     this.claim,
+    this.venueId,
   });
 
   final String? error;
   final List<String> warnings;
   final String? duplicateOf;
   final ClaimableVenue? claim;
+
+  /// Id da unidade gravada, quando o cadastro entrou.
+  final String? venueId;
 
   bool get saved => error == null && warnings.isEmpty && claim == null;
 }
@@ -88,9 +131,7 @@ Future<VenueSignupResult> submitVenue(
   }
   if (claim.offersClaim) return VenueSignupResult(claim: claim);
   if (claim.path == VenueClaimPath.alreadyOwner) {
-    return const VenueSignupResult(
-      error: 'Esta casa já está na sua conta.',
-    );
+    return const VenueSignupResult(error: 'Esta casa já está na sua conta.');
   }
   final duplicates = await _venueDuplicates(draft);
   if (duplicates.error != null) {
@@ -174,7 +215,7 @@ Future<VenueSignupResult> submitVenue(
         }
       }
     }
-    return const VenueSignupResult();
+    return VenueSignupResult(venueId: venueId);
   } on Object catch (error) {
     final text = error.toString().toLowerCase();
     if (text.contains('unknown invite')) {

@@ -7,8 +7,13 @@ import 'package:scapematch/features/scape_points/presentation/reward_rules_contr
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 /// Código da casa para compartilhar. Na demonstração é um exemplo.
+///
+/// Com [venueId], lê o código daquela unidade. Login com mais de uma unidade
+/// vê o código da que está aberta.
 class VenueReferralCode extends ConsumerStatefulWidget {
-  const VenueReferralCode({super.key});
+  const VenueReferralCode({super.key, this.venueId});
+
+  final String? venueId;
 
   @override
   ConsumerState<VenueReferralCode> createState() => _VenueReferralCodeState();
@@ -28,7 +33,7 @@ class _VenueReferralCodeState extends ConsumerState<VenueReferralCode> {
     _loading = true;
     Future<void>(() async {
       try {
-        final data = await scapeSupabase.rpc('my_venue_referral_code');
+        final data = await loadVenueReferralCode(widget.venueId);
         if (!mounted) return;
         setState(() {
           _loading = false;
@@ -82,4 +87,27 @@ class _VenueReferralCodeState extends ConsumerState<VenueReferralCode> {
       ],
     );
   }
+}
+
+/// Código de indicação da unidade [venueId].
+///
+/// O RPC com `p_venue_id` confere que a unidade é do login. Enquanto a
+/// migration que cria esse RPC não estiver no banco, cai no RPC antigo, que
+/// devolve o código da unidade mais nova do login.
+Future<Object?> loadVenueReferralCode(
+  String? venueId, {
+  Future<Object?> Function(String fn, Map<String, Object?>? params)? rpc,
+}) async {
+  final call =
+      rpc ??
+      (String fn, Map<String, Object?>? params) =>
+          scapeSupabase.rpc<Object?>(fn, params: params);
+  if (venueId != null && venueId.isNotEmpty) {
+    try {
+      return await call('my_venue_referral_code', {'p_venue_id': venueId});
+    } on Object {
+      // RPC novo ainda fora do banco: segue para o antigo.
+    }
+  }
+  return call('my_venue_referral_code', null);
 }

@@ -82,6 +82,10 @@ abstract final class PartnerKeys {
   static Key invoiceCopy(String id) => Key('invoice-copy-$id');
   static Key invoiceSelect(String id) => Key('invoice-select-$id');
   static const partnerHouseName = Key('partner-house-name');
+  static const partnerVenueSwitcher = Key('partner-venue-switcher');
+  static const partnerAddUnit = Key('partner-add-unit');
+  static Key partnerOpenUnit(String venueId) =>
+      Key('partner-open-unit-$venueId');
   static const payoutPending = Key('payout-pending');
   static const commissionAdmin = Key('commission-admin');
   static const venuePayouts = Key('venue-payouts');
