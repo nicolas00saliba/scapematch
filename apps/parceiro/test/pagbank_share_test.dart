@@ -52,7 +52,7 @@ void main() {
       expect(sources, hasLength(1));
       expect(
         PagbankShareMessages.button(sources.single),
-        'Usar a conta de Curitiba (PR) (Minos Curitiba) (final 4321)',
+        'Receber pela conta de Curitiba (PR) (Minos Curitiba) (final 4321)',
       );
     });
 

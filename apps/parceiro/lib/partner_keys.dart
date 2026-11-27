@@ -18,6 +18,8 @@ abstract final class PartnerKeys {
   static const partnerGoogleSubmit = Key('partner-google-submit');
   static const partnerVenueName = Key('partner-venue-name');
   static const partnerVenueDocument = Key('partner-venue-document');
+  static const partnerDocumentChoice = Key('partner-document-choice');
+  static const partnerDocumentChoiceHint = Key('partner-document-choice-hint');
   static const partnerVenueSubmit = Key('partner-venue-submit');
   static const partnerPending = Key('partner-pending');
   static const partnerAdmin = Key('partner-admin');

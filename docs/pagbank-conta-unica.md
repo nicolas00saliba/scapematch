@@ -126,10 +126,31 @@ Demo ou sandbox, com conta de teste:
   `pagbank_account_shared`): solte as outras antes.
 - Conectar um login PagBank próprio numa cidade que usava a conta da outra
   limpa o ponteiro e passa a guardar o token dela.
-- Riscos em aberto (perguntas para o Nícolas, nada decidido no código):
-  - **Nota fiscal**: a NFS-e da casa é emitida com a chave PagBank da conta
-    (a da origem) mas com documento e `venue_fiscal` da cidade. Com CNPJs
-    diferentes, a nota sairia em nome do CNPJ da cidade por uma conta de outro
-    CNPJ. Precisa de confirmação do contador antes de ligar a emissão.
-  - **Saldo e saque**: o cartão de saldo do PagBank mostra o saldo da conta
-    inteira em cada cidade, e o saque de uma cidade sai do mesmo saldo.
+- Nota fiscal (decisão do Nícolas, 27/11): **a nota sai pelo CNPJ da conta
+  PagBank que recebe**. `issue_invoices` usa os dados (`venues` e
+  `venue_fiscal`) da cidade dona da conta (`fiscalVenueIdOf`); a nota continua
+  registrada na cidade que vendeu. `configure-venue-fiscal` recusa (409) a
+  cidade que usa a conta de outra: a nota é configurada na cidade dona da
+  conta.
+- Saque (decisão do Nícolas): qualquer cidade da casa saca do saldo da conta.
+  Saldo, repasse e saque leem o token pela cidade dona da conta.
+
+## Conta de recebimento única por casa (migration 20261127200000)
+
+Esclarecimento do Nícolas (27/11): "uma mesma casa pode ter vários CNPJs
+diferentes pra cada cidade ou optar por um CNPJ abrangendo tudo; a conta pra
+saque é única e fica por conta da casa escolher".
+
+- A casa (o dono) conecta **uma** conta PagBank em qualquer cidade. Ao
+  conectar, todas as cidades dela sem conta passam a receber por essa conta
+  (`private.link_house_cities`). Cidade nova já nasce ligada (gatilho
+  `venues_link_house_account`).
+- Conectar outra conta numa cidade da casa é recusado (409
+  `pagbank_account_exists`). Conectar a mesma conta por outra cidade renova o
+  token na cidade que guarda a conta.
+- Trocar a conta da casa: desconectar a cidade que guarda o token desconecta
+  todas as cidades (trava se houver dinheiro a caminho em qualquer uma) e
+  revoga o token. Depois, conectar a nova conta liga todas de novo.
+- Entre donos diferentes, continua recusado.
+- Admin (com MFA): `admin_share_venue_pagbank_account`,
+  `admin_reactivate_unit` e `admin_venue_units`, com auditoria.

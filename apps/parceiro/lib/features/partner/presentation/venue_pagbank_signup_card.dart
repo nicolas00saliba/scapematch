@@ -836,6 +836,13 @@ class _ConnectedAccount extends StatelessWidget {
       key: PartnerKeys.pagbankAccountCard,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          PartnerMessages.pagbankHouseAccountTitle,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
         for (final (label, value) in rows)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),

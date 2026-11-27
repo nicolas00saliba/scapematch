@@ -37,7 +37,9 @@ class VenueDraft {
   /// Repete o que é da casa (nome, telefone, tipo e número do documento,
   /// categoria, faturamento). O endereço é de cada cidade e volta vazio.
   /// Convite e indicação ficam só na primeira unidade.
-  VenueDraft forNextCity(String nextCityId) {
+  /// [keepDocument]: a casa escolheu "mesmo CNPJ em todas as cidades". Com
+  /// "CNPJ próprio por cidade", o documento vem vazio para a próxima.
+  VenueDraft forNextCity(String nextCityId, {bool keepDocument = true}) {
     return VenueDraft(
       name: name,
       cityId: nextCityId,
@@ -47,7 +49,7 @@ class VenueDraft {
       postalCode: '',
       phone: phone,
       documentKind: documentKind,
-      documentNumber: documentNumber,
+      documentNumber: keepDocument ? documentNumber : '',
       category: category,
       incomeReais: incomeReais,
       companyType: companyType,

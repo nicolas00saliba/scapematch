@@ -178,3 +178,6 @@ echo "unidades desativar ok"
 # supabase/migrations/20261127190000_pagbank_e_documento_por_dono.sql
 run -f "$root/tests/pagbank_e_documento_por_dono.sql"
 echo "pagbank e documento por dono ok"
+# supabase/migrations/20261127200000_admin_unidades.sql
+run -f "$root/tests/admin_unidades.sql"
+echo "admin unidades ok"

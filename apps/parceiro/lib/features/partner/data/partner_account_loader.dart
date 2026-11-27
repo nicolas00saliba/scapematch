@@ -415,3 +415,50 @@ Future<String?> reviewVenue({
   if (updated.isEmpty) return 'Não foi possível atualizar a casa.';
   return null;
 }
+
+/// Dados da casa para cadastrar outra cidade (`my_unit_template`, só o
+/// dono). Nulo sem a função no banco ou em erro.
+Future<VenueDraft?> loadUnitTemplate(String venueId) async {
+  if (venueId.isEmpty) return null;
+  try {
+    final raw = await scapeSupabase.rpc<Object?>(
+      'my_unit_template',
+      params: {'p_venue_id': venueId},
+    );
+    return unitTemplateFrom(raw);
+  } on Object {
+    return null;
+  }
+}
+
+/// Lê a resposta de `my_unit_template` como rascunho sem endereço e sem cidade.
+VenueDraft? unitTemplateFrom(Object? raw) {
+  if (raw is! Map) return null;
+  String text(Object? value) => value == null ? '' : '$value';
+  final income = raw['income_value'];
+  return VenueDraft(
+    name: text(raw['name']),
+    cityId: '',
+    neighborhood: '',
+    street: '',
+    number: '',
+    postalCode: '',
+    phone: text(raw['phone']),
+    documentKind: raw['document_kind'] == 'cpf' ? 'cpf' : 'cnpj',
+    documentNumber: text(raw['document_number']),
+    category:
+        raw['category'] is String && (raw['category'] as String).isNotEmpty
+        ? raw['category'] as String
+        : 'escape-room',
+    incomeReais: income is num
+        ? (income == income.roundToDouble()
+              ? income.round().toString()
+              : income.toString())
+        : '',
+    companyType:
+        raw['company_type'] is String &&
+            (raw['company_type'] as String).isNotEmpty
+        ? raw['company_type'] as String
+        : 'LIMITED',
+  );
+}

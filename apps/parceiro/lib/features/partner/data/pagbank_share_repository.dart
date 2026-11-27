@@ -97,18 +97,18 @@ String pagbankShareError(String message) {
 }
 
 abstract final class PagbankShareMessages {
-  static const title = 'Usar a mesma conta PagBank de outra cidade';
+  static const title = 'Usar a conta de recebimento da casa';
   static String button(PagbankShareSource source) =>
-      'Usar a conta de ${source.label}'
+      'Receber pela conta de ${source.label}'
       '${source.accountLast4.isEmpty ? '' : ' (final ${source.accountLast4})'}';
   static const body =
-      'A conta PagBank que você já conectou em outra cidade passa a receber também por esta. Salas, reservas, saldo e saques continuam separados por cidade.';
-  static const confirmTitle = 'Usar a mesma conta?';
+      'A casa tem uma conta de recebimento só, já conectada em outra cidade. Ligue esta cidade a ela para receber e sacar por essa conta. Salas e reservas continuam separadas por cidade.';
+  static const confirmTitle = 'Receber pela conta da casa?';
   static const confirmBody =
-      'Os pagamentos desta cidade vão cair na mesma conta PagBank. Se esta cidade tem CNPJ diferente do dono da conta, confira com seu contador como ficam as notas fiscais.';
+      'Os pagamentos desta cidade vão cair na conta de recebimento da casa, e a nota fiscal sai pelo CNPJ dessa conta.';
   static const confirm = 'Usar esta conta';
   static const cancel = 'Cancelar';
-  static const done = 'Conta PagBank ligada a esta cidade.';
+  static const done = 'Esta cidade agora recebe pela conta da casa.';
   static const exists =
       'Esta cidade já tem conta PagBank. Para trocar, fale com o suporte.';
   static const invalid =

@@ -86,3 +86,13 @@ decisões do Nícolas de 27/11):
 - **Conta PagBank**: a mesma conta recebe por várias cidades do mesmo dono
   ("Usar a conta de <cidade>" em Saques). Entre donos diferentes continua
   recusado.
+
+## CNPJ das cidades e conta de recebimento (27/11)
+
+- No cadastro com várias cidades e em **Cadastrar outra cidade**, a casa
+  escolhe **Mesmo CNPJ em todas** (o documento vem da casa, travado) ou
+  **CNPJ próprio por cidade** (digita o desta cidade). As duas valem para o
+  mesmo dono; outro dono com o mesmo documento continua recusado.
+- A **conta de recebimento é uma só por casa** (ver
+  `docs/pagbank-conta-unica.md`). Em Saques aparece "Conta de recebimento da
+  casa" e a troca vale para todas as cidades.

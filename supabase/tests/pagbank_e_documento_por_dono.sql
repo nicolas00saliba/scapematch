@@ -35,6 +35,29 @@ select public.connect_venue_pagbank(
   now() + interval '1 hour'
 );
 
+-- Conta única da casa (20261127200000): conectar a1 já liga a2. Para testar
+-- o compartilhamento manual (cidades antigas), solta a2 aqui.
+do $$
+begin
+  if not exists (
+    select 1 from public.venues
+    where id = 'e3a11111-1111-4111-8111-1111111111a2'
+      and pagbank_token_venue_id = 'e3a11111-1111-4111-8111-1111111111a1'
+  ) then
+    raise exception 'conectar a1 não ligou a2 à conta da casa';
+  end if;
+  if exists (
+    select 1 from public.venues
+    where id = 'e3a22222-2222-4222-8222-2222222222b1'
+      and pagbank_account_id is not null
+  ) then
+    raise exception 'conta da casa ligou cidade de outro dono';
+  end if;
+end $$;
+update public.venues
+set pagbank_account_id = null, pagbank_token_venue_id = null
+where id = 'e3a11111-1111-4111-8111-1111111111a2';
+
 -- 1. O dono usa a conta de a1 em a2.
 select set_config('request.jwt.claim.sub', 'e3a11111-1111-4111-8111-111111111111', true);
 set local role authenticated;
@@ -226,24 +249,12 @@ begin
   end if;
 end $$;
 
--- 5. Desconectar: a origem não solta enquanto outra cidade usa a conta; a
--- cidade que usa só solta a ligação e o token continua em a1.
+-- 5. Desconectar: a cidade ligada só solta a ligação e o token continua em
+-- a1. Desconectar a1 (a conta da casa) solta todas as cidades.
 do $$
 declare
-  v_ok boolean := false;
-  v_msg text;
   v_out jsonb;
 begin
-  begin
-    perform public.disconnect_venue_pagbank(
-      'e3a11111-1111-4111-8111-1111111111a1', 'e3a11111-1111-4111-8111-111111111111', true
-    );
-  exception when sqlstate 'PB409' then
-    get stacked diagnostics v_msg = message_text;
-    v_ok := v_msg = 'pagbank_account_shared';
-  end;
-  if not v_ok then raise exception 'origem desconectou com cidade usando a conta'; end if;
-
   v_out := public.disconnect_venue_pagbank(
     'e3a11111-1111-4111-8111-1111111111a2', 'e3a11111-1111-4111-8111-111111111111', true
   );
@@ -265,12 +276,29 @@ begin
   ) then
     raise exception 'desconectar a2 apagou o token de a1';
   end if;
+  -- a3 (criada depois da conta) nasceu ligada à conta da casa.
+  if not exists (
+    select 1 from public.venues
+    where id = 'e3a11111-1111-4111-8111-1111111111a3'
+      and pagbank_token_venue_id = 'e3a11111-1111-4111-8111-1111111111a1'
+  ) then
+    raise exception 'cidade nova não nasceu com a conta da casa';
+  end if;
 
   v_out := public.disconnect_venue_pagbank(
     'e3a11111-1111-4111-8111-1111111111a1', 'e3a11111-1111-4111-8111-111111111111', true
   );
-  if (v_out ->> 'disconnected')::boolean is not true or v_out ? 'shared' then
+  if (v_out ->> 'disconnected')::boolean is not true
+    or (v_out ->> 'cities')::int <> 1
+  then
     raise exception 'desconectar a1 devolveu %', v_out;
+  end if;
+  if exists (
+    select 1 from public.venues
+    where owner_id = 'e3a11111-1111-4111-8111-111111111111'
+      and (pagbank_account_id is not null or pagbank_token_venue_id is not null)
+  ) then
+    raise exception 'cidade ficou com a conta depois de desconectar a casa';
   end if;
 end $$;
 
