@@ -122,13 +122,17 @@ class PartnerSessionController extends Notifier<PartnerAccount?> {
     }
   }
 
-  /// Troca a unidade aberta no painel, sem sair do login.
-  Future<void> openVenue(String venueId) async {
+  /// Troca a unidade aberta no painel, sem sair do login, e abre [section]
+  /// dela (Saldo, salvo pedido de outra seção).
+  Future<void> openVenue(
+    String venueId, {
+    PartnerSection section = PartnerSection.balance,
+  }) async {
     final current = state;
     if (current == null || current.houseId == venueId) return;
     for (final venue in current.venues) {
       if (venue.id != venueId) continue;
-      ref.read(partnerSectionProvider.notifier).select(PartnerSection.balance);
+      ref.read(partnerSectionProvider.notifier).select(section);
       state = current.openVenue(venue);
       await savePartnerVenuePreference(current.userId, venueId);
       return;

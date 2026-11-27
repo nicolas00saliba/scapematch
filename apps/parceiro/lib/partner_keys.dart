@@ -262,4 +262,5 @@ abstract final class PartnerKeys {
   static const pagbankAccountRenew = Key('pagbank-account-renew');
   static const pagbankAccountSwapConfirm = Key('pagbank-account-swap-confirm');
   static const pagbankAccountSwapCancel = Key('pagbank-account-swap-cancel');
+  static const fiscalSaveError = Key('fiscal-save-error');
 }
