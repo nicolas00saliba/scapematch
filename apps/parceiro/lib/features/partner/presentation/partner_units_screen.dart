@@ -77,7 +77,7 @@ class _PartnerUnitsScreenState extends ConsumerState<PartnerUnitsScreen> {
           for (final venue in venues)
             Card(
               child: ListTile(
-                title: Text(venue.name),
+                title: Text(venue.cityName ?? venue.name),
                 subtitle: Text(_subtitle(venue)),
                 selected: venue.id == session?.houseId,
                 onTap: venue.id == session?.houseId
@@ -131,7 +131,7 @@ class _PartnerUnitsScreenState extends ConsumerState<PartnerUnitsScreen> {
 
 String _subtitle(PartnerVenueOption venue) {
   final parts = [
-    if (venue.cityName != null) venue.cityName!,
+    if (venue.cityName != null) venue.name,
     if (partnerVenueStatusLabel(venue.status) != null)
       partnerVenueStatusLabel(venue.status)!,
   ];

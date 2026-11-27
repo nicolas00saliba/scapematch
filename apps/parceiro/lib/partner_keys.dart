@@ -85,6 +85,12 @@ abstract final class PartnerKeys {
   static const partnerVenueSwitcher = Key('partner-venue-switcher');
   static const venueReferralCodeError = Key('venue-referral-code-error');
   static const partnerManageUnits = Key('partner-manage-units');
+  static const partnerExtraCities = Key('partner-extra-cities');
+  static Key partnerExtraCity(String cityId) =>
+      Key('partner-extra-city-$cityId');
+  static const partnerCityTabs = Key('partner-city-tabs');
+  static Key partnerCityTab(String venueId) => Key('partner-city-tab-$venueId');
+  static const partnerAddCityTab = Key('partner-add-city-tab');
   static const partnerUnitsScreen = Key('partner-units-screen');
   static Key partnerRemoveUnit(String venueId) =>
       Key('partner-remove-unit-$venueId');

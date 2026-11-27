@@ -10,7 +10,9 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_
 import 'package:scapematch_parceiro/features/partner/presentation/venue_referral_code.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_units_repository.dart';
+import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_units_screen.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
@@ -174,6 +176,57 @@ void main() {
     });
   });
 
+  group('várias cidades no cadastro', () {
+    test('a cidade extra não repete nem duplica a principal', () {
+      var cities = addUnitCity(const [], 'curitiba', 'cascavel-pr');
+      cities = addUnitCity(cities, 'curitiba', 'cascavel-pr');
+      cities = addUnitCity(cities, 'curitiba', 'curitiba');
+      cities = addUnitCity(cities, 'curitiba', '');
+      cities = addUnitCity(cities, 'curitiba', 'londrina-pr');
+      expect(cities, ['cascavel-pr', 'londrina-pr']);
+      expect(remainingUnitCities(cities, 'cascavel-pr'), ['londrina-pr']);
+      expect(remainingUnitCities(cities, 'curitiba'), cities);
+    });
+
+    test('a próxima cidade repete a casa e zera o endereço', () {
+      const draft = VenueDraft(
+        name: 'Casa',
+        cityId: 'curitiba',
+        neighborhood: 'Centro',
+        street: 'Rua A',
+        number: '10',
+        postalCode: '80000000',
+        phone: '41999990000',
+        documentKind: 'cnpj',
+        documentNumber: '27180000000101',
+        category: 'escape-room',
+        incomeReais: '5000',
+        companyType: 'MEI',
+        inviteCode: 'convite',
+        referralCode: 'IND',
+      );
+      final next = draft.forNextCity('cascavel-pr');
+      expect(next.cityId, 'cascavel-pr');
+      expect(next.name, 'Casa');
+      expect(next.documentNumber, draft.documentNumber);
+      expect(next.companyType, 'MEI');
+      expect(next.phone, draft.phone);
+      expect(next.neighborhood, isEmpty);
+      expect(next.street, isEmpty);
+      expect(next.number, isEmpty);
+      expect(next.postalCode, isEmpty);
+      expect(next.inviteCode, isEmpty);
+      expect(next.referralCode, isEmpty);
+    });
+
+    test('abas em ordem de cadastro, com a cidade no rótulo', () {
+      final tabs = partnerCityTabOrder(const [_cascavel, _curitiba]);
+      expect(tabs.map((v) => v.id), ['cwb', 'cvel']);
+      expect(partnerCityTabLabel(_curitiba), 'Curitiba (PR)');
+      expect(partnerCityTabLabel(_cascavel), 'Cascavel (PR) (em análise)');
+    });
+  });
+
   group('remover unidade', () {
     test('cada recusa do servidor vira uma frase', () {
       expect(
@@ -227,6 +280,50 @@ void main() {
 
   group('telas', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    testWidgets('uma aba por cidade troca a unidade aberta', (tester) async {
+      final container = ProviderContainer(
+        overrides: [partnerSessionProvider.overrideWith(_TwoUnits.new)],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Scaffold(body: PartnerCityTabs())),
+        ),
+      );
+      expect(find.text('Curitiba (PR)'), findsOneWidget);
+      expect(find.text('Cascavel (PR) (em análise)'), findsOneWidget);
+      expect(find.byKey(PartnerKeys.partnerAddCityTab), findsOneWidget);
+      await tester.tap(find.byKey(PartnerKeys.partnerCityTab('cvel')));
+      await tester.pumpAndSettle();
+      expect(container.read(partnerSessionProvider)!.houseId, 'cvel');
+    });
+
+    testWidgets('com uma cidade só, a barra só aparece no app real', (
+      tester,
+    ) async {
+      final container = ProviderContainer(
+        overrides: [partnerSessionProvider.overrideWith(_OnlyPending.new)],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  PartnerCityTabs(),
+                  PartnerCityTabs(key: Key('real'), showWhenSingle: true),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.byKey(PartnerKeys.partnerAddCityTab), findsOneWidget);
+    });
 
     testWidgets('o seletor lista as unidades e troca a aberta', (tester) async {
       final container = ProviderContainer(
@@ -306,7 +403,7 @@ void main() {
         ),
       );
       expect(find.text('Curitiba (PR)'), findsOneWidget);
-      expect(find.text('Cascavel (PR) · em análise'), findsOneWidget);
+      expect(find.text('Casa Cascavel · em análise'), findsOneWidget);
 
       await tester.tap(find.byKey(PartnerKeys.partnerRemoveUnit('cvel')));
       await tester.pumpAndSettle();

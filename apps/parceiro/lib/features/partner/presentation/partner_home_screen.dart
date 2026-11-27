@@ -64,6 +64,7 @@ class PartnerHome extends ConsumerWidget {
       body: Column(
         children: [
           _PartnerBar(houseName: snapshot.house.name),
+          PartnerCityTabs(showWhenSingle: scapeUsesLiveBackend),
           if (!snapshot.house.receivesPayments) const PayoutPendingBanner(),
           Expanded(
             child: wide

@@ -114,3 +114,69 @@ String _label(PartnerVenueOption venue) {
   final status = partnerVenueStatusLabel(venue.status);
   return status == null ? venue.name : '${venue.name} ($status)';
 }
+
+/// Uma aba por cidade da casa, no topo do painel.
+///
+/// Cada aba é uma unidade (uma cidade), com as salas, a agenda e as reservas
+/// daquela cidade. "+ Cidade" cadastra outra. Login e conta são os mesmos.
+class PartnerCityTabs extends ConsumerWidget {
+  const PartnerCityTabs({super.key, this.showWhenSingle = false});
+
+  /// Mostra a barra mesmo com uma cidade só (app real), para o "+ Cidade".
+  final bool showWhenSingle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(partnerSessionProvider);
+    final venues = session?.venues ?? const <PartnerVenueOption>[];
+    if (session == null || venues.isEmpty) return const SizedBox.shrink();
+    if (venues.length < 2 && !showWhenSingle) return const SizedBox.shrink();
+    final ordered = partnerCityTabOrder(venues);
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: SingleChildScrollView(
+        key: PartnerKeys.partnerCityTabs,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Row(
+          children: [
+            for (final venue in ordered) ...[
+              ChoiceChip(
+                key: PartnerKeys.partnerCityTab(venue.id),
+                label: Text(partnerCityTabLabel(venue)),
+                selected: venue.id == session.houseId,
+                onSelected: (_) => ref
+                    .read(partnerSessionProvider.notifier)
+                    .openVenue(venue.id),
+              ),
+              const SizedBox(width: 8),
+            ],
+            ActionChip(
+              key: PartnerKeys.partnerAddCityTab,
+              avatar: const Icon(Icons.add, size: 18),
+              label: const Text(PartnerMessages.addCityTab),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PartnerVenueScreen(addingUnit: true),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Abas em ordem de cadastro (a primeira cidade primeiro).
+List<PartnerVenueOption> partnerCityTabOrder(List<PartnerVenueOption> venues) {
+  return venues.reversed.toList();
+}
+
+/// Rótulo da aba: a cidade; sem ela, o nome da unidade. Marca quem está em
+/// análise ou recusada.
+String partnerCityTabLabel(PartnerVenueOption venue) {
+  final base = venue.cityName ?? venue.name;
+  final status = partnerVenueStatusLabel(venue.status);
+  return status == null ? base : '$base ($status)';
+}

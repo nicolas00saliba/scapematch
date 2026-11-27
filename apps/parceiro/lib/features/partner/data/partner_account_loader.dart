@@ -134,6 +134,12 @@ Future<PartnerAccount?> loadPartnerAccount({String? preferVenueId}) async {
   );
 }
 
+/// O banco não aceita o mesmo documento em duas casas ativas
+/// (`venues_document_digits_active_uidx`). Cada cidade cadastrada como
+/// unidade precisa do documento da unidade daquela cidade.
+const sameDocumentUnitError =
+    'Este documento já está em outra unidade sua. Cada cidade precisa do CNPJ (ou CPF) da unidade daquela cidade.';
+
 /// Resultado do cadastro real. Aviso de duplicata não grava até a confirmação.
 class VenueSignupResult {
   const VenueSignupResult({
@@ -164,6 +170,7 @@ Future<VenueSignupResult> submitVenue(
   VenueDraft draft, {
   required bool acceptedTerms,
   bool confirmDuplicate = false,
+  bool addingUnit = false,
 }) async {
   if (!acceptedTerms) {
     return const VenueSignupResult(
@@ -180,7 +187,11 @@ Future<VenueSignupResult> submitVenue(
   }
   if (claim.offersClaim) return VenueSignupResult(claim: claim);
   if (claim.path == VenueClaimPath.alreadyOwner) {
-    return const VenueSignupResult(error: 'Esta casa já está na sua conta.');
+    return VenueSignupResult(
+      error: addingUnit
+          ? sameDocumentUnitError
+          : 'Esta casa já está na sua conta.',
+    );
   }
   final duplicates = await _venueDuplicates(draft);
   if (duplicates.error != null) {
@@ -271,8 +282,10 @@ Future<VenueSignupResult> submitVenue(
       return const VenueSignupResult(error: 'Convite não encontrado.');
     }
     if (text.contains('duplicate document')) {
-      return const VenueSignupResult(
-        error: 'Documento já cadastrado. Esta casa não foi enviada.',
+      return VenueSignupResult(
+        error: addingUnit
+            ? sameDocumentUnitError
+            : 'Documento já cadastrado. Esta casa não foi enviada.',
       );
     }
     if (text.contains('row-level') || text.contains('42501')) {
