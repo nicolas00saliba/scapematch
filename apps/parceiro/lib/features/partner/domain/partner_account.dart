@@ -1,5 +1,6 @@
 import 'package:scapematch/core/data/sample_ids.dart';
 import 'package:scapematch/core/mode/app_mode.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_venue_choice.dart';
 
 /// Casa que entrou no Parceiro.
 class PartnerAccount {
@@ -10,6 +11,7 @@ class PartnerAccount {
     this.userId = '',
     this.venueStatus = 'approved',
     this.isAdmin = false,
+    this.venues = const [],
   });
 
   final String email;
@@ -20,6 +22,29 @@ class PartnerAccount {
   /// `loading`, nulo (sem casa), `pending`, `approved` ou `rejected`.
   final String? venueStatus;
   final bool isAdmin;
+
+  /// Todas as unidades do login, da mais nova para a mais antiga. A aberta é
+  /// [houseId].
+  final List<PartnerVenueOption> venues;
+
+  /// Outras unidades do mesmo login, para trocar sem sair.
+  List<PartnerVenueOption> get otherVenues => [
+    for (final venue in venues)
+      if (venue.id != houseId) venue,
+  ];
+
+  /// A mesma conta com outra unidade aberta.
+  PartnerAccount openVenue(PartnerVenueOption venue) {
+    return PartnerAccount(
+      email: email,
+      houseId: venue.id,
+      houseName: venue.name,
+      userId: userId,
+      venueStatus: venue.status,
+      isAdmin: isAdmin,
+      venues: venues,
+    );
+  }
 
   bool get hasApprovedHouse => houseId.isNotEmpty && venueStatus == 'approved';
 }

@@ -15,10 +15,25 @@ import 'package:scapematch_parceiro/features/partner/presentation/company_type_f
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_possession_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/domain/brazilian_municipalities.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 class PartnerVenueScreen extends ConsumerStatefulWidget {
-  const PartnerVenueScreen({super.key});
+  const PartnerVenueScreen({
+    super.key,
+    this.addingUnit = false,
+    this.prefill,
+    this.queuedCities = const [],
+  });
+
+  /// Cadastro de outra unidade (outra cidade) por quem já tem casa no login.
+  final bool addingUnit;
+
+  /// Dados da casa repetidos da cidade anterior do mesmo cadastro.
+  final VenueDraft? prefill;
+
+  /// Cidades escolhidas no mesmo cadastro que ainda faltam, em ordem.
+  final List<String> queuedCities;
 
   @override
   ConsumerState<PartnerVenueScreen> createState() => _PartnerVenueScreenState();
@@ -47,6 +62,25 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
   ClaimableVenue? _claim;
   var _claiming = false;
   final _claims = const VenueClaimClient();
+  List<String> _extraCities = const [];
+  var _extraPickerRound = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final prefill = widget.prefill;
+    if (prefill != null) {
+      _name.text = prefill.name;
+      _phone.text = prefill.phone;
+      _document.text = prefill.documentNumber;
+      _income.text = prefill.incomeReais;
+      _kind = prefill.documentKind;
+      _companyType = prefill.companyType;
+      _category = prefill.category;
+      _cityId = prefill.cityId;
+    }
+    _extraCities = List.unmodifiable(widget.queuedCities);
+  }
 
   @override
   void dispose() {
@@ -94,6 +128,7 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       draft,
       acceptedTerms: true,
       confirmDuplicate: _confirmDuplicate,
+      addingUnit: widget.addingUnit,
     );
     if (!mounted) return;
     if (result.warnings.isNotEmpty) {
@@ -120,7 +155,28 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       });
       return;
     }
-    await ref.read(partnerSessionProvider.notifier).reload();
+    final session = ref.read(partnerSessionProvider.notifier);
+    final navigator = Navigator.of(context);
+    final remaining = remainingUnitCities(_extraCities, draft.cityId);
+    if (remaining.isNotEmpty) {
+      // Próxima cidade do mesmo cadastro: só falta o endereço (e o documento,
+      // se a unidade daquela cidade tem o dela).
+      final next = PartnerVenueScreen(
+        addingUnit: true,
+        prefill: draft.forNextCity(remaining.first),
+        queuedCities: remaining.skip(1).toList(),
+      );
+      final route = MaterialPageRoute<void>(builder: (_) => next);
+      if (navigator.canPop()) {
+        navigator.pushReplacement(route);
+      } else {
+        navigator.push(route);
+      }
+      await session.reload();
+      return;
+    }
+    if (navigator.canPop()) navigator.pop();
+    await session.reload(venueId: result.venueId);
   }
 
   @override
@@ -186,13 +242,16 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
     return AppScaffold(
       desktopMaxWidth: 640,
       appBar: AppBar(
-        title: const Text('Cadastro da casa'),
+        title: Text(
+          widget.addingUnit ? PartnerMessages.addUnitTitle : 'Cadastro da casa',
+        ),
         actions: [
-          TextButton(
-            onPressed: () =>
-                ref.read(partnerSessionProvider.notifier).signOut(),
-            child: const Text(PartnerMessages.signOut),
-          ),
+          if (!widget.addingUnit)
+            TextButton(
+              onPressed: () =>
+                  ref.read(partnerSessionProvider.notifier).signOut(),
+              child: const Text(PartnerMessages.signOut),
+            ),
         ],
       ),
       body: ListView(
@@ -216,6 +275,29 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
             cityLabel: 'Cidade',
             stateLabel: 'Estado',
             onChanged: (value) => setState(() => _cityId = value),
+          ),
+          const SizedBox(height: 12),
+          if (widget.addingUnit && widget.prefill != null) ...[
+            Text(
+              PartnerMessages.nextCityHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+          ],
+          _ExtraCitiesField(
+            mainCityId: _cityId,
+            cities: _extraCities,
+            round: _extraPickerRound,
+            onAdd: (id) => setState(() {
+              _extraCities = addUnitCity(_extraCities, _cityId, id);
+              _extraPickerRound++;
+            }),
+            onRemove: (id) => setState(() {
+              _extraCities = [
+                for (final city in _extraCities)
+                  if (city != id) city,
+              ];
+            }),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -385,6 +467,89 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Acrescenta [cityId] às outras cidades do cadastro, sem repetir e sem a
+/// cidade principal.
+List<String> addUnitCity(
+  List<String> cities,
+  String? mainCityId,
+  String cityId,
+) {
+  final id = cityId.trim();
+  if (id.isEmpty || id == mainCityId || cities.contains(id)) return cities;
+  return List.unmodifiable([...cities, id]);
+}
+
+/// Cidades que ainda faltam depois de gravar a unidade de [doneCityId].
+List<String> remainingUnitCities(List<String> cities, String doneCityId) {
+  return [
+    for (final city in cities)
+      if (city != doneCityId) city,
+  ];
+}
+
+/// Outras cidades da mesma casa. Cada uma vira uma unidade com endereço
+/// próprio, cadastrada logo depois desta, e uma aba no painel.
+class _ExtraCitiesField extends StatelessWidget {
+  const _ExtraCitiesField({
+    required this.mainCityId,
+    required this.cities,
+    required this.round,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final String? mainCityId;
+  final List<String> cities;
+  final int round;
+  final ValueChanged<String> onAdd;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      key: PartnerKeys.partnerExtraCities,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          PartnerMessages.extraCitiesTitle,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(PartnerMessages.extraCitiesHint, style: theme.textTheme.bodySmall),
+        if (cities.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final id in cities)
+                InputChip(
+                  key: PartnerKeys.partnerExtraCity(id),
+                  label: Text(municipalityById(id)?.label ?? id),
+                  onDeleted: () => onRemove(id),
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 8),
+        MunicipalityPicker(
+          key: ValueKey('extra-city-$round'),
+          cityId: null,
+          cityLabel: PartnerMessages.extraCityLabel,
+          stateLabel: 'Estado',
+          helperText: null,
+          onChanged: (value) {
+            if (value.isNotEmpty) onAdd(value);
+          },
+        ),
+      ],
     );
   }
 }

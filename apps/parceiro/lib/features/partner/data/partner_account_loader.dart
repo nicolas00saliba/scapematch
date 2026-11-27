@@ -1,6 +1,9 @@
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
+import 'package:scapematch_parceiro/features/partner/domain/partner_venue_choice.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_claim.dart';
 import 'package:scapematch_parceiro/features/partner/domain/venue_draft.dart';
 
@@ -12,7 +15,94 @@ const partnerVenueColumns =
     'category, badge, invite_id, status, reviewed_by, reviewed_at, created_at, '
     'receives_payments';
 
-Future<PartnerAccount?> loadPartnerAccount() async {
+/// Chave da unidade aberta por último, por login, só neste aparelho.
+String partnerVenuePreferenceKey(String userId) =>
+    'parceiro.unidade_aberta.$userId';
+
+Future<String?> readPartnerVenuePreference(String userId) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(partnerVenuePreferenceKey(userId));
+  } on Object {
+    return null;
+  }
+}
+
+Future<void> savePartnerVenuePreference(String userId, String venueId) async {
+  if (userId.isEmpty || venueId.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(partnerVenuePreferenceKey(userId), venueId);
+  } on Object {
+    // Sem preferência salva, o painel abre a mais nova aprovada.
+  }
+}
+
+const _unitColumns = 'id, name, status, city_id, created_at';
+
+/// Unidades ativas do login, da mais nova para a mais antiga, com a cidade.
+///
+/// Unidade desativada pelo dono (`deactivated_at`) fica de fora. Sem a
+/// migration da coluna no banco (42703), lê sem ela: nada está desativado.
+Future<List<PartnerVenueOption>> _ownerUnits(String userId) async {
+  List<Map<String, dynamic>> rows;
+  try {
+    rows = await scapeSupabase
+        .from('venues')
+        .select('$_unitColumns, deactivated_at')
+        .eq('owner_id', userId)
+        .order('created_at', ascending: false);
+  } on PostgrestException catch (error) {
+    if (error.code != '42703') rethrow;
+    rows = await scapeSupabase
+        .from('venues')
+        .select(_unitColumns)
+        .eq('owner_id', userId)
+        .order('created_at', ascending: false);
+  }
+  final active = [
+    for (final row in rows)
+      if (row['deactivated_at'] == null) row,
+  ];
+  final cityIds = {
+    for (final row in active)
+      if (row['city_id'] is String) row['city_id'] as String,
+  };
+  final cityNames = <String, String>{};
+  if (cityIds.isNotEmpty) {
+    try {
+      final cities = await scapeSupabase
+          .from('cities')
+          .select('id, name, state_code')
+          .inFilter('id', cityIds.toList());
+      for (final city in cities) {
+        final state = city['state_code'] as String?;
+        final name = city['name'] as String;
+        cityNames[city['id'] as String] = state == null || state.isEmpty
+            ? name
+            : '$name ($state)';
+      }
+    } on Object {
+      // Sem o nome da cidade, a lista mostra só o nome da unidade.
+    }
+  }
+  return [
+    for (final row in active)
+      PartnerVenueOption(
+        id: row['id'] as String,
+        name: row['name'] as String,
+        status: row['status'] as String?,
+        cityId: row['city_id'] as String?,
+        cityName: cityNames[row['city_id']],
+      ),
+  ];
+}
+
+/// Lê todas as unidades do login e abre uma.
+///
+/// [preferVenueId] vence a escolha salva no aparelho. Sem nenhuma das duas,
+/// vale [pickPartnerVenue].
+Future<PartnerAccount?> loadPartnerAccount({String? preferVenueId}) async {
   final user = scapeSupabase.auth.currentUser;
   if (user == null) return null;
   final admin = await scapeSupabase
@@ -20,12 +110,10 @@ Future<PartnerAccount?> loadPartnerAccount() async {
       .select('user_id')
       .eq('user_id', user.id)
       .maybeSingle();
-  final venues = await scapeSupabase
-      .from('venues')
-      .select(partnerVenueColumns)
-      .eq('owner_id', user.id)
-      .order('created_at', ascending: false);
-  if (venues.isEmpty) {
+  final venues = await _ownerUnits(user.id);
+  final preferred = preferVenueId ?? await readPartnerVenuePreference(user.id);
+  final venue = pickPartnerVenue(venues, preferredId: preferred);
+  if (venue == null) {
     return PartnerAccount(
       email: user.email ?? '',
       houseId: '',
@@ -35,16 +123,22 @@ Future<PartnerAccount?> loadPartnerAccount() async {
       isAdmin: admin != null,
     );
   }
-  final venue = venues.first;
   return PartnerAccount(
     email: user.email ?? '',
-    houseId: venue['id'] as String,
-    houseName: venue['name'] as String,
+    houseId: venue.id,
+    houseName: venue.name,
     userId: user.id,
-    venueStatus: venue['status'] as String?,
+    venueStatus: venue.status,
     isAdmin: admin != null,
+    venues: venues,
   );
 }
+
+/// O banco não aceita o mesmo documento em duas casas ativas
+/// (`venues_document_digits_active_uidx`). Cada cidade cadastrada como
+/// unidade precisa do documento da unidade daquela cidade.
+const sameDocumentUnitError =
+    'Este documento já está em outra unidade sua. Cada cidade precisa do CNPJ (ou CPF) da unidade daquela cidade.';
 
 /// Resultado do cadastro real. Aviso de duplicata não grava até a confirmação.
 class VenueSignupResult {
@@ -53,12 +147,16 @@ class VenueSignupResult {
     this.warnings = const [],
     this.duplicateOf,
     this.claim,
+    this.venueId,
   });
 
   final String? error;
   final List<String> warnings;
   final String? duplicateOf;
   final ClaimableVenue? claim;
+
+  /// Id da unidade gravada, quando o cadastro entrou.
+  final String? venueId;
 
   bool get saved => error == null && warnings.isEmpty && claim == null;
 }
@@ -72,6 +170,7 @@ Future<VenueSignupResult> submitVenue(
   VenueDraft draft, {
   required bool acceptedTerms,
   bool confirmDuplicate = false,
+  bool addingUnit = false,
 }) async {
   if (!acceptedTerms) {
     return const VenueSignupResult(
@@ -88,8 +187,10 @@ Future<VenueSignupResult> submitVenue(
   }
   if (claim.offersClaim) return VenueSignupResult(claim: claim);
   if (claim.path == VenueClaimPath.alreadyOwner) {
-    return const VenueSignupResult(
-      error: 'Esta casa já está na sua conta.',
+    return VenueSignupResult(
+      error: addingUnit
+          ? sameDocumentUnitError
+          : 'Esta casa já está na sua conta.',
     );
   }
   final duplicates = await _venueDuplicates(draft);
@@ -174,15 +275,17 @@ Future<VenueSignupResult> submitVenue(
         }
       }
     }
-    return const VenueSignupResult();
+    return VenueSignupResult(venueId: venueId);
   } on Object catch (error) {
     final text = error.toString().toLowerCase();
     if (text.contains('unknown invite')) {
       return const VenueSignupResult(error: 'Convite não encontrado.');
     }
     if (text.contains('duplicate document')) {
-      return const VenueSignupResult(
-        error: 'Documento já cadastrado. Esta casa não foi enviada.',
+      return VenueSignupResult(
+        error: addingUnit
+            ? sameDocumentUnitError
+            : 'Documento já cadastrado. Esta casa não foi enviada.',
       );
     }
     if (text.contains('row-level') || text.contains('42501')) {

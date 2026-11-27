@@ -32,6 +32,28 @@ class VenueDraft {
   final String inviteCode;
   final String referralCode;
 
+  /// Rascunho da unidade da próxima cidade escolhida no mesmo cadastro.
+  ///
+  /// Repete o que é da casa (nome, telefone, tipo e número do documento,
+  /// categoria, faturamento). O endereço é de cada cidade e volta vazio.
+  /// Convite e indicação ficam só na primeira unidade.
+  VenueDraft forNextCity(String nextCityId) {
+    return VenueDraft(
+      name: name,
+      cityId: nextCityId,
+      neighborhood: '',
+      street: '',
+      number: '',
+      postalCode: '',
+      phone: phone,
+      documentKind: documentKind,
+      documentNumber: documentNumber,
+      category: category,
+      incomeReais: incomeReais,
+      companyType: companyType,
+    );
+  }
+
   static String digits(String raw) => raw.replaceAll(RegExp(r'[^0-9]'), '');
 
   String? validate() {

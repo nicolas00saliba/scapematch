@@ -50,6 +50,27 @@ class PartnerPendingScreen extends ConsumerWidget {
             onPressed: () => ref.read(partnerSessionProvider.notifier).reload(),
             child: const Text(PartnerMessages.refresh),
           ),
+          if (session != null && session.otherVenues.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text(
+              PartnerMessages.otherUnitsTitle,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            for (final venue in session.otherVenues)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: PartnerKeys.partnerOpenUnit(venue.id),
+                  onPressed: () => ref
+                      .read(partnerSessionProvider.notifier)
+                      .openVenue(venue.id),
+                  child: Text(PartnerMessages.openUnit(venue.name)),
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
           if (rejected) ...[
             const SizedBox(height: 8),
             TextButton(

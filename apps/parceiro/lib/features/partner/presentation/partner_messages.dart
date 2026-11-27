@@ -21,6 +21,29 @@ abstract final class PartnerMessages {
   static const refresh = 'Atualizar';
   static const sendVenue = 'Enviar casa';
   static const anotherVenue = 'Enviar outra casa';
+  static const addUnitTitle = 'Cadastrar outra cidade';
+  static const addUnit = 'Cadastrar outra cidade';
+  static const unitsTooltip = 'Cidades';
+  static const otherUnitsTitle = 'Suas outras cidades';
+  static String openUnit(String name) => 'Abrir $name';
+  static const cancel = 'Cancelar';
+  static const manageUnits = 'Gerenciar cidades';
+  static const extraCitiesTitle = 'Outras cidades desta casa';
+  static const extraCitiesHint =
+      'Tem unidade em mais de uma cidade? Escolha todas. Depois de enviar esta, o app abre o cadastro de cada cidade só para o endereço. Cada cidade ganha uma aba com as salas dela.';
+  static const extraCityLabel = 'Adicionar cidade';
+  static const nextCityHint =
+      'Os dados da casa vieram da cidade anterior. Preencha o endereço desta cidade. Se a unidade daqui tem CNPJ próprio, troque o documento.';
+  static const addCityTab = 'Cidade';
+  static const unitsTitle = 'Cidades da casa';
+  static const unitsIntro =
+      'Cada unidade tem cidade, salas, agenda e conta de recebimento próprias. No app, ela aparece na cidade dela, com as salas dela. Unidade nova passa pela mesma análise do cadastro.';
+  static const unitsSingleHint =
+      'Com uma unidade só, não dá para remover. Cadastre outra antes.';
+  static const removeUnit = 'Remover';
+  static String removeUnitTitle(String name) => 'Remover $name?';
+  static String removeUnitBody(String? city) =>
+      'A unidade sai do seu painel e deixa de aparecer para os jogadores${city == null ? '' : ' em $city'}. Salas, histórico e notas ficam guardados. Só dá para remover sem grupos marcados e sem dinheiro a liberar. Para trazer a unidade de volta, fale com o suporte.';
   static const adminTitle = 'Casas para aprovar';
   static const adminEmpty = 'Nenhuma casa pendente.';
   static const approve = 'Aprovar';

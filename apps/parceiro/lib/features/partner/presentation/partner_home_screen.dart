@@ -35,6 +35,7 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_money.
 import 'package:scapematch_parceiro/features/partner/presentation/partner_palette.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_room_form.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_switcher.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
 
@@ -63,6 +64,7 @@ class PartnerHome extends ConsumerWidget {
       body: Column(
         children: [
           _PartnerBar(houseName: snapshot.house.name),
+          PartnerCityTabs(showWhenSingle: scapeUsesLiveBackend),
           if (!snapshot.house.receivesPayments) const PayoutPendingBanner(),
           Expanded(
             child: wide
@@ -142,6 +144,10 @@ class _PartnerBar extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  if (scapeUsesLiveBackend ||
+                      (ref.watch(partnerSessionProvider)?.venues.length ?? 0) >
+                          1)
+                    const PartnerVenueSwitcher(),
                   if (scapeUsesLiveBackend)
                     IconButton(
                       key: PartnerKeys.partnerChangePassword,
@@ -348,7 +354,11 @@ class _BalanceSection extends ConsumerWidget {
         const SizedBox(height: 8),
         const _OpenWithdrawalsLink(),
         const SizedBox(height: 16),
-        const VenueReferralCode(),
+        VenueReferralCode(
+          venueId: snapshot.house.id,
+          singleUnit:
+              (ref.watch(partnerSessionProvider)?.venues.length ?? 0) <= 1,
+        ),
         const SizedBox(height: 16),
         EmptySlotCard(venueId: snapshot.house.id),
         const SizedBox(height: 16),
