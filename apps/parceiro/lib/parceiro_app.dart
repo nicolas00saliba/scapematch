@@ -8,7 +8,10 @@ import 'package:scapematch/features/payments/presentation/pagbank_connect_return
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/pwa/pwa_frame.dart';
 import 'package:scapematch/core/ui/scape_logo.dart';
+import 'package:scapematch/features/auth/presentation/password_recovery_gate.dart';
 import 'package:scapematch/features/scape_points/presentation/reward_rules_sync.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_password_reset.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch/features/theme/presentation/theme_choice_controller.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_screen.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
@@ -42,6 +45,31 @@ class _ParceiroHomeState extends State<_ParceiroHome> {
   }
 }
 
+/// Depois do link, grava a senha com `auth.updateUser` e abre a casa.
+class PartnerPasswordRecovery extends ConsumerWidget {
+  const PartnerPasswordRecovery({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PasswordRecoveryGate(
+      savePassword: (password) async {
+        final error = await updatePartnerPassword(password);
+        if (error != null) return error;
+        try {
+          await ref.read(partnerSessionProvider.notifier).reload();
+        } on Object {
+          // A senha já foi salva. A casa relê quando o painel abre.
+        }
+        return null;
+      },
+      onCancel: () => ref.read(partnerSessionProvider.notifier).signOut(),
+      child: child,
+    );
+  }
+}
+
 class ParceiroApp extends ConsumerWidget {
   const ParceiroApp({super.key});
 
@@ -71,8 +99,10 @@ class ParceiroApp extends ConsumerWidget {
               solidPeach: true,
             );
           },
-          child: RewardRulesSync(
-            child: PwaFrame(child: child ?? const SizedBox.shrink()),
+          child: PartnerPasswordRecovery(
+            child: RewardRulesSync(
+              child: PwaFrame(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         );
       },

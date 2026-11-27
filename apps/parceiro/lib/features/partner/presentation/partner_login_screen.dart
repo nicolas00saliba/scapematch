@@ -6,6 +6,10 @@ import 'package:scapematch/features/auth/presentation/google_sign_in_button.dart
 import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/core/ui/app_scaffold.dart';
 import 'package:scapematch/core/ui/example_data_banner.dart';
+import 'package:scapematch/core/ui/password_field.dart';
+import 'package:scapematch/features/auth/data/auth_messages.dart';
+import 'package:scapematch/features/auth/presentation/password_reset_dialog.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_password_reset.dart';
 import 'package:scapematch_parceiro/features/partner/data/partner_account_loader.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_google_account.dart';
@@ -18,7 +22,10 @@ import 'package:scapematch_parceiro/partner_keys.dart';
 import 'package:scapematch_parceiro/partner_mark.dart';
 
 class PartnerLoginScreen extends ConsumerStatefulWidget {
-  const PartnerLoginScreen({super.key});
+  const PartnerLoginScreen({super.key, this.requestReset});
+
+  /// Teste injeta o pedido. O app usa [requestPartnerPasswordReset].
+  final Future<String?> Function(String email)? requestReset;
 
   @override
   ConsumerState<PartnerLoginScreen> createState() => _PartnerLoginScreenState();
@@ -85,6 +92,24 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
     });
   }
 
+  Future<void> _forgot() async {
+    final sent = await showPasswordResetDialog(
+      context: context,
+      initialEmail: _email.text.trim(),
+      emailKey: PartnerKeys.partnerResetEmail,
+      submitKey: PartnerKeys.partnerResetSubmit,
+      intro: 'Informe o e-mail da conta. Se ele estiver cadastrado, enviamos um link.',
+      requestReset: widget.requestReset ?? requestPartnerPasswordReset,
+    );
+    if (sent && mounted) {
+      setState(() {
+        _error = scapeUsesLiveBackend
+            ? passwordResetSentMessage
+            : passwordResetDemoMessage;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -141,15 +166,11 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
             onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 12),
-          TextField(
-            key: PartnerKeys.partnerPassword,
+          PasswordField(
+            fieldKey: PartnerKeys.partnerPassword,
             controller: _password,
-            obscureText: true,
             autofillHints: const [AutofillHints.password],
-            decoration: const InputDecoration(
-              labelText: 'Senha',
-              border: OutlineInputBorder(),
-            ),
+            textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
           ),
           if (_error != null) ...[
@@ -165,6 +186,12 @@ class _PartnerLoginScreenState extends ConsumerState<PartnerLoginScreen> {
             key: PartnerKeys.partnerSubmit,
             onPressed: _busy ? null : _submit,
             child: const Text('Entrar'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            key: PartnerKeys.partnerForgotPassword,
+            onPressed: _busy ? null : _forgot,
+            child: const Text('Esqueci a senha'),
           ),
           if (scapeUsesLiveBackend) ...[
             const SizedBox(height: 8),

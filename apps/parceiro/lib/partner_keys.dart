@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 abstract final class PartnerKeys {
   static const partnerEmail = Key('partner-email');
   static const partnerPassword = Key('partner-password');
+  static const partnerForgotPassword = Key('partner-forgot-password');
+  static const partnerResetEmail = Key('partner-reset-email');
+  static const partnerResetSubmit = Key('partner-reset-submit');
   static const partnerSubmit = Key('partner-submit');
   static const partnerLoginError = Key('partner-login-error');
   static const partnerQuickDemo = Key('partner-quick-demo');
@@ -65,6 +68,9 @@ abstract final class PartnerKeys {
   static const partnerSignupName = Key('partner-signup-name');
   static const partnerSignupEmail = Key('partner-signup-email');
   static const partnerSignupPassword = Key('partner-signup-password');
+  static const partnerSignupConfirmPassword = Key(
+    'partner-signup-confirm-password',
+  );
   static const partnerSignupTerms = Key('partner-signup-terms');
   static const partnerSignupSubmit = Key('partner-signup-submit');
   static const partnerSignupBanner = Key('partner-signup-banner');

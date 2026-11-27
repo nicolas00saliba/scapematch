@@ -60,8 +60,14 @@ class AuthController extends Notifier<CurrentUser?> {
     return ref.read(authRepositoryProvider).requestPasswordReset(email: email);
   }
 
-  Future<String?> changePassword({required String password}) {
-    return ref.read(authRepositoryProvider).changePassword(password: password);
+  Future<String?> changePassword({required String password}) async {
+    final repo = ref.read(authRepositoryProvider);
+    final error = await repo.changePassword(password: password);
+    if (error == null) {
+      await repo.refresh();
+      state = repo.signedInUser;
+    }
+    return error;
   }
 
   Future<String?> signInWithGoogle() async {

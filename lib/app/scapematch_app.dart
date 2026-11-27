@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/app/router.dart';
 import 'package:scapematch/app/splash_gate.dart';
+import 'package:scapematch/features/auth/presentation/password_recovery_gate.dart';
 import 'package:scapematch/app/theme.dart';
 import 'package:scapematch/core/pwa/pwa_frame.dart';
 import 'package:scapematch/features/scape_points/presentation/reward_rules_sync.dart';
@@ -26,8 +27,10 @@ class ScapeMatchApp extends ConsumerWidget {
       builder: (context, child) {
         // No celular, a abertura cobre o primeiro frame. O site largo segue.
         return SplashGate(
-          child: RewardRulesSync(
-            child: PwaFrame(child: child ?? const SizedBox.shrink()),
+          child: PlayerPasswordRecovery(
+            child: RewardRulesSync(
+              child: PwaFrame(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         );
       },

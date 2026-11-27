@@ -8,6 +8,7 @@ import 'package:scapematch/core/supabase/scape_backend.dart';
 import 'package:scapematch/app/scapematch_app.dart';
 import 'package:scapematch/app/url_strategy.dart';
 import 'package:scapematch/features/auth/data/google_oauth.dart';
+import 'package:scapematch/features/auth/data/password_recovery.dart';
 import 'package:scapematch/features/auth/data/pending_invite_store.dart';
 import 'package:scapematch/features/cities/data/selected_city_store.dart';
 import 'package:scapematch/features/cities/presentation/selected_city_controller.dart';
@@ -26,7 +27,12 @@ Future<void> main() => iniciarSentry(_abrirApp);
 
 Future<void> _abrirApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final openingUri = Uri.base;
   await bootScapeBackend();
+  if (scapeUsesLiveBackend) {
+    notePasswordRecoveryLink(openingUri);
+    watchPasswordRecovery(scapeSupabase.auth);
+  }
   pendingGoogleAuthNotice = googleAuthNoticeFromUri(Uri.base);
   configureUrlStrategy();
   // The handle is intentionally not disposed: semantics stay on so screen

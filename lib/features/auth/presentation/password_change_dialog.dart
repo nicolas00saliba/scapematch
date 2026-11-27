@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:scapematch/core/ui/app_keys.dart';
+import 'package:scapematch/core/ui/password_field.dart';
 
 /// Pede a senha nova. [changePassword] devolve a frase de erro, ou nulo.
 Future<void> showPasswordChangeDialog({
@@ -24,15 +25,11 @@ Future<void> showPasswordChangeDialog({
                   'Use pelo menos 8 caracteres, com letras e números. Senhas que já vazaram não entram.',
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  key: AppKeys.changePasswordField,
+                PasswordField(
+                  fieldKey: AppKeys.changePasswordField,
                   controller: password,
-                  obscureText: true,
+                  labelText: 'Nova senha',
                   autofillHints: const [AutofillHints.newPassword],
-                  decoration: const InputDecoration(
-                    labelText: 'Nova senha',
-                    border: OutlineInputBorder(),
-                  ),
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 12),

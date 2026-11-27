@@ -285,6 +285,7 @@ void main() {
       'teen@exemplo.invalid',
     );
     await tester.enterText(find.byKey(AppKeys.signupPassword), 'senha');
+    await tester.enterText(find.byKey(AppKeys.signupConfirmPassword), 'senha');
     await tester.enterText(find.byKey(AppKeys.signupBirthDay), '1');
     await tester.enterText(find.byKey(AppKeys.signupBirthMonth), '1');
     await tester.enterText(find.byKey(AppKeys.signupBirthYear), '2015');
