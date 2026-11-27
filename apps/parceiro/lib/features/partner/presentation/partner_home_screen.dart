@@ -353,7 +353,11 @@ class _BalanceSection extends ConsumerWidget {
         const SizedBox(height: 8),
         const _OpenWithdrawalsLink(),
         const SizedBox(height: 16),
-        VenueReferralCode(venueId: snapshot.house.id),
+        VenueReferralCode(
+          venueId: snapshot.house.id,
+          singleUnit:
+              (ref.watch(partnerSessionProvider)?.venues.length ?? 0) <= 1,
+        ),
         const SizedBox(height: 16),
         EmptySlotCard(venueId: snapshot.house.id),
         const SizedBox(height: 16),

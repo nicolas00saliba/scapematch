@@ -172,3 +172,6 @@ echo "admin casa campos ok"
 # supabase/migrations/20261127170000_venue_referral_code_por_unidade.sql
 run -f "$root/tests/venue_referral_code_por_unidade.sql"
 echo "venue referral code por unidade ok"
+# supabase/migrations/20261127180000_unidades_desativar.sql
+run -f "$root/tests/unidades_desativar.sql"
+echo "unidades desativar ok"

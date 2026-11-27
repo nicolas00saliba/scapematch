@@ -7,10 +7,17 @@ class PartnerVenueOption {
     required this.id,
     required this.name,
     required this.status,
+    this.cityId,
+    this.cityName,
   });
 
   final String id;
   final String name;
+
+  /// Cidade da unidade. No app do jogador ela aparece nesta cidade, com as
+  /// salas dela.
+  final String? cityId;
+  final String? cityName;
 
   /// `pending`, `approved` ou `rejected`.
   final String? status;

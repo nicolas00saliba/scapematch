@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_venue_choice.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_units_screen.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_screen.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
 
 const _addUnit = '__cadastrar_unidade__';
+const _manageUnits = '__gerenciar_unidades__';
 
 /// Troca a unidade aberta e cadastra outra, no mesmo login.
 ///
@@ -25,6 +27,12 @@ class PartnerVenueSwitcher extends ConsumerWidget {
       tooltip: PartnerMessages.unitsTooltip,
       icon: const Icon(Icons.storefront_outlined),
       onSelected: (value) {
+        if (value == _manageUnits) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const PartnerUnitsScreen()),
+          );
+          return;
+        }
         if (value == _addUnit) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
@@ -63,6 +71,23 @@ class PartnerVenueSwitcher extends ConsumerWidget {
             ),
           ),
         if (session.venues.isNotEmpty) const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          key: PartnerKeys.partnerManageUnits,
+          value: _manageUnits,
+          child: Row(
+            children: [
+              Icon(Icons.tune, size: 18),
+              SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  PartnerMessages.manageUnits,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
         const PopupMenuItem<String>(
           key: PartnerKeys.partnerAddUnit,
           value: _addUnit,

@@ -26,6 +26,17 @@ abstract final class PartnerMessages {
   static const unitsTooltip = 'Unidades';
   static const otherUnitsTitle = 'Suas outras unidades';
   static String openUnit(String name) => 'Abrir $name';
+  static const cancel = 'Cancelar';
+  static const manageUnits = 'Gerenciar unidades';
+  static const unitsTitle = 'Unidades';
+  static const unitsIntro =
+      'Cada unidade tem cidade, salas, agenda e conta de recebimento próprias. No app, ela aparece na cidade dela, com as salas dela. Unidade nova passa pela mesma análise do cadastro.';
+  static const unitsSingleHint =
+      'Com uma unidade só, não dá para remover. Cadastre outra antes.';
+  static const removeUnit = 'Remover';
+  static String removeUnitTitle(String name) => 'Remover $name?';
+  static String removeUnitBody(String? city) =>
+      'A unidade sai do seu painel e deixa de aparecer para os jogadores${city == null ? '' : ' em $city'}. Salas, histórico e notas ficam guardados. Só dá para remover sem grupos marcados e sem dinheiro a liberar. Para trazer a unidade de volta, fale com o suporte.';
   static const adminTitle = 'Casas para aprovar';
   static const adminEmpty = 'Nenhuma casa pendente.';
   static const approve = 'Aprovar';

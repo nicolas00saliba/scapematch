@@ -9,17 +9,24 @@ import 'package:scapematch_parceiro/features/partner/presentation/partner_sessio
 import 'package:scapematch_parceiro/features/partner/presentation/partner_venue_switcher.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_referral_code.dart';
 import 'package:scapematch_parceiro/partner_keys.dart';
+import 'package:scapematch_parceiro/features/partner/data/partner_units_repository.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/partner_units_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 const _curitiba = PartnerVenueOption(
   id: 'cwb',
   name: 'Casa Curitiba',
   status: 'approved',
+  cityId: 'curitiba',
+  cityName: 'Curitiba (PR)',
 );
 const _cascavel = PartnerVenueOption(
   id: 'cvel',
   name: 'Casa Cascavel',
   status: 'pending',
+  cityId: 'cascavel-pr',
+  cityName: 'Cascavel (PR)',
 );
 const _recusada = PartnerVenueOption(
   id: 'old',
@@ -101,13 +108,19 @@ void main() {
       ]);
     });
 
-    test('sem o RPC novo no banco, cai no antigo', () async {
+    test('RPC novo fora do banco (PGRST202) cai no antigo', () async {
       final calls = <Map<String, Object?>?>[];
       final code = await loadVenueReferralCode(
         'cvel',
+        singleUnit: false,
         rpc: (fn, params) async {
           calls.add(params);
-          if (params != null) throw StateError('function not found');
+          if (params != null) {
+            throw const PostgrestException(
+              message: 'Could not find the function',
+              code: 'PGRST202',
+            );
+          }
           return 'ANTIGO';
         },
       );
@@ -116,6 +129,99 @@ void main() {
         {'p_venue_id': 'cvel'},
         null,
       ]);
+    });
+
+    test('com várias unidades, outro erro não mostra código alheio', () async {
+      final calls = <Map<String, Object?>?>[];
+      Future<Object?> rpc(String fn, Map<String, Object?>? params) async {
+        calls.add(params);
+        if (params != null) {
+          throw const PostgrestException(message: 'timeout', code: '57014');
+        }
+        return 'DA_MAIS_NOVA';
+      }
+
+      await expectLater(
+        loadVenueReferralCode('cvel', singleUnit: false, rpc: rpc),
+        throwsA(isA<PostgrestException>()),
+      );
+      await expectLater(
+        loadVenueReferralCode(
+          'cvel',
+          singleUnit: false,
+          rpc: (fn, params) async {
+            calls.add(params);
+            if (params != null) throw StateError('rede');
+            return 'DA_MAIS_NOVA';
+          },
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(calls.where((params) => params == null), isEmpty);
+    });
+
+    test('com uma unidade só, qualquer erro cai no antigo', () async {
+      final code = await loadVenueReferralCode(
+        'cwb',
+        rpc: (fn, params) async {
+          if (params != null) {
+            throw const PostgrestException(message: 'timeout', code: '57014');
+          }
+          return 'UNICA';
+        },
+      );
+      expect(code, 'UNICA');
+    });
+  });
+
+  group('remover unidade', () {
+    test('cada recusa do servidor vira uma frase', () {
+      expect(
+        partnerUnitRemovalError('P0001', 'unit_last'),
+        PartnerUnitMessages.last,
+      );
+      expect(
+        partnerUnitRemovalError('P0001', 'unit_future_groups'),
+        PartnerUnitMessages.futureGroups,
+      );
+      expect(
+        partnerUnitRemovalError('P0001', 'unit_pending_money'),
+        PartnerUnitMessages.pendingMoney,
+      );
+      expect(
+        partnerUnitRemovalError('42501', 'not owner'),
+        PartnerUnitMessages.notOwner,
+      );
+      expect(
+        partnerUnitRemovalError('PGRST202', 'missing'),
+        PartnerUnitMessages.unavailable,
+      );
+      expect(partnerUnitRemovalError('XX000', 'x'), PartnerUnitMessages.failed);
+    });
+
+    test('o repositório chama o RPC com a unidade', () async {
+      final calls = <Map<String, Object?>>[];
+      final repo = PartnerUnitsRepository(
+        rpc: (fn, params) async {
+          expect(fn, 'deactivate_my_unit');
+          calls.add(params);
+          return {'ok': true};
+        },
+      );
+      expect(await repo.deactivate('cvel'), isNull);
+      expect(calls, [
+        {'p_venue_id': 'cvel'},
+      ]);
+      final refused = PartnerUnitsRepository(
+        rpc: (fn, params) async => throw const PostgrestException(
+          message: 'unit_future_groups',
+          code: 'P0001',
+        ),
+      );
+      expect(
+        await refused.deactivate('cvel'),
+        PartnerUnitMessages.futureGroups,
+      );
     });
   });
 
@@ -140,6 +246,7 @@ void main() {
       expect(find.text('Casa Curitiba'), findsOneWidget);
       expect(find.text('Casa Cascavel (em análise)'), findsOneWidget);
       expect(find.text(PartnerMessages.addUnit), findsOneWidget);
+      expect(find.text(PartnerMessages.manageUnits), findsOneWidget);
 
       await tester.tap(find.text('Casa Cascavel (em análise)'));
       await tester.pumpAndSettle();
@@ -167,6 +274,73 @@ void main() {
       await tester.tap(find.text(PartnerMessages.openUnit('Casa Curitiba')));
       await tester.pumpAndSettle();
       expect(container.read(partnerSessionProvider)!.houseId, 'cwb');
+    });
+
+    testWidgets('remover pede confirmação e mostra a recusa', (tester) async {
+      final calls = <String>[];
+      final container = ProviderContainer(
+        overrides: [
+          partnerSessionProvider.overrideWith(_TwoUnits.new),
+          partnerUnitsRepositoryProvider.overrideWithValue(
+            PartnerUnitsRepository(
+              rpc: (fn, params) async {
+                calls.add(params['p_venue_id']! as String);
+                throw const PostgrestException(
+                  message: 'unit_pending_money',
+                  code: 'P0001',
+                );
+              },
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: PartnerUnitsScreen()),
+        ),
+      );
+      expect(find.text('Curitiba (PR)'), findsOneWidget);
+      expect(find.text('Cascavel (PR) · em análise'), findsOneWidget);
+
+      await tester.tap(find.byKey(PartnerKeys.partnerRemoveUnit('cvel')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(PartnerMessages.removeUnitTitle('Casa Cascavel')),
+        findsOneWidget,
+      );
+      // Cancelar não chama o servidor.
+      await tester.tap(find.text(PartnerMessages.cancel));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+
+      await tester.tap(find.byKey(PartnerKeys.partnerRemoveUnit('cvel')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(PartnerKeys.partnerConfirmRemoveUnit));
+      await tester.pumpAndSettle();
+      expect(calls, ['cvel']);
+      expect(find.text(PartnerUnitMessages.pendingMoney), findsOneWidget);
+      expect(container.read(partnerSessionProvider)!.venues.length, 2);
+    });
+
+    testWidgets('com uma unidade só não há botão de remover', (tester) async {
+      final container = ProviderContainer(
+        overrides: [partnerSessionProvider.overrideWith(_OnlyPending.new)],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: PartnerUnitsScreen()),
+        ),
+      );
+      expect(find.byKey(PartnerKeys.partnerRemoveUnit('cvel')), findsNothing);
+      expect(find.text(PartnerMessages.unitsSingleHint), findsOneWidget);
     });
 
     testWidgets('uma unidade só não mostra outras unidades na espera', (

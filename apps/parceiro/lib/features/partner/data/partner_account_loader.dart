@@ -1,4 +1,5 @@
 import 'package:scapematch/core/supabase/scape_backend.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:scapematch_parceiro/features/partner/data/venue_claim_client.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_account.dart';
 import 'package:scapematch_parceiro/features/partner/domain/partner_venue_choice.dart';
@@ -37,6 +38,66 @@ Future<void> savePartnerVenuePreference(String userId, String venueId) async {
   }
 }
 
+const _unitColumns = 'id, name, status, city_id, created_at';
+
+/// Unidades ativas do login, da mais nova para a mais antiga, com a cidade.
+///
+/// Unidade desativada pelo dono (`deactivated_at`) fica de fora. Sem a
+/// migration da coluna no banco (42703), lê sem ela: nada está desativado.
+Future<List<PartnerVenueOption>> _ownerUnits(String userId) async {
+  List<Map<String, dynamic>> rows;
+  try {
+    rows = await scapeSupabase
+        .from('venues')
+        .select('$_unitColumns, deactivated_at')
+        .eq('owner_id', userId)
+        .order('created_at', ascending: false);
+  } on PostgrestException catch (error) {
+    if (error.code != '42703') rethrow;
+    rows = await scapeSupabase
+        .from('venues')
+        .select(_unitColumns)
+        .eq('owner_id', userId)
+        .order('created_at', ascending: false);
+  }
+  final active = [
+    for (final row in rows)
+      if (row['deactivated_at'] == null) row,
+  ];
+  final cityIds = {
+    for (final row in active)
+      if (row['city_id'] is String) row['city_id'] as String,
+  };
+  final cityNames = <String, String>{};
+  if (cityIds.isNotEmpty) {
+    try {
+      final cities = await scapeSupabase
+          .from('cities')
+          .select('id, name, state_code')
+          .inFilter('id', cityIds.toList());
+      for (final city in cities) {
+        final state = city['state_code'] as String?;
+        final name = city['name'] as String;
+        cityNames[city['id'] as String] = state == null || state.isEmpty
+            ? name
+            : '$name ($state)';
+      }
+    } on Object {
+      // Sem o nome da cidade, a lista mostra só o nome da unidade.
+    }
+  }
+  return [
+    for (final row in active)
+      PartnerVenueOption(
+        id: row['id'] as String,
+        name: row['name'] as String,
+        status: row['status'] as String?,
+        cityId: row['city_id'] as String?,
+        cityName: cityNames[row['city_id']],
+      ),
+  ];
+}
+
 /// Lê todas as unidades do login e abre uma.
 ///
 /// [preferVenueId] vence a escolha salva no aparelho. Sem nenhuma das duas,
@@ -49,19 +110,7 @@ Future<PartnerAccount?> loadPartnerAccount({String? preferVenueId}) async {
       .select('user_id')
       .eq('user_id', user.id)
       .maybeSingle();
-  final rows = await scapeSupabase
-      .from('venues')
-      .select(partnerVenueColumns)
-      .eq('owner_id', user.id)
-      .order('created_at', ascending: false);
-  final venues = [
-    for (final row in rows)
-      PartnerVenueOption(
-        id: row['id'] as String,
-        name: row['name'] as String,
-        status: row['status'] as String?,
-      ),
-  ];
+  final venues = await _ownerUnits(user.id);
   final preferred = preferVenueId ?? await readPartnerVenuePreference(user.id);
   final venue = pickPartnerVenue(venues, preferredId: preferred);
   if (venue == null) {
