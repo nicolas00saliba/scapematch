@@ -48,11 +48,15 @@ begin
   where venue_id = 'e3a11111-1111-4111-8111-1111111111a1' and account_last4 = 'A1A1';
   if v_sources <> 1 then raise exception 'a1 não apareceu como origem'; end if;
 
-  -- Update direto não liga a conta.
-  update public.venues
-  set pagbank_account_id = 'ACCO_E3A00000-0000-4000-8000-00000000A1A1',
-      pagbank_token_venue_id = 'e3a11111-1111-4111-8111-1111111111a1'
-  where id = 'e3a11111-1111-4111-8111-1111111111a2';
+  -- Update direto não liga a conta (sem grant de coluna ou pelo guard).
+  begin
+    update public.venues
+    set pagbank_account_id = 'ACCO_E3A00000-0000-4000-8000-00000000A1A1',
+        pagbank_token_venue_id = 'e3a11111-1111-4111-8111-1111111111a1'
+    where id = 'e3a11111-1111-4111-8111-1111111111a2';
+  exception when insufficient_privilege then
+    null;
+  end;
   if exists (
     select 1 from public.venues
     where id = 'e3a11111-1111-4111-8111-1111111111a2'
@@ -286,8 +290,12 @@ begin
   perform public.deactivate_my_unit('e3a11111-1111-4111-8111-1111111111a2');
 
   -- Update direto não reativa.
-  update public.venues set deactivated_at = null, suspended_at = null
-  where id = 'e3a11111-1111-4111-8111-1111111111a3';
+  begin
+    update public.venues set deactivated_at = null, suspended_at = null
+    where id = 'e3a11111-1111-4111-8111-1111111111a3';
+  exception when insufficient_privilege then
+    null;
+  end;
   if not exists (
     select 1 from public.venues
     where id = 'e3a11111-1111-4111-8111-1111111111a3' and deactivated_at is not null
