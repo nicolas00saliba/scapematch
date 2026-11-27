@@ -439,8 +439,12 @@ begin
     where id = 'f1b77777-7777-4777-8777-777777777777';
     raise exception 'casa real repetiu a conta PagBank';
   exception
-    when unique_violation then
-      null;
+    -- Desde 20261127190000 quem recusa é o gatilho
+    -- venues_pagbank_account_one_owner (dono diferente), não o índice único.
+    when sqlstate 'PB409' then
+      if sqlerrm is distinct from 'pagbank_account_in_use' then
+        raise exception 'conta repetida recebeu outra mensagem: %', sqlerrm;
+      end if;
   end;
   if (
     select pagbank_account_id from public.venues

@@ -369,6 +369,122 @@ end $$;
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 
+-- 7. Cidade removida pelo Admin (deactivated_by não é o dono): o dono não
+-- reativa. Cidade desativada antes da coluna nova, sem auditoria: recusa e
+-- manda para o suporte. Com auditoria: o backfill e a reativação mantêm a
+-- suspensão do Admin.
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('e3a33333-3333-4333-8333-333333333333', 'admin-conta@example.com', '{"display_name":"Admin"}');
+insert into public.venues (
+  id, owner_id, city_id, name, neighborhood, street_address, address_number,
+  postal_code, latitude, longitude, income_value, document_kind,
+  document_number, phone, status, suspended_at, deactivated_at, deactivated_by
+) values
+  ('e3a11111-1111-4111-8111-1111111111a4', 'e3a11111-1111-4111-8111-111111111111',
+   'curitiba', 'Minos Teste Removida Admin', 'Centro', 'Rua F', '6', '80020015',
+   -25.43, -49.27, 5000, 'cnpj', '27190000000606', '41977780006', 'approved',
+   now(), now(), 'e3a33333-3333-4333-8333-333333333333'),
+  ('e3a11111-1111-4111-8111-1111111111a5', 'e3a11111-1111-4111-8111-111111111111',
+   'curitiba', 'Minos Teste Legado Sem Auditoria', 'Centro', 'Rua G', '7', '80020016',
+   -25.43, -49.27, 5000, 'cnpj', '27190000000707', '41977780007', 'approved',
+   now() - interval '5 days', now() - interval '1 day', 'e3a11111-1111-4111-8111-111111111111'),
+  ('e3a11111-1111-4111-8111-1111111111a6', 'e3a11111-1111-4111-8111-111111111111',
+   'curitiba', 'Minos Teste Legado Com Auditoria', 'Centro', 'Rua H', '8', '80020017',
+   -25.43, -49.27, 5000, 'cnpj', '27190000000808', '41977780008', 'approved',
+   now() - interval '5 days', now() - interval '1 day', 'e3a11111-1111-4111-8111-111111111111'),
+  ('e3a11111-1111-4111-8111-1111111111a7', 'e3a11111-1111-4111-8111-111111111111',
+   'curitiba', 'Minos Teste Legado Sem Suspensao', 'Centro', 'Rua I', '9', '80020018',
+   -25.43, -49.27, 5000, 'cnpj', '27190000000909', '41977780009', 'approved',
+   now() - interval '1 day', now() - interval '1 day', 'e3a11111-1111-4111-8111-111111111111');
+
+-- Como a versão 20261127180000 gravava: before_state.suspended_at.
+insert into public.admin_audit_log (
+  actor_id, action, target_table, target_id, before_state, after_state, created_at
+) values
+  ('e3a11111-1111-4111-8111-111111111111', 'deactivate_unit', 'venues',
+   'e3a11111-1111-4111-8111-1111111111a6',
+   jsonb_build_object('suspended_at', now() - interval '5 days'),
+   jsonb_build_object('deactivated', true), now() - interval '1 day'),
+  ('e3a11111-1111-4111-8111-111111111111', 'deactivate_unit', 'venues',
+   'e3a11111-1111-4111-8111-1111111111a7',
+   jsonb_build_object('suspended_at', null),
+   jsonb_build_object('deactivated', true), now() - interval '1 day');
+
+do $$
+begin
+  if private.backfill_deactivated_prev_suspended() < 1 then
+    raise exception 'backfill não copiou a suspensão anterior';
+  end if;
+  if (select deactivated_prev_suspended_at from public.venues
+      where id = 'e3a11111-1111-4111-8111-1111111111a6') is null
+  then
+    raise exception 'backfill não gravou a suspensão de a6';
+  end if;
+  if (select deactivated_prev_suspended_at from public.venues
+      where id in ('e3a11111-1111-4111-8111-1111111111a5',
+                   'e3a11111-1111-4111-8111-1111111111a7')
+      and deactivated_prev_suspended_at is not null
+      limit 1) is not null
+  then
+    raise exception 'backfill inventou suspensão';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', 'e3a11111-1111-4111-8111-111111111111', true);
+set local role authenticated;
+do $$
+declare
+  v_ok boolean;
+begin
+  v_ok := false;
+  begin
+    perform public.reactivate_my_unit('e3a11111-1111-4111-8111-1111111111a4');
+  exception when others then
+    v_ok := sqlerrm = 'unit_removed_by_admin';
+  end;
+  if not v_ok then raise exception 'dono reativou cidade removida pelo Admin'; end if;
+
+  v_ok := false;
+  begin
+    perform public.reactivate_my_unit('e3a11111-1111-4111-8111-1111111111a5');
+  exception when others then
+    v_ok := sqlerrm = 'unit_reactivate_support';
+  end;
+  if not v_ok then raise exception 'reativou sem saber o estado de antes'; end if;
+
+  -- Com auditoria: volta ativa no Parceiro, ainda suspensa pelo Admin.
+  perform public.reactivate_my_unit('e3a11111-1111-4111-8111-1111111111a6');
+  -- Auditoria com suspended_at nulo: não estava suspensa, volta ao jogador.
+  perform public.reactivate_my_unit('e3a11111-1111-4111-8111-1111111111a7');
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+do $$
+begin
+  if exists (
+    select 1 from public.venues
+    where id in ('e3a11111-1111-4111-8111-1111111111a4',
+                 'e3a11111-1111-4111-8111-1111111111a5')
+      and (deactivated_at is null or suspended_at is null)
+  ) then
+    raise exception 'recusa mexeu na cidade';
+  end if;
+  if not exists (
+    select 1 from public.venues
+    where id = 'e3a11111-1111-4111-8111-1111111111a6'
+      and deactivated_at is null and suspended_at is not null
+  ) then
+    raise exception 'a6 perdeu a suspensão do Admin';
+  end if;
+  if not exists (
+    select 1 from public.venues
+    where id = 'e3a11111-1111-4111-8111-1111111111a7'
+      and deactivated_at is null and suspended_at is null
+  ) then
+    raise exception 'a7 não voltou';
+  end if;
+end $$;
+
 -- anon não chama as funções novas.
 do $$
 begin

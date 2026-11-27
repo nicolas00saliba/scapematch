@@ -896,9 +896,49 @@ $$;
 revoke all on function public.share_venue_pagbank_account(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.share_venue_pagbank_account(uuid, uuid) to authenticated;
 
--- O dono reativa a cidade que ele mesmo desativou. Volta como estava:
--- status (aprovada, em análise) não muda, e a suspensão de antes (do Admin)
--- volta junto. Cidade nunca aprovada continua em análise.
+-- Cidades desativadas antes desta migration: o suspended_at de antes está na
+-- auditoria (deactivate_unit guarda before_state.suspended_at). Copia para a
+-- coluna nova. Sem a auditoria, reactivate_my_unit recusa (suporte).
+create or replace function private.backfill_deactivated_prev_suspended()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  with last_deactivation as (
+    select distinct on (l.target_id)
+      l.target_id,
+      l.before_state ->> 'suspended_at' as prev
+    from public.admin_audit_log l
+    where l.action = 'deactivate_unit'
+      and l.target_table = 'venues'
+    order by l.target_id, l.created_at desc
+  )
+  update public.venues v
+  set deactivated_prev_suspended_at = d.prev::timestamptz
+  from last_deactivation d
+  where d.target_id = v.id::text
+    and d.prev is not null
+    and v.deactivated_at is not null
+    and v.deactivated_prev_suspended_at is null;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+revoke all on function private.backfill_deactivated_prev_suspended()
+  from public, anon, authenticated, service_role;
+
+select private.backfill_deactivated_prev_suspended();
+
+-- Reativar: só a cidade que o próprio dono removeu (deactivated_by = dono).
+-- Desativação ou suspensão pelo Admin só o Admin desfaz. A cidade volta ao
+-- estado de antes: o status não muda (em análise continua em análise) e a
+-- suspensão do Admin anterior à remoção volta junto. Sem saber o estado de
+-- antes (auditoria ausente), recusa: o suporte reativa.
 create or replace function public.reactivate_my_unit(p_venue_id uuid)
 returns jsonb
 language plpgsql
@@ -908,6 +948,8 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_venue public.venues%rowtype;
+  v_prev timestamptz;
+  v_audit jsonb;
 begin
   if v_uid is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -922,10 +964,35 @@ begin
   if v_venue.deactivated_at is null then
     return pg_catalog.jsonb_build_object('ok', true, 'already', true, 'status', v_venue.status);
   end if;
+  if v_venue.deactivated_by is distinct from v_uid then
+    raise exception 'unit_removed_by_admin'
+      using errcode = 'P0001',
+            detail = 'a cidade não foi removida pelo dono; só o suporte reativa';
+  end if;
+
+  v_prev := v_venue.deactivated_prev_suspended_at;
+  if v_prev is null then
+    -- Nulo pode ser "não estava suspensa" ou "desativada antes da coluna".
+    -- Confere na auditoria da última desativação.
+    select l.before_state into v_audit
+    from public.admin_audit_log l
+    where l.action = 'deactivate_unit'
+      and l.target_table = 'venues'
+      and l.target_id = p_venue_id::text
+      and l.created_at >= v_venue.deactivated_at - interval '1 minute'
+    order by l.created_at desc
+    limit 1;
+    if v_audit is null or not (v_audit ? 'suspended_at') then
+      raise exception 'unit_reactivate_support'
+        using errcode = 'P0001',
+              detail = 'sem registro do estado de antes; o suporte reativa';
+    end if;
+    v_prev := (v_audit ->> 'suspended_at')::timestamptz;
+  end if;
 
   perform pg_catalog.set_config('scapematch.unit_deactivation', 'on', true);
   update public.venues
-  set suspended_at = v_venue.deactivated_prev_suspended_at,
+  set suspended_at = v_prev,
       deactivated_at = null,
       deactivated_by = null,
       deactivated_prev_suspended_at = null
@@ -942,14 +1009,14 @@ begin
     pg_catalog.jsonb_build_object('deactivated', true),
     pg_catalog.jsonb_build_object(
       'status', v_venue.status,
-      'suspended', v_venue.deactivated_prev_suspended_at is not null
+      'suspended', v_prev is not null
     )
   );
   return pg_catalog.jsonb_build_object(
     'ok', true,
     'already', false,
     'status', v_venue.status,
-    'suspended', v_venue.deactivated_prev_suspended_at is not null
+    'suspended', v_prev is not null
   );
 end;
 $$;

@@ -54,6 +54,12 @@ String partnerUnitReactivationError(String? code, String message) {
   if (message.contains('duplicate document')) {
     return PartnerUnitMessages.documentTaken;
   }
+  if (message.contains('unit_removed_by_admin')) {
+    return PartnerUnitMessages.removedByAdmin;
+  }
+  if (message.contains('unit_reactivate_support')) {
+    return PartnerUnitMessages.reactivateSupport;
+  }
   if (code == '42501') return PartnerUnitMessages.notOwner;
   if (code == 'PGRST202') return PartnerUnitMessages.reactivateUnavailable;
   return PartnerUnitMessages.reactivateFailed;
@@ -96,6 +102,10 @@ abstract final class PartnerUnitMessages {
   static const notRemoved = 'Esta cidade já está ativa.';
   static const documentTaken =
       'O documento desta cidade agora está em outra casa. Fale com o suporte.';
+  static const removedByAdmin =
+      'Esta cidade foi removida pelo suporte. Peça ao suporte para reativar.';
+  static const reactivateSupport =
+      'Não foi possível conferir como a cidade estava antes de ser removida. Peça ao suporte para reativar.';
   static const reactivateUnavailable =
       'Reativar cidade ainda não está disponível. Tente mais tarde.';
   static const reactivateFailed =

@@ -208,6 +208,14 @@ void main() {
         PartnerUnitMessages.documentTaken,
       );
       expect(
+        partnerUnitReactivationError('P0001', 'unit_removed_by_admin'),
+        PartnerUnitMessages.removedByAdmin,
+      );
+      expect(
+        partnerUnitReactivationError('P0001', 'unit_reactivate_support'),
+        PartnerUnitMessages.reactivateSupport,
+      );
+      expect(
         partnerUnitReactivationError(null, 'x'),
         PartnerUnitMessages.reactivateFailed,
       );

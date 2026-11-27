@@ -60,8 +60,11 @@ regra da troca de conta PagBank). O app pede confirmação.
 **Gerenciar cidades → Cidades removidas** (`reactivate_my_unit`, confere o
 dono). A cidade volta como estava: aprovada volta para o jogador, em análise
 continua em análise (não pula a revisão), e suspensa pelo Admin antes da
-remoção continua suspensa (`deactivated_prev_suspended_at`). O Admin também
-traz de volta tirando a suspensão.
+remoção continua suspensa (`deactivated_prev_suspended_at`). Só reativa a
+cidade que o próprio dono removeu (`deactivated_by`); a que o Admin removeu, só
+o Admin traz de volta (tirando a suspensão). Cidade removida antes da migration
+`20261127190000` tem o estado de antes copiado da auditoria
+(`deactivate_unit`); sem auditoria, a reativação é recusada e pede o suporte.
 
 ## Por que uma casa por cidade (e não casa única + tabela de cidades)
 
