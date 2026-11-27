@@ -57,11 +57,10 @@ begin
   exception when insufficient_privilege then
     null;
   end;
-  if exists (
-    select 1 from public.venues
-    where id = 'e3a11111-1111-4111-8111-1111111111a2'
-      and (pagbank_account_id is not null or pagbank_token_venue_id is not null)
-  ) then
+  -- O dono não lê a coluna da conta; confere pela tela da conta.
+  if (public.venue_pagbank_account_view('e3a11111-1111-4111-8111-1111111111a2')
+      ->> 'connected')::boolean
+  then
     raise exception 'update direto ligou a conta';
   end if;
 
