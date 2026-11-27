@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { cronSecretTtlMs, resolveCronSecret } from "./cron_secret.ts";
+import { cronSecretTtlMs, readVaultSecret, resolveCronSecret } from "./cron_secret.ts";
 
 Deno.test("a env tem prioridade e o vault não é lido", async () => {
   let reads = 0;
@@ -62,4 +62,13 @@ Deno.test("vault vazio ou com erro vira segredo ausente", async () => {
   });
   assertEquals(empty, "");
   assertEquals(failed, "");
+});
+
+Deno.test("readVaultSecret aceita o data do rpc e recusa erro ou valor que não é texto", () => {
+  assertEquals(readVaultSecret({ data: "  do-vault  ", error: null }), "do-vault");
+  assertEquals(readVaultSecret({ data: "do-vault", error: { message: "falhou" } }), "");
+  assertEquals(readVaultSecret({ data: 12, error: null }), "");
+  assertEquals(readVaultSecret("  ja-desembrulhado  "), "ja-desembrulhado");
+  assertEquals(readVaultSecret(null), "");
+  assertEquals(readVaultSecret({ error: null }), "");
 });

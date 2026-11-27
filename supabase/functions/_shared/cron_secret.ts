@@ -36,6 +36,15 @@ export async function resolveCronSecret(input: {
   return value;
 }
 
-function secretText(value: unknown): string {
+export function readVaultSecret(value: unknown): string {
+  if (value && typeof value === "object" && "data" in value) {
+    const row = value as { data?: unknown; error?: unknown };
+    if (row.error) return "";
+    value = row.data;
+  }
   return typeof value === "string" ? value.trim() : "";
+}
+
+function secretText(value: unknown): string {
+  return readVaultSecret(value);
 }
