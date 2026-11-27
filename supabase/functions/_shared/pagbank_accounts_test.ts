@@ -291,6 +291,65 @@ Deno.test("a sonda não liga em 401 e avisa só na transição", async () => {
   assertEquals(alerts.at(-1), "probe_criou_conta");
 });
 
+Deno.test("sonda com segredo só no Vault autentica e recusa header errado ou ausente", async () => {
+  const vaultEnv = env({
+    PAGBANK_ENV: "sandbox",
+    PAGBANK_TOKEN: "token-pagbank-teste",
+    PAGBANK_CONNECT_CLIENT_ID: "client-id-teste",
+    PAGBANK_CONNECT_CLIENT_SECRET: "client-secret-teste",
+  });
+  const readVault = () => Promise.resolve("segredo-do-vault");
+  const deps = {
+    env: vaultEnv,
+    fetchFn: () =>
+      Promise.resolve(new Response(JSON.stringify({
+        error_messages: [{
+          code: "40001",
+          description: "Parâmetro obrigatório",
+          parameter_name: "email",
+        }],
+      }), { status: 400 })),
+    readVault,
+    store: probeStore([], false),
+    alert: () => Promise.resolve(),
+  };
+
+  const ok = await handlePagbankSignupProbe(
+    new Request("https://example.test/probe", {
+      method: "POST",
+      headers: { "x-pagbank-signup-probe-secret": "segredo-do-vault" },
+    }),
+    deps,
+  );
+  assertEquals(ok.status, 200);
+  assertEquals((await ok.json()).ok, true);
+
+  let called = false;
+  const rejected = {
+    ...deps,
+    fetchFn: () => {
+      called = true;
+      return Promise.resolve(new Response(""));
+    },
+  };
+  const wrong = await handlePagbankSignupProbe(
+    new Request("https://example.test/probe", {
+      method: "POST",
+      headers: { "x-pagbank-signup-probe-secret": "errado" },
+    }),
+    rejected,
+  );
+  const missing = await handlePagbankSignupProbe(
+    new Request("https://example.test/probe", { method: "POST" }),
+    rejected,
+  );
+  assertEquals(wrong.status, 401);
+  assertEquals((await wrong.json()).error, "not authenticated");
+  assertEquals(missing.status, 401);
+  assertEquals((await missing.json()).error, "not authenticated");
+  assertEquals(called, false);
+});
+
 Deno.test("sonda sem segredo não chama a PagBank", async () => {
   let called = false;
   const response = await handlePagbankSignupProbe(

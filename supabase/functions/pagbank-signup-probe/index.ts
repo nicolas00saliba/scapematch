@@ -2,7 +2,7 @@
 // Não cria conta: o corpo é só {"type":"SELLER"}.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { createSecretCache } from "../_shared/cron_secret.ts";
+import { createSecretCache, readVaultSecret } from "../_shared/cron_secret.ts";
 import { handlePagbankSignupProbe } from "../_shared/pagbank_accounts.ts";
 import { captureOpsAlert } from "../_shared/sentry_ops.ts";
 
@@ -16,10 +16,12 @@ Deno.serve((req) => {
     env: Deno.env,
     fetchFn: fetch,
     secretCache,
-    readVault: () =>
-      admin.rpc("cron_vault_secret", {
-        p_name: "pagbank_signup_probe_secret",
-      }),
+    readVault: async () =>
+      readVaultSecret(
+        await admin.rpc("cron_vault_secret", {
+          p_name: "pagbank_signup_probe_secret",
+        }),
+      ),
     store: {
       async apply(input) {
         const { data, error } = await admin.rpc("apply_pagbank_signup_probe", {
