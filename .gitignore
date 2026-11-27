@@ -56,3 +56,6 @@ app.*.map.json
 key.properties
 google-services.json
 GoogleService-Info.plist
+
+# Cache local da Supabase CLI (project-ref, pooler-url, versões). Não versionar.
+supabase/.temp/
