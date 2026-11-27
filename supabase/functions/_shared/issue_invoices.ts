@@ -30,6 +30,8 @@ import {
 } from "./fiscal_plan.ts";
 import { bandConfirmed } from "./group_band.ts";
 import { todayInSaoPaulo } from "./http.ts";
+import { fiscalVenueIdOf } from "./fiscal_venue.ts";
+export { fiscalVenueIdOf, sharedFiscalMessage } from "./fiscal_venue.ts";
 
 // O cliente do Supabase muda o genérico entre chamadas. A função só usa
 // from/select/insert, e o webhook já entrega esse cliente.
@@ -179,7 +181,11 @@ async function issuePaidInvoicesBody(
   const stored = await loadInvoices(admin, charge.id);
   const byKind = new Map(stored.map((row) => [row.kind, row]));
 
-  const venue = await loadVenue(admin, charge.venue_id);
+  // A nota da casa sai pelo CNPJ da conta PagBank que recebe (decisão do
+  // Nícolas, 27/11): cidade que usa a conta de outra emite com os dados
+  // fiscais da cidade dona da conta.
+  const issuerVenueId = await fiscalVenueIdOf(admin, charge.venue_id);
+  const venue = await loadVenue(admin, issuerVenueId);
   if (!venue) return;
   const playerName = await playerNameOf(admin, charge.user_id);
   const fiscal = venue.fiscal;
@@ -384,8 +390,9 @@ async function emitOrAdopt(
   pdfUrl: string;
   xmlUrl: string;
 }> {
+  const issuerVenueId = await fiscalVenueIdOf(admin, charge.venue_id);
   const client = draft.issuer === "venue"
-    ? await subaccount(admin, root, charge.venue_id)
+    ? await subaccount(admin, root, issuerVenueId)
     : root;
   const reference = `${draft.kind}:${charge.id}`;
   const found = await client.findInvoiceByReference(reference);
@@ -468,12 +475,13 @@ async function emitOnPagBank(
 ): Promise<
   { id: string; status: string; number: string; pdfUrl: string; xmlUrl: string }
 > {
+  const issuerVenueId = await fiscalVenueIdOf(admin, charge.venue_id);
   const client = draft.issuer === "venue"
-    ? await subaccount(admin, root, charge.venue_id)
+    ? await subaccount(admin, root, issuerVenueId)
     : root;
   const customer = draft.issuer === "venue"
-    ? await ensurePlayerCustomer(admin, client, charge)
-    : await ensureHouseCustomer(admin, root, charge.venue_id);
+    ? await ensurePlayerCustomer(admin, client, charge, issuerVenueId)
+    : await ensureHouseCustomer(admin, root, issuerVenueId);
   const input: ScheduleInvoiceInput = {
     customer,
     serviceDescription: draft.description,
@@ -535,12 +543,13 @@ async function ensurePlayerCustomer(
   admin: Admin,
   client: PagBankProvider,
   charge: ChargeRow,
+  issuerVenueId: string,
 ): Promise<string> {
   const { data: found } = await admin
     .from("pagbank_customers")
     .select("pagbank_customer_id")
     .eq("scope", "venue_player")
-    .eq("venue_id", charge.venue_id)
+    .eq("venue_id", issuerVenueId)
     .eq("user_id", charge.user_id)
     .maybeSingle();
   const name = await playerNameOf(admin, charge.user_id);
@@ -555,13 +564,13 @@ async function ensurePlayerCustomer(
     customerId: (found?.pagbank_customer_id as string | null) ?? null,
     name,
     email: email ?? `jogador-${charge.user_id}@escapematch.invalid`,
-    externalReference: `player:${charge.venue_id}:${charge.user_id}`,
+    externalReference: `player:${issuerVenueId}:${charge.user_id}`,
     cpf,
   });
   if (!found?.pagbank_customer_id) {
     await admin.from("pagbank_customers").insert({
       scope: "venue_player",
-      venue_id: charge.venue_id,
+      venue_id: issuerVenueId,
       user_id: charge.user_id,
       pagbank_customer_id: customerId,
     });

@@ -33,7 +33,16 @@ abstract final class PartnerMessages {
       'Tem unidade em mais de uma cidade? Escolha todas. Depois de enviar esta, o app abre o cadastro de cada cidade só para o endereço. Cada cidade ganha uma aba com as salas dela.';
   static const extraCityLabel = 'Adicionar cidade';
   static const nextCityHint =
-      'Os dados da casa vieram da cidade anterior. Preencha o endereço desta cidade. Se a unidade daqui tem CNPJ próprio, troque o documento.';
+      'Os dados da casa vieram da cidade anterior. Preencha o endereço desta cidade.';
+  static const documentChoiceTitle = 'CNPJ das cidades';
+  static const documentChoiceSame = 'Mesmo CNPJ em todas';
+  static const documentChoiceOwn = 'CNPJ próprio por cidade';
+  static const documentChoiceSameHint =
+      'Esta cidade usa o mesmo CNPJ (ou CPF) da casa. A conta de recebimento é a mesma para todas as cidades.';
+  static const documentChoiceOwnHint =
+      'Informe o CNPJ (ou CPF) desta cidade. A conta de recebimento continua uma só para a casa.';
+  static const documentChoiceMissing =
+      'Não deu para ler o documento da casa. Digite o CNPJ (ou CPF) abaixo.';
   static const addCityTab = 'Cidade';
   static const unitsTitle = 'Cidades da casa';
   static const unitsIntro =
@@ -395,7 +404,7 @@ abstract final class PartnerMessages {
   static const documentsFile = 'Escolha um PDF, JPG ou PNG.';
   static const pagbankChoicesTitle = 'Entre no PagBank para ver seu saldo';
   static const pagbankChoicesBody =
-      'Os ganhos da sua casa caem direto na sua conta PagBank.';
+      'Os ganhos de todas as cidades da casa caem numa conta PagBank só: a conta de recebimento que a casa escolher.';
   static const pagbankWithdrawHint =
       'Para sacar, use o app do PagBank e transfira para qualquer conta.';
   static const pagbankHaveAccount = 'Entrar no PagBank';
@@ -409,25 +418,28 @@ abstract final class PartnerMessages {
   static const pagbankAccountHouse = 'Casa';
   static const pagbankAccountBank = 'Banco';
   static const pagbankAccountEnding = 'Conta final';
+  static const pagbankSharedFromLabel = 'Mesma conta de';
+  static const pagbankSharedFromUnknown = 'outra cidade da casa';
+  static const pagbankHouseAccountTitle = 'Conta de recebimento da casa';
   static const pagbankAccountOne =
-      'A casa tem uma conta PagBank só. Ela vale em qualquer aparelho que entrar nesta conta.';
-  static const pagbankSwap = 'Trocar conta PagBank';
+      'A casa tem uma conta de recebimento só, escolhida por ela. Todas as cidades recebem e sacam por esta conta, com o mesmo CNPJ ou um por cidade.';
+  static const pagbankSwap = 'Trocar conta de recebimento';
   static const pagbankSwapSupport =
-      'Para trocar a conta PagBank, fale com o suporte do EscapeMatch. A troca é feita pelo Admin, com confirmação.';
+      'Para trocar a conta de recebimento da casa (vale para todas as cidades), fale com o suporte do EscapeMatch. A troca é feita pelo Admin, com confirmação.';
   static const pagbankRenew = 'Renovar autorização';
-  static const pagbankSwapTitle = 'Trocar a conta PagBank?';
+  static const pagbankSwapTitle = 'Trocar a conta de recebimento?';
   static String pagbankSwapBody(String last4) =>
-      'Vamos desconectar a conta final $last4. Até conectar outra, a casa não recebe reservas novas. Só dá para trocar se não houver dinheiro a caminho.';
+      'Vamos desconectar a conta final $last4 de todas as cidades da casa. Até conectar outra, a casa não recebe reservas novas. Só dá para trocar se não houver dinheiro a caminho.';
   static const pagbankSwapCancel = 'Cancelar';
   static const pagbankSwapConfirm = 'Desconectar';
   static const pagbankSwapBusy =
       'Há dinheiro a caminho para esta conta. Espere cair para trocar.';
   static const pagbankAccountInUse =
-      'Esta conta PagBank já está ligada a outra casa. Conecte uma conta que seja desta casa ou fale com o suporte.';
+      'Esta conta PagBank já está ligada a casa de outro dono. Conecte uma conta que seja sua ou fale com o suporte.';
   static const pagbankAccountChanged =
       'A conta PagBank da casa mudou agora. Tente de novo.';
   static const pagbankAccountExists =
-      'Esta casa já tem uma conta PagBank conectada. Para trocar, desconecte a atual e conecte de novo.';
+      'A casa já tem uma conta de recebimento, e todas as cidades usam a mesma. Para trocar, desconecte a atual e conecte de novo.';
   static const pagbankConnectedTitle = 'Conta PagBank conectada';
   static const pagbankConnectedBody =
       'O dinheiro das reservas cai na conta PagBank da casa.';

@@ -11,6 +11,7 @@ import 'package:scapematch_admin/admin_notice.dart';
 import 'package:scapematch_admin/admin_pages.dart';
 import 'package:scapematch_admin/admin_people.dart';
 import 'package:scapematch_admin/admin_place.dart';
+import 'package:scapematch_admin/admin_unidades.dart';
 
 const _categories = <(String, String)>[
   ('escape-room', 'Escape room'),
@@ -309,6 +310,11 @@ class _CasaPageState extends ConsumerState<CasaPage> {
                 child: Text(house.suspended ? 'Reativar' : 'Suspender'),
               ),
           ],
+        ),
+        AdminUnitsCard(
+          key: ValueKey('admin-unidades-${house.id}'),
+          venueId: house.id,
+          onChanged: () => _reload().then((_) {}, onError: (_) {}),
         ),
         const SizedBox(height: 16),
         const Text(

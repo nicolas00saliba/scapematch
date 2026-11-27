@@ -824,11 +824,25 @@ class _ConnectedAccount extends StatelessWidget {
         (PartnerMessages.pagbankAccountEnding, account.accountLast4),
       if (account.documentMasked != null)
         (account.documentLabel, account.documentMasked!),
+      if (account.sharedFrom != null)
+        (
+          PartnerMessages.pagbankSharedFromLabel,
+          account.sharedFrom!.isEmpty
+              ? PartnerMessages.pagbankSharedFromUnknown
+              : account.sharedFrom!,
+        ),
     ];
     return Column(
       key: PartnerKeys.pagbankAccountCard,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          PartnerMessages.pagbankHouseAccountTitle,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
         for (final (label, value) in rows)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),

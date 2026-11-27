@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scapematch/core/sharing/external_url_launch.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_documents_repository.dart';
 import 'package:scapematch_parceiro/features/partner/data/venue_withdrawal_repository.dart';
+import 'package:scapematch_parceiro/features/partner/presentation/pagbank_share_offer.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_messages.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/partner_session.dart';
 import 'package:scapematch_parceiro/features/partner/presentation/venue_documents_card.dart';
@@ -38,6 +39,7 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
   VenueDocumentsView _documents = VenueDocumentsView.hidden;
   var _busy = false;
   String? _error;
+  var _pagbankRound = 0;
 
   @override
   void initState() {
@@ -132,7 +134,13 @@ class _VenueWithdrawalsPanelState extends ConsumerState<VenueWithdrawalsPanel> {
       key: PartnerKeys.withdrawals,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        PagbankShareOffer(
+          key: ValueKey('pagbank-share-${widget.venueId}-$_pagbankRound'),
+          venueId: widget.venueId,
+          onShared: () => setState(() => _pagbankRound++),
+        ),
         VenuePagbankSignupCard(
+          key: ValueKey('pagbank-card-${widget.venueId}-$_pagbankRound'),
           venueId: widget.venueId,
           onOpen: widget.onOpenPagBank,
           receivesPayments:

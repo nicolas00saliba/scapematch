@@ -25,6 +25,10 @@ const _knownRejections = <String, String>{
   'invalid input syntax for type uuid':
       'Id inválido. Cole o id completo da casa que fica.',
   'unknown venue': 'A casa não foi encontrada.',
+  'pagbank_share_invalid': 'Não compartilha: as duas cidades precisam ser do mesmo dono e a outra precisa ter conta PagBank conectada.',
+  'pagbank_account_exists':
+      'Esta cidade já tem conta PagBank. Desconecte antes de compartilhar.',
+  'pagbank_account_in_use': 'Esta conta PagBank é de casa de outro dono.',
 };
 
 /// Texto curto para o Nícolas quando uma leitura ou ação do painel falha.

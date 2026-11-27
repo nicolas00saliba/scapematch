@@ -3,6 +3,7 @@ import { clientFailure } from "../_shared/pagbank_client_error.ts";
 import { PagBankProvider } from "../_shared/pagbank_provider.ts";
 import { bindJson, corsHeadersFor } from "../_shared/http.ts";
 import { adminWithMfa } from "../_shared/admin_session.ts";
+import { fiscalVenueIdOf, sharedFiscalMessage } from "../_shared/fiscal_venue.ts";
 
 type Body = {
   venue_id?: string;
@@ -54,6 +55,17 @@ Deno.serve(async (req) => {
     if (!venue) return json({ error: "casa não encontrada" }, 404);
     if (venue.owner_id !== userData.user.id && !adminRow) {
       return json({ error: "not owner" }, 403);
+    }
+    // Cidade que usa a conta PagBank de outra emite a nota pelo CNPJ da
+    // conta que recebe (decisão do Nícolas, 27/11). Configurar aqui gravaria
+    // a inscrição desta cidade na conta da outra.
+    const fiscalVenueId = await fiscalVenueIdOf(admin, venueId);
+    if (fiscalVenueId !== venueId) {
+      return json({
+        error: "pagbank_account_shared",
+        fiscal_venue_id: fiscalVenueId,
+        message: sharedFiscalMessage,
+      }, 409);
     }
 
     const owner = await admin.auth.admin.getUserById(venue.owner_id as string);

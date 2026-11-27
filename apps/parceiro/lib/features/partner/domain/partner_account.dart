@@ -12,6 +12,7 @@ class PartnerAccount {
     this.venueStatus = 'approved',
     this.isAdmin = false,
     this.venues = const [],
+    this.removedVenues = const [],
   });
 
   final String email;
@@ -26,6 +27,9 @@ class PartnerAccount {
   /// Todas as unidades do login, da mais nova para a mais antiga. A aberta é
   /// [houseId].
   final List<PartnerVenueOption> venues;
+
+  /// Unidades que o dono removeu e pode reativar.
+  final List<PartnerVenueOption> removedVenues;
 
   /// Outras unidades do mesmo login, para trocar sem sair.
   List<PartnerVenueOption> get otherVenues => [
@@ -43,6 +47,7 @@ class PartnerAccount {
       venueStatus: venue.status,
       isAdmin: isAdmin,
       venues: venues,
+      removedVenues: removedVenues,
     );
   }
 

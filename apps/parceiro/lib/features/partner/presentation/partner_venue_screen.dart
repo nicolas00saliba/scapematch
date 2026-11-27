@@ -24,6 +24,8 @@ class PartnerVenueScreen extends ConsumerStatefulWidget {
     this.addingUnit = false,
     this.prefill,
     this.queuedCities = const [],
+    this.sameDocument,
+    this.loadTemplate,
   });
 
   /// Cadastro de outra unidade (outra cidade) por quem já tem casa no login.
@@ -34,6 +36,14 @@ class PartnerVenueScreen extends ConsumerStatefulWidget {
 
   /// Cidades escolhidas no mesmo cadastro que ainda faltam, em ordem.
   final List<String> queuedCities;
+
+  /// Escolha da casa: mesmo CNPJ em todas as cidades (true) ou CNPJ próprio
+  /// por cidade (false). Nulo: começa em "mesmo CNPJ".
+  final bool? sameDocument;
+
+  /// Lê os dados da casa para "Cadastrar outra cidade" sem rascunho. Nos
+  /// testes, troca o RPC `my_unit_template`.
+  final Future<VenueDraft?> Function(String venueId)? loadTemplate;
 
   @override
   ConsumerState<PartnerVenueScreen> createState() => _PartnerVenueScreenState();
@@ -64,11 +74,27 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
   final _claims = const VenueClaimClient();
   List<String> _extraCities = const [];
   var _extraPickerRound = 0;
+  var _sameDocument = true;
+  String _houseDocument = '';
+  String _houseKind = 'cnpj';
+
+  /// A escolha de CNPJ aparece ao cadastrar outra cidade ou quando o
+  /// cadastro já tem outras cidades na fila.
+  bool get _showDocumentChoice => widget.addingUnit || _extraCities.isNotEmpty;
+
+  /// Documento travado no da casa ("mesmo CNPJ em todas").
+  bool get _documentLocked =>
+      widget.addingUnit && _sameDocument && _houseDocument.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
+    _sameDocument = widget.sameDocument ?? true;
     final prefill = widget.prefill;
+    if (prefill != null && prefill.documentNumber.isNotEmpty) {
+      _houseDocument = prefill.documentNumber;
+      _houseKind = prefill.documentKind;
+    }
     if (prefill != null) {
       _name.text = prefill.name;
       _phone.text = prefill.phone;
@@ -80,6 +106,40 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       _cityId = prefill.cityId;
     }
     _extraCities = List.unmodifiable(widget.queuedCities);
+    if (widget.addingUnit && prefill == null) _loadTemplate();
+  }
+
+  Future<void> _loadTemplate() async {
+    final houseId = ref.read(partnerSessionProvider)?.houseId ?? '';
+    final load = widget.loadTemplate ?? loadUnitTemplate;
+    final template = await load(houseId);
+    if (!mounted || template == null) return;
+    setState(() {
+      if (_name.text.isEmpty) _name.text = template.name;
+      if (_phone.text.isEmpty) _phone.text = template.phone;
+      if (_income.text.isEmpty) _income.text = template.incomeReais;
+      _category = template.category;
+      _companyType = template.companyType;
+      _houseDocument = template.documentNumber;
+      _houseKind = template.documentKind;
+      if (_sameDocument) {
+        _document.text = _houseDocument;
+        _kind = _houseKind;
+      }
+    });
+  }
+
+  void _chooseDocument(bool same) {
+    setState(() {
+      _sameDocument = same;
+      if (!widget.addingUnit) return;
+      if (same) {
+        _document.text = _houseDocument;
+        _kind = _houseKind;
+      } else if (_document.text == _houseDocument) {
+        _document.clear();
+      }
+    });
   }
 
   @override
@@ -163,8 +223,12 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
       // se a unidade daquela cidade tem o dela).
       final next = PartnerVenueScreen(
         addingUnit: true,
-        prefill: draft.forNextCity(remaining.first),
+        prefill: draft.forNextCity(
+          remaining.first,
+          keepDocument: _sameDocument,
+        ),
         queuedCities: remaining.skip(1).toList(),
+        sameDocument: _sameDocument,
       );
       final route = MaterialPageRoute<void>(builder: (_) => next);
       if (navigator.canPop()) {
@@ -350,18 +414,54 @@ class _PartnerVenueScreenState extends ConsumerState<PartnerVenueScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          if (_showDocumentChoice) ...[
+            Text(
+              PartnerMessages.documentChoiceTitle,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<bool>(
+              key: PartnerKeys.partnerDocumentChoice,
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text(PartnerMessages.documentChoiceSame),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text(PartnerMessages.documentChoiceOwn),
+                ),
+              ],
+              selected: {_sameDocument},
+              onSelectionChanged: (value) => _chooseDocument(value.first),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.addingUnit && _sameDocument && _houseDocument.isEmpty
+                  ? PartnerMessages.documentChoiceMissing
+                  : _sameDocument
+                  ? PartnerMessages.documentChoiceSameHint
+                  : PartnerMessages.documentChoiceOwnHint,
+              key: PartnerKeys.partnerDocumentChoiceHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+          ],
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(value: 'cnpj', label: Text('CNPJ')),
               ButtonSegment(value: 'cpf', label: Text('CPF')),
             ],
             selected: {_kind},
-            onSelectionChanged: (value) => setState(() => _kind = value.first),
+            onSelectionChanged: _documentLocked
+                ? null
+                : (value) => setState(() => _kind = value.first),
           ),
           const SizedBox(height: 12),
           TextField(
             key: PartnerKeys.partnerVenueDocument,
             controller: _document,
+            readOnly: _documentLocked,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               labelText: _kind == 'cpf' ? 'CPF' : 'CNPJ',

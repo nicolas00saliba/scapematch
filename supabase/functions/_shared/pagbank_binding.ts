@@ -13,7 +13,16 @@ export const inFlightMessage =
   "Há dinheiro a caminho para a conta atual. Espere cair e tente trocar de novo.";
 
 export const accountInUseMessage =
-  "Esta conta PagBank já está ligada a outra casa. Conecte uma conta que seja desta casa ou fale com o suporte.";
+  "Esta conta PagBank já está ligada a casa de outro dono. Conecte uma conta que seja sua ou fale com o suporte.";
+
+/// A mesma conta pode receber por todas as cidades do mesmo dono (decisão do
+/// Nícolas, 27/11). A unidade que guarda o token não solta a conta enquanto
+/// outra cidade usa a conta dela.
+export const accountSharedMessage =
+  "Outra cidade da casa usa esta conta PagBank. Desconecte a outra cidade antes.";
+
+export const shareInvalidMessage =
+  "A outra cidade ainda não conectou a conta PagBank, ou não é da mesma casa.";
 
 export const accountChangedMessage =
   "A conta PagBank da casa mudou agora. Tente de novo.";
@@ -23,9 +32,13 @@ export type ConflictCode =
   | "pagbank_account_changed"
   | "pagbank_account_exists"
   | "pagbank_account_mismatch"
-  | "pagbank_in_flight";
+  | "pagbank_in_flight"
+  | "pagbank_account_shared"
+  | "pagbank_share_invalid";
 
 const conflictCodes: ConflictCode[] = [
+  "pagbank_account_shared",
+  "pagbank_share_invalid",
   "pagbank_account_in_use",
   "pagbank_account_changed",
   "pagbank_account_exists",
@@ -50,6 +63,10 @@ export class PagbankAccountConflict extends Error {
         return accountInUseMessage;
       case "pagbank_account_changed":
         return accountChangedMessage;
+      case "pagbank_account_shared":
+        return accountSharedMessage;
+      case "pagbank_share_invalid":
+        return shareInvalidMessage;
       default:
         return accountExistsMessage;
     }
@@ -136,4 +153,12 @@ export async function chargeBindingBlocked(
   } catch (_error) {
     return true;
   }
+}
+
+/// Depois de desconectar: revoga no PagBank só o token que era da própria
+/// cidade. Cidade que usava a conta de outra (shared) não revoga nada.
+export function shouldRevokeAfterDisconnect(
+  row: { disconnected?: boolean; shared?: boolean } | null | undefined,
+): boolean {
+  return row?.disconnected === true && row?.shared !== true;
 }

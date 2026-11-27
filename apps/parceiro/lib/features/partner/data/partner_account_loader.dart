@@ -40,11 +40,13 @@ Future<void> savePartnerVenuePreference(String userId, String venueId) async {
 
 const _unitColumns = 'id, name, status, city_id, created_at';
 
-/// Unidades ativas do login, da mais nova para a mais antiga, com a cidade.
+/// Unidades do login, da mais nova para a mais antiga, com a cidade.
 ///
-/// Unidade desativada pelo dono (`deactivated_at`) fica de fora. Sem a
-/// migration da coluna no banco (42703), lê sem ela: nada está desativado.
-Future<List<PartnerVenueOption>> _ownerUnits(String userId) async {
+/// `active` são as que abrem no painel. `removed` são as desativadas pelo
+/// dono (`deactivated_at`), que ele pode reativar. Sem a migration da coluna
+/// no banco (42703), lê sem ela: nada está desativado.
+Future<({List<PartnerVenueOption> active, List<PartnerVenueOption> removed})>
+_ownerUnits(String userId) async {
   List<Map<String, dynamic>> rows;
   try {
     rows = await scapeSupabase
@@ -60,12 +62,8 @@ Future<List<PartnerVenueOption>> _ownerUnits(String userId) async {
         .eq('owner_id', userId)
         .order('created_at', ascending: false);
   }
-  final active = [
-    for (final row in rows)
-      if (row['deactivated_at'] == null) row,
-  ];
   final cityIds = {
-    for (final row in active)
+    for (final row in rows)
       if (row['city_id'] is String) row['city_id'] as String,
   };
   final cityNames = <String, String>{};
@@ -86,16 +84,23 @@ Future<List<PartnerVenueOption>> _ownerUnits(String userId) async {
       // Sem o nome da cidade, a lista mostra só o nome da unidade.
     }
   }
-  return [
-    for (final row in active)
-      PartnerVenueOption(
-        id: row['id'] as String,
-        name: row['name'] as String,
-        status: row['status'] as String?,
-        cityId: row['city_id'] as String?,
-        cityName: cityNames[row['city_id']],
-      ),
-  ];
+  PartnerVenueOption option(Map<String, dynamic> row) => PartnerVenueOption(
+    id: row['id'] as String,
+    name: row['name'] as String,
+    status: row['status'] as String?,
+    cityId: row['city_id'] as String?,
+    cityName: cityNames[row['city_id']],
+  );
+  return (
+    active: [
+      for (final row in rows)
+        if (row['deactivated_at'] == null) option(row),
+    ],
+    removed: [
+      for (final row in rows)
+        if (row['deactivated_at'] != null) option(row),
+    ],
+  );
 }
 
 /// Lê todas as unidades do login e abre uma.
@@ -110,7 +115,8 @@ Future<PartnerAccount?> loadPartnerAccount({String? preferVenueId}) async {
       .select('user_id')
       .eq('user_id', user.id)
       .maybeSingle();
-  final venues = await _ownerUnits(user.id);
+  final units = await _ownerUnits(user.id);
+  final venues = units.active;
   final preferred = preferVenueId ?? await readPartnerVenuePreference(user.id);
   final venue = pickPartnerVenue(venues, preferredId: preferred);
   if (venue == null) {
@@ -131,14 +137,25 @@ Future<PartnerAccount?> loadPartnerAccount({String? preferVenueId}) async {
     venueStatus: venue.status,
     isAdmin: admin != null,
     venues: venues,
+    removedVenues: units.removed,
   );
 }
 
-/// O banco não aceita o mesmo documento em duas casas ativas
-/// (`venues_document_digits_active_uidx`). Cada cidade cadastrada como
-/// unidade precisa do documento da unidade daquela cidade.
+/// O mesmo documento vale para várias cidades do MESMO dono (decisão do
+/// Nícolas, 27/11). Entre donos diferentes o banco continua recusando
+/// (`venues_normalize`, 'duplicate document').
 const sameDocumentUnitError =
-    'Este documento já está em outra unidade sua. Cada cidade precisa do CNPJ (ou CPF) da unidade daquela cidade.';
+    'Este documento já está cadastrado em outra casa. Confira o CNPJ (ou CPF) ou fale com o suporte.';
+
+/// Documento que já está numa casa do próprio login só bloqueia o cadastro
+/// de uma casa nova. Ao cadastrar outra cidade, o mesmo CNPJ pode repetir.
+String? ownDocumentSignupError(
+  VenueClaimPath path, {
+  required bool addingUnit,
+}) {
+  if (path != VenueClaimPath.alreadyOwner || addingUnit) return null;
+  return 'Esta casa já está na sua conta.';
+}
 
 /// Resultado do cadastro real. Aviso de duplicata não grava até a confirmação.
 class VenueSignupResult {
@@ -186,13 +203,11 @@ Future<VenueSignupResult> submitVenue(
     claim = const ClaimableVenue(path: VenueClaimPath.none);
   }
   if (claim.offersClaim) return VenueSignupResult(claim: claim);
-  if (claim.path == VenueClaimPath.alreadyOwner) {
-    return VenueSignupResult(
-      error: addingUnit
-          ? sameDocumentUnitError
-          : 'Esta casa já está na sua conta.',
-    );
-  }
+  final ownDocument = ownDocumentSignupError(
+    claim.path,
+    addingUnit: addingUnit,
+  );
+  if (ownDocument != null) return VenueSignupResult(error: ownDocument);
   final duplicates = await _venueDuplicates(draft);
   if (duplicates.error != null) {
     return VenueSignupResult(error: duplicates.error);
@@ -399,4 +414,51 @@ Future<String?> reviewVenue({
       .select('id');
   if (updated.isEmpty) return 'Não foi possível atualizar a casa.';
   return null;
+}
+
+/// Dados da casa para cadastrar outra cidade (`my_unit_template`, só o
+/// dono). Nulo sem a função no banco ou em erro.
+Future<VenueDraft?> loadUnitTemplate(String venueId) async {
+  if (venueId.isEmpty) return null;
+  try {
+    final raw = await scapeSupabase.rpc<Object?>(
+      'my_unit_template',
+      params: {'p_venue_id': venueId},
+    );
+    return unitTemplateFrom(raw);
+  } on Object {
+    return null;
+  }
+}
+
+/// Lê a resposta de `my_unit_template` como rascunho sem endereço e sem cidade.
+VenueDraft? unitTemplateFrom(Object? raw) {
+  if (raw is! Map) return null;
+  String text(Object? value) => value == null ? '' : '$value';
+  final income = raw['income_value'];
+  return VenueDraft(
+    name: text(raw['name']),
+    cityId: '',
+    neighborhood: '',
+    street: '',
+    number: '',
+    postalCode: '',
+    phone: text(raw['phone']),
+    documentKind: raw['document_kind'] == 'cpf' ? 'cpf' : 'cnpj',
+    documentNumber: text(raw['document_number']),
+    category:
+        raw['category'] is String && (raw['category'] as String).isNotEmpty
+        ? raw['category'] as String
+        : 'escape-room',
+    incomeReais: income is num
+        ? (income == income.roundToDouble()
+              ? income.round().toString()
+              : income.toString())
+        : '',
+    companyType:
+        raw['company_type'] is String &&
+            (raw['company_type'] as String).isNotEmpty
+        ? raw['company_type'] as String
+        : 'LIMITED',
+  );
 }

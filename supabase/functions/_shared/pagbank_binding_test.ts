@@ -9,6 +9,7 @@ import {
   conflictFromRpc,
   ownerMayDisconnect,
   parseBinding,
+  shouldRevokeAfterDisconnect,
 } from "./pagbank_binding.ts";
 
 Deno.test("PB409 vira conflito 409 com mensagem clara", () => {
@@ -182,4 +183,30 @@ Deno.test("conflitos novos: conta em uso e conta mudou viram 409 com texto próp
   const changed = conflictFromRpc({ message: "pagbank_account_changed" });
   assertEquals(changed?.code, "pagbank_account_changed");
   assertEquals(changed?.message409, accountChangedMessage);
+});
+
+Deno.test("conta compartilhada entre cidades: conflitos novos com frase clara", () => {
+  const shared = conflictFromRpc({
+    code: "PB409",
+    message: "pagbank_account_shared",
+  });
+  assertEquals(shared?.code, "pagbank_account_shared");
+  assert(conflictBody(shared!).message.includes("Outra cidade"));
+  const invalid = conflictFromRpc({
+    code: "PB409",
+    message: "pagbank_share_invalid",
+  });
+  assertEquals(invalid?.code, "pagbank_share_invalid");
+  assert(conflictBody(invalid!).message.includes("ainda não conectou"));
+  assert(accountInUseMessage.includes("outro dono"));
+});
+
+Deno.test("desconectar cidade que usa a conta de outra não revoga o token", () => {
+  assertEquals(shouldRevokeAfterDisconnect({ disconnected: true }), true);
+  assertEquals(
+    shouldRevokeAfterDisconnect({ disconnected: true, shared: true }),
+    false,
+  );
+  assertEquals(shouldRevokeAfterDisconnect({ disconnected: false }), false);
+  assertEquals(shouldRevokeAfterDisconnect(null), false);
 });

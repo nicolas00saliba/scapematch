@@ -63,6 +63,68 @@ Deno.test("a emissão só liga com o valor on", () => {
   );
 });
 
+Deno.test("cidade com conta compartilhada usa os dados fiscais da dona da conta", async () => {
+  const state = { invoices: [] as Record<string, unknown>[] };
+  const base = adminFor(state);
+  const lookups: Array<[string, unknown]> = [];
+  const admin = {
+    ...base,
+    from(table: string) {
+      const api = base.from(table) as Record<string, unknown> & {
+        eq(column: string, value: unknown): unknown;
+        maybeSingle(): Promise<unknown>;
+      };
+      const eq = api.eq.bind(api);
+      let id: unknown;
+      api.eq = (column: string, value: unknown) => {
+        if (column === "id" || column === "venue_id") id = value;
+        if (table === "venues" || table === "venue_fiscal") {
+          lookups.push([table, value]);
+        }
+        return eq(column, value);
+      };
+      if (table === "venues") {
+        const single = api.maybeSingle.bind(api);
+        api.maybeSingle = async () => {
+          if (id === "venue-1") {
+            return {
+              data: {
+                pagbank_token_venue_id: "venue-root",
+                name: "Casa",
+                owner_id: "owner-1",
+                document_kind: "cnpj",
+                document_number: "70100608000173",
+              },
+              error: null,
+            };
+          }
+          return await single();
+        };
+      }
+      return api;
+    },
+  };
+  await issuePaidInvoices(admin as never, charge, {
+    sandbox: false,
+    emissionEnabled: false,
+    pagbank: providerSpy([]),
+  });
+  assertEquals(
+    lookups.some(([table, value]) =>
+      table === "venue_fiscal" && value === "venue-root"
+    ),
+    true,
+  );
+  assertEquals(
+    lookups.some(([table, value]) =>
+      table === "venue_fiscal" && value === "venue-1"
+    ),
+    false,
+  );
+  // A nota continua registrada na cidade que vendeu.
+  assertEquals(state.invoices.every((row) => row.venue_id === "venue-1"), true);
+});
+
 Deno.test("produção desligada grava a nota e não chama o PagBank", async () => {
   const state = { invoices: [] as Record<string, unknown>[] };
   const calls: string[] = [];

@@ -27,6 +27,42 @@ class PartnerUnitsRepository {
       return PartnerUnitMessages.failed;
     }
   }
+
+  /// Nulo quando reativou. A cidade volta ao estado de antes de ser
+  /// removida: aprovada volta aprovada, em análise continua em análise.
+  Future<String?> reactivate(String venueId) async {
+    final call =
+        rpc ??
+        (String fn, Map<String, Object?> params) =>
+            scapeSupabase.rpc<Object?>(fn, params: params);
+    try {
+      await call('reactivate_my_unit', {'p_venue_id': venueId});
+      return null;
+    } on PostgrestException catch (error) {
+      return partnerUnitReactivationError(error.code, error.message);
+    } on Object {
+      return PartnerUnitMessages.reactivateFailed;
+    }
+  }
+}
+
+/// Frase da recusa ao reativar.
+String partnerUnitReactivationError(String? code, String message) {
+  if (message.contains('unit_not_deactivated')) {
+    return PartnerUnitMessages.notRemoved;
+  }
+  if (message.contains('duplicate document')) {
+    return PartnerUnitMessages.documentTaken;
+  }
+  if (message.contains('unit_removed_by_admin')) {
+    return PartnerUnitMessages.removedByAdmin;
+  }
+  if (message.contains('unit_reactivate_support')) {
+    return PartnerUnitMessages.reactivateSupport;
+  }
+  if (code == '42501') return PartnerUnitMessages.notOwner;
+  if (code == 'PGRST202') return PartnerUnitMessages.reactivateUnavailable;
+  return PartnerUnitMessages.reactivateFailed;
 }
 
 /// Frase da recusa, pelo código e pela mensagem do Postgres.
@@ -55,6 +91,25 @@ abstract final class PartnerUnitMessages {
       'Remover unidade ainda não está disponível. Tente mais tarde.';
   static const failed = 'Não foi possível remover a unidade. Tente de novo.';
   static const removed = 'Unidade removida.';
+  static const removedTitle = 'Cidades removidas';
+  static const removedHint =
+      'Não aparecem para os jogadores. Reative quando quiser: a cidade volta como estava (aprovada ou em análise).';
+  static const reactivate = 'Reativar';
+  static const reactivateConfirmTitle = 'Reativar esta cidade?';
+  static const reactivateConfirmBody =
+      'Se ela já estava aprovada, as salas voltam a aparecer para os jogadores. Se estava em análise, continua em análise.';
+  static const reactivated = 'Cidade reativada.';
+  static const notRemoved = 'Esta cidade já está ativa.';
+  static const documentTaken =
+      'O documento desta cidade agora está em outra casa. Fale com o suporte.';
+  static const removedByAdmin =
+      'Esta cidade foi removida pelo suporte. Peça ao suporte para reativar.';
+  static const reactivateSupport =
+      'Não foi possível conferir como a cidade estava antes de ser removida. Peça ao suporte para reativar.';
+  static const reactivateUnavailable =
+      'Reativar cidade ainda não está disponível. Tente mais tarde.';
+  static const reactivateFailed =
+      'Não foi possível reativar a cidade. Tente de novo.';
 }
 
 final partnerUnitsRepositoryProvider = Provider<PartnerUnitsRepository>(

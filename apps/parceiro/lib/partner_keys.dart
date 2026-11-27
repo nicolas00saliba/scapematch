@@ -18,6 +18,8 @@ abstract final class PartnerKeys {
   static const partnerGoogleSubmit = Key('partner-google-submit');
   static const partnerVenueName = Key('partner-venue-name');
   static const partnerVenueDocument = Key('partner-venue-document');
+  static const partnerDocumentChoice = Key('partner-document-choice');
+  static const partnerDocumentChoiceHint = Key('partner-document-choice-hint');
   static const partnerVenueSubmit = Key('partner-venue-submit');
   static const partnerPending = Key('partner-pending');
   static const partnerAdmin = Key('partner-admin');
@@ -96,6 +98,11 @@ abstract final class PartnerKeys {
       Key('partner-remove-unit-$venueId');
   static const partnerConfirmRemoveUnit = Key('partner-confirm-remove-unit');
   static const partnerAddUnit = Key('partner-add-unit');
+  static Key partnerReactivateUnit(String venueId) =>
+      Key('partner-reactivate-unit-$venueId');
+  static const partnerConfirmReactivateUnit = Key(
+    'partner-confirm-reactivate-unit',
+  );
   static Key partnerOpenUnit(String venueId) =>
       Key('partner-open-unit-$venueId');
   static const payoutPending = Key('payout-pending');
@@ -246,6 +253,10 @@ abstract final class PartnerKeys {
   static const pagbankSignupConnect = Key('pagbank-signup-connect');
   static const pagbankSignupActivation = Key('pagbank-signup-activation');
   static const pagbankAccountCard = Key('pagbank-account-card');
+  static const pagbankShareOffer = Key('pagbank-share-offer');
+  static Key pagbankShareUse(String venueId) =>
+      Key('pagbank-share-use-$venueId');
+  static const pagbankShareConfirm = Key('pagbank-share-confirm');
   static const pagbankAccountSwap = Key('pagbank-account-swap');
   static const pagbankAccountSwapSupport = Key('pagbank-account-swap-support');
   static const pagbankAccountRenew = Key('pagbank-account-renew');
