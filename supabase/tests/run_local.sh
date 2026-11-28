@@ -181,3 +181,6 @@ echo "pagbank e documento por dono ok"
 # supabase/migrations/20261127200000_admin_unidades.sql
 run -f "$root/tests/admin_unidades.sql"
 echo "admin unidades ok"
+# supabase/migrations/20261128110000_referral_same_owner.sql
+run -f "$root/tests/referral_same_owner.sql"
+echo "referral same owner ok"
